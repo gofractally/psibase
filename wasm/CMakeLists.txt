@@ -19,7 +19,7 @@ endif()
 function(native_test N)
 endfunction()
 
-function(eden_tester_test N)
+function(add_cltester_test N)
     add_test(
         NAME t-${N}
         WORKING_DIRECTORY ${ROOT_BINARY_DIR}
@@ -161,5 +161,3 @@ add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../programs programs)
 add_subdirectory(boost)
-add_subdirectory(atomicassets)
-add_subdirectory(atomicmarket)
