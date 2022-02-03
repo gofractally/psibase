@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(eden)
+project(contract-lab)
 include(ExternalProject)
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -22,11 +22,6 @@ if(BUILD_NATIVE)
 endif()
 
 if(DEFINED WASI_SDK_PREFIX)
-    set(EDEN_ATOMIC_ASSETS_ACCOUNT atomicassets CACHE STRING "The account holding the atomicassets contract")
-    set(EDEN_ATOMIC_MARKET_ACCOUNT atomicmarket CACHE STRING "The account holding the atomicmarket contract")
-    set(EDEN_SCHEMA_NAME members CACHE STRING "The atomicassets schema to use for NFTS")
-    set(EDEN_ENABLE_SET_TABLE_ROWS "no" CACHE BOOL "Enable the settablerows action")
-
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
         DEPENDS ${DEPEND_TESTER} # for abi generation
@@ -42,10 +37,6 @@ if(DEFINED WASI_SDK_PREFIX)
             -DWASI_SDK_PREFIX=${WASI_SDK_PREFIX}
             -DWASM_CLANG_PREFIX=${WASM_CLANG_PREFIX}
             -DWASM_CLANG_SUFFIX=${WASM_CLANG_SUFFIX}
-            -DEDEN_ATOMIC_ASSETS_ACCOUNT:STRING=${EDEN_ATOMIC_ASSETS_ACCOUNT}
-            -DEDEN_ATOMIC_MARKET_ACCOUNT:STRING=${EDEN_ATOMIC_MARKET_ACCOUNT}
-            -DEDEN_SCHEMA_NAME:STRING=${EDEN_SCHEMA_NAME}
-            -DEDEN_ENABLE_SET_TABLE_ROWS:BOOL=${EDEN_ENABLE_SET_TABLE_ROWS}
             -DCMAKE_SYSROOT=${WASI_SDK_PREFIX}/share/wasi-sysroot
             -DFORCE_COLORED_OUTPUT=${FORCE_COLORED_OUTPUT}
             -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
@@ -57,25 +48,4 @@ if(DEFINED WASI_SDK_PREFIX)
     ExternalProject_Add_StepTargets(wasm test)
 else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
-endif()
-
-########## TS PACKAGES ####################
-if(NOT DEFINED SKIP_TS OR NOT SKIP_TS)
-    add_custom_target(yarn ALL
-        COMMAND yarn
-        COMMAND yarn build
-    )
-
-    add_custom_target(packages ALL
-        DEPENDS yarn
-        COMMAND rm -rf ${CMAKE_BINARY_DIR}/dist
-
-        COMMAND mkdir -p ${CMAKE_BINARY_DIR}/dist/webapp
-        COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/webapp/dist/* ${CMAKE_BINARY_DIR}/dist/webapp
-    )
-
-    add_custom_target(dev
-        DEPENDS yarn
-        COMMAND yarn dev --stream
-    )
 endif()
