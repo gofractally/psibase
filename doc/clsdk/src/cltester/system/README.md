@@ -1,4 +1,4 @@
-# System Contract
+# cltester: System Contract
 
 This example shows how to load and activate the `eosio.system` contract on a test chain. This is a simplified setup which isn't suitable for public chains. All accounts use the default public key. This doesn't activate optional features (REX, powerup, etc.). It spawns nodeos on the activated chain with 21 producers.
 
