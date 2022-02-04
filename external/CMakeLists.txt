@@ -109,6 +109,9 @@ if(IS_NATIVE)
         ${GMP_LIBRARIES}
         ${ZLIB_LIBRARIES}
     )
+    if(NOT APPLE)
+        target_link_libraries(chain INTERFACE -lrt)
+    endif()
     add_dependencies(chain eos)
 
     add_library(eos-fc INTERFACE)
