@@ -22,8 +22,8 @@ git submodule update --init --recursive
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j
-ctest -j
+make -j $(nproc)
+ctest -j $(nproc)
 ```
 
 The built product lives in `build/clsdk`.
