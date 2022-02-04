@@ -14,7 +14,7 @@ brew install   \
     lightgbm   \
     mpfi       \
     nss        \
-    openssl    \
+    openssl@1.1 \
     pkg-config \
     wget       \
     zstd
@@ -29,10 +29,13 @@ export CFLAGS=-I/usr/local/Cellar/openssl@1.1/1.1.1m/include
 ```
 
 // A directory `work`--that can live anywhere--will hold a few 3rd party deps
+
+```
 cd ~/work
 wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-sdk-12.0-macos.tar.gz
-tar xf wasi-sdk-12.0-linux.tar.gz
+tar xf wasi-sdk-12.0-macos.tar.gz
 
 cd ~/work
 wget https://github.com/gofractally/contract-lab/releases/download/v1.0.0-rc1/clsdk-macos.tar.gz
-tar xf clsdk-ubuntu-20-04.tar.gz
+tar xf clsdk-macos.tar.gz
+```
