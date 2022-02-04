@@ -8,7 +8,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/contract-lab-ubuntu-2004-builder:b9ece4fb09cdd41bd6dee47d41e5746f696f5e93"
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/contract-lab-ubuntu-2004-builder:ccaa037795aca7ee3353d5d8e80a02f2df5b4384"
 
 jobs:
   ubuntu-2004-build:
