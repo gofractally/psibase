@@ -1,6 +1,6 @@
 # Ubuntu 20.04 Installation
 
-This installs several dependencies then downloads and extracts both wasi-sdk and clsdk. wasi-sdk provides clang and other tools and provides the C and C++ runtime libraries built for WASM. clsdk provides libraries and tools for working with eosio.
+This installs several dependencies then downloads and extracts both wasi-sdk and Contract Lab. wasi-sdk provides clang and other tools and provides the C and C++ runtime libraries built for WASM. Contract Lab provides libraries and tools for working with eosio.
 
 For convenience, consider adding the environment variables below to `~/.bashrc` or whatever is appropriate for the shell you use.
 
@@ -30,6 +30,6 @@ wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-
 tar xf wasi-sdk-12.0-linux.tar.gz
 
 cd ~/work
-wget https://github.com/eoscommunity/Eden/releases/download/sdk-v0.2.0-alpha/clsdk-ubuntu-20-04.tar.gz
+wget https://github.com/gofractally/contract-lab/releases/download/v1.0.0-rc1/clsdk-ubuntu-20-04.tar.gz
 tar xf clsdk-ubuntu-20-04.tar.gz
 ```
