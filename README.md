@@ -48,7 +48,8 @@ npm i -g yarn
 
 ### Mac (Monterey 12.1)
 
-```brew install   \
+```
+brew install   \
     binaryen   \
     cmake      \
     gdb        \
@@ -62,13 +63,16 @@ npm i -g yarn
     zstd
 ```
 
+```
+export PATH=/usr/local/opt/gnu-sed/libexec/gnubin:$PATH
+export OPENSSL_ROOT_DIR=/usr/local/Cellar/openssl@1.1/1.1.1m
+export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig
 export WASI_SDK_PREFIX=~/work/wasi-sdk-12.0
-export CLSDK_PREFIX=~/work/clsdk
-export PATH=~/work/node-v14.16.0-linux-x64/bin:$PATH
 export CXXFLAGS=-I/usr/local/Cellar/openssl@1.1/1.1.1m/include
 export CFLAGS=-I/usr/local/Cellar/openssl@1.1/1.1.1m/include
+```
 
-// A directory `work`--that can live anyway--will hold a few 3rd party deps
+// A directory `work`--that can live anywhere--will hold a few 3rd party deps
 cd ~/work
 wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-sdk-12.0-macos.tar.gz
 tar xf wasi-sdk-12.0-linux.tar.gz
@@ -87,13 +91,11 @@ Make the dev experience suck less on Mac:
 
 ### Notes on `cmake` and `ctest` on MacOS
 
-To provide `libcrypto` (if installed from brew), you have to include an `export` command for `dkg-package` (brew will tell you this when you install `dkg-package`)
+To provide `libcrypto` (if installed from brew), include the following `export` for `dkg-package` (brew will tell you this when you install `dkg-package`) [[ref]](https://stackoverflow.com/questions/60925326/issue-no-package-libcrypto-found)
 
 ```
 export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig"
 ```
-
-[ref](https://stackoverflow.com/questions/60925326/issue-no-package-libcrypto-found)
 
 Run `cmake` with this arg:
 -DOPENSSL_ROOT_DIR=/usr/local/Cellar/openssl@1.1/1.1.1m
