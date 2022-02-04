@@ -48,7 +48,7 @@ npm i -g yarn
 
 ### Mac (Monterey 12.1)
 
-```
+```sh
 brew install   \
     binaryen   \
     cmake      \
@@ -64,7 +64,7 @@ brew install   \
     zstd
 ```
 
-```
+```sh
 export PATH=/usr/local/opt/gnu-sed/libexec/gnubin:$PATH
 export OPENSSL_ROOT_DIR=/usr/local/Cellar/openssl@1.1/1.1.1m
 export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig
@@ -75,7 +75,8 @@ export CFLAGS=-I/usr/local/Cellar/openssl@1.1/1.1.1m/include
 
 NOTE: If you have openssl trouble, see if `brew search openssl` lists a version other than 1.1. In particular, if v3 is listed, you'll likely need to `brew uninstall openssl@3`.
 
-// A directory `work`--that can live anywhere--will hold a few 3rd party deps
+```sh
+# A directory `work`--that can live anywhere--will hold a few 3rd party deps
 cd ~/work
 wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-sdk-12.0-macos.tar.gz
 tar xf wasi-sdk-12.0-macos.tar.gz
@@ -83,6 +84,7 @@ tar xf wasi-sdk-12.0-macos.tar.gz
 cd ~/work
 wget https://github.com/gofractally/contract-lab/releases/download/v1.0.0-rc1/clsdk-macos.tar.gz
 tar xf clsdk-macos.tar.gz
+```
 
 ### Prepping to build
 
@@ -101,7 +103,7 @@ export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig"
 ```
 
 Run `cmake` with this arg:
--DOPENSSL_ROOT_DIR=/usr/local/Cellar/openssl@1.1/1.1.1m
+`-DOPENSSL_ROOT_DIR=/usr/local/Cellar/openssl@1.1/1.1.1m`
 
 When running `make` or `ctest`, instead of linux's `$(nproc)`, use `$(sysctl -n hw.logicalcpu)`.
 
