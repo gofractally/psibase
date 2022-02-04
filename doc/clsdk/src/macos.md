@@ -23,9 +23,7 @@ brew install   \
 ```
 export WASI_SDK_PREFIX=~/work/wasi-sdk-12.0
 export CLSDK_PREFIX=~/work/clsdk
-export PATH=~/work/node-v14.16.0-linux-x64/bin:$PATH
-export CXXFLAGS=-I/usr/local/Cellar/openssl@1.1/1.1.1m/include
-export CFLAGS=-I/usr/local/Cellar/openssl@1.1/1.1.1m/include
+export PATH=$CLSDK_PREFIX/bin:$PATH
 ```
 
 // A directory `work`--that can live anywhere--will hold a few 3rd party deps
