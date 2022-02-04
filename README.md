@@ -62,28 +62,44 @@ npm i -g yarn
     zstd
 ```
 
-// The following assumes a directory `work` that can lives anyway and will hold a few 3rd party deps
-
-cd ~/work
-wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-sdk-12.0-macos.tar.gz
-tar xf wasi-sdk-12.0-linux.tar.gz
-
 export WASI_SDK_PREFIX=~/work/wasi-sdk-12.0
+export CLSDK_PREFIX=~/work/clsdk
 export PATH=~/work/node-v14.16.0-linux-x64/bin:$PATH
 export CXXFLAGS=-I/usr/local/Cellar/openssl@1.1/1.1.1m/include
 export CFLAGS=-I/usr/local/Cellar/openssl@1.1/1.1.1m/include
 
-Run `cmake` with this:
--DOPENSSL_ROOT_DIR=/usr/local/Cellar/openssl@1.1/1.1.1m
+// A directory `work`--that can live anyway--will hold a few 3rd party deps
+cd ~/work
+wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-sdk-12.0-macos.tar.gz
+tar xf wasi-sdk-12.0-linux.tar.gz
 
-Make the dev experience suck less on Mac:
-`sudo spctl --master-disable`
+cd ~/work
+wget https://github.com/gofractally/contract-lab/releases/download/v1.0.0-rc1/clsdk-macos-20-04.tar.gz
+tar xf clsdk-ubuntu-20-04.tar.gz
+
+### Prepping to build
 
 Install gnu sed
 https://gist.github.com/andre3k1/e3a1a7133fded5de5a9ee99c87c6fa0d
 
-To provide `libcrypto` (if installed from brew), you have to include an `export` command for `dkg-package`
-`export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig"`
-Ref: https://stackoverflow.com/questions/60925326/issue-no-package-libcrypto-found
+Make the dev experience suck less on Mac:
+`sudo spctl --master-disable`
 
-When running `make` or `ctest`, instead of `$(nproc)`, use `$(sysctl -n hw.logicalcpu)`.
+### Notes on `cmake` and `ctest` on MacOS
+
+To provide `libcrypto` (if installed from brew), you have to include an `export` command for `dkg-package` (brew will tell you this when you install `dkg-package`)
+
+```
+export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig"
+```
+
+[ref](https://stackoverflow.com/questions/60925326/issue-no-package-libcrypto-found)
+
+Run `cmake` with this arg:
+-DOPENSSL_ROOT_DIR=/usr/local/Cellar/openssl@1.1/1.1.1m
+
+When running `make` or `ctest`, instead of linux's `$(nproc)`, use `$(sysctl -n hw.logicalcpu)`.
+
+```
+make -j $(sysctl -n hw.logicalcpu)
+```
