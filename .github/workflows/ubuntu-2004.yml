@@ -1,0 +1,69 @@
+name: Ubuntu 20.04
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+  pull_request:
+    types: [assigned, opened, synchronize, reopened, labeled]
+
+env:
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/contract-lab-ubuntu-2004-builder:b9ece4fb09cdd41bd6dee47d41e5746f696f5e93"
+
+jobs:
+  ubuntu-2004-build:
+    name: Ubuntu 20.04 | Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Timestamp
+        id: ccache_cache_timestamp
+        shell: cmake -P {0}
+        run: |
+          string(TIMESTAMP current_date "%Y-%m-%d-%H-%M-%S" UTC)
+          message("::set-output name=timestamp::${current_date}")
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Preserve ccache
+        uses: actions/cache@v1.1.0
+        with:
+          path: .ccache
+          key: $ubuntu-20.04-ccache_make-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
+          restore-keys: |
+            $ubuntu-20.04-ccache_make-
+      - name: Build
+        run: |
+          set -e
+          export CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache
+          export CCACHE_CONFIGPATH=${GITHUB_WORKSPACE}/ccache.conf
+          echo max_size = 600M >${GITHUB_WORKSPACE}/ccache.conf
+          echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
+          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
+          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH ${UBUNTU_2004_IMAGE}"
+          docker pull ${UBUNTU_2004_IMAGE}
+          echo =====
+          ${DOCKER} ccache -s
+          echo =====
+          mkdir build
+          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
+          echo =====
+          ${DOCKER} bash -c "cd build && make -j $(nproc)"
+          echo =====
+          ${DOCKER} bash -c "cd build && ctest -j $(nproc)"
+          echo =====
+          ls -la ${GITHUB_WORKSPACE}
+          echo =====
+          ${DOCKER} ccache -s
+          echo =====
+          echo nodeos version:
+          ${DOCKER} build/clsdk/bin/nodeos --version
+          ${DOCKER} build/clsdk/bin/nodeos --full-version
+          echo =====
+          bash -c "cd build && tar czf ../clsdk-ubuntu-20-04.tar.gz clsdk"
+      - name: Upload build
+        uses: actions/upload-artifact@v1
+        with:
+          name: ubuntu-2004-build
+          path: clsdk-ubuntu-20-04.tar.gz
