@@ -65,7 +65,12 @@ namespace eosio
    /**
     *  @ingroup transaction
     */
-   typedef std::tuple<uint16_t, std::vector<char>> extension;
+   struct extension
+   {
+      uint16_t type = {};
+      std::vector<char> data = {};
+   };
+   EOSIO_REFLECT(extension, type, data)
 
    /**
     *  @ingroup transaction
