@@ -76,7 +76,7 @@ function(download url archive)
         message("Downloading ${url}")
         file(DOWNLOAD ${url} ${archive}
             STATUS download_status
-            TIMEOUT 60
+            TIMEOUT 600
             SHOW_PROGRESS
             TLS_VERIFY ON)
         list(POP_BACK download_status BOOST_DOWNLOAD_STATUS_MSG)

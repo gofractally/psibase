@@ -65,9 +65,11 @@ if(IS_NATIVE)
             ${CMAKE_BINARY_DIR}/eos/libWAST.a
     )
 
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/eos/libraries/fc/CMakeModules")
     find_package(OpenSSL REQUIRED)
     find_package(Threads REQUIRED)
     find_package(ZLIB REQUIRED)
+    find_package(GMP REQUIRED)
 
     set(Boost_USE_MULTITHREADED ON)
     set(Boost_USE_STATIC_LIBS   ON)
@@ -75,6 +77,8 @@ if(IS_NATIVE)
 
     add_library(chain INTERFACE)
     target_include_directories(chain INTERFACE
+        ${GMP_INCLUDE_DIR}
+        ${OPENSSL_INCLUDE_DIR}
         ${ROOT_SOURCE_DIR}/external/eos/libraries/appbase/include
         ${ROOT_SOURCE_DIR}/external/eos/libraries/builtins
         ${ROOT_SOURCE_DIR}/external/eos/libraries/chain/include
@@ -102,10 +106,12 @@ if(IS_NATIVE)
         -lappbase
         Boost::date_time Boost::filesystem Boost::chrono Boost::iostreams Threads::Threads
         ${OPENSSL_LIBRARIES}
+        ${GMP_LIBRARIES}
         ${ZLIB_LIBRARIES}
-        -lgmp
-        -lrt
     )
+    if(NOT APPLE)
+        target_link_libraries(chain INTERFACE -lrt)
+    endif()
     add_dependencies(chain eos)
 
     add_library(eos-fc INTERFACE)
@@ -119,7 +125,7 @@ if(IS_NATIVE)
         Boost::date_time Boost::filesystem Boost::chrono Boost::iostreams Threads::Threads
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
-        -lgmp
+        ${GMP_LIBRARIES}
     )
     add_dependencies(eos-fc eos)
 endif()

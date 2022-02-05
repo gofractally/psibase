@@ -3,6 +3,7 @@
 - [Introduction](README.md)
 - [Installation]()
   - [Ubuntu Installation](ubuntu.md)
+  - [MacOS Installation](macos.md)
 - [Contracts]()
   - [Basic Contract](contract/basic/README.md)
   - [Tables](contract/table/README.md)
