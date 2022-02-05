@@ -86,7 +86,7 @@ wget https://github.com/gofractally/contract-lab/releases/download/v1.0.0-rc1/cl
 tar xf clsdk-macos.tar.gz
 ```
 
-### Prepping to build
+#### Prepping to build
 
 Install gnu sed
 https://gist.github.com/andre3k1/e3a1a7133fded5de5a9ee99c87c6fa0d
@@ -94,7 +94,7 @@ https://gist.github.com/andre3k1/e3a1a7133fded5de5a9ee99c87c6fa0d
 Make the dev experience suck less on Mac:
 `sudo spctl --master-disable`
 
-### Notes on `cmake` and `ctest` on MacOS
+#### Notes on `cmake` and `ctest` on MacOS
 
 To provide `libcrypto` (if installed from brew), include the following `export` for `dkg-package` (brew will tell you this when you install `dkg-package`) [[ref]](https://stackoverflow.com/questions/60925326/issue-no-package-libcrypto-found)
 
