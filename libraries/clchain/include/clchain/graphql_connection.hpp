@@ -38,7 +38,7 @@ namespace clchain
       return Config::edge_name;
    }
    template <typename Config, typename F>
-   constexpr void eosio_for_each_field(Edge<Config>*, F f)
+   constexpr void eosio_for_each_field(Edge<Config>*, F f, bool include_base_fields = true)
    {
       EOSIO_REFLECT2_FOR_EACH_FIELD(Edge<Config>, node, cursor)
    }
@@ -57,7 +57,7 @@ namespace clchain
       return Config::connection_name;
    }
    template <typename Config, typename F>
-   constexpr void eosio_for_each_field(Connection<Config>*, F f)
+   constexpr void eosio_for_each_field(Connection<Config>*, F f, bool include_base_fields = true)
    {
       EOSIO_REFLECT2_FOR_EACH_FIELD(Connection<Config>, edges, pageInfo)
    }

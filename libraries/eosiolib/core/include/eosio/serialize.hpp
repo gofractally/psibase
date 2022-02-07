@@ -18,12 +18,16 @@
  *  @param TYPE - the class to have its serialization and deserialization defined
  *  @param MEMBERS - a sequence of member names.  (field1)(field2)(field3)
  */
-#define EOSLIB_SERIALIZE(STRUCT, MEMBERS)                                  \
-   friend constexpr const char* get_type_name(STRUCT*) { return #STRUCT; } \
-   template <typename F>                                                   \
-   friend constexpr void eosio_for_each_field(STRUCT*, F f)                \
-   {                                                                       \
-      BOOST_PP_SEQ_FOR_EACH(EOSLIB_REFLECT_MEMBER_OP, ~, MEMBERS);         \
+#define EOSLIB_SERIALIZE(STRUCT, MEMBERS)                                                    \
+   friend constexpr const char* get_type_name(STRUCT*) { return #STRUCT; }                   \
+   template <typename F>                                                                     \
+   friend constexpr void eosio_for_each_field(STRUCT*, F f, bool include_base_fields = true) \
+   {                                                                                         \
+      BOOST_PP_SEQ_FOR_EACH(EOSLIB_REFLECT_MEMBER_OP, ~, MEMBERS);                           \
+   }                                                                                         \
+   template <typename F>                                                                     \
+   friend constexpr void eosio_for_each_base(STRUCT*, F f)                                   \
+   {                                                                                         \
    }
 
 /**
@@ -36,11 +40,17 @@
  *  @param MEMBERS - a sequence of member names.  (field1)(field2)(field3)
  */
 
-#define EOSLIB_SERIALIZE_DERIVED(STRUCT, BASE, MEMBERS)                    \
-   friend constexpr const char* get_type_name(STRUCT*) { return #STRUCT; } \
-   template <typename F>                                                   \
-   friend constexpr void eosio_for_each_field(STRUCT*, F f)                \
-   {                                                                       \
-      eosio_for_each_field((BASE*)nullptr, f);                             \
-      BOOST_PP_SEQ_FOR_EACH(EOSLIB_REFLECT_MEMBER_OP, ~, MEMBERS);         \
+#define EOSLIB_SERIALIZE_DERIVED(STRUCT, BASE, MEMBERS)                                      \
+   friend constexpr const char* get_type_name(STRUCT*) { return #STRUCT; }                   \
+   template <typename F>                                                                     \
+   friend constexpr void eosio_for_each_field(STRUCT*, F f, bool include_base_fields = true) \
+   {                                                                                         \
+      if (include_base_fields)                                                               \
+         eosio_for_each_field((BASE*)nullptr, f, true);                                      \
+      BOOST_PP_SEQ_FOR_EACH(EOSLIB_REFLECT_MEMBER_OP, ~, MEMBERS);                           \
+   }                                                                                         \
+   template <typename F>                                                                     \
+   friend constexpr void eosio_for_each_base(STRUCT*, F f)                                   \
+   {                                                                                         \
+      f((BASE*)nullptr);                                                                     \
    }

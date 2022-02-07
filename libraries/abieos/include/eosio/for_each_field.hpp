@@ -33,14 +33,17 @@ namespace eosio
    }
 
    template <typename T, typename F>
-   constexpr void for_each_field(F&& f)
+   constexpr void for_each_field(F&& f, bool include_base_fields = true)
    {
-      eosio_for_each_field((T*)nullptr, [&f](const char* name, auto member, auto...) {
-         if constexpr (std::is_member_object_pointer_v<decltype(member((T*)nullptr))>)
-         {
-            f(name, [member](auto p) -> decltype((p->*member(p))) { return p->*member(p); });
-         }
-      });
+      eosio_for_each_field(
+          (T*)nullptr,
+          [&f](const char* name, auto member, auto...) {
+             if constexpr (std::is_member_object_pointer_v<decltype(member((T*)nullptr))>)
+             {
+                f(name, [member](auto p) -> decltype((p->*member(p))) { return p->*member(p); });
+             }
+          },
+          include_base_fields);
    }
 
    // Calls f(#fn_name, &T::fn_name) for every reflected member function of T.

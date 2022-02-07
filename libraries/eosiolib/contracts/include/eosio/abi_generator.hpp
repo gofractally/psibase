@@ -113,9 +113,17 @@ namespace eosio
                const auto& name = reserve_name(get_type_name((T*)nullptr), type);
                type_to_name[typeid(T)] = name;
                struct_def d{name};
-               for_each_field<T>([&](const char* n, auto&& member) {
-                  d.fields.push_back({n, get_type<decltype(member((T*)nullptr))>()});
+               eosio_for_each_base((T*)nullptr, [&](auto* base) {
+                  if (!d.base.empty())
+                     check(false, std::string{typeid(T).name()} +
+                                      " has multiple bases; this cannot be used in an abi");
+                  d.base = get_type<decltype(*base)>();
                });
+               for_each_field<T>(
+                   [&](const char* n, auto&& member) {
+                      d.fields.push_back({n, get_type<decltype(member((T*)nullptr))>()});
+                   },
+                   false);
                def.structs.push_back(std::move(d));
                return name;
             }
