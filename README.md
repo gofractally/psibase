@@ -1,5 +1,18 @@
 # Contract Lab
 
+Contract Lab (clsdk) is a set of tools and libraries for building, testing, and debugging smart contracts for Mandel. It has the following capabilities:
+
+* Compile contracts for Mandel 3.0, eosio 2.0, and earlier
+* Debug contracts using the `debug_plugin`, which comes built in to Contract Lab's `nodeos` executable
+* Create deterministic tests using `cltester`, which comes with Contract Lab
+* Debug contracts and tests using `cltester`
+* Bootstrap test chains using `cltester` and spawn a `nodeos` producer on them
+* Fork public chains into test chains
+
+## Documentation
+
+End-user documentation, including how to install the binary packages, is at [https://gofractally.github.io/contract-lab/book/](https://gofractally.github.io/contract-lab/book/).
+
 ## Build
 
 Set the `WASI_SDK_PREFIX` environment variable before building (see architecture-specific instructions below). Alternatively, use cmake's `-DWASI_SDK_PREFIX=....` option. Also make sure `nodejs 14`, `npm 6.14`, and `yarn 1.22` are in your path.
@@ -9,9 +22,11 @@ git submodule update --init --recursive
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j
-ctest -j
+make -j $(nproc)
+ctest -j $(nproc)
 ```
+
+The built product lives in `build/clsdk`.
 
 To speed up builds, use `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache`
 

@@ -1,4 +1,4 @@
-# clsdk
+# Contract Lab
 
 - [Introduction](README.md)
 - [Installation]()
@@ -21,4 +21,5 @@
   - [BIOS and Chain Configuration](cltester/bios/README.md)
   - [Block Control](cltester/block/README.md)
   - [Starting Nodeos](cltester/nodeos/README.md)
+  - [System Contract](cltester/system/README.md)
   - [Hostile Takeover](cltester/takeover/README.md)
