@@ -8,5 +8,3 @@ endif()
 if(DEFINED IS_NATIVE)
     add_subdirectory(debug_eos_vm)
 endif()
-
-add_subdirectory(clchain)
