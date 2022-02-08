@@ -6,13 +6,17 @@ namespace eosio
    struct might_not_exist
    {
       T value{};
+      bool filled{};  // true if value was deserialized. Has no effect while serializing.
    };
 
    template <typename T, typename S>
    void from_bin(might_not_exist<T>& obj, S& stream)
    {
       if (stream.remaining())
+      {
+         obj.filled = true;
          return from_bin(obj.value, stream);
+      }
    }
 
    template <typename T, typename S>
@@ -24,6 +28,7 @@ namespace eosio
    template <typename T, typename S>
    void from_json(might_not_exist<T>& obj, S& stream)
    {
+      obj.filled = true;
       return from_json(obj.value, stream);
    }
 

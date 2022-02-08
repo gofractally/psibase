@@ -1,6 +1,6 @@
 #pragma once
 
-#error TODO: has compilation bugs and undefined behavior; use might_not_exist or tracked_might_not_exist
+#error TODO: has compilation bugs and undefined behavior; use might_not_exist
 
 #include <eosio/check.hpp>
 

@@ -154,15 +154,6 @@ namespace eosio
    };
 
    template <typename T>
-   struct tracked_might_not_exist;
-
-   template <typename T>
-   struct is_binary_extension<tracked_might_not_exist<T>> : std::true_type
-   {
-      using value_type = T;
-   };
-
-   template <typename T>
    struct binary_extension;
 
    template <typename T>
