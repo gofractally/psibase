@@ -4,6 +4,8 @@
 #include <catch2/catch.hpp>
 
 #include <bios/bios.hpp>
+#include <eosio/from_json.hpp>
+#include <eosio/to_json.hpp>
 #include "contracts/get-code.hpp"
 
 using namespace eosio;
@@ -58,4 +60,43 @@ TEST_CASE("get_code")
    // run_nodeos(chain);
 
    // clsdk/bin/cleos push action getcode get '["eosio"]' -p getcode -j | jq .processed.action_traces[0].return_value_data
+}
+
+template <typename T>
+void convert_container(T& dest, const T& src)
+{
+   dest = src;
+}
+
+void convert_container(eosio::input_stream& dest, const eosio::bytes& src)
+{
+   dest = {src.data.data(), src.data.size()};
+}
+
+TEST_CASE("hex_serialization")
+{
+   auto test1 = [](auto* from_json_t, auto* to_json_t, std::string_view hex) {
+      std::string input_json = "\"" + (std::string)hex + "\"";
+      auto copy = input_json;
+      remove_cvref_t<decltype(*from_json_t)> from_json_obj;
+      json_token_stream input_stream(copy.data());
+      from_json(from_json_obj, input_stream);
+
+      remove_cvref_t<decltype(*to_json_t)> to_json_obj;
+      convert_container(to_json_obj, from_json_obj);
+      auto output_json = convert_to_json(to_json_obj);
+      CHECK(input_json == output_json);
+   };
+
+   auto test2 = [&](auto* from_json_t, auto* to_json_t) {
+      test1(from_json_t, to_json_t, "");
+      test1(from_json_t, to_json_t, "00");
+      test1(from_json_t, to_json_t, "FF80AA0012");
+   };
+
+   test2((eosio::bytes*)nullptr, (eosio::bytes*)nullptr);
+   test2((eosio::bytes*)nullptr, (eosio::input_stream*)nullptr);
+   test2((std::vector<char>*)nullptr, (std::vector<char>*)nullptr);
+   test2((std::vector<signed char>*)nullptr, (std::vector<signed char>*)nullptr);
+   test2((std::vector<unsigned char>*)nullptr, (std::vector<unsigned char>*)nullptr);
 }

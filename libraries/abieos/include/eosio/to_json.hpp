@@ -319,6 +319,30 @@ template <typename S> void to_json(__int128 value, S& stream) { return int_to_js
 
 #endif
 
+   template <typename S>
+   void to_json(const input_stream& data, S& stream)
+   {
+      return to_json_hex(data.pos, data.end - data.pos, stream);
+   }
+
+   template <typename S>
+   void to_json(const std::vector<char>& v, S& stream)
+   {
+      return to_json_hex(v.data(), v.size(), stream);
+   }
+
+   template <typename S>
+   void to_json(const std::vector<unsigned char>& v, S& stream)
+   {
+      return to_json_hex(reinterpret_cast<const char*>(v.data()), v.size(), stream);
+   }
+
+   template <typename S>
+   void to_json(const std::vector<signed char>& v, S& stream)
+   {
+      return to_json_hex(reinterpret_cast<const char*>(v.data()), v.size(), stream);
+   }
+
    template <typename T>
    std::string convert_to_json(const T& t)
    {

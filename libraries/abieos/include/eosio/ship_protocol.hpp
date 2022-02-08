@@ -10,16 +10,6 @@
 #include "time.hpp"
 #include "varint.hpp"
 
-// todo: move
-namespace eosio
-{
-   template <typename S>
-   void to_json(const input_stream& data, S& stream)
-   {
-      return to_json_hex(data.pos, data.end - data.pos, stream);
-   }
-}  // namespace eosio
-
 namespace eosio
 {
    namespace ship_protocol
