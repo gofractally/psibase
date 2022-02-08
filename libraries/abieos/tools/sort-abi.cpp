@@ -1,7 +1,7 @@
-#include <unistd.h>
 #include <eosio/abi.hpp>
 #include <eosio/from_json.hpp>
 #include <eosio/to_json.hpp>
+#include <iostream>
 
 int main(int argc, const char** argv)
 {
@@ -16,16 +16,7 @@ int main(int argc, const char** argv)
    try
    {
       std::string json;
-      std::vector<char> buf(1024 * 1024);
-      while (true)
-      {
-         auto n = read(0, buf.data(), buf.size());
-         if (n < 0)
-            throw std::runtime_error("read error");
-         if (!n)
-            break;
-         json.insert(json.end(), buf.begin(), buf.begin() + n);
-      }
+      std::getline(std::cin, json, '\0');
 
       eosio::abi_def abi;
       eosio::json_token_stream is{json.data()};
