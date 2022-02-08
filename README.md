@@ -76,7 +76,8 @@ brew install   \
     openssl@1.1 \
     pkg-config \
     wget       \
-    zstd
+    zstd       \
+    coreutils
 ```
 
 ```sh
@@ -106,8 +107,13 @@ tar xf clsdk-macos.tar.gz
 Install gnu sed
 https://gist.github.com/andre3k1/e3a1a7133fded5de5a9ee99c87c6fa0d
 
+Copy elf.h from the following gist to /usr/local/include/elf.h
+https://gist.github.com/mlafeldt/3885346
+
 Make the dev experience suck less on Mac:
 `sudo spctl --master-disable`
+
+Debugging support is untested on MacOS.
 
 #### Notes on `cmake` and `ctest` on MacOS
 
