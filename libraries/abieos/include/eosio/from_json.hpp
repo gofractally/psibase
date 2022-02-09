@@ -658,8 +658,11 @@ namespace eosio
    }
 
    /// \group from_json_explicit
-   template <typename S>
-   void from_json_hex(std::vector<char>& result, S& stream)
+   template <typename T, typename S>
+   auto from_json_hex(std::vector<T>& result, S& stream)
+       -> std::enable_if_t<std::is_same_v<T, char> || std::is_same_v<T, unsigned char> ||
+                               std::is_same_v<T, signed char>,
+                           void>
    {
       auto s = stream.get_string();
       check(!(s.size() & 1), convert_json_error(from_json_error::expected_hex_string));
@@ -740,6 +743,24 @@ namespace eosio
    void from_json(std::pair<First, Second>& obj, S& stream)
    {
       check(false, convert_json_error(from_json_error::from_json_no_pair));
+   }
+
+   template <typename S>
+   void from_json(std::vector<char>& obj, S& stream)
+   {
+      eosio::from_json_hex(obj, stream);
+   }
+
+   template <typename S>
+   void from_json(std::vector<unsigned char>& obj, S& stream)
+   {
+      eosio::from_json_hex(obj, stream);
+   }
+
+   template <typename S>
+   void from_json(std::vector<signed char>& obj, S& stream)
+   {
+      eosio::from_json_hex(obj, stream);
    }
 
    /*

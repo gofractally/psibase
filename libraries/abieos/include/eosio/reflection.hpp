@@ -18,7 +18,7 @@ namespace eosio
          };
 
          template <typename C>
-         static char test(decltype(eosio_for_each_field((C*)nullptr, std::declval<F>()))*);
+         static char test(decltype(eosio_for_each_field((C*)nullptr, std::declval<F>(), true))*);
 
          template <typename C>
          static long test(...);
@@ -39,22 +39,39 @@ namespace eosio
 #define EOSIO_REFLECT_BASE(STRUCT, BASE)                                    \
    static_assert(std::is_base_of_v<EOSIO_REFLECT_STRIP_BASE##BASE, STRUCT>, \
                  #BASE " is not a base class of " #STRUCT);                 \
-   eosio_for_each_field((EOSIO_REFLECT_STRIP_BASE##BASE*)nullptr, f);
+   if (include_base_fields)                                                 \
+      eosio_for_each_field((EOSIO_REFLECT_STRIP_BASE##BASE*)nullptr, f, true);
+
+#define EOSIO_REFLECT_MEMBER2(STRUCT, FIELD)
+#define EOSIO_REFLECT_STRIP_BASE2base
+#define EOSIO_REFLECT_BASE2(STRUCT, BASE)                                    \
+   static_assert(std::is_base_of_v<EOSIO_REFLECT_STRIP_BASE2##BASE, STRUCT>, \
+                 #BASE " is not a base class of " #STRUCT);                  \
+   f((EOSIO_REFLECT_STRIP_BASE2##BASE*)nullptr);
 
 #define EOSIO_REFLECT_SIGNATURE(STRUCT, ...)                                      \
    [[maybe_unused]] inline const char* get_type_name(STRUCT*) { return #STRUCT; } \
    template <typename F>                                                          \
-   constexpr void eosio_for_each_field(STRUCT*, F f)
+   constexpr void eosio_for_each_field(STRUCT*, F f, bool include_base_fields = true)
+
+#define EOSIO_REFLECT_BASE_SIGNATURE(STRUCT, ...) \
+   template <typename F>                          \
+   constexpr void eosio_for_each_base(STRUCT*, F f)
 
 /**
  * EOSIO_REFLECT(<struct>, <member or base spec>...)
  * Each parameter should be either the keyword 'base' followed by a base class of the struct or
  * an identifier which names a non-static data member of the struct.
  */
-#define EOSIO_REFLECT(...)                                      \
-   EOSIO_REFLECT_SIGNATURE(__VA_ARGS__)                         \
-   {                                                            \
-      EOSIO_MAP_REUSE_ARG0(EOSIO_REFLECT_INTERNAL, __VA_ARGS__) \
+#define EOSIO_REFLECT(...)                                            \
+   EOSIO_REFLECT_SIGNATURE(__VA_ARGS__) /**/                          \
+   {                                                                  \
+       EOSIO_MAP_REUSE_ARG0(EOSIO_REFLECT_INTERNAL, __VA_ARGS__) /**/ \
+   }                                                                  \
+                                                                      \
+   EOSIO_REFLECT_BASE_SIGNATURE(__VA_ARGS__)                          \
+   {                                                                  \
+      EOSIO_MAP_REUSE_ARG0(EOSIO_REFLECT_BASE_INTERNAL, __VA_ARGS__)  \
    }
 
 // Identity the keyword 'base' followed by at least one token
@@ -67,6 +84,11 @@ namespace eosio
 #define EOSIO_REFLECT_INTERNAL(STRUCT, FIELD)                                          \
    EOSIO_APPLY(EOSIO_REFLECT_SELECT_I,                                                 \
                (EOSIO_CAT(EOSIO_REFLECT_IS_BASE_TEST, FIELD()), MEMBER, BASE, MEMBER)) \
+   (STRUCT, FIELD)
+
+#define EOSIO_REFLECT_BASE_INTERNAL(STRUCT, FIELD)                                        \
+   EOSIO_APPLY(EOSIO_REFLECT_SELECT_I,                                                    \
+               (EOSIO_CAT(EOSIO_REFLECT_IS_BASE_TEST, FIELD()), MEMBER2, BASE2, MEMBER2)) \
    (STRUCT, FIELD)
 
    }  // namespace reflection

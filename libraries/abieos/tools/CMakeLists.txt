@@ -9,3 +9,7 @@ add_custom_command(TARGET name POST_BUILD
     COMMAND cp -a $<TARGET_FILE:name> ${ROOT_BINARY_DIR}/clsdk/bin/name2num
     COMMAND ln -sf name2num ${ROOT_BINARY_DIR}/clsdk/bin/num2name
 )
+
+add_executable(sort-abi sort-abi.cpp)
+target_link_libraries(sort-abi abieos)
+set_target_properties(sort-abi PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/clsdk/bin)

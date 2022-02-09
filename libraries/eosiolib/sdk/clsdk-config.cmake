@@ -40,6 +40,16 @@ function(add_libs suffix)
         COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc-no-malloc${suffix}.a dlmalloc.o
     )
 
+    add_library(c++abi-replacements${suffix} EXCLUDE_FROM_ALL)
+    target_link_libraries(c++abi-replacements${suffix} PUBLIC wasm-base${suffix})
+    target_sources(c++abi-replacements${suffix} PRIVATE ${clsdk_DIR}/eosiolib/abort_message.cpp)
+    add_custom_command(
+        TARGET c++abi-replacements${suffix}
+        PRE_LINK
+        COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/libc++abi.a libc++abi-shrunk${suffix}.a
+        COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc++abi-shrunk${suffix}.a abort_message.cpp.o
+    )
+
     add_library(eosio-core${suffix} INTERFACE)
     target_include_directories(eosio-core${suffix} INTERFACE ${clsdk_DIR}/eosiolib/core/include)
     target_link_libraries(eosio-core${suffix} INTERFACE
@@ -72,7 +82,8 @@ function(add_libs suffix)
         -L${CMAKE_CURRENT_BINARY_DIR}
         eosio-contract-base${suffix}
         -lc++
-        -lc++abi
+        -lc++abi-shrunk${suffix}
+        c++abi-replacements${suffix}
         -lc-no-malloc${suffix}
         simple-malloc${suffix}
         -leosio-contracts-wasi-polyfill${suffix}
@@ -84,7 +95,8 @@ function(add_libs suffix)
     target_link_libraries(eosio-contract-full-malloc${suffix} INTERFACE
         eosio-contract-base${suffix}
         -lc++
-        -lc++abi
+        -lc++abi-shrunk${suffix}
+        c++abi-replacements${suffix}
         -lc
         -leosio-contracts-wasi-polyfill${suffix}
         ${WASI_SDK_PREFIX}/lib/clang/11.0.0/lib/wasi/libclang_rt.builtins-wasm32.a

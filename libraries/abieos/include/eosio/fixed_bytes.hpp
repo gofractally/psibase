@@ -232,7 +232,7 @@ namespace eosio
    // This is only needed to make eosio.cdt/tests/unit/fixed_bytes_tests.cpp pass.
    // Everything else should be using one of the typedefs below.
    template <std::size_t Size, typename Word, typename F>
-   void eosio_for_each_field(fixed_bytes<Size, Word>*, F&& f)
+   void eosio_for_each_field(fixed_bytes<Size, Word>*, F&& f, bool include_base_fields = true)
    {
       f("value", [](auto* p) -> decltype(&std::decay_t<decltype(*p)>::value) {
          return &std::decay_t<decltype(*p)>::value;

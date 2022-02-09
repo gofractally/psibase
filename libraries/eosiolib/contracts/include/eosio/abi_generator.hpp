@@ -21,6 +21,11 @@ namespace eosio
             type_to_name.insert({typeid(decltype(*p)), get_type_name(p)});
             name_to_type.insert({get_type_name(p), typeid(decltype(*p))});
          });
+         // eosio::bytes was added above
+         type_to_name.insert({typeid(eosio::input_stream), "bytes"});
+         type_to_name.insert({typeid(std::vector<char>), "bytes"});
+         type_to_name.insert({typeid(std::vector<unsigned char>), "bytes"});
+         type_to_name.insert({typeid(std::vector<signed char>), "bytes"});
       }
 
       const std::string& reserve_name(const std::string& base, std::type_index type)
@@ -38,7 +43,10 @@ namespace eosio
       std::string get_type(bool force_alias = false, bool fake_alias = false)
       {
          using T = std::remove_cvref_t<Raw>;
-         if constexpr (is_serializable_container<T>())
+         if constexpr (is_serializable_container<T>() &&  //
+                       !std::is_same_v<T, std::vector<char>> &&
+                       !std::is_same_v<T, std::vector<unsigned char>> &&
+                       !std::is_same_v<T, std::vector<signed char>>)
          {
             using inner = std::remove_cvref_t<typename is_serializable_container<T>::value_type>;
             if (force_alias)
@@ -105,9 +113,17 @@ namespace eosio
                const auto& name = reserve_name(get_type_name((T*)nullptr), type);
                type_to_name[typeid(T)] = name;
                struct_def d{name};
-               for_each_field<T>([&](const char* n, auto&& member) {
-                  d.fields.push_back({n, get_type<decltype(member((T*)nullptr))>()});
+               eosio_for_each_base((T*)nullptr, [&](auto* base) {
+                  if (!d.base.empty())
+                     check(false, std::string{typeid(T).name()} +
+                                      " has multiple bases; this cannot be used in an abi");
+                  d.base = get_type<decltype(*base)>();
                });
+               for_each_field<T>(
+                   [&](const char* n, auto&& member) {
+                      d.fields.push_back({n, get_type<decltype(member((T*)nullptr))>()});
+                   },
+                   false);
                def.structs.push_back(std::move(d));
                return name;
             }

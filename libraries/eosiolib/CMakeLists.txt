@@ -11,6 +11,16 @@ function(add_libs suffix)
         COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc-no-malloc${suffix}.a dlmalloc.o
     )
 
+    add_library(c++abi-replacements${suffix})
+    target_link_libraries(c++abi-replacements${suffix} PUBLIC wasm-base${suffix})
+    target_sources(c++abi-replacements${suffix} PRIVATE abort_message.cpp)
+    add_custom_command(
+        TARGET c++abi-replacements${suffix}
+        PRE_LINK
+        COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/libc++abi.a libc++abi-shrunk${suffix}.a
+        COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc++abi-shrunk${suffix}.a abort_message.cpp.o
+    )
+
     add_library(eosio-contracts-wasi-polyfill${suffix})
     target_link_libraries(eosio-contracts-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
     target_sources(eosio-contracts-wasi-polyfill${suffix} PRIVATE
@@ -40,11 +50,12 @@ function(add_libs suffix)
 
     # Contract with simple malloc/free
     add_library(eosio-contract-simple-malloc${suffix} INTERFACE)
-    target_link_libraries(eosio-contract-simple-malloc${suffix} INTERFACE 
+    target_link_libraries(eosio-contract-simple-malloc${suffix} INTERFACE
         eosio-contract-base${suffix}
         -L${CMAKE_CURRENT_BINARY_DIR}
         -lc++
-        -lc++abi
+        -lc++abi-shrunk${suffix}
+        c++abi-replacements${suffix}
         -lc-no-malloc${suffix}
         simple-malloc${suffix}
         eosio-contracts-wasi-polyfill${suffix}
@@ -53,10 +64,11 @@ function(add_libs suffix)
 
     # Contract with full malloc/free
     add_library(eosio-contract${suffix} INTERFACE)
-    target_link_libraries(eosio-contract${suffix} INTERFACE 
+    target_link_libraries(eosio-contract${suffix} INTERFACE
         eosio-contract-base${suffix}
         -lc++
-        -lc++abi
+        -lc++abi-shrunk${suffix}
+        c++abi-replacements${suffix}
         -lc
         eosio-contracts-wasi-polyfill${suffix}
         ${WASI_SDK_PREFIX}/lib/clang/11.0.0/lib/wasi/libclang_rt.builtins-wasm32.a
@@ -105,7 +117,7 @@ function(add_libs suffix)
         tester/wasi_polyfill/__wasi_proc_exit.cpp
     )
     target_compile_options(cltestlib${suffix} PUBLIC -DCOMPILING_TESTS)
-    target_link_libraries(cltestlib${suffix} PUBLIC 
+    target_link_libraries(cltestlib${suffix} PUBLIC
         boost eosio-core${suffix}
         -lc++
         -lc++abi
@@ -139,6 +151,7 @@ copy_headers(core/include/eosio eosiolib/core/include/eosio)
 copy_headers(tester/include/eosio eosiolib/tester/include/eosio)
 file(COPY contracts/wasi-polyfill DESTINATION ${ROOT_BINARY_DIR}/clsdk/eosiolib/contracts)
 file(COPY tester/wasi_polyfill DESTINATION ${ROOT_BINARY_DIR}/clsdk/eosiolib/tester)
+configure_file(abort_message.cpp ${ROOT_BINARY_DIR}/clsdk/eosiolib/abort_message.cpp COPYONLY)
 configure_file(crypto.cpp ${ROOT_BINARY_DIR}/clsdk/eosiolib/crypto.cpp COPYONLY)
 configure_file(eosiolib.cpp ${ROOT_BINARY_DIR}/clsdk/eosiolib/eosiolib.cpp COPYONLY)
 configure_file(simple_malloc.cpp ${ROOT_BINARY_DIR}/clsdk/eosiolib/simple_malloc.cpp COPYONLY)

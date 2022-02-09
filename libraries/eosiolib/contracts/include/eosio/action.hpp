@@ -66,7 +66,7 @@ namespace eosio
       T value;
    };
    template <typename T, typename F>
-   constexpr void eosio_for_each_field(not_in_abi<T>*, F f)
+   constexpr void eosio_for_each_field(not_in_abi<T>*, F f, bool include_base_fields = true)
    {
    }
 

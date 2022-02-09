@@ -37,7 +37,8 @@
 #define EOSIO_REFLECT2_base(STRUCT, base)                                                         \
    static_assert(std::is_base_of_v<base, STRUCT>,                                                 \
                  BOOST_PP_STRINGIZE(base) " is not a base class of " BOOST_PP_STRINGIZE(STRUCT)); \
-   eosio_for_each_field((base*)nullptr, f);
+   if (include_base_fields)                                                                       \
+      eosio_for_each_field((base*)nullptr, f, true);
 
 #define EOSIO_REFLECT2_MATCH_ITEMmethod(...) (EOSIO_REFLECT2_method, __VA_ARGS__), 1
 #define EOSIO_REFLECT2_method(STRUCT, member, ...)                   \
@@ -48,6 +49,25 @@
        },                                                            \
        __VA_ARGS__);
 
+#define EOSIO_REFLECT2_BASE_KNOWN_ITEM(STRUCT, item)         \
+   EOSIO_REFLECT2_FIRST EOSIO_REFLECT2_APPLY_FIRST(          \
+       BOOST_PP_CAT(EOSIO_REFLECT2_BASE_MATCH_ITEM, item))   \
+       EOSIO_REFLECT2_SKIP_SECOND BOOST_PP_TUPLE_PUSH_FRONT( \
+           EOSIO_REFLECT2_APPLY_FIRST(BOOST_PP_CAT(EOSIO_REFLECT2_BASE_MATCH_ITEM, item)), STRUCT)
+#define EOSIO_REFLECT2_BASE_MATCH_ITEM(r, STRUCT, item)                         \
+   BOOST_PP_IIF(                                                                \
+       BOOST_PP_CHECK_EMPTY(item), ,                                            \
+       BOOST_PP_IIF(EOSIO_REFLECT2_MATCH(EOSIO_REFLECT2_BASE_MATCH_ITEM, item), \
+                    EOSIO_REFLECT2_BASE_KNOWN_ITEM, EOSIO_REFLECT2_BASE_MEMBER)(STRUCT, item))
+
+#define EOSIO_REFLECT2_BASE_MEMBER(STRUCT, member)
+
+#define EOSIO_REFLECT2_BASE_MATCH_ITEMbase(...) (EOSIO_REFLECT2_BASE_base, __VA_ARGS__), 1
+#define EOSIO_REFLECT2_BASE_base(STRUCT, base)                                                    \
+   static_assert(std::is_base_of_v<base, STRUCT>,                                                 \
+                 BOOST_PP_STRINGIZE(base) " is not a base class of " BOOST_PP_STRINGIZE(STRUCT)); \
+   f((base*)nullptr);
+
 /**
  * EOSIO_REFLECT2(<struct>, <member or base spec>...)
  * Each parameter may be one of the following:
@@ -55,13 +75,19 @@
  *    * base(ident):                   base class
  *    * method(ident, "arg1", ...):    method
  */
-#define EOSIO_REFLECT2(STRUCT, ...)                                               \
-   [[maybe_unused]] inline const char* get_type_name(STRUCT*) { return #STRUCT; } \
-   template <typename F>                                                          \
-   constexpr void eosio_for_each_field(STRUCT*, F f)                              \
-   {                                                                              \
-      BOOST_PP_SEQ_FOR_EACH(EOSIO_REFLECT2_MATCH_ITEM, STRUCT,                    \
-                            BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                \
+#define EOSIO_REFLECT2(STRUCT, ...)                                                   \
+   [[maybe_unused]] inline const char* get_type_name(STRUCT*) { return #STRUCT; }     \
+   template <typename F>                                                              \
+   constexpr void eosio_for_each_field(STRUCT*, F f, bool include_base_fields = true) \
+   {                                                                                  \
+      BOOST_PP_SEQ_FOR_EACH(EOSIO_REFLECT2_MATCH_ITEM, STRUCT,                        \
+                            BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                    \
+   }                                                                                  \
+   template <typename F>                                                              \
+   constexpr void eosio_for_each_base(STRUCT*, F f)                                   \
+   {                                                                                  \
+      BOOST_PP_SEQ_FOR_EACH(EOSIO_REFLECT2_BASE_MATCH_ITEM, STRUCT,                   \
+                            BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                    \
    }
 
 #define EOSIO_REFLECT2_FOR_EACH_FIELD(STRUCT, ...) \
