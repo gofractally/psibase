@@ -140,6 +140,16 @@ namespace eosio
    };
 
    template <typename T>
+   struct is_std_pair : std::false_type
+   {
+   };
+
+   template <typename A, typename B>
+   struct is_std_pair<std::pair<A, B>> : std::true_type
+   {
+   };
+
+   template <typename T>
    struct is_binary_extension : std::false_type
    {
    };

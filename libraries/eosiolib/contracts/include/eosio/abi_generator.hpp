@@ -38,7 +38,7 @@ namespace eosio
                return it->first;
       }
 
-      // TODO: std::pair (needed by map), std::tuple
+      // TODO: std::tuple
       template <typename Raw>
       std::string get_type(bool force_alias = false, bool fake_alias = false)
       {
@@ -83,6 +83,24 @@ namespace eosio
             if (fake_alias)
                return "optional<" + get_type<inner>(true) + ">";
             return get_type<inner>(true) + "?";
+         }
+         else if constexpr (is_std_pair<T>())
+         {
+            std::type_index type = typeid(std::pair<remove_cvref_t<typename T::first_type>,
+                                                    remove_cvref_t<typename T::second_type>>);
+            auto it = type_to_name.find(type);
+            if (it != type_to_name.end())
+               return it->second;
+            auto first = get_type<typename T::first_type>(true);
+            auto second = get_type<typename T::second_type>(true);
+            const auto& name = reserve_name("pair<" + first + "," + second + ">", type);
+            type_to_name[type] = name;
+            struct_def d{name};
+            // "key" and "value" matches CDT behavior. Useful for maps.
+            d.fields.push_back({"key", first});
+            d.fields.push_back({"value", second});
+            def.structs.push_back(std::move(d));
+            return name;
          }
          else if constexpr (is_binary_extension<T>())
          {
