@@ -71,6 +71,7 @@ namespace eosio
        */
       std::vector<producer_key> producers;
    };
+   EOSIO_REFLECT(producer_schedule, version, producers)
 
    /**
     *  @defgroup producer_authority Producer Authority
