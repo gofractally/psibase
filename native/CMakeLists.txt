@@ -25,6 +25,11 @@ function(native_test N)
     )
 endfunction()
 
+find_package(Boost 1.40 REQUIRED)
+add_library(boost INTERFACE)
+target_include_directories(boost INTERFACE ${Boost_INCLUDE_DIR})
+target_link_libraries(boost INTERFACE ${Boost_LIBRARIES})
+
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../programs programs)

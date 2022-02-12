@@ -1,5 +1,6 @@
 enable_testing()
 add_subdirectory(abieos)
+add_subdirectory(newchain)
 
 if(DEFINED IS_WASM)
     add_subdirectory(eosiolib)

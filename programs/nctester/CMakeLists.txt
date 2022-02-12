@@ -1,0 +1,13 @@
+add_executable(nctester main.cpp)
+target_link_libraries(nctester newchain abieos debug_eos_vm)
+set_target_properties(nctester PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+add_custom_command(TARGET nctester POST_BUILD
+    COMMAND mkdir -p ${ROOT_BINARY_DIR}/clsdk/bin
+    COMMAND cp -a $<TARGET_FILE:nctester> ${ROOT_BINARY_DIR}/clsdk/bin
+)
+
+# TODO: find out why this is necessary. Without this,
+# nctester, when compiled with gcc, produces
+# "longjmp causes uninitialized stack frame"
+# when the --subst option is used.
+target_compile_options(nctester PRIVATE -D_FORTIFY_SOURCE=0)
