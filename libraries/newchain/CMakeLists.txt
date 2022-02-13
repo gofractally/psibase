@@ -7,6 +7,12 @@ function(add suffix)
     target_sources(newchain${suffix} PRIVATE
         src/crypto.cpp
     )
+    if(DEFINED IS_NATIVE)
+        target_link_libraries(newchain${suffix} PUBLIC chain)
+        target_sources(newchain${suffix} PRIVATE
+            src/block_context.cpp
+        )
+    endif()
 endfunction()
 
 add("")

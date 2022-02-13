@@ -7,6 +7,7 @@
 #include <eosio/crypto.hpp>
 #include <eosio/fixed_bytes.hpp>
 #include <eosio/time.hpp>
+#include <newchain/crypto.hpp>
 
 namespace newchain
 {
@@ -66,19 +67,34 @@ namespace newchain
    // TODO: Protocol Activation? Main reason to put here is to support light-client validation.
    // TODO: Are we going to attempt to support light-client validation? Didn't seem to work out easy last time.
    // TODO: Consider placing consensus alg in a contract; might affect how header is laid out.
-   struct block
+   struct block_header
    {
-      eosio::checksum256              previous;
-      block_num                       num = 0;  // TODO: pack into previous instead?
-      eosio::time_point_sec           time;
+      eosio::checksum256    previous;
+      block_num             num = 0;  // TODO: pack into previous instead?
+      eosio::time_point_sec time;
+   };
+   EOSIO_REFLECT(block_header, previous, num, time)
+
+   struct block : block_header
+   {
       std::vector<signed_transaction> transactions;  // TODO: move inside receipts
    };
-   EOSIO_REFLECT(block, previous, num, time, transactions)
+   EOSIO_REFLECT(block, base block_header, transactions)
 
    struct signed_block : block
    {
       eosio::signature signature;
    };
    EOSIO_REFLECT(signed_block, base block, signature)
+
+   struct block_info : block_header
+   {
+      eosio::checksum256 id;
+
+      block_info()                  = default;
+      block_info(const block_info&) = default;
+      block_info(const block& b) : block_header{b}, id{sha256(b)} {}
+   };
+   EOSIO_REFLECT(block_info, base block_header, id)
 
 }  // namespace newchain

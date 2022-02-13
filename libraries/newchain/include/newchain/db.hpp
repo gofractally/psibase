@@ -50,8 +50,8 @@ namespace newchain
    {
       CHAINBASE_DEFAULT_CONSTRUCTOR(status_object)
 
-      id_type id;
-      block   head;  // TODO: just header
+      id_type                   id;
+      std::optional<block_info> head;
    };
    using status_index = mic<status_object, ordered_by_id<status_object>>;
 
