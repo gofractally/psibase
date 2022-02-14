@@ -9,8 +9,11 @@ namespace newchain
       return db.db.create<status_object>([](auto&) {});
    }
 
-   block_context::block_context(database& db, bool enable_undo)
-       : db{db}, db_session{db.db.start_undo_session(enable_undo)}, status{load_status(db)}
+   block_context::block_context(newchain::system_context& system_context, bool enable_undo)
+       : system_context{system_context},
+         db{system_context.db},
+         db_session{db.db.start_undo_session(enable_undo)},
+         status{load_status(db)}
    {
       // Corruption detection. busy gets reset only on commit or undo.
       eosio::check(!status.busy,
@@ -47,6 +50,7 @@ namespace newchain
       active  = true;
    }
 
+   // TODO: (or elsewhere) check block signature
    void block_context::start(block&& src)
    {
       start(src.time);

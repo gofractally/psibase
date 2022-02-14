@@ -1,6 +1,6 @@
 #pragma once
 
-#include <newchain/db.hpp>
+#include <newchain/system_context.hpp>
 #include <newchain/trace.hpp>
 
 namespace newchain
@@ -8,6 +8,7 @@ namespace newchain
    // Note: forking must occur before a block_context is created
    struct block_context
    {
+      newchain::system_context&    system_context;
       database&                    db;
       chainbase::database::session db_session;
       const status_object&         status;
@@ -15,7 +16,7 @@ namespace newchain
       bool                         started = false;
       bool                         active  = false;
 
-      block_context(database& db, bool enable_undo);
+      block_context(newchain::system_context& system_context, bool enable_undo);
 
       void check_active() { eosio::check(active, "block is not active"); }
 

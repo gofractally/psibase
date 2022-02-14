@@ -11,6 +11,7 @@ function(add suffix)
         target_link_libraries(newchain${suffix} PUBLIC chain)
         target_sources(newchain${suffix} PRIVATE
             src/block_context.cpp
+            src/execution_context.cpp
             src/transaction_context.cpp
         )
     endif()

@@ -52,7 +52,8 @@ namespace newchain
 
       id_type                   id;
       std::optional<block_info> head;
-      bool                      busy = false;
+      bool                      busy                   = false;
+      uint32_t                  num_execution_memories = 32;
    };
    using status_index = mic<status_object, ordered_by_id<status_object>>;
 
