@@ -32,10 +32,12 @@ namespace newchain
    {
       status_table,
       account_table,
+      code_table,
       ram_kv_table,
    };
 
    struct by_id;
+   struct by_pk;
    struct by_kv_key;
 
    template <typename T, typename... Indexes>
@@ -46,11 +48,17 @@ namespace newchain
        multi_index::tag<by_id>,
        multi_index::key<&T::id>>;
 
+   template <typename T>
+   using ordered_by_pk = boost::multi_index::ordered_unique<  //
+       boost::multi_index::tag<by_pk>,
+       boost::multi_index::key<&T::by_pk>>;
+
    struct status_object : public object<status_table, status_object>
    {
       CHAINBASE_DEFAULT_CONSTRUCTOR(status_object)
 
       id_type                   id;
+      eosio::checksum256        chain_id;
       std::optional<block_info> head;
       bool                      busy                   = false;
       uint32_t                  num_execution_memories = 32;
@@ -59,17 +67,31 @@ namespace newchain
 
    // TODO: ram, disk, cpu, net: limits and usage
    // TODO: sequence numbers
-   // TODO: vm_type, vm_version, move code to another table indexed by hash
    struct account_object : public object<account_table, account_object>
    {
-      SHARED_CTOR(account_object, code)
-
-      id_type       id;
-      account_num   auth_contract;
-      shared_string code;
-      bool          privileged;  // TODO: consider finer granularity
+      id_type            id;
+      account_num        auth_contract = 0;
+      bool               privileged    = false;  // TODO: consider finer granularity
+      eosio::checksum256 code_hash;
+      uint8_t            vm_type    = 0;
+      uint8_t            vm_version = 0;
    };
    using account_index = mic<account_object, ordered_by_id<account_object>>;
+
+   struct code_object : public object<code_table, code_object>
+   {
+      SHARED_CTOR(code_object, code)
+
+      id_type            id;
+      uint64_t           ref_count = 0;
+      eosio::checksum256 code_hash;
+      uint8_t            vm_type    = 0;
+      uint8_t            vm_version = 0;
+      shared_string      code;
+
+      auto by_pk() const { return std::tuple{code_hash, vm_type, vm_version}; }
+   };
+   using code_index = mic<code_object, ordered_by_id<code_object>, ordered_by_pk<code_object>>;
 
    // TODO: payer?
    struct ram_kv_object : public object<ram_kv_table, ram_kv_object>

@@ -13,8 +13,9 @@ namespace newchain
       chainbase::database::session db_session;
       const status_object&         status;
       block                        current;
-      bool                         started = false;
-      bool                         active  = false;
+      bool                         is_genesis_block = false;
+      bool                         started          = false;
+      bool                         active           = false;
 
       block_context(newchain::system_context& system_context, bool enable_undo);
 

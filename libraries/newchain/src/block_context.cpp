@@ -42,7 +42,8 @@ namespace newchain
       }
       else
       {
-         current.num = 1;
+         is_genesis_block = true;
+         current.num      = 1;
          if (time)
             current.time = *time;
       }
@@ -68,10 +69,13 @@ namespace newchain
       db.db.modify(status, [&](auto& status) {
          status.head = current;
          status.busy = false;
+         if (is_genesis_block)
+            status.chain_id = status.head->id;
       });
       db_session.push();
    }
 
+   // TODO: limit charged CPU & NET which can go into a block
    void block_context::push_transaction(signed_transaction&& trx,
                                         transaction_trace&   trace,
                                         bool                 enable_undo,

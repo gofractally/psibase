@@ -1,18 +1,48 @@
-#include <newchain/transaction_context.hpp>
+#include <newchain/action_context.hpp>
+
+#include <eosio/from_bin.hpp>
 
 namespace newchain
 {
    transaction_context::transaction_context(newchain::block_context&              block_context,
                                             const signed_transaction&             trx,
                                             const std::vector<eosio::public_key>& recovered_keys,
-                                            transaction_trace&                    trace,
+                                            newchain::transaction_trace&          transaction_trace,
                                             bool                                  enable_undo)
        : block_context{block_context},
          db_session{block_context.db.db.start_undo_session(enable_undo)},
          trx{trx},
          recovered_keys{recovered_keys},
-         trace{trace}
+         transaction_trace{transaction_trace}
    {
+   }
+
+   static void exec_genesis_action(transaction_context& self, const action& act)
+   {
+      genesis_action_data data;
+      eosio::input_stream s{act.raw_data.data(), act.raw_data.size()};
+      from_bin(data, s);
+      eosio::check(!s.remaining(), "extra data in genesis payload");
+      eosio::check(data.contract == 1, "genesis contract must be 1");
+      // TODO; also check vm_type, vm_version
+   }
+
+   static void exec_action(transaction_context& self, const action& act)
+   {
+      auto& db     = self.block_context.db;
+      auto* sender = db.db.find(account_object::id_type(act.sender));
+      eosio::check(sender, "unknown sender account");
+
+      action auth_action{
+          .sender   = 0,
+          .contract = sender->auth_contract,
+          .act      = auth_action_num,
+          .raw_data = eosio::convert_to_bin(act),
+      };
+
+      self.transaction_trace.action_traces.emplace_back();
+      action_context ac{self, auth_action, self.transaction_trace.action_traces.back()};
+      ac.exec();
    }
 
    // TODO: limit execution time when not playing a produced block
@@ -27,10 +57,11 @@ namespace newchain
       // Prepare for execution
       block_context.system_context.set_num_memories(block_context.status.num_execution_memories);
 
-      for (auto& action : trx.actions)
-      {
-         // TODO
-      }
+      for (auto& act : trx.actions)
+         if (block_context.is_genesis_block && &act == &trx.actions[0])
+            exec_genesis_action(*this, act);
+         else
+            exec_action(*this, act);
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.

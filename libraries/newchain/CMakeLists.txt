@@ -10,6 +10,7 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         target_link_libraries(newchain${suffix} PUBLIC chain)
         target_sources(newchain${suffix} PRIVATE
+            src/action_context.cpp
             src/block_context.cpp
             src/execution_context.cpp
             src/transaction_context.cpp
