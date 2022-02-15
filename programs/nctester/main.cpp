@@ -1,11 +1,9 @@
-#include <newchain/trace.hpp>
-
 #include <debug_eos_vm/debug_eos_vm.hpp>
-
 #include <eosio/chain_types.hpp>
 #include <eosio/fixed_bytes.hpp>
-#include <eosio/ship_protocol.hpp>
 #include <eosio/to_bin.hpp>
+#include <fc/filesystem.hpp>
+#include <newchain/block_context.hpp>
 
 #include <stdio.h>
 #include <chrono>
@@ -115,12 +113,19 @@ struct test_chain_ref
 
 struct test_chain
 {
-   ::state&                  state;
-   std::set<test_chain_ref*> refs;
+   ::state&                                  state;
+   std::set<test_chain_ref*>                 refs;
+   fc::temp_directory                        dir;
+   std::unique_ptr<newchain::database>       db;
+   std::unique_ptr<newchain::system_context> sys;
+   std::unique_ptr<newchain::block_context>  block;
 
-   test_chain(::state& state, const char* snapshot, uint64_t state_size) : state{state}
+   test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
-      // TODO
+      eosio::check(snapshot.empty(), "snapshots not implemented");
+      db  = std::make_unique<newchain::database>(dir.path(), chainbase::database::read_write,
+                                                state_size);
+      sys = std::make_unique<newchain::system_context>(newchain::system_context{*db});
    }
 
    test_chain(const test_chain&) = delete;
@@ -134,17 +139,26 @@ struct test_chain
 
    void start_block(int64_t skip_miliseconds = 0)
    {
-      // TODO
+      // TODO: time control
+      // TODO: undo control
+      finish_block();
+      block = std::make_unique<newchain::block_context>(*sys, false);
+      block->start();
    }
 
    void start_if_needed()
    {
-      // TODO
+      if (!block)
+         start_block();
    }
 
    void finish_block()
    {
-      // TODO
+      if (block)
+      {
+         block->commit();
+         block.reset();
+      }
    }
 };  // test_chain
 
@@ -531,21 +545,19 @@ struct callbacks
 
    int32_t tester_execute(span<const char> command) { return system(span_str(command).c_str()); }
 
-   test_chain& assert_chain(uint32_t chain, bool require_control = true)
+   test_chain& assert_chain(uint32_t chain, bool require_context = true)
    {
       if (chain >= state.chains.size() || !state.chains[chain])
          throw std::runtime_error("chain does not exist or was destroyed");
       auto& result = *state.chains[chain];
-      // TODO:
-      // if (require_control && !result.control)
-      //    throw std::runtime_error("chain was shut down");
+      if (require_context && !result.sys)
+         throw std::runtime_error("chain was shut down");
       return result;
    }
 
    uint32_t tester_create_chain(span<const char> snapshot, uint64_t state_size)
    {
-      state.chains.push_back(
-          std::make_unique<test_chain>(state, span_str(snapshot).c_str(), state_size));
+      state.chains.push_back(std::make_unique<test_chain>(state, span_str(snapshot), state_size));
       if (state.chains.size() == 1)
          state.selected_chain_index = 0;
       return state.chains.size() - 1;
@@ -566,14 +578,17 @@ struct callbacks
    void tester_shutdown_chain(uint32_t chain)
    {
       auto& c = assert_chain(chain);
-      // TODO
-      // c.control.reset();
+      c.block.reset();
+      c.sys.reset();
+      c.db.reset();
    }
 
    uint32_t tester_get_chain_path(uint32_t chain, span<char> dest)
    {
-      // TODO
-      return 0;
+      auto& c = assert_chain(chain, false);
+      auto  s = c.dir.path().string();
+      memcpy(dest.data(), s.c_str(), std::min(dest.size(), s.size()));
+      return s.size();
    }
 
    void tester_start_block(uint32_t chain_index, int64_t skip_miliseconds)
@@ -636,7 +651,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::tester_read_file>("env", "tester_read_file");
    rhf_t::add<&callbacks::tester_read_whole_file>("env", "tester_read_whole_file");
    rhf_t::add<&callbacks::tester_execute>("env", "tester_execute");
-   rhf_t::add<&callbacks::tester_create_chain>("env", "tester_create_chain");
+   rhf_t::add<&callbacks::tester_create_chain>("env", "tester_create_chain2");  // TODO: rename
    rhf_t::add<&callbacks::tester_destroy_chain>("env", "tester_destroy_chain");
    rhf_t::add<&callbacks::tester_shutdown_chain>("env", "tester_shutdown_chain");
    rhf_t::add<&callbacks::tester_get_chain_path>("env", "tester_get_chain_path");

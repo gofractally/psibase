@@ -21,7 +21,7 @@ namespace newchain
 
       void check_active() { eosio::check(active, "block is not active"); }
 
-      void start(std::optional<eosio::time_point_sec> time);
+      void start(std::optional<eosio::time_point_sec> time = {});
       void start(block&& src);
       void commit();
 
