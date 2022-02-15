@@ -69,6 +69,8 @@ namespace newchain
    // TODO: sequence numbers
    struct account_object : public object<account_table, account_object>
    {
+      CHAINBASE_DEFAULT_CONSTRUCTOR(account_object)
+
       id_type            id;
       account_num        auth_contract = 0;
       bool               privileged    = false;  // TODO: consider finer granularity
@@ -83,7 +85,7 @@ namespace newchain
       SHARED_CTOR(code_object, code)
 
       id_type            id;
-      uint64_t           ref_count = 0;
+      uint32_t           ref_count = 0;
       eosio::checksum256 code_hash;
       uint8_t            vm_type    = 0;
       uint8_t            vm_version = 0;
@@ -136,4 +138,5 @@ namespace newchain
 
 CHAINBASE_SET_INDEX_TYPE(newchain::status_object, newchain::status_index)
 CHAINBASE_SET_INDEX_TYPE(newchain::account_object, newchain::account_index)
+CHAINBASE_SET_INDEX_TYPE(newchain::code_object, newchain::code_index)
 CHAINBASE_SET_INDEX_TYPE(newchain::ram_kv_object, newchain::ram_kv_index)

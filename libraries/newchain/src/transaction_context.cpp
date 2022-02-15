@@ -19,12 +19,17 @@ namespace newchain
 
    static void exec_genesis_action(transaction_context& self, const action& act)
    {
+      auto&               db = self.block_context.db;
       genesis_action_data data;
       eosio::input_stream s{act.raw_data.data(), act.raw_data.size()};
       from_bin(data, s);
       eosio::check(!s.remaining(), "extra data in genesis payload");
       eosio::check(data.contract == 1, "genesis contract must be 1");
-      // TODO; also check vm_type, vm_version
+
+      db.db.remove(db.db.create<account_object>([](auto&) {}));
+      db.db.create<account_object>([](auto&) {});
+      set_code(db, data.contract, data.vm_type, data.vm_version,
+               {data.code.data(), data.code.size()});
    }
 
    static void exec_action(transaction_context& self, const action& act)

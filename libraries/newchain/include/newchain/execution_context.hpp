@@ -4,6 +4,12 @@
 
 namespace newchain
 {
+   void set_code(database&           db,
+                 account_num         contract,
+                 uint8_t             vm_type,
+                 uint8_t             vm_version,
+                 eosio::input_stream code);
+
    struct execution_memory_impl;
    struct execution_memory
    {
@@ -27,6 +33,8 @@ namespace newchain
                         account_num          contract);
       execution_context(execution_context&&);
       ~execution_context();
+
+      static void register_host_functions();
 
       void exec(action_context& act_context);
    };
