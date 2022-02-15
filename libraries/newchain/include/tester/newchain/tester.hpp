@@ -92,7 +92,7 @@ namespace newchain
       /*
        * Set the reference block of the transaction to the head block.
        */
-      void fill_tapos(transaction& t, uint32_t expire_sec = 1);
+      void fill_tapos(transaction& t, uint32_t expire_sec = 2);
 
       /*
        * Creates a transaction.

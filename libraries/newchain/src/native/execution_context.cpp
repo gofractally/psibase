@@ -10,6 +10,20 @@ namespace newchain
    using rhf_t     = eosio::vm::registered_host_functions<execution_context_impl>;
    using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit>;
 
+   // Rethrow with detailed info
+   template <typename F>
+   void rethrow_vm_except(F f)
+   {
+      try
+      {
+         f();
+      }
+      catch (const eosio::vm::exception& e)
+      {
+         throw std::runtime_error(e.detail());
+      }
+   }
+
    void set_code(database&           db,
                  account_num         contract,
                  uint8_t             vm_type,
@@ -99,7 +113,7 @@ namespace newchain
          std::vector<uint8_t> copy(
              reinterpret_cast<const uint8_t*>(code->code.data()),
              reinterpret_cast<const uint8_t*>(code->code.data() + code->code.size()));
-         backend = std::make_unique<backend_t>(copy, *this, nullptr);
+         rethrow_vm_except([&] { backend = std::make_unique<backend_t>(copy, *this, nullptr); });
       }
 
       // TODO: configurable wasm limits
@@ -108,10 +122,12 @@ namespace newchain
          this->act_context = &act_context;
          if (initialized)
             return;
-         backend->set_wasm_allocator(&wa);
-         backend->initialize(this);
-         (*backend)(*this, "env", "_start");
-         initialized = true;
+         rethrow_vm_except([&] {
+            backend->set_wasm_allocator(&wa);
+            backend->initialize(this);
+            (*backend)(*this, "env", "_start");
+            initialized = true;
+         });
       }
 
       void prints_l(span<const char> str)

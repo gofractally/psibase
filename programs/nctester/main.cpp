@@ -225,6 +225,14 @@ struct file
    }
 };
 
+struct push_trx_args
+{
+   eosio::input_stream             transaction;
+   std::vector<eosio::signature>   signatures;
+   std::vector<eosio::private_key> keys;
+};
+EOSIO_REFLECT(push_trx_args, transaction, signatures, keys)
+
 struct callbacks
 {
    ::state&          state;
@@ -600,7 +608,12 @@ struct callbacks
 
    void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
-      // TODO
+      auto&                chain = assert_chain(chain_index);
+      newchain::block_info bi;
+      auto*                obj = chain.db->db.find<newchain::status_object>();
+      if (obj && obj->head)
+         bi = *obj->head;
+      set_data(cb_alloc_data, cb_alloc, convert_to_bin(bi));
    }
 
    void tester_push_transaction(uint32_t         chain_index,
@@ -608,7 +621,34 @@ struct callbacks
                                 uint32_t         cb_alloc_data,
                                 uint32_t         cb_alloc)
    {
-      // TODO
+      auto&               chain = assert_chain(chain_index);
+      eosio::input_stream s     = {args_packed.data(), args_packed.size()};
+      auto                args  = eosio::from_bin<push_trx_args>(s);
+      auto                trx   = eosio::from_bin<newchain::transaction>(args.transaction);
+
+      newchain::signed_transaction signed_trx;
+      (newchain::transaction&)signed_trx = std::move(trx);
+      signed_trx.signatures              = std::move(args.signatures);
+
+      // TODO: sign with args.keys
+
+      chain.start_if_needed();
+      newchain::transaction_trace trace;
+      auto                        start_time = std::chrono::steady_clock::now();
+      try
+      {
+         // TODO: undo and commit control
+         chain.block->push_transaction(signed_trx, trace);
+      }
+      catch (const std::exception& e)
+      {
+      }
+
+      auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now() - start_time);
+      std::cout << "newchain transaction took " << us.count() << " us\n";
+      // std::cout << eosio::format_json(trace) << "\n";
+      set_data(cb_alloc_data, cb_alloc, convert_to_bin(trace));
    }
 
    void tester_select_chain_for_db(uint32_t chain_index)

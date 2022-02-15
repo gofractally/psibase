@@ -6,6 +6,7 @@ function(add suffix)
     target_include_directories(newchain${suffix} PUBLIC include/common)
     target_sources(newchain${suffix} PRIVATE
         src/common/crypto.cpp
+        src/common/trace.cpp
     )
 
     if(DEFINED IS_WASM)

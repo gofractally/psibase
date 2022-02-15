@@ -42,8 +42,9 @@ namespace newchain
       }
       else
       {
-         is_genesis_block = true;
-         current.num      = 1;
+         is_genesis_block    = true;
+         need_genesis_action = true;
+         current.num         = 1;
          if (time)
             current.time = *time;
       }
@@ -65,6 +66,7 @@ namespace newchain
    void block_context::commit()
    {
       check_active();
+      eosio::check(!need_genesis_action, "missing genesis action in block");
       active = false;
       db.db.modify(status, [&](auto& status) {
          status.head = current;
@@ -75,11 +77,10 @@ namespace newchain
       db_session.push();
    }
 
-   // TODO: limit charged CPU & NET which can go into a block
-   void block_context::push_transaction(signed_transaction&& trx,
-                                        transaction_trace&   trace,
-                                        bool                 enable_undo,
-                                        bool                 commit)
+   void block_context::push_transaction(const signed_transaction& trx,
+                                        transaction_trace&        trace,
+                                        bool                      enable_undo,
+                                        bool                      commit)
    {
       exec(trx, trace, enable_undo, commit);
       current.transactions.push_back(std::move(trx));
@@ -103,30 +104,41 @@ namespace newchain
       exec(trx, {}, trace, enable_undo, commit);
    }
 
+   // TODO: limit charged CPU & NET which can go into a block
+   // TODO: duplicate detection
    void block_context::exec(const signed_transaction&             trx,
                             const std::vector<eosio::public_key>& recovered_keys,
                             transaction_trace&                    trace,
                             bool                                  enable_undo,
                             bool                                  commit)
    {
-      check_active();
-      eosio::check(enable_undo || commit, "neither enable_undo or commit is set");
-
-      // if !enable_undo then block_context becomes unusable if transaction
-      // fails. This will cascade to a busy lock (database corruption) if
-      // block_context::enable_undo is also false.
-      active = enable_undo;
-
-      transaction_context t{*this, trx, recovered_keys, trace, enable_undo};
-      t.exec();
-
-      if (commit)
+      try
       {
-         // TODO: limit billed time in block
-         eosio::check(!(trx.flags & transaction::do_not_broadcast),
-                      "cannot commit a do_not_broadcast transaction");
-         t.db_session.squash();
-         active = true;
+         check_active();
+         eosio::check(enable_undo || commit, "neither enable_undo or commit is set");
+
+         // if !enable_undo then block_context becomes unusable if transaction
+         // fails. This will cascade to a busy lock (database corruption) if
+         // block_context::enable_undo is also false.
+         active = enable_undo;
+
+         trace.trx = trx;
+         transaction_context t{*this, trx, recovered_keys, trace, enable_undo};
+         t.exec();
+
+         if (commit)
+         {
+            // TODO: limit billed time in block
+            eosio::check(!(trx.flags & transaction::do_not_broadcast),
+                         "cannot commit a do_not_broadcast transaction");
+            t.db_session.squash();
+            active = true;
+         }
+      }
+      catch (const std::exception& e)
+      {
+         trace.error = e.what();
+         throw;
       }
    }
 

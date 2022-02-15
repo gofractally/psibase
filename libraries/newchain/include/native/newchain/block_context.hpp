@@ -13,9 +13,10 @@ namespace newchain
       chainbase::database::session db_session;
       const status_object&         status;
       block                        current;
-      bool                         is_genesis_block = false;
-      bool                         started          = false;
-      bool                         active           = false;
+      bool                         is_genesis_block    = false;
+      bool                         need_genesis_action = false;
+      bool                         started             = false;
+      bool                         active              = false;
 
       block_context(newchain::system_context& system_context, bool enable_undo);
 
@@ -25,10 +26,10 @@ namespace newchain
       void start(block&& src);
       void commit();
 
-      void push_transaction(signed_transaction&& trx,
-                            transaction_trace&   trace,
-                            bool                 enable_undo = true,
-                            bool                 commit      = true);
+      void push_transaction(const signed_transaction& trx,
+                            transaction_trace&        trace,
+                            bool                      enable_undo = true,
+                            bool                      commit      = true);
 
       void exec_all_in_block();
 

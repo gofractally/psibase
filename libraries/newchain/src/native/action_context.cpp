@@ -11,9 +11,17 @@ namespace newchain
 
    void action_context::exec()
    {
-      auto& db = transaction_context.block_context.db;
-      auto& ec = transaction_context.get_execution_context(action.contract);
-      // TODO
+      try
+      {
+         auto& db = transaction_context.block_context.db;
+         auto& ec = transaction_context.get_execution_context(action.contract);
+         // TODO
+      }
+      catch (const std::exception& e)
+      {
+         action_trace.error = e.what();
+         throw;
+      }
    }
 
 }  // namespace newchain

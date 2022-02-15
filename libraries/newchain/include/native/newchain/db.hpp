@@ -130,6 +130,7 @@ namespace newchain
       {
          db.add_index<status_index>();
          db.add_index<account_index>();
+         db.add_index<code_index>();
          db.add_index<ram_kv_index>();
       }
    };

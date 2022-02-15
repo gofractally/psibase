@@ -19,17 +19,27 @@ namespace newchain
 
    static void exec_genesis_action(transaction_context& self, const action& act)
    {
-      auto&               db = self.block_context.db;
-      genesis_action_data data;
-      eosio::input_stream s{act.raw_data.data(), act.raw_data.size()};
-      from_bin(data, s);
-      eosio::check(!s.remaining(), "extra data in genesis payload");
-      eosio::check(data.contract == 1, "genesis contract must be 1");
+      auto& atrace = self.transaction_trace.action_traces.emplace_back();
+      atrace.act   = act;
+      try
+      {
+         auto&               db = self.block_context.db;
+         genesis_action_data data;
+         eosio::input_stream s{act.raw_data.data(), act.raw_data.size()};
+         from_bin(data, s);
+         eosio::check(!s.remaining(), "extra data in genesis payload");
+         eosio::check(data.contract == 1, "genesis contract must be 1");
 
-      db.db.remove(db.db.create<account_object>([](auto&) {}));
-      db.db.create<account_object>([](auto&) {});
-      set_code(db, data.contract, data.vm_type, data.vm_version,
-               {data.code.data(), data.code.size()});
+         db.db.remove(db.db.create<account_object>([](auto&) {}));
+         db.db.create<account_object>([](auto& obj) { obj.auth_contract = 1; });
+         set_code(db, data.contract, data.vm_type, data.vm_version,
+                  {data.code.data(), data.code.size()});
+      }
+      catch (const std::exception& e)
+      {
+         atrace.error = e.what();
+         throw;
+      }
    }
 
    static void exec_action(transaction_context& self, const action& act)
@@ -44,8 +54,10 @@ namespace newchain
           .act      = auth_action_num,
           .raw_data = eosio::convert_to_bin(act),
       };
+      auto& atrace         = self.transaction_trace.action_traces.emplace_back();
+      atrace.act           = act;
+      atrace.auth_contract = sender->auth_contract;
 
-      self.transaction_trace.action_traces.emplace_back();
       action_context ac{self, auth_action, self.transaction_trace.action_traces.back()};
       ac.exec();
    }
@@ -56,17 +68,24 @@ namespace newchain
    // TODO: check max_net_usage_words, max_cpu_usage_ms
    void transaction_context::exec()
    {
-      eosio::check(trx.expiration < block_context.current.time, "transaction expired");
+      eosio::check(block_context.current.time < trx.expiration, "transaction expired");
       eosio::check(!trx.actions.empty(), "transaction has no actions");
 
       // Prepare for execution
       block_context.system_context.set_num_memories(block_context.status.num_execution_memories);
 
       for (auto& act : trx.actions)
-         if (block_context.is_genesis_block && &act == &trx.actions[0])
+      {
+         if (block_context.need_genesis_action)
+         {
             exec_genesis_action(*this, act);
+            block_context.need_genesis_action = false;
+         }
          else
+         {
             exec_action(*this, act);
+         }
+      }
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
