@@ -3,9 +3,9 @@ find_package(OpenSSL REQUIRED Crypto)
 function(add suffix)
     add_library(newchain${suffix})
     target_link_libraries(newchain${suffix} PUBLIC abieos${suffix} boost OpenSSL::Crypto)
-    target_include_directories(newchain${suffix} PUBLIC include)
+    target_include_directories(newchain${suffix} PUBLIC include/common)
     target_sources(newchain${suffix} PRIVATE
-        src/crypto.cpp
+        src/common/crypto.cpp
     )
 
     if(DEFINED IS_WASM)
@@ -89,11 +89,12 @@ function(add suffix)
 
     if(DEFINED IS_NATIVE)
         target_link_libraries(newchain${suffix} PUBLIC chain)
+        target_include_directories(newchain${suffix} PUBLIC include/native)
         target_sources(newchain${suffix} PRIVATE
-            src/action_context.cpp
-            src/block_context.cpp
-            src/execution_context.cpp
-            src/transaction_context.cpp
+            src/native/action_context.cpp
+            src/native/block_context.cpp
+            src/native/execution_context.cpp
+            src/native/transaction_context.cpp
         )
     endif()
 endfunction()
