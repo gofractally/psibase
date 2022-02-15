@@ -1,9 +1,10 @@
-#include <eosio/tester.hpp>
+#include <newchain/tester.hpp>
 
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 
 using namespace eosio;
+using namespace newchain;
 
 TEST_CASE("t1")
 {
@@ -13,6 +14,6 @@ TEST_CASE("t1")
    t.start_block();
 
    std::cout << "\n\n" << t.get_path() << "\n\n";
-   eosio::execute("ls -lh " + t.get_path());
+   execute("ls -lh " + t.get_path());
    std::cout << "\n\n";
 }

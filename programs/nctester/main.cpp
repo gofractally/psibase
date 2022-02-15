@@ -651,7 +651,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::tester_read_file>("env", "tester_read_file");
    rhf_t::add<&callbacks::tester_read_whole_file>("env", "tester_read_whole_file");
    rhf_t::add<&callbacks::tester_execute>("env", "tester_execute");
-   rhf_t::add<&callbacks::tester_create_chain>("env", "tester_create_chain2");  // TODO: rename
+   rhf_t::add<&callbacks::tester_create_chain>("env", "tester_create_chain");
    rhf_t::add<&callbacks::tester_destroy_chain>("env", "tester_destroy_chain");
    rhf_t::add<&callbacks::tester_shutdown_chain>("env", "tester_shutdown_chain");
    rhf_t::add<&callbacks::tester_get_chain_path>("env", "tester_get_chain_path");
