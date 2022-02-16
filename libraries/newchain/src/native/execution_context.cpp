@@ -20,7 +20,7 @@ namespace newchain
       }
       catch (const eosio::vm::exception& e)
       {
-         throw std::runtime_error(e.detail());
+         throw std::runtime_error(std::string(e.what()) + ": " + e.detail());
       }
    }
 
@@ -125,15 +125,27 @@ namespace newchain
          rethrow_vm_except([&] {
             backend->set_wasm_allocator(&wa);
             backend->initialize(this);
-            (*backend)(*this, "env", "_start");
+            (*backend)(*this, "env", "start", (uint32_t)act_context.action.contract);
             initialized = true;
          });
       }
 
       void prints_l(span<const char> str)
       {
-         // TODO
-         std::cout.write(str.data(), str.size());
+         // TODO: limit total console size across all executions within transaction
+         if (act_context->action_trace.inner_traces.empty() ||
+             !std::holds_alternative<console_trace>(
+                 act_context->action_trace.inner_traces.back().inner))
+            act_context->action_trace.inner_traces.push_back({console_trace{}});
+         auto& console =
+             std::get<console_trace>(act_context->action_trace.inner_traces.back().inner).console;
+         console.append(str.begin(), str.end());
+      }
+
+      void abort_message(span<const char> str)
+      {
+         throw std::runtime_error("contract aborted with message: " +
+                                  std::string(str.data(), str.size()));
       }
    };
 
@@ -150,13 +162,17 @@ namespace newchain
    void execution_context::register_host_functions()
    {
       rhf_t::add<&execution_context_impl::prints_l>("env", "prints_l");
+      rhf_t::add<&execution_context_impl::abort_message>("env", "abort_message");
    }
 
    void execution_context::exec(action_context& act_context)
    {
       impl->init(act_context);
-      // TODO
-      (*impl->backend)(*impl, "env", "test");
+      rethrow_vm_except([&] {
+         // TODO
+         (*impl->backend)(*impl, "env", "called", (uint32_t)act_context.action.sender,
+                          (uint32_t)act_context.action.contract, (uint32_t)act_context.action.act);
+      });
    }
 
 }  // namespace newchain

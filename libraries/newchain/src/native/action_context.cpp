@@ -15,7 +15,7 @@ namespace newchain
       {
          auto& db = transaction_context.block_context.db;
          auto& ec = transaction_context.get_execution_context(action.contract);
-         // TODO
+         ec.exec(*this);
       }
       catch (const std::exception& e)
       {

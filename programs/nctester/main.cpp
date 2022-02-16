@@ -824,6 +824,7 @@ int main(int argc, char* argv[])
    try
    {
       std::vector<std::string> args{argv + next_arg, argv + argc};
+      newchain::execution_context::register_host_functions();
       register_callbacks();
       run(argv[next_arg], args, substitutions);
       return 0;

@@ -27,7 +27,7 @@ namespace newchain
 
    struct console_trace
    {
-      std::vector<char> console;
+      std::string console;
    };
    EOSIO_REFLECT(console_trace, console)
 

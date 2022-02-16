@@ -24,7 +24,7 @@ TEST_CASE("t1")
                         .contract = 9999,
                         .act      = 9999,
                         .raw_data = eosio::convert_to_bin(newchain::genesis_action_data{
-                            .code = read_whole_file("nc-test.wasm"),
+                            .code = read_whole_file("nc-test-cntr.wasm"),
                         }),
                     }}))))
              << "\n";

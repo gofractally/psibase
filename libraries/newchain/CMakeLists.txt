@@ -12,21 +12,26 @@ function(add suffix)
     if(DEFINED IS_WASM)
         target_link_libraries(newchain${suffix} PUBLIC wasm-base${suffix})
 
-        add_library(newchain-contract-base${suffix} INTERFACE)
-        target_link_libraries(newchain-contract-base${suffix} INTERFACE newchain${suffix})
-        target_compile_options(newchain-contract-base${suffix} INTERFACE -DCOMPILING_CONTRACT)
-        target_link_options(newchain-contract-base${suffix} INTERFACE
+        add_library(newchain-contract-base${suffix})
+        target_sources(newchain-contract-base${suffix} PRIVATE
+            ../eosiolib/tester/tester_intrinsics.cpp    # TODO
+        )
+        target_link_libraries(newchain-contract-base${suffix} PUBLIC newchain${suffix})
+        target_compile_options(newchain-contract-base${suffix} PUBLIC -DCOMPILING_CONTRACT)
+        target_link_options(newchain-contract-base${suffix} PUBLIC
             -Wl,--stack-first
             -Wl,--entry,start
+            -Wl,--export=called
             -Wl,-z,stack-size=8192
             -Wl,--no-merge-data-segments
             -nostdlib
         )
-        target_include_directories(newchain-contract-base${suffix} INTERFACE ../eosiolib/core/include ../eosiolib/contracts/include)
+        target_include_directories(newchain-contract-base${suffix} PUBLIC include/contract ../eosiolib/core/include ../eosiolib/contracts/include)
 
         # Contract with simple malloc/free
         add_library(newchain-contract-simple-malloc${suffix} INTERFACE)
         target_link_libraries(newchain-contract-simple-malloc${suffix} INTERFACE
+            -L${ROOT_BINARY_DIR}/wasm/libraries/eosiolib
             newchain-contract-base${suffix}
             -lc++
             -lc++abi-shrunk${suffix}
