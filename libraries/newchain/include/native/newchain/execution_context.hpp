@@ -4,6 +4,8 @@
 
 namespace newchain
 {
+   struct database;
+
    void set_code(database&           db,
                  account_num         contract,
                  uint8_t             vm_type,

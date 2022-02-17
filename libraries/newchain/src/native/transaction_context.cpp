@@ -1,6 +1,8 @@
-#include <newchain/action_context.hpp>
+#include <newchain/transaction_context.hpp>
 
 #include <eosio/from_bin.hpp>
+#include <newchain/action_context.hpp>
+#include <newchain/from_bin.hpp>
 
 namespace newchain
 {
@@ -17,50 +19,7 @@ namespace newchain
    {
    }
 
-   static void exec_genesis_action(transaction_context& self, const action& act)
-   {
-      auto& atrace = self.transaction_trace.action_traces.emplace_back();
-      atrace.act   = act;
-      try
-      {
-         auto&               db = self.block_context.db;
-         genesis_action_data data;
-         eosio::input_stream s{act.raw_data.data(), act.raw_data.size()};
-         from_bin(data, s);
-         eosio::check(!s.remaining(), "extra data in genesis payload");
-         eosio::check(data.contract == 1, "genesis contract must be 1");
-
-         db.db.remove(db.db.create<account_object>([](auto&) {}));
-         db.db.create<account_object>([](auto& obj) { obj.auth_contract = 1; });
-         set_code(db, data.contract, data.vm_type, data.vm_version,
-                  {data.code.data(), data.code.size()});
-      }
-      catch (const std::exception& e)
-      {
-         atrace.error = e.what();
-         throw;
-      }
-   }
-
-   static void exec_action(transaction_context& self, const action& act)
-   {
-      auto& db     = self.block_context.db;
-      auto* sender = db.db.find(account_object::id_type(act.sender));
-      eosio::check(sender, "unknown sender account");
-
-      action auth_action{
-          .sender   = 0,
-          .contract = sender->auth_contract,
-          .act      = auth_action_num,
-          .raw_data = eosio::convert_to_bin(act),
-      };
-      auto& atrace         = self.transaction_trace.action_traces.emplace_back();
-      atrace.act           = act;
-      atrace.auth_contract = sender->auth_contract;
-
-      action_context ac{self, auth_action, self.transaction_trace.action_traces.back()};
-      ac.exec();
-   }
+   static void exec_genesis_action(transaction_context& self, const action& act);
 
    // TODO: limit execution time when not playing a produced block
    // TODO: charge net and cpu
@@ -83,13 +42,56 @@ namespace newchain
          }
          else
          {
-            exec_action(*this, act);
+            exec_action(act);
          }
       }
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
       block_context.system_context.set_num_memories(block_context.status.num_execution_memories);
+   }
+
+   static void exec_genesis_action(transaction_context& self, const action& act)
+   {
+      auto& atrace = self.transaction_trace.action_traces.emplace_back();
+      atrace.act   = act;
+      try
+      {
+         auto& db   = self.block_context.db;
+         auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
+                                                     "extra data in genesis payload");
+         eosio::check(data.contract == 1, "genesis contract must be 1");
+
+         db.db.remove(db.db.create<account_object>([](auto&) {}));
+         db.db.create<account_object>([](auto& obj) { obj.auth_contract = 1; });
+         set_code(db, data.contract, data.vm_type, data.vm_version,
+                  {data.code.data(), data.code.size()});
+      }
+      catch (const std::exception& e)
+      {
+         atrace.error = e.what();
+         throw;
+      }
+   }
+
+   void transaction_context::exec_action(const action& act)
+   {
+      auto& db     = block_context.db;
+      auto* sender = db.db.find(account_object::id_type(act.sender));
+      eosio::check(sender, "unknown sender account");
+
+      action auth_action{
+          .sender   = 0,
+          .contract = sender->auth_contract,
+          .act      = auth_action_num,
+          .raw_data = eosio::convert_to_bin(act),
+      };
+      auto& atrace         = transaction_trace.action_traces.emplace_back();
+      atrace.act           = act;
+      atrace.auth_contract = sender->auth_contract;
+
+      action_context ac{*this, auth_action, transaction_trace.action_traces.back()};
+      ac.exec();
    }
 
    execution_context& transaction_context::get_execution_context(account_num contract)

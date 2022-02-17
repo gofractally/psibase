@@ -11,6 +11,7 @@ function(add_abieos suffix)
 
     if(IS_WASM)
         target_link_libraries(abieos${suffix} PUBLIC wasm-base${suffix})
+        target_compile_definitions(abieos${suffix} PUBLIC COMPILING_NEWCHAIN_WASM)
     endif()
 endfunction()
 

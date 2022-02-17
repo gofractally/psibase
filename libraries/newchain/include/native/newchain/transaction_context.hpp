@@ -20,6 +20,7 @@ namespace newchain
                           bool                                  enable_undo);
 
       void exec();
+      void exec_action(const action& act);
 
       execution_context& get_execution_context(account_num contract);
    };  // transaction_context

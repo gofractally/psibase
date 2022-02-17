@@ -1,6 +1,9 @@
+#include <newchain/execution_context.hpp>
+
 #include <eosio/vm/backend.hpp>
 #include <newchain/action_context.hpp>
 #include <newchain/db.hpp>
+#include <newchain/from_bin.hpp>
 
 using eosio::vm::span;
 
@@ -94,21 +97,22 @@ namespace newchain
    // TODO: debugger
    struct execution_context_impl
    {
+      database&                  db;
       eosio::vm::wasm_allocator& wa;
       std::unique_ptr<backend_t> backend;
-      bool                       initialized = false;
-      action_context*            act_context = nullptr;
+      const account_object*      contract_account;
+      bool                       initialized         = false;
+      action_context*            current_act_context = nullptr;  // Changes during recursion
 
       execution_context_impl(transaction_context& trx_context,
                              execution_memory&    memory,
                              account_num          contract)
-          : wa{memory.impl->wa}
+          : db{trx_context.block_context.db}, wa{memory.impl->wa}
       {
-         auto& db      = trx_context.block_context.db;
-         auto* account = db.db.find<account_object>(account_object::id_type(contract));
-         eosio::check(account, "unknown contract account");
-         auto* code = db.db.find<code_object, by_pk>(
-             std::tuple{account->code_hash, account->vm_type, account->vm_version});
+         contract_account = db.db.find<account_object>(account_object::id_type(contract));
+         eosio::check(contract_account, "unknown contract account");
+         auto* code = db.db.find<code_object, by_pk>(std::tuple{
+             contract_account->code_hash, contract_account->vm_type, contract_account->vm_version});
          eosio::check(code, "account has no code");
          std::vector<uint8_t> copy(
              reinterpret_cast<const uint8_t*>(code->code.data()),
@@ -117,28 +121,36 @@ namespace newchain
       }
 
       // TODO: configurable wasm limits
-      void init(action_context& act_context)
+      void init()
       {
-         this->act_context = &act_context;
          if (initialized)
             return;
          rethrow_vm_except([&] {
             backend->set_wasm_allocator(&wa);
             backend->initialize(this);
-            (*backend)(*this, "env", "start", (uint32_t)act_context.action.contract);
+            (*backend)(*this, "env", "start", (uint32_t)current_act_context->action.contract);
             initialized = true;
          });
       }
 
-      void prints_l(span<const char> str)
+      std::vector<char> result;
+      uint32_t          get_result(span<char> dest)
+      {
+         if (!result.empty())
+            memcpy(dest.data(), result.data(), std::min(result.size(), dest.size()));
+         return result.size();
+      }
+
+      void write_console(span<const char> str)
       {
          // TODO: limit total console size across all executions within transaction
-         if (act_context->action_trace.inner_traces.empty() ||
+         if (current_act_context->action_trace.inner_traces.empty() ||
              !std::holds_alternative<console_trace>(
-                 act_context->action_trace.inner_traces.back().inner))
-            act_context->action_trace.inner_traces.push_back({console_trace{}});
+                 current_act_context->action_trace.inner_traces.back().inner))
+            current_act_context->action_trace.inner_traces.push_back({console_trace{}});
          auto& console =
-             std::get<console_trace>(act_context->action_trace.inner_traces.back().inner).console;
+             std::get<console_trace>(current_act_context->action_trace.inner_traces.back().inner)
+                 .console;
          console.append(str.begin(), str.end());
       }
 
@@ -146,6 +158,31 @@ namespace newchain
       {
          throw std::runtime_error("contract aborted with message: " +
                                   std::string(str.data(), str.size()));
+      }
+
+      uint32_t get_current_action()
+      {
+         result = eosio::convert_to_bin(current_act_context->action);
+         return result.size();
+      }
+
+      // TODO: should privileged be able to sudo a deleted account? Might be needed
+      //       to roll back attacks. OTOH, might confuse contracts which look up the
+      //       sender account. Maybe support undelete instead?
+      uint32_t call(span<const char> data)
+      {
+         auto act = unpack_all<action>({data.data(), data.size()}, "extra data in call");
+         if (act.sender != contract_account->id)
+         {
+            auto* sender = db.db.find<account_object>(account_object::id_type(act.sender));
+            eosio::check(sender, "unknown sender account");
+            eosio::check(
+                sender->auth_contract == contract_account->id || contract_account->privileged,
+                "contract is not authorized to call as sender");
+         }
+         current_act_context->transaction_context.exec_action(act);
+         // TODO: store return value in result, return size
+         return 0;
       }
    };
 
@@ -161,18 +198,26 @@ namespace newchain
 
    void execution_context::register_host_functions()
    {
-      rhf_t::add<&execution_context_impl::prints_l>("env", "prints_l");
+      rhf_t::add<&execution_context_impl::get_result>("env", "get_result");
+      rhf_t::add<&execution_context_impl::write_console>("env", "write_console");
       rhf_t::add<&execution_context_impl::abort_message>("env", "abort_message");
+      rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
+      rhf_t::add<&execution_context_impl::call>("env", "call");
    }
 
    void execution_context::exec(action_context& act_context)
    {
-      impl->init(act_context);
+      auto prev                 = impl->current_act_context;
+      impl->current_act_context = &act_context;
+
+      impl->init();
       rethrow_vm_except([&] {
          // TODO
          (*impl->backend)(*impl, "env", "called", (uint32_t)act_context.action.sender,
                           (uint32_t)act_context.action.contract, (uint32_t)act_context.action.act);
       });
+
+      impl->current_act_context = prev;
    }
 
 }  // namespace newchain

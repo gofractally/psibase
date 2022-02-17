@@ -4,7 +4,42 @@
  */
 #pragma once
 
-#ifdef __eosio_cdt__
+#if defined(COMPILING_NEWCHAIN_WASM)
+namespace newchain
+{
+   namespace intrinsic
+   {
+      extern "C"
+      {
+         [[clang::import_name("abort_message"), noreturn]] void abort_message(const char* message,
+                                                                              uint32_t len);
+      }
+   }  // namespace intrinsic
+}  // namespace newchain
+namespace eosio
+{
+   namespace internal_use_do_not_use
+   {
+      extern "C"
+      {
+         [[noreturn]] inline void eosio_assert_message(uint32_t, const char* msg, uint32_t len)
+         {
+            newchain::intrinsic::abort_message(msg, len);
+         }
+
+         [[noreturn]] inline void eosio_assert(uint32_t, const char* msg)
+         {
+            newchain::intrinsic::abort_message(msg, strlen(msg));
+         }
+
+         [[noreturn]] inline void eosio_assert_code(uint32_t, uint64_t)
+         {
+            eosio_assert(0, "eosio_assert_code");
+         }
+      }
+   }  // namespace internal_use_do_not_use
+}  // namespace eosio
+#elif defined(__eosio_cdt__)
 #include <cstdint>
 namespace eosio
 {

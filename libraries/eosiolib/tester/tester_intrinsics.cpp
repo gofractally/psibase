@@ -122,6 +122,7 @@ namespace eosio
    {
       extern "C"
       {
+         /*
          void eosio_assert(uint32_t test, const char* msg)
          {
             eosio_assert_message(false, msg, strlen(msg));
@@ -132,6 +133,7 @@ namespace eosio
             eosio_assert(0, "eosio_assert_code is not available");
             __builtin_unreachable();
          }
+         */
 
          uint64_t current_time()
          {
