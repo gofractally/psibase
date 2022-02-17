@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <newchain/block.hpp>
-#include <newchain/contract.hpp>
 #include <newchain/from_bin.hpp>
+#include <newchain/intrinsic.hpp>
 
 using namespace newchain;
 
@@ -25,11 +25,12 @@ extern "C" void called(account_num sender, account_num this_contract, action_num
    if (act_num == auth_action_num)
    {
       check(sender == 0, "can only authenticate top-level actions");
+      // TODO: only unpack the needed fields; still need the extra data check
       auto inner = unpack_all<action>(current.raw_data, "extra data after action");
       // TODO: check keys of inner.sender
       printf("Authenticated account %d\n", inner.sender);
       // TODO: forward return value
-      call(inner);
+      call(current.raw_data);
    }
    else if (act_num == 999)
    {

@@ -40,8 +40,3 @@ extern "C" void printi(int64_t value)
    else
       printui(value);
 }
-
-namespace eosio
-{
-   void print(std::string_view sv) { prints_l(sv.data(), sv.size()); }
-}  // namespace eosio

@@ -14,8 +14,8 @@ function(add suffix)
 
         add_library(newchain-contract-base${suffix})
         target_sources(newchain-contract-base${suffix} PRIVATE
-            src/contract/contract.cpp
             src/contract/eosio_polyfill.cpp
+            src/contract/intrinsic.cpp
         )
         target_link_libraries(newchain-contract-base${suffix} PUBLIC newchain${suffix})
         target_compile_options(newchain-contract-base${suffix} PUBLIC -DCOMPILING_CONTRACT)

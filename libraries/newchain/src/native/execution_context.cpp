@@ -134,7 +134,9 @@ namespace newchain
       }
 
       std::vector<char> result;
-      uint32_t          get_result(span<char> dest)
+
+      // TODO: offset
+      uint32_t get_result(span<char> dest)
       {
          if (!result.empty())
             memcpy(dest.data(), result.data(), std::min(result.size(), dest.size()));

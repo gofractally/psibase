@@ -1,5 +1,6 @@
+#include <newchain/intrinsic.hpp>
+
 #include <eosio/from_bin.hpp>
-#include <newchain/contract.hpp>
 
 namespace newchain
 {
@@ -19,9 +20,15 @@ namespace newchain
       return eosio::convert_from_bin<action>(data);
    }
 
-   std::vector<char> call(const action& action)
+   std::vector<char> call(const char* action, uint32_t len)
    {
-      auto bin = eosio::convert_to_bin(action);
-      return get_result(intrinsic::call(bin.data(), bin.size()));
+      return get_result(intrinsic::call(action, len));
    }
+
+   std::vector<char> call(eosio::input_stream action)
+   {
+      return get_result(intrinsic::call(action.pos, action.remaining()));
+   }
+
+   std::vector<char> call(const action& action) { return call(eosio::convert_to_bin(action)); }
 }  // namespace newchain
