@@ -171,6 +171,10 @@ namespace newchain
       //       sender account. Maybe support undelete instead?
       uint32_t call(span<const char> data)
       {
+         // TODO: replace temporary rule
+         if (++current_act_context->transaction_context.call_depth > 4)
+            eosio::check(false, "call depth exceeded (temporary rule)");
+
          auto act = unpack_all<action>({data.data(), data.size()}, "extra data in call");
          if (act.sender != contract_account->id)
          {
@@ -180,7 +184,13 @@ namespace newchain
                 sender->auth_contract == contract_account->id || contract_account->privileged,
                 "contract is not authorized to call as sender");
          }
-         current_act_context->transaction_context.exec_action(act);
+
+         current_act_context->action_trace.inner_traces.push_back({action_trace{}});
+         auto& inner_action_trace =
+             std::get<action_trace>(current_act_context->action_trace.inner_traces.back().inner);
+         current_act_context->transaction_context.exec_called_action(act, inner_action_trace);
+
+         --current_act_context->transaction_context.call_depth;
          // TODO: store return value in result, return size
          return 0;
       }

@@ -9,11 +9,8 @@ namespace newchain
 {
    namespace intrinsic
    {
-      extern "C"
-      {
-         [[clang::import_name("abort_message"), noreturn]] void abort_message(const char* message,
-                                                                              uint32_t len);
-      }
+      [[clang::import_name("abort_message"), noreturn]] void abort_message(const char* message,
+                                                                           uint32_t len);
    }  // namespace intrinsic
 }  // namespace newchain
 namespace eosio

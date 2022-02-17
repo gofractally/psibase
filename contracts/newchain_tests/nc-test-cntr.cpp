@@ -27,8 +27,25 @@ extern "C" void called(account_num sender, account_num this_contract, action_num
       check(sender == 0, "can only authenticate top-level actions");
       auto inner = unpack_all<action>(current.raw_data, "extra data after action");
       // TODO: check keys of inner.sender
-      printf("Authenticated %d\n", inner.sender);
+      printf("Authenticated account %d\n", inner.sender);
       // TODO: forward return value
-      // call(inner);
+      call(inner);
+   }
+   else if (act_num == 999)
+   {
+      printf("This is 999\n");
+      call({
+          .sender   = 1,
+          .contract = 1,
+          .act      = 1000,
+      });
+   }
+   else if (act_num == 1000)
+   {
+      printf("This is 1000\n");
+   }
+   else
+   {
+      check(false, "unknown action");
    }
 }

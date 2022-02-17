@@ -20,12 +20,13 @@ namespace newchain
    }
 
    static void exec_genesis_action(transaction_context& self, const action& act);
+   static void exec_auth_action(transaction_context& self, const action& act);
 
    // TODO: limit execution time when not playing a produced block
    // TODO: charge net and cpu
    // TODO: check ref_block_num, ref_block_prefix
    // TODO: check max_net_usage_words, max_cpu_usage_ms
-   void transaction_context::exec()
+   void transaction_context::exec_all_actions()
    {
       eosio::check(block_context.current.time < trx.expiration, "transaction expired");
       eosio::check(!trx.actions.empty(), "transaction has no actions");
@@ -42,7 +43,7 @@ namespace newchain
          }
          else
          {
-            exec_action(act);
+            exec_auth_action(*this, act);
          }
       }
 
@@ -74,9 +75,9 @@ namespace newchain
       }
    }
 
-   void transaction_context::exec_action(const action& act)
+   static void exec_auth_action(transaction_context& self, const action& act)
    {
-      auto& db     = block_context.db;
+      auto& db     = self.block_context.db;
       auto* sender = db.db.find(account_object::id_type(act.sender));
       eosio::check(sender, "unknown sender account");
 
@@ -86,11 +87,18 @@ namespace newchain
           .act      = auth_action_num,
           .raw_data = eosio::convert_to_bin(act),
       };
-      auto& atrace         = transaction_trace.action_traces.emplace_back();
+      auto& atrace         = self.transaction_trace.action_traces.emplace_back();
       atrace.act           = act;
       atrace.auth_contract = sender->auth_contract;
 
-      action_context ac{*this, auth_action, transaction_trace.action_traces.back()};
+      action_context ac{self, auth_action, self.transaction_trace.action_traces.back()};
+      ac.exec();
+   }
+
+   void transaction_context::exec_called_action(const action& act, action_trace& atrace)
+   {
+      atrace.act = act;
+      action_context ac{*this, act, atrace};
       ac.exec();
    }
 

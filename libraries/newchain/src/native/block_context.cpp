@@ -124,7 +124,7 @@ namespace newchain
 
          trace.trx = trx;
          transaction_context t{*this, trx, recovered_keys, trace, enable_undo};
-         t.exec();
+         t.exec_all_actions();
 
          if (commit)
          {

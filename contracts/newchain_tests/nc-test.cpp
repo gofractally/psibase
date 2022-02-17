@@ -33,7 +33,7 @@ TEST_CASE("t1")
                     {{
                         .sender   = 1,
                         .contract = 1,
-                        .act      = 0,
+                        .act      = 999,
                         .raw_data = {},
                     }}))))
              << "\n";

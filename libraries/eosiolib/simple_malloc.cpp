@@ -35,7 +35,8 @@ namespace eosio
 
       void* operator()(size_t sz, size_t align_amt = 16)
       {
-         [[clang::import_name("eosio_assert"), noreturn]] void eosio_assert(uint32_t, const char*);
+         [[clang::import_name("abort_message"), noreturn]] void malloc_abort_message(
+             const char* message, uint32_t len);
          if (sz == 0)
             return NULL;
 
@@ -46,7 +47,7 @@ namespace eosio
          {
             size_t new_next_page = align(next_addr, wasm_page_size);
             if (GROW_MEMORY((new_next_page - next_page) >> 16) == -1)
-               eosio_assert(false, "failed to allocate pages");
+               malloc_abort_message("failed to allocate pages", 24);
             next_page = new_next_page;
          }
 
