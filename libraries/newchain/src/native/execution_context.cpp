@@ -217,16 +217,18 @@ namespace newchain
       rhf_t::add<&execution_context_impl::call>("env", "call");
    }
 
-   void execution_context::exec(action_context& act_context)
+   void execution_context::exec(action_context& act_context, bool is_auth)
    {
       auto prev                 = impl->current_act_context;
       impl->current_act_context = &act_context;
 
       impl->init();
       rethrow_vm_except([&] {
-         // TODO
-         (*impl->backend)(*impl, "env", "called", (uint32_t)act_context.action.sender,
-                          (uint32_t)act_context.action.contract, (uint32_t)act_context.action.act);
+         if (is_auth)
+            (*impl->backend)(*impl, "env", "auth", (uint32_t)act_context.action.contract);
+         else
+            (*impl->backend)(*impl, "env", "called", (uint32_t)act_context.action.contract,
+                             (uint32_t)act_context.action.sender);
       });
 
       impl->current_act_context = prev;

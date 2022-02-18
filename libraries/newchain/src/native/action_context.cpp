@@ -9,13 +9,13 @@ namespace newchain
    {
    }
 
-   void action_context::exec()
+   void action_context::exec(bool is_auth)
    {
       try
       {
          auto& db = transaction_context.block_context.db;
          auto& ec = transaction_context.get_execution_context(action.contract);
-         ec.exec(*this);
+         ec.exec(*this, is_auth);
       }
       catch (const std::exception& e)
       {

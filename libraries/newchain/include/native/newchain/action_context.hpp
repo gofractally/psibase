@@ -14,7 +14,7 @@ namespace newchain
                      const newchain::action&        action,
                      newchain::action_trace&        action_trace);
 
-      void exec();
+      void exec(bool is_auth = false);
    };  // action_context
 
 }  // namespace newchain

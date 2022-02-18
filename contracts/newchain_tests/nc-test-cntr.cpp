@@ -1,3 +1,5 @@
+#include "nc-test.hpp"
+
 #include <stdio.h>
 #include <newchain/block.hpp>
 #include <newchain/from_bin.hpp>
@@ -18,35 +20,33 @@ extern "C" void start(account_num this_contract)
    printf("This is contract %d\n", this_contract);
 }
 
-extern "C" void called(account_num sender, account_num this_contract, action_num act_num)
+extern "C" [[clang::export_name("auth")]] void auth(account_num this_contract)
 {
-   printf("Entry sender=%d, this_contract=%d, act_num=%d\n", sender, this_contract, act_num);
-   auto current = get_current_action();
-   if (act_num == auth_action_num)
-   {
-      check(sender == 0, "can only authenticate top-level actions");
-      // TODO: only unpack the needed fields; still need the extra data check
-      auto inner = unpack_all<action>(current.raw_data, "extra data after action");
-      // TODO: check keys of inner.sender
-      printf("Authenticated account %d\n", inner.sender);
-      // TODO: forward return value
-      call(current.raw_data);
-   }
-   else if (act_num == 999)
-   {
-      printf("This is 999\n");
+   printf("auth this_contract=%d\n", this_contract);
+
+   // TODO: only unpack the needed fields
+   auto act = get_current_action();
+   printf("act:%s\n", eosio::convert_to_json(act).c_str());
+   // TODO: check keys of act.sender
+   printf("Authenticated account %d\n", act.sender);
+   // TODO: forward return value
+   call(act);
+}
+
+extern "C" void called(account_num this_contract, account_num sender)
+{
+   // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
+   auto act = get_current_action();
+   auto pl  = eosio::convert_from_bin<payload>(act.raw_data);
+   printf("%s\n", eosio::convert_to_json(pl).c_str());
+   if (pl.number)
       call({
-          .sender   = 1,
-          .contract = 1,
-          .act      = 1000,
+          .sender   = this_contract,
+          .contract = this_contract,
+          .raw_data = eosio::convert_to_bin(payload{
+              .number = pl.number - 1,
+              .memo   = pl.memo,
+          }),
       });
-   }
-   else if (act_num == 1000)
-   {
-      printf("This is 1000\n");
-   }
-   else
-   {
-      check(false, "unknown action");
-   }
+   printf("Back to %d\n", pl.number);
 }

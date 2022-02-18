@@ -1,3 +1,4 @@
+#include "nc-test.hpp"
 #include <newchain/tester.hpp>
 
 #define CATCH_CONFIG_MAIN
@@ -22,7 +23,6 @@ TEST_CASE("t1")
                     {{
                         .sender   = 9999,
                         .contract = 9999,
-                        .act      = 9999,
                         .raw_data = eosio::convert_to_bin(newchain::genesis_action_data{
                             .code = read_whole_file("nc-test-cntr.wasm"),
                         }),
@@ -33,8 +33,10 @@ TEST_CASE("t1")
                     {{
                         .sender   = 1,
                         .contract = 1,
-                        .act      = 999,
-                        .raw_data = {},
+                        .raw_data = eosio::convert_to_bin(payload{
+                            .number = 3,
+                            .memo   = "Counting down",
+                        }),
                     }}))))
              << "\n";
 

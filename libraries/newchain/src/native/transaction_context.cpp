@@ -61,12 +61,9 @@ namespace newchain
          auto& db   = self.block_context.db;
          auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
                                                      "extra data in genesis payload");
-         eosio::check(data.contract == 1, "genesis contract must be 1");
-
          db.db.remove(db.db.create<account_object>([](auto&) {}));
          db.db.create<account_object>([](auto& obj) { obj.auth_contract = 1; });
-         set_code(db, data.contract, data.vm_type, data.vm_version,
-                  {data.code.data(), data.code.size()});
+         set_code(db, 1, data.vm_type, data.vm_version, {data.code.data(), data.code.size()});
       }
       catch (const std::exception& e)
       {
@@ -80,19 +77,11 @@ namespace newchain
       auto& db     = self.block_context.db;
       auto* sender = db.db.find(account_object::id_type(act.sender));
       eosio::check(sender, "unknown sender account");
-
-      action auth_action{
-          .sender   = 0,
-          .contract = sender->auth_contract,
-          .act      = auth_action_num,
-          .raw_data = eosio::convert_to_bin(act),
-      };
       auto& atrace         = self.transaction_trace.action_traces.emplace_back();
       atrace.act           = act;
       atrace.auth_contract = sender->auth_contract;
-
-      action_context ac{self, auth_action, self.transaction_trace.action_traces.back()};
-      ac.exec();
+      action_context ac{self, act, self.transaction_trace.action_traces.back()};
+      ac.exec(true);
    }
 
    void transaction_context::exec_called_action(const action& act, action_trace& atrace)

@@ -38,7 +38,7 @@ namespace newchain
 
       static void register_host_functions();
 
-      void exec(action_context& act_context);
+      void exec(action_context& act_context, bool is_auth);
    };
 
 }  // namespace newchain

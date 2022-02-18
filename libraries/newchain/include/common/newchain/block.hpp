@@ -13,39 +13,27 @@ namespace newchain
 {
    using account_num = uint32_t;
 
-   // TODO: this may make it hard to define standard actions/notifications/etc.
-   //       for contracts to communicate with each other. Maybe a registration
-   //       contract? Registered scopes?
-   using action_num = uint16_t;
-
    using block_num = uint32_t;
 
    struct action
    {
       account_num       sender   = 0;
       account_num       contract = 0;
-      action_num        act      = 0;
       std::vector<char> raw_data;
    };
-   EOSIO_REFLECT(action, sender, contract, act, raw_data)
-
-   constexpr action_num auth_action_num = 1;  // raw_data contains action to authorize and run
+   EOSIO_REFLECT(action, sender, contract, raw_data)
 
    // The genesis action is the first action of the first transaction of
    // the first block. The action struct's fields (above) are ignored,
-   // except raw_data, which contains this struct. This struct mirrors what
-   // a setcode action's payload could look like. The action's sender,
-   // contract, and act fields could be set to allow ABI decoding to view this
-   // as a normal setcode action.
+   // except raw_data, which contains this struct.
    struct genesis_action_data
    {
-      account_num       contract   = 1;  // must be 1
       uint8_t           vm_type    = 0;
       uint8_t           vm_version = 0;
       std::string       memo;
       std::vector<char> code;
    };
-   EOSIO_REFLECT(genesis_action_data, contract, vm_type, vm_version, memo, code)
+   EOSIO_REFLECT(genesis_action_data, vm_type, vm_version, memo, code)
 
    // Resources billed to trx.actions[0].sender
    // TODO: context-free actions?
