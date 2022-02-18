@@ -191,10 +191,15 @@ namespace newchain
          auto& inner_action_trace =
              std::get<action_trace>(current_act_context->action_trace.inner_traces.back().inner);
          current_act_context->transaction_context.exec_called_action(act, inner_action_trace);
+         result = inner_action_trace.retval;
 
          --current_act_context->transaction_context.call_depth;
-         // TODO: store return value in result, return size
-         return 0;
+         return result.size();
+      }
+
+      void set_retval(span<const char> data)
+      {
+         current_act_context->action_trace.retval.assign(data.begin(), data.end());
       }
    };
 
@@ -215,6 +220,7 @@ namespace newchain
       rhf_t::add<&execution_context_impl::abort_message>("env", "abort_message");
       rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
       rhf_t::add<&execution_context_impl::call>("env", "call");
+      rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
    }
 
    void execution_context::exec(action_context& act_context, bool is_auth)

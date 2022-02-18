@@ -3,7 +3,7 @@
 
 extern "C" void prints_l(const char* str, uint32_t len)
 {
-   newchain::intrinsic::write_console(str, len);
+   newchain::raw::write_console(str, len);
 }
 
 extern "C" void prints(const char* cstr)

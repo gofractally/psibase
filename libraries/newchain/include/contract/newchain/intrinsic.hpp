@@ -6,7 +6,7 @@ namespace newchain
 {
    // These use mangled names instead of extern "C" to prevent collisions
    // with other libraries. e.g. libc++'s abort_message
-   namespace intrinsic
+   namespace raw
    {
       // Intrinsics which return data do it by storing it in a result buffer.
       // get_result copies min(dest_size, result_size) bytes into dest and returns result_size.
@@ -34,7 +34,10 @@ namespace newchain
 
       // Call a contract, store the return value into result, and return the result size.
       [[clang::import_name("call")]] uint32_t call(const char* action, uint32_t len);
-   }  // namespace intrinsic
+
+      // Set the return value of the currently-executing action
+      [[clang::import_name("set_retval")]] void set_retval(const char* retval, uint32_t len);
+   }  // namespace raw
 
    // Get result when size is known. Caution: this does not verify size.
    std::vector<char> get_result(uint32_t size);
@@ -45,7 +48,7 @@ namespace newchain
    // Abort with message. Message should be UTF8.
    [[noreturn]] inline void abort_message(std::string_view msg)
    {
-      intrinsic::abort_message(msg.data(), msg.size());
+      raw::abort_message(msg.data(), msg.size());
    }
 
    // Abort with message if !cond. Message should be UTF8.
@@ -75,4 +78,12 @@ namespace newchain
 
    // Call a contract and return its result
    std::vector<char> call(const action& action);
+
+   // Set the return value of the currently-executing action
+   template <typename T>
+   void set_retval(const T& retval)
+   {
+      auto data = eosio::convert_to_bin(retval);
+      raw::set_retval(data.data(), data.size());
+   }
 }  // namespace newchain

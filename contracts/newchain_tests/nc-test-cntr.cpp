@@ -40,13 +40,17 @@ extern "C" void called(account_num this_contract, account_num sender)
    auto pl  = eosio::convert_from_bin<payload>(act.raw_data);
    printf("%s\n", eosio::convert_to_json(pl).c_str());
    if (pl.number)
-      call({
+   {
+      auto r = eosio::convert_from_bin<int>(call({
           .sender   = this_contract,
           .contract = this_contract,
           .raw_data = eosio::convert_to_bin(payload{
               .number = pl.number - 1,
               .memo   = pl.memo,
           }),
-      });
+      }));
+      printf("Child returned %d\n", r);
+   }
    printf("Back to %d\n", pl.number);
+   set_retval(pl.number);
 }
