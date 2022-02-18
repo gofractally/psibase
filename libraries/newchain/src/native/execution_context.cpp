@@ -93,13 +93,12 @@ namespace newchain
    execution_memory::execution_memory(execution_memory&& src) { impl = std::move(src.impl); }
    execution_memory::~execution_memory() {}
 
-   // TODO: cache backend?
    // TODO: debugger
    struct execution_context_impl
    {
       database&                  db;
       eosio::vm::wasm_allocator& wa;
-      std::unique_ptr<backend_t> backend;
+      backend_t*                 backend;
       const account_object*      contract_account;
       bool                       initialized         = false;
       action_context*            current_act_context = nullptr;  // Changes during recursion
@@ -114,10 +113,21 @@ namespace newchain
          auto* code = db.db.find<code_object, by_pk>(std::tuple{
              contract_account->code_hash, contract_account->vm_type, contract_account->vm_version});
          eosio::check(code, "account has no code");
-         std::vector<uint8_t> copy(
-             reinterpret_cast<const uint8_t*>(code->code.data()),
-             reinterpret_cast<const uint8_t*>(code->code.data() + code->code.size()));
-         rethrow_vm_except([&] { backend = std::make_unique<backend_t>(copy, *this, nullptr); });
+         rethrow_vm_except([&] {
+            // TODO (CRITICAL): remove global state
+            // TODO: expire cache entries
+            static std::map<eosio::checksum256, std::unique_ptr<backend_t>> cache;
+            auto it = cache.find(contract_account->code_hash);
+            if (it == cache.end())
+            {
+               std::vector<uint8_t> copy(
+                   reinterpret_cast<const uint8_t*>(code->code.data()),
+                   reinterpret_cast<const uint8_t*>(code->code.data() + code->code.size()));
+               std::unique_ptr<backend_t> be = std::make_unique<backend_t>(copy, nullptr);
+               it = cache.insert({contract_account->code_hash, std::move(be)}).first;
+            }
+            backend = &*it->second;
+         });
       }
 
       // TODO: configurable wasm limits
