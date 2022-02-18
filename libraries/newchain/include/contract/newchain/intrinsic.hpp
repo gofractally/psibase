@@ -37,6 +37,16 @@ namespace newchain
 
       // Set the return value of the currently-executing action
       [[clang::import_name("set_retval")]] void set_retval(const char* retval, uint32_t len);
+
+      // Create an account. This intrinsic is privileged.
+      [[clang::import_name("create_account")]] account_num create_account(account_num auth_contract,
+                                                                          bool        privileged);
+      // Set a contract's code. This intrinsic is privileged.
+      [[clang::import_name("set_code")]] void set_code(account_num contract,
+                                                       uint8_t     vm_type,
+                                                       uint8_t     vm_version,
+                                                       const char* code,
+                                                       uint32_t    len);
    }  // namespace raw
 
    // Get result when size is known. Caution: this does not verify size.
@@ -85,5 +95,26 @@ namespace newchain
    {
       auto data = eosio::convert_to_bin(retval);
       raw::set_retval(data.data(), data.size());
+   }
+
+   // Set the return value of the currently-executing action
+   inline void set_retval_serialized(eosio::input_stream s)
+   {
+      raw::set_retval(s.pos, s.remaining());
+   }
+
+   // Create an account. This intrinsic is privileged.
+   inline account_num create_account(account_num auth_contract, bool privileged)
+   {
+      return raw::create_account(auth_contract, privileged);
+   }
+
+   // Set a contract's code. This intrinsic is privileged.
+   inline void set_code(account_num         contract,
+                        uint8_t             vm_type,
+                        uint8_t             vm_version,
+                        eosio::input_stream code)
+   {
+      raw::set_code(contract, vm_type, vm_version, code.pos, code.remaining());
    }
 }  // namespace newchain

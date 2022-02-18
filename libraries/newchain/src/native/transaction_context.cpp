@@ -62,7 +62,10 @@ namespace newchain
          auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
                                                      "extra data in genesis payload");
          db.db.remove(db.db.create<account_object>([](auto&) {}));
-         db.db.create<account_object>([](auto& obj) { obj.auth_contract = 1; });
+         db.db.create<account_object>([](auto& obj) {
+            obj.auth_contract = 1;
+            obj.privileged    = true;
+         });
          set_code(db, 1, data.vm_type, data.vm_version, {data.code.data(), data.code.size()});
       }
       catch (const std::exception& e)

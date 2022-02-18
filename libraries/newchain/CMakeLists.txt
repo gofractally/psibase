@@ -58,6 +58,7 @@ function(add suffix)
         add_library(nctestlib${suffix})
         target_sources(nctestlib${suffix} PRIVATE
             src/tester/tester.cpp
+            src/contract/intrinsic.cpp
             ../eosiolib/tester/tester_intrinsics.cpp
             ../eosiolib/tester/wasi_polyfill/__wasi_args_get.cpp
             ../eosiolib/tester/wasi_polyfill/__wasi_args_sizes_get.cpp
@@ -86,7 +87,7 @@ function(add suffix)
             ${WASI_SDK_PREFIX}/lib/clang/11.0.0/lib/wasi/libclang_rt.builtins-wasm32.a
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
         )
-        target_include_directories(nctestlib${suffix} PUBLIC ../eosiolib/core/include ../eosiolib/contracts/include include/tester)
+        target_include_directories(nctestlib${suffix} PUBLIC include/contract ../eosiolib/core/include ../eosiolib/contracts/include include/tester)
         target_link_options(nctestlib${suffix} INTERFACE -Wl,--export-table)
         target_link_options(nctestlib${suffix} PUBLIC
             -Wl,--entry,_start

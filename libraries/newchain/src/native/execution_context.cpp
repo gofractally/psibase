@@ -201,7 +201,33 @@ namespace newchain
       {
          current_act_context->action_trace.retval.assign(data.begin(), data.end());
       }
-   };
+
+      account_num create_account(account_num auth_contract, bool privileged)
+      {
+         eosio::check(contract_account->privileged,
+                      "contract is not authorized to use create_account");
+         auto id = db.db
+                       .create<account_object>([&](auto& obj) {
+                          obj.auth_contract = auth_contract;
+                          obj.privileged    = privileged;
+                       })
+                       .id._id;
+         auto* a = db.db.find<account_object>(account_object::id_type(auth_contract));
+         eosio::check(a, "auth_contract is not a valid account");
+         return id;
+      }
+
+      void set_code(account_num      contract,
+                    uint32_t         vm_type,
+                    uint32_t         vm_version,
+                    span<const char> code)
+      {
+         eosio::check(contract_account->privileged, "contract is not authorized to use set_code");
+         eosio::check(vm_type == uint8_t(vm_type), "vm_type out of range");
+         eosio::check(vm_version == uint8_t(vm_version), "vm_version out of range");
+         newchain::set_code(db, contract, vm_type, vm_version, {code.data(), code.size()});
+      }
+   };  // execution_context_impl
 
    execution_context::execution_context(transaction_context& trx_context,
                                         execution_memory&    memory,
@@ -221,6 +247,8 @@ namespace newchain
       rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
+      rhf_t::add<&execution_context_impl::create_account>("env", "create_account");
+      rhf_t::add<&execution_context_impl::set_code>("env", "set_code");
    }
 
    void execution_context::exec(action_context& act_context, bool is_auth)
