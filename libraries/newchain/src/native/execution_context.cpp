@@ -97,6 +97,7 @@ namespace newchain
    struct execution_context_impl
    {
       database&                  db;
+      transaction_context&       trx_context;
       eosio::vm::wasm_allocator& wa;
       backend_t*                 backend;
       const account_object*      contract_account;
@@ -106,7 +107,7 @@ namespace newchain
       execution_context_impl(transaction_context& trx_context,
                              execution_memory&    memory,
                              account_num          contract)
-          : db{trx_context.block_context.db}, wa{memory.impl->wa}
+          : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
          contract_account = db.db.find<account_object>(account_object::id_type(contract));
          eosio::check(contract_account, "unknown contract account");
@@ -241,28 +242,23 @@ namespace newchain
       // TODO: track consumption
       // TODO: restrict key size
       // TODO: restrict value size
+      // TODO: restrict contracts writing to other contracts' regions
       void set_kv(span<const char> key, span<const char> value)
       {
-         auto  k   = std::tuple{(account_num)contract_account->id._id,
-                             std::string_view{key.data(), key.size()}};
-         auto* obj = db.db.find<ram_kv_object, by_kv_key>(k);
-         if (obj)
-            db.db.modify(*obj, [&](auto& obj) { obj.value.assign(value.data(), value.size()); });
-         else
-            db.db.create<ram_kv_object>([&](auto& obj) {
-               obj.contract = contract_account->id._id;
-               obj.key.assign(key.data(), key.size());
-               obj.value.assign(value.data(), value.size());
-            });
+         trx_context.kv_trx->upsert(db.kv_map, {key.data(), key.size()},
+                                    {value.data(), value.size()});
       }
 
-      uint32_t get_kv(account_num contract, span<const char> key)
+      // TODO: avoid copying value to result
+      uint32_t get_kv(span<const char> key)
       {
-         auto  k   = std::tuple{contract, std::string_view{key.data(), key.size()}};
-         auto* obj = db.db.find<ram_kv_object, by_kv_key>(k);
-         if (!obj)
+         mdbx::slice k{key.data(), key.size()};
+         mdbx::slice v;
+         auto        stat = ::mdbx_get(*trx_context.kv_trx, db.kv_map, &k, &v);
+         if (stat == MDBX_NOTFOUND)
             return -1;
-         result.assign(obj->value.begin(), obj->value.end());
+         mdbx::error::success_or_throw(stat);
+         result.assign((const char*)v.data(), (const char*)v.data() + v.length());
          return result.size();
       }
    };  // execution_context_impl

@@ -13,8 +13,10 @@ namespace newchain
        : system_context{system_context},
          db{system_context.db},
          db_session{db.db.start_undo_session(enable_undo)},
+         kv_trx{system_context.db.kv->start_write()},
          status{load_status(db)}
    {
+      eosio::check(enable_undo, "TODO: remove option");
       // Corruption detection. busy gets reset only on commit or undo.
       eosio::check(!status.busy,
                    "Can not create a block_context on busy chain. Most likely database was "
@@ -75,6 +77,7 @@ namespace newchain
             status.chain_id = status.head->id;
       });
       db_session.push();
+      kv_trx.commit();
    }
 
    void block_context::push_transaction(const signed_transaction& trx,
@@ -132,6 +135,8 @@ namespace newchain
             eosio::check(!(trx.flags & transaction::do_not_broadcast),
                          "cannot commit a do_not_broadcast transaction");
             t.db_session.squash();
+            if (t.nested_kv_trx)
+               t.nested_kv_trx.commit();
             active = true;
          }
       }

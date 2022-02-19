@@ -11,6 +11,7 @@ namespace newchain
       newchain::system_context&    system_context;
       database&                    db;
       chainbase::database::session db_session;
+      mdbx::txn_managed            kv_trx;
       const status_object&         status;
       block                        current;
       bool                         is_genesis_block    = false;

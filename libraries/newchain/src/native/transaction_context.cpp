@@ -17,6 +17,15 @@ namespace newchain
          recovered_keys{recovered_keys},
          transaction_trace{transaction_trace}
    {
+      if (enable_undo)
+      {
+         nested_kv_trx = block_context.kv_trx.start_nested();
+         kv_trx        = &nested_kv_trx;
+      }
+      else
+      {
+         kv_trx = &block_context.kv_trx;
+      }
    }
 
    static void exec_genesis_action(transaction_context& self, const action& act);

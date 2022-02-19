@@ -8,16 +8,16 @@ namespace token
 {
    eosio::asset get_balance(account_num this_contract, account_num acc, eosio::symbol sym)
    {
-      auto result = get_kv<eosio::asset>(this_contract, std::tuple{acc, sym.code()});
+      auto result = get_kv<eosio::asset>(std::tuple{this_contract, acc, sym.code()});
       if (!result)
          return {0, sym};
       check(result->symbol == sym, "symbol precision mismatch");
       return *result;
    }
 
-   void set_balance(account_num acc, eosio::asset amount)
+   void set_balance(account_num this_contract, account_num acc, eosio::asset amount)
    {
-      set_kv(std::tuple{acc, amount.symbol.code()}, amount);
+      set_kv(std::tuple{this_contract, acc, amount.symbol.code()}, amount);
    }
 
    // TODO: This does a blind issue; need to track created tokens and limits
@@ -26,7 +26,8 @@ namespace token
       check(sender == token::contract, "sender must be token account");
       if (enable_print)
          printf("issue %s to %d\n", args.amount.to_string().c_str(), args.to);
-      set_balance(args.to, get_balance(this_contract, args.to, args.amount.symbol) + args.amount);
+      set_balance(this_contract, args.to,
+                  get_balance(this_contract, args.to, args.amount.symbol) + args.amount);
       if (enable_print)
          printf(" new balance: %s\n",
                 get_balance(this_contract, args.to, args.amount.symbol).to_string().c_str());
@@ -39,8 +40,9 @@ namespace token
          printf("transfer %d->%d %s", sender, args.to, args.amount.to_string().c_str());
       check(args.amount.amount > 0, "may only transfer positive amount");
       check(args.amount.amount <= from_bal.amount, "do not have enough funds");
-      set_balance(sender, from_bal - args.amount);
-      set_balance(args.to, get_balance(this_contract, args.to, args.amount.symbol) + args.amount);
+      set_balance(this_contract, sender, from_bal - args.amount);
+      set_balance(this_contract, args.to,
+                  get_balance(this_contract, args.to, args.amount.symbol) + args.amount);
       if (enable_print)
          printf(" new balances: %s %s\n",
                 get_balance(this_contract, sender, args.amount.symbol).to_string().c_str(),

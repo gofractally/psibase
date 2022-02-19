@@ -58,9 +58,7 @@ namespace newchain
 
       // Get a key-value pair, if any. If key exists, then sets result to value and
       // returns size. If key does not exist, returns -1.
-      [[clang::import_name("get_kv")]] uint32_t get_kv(account_num contract,
-                                                       const char* key,
-                                                       uint32_t    key_len);
+      [[clang::import_name("get_kv")]] uint32_t get_kv(const char* key, uint32_t key_len);
 
    }  // namespace raw
 
@@ -144,10 +142,9 @@ namespace newchain
    }
 
    // Get a key-value pair, if any
-   inline std::optional<std::vector<char>> get_kv_bytes(account_num         contract,
-                                                        eosio::input_stream key)
+   inline std::optional<std::vector<char>> get_kv_bytes(eosio::input_stream key)
    {
-      auto size = raw::get_kv(contract, key.pos, key.remaining());
+      auto size = raw::get_kv(key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
       return get_result(size);
@@ -155,9 +152,9 @@ namespace newchain
 
    // Get a key-value pair, if any
    template <typename V, typename K>
-   inline std::optional<V> get_kv(account_num contract, const K& key)
+   inline std::optional<V> get_kv(const K& key)
    {
-      auto v = get_kv_bytes(contract, eosio::convert_to_key(key));
+      auto v = get_kv_bytes(eosio::convert_to_key(key));
       if (!v)
          return std::nullopt;
       return eosio::convert_from_bin<V>(*v);

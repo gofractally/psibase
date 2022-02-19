@@ -8,6 +8,7 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <chainbase/chainbase.hpp>
+#include <mdbx.h++>
 
 #define SHARED_CTOR_MACRO(x, y, field) , field(a)
 #define SHARED_CTOR(NAME, ...)                                                                    \
@@ -118,7 +119,9 @@ namespace newchain
 
    struct database
    {
-      chainbase::database db;
+      chainbase::database                db;
+      std::unique_ptr<mdbx::env_managed> kv;
+      mdbx::map_handle                   kv_map;
 
       database(const boost::filesystem::path&            dir,
                chainbase::database::open_flags           write = chainbase::database::read_write,
@@ -126,8 +129,19 @@ namespace newchain
                bool                                      allow_dirty      = false,
                chainbase::pinnable_mapped_file::map_mode db_map_mode =
                    chainbase::pinnable_mapped_file::map_mode::mapped)
-          : db{dir, write, shared_file_size, allow_dirty, db_map_mode}
+          : db{dir / "chainbase", write, shared_file_size, allow_dirty, db_map_mode}
       {
+         auto                                  kv_dir = dir / "mdbx";
+         mdbx::env_managed::operate_parameters op;
+         op.options.nested_write_transactions = true;
+         op.options.orphan_read_transactions  = false;
+         kv                                   = std::make_unique<mdbx::env_managed>(
+             kv_dir.native(), mdbx::env_managed::create_parameters{mdbx::env_managed::geometry{}},
+             op);
+         auto trx = kv->start_write();
+         kv_map   = trx.create_map(nullptr);
+         trx.commit();
+
          db.add_index<status_index>();
          db.add_index<account_index>();
          db.add_index<code_index>();

@@ -128,6 +128,10 @@ if(IS_NATIVE)
         ${GMP_LIBRARIES}
     )
     add_dependencies(eos-fc eos)
+
+    set(MDBX_OUTPUT_DIR ${ROOT_BINARY_DIR}/mdbx)
+    set(MDBX_BUILD_TIMESTAMP unknown)
+    add_subdirectory(libmdbx)
 endif()
 
 ExternalProject_Add(fmt-ext
