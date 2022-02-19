@@ -1,5 +1,7 @@
 #pragma once
 
+#include <eosio/from_bin.hpp>
+#include <eosio/to_key.hpp>
 #include <newchain/block.hpp>
 
 namespace newchain
@@ -47,6 +49,19 @@ namespace newchain
                                                        uint8_t     vm_version,
                                                        const char* code,
                                                        uint32_t    len);
+
+      // Set a key-value pair. If key already exists, then replace the existing value.
+      [[clang::import_name("set_kv")]] void set_kv(const char* key,
+                                                   uint32_t    key_len,
+                                                   const char* value,
+                                                   uint32_t    value_len);
+
+      // Get a key-value pair, if any. If key exists, then sets result to value and
+      // returns size. If key does not exist, returns -1.
+      [[clang::import_name("get_kv")]] uint32_t get_kv(account_num contract,
+                                                       const char* key,
+                                                       uint32_t    key_len);
+
    }  // namespace raw
 
    // Get result when size is known. Caution: this does not verify size.
@@ -98,10 +113,7 @@ namespace newchain
    }
 
    // Set the return value of the currently-executing action
-   inline void set_retval_serialized(eosio::input_stream s)
-   {
-      raw::set_retval(s.pos, s.remaining());
-   }
+   inline void set_retval_bytes(eosio::input_stream s) { raw::set_retval(s.pos, s.remaining()); }
 
    // Create an account. This intrinsic is privileged.
    inline account_num create_account(account_num auth_contract, bool privileged)
@@ -116,5 +128,38 @@ namespace newchain
                         eosio::input_stream code)
    {
       raw::set_code(contract, vm_type, vm_version, code.pos, code.remaining());
+   }
+
+   // Set a key-value pair. If key already exists, then replace the existing value.
+   inline void set_kv_bytes(eosio::input_stream key, eosio::input_stream value)
+   {
+      raw::set_kv(key.pos, key.remaining(), value.pos, value.remaining());
+   }
+
+   // Set a key-value pair. If key already exists, then replace the existing value.
+   template <typename K, typename V>
+   void set_kv(const K& key, const V& value)
+   {
+      set_kv_bytes(eosio::convert_to_key(key), eosio::convert_to_bin(value));
+   }
+
+   // Get a key-value pair, if any
+   inline std::optional<std::vector<char>> get_kv_bytes(account_num         contract,
+                                                        eosio::input_stream key)
+   {
+      auto size = raw::get_kv(contract, key.pos, key.remaining());
+      if (size == -1)
+         return std::nullopt;
+      return get_result(size);
+   }
+
+   // Get a key-value pair, if any
+   template <typename V, typename K>
+   inline std::optional<V> get_kv(account_num contract, const K& key)
+   {
+      auto v = get_kv_bytes(contract, eosio::convert_to_key(key));
+      if (!v)
+         return std::nullopt;
+      return eosio::convert_from_bin<V>(*v);
    }
 }  // namespace newchain

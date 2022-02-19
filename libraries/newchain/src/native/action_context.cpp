@@ -14,7 +14,8 @@ namespace newchain
       try
       {
          auto& db = transaction_context.block_context.db;
-         auto& ec = transaction_context.get_execution_context(action.contract);
+         auto& ec = transaction_context.get_execution_context(is_auth ? action_trace.auth_contract
+                                                                      : action.contract);
          ec.exec(*this, is_auth);
       }
       catch (const std::exception& e)

@@ -237,6 +237,34 @@ namespace newchain
          eosio::check(vm_version == uint8_t(vm_version), "vm_version out of range");
          newchain::set_code(db, contract, vm_type, vm_version, {code.data(), code.size()});
       }
+
+      // TODO: track consumption
+      // TODO: restrict key size
+      // TODO: restrict value size
+      void set_kv(span<const char> key, span<const char> value)
+      {
+         auto  k   = std::tuple{(account_num)contract_account->id._id,
+                             std::string_view{key.data(), key.size()}};
+         auto* obj = db.db.find<ram_kv_object, by_kv_key>(k);
+         if (obj)
+            db.db.modify(*obj, [&](auto& obj) { obj.value.assign(value.data(), value.size()); });
+         else
+            db.db.create<ram_kv_object>([&](auto& obj) {
+               obj.contract = contract_account->id._id;
+               obj.key.assign(key.data(), key.size());
+               obj.value.assign(value.data(), value.size());
+            });
+      }
+
+      uint32_t get_kv(account_num contract, span<const char> key)
+      {
+         auto  k   = std::tuple{contract, std::string_view{key.data(), key.size()}};
+         auto* obj = db.db.find<ram_kv_object, by_kv_key>(k);
+         if (!obj)
+            return -1;
+         result.assign(obj->value.begin(), obj->value.end());
+         return result.size();
+      }
    };  // execution_context_impl
 
    execution_context::execution_context(transaction_context& trx_context,
@@ -259,6 +287,8 @@ namespace newchain
       rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
       rhf_t::add<&execution_context_impl::create_account>("env", "create_account");
       rhf_t::add<&execution_context_impl::set_code>("env", "set_code");
+      rhf_t::add<&execution_context_impl::set_kv>("env", "set_kv");
+      rhf_t::add<&execution_context_impl::get_kv>("env", "get_kv");
    }
 
    void execution_context::exec(action_context& act_context, bool is_auth)

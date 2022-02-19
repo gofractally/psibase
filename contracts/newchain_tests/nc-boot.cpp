@@ -36,7 +36,7 @@ namespace boot
       // TODO: only unpack the needed fields
       auto act = get_current_action();
       // TODO: check keys of act.sender
-      set_retval_serialized(call(act));
+      set_retval_bytes(call(act));
    }
 
    extern "C" void __wasm_call_ctors();
