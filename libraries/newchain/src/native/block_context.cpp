@@ -2,44 +2,39 @@
 
 namespace newchain
 {
-   static const status_object& load_status(database& db)
-   {
-      if (auto* obj = db.db.find<status_object>())
-         return *obj;
-      return db.db.create<status_object>([](auto&) {});
-   }
-
    block_context::block_context(newchain::system_context& system_context, bool enable_undo)
        : system_context{system_context},
          db{system_context.db},
-         db_session{db.db.start_undo_session(enable_undo)},
-         kv_trx{system_context.db.kv->start_write()},
-         status{load_status(db)}
+         kv_trx{system_context.db.kv->start_write()}
    {
       eosio::check(enable_undo, "TODO: remove option");
       // Corruption detection. busy gets reset only on commit or undo.
-      eosio::check(!status.busy,
-                   "Can not create a block_context on busy chain. Most likely database was "
-                   "corrupted by a replay failure when optimizations were enabled.");
-      db.db.modify(status, [](auto& status) { status.busy = true; });
    }
 
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold
    void block_context::start(std::optional<eosio::time_point_sec> time)
    {
       eosio::check(!started, "block has already been started");
-      if (status.head)
+      auto status = db.get_kv<status_row>(kv_trx, status_key());
+      if (!status)
       {
-         current.previous = status.head->id;
-         current.num      = status.head->num + 1;
+         status.emplace();
+         db.set_kv(kv_trx, status->key(), *status);
+      }
+
+      if (status->head)
+      {
+         current.previous = status->head->id;
+         current.num      = status->head->num + 1;
          if (time)
          {
-            eosio::check(time->utc_seconds > status.head->time.utc_seconds, "block is in the past");
+            eosio::check(time->utc_seconds > status->head->time.utc_seconds,
+                         "block is in the past");
             current.time = *time;
          }
          else
          {
-            current.time = status.head->time + 1;
+            current.time = status->head->time + 1;
          }
       }
       else
@@ -70,13 +65,14 @@ namespace newchain
       check_active();
       eosio::check(!need_genesis_action, "missing genesis action in block");
       active = false;
-      db.db.modify(status, [&](auto& status) {
-         status.head = current;
-         status.busy = false;
-         if (is_genesis_block)
-            status.chain_id = status.head->id;
-      });
-      db_session.push();
+
+      auto status = db.get_kv<status_row>(kv_trx, status_key());
+      eosio::check(status.has_value(), "missing status record");
+      status->head = current;
+      if (is_genesis_block)
+         status->chain_id = status->head->id;
+      db.set_kv(kv_trx, status->key(), *status);
+
       kv_trx.commit();
    }
 
@@ -134,7 +130,6 @@ namespace newchain
             // TODO: limit billed time in block
             eosio::check(!(trx.flags & transaction::do_not_broadcast),
                          "cannot commit a do_not_broadcast transaction");
-            t.db_session.squash();
             if (t.nested_kv_trx)
                t.nested_kv_trx.commit();
             active = true;

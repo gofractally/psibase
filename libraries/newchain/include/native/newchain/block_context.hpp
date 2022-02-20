@@ -8,16 +8,14 @@ namespace newchain
    // Note: forking must occur before a block_context is created
    struct block_context
    {
-      newchain::system_context&    system_context;
-      database&                    db;
-      chainbase::database::session db_session;
-      mdbx::txn_managed            kv_trx;
-      const status_object&         status;
-      block                        current;
-      bool                         is_genesis_block    = false;
-      bool                         need_genesis_action = false;
-      bool                         started             = false;
-      bool                         active              = false;
+      newchain::system_context& system_context;
+      database&                 db;
+      mdbx::txn_managed         kv_trx;
+      block                     current;
+      bool                      is_genesis_block    = false;
+      bool                      need_genesis_action = false;
+      bool                      started             = false;
+      bool                      active              = false;
 
       block_context(newchain::system_context& system_context, bool enable_undo);
 

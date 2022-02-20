@@ -27,7 +27,9 @@ namespace newchain
       }
    }
 
+   // Only useful for genesis
    void set_code(database&           db,
+                 mdbx::txn_managed&  kv_trx,
                  account_num         contract,
                  uint8_t             vm_type,
                  uint8_t             vm_version,
@@ -35,51 +37,29 @@ namespace newchain
    {
       eosio::check(vm_type == 0, "vm_type is not 0");
       eosio::check(vm_version == 0, "vm_version is not 0");
-      eosio::checksum256 code_hash;
-      if (code.remaining())
-         code_hash = sha256(code.pos, code.remaining());
+      eosio::check(code.remaining(), "native set_code can't clear code");
+      auto code_hash = sha256(code.pos, code.remaining());
 
-      auto* account = db.db.find<account_object>(account_object::id_type(contract));
-      eosio::check(account, "unknown contract account");
-      if (account->code_hash == code_hash && account->vm_type == vm_type &&
-          account->vm_version == vm_version)
-         return;
+      auto account = db.get_kv<account_row>(kv_trx, account_key(contract));
+      eosio::check(account.has_value(), "set_code: unknown contract account");
+      eosio::check(account->code_hash == eosio::checksum256{},
+                   "native set_code can't replace code");
+      account->code_hash  = code_hash;
+      account->vm_type    = vm_type;
+      account->vm_version = vm_version;
+      db.set_kv(kv_trx, account->key(), *account);
 
-      if (account->code_hash != eosio::checksum256{})
+      auto code_obj = db.get_kv<code_row>(kv_trx, code_key(code_hash, vm_type, vm_version));
+      if (!code_obj)
       {
-         // TODO: refund RAM
-         auto* code_obj = db.db.find<code_object, by_pk>(
-             std::tuple{account->code_hash, account->vm_type, account->vm_version});
-         eosio::check(code_obj, "code is missing");
-         if (code_obj->ref_count == 1)
-            db.db.remove(*code_obj);
-         else
-            db.db.modify(*code_obj, [](auto& code_obj) { --code_obj.ref_count; });
+         code_obj.emplace();
+         code_obj->code_hash  = code_hash;
+         code_obj->vm_type    = vm_type;
+         code_obj->vm_version = vm_version;
+         code_obj->code.assign(code.pos, code.end);
       }
-
-      db.db.modify(*account, [&](auto& account) {
-         // TODO: charge RAM if code is not empty
-         account.code_hash  = code_hash;
-         account.vm_type    = vm_type;
-         account.vm_version = vm_version;
-      });
-
-      if (code.remaining())
-      {
-         // TODO: check code
-         auto* code_obj =
-             db.db.find<code_object, by_pk>(std::tuple{code_hash, vm_type, vm_version});
-         if (code_obj)
-            db.db.modify(*code_obj, [](auto& code_obj) { ++code_obj.ref_count; });
-         else
-            db.db.create<code_object>([&](auto& code_obj) {
-               code_obj.ref_count  = 1;
-               code_obj.code_hash  = code_hash;
-               code_obj.vm_type    = vm_type;
-               code_obj.vm_version = vm_version;
-               code_obj.code.assign(code.pos, code.remaining());
-            });
-      }
+      ++code_obj->ref_count;
+      db.set_kv(kv_trx, code_obj->key(), *code_obj);
    }  // set_code
 
    struct execution_memory_impl
@@ -100,7 +80,7 @@ namespace newchain
       transaction_context&       trx_context;
       eosio::vm::wasm_allocator& wa;
       backend_t*                 backend;
-      const account_object*      contract_account;
+      account_row                contract_account;
       bool                       initialized         = false;
       action_context*            current_act_context = nullptr;  // Changes during recursion
 
@@ -109,23 +89,23 @@ namespace newchain
                              account_num          contract)
           : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
-         contract_account = db.db.find<account_object>(account_object::id_type(contract));
-         eosio::check(contract_account, "unknown contract account");
-         auto* code = db.db.find<code_object, by_pk>(std::tuple{
-             contract_account->code_hash, contract_account->vm_type, contract_account->vm_version});
-         eosio::check(code, "account has no code");
+         auto ca = db.get_kv<account_row>(*trx_context.kv_trx, account_key(contract));
+         eosio::check(ca.has_value(), "unknown contract account");
+         eosio::check(ca->code_hash != eosio::checksum256{}, "account has no code");
+         contract_account = std::move(*ca);
+         auto code        = db.get_kv<code_row>(
+             *trx_context.kv_trx, code_key(contract_account.code_hash, contract_account.vm_type,
+                                           contract_account.vm_version));
+         eosio::check(code.has_value(), "code record is missing");
          rethrow_vm_except([&] {
             // TODO (CRITICAL): remove global state
             // TODO: expire cache entries
             static std::map<eosio::checksum256, std::unique_ptr<backend_t>> cache;
-            auto it = cache.find(contract_account->code_hash);
+            auto it = cache.find(contract_account.code_hash);
             if (it == cache.end())
             {
-               std::vector<uint8_t> copy(
-                   reinterpret_cast<const uint8_t*>(code->code.data()),
-                   reinterpret_cast<const uint8_t*>(code->code.data() + code->code.size()));
-               std::unique_ptr<backend_t> be = std::make_unique<backend_t>(copy, nullptr);
-               it = cache.insert({contract_account->code_hash, std::move(be)}).first;
+               std::unique_ptr<backend_t> be = std::make_unique<backend_t>(code->code, nullptr);
+               it = cache.insert({contract_account.code_hash, std::move(be)}).first;
             }
             backend = &*it->second;
          });
@@ -189,12 +169,12 @@ namespace newchain
             eosio::check(false, "call depth exceeded (temporary rule)");
 
          auto act = unpack_all<action>({data.data(), data.size()}, "extra data in call");
-         if (act.sender != contract_account->id)
+         if (act.sender != contract_account.num)
          {
-            auto* sender = db.db.find<account_object>(account_object::id_type(act.sender));
-            eosio::check(sender, "unknown sender account");
+            auto sender = db.get_kv<account_row>(*trx_context.kv_trx, account_key(act.sender));
+            eosio::check(sender.has_value(), "unknown sender account");
             eosio::check(
-                sender->auth_contract == contract_account->id || contract_account->privileged,
+                sender->auth_contract == contract_account.num || contract_account.privileged,
                 "contract is not authorized to call as sender");
          }
 
@@ -211,32 +191,6 @@ namespace newchain
       void set_retval(span<const char> data)
       {
          current_act_context->action_trace.retval.assign(data.begin(), data.end());
-      }
-
-      account_num create_account(account_num auth_contract, bool privileged)
-      {
-         eosio::check(contract_account->privileged,
-                      "contract is not authorized to use create_account");
-         auto id = db.db
-                       .create<account_object>([&](auto& obj) {
-                          obj.auth_contract = auth_contract;
-                          obj.privileged    = privileged;
-                       })
-                       .id._id;
-         auto* a = db.db.find<account_object>(account_object::id_type(auth_contract));
-         eosio::check(a, "auth_contract is not a valid account");
-         return id;
-      }
-
-      void set_code(account_num      contract,
-                    uint32_t         vm_type,
-                    uint32_t         vm_version,
-                    span<const char> code)
-      {
-         eosio::check(contract_account->privileged, "contract is not authorized to use set_code");
-         eosio::check(vm_type == uint8_t(vm_type), "vm_type out of range");
-         eosio::check(vm_version == uint8_t(vm_version), "vm_version out of range");
-         newchain::set_code(db, contract, vm_type, vm_version, {code.data(), code.size()});
       }
 
       // TODO: track consumption
@@ -281,8 +235,6 @@ namespace newchain
       rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
-      rhf_t::add<&execution_context_impl::create_account>("env", "create_account");
-      rhf_t::add<&execution_context_impl::set_code>("env", "set_code");
       rhf_t::add<&execution_context_impl::set_kv>("env", "set_kv");
       rhf_t::add<&execution_context_impl::get_kv>("env", "get_kv");
    }

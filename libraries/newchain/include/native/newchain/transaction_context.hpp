@@ -7,7 +7,6 @@ namespace newchain
    struct transaction_context
    {
       newchain::block_context&                 block_context;
-      chainbase::database::session             db_session;
       mdbx::txn_managed*                       kv_trx;
       mdbx::txn_managed                        nested_kv_trx;
       const signed_transaction&                trx;

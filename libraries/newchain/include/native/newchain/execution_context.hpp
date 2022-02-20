@@ -2,11 +2,18 @@
 
 #include <newchain/block.hpp>
 
+namespace mdbx
+{
+   class txn_managed;
+}
+
 namespace newchain
 {
    struct database;
 
+   // Only useful for genesis
    void set_code(database&           db,
+                 mdbx::txn_managed&  kv_trx,
                  account_num         contract,
                  uint8_t             vm_type,
                  uint8_t             vm_version,

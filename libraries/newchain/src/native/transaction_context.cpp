@@ -12,7 +12,6 @@ namespace newchain
                                             newchain::transaction_trace&          transaction_trace,
                                             bool                                  enable_undo)
        : block_context{block_context},
-         db_session{block_context.db.db.start_undo_session(enable_undo)},
          trx{trx},
          recovered_keys{recovered_keys},
          transaction_trace{transaction_trace}
@@ -41,7 +40,9 @@ namespace newchain
       eosio::check(!trx.actions.empty(), "transaction has no actions");
 
       // Prepare for execution
-      block_context.system_context.set_num_memories(block_context.status.num_execution_memories);
+      auto& db     = block_context.db;
+      auto  status = db.get_kv_or_default<status_row>(*kv_trx, status_key());
+      block_context.system_context.set_num_memories(status.num_execution_memories);
 
       for (auto& act : trx.actions)
       {
@@ -58,7 +59,8 @@ namespace newchain
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
-      block_context.system_context.set_num_memories(block_context.status.num_execution_memories);
+      status = db.get_kv_or_default<status_row>(*kv_trx, status_key());
+      block_context.system_context.set_num_memories(status.num_execution_memories);
    }
 
    static void exec_genesis_action(transaction_context& self, const action& act)
@@ -70,12 +72,14 @@ namespace newchain
          auto& db   = self.block_context.db;
          auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
                                                      "extra data in genesis payload");
-         db.db.remove(db.db.create<account_object>([](auto&) {}));
-         db.db.create<account_object>([](auto& obj) {
-            obj.auth_contract = 1;
-            obj.privileged    = true;
-         });
-         set_code(db, 1, data.vm_type, data.vm_version, {data.code.data(), data.code.size()});
+         account_row account{
+             .num           = 1,
+             .auth_contract = 1,
+             .privileged    = true,
+         };
+         db.set_kv(*self.kv_trx, account.key(), account);
+         set_code(db, *self.kv_trx, 1, data.vm_type, data.vm_version,
+                  {data.code.data(), data.code.size()});
       }
       catch (const std::exception& e)
       {
@@ -87,8 +91,8 @@ namespace newchain
    static void exec_auth_action(transaction_context& self, const action& act)
    {
       auto& db     = self.block_context.db;
-      auto* sender = db.db.find(account_object::id_type(act.sender));
-      eosio::check(sender, "unknown sender account");
+      auto  sender = db.get_kv<account_row>(*self.kv_trx, account_key(act.sender));
+      eosio::check(sender.has_value(), "unknown sender account");
       auto& atrace         = self.transaction_trace.action_traces.emplace_back();
       atrace.act           = act;
       atrace.auth_contract = sender->auth_contract;

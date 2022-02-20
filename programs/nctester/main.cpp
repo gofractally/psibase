@@ -123,8 +123,7 @@ struct test_chain
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
       eosio::check(snapshot.empty(), "snapshots not implemented");
-      db  = std::make_unique<newchain::database>(dir.path(), chainbase::database::read_write,
-                                                state_size);
+      db  = std::make_unique<newchain::database>(dir.path());
       sys = std::make_unique<newchain::system_context>(newchain::system_context{*db});
    }
 
@@ -609,13 +608,14 @@ struct callbacks
 
    void tester_finish_block(uint32_t chain_index) { assert_chain(chain_index).finish_block(); }
 
+   // TODO: drop this and add general kv access
    void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
       auto&                chain = assert_chain(chain_index);
       newchain::block_info bi;
-      auto*                obj = chain.db->db.find<newchain::status_object>();
-      if (obj && obj->head)
-         bi = *obj->head;
+      // auto*                obj = chain.db->db.find<newchain::status_object>();
+      // if (obj && obj->head)
+      //    bi = *obj->head;
       set_data(cb_alloc_data, cb_alloc, convert_to_bin(bi));
    }
 

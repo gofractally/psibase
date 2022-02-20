@@ -40,9 +40,6 @@ namespace newchain
       // Set the return value of the currently-executing action
       [[clang::import_name("set_retval")]] void set_retval(const char* retval, uint32_t len);
 
-      // Create an account. This intrinsic is privileged.
-      [[clang::import_name("create_account")]] account_num create_account(account_num auth_contract,
-                                                                          bool        privileged);
       // Set a contract's code. This intrinsic is privileged.
       [[clang::import_name("set_code")]] void set_code(account_num contract,
                                                        uint8_t     vm_type,
@@ -113,12 +110,6 @@ namespace newchain
    // Set the return value of the currently-executing action
    inline void set_retval_bytes(eosio::input_stream s) { raw::set_retval(s.pos, s.remaining()); }
 
-   // Create an account. This intrinsic is privileged.
-   inline account_num create_account(account_num auth_contract, bool privileged)
-   {
-      return raw::create_account(auth_contract, privileged);
-   }
-
    // Set a contract's code. This intrinsic is privileged.
    inline void set_code(account_num         contract,
                         uint8_t             vm_type,
@@ -136,7 +127,7 @@ namespace newchain
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, typename V>
-   void set_kv(const K& key, const V& value)
+   auto set_kv(const K& key, const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
       set_kv_bytes(eosio::convert_to_key(key), eosio::convert_to_bin(value));
    }
@@ -159,4 +150,15 @@ namespace newchain
          return std::nullopt;
       return eosio::convert_from_bin<V>(*v);
    }
+
+   // Get a value, or the default if not found
+   template <typename V, typename K>
+   inline V get_kv_or_default(const K& key)
+   {
+      auto obj = get_kv<V>(key);
+      if (obj)
+         return std::move(*obj);
+      return {};
+   }
+
 }  // namespace newchain
