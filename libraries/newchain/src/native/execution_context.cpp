@@ -1,9 +1,16 @@
 #include <newchain/execution_context.hpp>
 
+#include <boost/multi_index/key.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index_container.hpp>
 #include <eosio/vm/backend.hpp>
+#include <mutex>
 #include <newchain/action_context.hpp>
 #include <newchain/db.hpp>
 #include <newchain/from_bin.hpp>
+
+namespace bmi = boost::multi_index;
 
 using eosio::vm::span;
 
@@ -62,6 +69,61 @@ namespace newchain
       db.set_kv(kv_trx, code_obj->key(), *code_obj);
    }  // set_code
 
+   struct backend_entry
+   {
+      eosio::checksum256         hash;
+      std::unique_ptr<backend_t> backend;
+   };
+
+   struct by_age;
+   struct by_hash;
+
+   using backend_container = bmi::multi_index_container<
+       backend_entry,
+       bmi::indexed_by<bmi::sequenced<bmi::tag<by_age>>,
+                       bmi::ordered_non_unique<bmi::tag<by_hash>, bmi::key<&backend_entry::hash>>>>;
+
+   struct wasm_cache_impl
+   {
+      std::mutex        mutex;
+      uint32_t          cache_size;
+      backend_container backends;
+
+      wasm_cache_impl(uint32_t cache_size) : cache_size{cache_size} {}
+
+      void add(backend_entry&& entry)
+      {
+         std::lock_guard<std::mutex> lock{mutex};
+         auto&                       ind = backends.get<by_age>();
+         ind.push_back(std::move(entry));
+         while (ind.size() > cache_size)
+            ind.pop_front();
+      }
+
+      std::unique_ptr<backend_t> get(const eosio::checksum256& hash)
+      {
+         std::unique_ptr<backend_t>  result;
+         std::lock_guard<std::mutex> lock{mutex};
+         auto&                       ind = backends.get<by_hash>();
+         auto                        it  = ind.find(hash);
+         if (it == ind.end())
+            return result;
+         ind.modify(it, [&](auto& x) { result = std::move(x.backend); });
+         ind.erase(it);
+         return result;
+      }
+   };
+
+   wasm_cache::wasm_cache(uint32_t cache_size) : impl{std::make_shared<wasm_cache_impl>(cache_size)}
+   {
+   }
+
+   wasm_cache::wasm_cache(const wasm_cache& src) : impl{src.impl} {}
+
+   wasm_cache::wasm_cache(wasm_cache&& src) : impl{std::move(src.impl)} {}
+
+   wasm_cache::~wasm_cache() {}
+
    struct execution_memory_impl
    {
       eosio::vm::wasm_allocator wa;
@@ -79,7 +141,7 @@ namespace newchain
       database&                  db;
       transaction_context&       trx_context;
       eosio::vm::wasm_allocator& wa;
-      backend_t*                 backend;
+      std::unique_ptr<backend_t> backend;
       account_row                contract_account;
       bool                       initialized         = false;
       action_context*            current_act_context = nullptr;  // Changes during recursion
@@ -98,17 +160,17 @@ namespace newchain
                                            contract_account.vm_version));
          eosio::check(code.has_value(), "code record is missing");
          rethrow_vm_except([&] {
-            // TODO (CRITICAL): remove global state
-            // TODO: expire cache entries
-            static std::map<eosio::checksum256, std::unique_ptr<backend_t>> cache;
-            auto it = cache.find(contract_account.code_hash);
-            if (it == cache.end())
-            {
-               std::unique_ptr<backend_t> be = std::make_unique<backend_t>(code->code, nullptr);
-               it = cache.insert({contract_account.code_hash, std::move(be)}).first;
-            }
-            backend = &*it->second;
+            backend = trx_context.block_context.system_context.wasm_cache.impl->get(
+                contract_account.code_hash);
+            if (!backend)
+               backend = std::make_unique<backend_t>(code->code, nullptr);
          });
+      }
+
+      ~execution_context_impl()
+      {
+         trx_context.block_context.system_context.wasm_cache.impl->add(
+             {contract_account.code_hash, std::move(backend)});
       }
 
       // TODO: configurable wasm limits

@@ -124,7 +124,7 @@ struct test_chain
    {
       eosio::check(snapshot.empty(), "snapshots not implemented");
       db  = std::make_unique<newchain::database>(dir.path());
-      sys = std::make_unique<newchain::system_context>(newchain::system_context{*db});
+      sys = std::make_unique<newchain::system_context>(newchain::system_context{*db, {128}});
    }
 
    test_chain(const test_chain&) = delete;

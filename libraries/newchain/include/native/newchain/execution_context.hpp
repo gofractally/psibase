@@ -19,6 +19,17 @@ namespace newchain
                  uint8_t             vm_version,
                  eosio::input_stream code);
 
+   struct wasm_cache_impl;
+   struct wasm_cache
+   {
+      std::shared_ptr<wasm_cache_impl> impl;
+
+      wasm_cache(uint32_t cache_size);
+      wasm_cache(const wasm_cache&);
+      wasm_cache(wasm_cache&&);
+      ~wasm_cache();
+   };
+
    struct execution_memory_impl;
    struct execution_memory
    {

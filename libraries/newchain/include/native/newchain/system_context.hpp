@@ -8,6 +8,7 @@ namespace newchain
    struct system_context
    {
       database&                     db;
+      newchain::wasm_cache          wasm_cache;
       std::vector<execution_memory> execution_memories;
 
       void set_num_memories(size_t n)
