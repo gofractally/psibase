@@ -28,13 +28,13 @@ namespace newchain
    }
 
    static void exec_genesis_action(transaction_context& self, const action& act);
-   static void exec_auth_action(transaction_context& self, const action& act);
+   static void exec_auth_actions(transaction_context& self);
 
    // TODO: limit execution time when not playing a produced block
    // TODO: charge net and cpu
    // TODO: check ref_block_num, ref_block_prefix
    // TODO: check max_net_usage_words, max_cpu_usage_ms
-   void transaction_context::exec_all_actions()
+   void transaction_context::exec_transaction()
    {
       eosio::check(block_context.current.time < trx.expiration, "transaction expired");
       eosio::check(!trx.actions.empty(), "transaction has no actions");
@@ -44,17 +44,15 @@ namespace newchain
       auto  status = db.get_kv_or_default<status_row>(*kv_trx, status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
 
-      for (auto& act : trx.actions)
+      if (block_context.need_genesis_action)
       {
-         if (block_context.need_genesis_action)
-         {
-            exec_genesis_action(*this, act);
-            block_context.need_genesis_action = false;
-         }
-         else
-         {
-            exec_auth_action(*this, act);
-         }
+         eosio::check(trx.actions.size() == 1, "genesis transaction must have exactly 1 action");
+         exec_genesis_action(*this, trx.actions[0]);
+         block_context.need_genesis_action = false;
+      }
+      else
+      {
+         exec_auth_actions(*this);
       }
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
@@ -88,23 +86,28 @@ namespace newchain
       }
    }
 
-   static void exec_auth_action(transaction_context& self, const action& act)
+   static void exec_auth_actions(transaction_context& self)
    {
-      auto& db     = self.block_context.db;
-      auto  sender = db.get_kv<account_row>(*self.kv_trx, account_key(act.sender));
-      eosio::check(sender.has_value(), "unknown sender account");
-      auto& atrace         = self.transaction_trace.action_traces.emplace_back();
-      atrace.act           = act;
-      atrace.auth_contract = sender->auth_contract;
-      action_context ac{self, act, self.transaction_trace.action_traces.back()};
-      ac.exec(true);
+      auto& db = self.block_context.db;
+      for (auto& act : self.trx.actions)
+      {
+         auto sender = db.get_kv<account_row>(*self.kv_trx, account_key(act.sender));
+         eosio::check(sender.has_value(), "unknown sender account");
+         auto& atrace         = self.transaction_trace.action_traces.emplace_back();
+         atrace.act           = act;
+         atrace.auth_contract = sender->auth_contract;
+         action_context ac    = {self, act, self.transaction_trace.action_traces.back()};
+         auto&          ec    = self.get_execution_context(atrace.auth_contract);
+         ec.exec_auth(ac);
+      }
    }
 
    void transaction_context::exec_called_action(const action& act, action_trace& atrace)
    {
-      atrace.act = act;
-      action_context ac{*this, act, atrace};
-      ac.exec();
+      atrace.act        = act;
+      action_context ac = {*this, act, atrace};
+      auto&          ec = get_execution_context(act.contract);
+      ec.exec_called(ac);
    }
 
    execution_context& transaction_context::get_execution_context(account_num contract)

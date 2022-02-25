@@ -29,14 +29,16 @@ TEST_CASE("t1")
 
    std::cout << "set first code\n";
    show(false, t.push_transaction(t.make_transaction(  //
+                   {{
+                       .sender   = 9999,
+                       .contract = 9999,
+                       .raw_data = eosio::convert_to_bin(newchain::genesis_action_data{
+                           .code = read_whole_file("nc-boot.wasm"),
+                       }),
+                   }})));
+
+   show(false, t.push_transaction(t.make_transaction(  //
                    {
-                       {
-                           .sender   = 9999,
-                           .contract = 9999,
-                           .raw_data = eosio::convert_to_bin(newchain::genesis_action_data{
-                               .code = read_whole_file("nc-boot.wasm"),
-                           }),
-                       },
                        {
                            .sender   = boot::contract,
                            .contract = boot::contract,
@@ -80,14 +82,16 @@ TEST_CASE("t2")
    test_chain t;
    t.start_block();
    show(false, t.push_transaction(t.make_transaction(  //
+                   {{
+                       .sender   = 9999,
+                       .contract = 9999,
+                       .raw_data = eosio::convert_to_bin(newchain::genesis_action_data{
+                           .code = read_whole_file("nc-boot.wasm"),
+                       }),
+                   }})));
+
+   show(false, t.push_transaction(t.make_transaction(  //
                    {
-                       {
-                           .sender   = 9999,
-                           .contract = 9999,
-                           .raw_data = eosio::convert_to_bin(newchain::genesis_action_data{
-                               .code = read_whole_file("nc-boot.wasm"),
-                           }),
-                       },
                        {
                            .sender   = boot::contract,
                            .contract = boot::contract,

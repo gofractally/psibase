@@ -21,7 +21,7 @@ namespace newchain
                           newchain::transaction_trace&          transaction_trace,
                           bool                                  enable_undo);
 
-      void exec_all_actions();
+      void exec_transaction();
       void exec_called_action(const action& act, action_trace& atrace);
 
       execution_context& get_execution_context(account_num contract);

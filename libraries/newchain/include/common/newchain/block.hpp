@@ -37,6 +37,7 @@ namespace newchain
 
    // Resources billed to trx.actions[0].sender
    // TODO: context-free actions?
+   // TODO: separate native-defined fields from contract-defined fields
    struct transaction
    {
       static constexpr uint32_t do_not_broadcast = 1u << 0;

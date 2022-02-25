@@ -176,14 +176,23 @@ namespace newchain
       // TODO: configurable wasm limits
       void init()
       {
-         if (initialized)
-            return;
          rethrow_vm_except([&] {
             backend->set_wasm_allocator(&wa);
             backend->initialize(this);
             (*backend)(*this, "env", "start", (uint32_t)current_act_context->action.contract);
             initialized = true;
          });
+      }
+
+      template <typename F>
+      void exec(action_context& act_context, F f)
+      {
+         auto prev           = current_act_context;
+         current_act_context = &act_context;
+         if (!initialized)
+            init();
+         rethrow_vm_except(f);
+         current_act_context = prev;
       }
 
       std::vector<char> result;
@@ -301,21 +310,19 @@ namespace newchain
       rhf_t::add<&execution_context_impl::get_kv>("env", "get_kv");
    }
 
-   void execution_context::exec(action_context& act_context, bool is_auth)
+   void execution_context::exec_auth(action_context& act_context)
    {
-      auto prev                 = impl->current_act_context;
-      impl->current_act_context = &act_context;
-
-      impl->init();
-      rethrow_vm_except([&] {
-         if (is_auth)
-            (*impl->backend)(*impl, "env", "auth", (uint32_t)act_context.action.contract);
-         else
-            (*impl->backend)(*impl, "env", "called", (uint32_t)act_context.action.contract,
-                             (uint32_t)act_context.action.sender);
+      impl->exec(act_context, [&] {  //
+         (*impl->backend)(*impl, "env", "auth", (uint32_t)act_context.action.contract);
       });
+   }
 
-      impl->current_act_context = prev;
+   void execution_context::exec_called(action_context& act_context)
+   {
+      impl->exec(act_context, [&] {  //
+         (*impl->backend)(*impl, "env", "called", (uint32_t)act_context.action.contract,
+                          (uint32_t)act_context.action.sender);
+      });
    }
 
 }  // namespace newchain

@@ -99,7 +99,6 @@ function(add suffix)
         target_link_libraries(newchain${suffix} PUBLIC chain mdbx-static)
         target_include_directories(newchain${suffix} PUBLIC include/native ../../external/libmdbx)
         target_sources(newchain${suffix} PRIVATE
-            src/native/action_context.cpp
             src/native/block_context.cpp
             src/native/execution_context.cpp
             src/native/system_context.cpp
