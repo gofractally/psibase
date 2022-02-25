@@ -8,4 +8,5 @@ endif()
 
 if(DEFINED IS_NATIVE)
     add_subdirectory(debug_eos_vm)
+    add_subdirectory(newchain_http)
 endif()

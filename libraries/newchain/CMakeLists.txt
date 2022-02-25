@@ -102,6 +102,7 @@ function(add suffix)
             src/native/action_context.cpp
             src/native/block_context.cpp
             src/native/execution_context.cpp
+            src/native/system_context.cpp
             src/native/transaction_context.cpp
         )
     endif()

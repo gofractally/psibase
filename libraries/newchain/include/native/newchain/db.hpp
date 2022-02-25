@@ -13,21 +13,31 @@ namespace newchain
 {
    struct database
    {
-      std::unique_ptr<mdbx::env_managed> kv;
-      mdbx::map_handle                   kv_map;
+      const std::unique_ptr<mdbx::env_managed> kv;
+      const mdbx::map_handle                   kv_map;
 
       database(const boost::filesystem::path& dir)
+          : kv{construct_kv(dir)}, kv_map{construct_kv_map(*kv)}
+      {
+      }
+
+      static std::unique_ptr<mdbx::env_managed> construct_kv(const boost::filesystem::path& dir)
       {
          mdbx::env_managed::operate_parameters op;
          op.options.nested_write_transactions = true;
          op.options.orphan_read_transactions  = false;
 
-         kv = std::make_unique<mdbx::env_managed>(
+         return std::make_unique<mdbx::env_managed>(
              dir.native(), mdbx::env_managed::create_parameters{mdbx::env_managed::geometry{}}, op);
+      }
 
-         auto trx = kv->start_write();
-         kv_map   = trx.create_map(nullptr);
+      static mdbx::map_handle construct_kv_map(mdbx::env_managed& kv)
+      {
+         mdbx::map_handle kv_map;
+         auto             trx = kv.start_write();
+         kv_map               = trx.create_map(nullptr);
          trx.commit();
+         return kv_map;
       }
 
       void set_kv_raw(mdbx::txn& kv_trx, eosio::input_stream key, eosio::input_stream value)

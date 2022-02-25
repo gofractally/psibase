@@ -7,8 +7,14 @@ namespace newchain
          db{system_context.db},
          kv_trx{system_context.db.kv->start_write()}
    {
-      eosio::check(enable_undo, "TODO: remove option");
-      // Corruption detection. busy gets reset only on commit or undo.
+      eosio::check(enable_undo, "TODO: revisit enable_undo option");
+   }
+
+   block_context::block_context(newchain::system_context& system_context, read_only)
+       : system_context{system_context},
+         db{system_context.db},
+         kv_trx{system_context.db.kv->start_read()}
+   {
    }
 
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold

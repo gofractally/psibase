@@ -21,4 +21,15 @@ namespace newchain
       }
    };  // system_context
 
+   struct shared_state_impl;
+   struct shared_state
+   {
+      const std::unique_ptr<shared_state_impl> impl;
+
+      shared_state(std::unique_ptr<database> db, newchain::wasm_cache wasm_cache);
+      ~shared_state();
+
+      std::unique_ptr<system_context> get_system_context();
+      void                            add_system_context(std::unique_ptr<system_context> context);
+   };
 }  // namespace newchain

@@ -5,6 +5,10 @@
 
 namespace newchain
 {
+   struct read_only
+   {
+   };
+
    // Note: forking must occur before a block_context is created
    struct block_context
    {
@@ -18,6 +22,7 @@ namespace newchain
       bool                      active              = false;
 
       block_context(newchain::system_context& system_context, bool enable_undo);
+      block_context(newchain::system_context& system_context, read_only);
 
       void check_active() { eosio::check(active, "block is not active"); }
 
@@ -29,6 +34,13 @@ namespace newchain
                             transaction_trace&        trace,
                             bool                      enable_undo = true,
                             bool                      commit      = true);
+
+      transaction_trace push_transaction(const signed_transaction& trx)
+      {
+         transaction_trace trace;
+         push_transaction(trx, trace);
+         return trace;
+      }
 
       void exec_all_in_block();
 
