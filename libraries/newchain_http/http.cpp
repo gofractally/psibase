@@ -238,7 +238,7 @@ namespace newchain::http
             trx.expiration = bc.current.time + 1;
             // TODO: need cleaner way to indicate RPC call. Separate WASM entry point?
             trx.actions.push_back({
-                .sender   = 0,
+                .sender   = rpc_contract_num,
                 .contract = rpc_contract_num,
                 .raw_data = eosio::convert_to_bin(data),
             });

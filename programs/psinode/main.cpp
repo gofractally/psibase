@@ -1,4 +1,6 @@
+#include <nc-boot.hpp>
 #include <newchain/http.hpp>
+#include <newchain/rpc.hpp>
 #include <newchain/transaction_context.hpp>
 
 #include <eosio/finally.hpp>
@@ -27,7 +29,7 @@ std::vector<char> read_whole_file(const char* filename)
    return buf;
 }
 
-// TODO: configurable locations
+// TODO: configurable wasm locations
 void bootstrap_chain(system_context& system)
 {
    auto push = [&](auto& bc, account_num sender, account_num contract, const auto& data) {
@@ -45,11 +47,19 @@ void bootstrap_chain(system_context& system)
    bc.start();
    eosio::check(bc.is_genesis_block, "can not bootstrap non-empty chain");
    push(bc, 0, 0, genesis_action_data{.code = read_whole_file("nc-boot.wasm")});
+   push(bc, 1, 1, boot::action{boot::create_account{.auth_contract = 1}});
+   push(bc, 1, 1,
+        boot::action{boot::set_code{
+            .contract = rpc_contract_num,
+            .code     = read_whole_file("nc-rpc.wasm"),
+        }});
    bc.commit();
 }
 
 void run(const char* db_path, bool bootstrap, bool produce, bool api_server)
 {
+   execution_context::register_host_functions();
+
    // TODO: configurable wasm_cache size
    auto db           = std::make_unique<database>(db_path);
    auto shared_state = std::make_shared<newchain::shared_state>(std::move(db), wasm_cache{128});

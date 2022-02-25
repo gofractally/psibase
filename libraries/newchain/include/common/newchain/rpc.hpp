@@ -4,7 +4,7 @@
 
 namespace newchain
 {
-   account_num rpc_contract_num = 2;  // RPC requests run on this contract
+   constexpr account_num rpc_contract_num = 2;  // RPC requests run on this contract
 
    struct rpc_request_data
    {
