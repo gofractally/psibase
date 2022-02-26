@@ -5,8 +5,21 @@
 
 using namespace newchain;
 
+static constexpr bool enable_print = false;
+
 namespace boot
 {
+   void exec(account_num this_contract, account_num sender, auth_check& act)
+   {
+      // TODO: avoid copying inner raw_data (occurs in "called()" dispatcher below)
+      if (enable_print)
+         eosio::print("auth_check\n");
+      check(sender == 1, "Only contract 1 may request auth checks");
+      // TODO: check keys of act.sender
+      // TODO: avoid reserialization
+      set_retval_bytes(call(act));
+   }
+
    account_num exec(account_num this_contract, account_num sender, create_account& args)
    {
       // TODO: Bill RAM? A different resource?
@@ -83,12 +96,32 @@ namespace boot
           data);
    }
 
-   extern "C" [[clang::export_name("auth")]] void auth(account_num this_contract)
+   extern "C" [[clang::export_name("process_transaction")]] void process_transaction()
    {
-      // TODO: only unpack the needed fields
-      auto act = get_current_action();
-      // TODO: check keys of act.sender
-      set_retval_bytes(call(act));
+      if (enable_print)
+         eosio::print("process_transaction\n");
+      // TODO: expiration
+      // TODO: check ref_block_num, ref_block_prefix
+      // TODO: check max_net_usage_words, max_cpu_usage_ms
+      // TODO: resource billing
+      // TODO: subjective mitigation hooks
+      // TODO: limit execution time
+      auto top_act = get_current_action();
+      // TODO: avoid copying inner raw_data during unpack
+      auto trx = eosio::convert_from_bin<transaction>(top_act.raw_data);
+      for (auto& act : trx.actions)
+      {
+         auto account = get_kv<account_row>(account_key(act.sender));
+         check(!!account, "unknown sender");
+         // TODO: assumes same dispatch format (abi) as nc-boot
+         // TODO: avoid inner raw_data copy
+         newchain::action outer = {
+             .sender   = 1,
+             .contract = account->auth_contract,
+             .raw_data = eosio::convert_to_bin(boot::action{act}),
+         };
+         call(outer);  // TODO: avoid copy (serializing outer)
+      }
    }
 
    extern "C" void __wasm_call_ctors();

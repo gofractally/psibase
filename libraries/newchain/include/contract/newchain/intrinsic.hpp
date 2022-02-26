@@ -40,13 +40,6 @@ namespace newchain
       // Set the return value of the currently-executing action
       [[clang::import_name("set_retval")]] void set_retval(const char* retval, uint32_t len);
 
-      // Set a contract's code. This intrinsic is privileged.
-      [[clang::import_name("set_code")]] void set_code(account_num contract,
-                                                       uint8_t     vm_type,
-                                                       uint8_t     vm_version,
-                                                       const char* code,
-                                                       uint32_t    len);
-
       // Set a key-value pair. If key already exists, then replace the existing value.
       [[clang::import_name("set_kv")]] void set_kv(const char* key,
                                                    uint32_t    key_len,
@@ -109,15 +102,6 @@ namespace newchain
 
    // Set the return value of the currently-executing action
    inline void set_retval_bytes(eosio::input_stream s) { raw::set_retval(s.pos, s.remaining()); }
-
-   // Set a contract's code. This intrinsic is privileged.
-   inline void set_code(account_num         contract,
-                        uint8_t             vm_type,
-                        uint8_t             vm_version,
-                        eosio::input_stream code)
-   {
-      raw::set_code(contract, vm_type, vm_version, code.pos, code.remaining());
-   }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    inline void set_kv_bytes(eosio::input_stream key, eosio::input_stream value)

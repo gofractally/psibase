@@ -28,14 +28,11 @@ namespace newchain
    }
 
    static void exec_genesis_action(transaction_context& self, const action& act);
-   static void exec_auth_actions(transaction_context& self);
+   static void exec_process_transaction(transaction_context& self);
 
-   // TODO: limit execution time when not playing a produced block
-   // TODO: charge net and cpu
-   // TODO: check ref_block_num, ref_block_prefix
-   // TODO: check max_net_usage_words, max_cpu_usage_ms
    void transaction_context::exec_transaction()
    {
+      // TODO: move checks into wasm
       eosio::check(block_context.current.time < trx.expiration, "transaction expired");
       eosio::check(!trx.actions.empty(), "transaction has no actions");
 
@@ -52,7 +49,7 @@ namespace newchain
       }
       else
       {
-         exec_auth_actions(*this);
+         exec_process_transaction(*this);
       }
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
@@ -86,20 +83,18 @@ namespace newchain
       }
    }
 
-   static void exec_auth_actions(transaction_context& self)
+   static void exec_process_transaction(transaction_context& self)
    {
-      auto& db = self.block_context.db;
-      for (auto& act : self.trx.actions)
-      {
-         auto sender = db.get_kv<account_row>(*self.kv_trx, account_key(act.sender));
-         eosio::check(sender.has_value(), "unknown sender account");
-         auto& atrace         = self.transaction_trace.action_traces.emplace_back();
-         atrace.act           = act;
-         atrace.auth_contract = sender->auth_contract;
-         action_context ac    = {self, act, self.transaction_trace.action_traces.back()};
-         auto&          ec    = self.get_execution_context(atrace.auth_contract);
-         ec.exec_auth(ac);
-      }
+      action act{
+          .sender   = 0,
+          .contract = 1,
+          .raw_data = eosio::convert_to_bin(self.trx),
+      };
+      auto& atrace      = self.transaction_trace.action_traces.emplace_back();
+      atrace.act        = act;  // TODO: avoid copy and redundancy between act and atrace.act
+      action_context ac = {self, act, self.transaction_trace.action_traces.back()};
+      auto&          ec = self.get_execution_context(1);
+      ec.exec_process_transaction(ac);
    }
 
    void transaction_context::exec_called_action(const action& act, action_trace& atrace)

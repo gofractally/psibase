@@ -9,6 +9,8 @@ namespace boot
 {
    static constexpr newchain::account_num contract = 1;
 
+   using auth_check = newchain::action;
+
    struct create_account
    {
       using return_type = newchain::account_num;
@@ -29,7 +31,7 @@ namespace boot
    };
    EOSIO_REFLECT(set_code, contract, vm_type, vm_version, code)
 
-   using action = std::variant<create_account, set_code>;
+   using action = std::variant<auth_check, create_account, set_code>;
 
    template <typename T, typename R = typename T::return_type>
    R call(newchain::account_num sender, T args)

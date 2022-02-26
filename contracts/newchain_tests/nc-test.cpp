@@ -43,7 +43,7 @@ TEST_CASE("t1")
                            .sender   = boot::contract,
                            .contract = boot::contract,
                            .raw_data = eosio::convert_to_bin(boot::action{boot::create_account{
-                               .auth_contract = 2,
+                               .auth_contract = 1,
                                .privileged    = false,
                            }}),
                        },

@@ -23,6 +23,7 @@ namespace newchain
    };
    EOSIO_REFLECT(status_row, chain_id, head, next_account_num, num_execution_memories)
 
+   // TODO: Rename account to contract?
    inline auto account_key(account_num num)
    {
       // TODO: leave space for secondary index?

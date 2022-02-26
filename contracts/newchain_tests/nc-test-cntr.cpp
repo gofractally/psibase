@@ -20,19 +20,6 @@ extern "C" void start(account_num this_contract)
    printf("This is contract %d\n", this_contract);
 }
 
-extern "C" [[clang::export_name("auth")]] void auth(account_num this_contract)
-{
-   printf("auth this_contract=%d\n", this_contract);
-
-   // TODO: only unpack the needed fields
-   auto act = get_current_action();
-   printf("act:%s\n", eosio::convert_to_json(act).c_str());
-   // TODO: check keys of act.sender
-   printf("Authenticated account %d\n", act.sender);
-   // TODO: forward return value
-   call(act);
-}
-
 extern "C" void called(account_num this_contract, account_num sender)
 {
    // printf("called this_contract=%d, sender=%d\n", this_contract, sender);

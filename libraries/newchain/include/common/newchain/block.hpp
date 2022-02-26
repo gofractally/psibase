@@ -11,6 +11,7 @@
 
 namespace newchain
 {
+   // TODO: Rename to contract_num?
    using account_num = uint32_t;
 
    using block_num = uint32_t;
@@ -35,8 +36,6 @@ namespace newchain
    };
    EOSIO_REFLECT(genesis_action_data, vm_type, vm_version, memo, code)
 
-   // Resources billed to trx.actions[0].sender
-   // TODO: context-free actions?
    // TODO: separate native-defined fields from contract-defined fields
    struct transaction
    {

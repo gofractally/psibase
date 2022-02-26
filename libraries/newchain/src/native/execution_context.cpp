@@ -236,9 +236,10 @@ namespace newchain
       uint32_t call(span<const char> data)
       {
          // TODO: replace temporary rule
-         if (++current_act_context->transaction_context.call_depth > 4)
+         if (++current_act_context->transaction_context.call_depth > 6)
             eosio::check(false, "call depth exceeded (temporary rule)");
 
+         // TODO: don't unpack raw_data
          auto act = unpack_all<action>({data.data(), data.size()}, "extra data in call");
          if (act.sender != contract_account.num)
          {
@@ -252,6 +253,7 @@ namespace newchain
          current_act_context->action_trace.inner_traces.push_back({action_trace{}});
          auto& inner_action_trace =
              std::get<action_trace>(current_act_context->action_trace.inner_traces.back().inner);
+         // TODO: avoid reserialization
          current_act_context->transaction_context.exec_called_action(act, inner_action_trace);
          result = inner_action_trace.retval;
 
@@ -310,10 +312,10 @@ namespace newchain
       rhf_t::add<&execution_context_impl::get_kv>("env", "get_kv");
    }
 
-   void execution_context::exec_auth(action_context& act_context)
+   void execution_context::exec_process_transaction(action_context& act_context)
    {
       impl->exec(act_context, [&] {  //
-         (*impl->backend)(*impl, "env", "auth", (uint32_t)act_context.action.contract);
+         (*impl->backend)(*impl, "env", "process_transaction");
       });
    }
 
