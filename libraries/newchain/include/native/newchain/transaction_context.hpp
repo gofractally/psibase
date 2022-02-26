@@ -23,6 +23,7 @@ namespace newchain
 
       void exec_transaction();
       void exec_called_action(const action& act, action_trace& atrace);
+      void exec_rpc(const action& act, action_trace& atrace);
 
       execution_context& get_execution_context(account_num contract);
    };  // transaction_context

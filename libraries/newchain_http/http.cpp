@@ -235,18 +235,16 @@ namespace newchain::http
             block_context  bc{*system, read_only{}};
             bc.start();
             signed_transaction trx;
-            trx.expiration = bc.current.time + 1;
-            // TODO: need cleaner way to indicate RPC call. Separate WASM entry point?
-            trx.actions.push_back({
+            action             act{
                 .sender   = rpc_contract_num,
                 .contract = rpc_contract_num,
                 .raw_data = eosio::convert_to_bin(data),
-            });
+            };
             transaction_trace   trace;
             transaction_context tc{bc, trx, {}, trace, false};
-            tc.exec_transaction();
-
-            auto result = eosio::convert_from_bin<rpc_reply_data>(trace.action_traces[0].retval);
+            action_trace        atrace;
+            tc.exec_rpc(act, atrace);
+            auto result = eosio::convert_from_bin<rpc_reply_data>(atrace.retval);
             return send(ok(std::move(result.reply), result.content_type.c_str()));
          }
          else if (http_config.static_dir.empty())

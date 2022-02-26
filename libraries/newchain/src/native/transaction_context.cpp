@@ -105,6 +105,18 @@ namespace newchain
       ec.exec_called(ac);
    }
 
+   void transaction_context::exec_rpc(const action& act, action_trace& atrace)
+   {
+      auto& db     = block_context.db;
+      auto  status = db.get_kv_or_default<status_row>(*kv_trx, status_key());
+      block_context.system_context.set_num_memories(status.num_execution_memories);
+
+      atrace.act        = act;
+      action_context ac = {*this, act, atrace};
+      auto&          ec = get_execution_context(act.contract);
+      ec.exec_rpc(ac);
+   }
+
    execution_context& transaction_context::get_execution_context(account_num contract)
    {
       auto it = execution_contexts.find(contract);

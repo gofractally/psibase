@@ -4,6 +4,7 @@
 
 namespace newchain
 {
+   // TODO: move to table instead of fixed value
    constexpr account_num rpc_contract_num = 2;  // RPC requests run on this contract
 
    struct rpc_request_data
