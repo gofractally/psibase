@@ -19,6 +19,11 @@ function(add suffix)
     target_link_libraries(nc-rpc${suffix} newchain-contract-simple-malloc)
     set_target_properties(nc-rpc${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
+    add_executable(nc-name${suffix} nc-name.cpp)
+    target_include_directories(nc-name${suffix} PUBLIC include)
+    target_link_libraries(nc-name${suffix} newchain-contract-simple-malloc)
+    set_target_properties(nc-name${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+
     add_executable(nc-test${suffix} nc-test.cpp)
     target_include_directories(nc-test${suffix} PUBLIC include)
     target_link_libraries(nc-test${suffix} nctestlib)

@@ -116,6 +116,22 @@ namespace newchain
       set_kv_bytes(eosio::convert_to_key(key), eosio::convert_to_bin(value));
    }
 
+   // Size of key-value pair, if any
+   inline std::optional<uint32_t> get_kv_bytes_size(eosio::input_stream key)
+   {
+      auto size = raw::get_kv(key.pos, key.remaining());
+      if (size == -1)
+         return std::nullopt;
+      return size;
+   }
+
+   // Size of key-value pair, if any
+   template <typename K>
+   inline std::optional<uint32_t> get_kv_size(const K& key)
+   {
+      return get_kv_bytes_size(eosio::convert_to_key(key));
+   }
+
    // Get a key-value pair, if any
    inline std::optional<std::vector<char>> get_kv_bytes(eosio::input_stream key)
    {

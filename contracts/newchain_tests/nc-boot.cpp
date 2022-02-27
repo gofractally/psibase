@@ -1,4 +1,5 @@
 #include "nc-boot.hpp"
+#include "nc-name.hpp"
 
 #include <newchain/crypto.hpp>
 #include <newchain/native_tables.hpp>
@@ -23,7 +24,8 @@ namespace boot
    account_num exec(account_num this_contract, account_num sender, create_account& args)
    {
       // TODO: Bill RAM? A different resource?
-      check(sender == boot::contract, "sender must be boot account");
+      check(sender == boot::contract || sender == name::contract,
+            "sender must be boot account or name account");
       auto status = get_kv<status_row>(status_key());
       check(status.has_value(), "missing status");
       account_row account{

@@ -1,4 +1,5 @@
 #include <nc-boot.hpp>
+#include <nc-name.hpp>
 #include <newchain/http.hpp>
 #include <newchain/rpc.hpp>
 #include <newchain/transaction_context.hpp>
@@ -50,8 +51,38 @@ void bootstrap_chain(system_context& system)
    push(bc, 1, 1, boot::action{boot::create_account{.auth_contract = 1}});
    push(bc, 1, 1,
         boot::action{boot::set_code{
+            .contract = name::contract,
+            .code     = read_whole_file("nc-name.wasm"),
+        }});
+   push(bc, name::contract, name::contract,
+        name::action{name::register_account{
+            .account = 1,
+            .name    = "transaction.psi",
+        }});
+   push(bc, name::contract, name::contract,
+        name::action{name::register_account{
+            .account = 2,
+            .name    = "name.psi",
+        }});
+   push(bc, name::contract, name::contract,
+        name::action{name::create_account{
+            .name          = "rpc.psi",
+            .auth_contract = "transaction.psi",
+        }});
+   push(bc, 1, 1,
+        boot::action{boot::set_code{
             .contract = rpc_contract_num,
             .code     = read_whole_file("nc-rpc.wasm"),
+        }});
+   push(bc, name::contract, name::contract,
+        name::action{name::create_account{
+            .name          = "alice",
+            .auth_contract = "transaction.psi",
+        }});
+   push(bc, name::contract, name::contract,
+        name::action{name::create_account{
+            .name          = "bob",
+            .auth_contract = "transaction.psi",
         }});
    bc.commit();
 }

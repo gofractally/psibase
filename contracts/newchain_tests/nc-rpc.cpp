@@ -1,4 +1,4 @@
-#include "nc-token.hpp"
+#include "nc-name.hpp"
 
 #include <newchain/intrinsic.hpp>
 #include <newchain/native_tables.hpp>
@@ -7,6 +7,13 @@
 using namespace newchain;
 
 static constexpr bool enable_print = true;
+
+struct augmented_account_row : account_row
+{
+   std::optional<std::string> name;
+   std::optional<std::string> auth_contract_name;
+};
+EOSIO_REFLECT(augmented_account_row, base account_row, name, auth_contract_name)
 
 namespace rpc
 {
@@ -30,13 +37,17 @@ namespace rpc
       }
       else if (req.method == "GET" && req.target == "/psiq/accounts")
       {
-         std::vector<account_row> rows;
+         std::vector<augmented_account_row> rows;
          for (account_num i = 1;; ++i)
          {
             auto acc = get_kv<account_row>(account_key(i));
             if (!acc)
                break;
-            rows.push_back(std::move(*acc));
+            augmented_account_row aug;
+            (account_row&)aug      = *acc;
+            aug.name               = name::call(act.contract, name::get_by_num{aug.num});
+            aug.auth_contract_name = name::call(act.contract, name::get_by_num{aug.auth_contract});
+            rows.push_back(std::move(aug));
          }
          return to_json(rows);
       }
