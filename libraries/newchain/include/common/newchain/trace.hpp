@@ -10,12 +10,11 @@ namespace newchain
    struct action_trace
    {
       action                     act;
-      account_num                auth_contract = 0;  // non-0: called instead of act.contract
-      std::vector<char>          retval;             // TODO: Move to receipt?
+      std::vector<char>          retval;  // TODO: Move to receipt?
       std::vector<inner_trace>   inner_traces;
       std::optional<std::string> error;
    };
-   EOSIO_REFLECT(action_trace, act, auth_contract, retval, inner_traces, error)
+   EOSIO_REFLECT(action_trace, act, retval, inner_traces, error)
 
    // TODO: need event definitions in ABI
    struct event_trace

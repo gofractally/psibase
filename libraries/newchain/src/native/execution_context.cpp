@@ -230,9 +230,6 @@ namespace newchain
          return result.size();
       }
 
-      // TODO: should privileged be able to sudo a deleted account? Might be needed
-      //       to roll back attacks. OTOH, might confuse contracts which look up the
-      //       sender account. Maybe support undelete instead?
       uint32_t call(span<const char> data)
       {
          // TODO: replace temporary rule
@@ -241,14 +238,8 @@ namespace newchain
 
          // TODO: don't unpack raw_data
          auto act = unpack_all<action>({data.data(), data.size()}, "extra data in call");
-         if (act.sender != contract_account.num)
-         {
-            auto sender = db.get_kv<account_row>(*trx_context.kv_trx, account_key(act.sender));
-            eosio::check(sender.has_value(), "unknown sender account");
-            eosio::check(
-                sender->auth_contract == contract_account.num || contract_account.privileged,
-                "contract is not authorized to call as sender");
-         }
+         eosio::check(act.sender == contract_account.num || contract_account.privileged,
+                      "contract is not authorized to call as sender");
 
          current_act_context->action_trace.inner_traces.push_back({action_trace{}});
          auto& inner_action_trace =

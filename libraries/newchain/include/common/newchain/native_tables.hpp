@@ -32,7 +32,7 @@ namespace newchain
    struct account_row
    {
       account_num        num           = 0;
-      account_num        auth_contract = 0;
+      account_num        auth_contract = 0;      // TODO: move out of native
       bool               privileged    = false;  // TODO: consider finer granularity
       eosio::checksum256 code_hash     = {};
       uint8_t            vm_type       = 0;

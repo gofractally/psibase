@@ -17,8 +17,6 @@ namespace boot
          eosio::print("auth_check\n");
       check(sender == 1, "Only contract 1 may request auth checks");
       // TODO: check keys of act.sender
-      // TODO: avoid reserialization
-      set_retval_bytes(call(act));
    }
 
    account_num exec(account_num this_contract, account_num sender, create_account& args)
@@ -122,7 +120,12 @@ namespace boot
              .contract = account->auth_contract,
              .raw_data = eosio::convert_to_bin(boot::action{act}),
          };
+         if (enable_print)
+            eosio::print("call auth_check\n");
          call(outer);  // TODO: avoid copy (serializing outer)
+         if (enable_print)
+            eosio::print("call action\n");
+         call(act);  // TODO: avoid copy (serializing)
       }
    }
 
