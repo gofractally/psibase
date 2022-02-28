@@ -16,9 +16,9 @@ namespace boot
       using return_type = newchain::account_num;
 
       newchain::account_num auth_contract = {};
-      bool                  privileged    = {};
+      bool                  allow_sudo    = {};
    };
-   EOSIO_REFLECT(create_account, auth_contract, privileged)
+   EOSIO_REFLECT(create_account, auth_contract, allow_sudo)
 
    struct set_code
    {

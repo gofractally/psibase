@@ -63,7 +63,7 @@ namespace newchain
          account_row account{
              .num           = 1,
              .auth_contract = 1,
-             .privileged    = true,
+             .flags         = account_row::transaction_psi_flags,
          };
          db.kv_set(account.key(), account);
          set_code(db, 1, data.vm_type, data.vm_version, {data.code.data(), data.code.size()});

@@ -26,10 +26,13 @@ namespace boot
             "sender must be boot account or name account");
       auto status = kv_get<status_row>(status_key());
       check(status.has_value(), "missing status");
+      uint32_t flags = 0;
+      if (args.allow_sudo)
+         flags |= account_row::allow_sudo;
       account_row account{
           .num           = status->next_account_num++,
           .auth_contract = args.auth_contract,
-          .privileged    = args.privileged,
+          .flags         = flags,
       };
       kv_set(status->key(), *status);
       kv_set(account.key(), account);

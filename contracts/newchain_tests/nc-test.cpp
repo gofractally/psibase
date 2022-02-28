@@ -44,7 +44,6 @@ TEST_CASE("t1")
                            .contract = boot::contract,
                            .raw_data = eosio::convert_to_bin(boot::action{boot::create_account{
                                .auth_contract = 1,
-                               .privileged    = false,
                            }}),
                        },
                        {
@@ -97,7 +96,6 @@ TEST_CASE("t2")
                            .contract = boot::contract,
                            .raw_data = eosio::convert_to_bin(boot::action{boot::create_account{
                                .auth_contract = boot::contract,
-                               .privileged    = false,
                            }}),
                        },
                        {
@@ -120,7 +118,6 @@ TEST_CASE("t2")
                           .contract = boot::contract,
                           .raw_data = eosio::convert_to_bin(boot::action{boot::create_account{
                               .auth_contract = 1,
-                              .privileged    = false,
                           }}),
                       }})));
 

@@ -236,8 +236,9 @@ namespace newchain
 
          // TODO: don't unpack raw_data
          auto act = unpack_all<action>({data.data(), data.size()}, "extra data in call");
-         eosio::check(act.sender == contract_account.num || contract_account.privileged,
-                      "contract is not authorized to call as sender");
+         eosio::check(act.sender == contract_account.num ||
+                          (contract_account.flags & account_row::allow_sudo),
+                      "contract is not authorized to call as another sender");
 
          current_act_context->action_trace.inner_traces.push_back({action_trace{}});
          auto& inner_action_trace =

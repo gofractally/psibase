@@ -25,9 +25,9 @@ namespace name
 
       std::string name          = {};
       std::string auth_contract = {};
-      bool        privileged    = {};
+      bool        allow_sudo    = {};
    };
-   EOSIO_REFLECT(create_account, name, auth_contract, privileged)
+   EOSIO_REFLECT(create_account, name, auth_contract, allow_sudo)
 
    struct get_by_name
    {

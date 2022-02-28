@@ -31,16 +31,19 @@ namespace newchain
    }
    struct account_row
    {
+      static constexpr uint32_t allow_sudo            = 0x01;
+      static constexpr uint32_t transaction_psi_flags = allow_sudo;
+
       account_num        num           = 0;
-      account_num        auth_contract = 0;      // TODO: move out of native
-      bool               privileged    = false;  // TODO: consider finer granularity
+      account_num        auth_contract = 0;  // TODO: move out of native
+      uint32_t           flags         = 0;
       eosio::checksum256 code_hash     = {};
       uint8_t            vm_type       = 0;
       uint8_t            vm_version    = 0;
 
       auto key() const { return account_key(num); }
    };
-   EOSIO_REFLECT(account_row, num, auth_contract, privileged, code_hash, vm_type, vm_version)
+   EOSIO_REFLECT(account_row, num, auth_contract, flags, code_hash, vm_type, vm_version)
 
    inline auto code_key(const eosio::checksum256& code_hash, uint8_t vm_type, uint8_t vm_version)
    {

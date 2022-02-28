@@ -58,7 +58,7 @@ namespace name
       check(!!auth_row, "auth_contract not found");
       auto num = boot::call(this_contract, boot::create_account{
                                                .auth_contract = auth_row->num,
-                                               .privileged    = args.privileged,
+                                               .allow_sudo    = args.allow_sudo,
                                            });
       register_acc(num, args.name);
       return num;
