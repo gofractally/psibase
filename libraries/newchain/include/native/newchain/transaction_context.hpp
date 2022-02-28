@@ -7,8 +7,7 @@ namespace newchain
    struct transaction_context
    {
       newchain::block_context&                 block_context;
-      mdbx::txn_managed*                       kv_trx;
-      mdbx::txn_managed                        nested_kv_trx;
+      database::session                        session;
       const signed_transaction&                trx;
       const std::vector<eosio::public_key>&    recovered_keys;
       newchain::transaction_trace&             transaction_trace;

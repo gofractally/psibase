@@ -3,17 +3,13 @@
 namespace newchain
 {
    block_context::block_context(newchain::system_context& system_context, bool enable_undo)
-       : system_context{system_context},
-         db{system_context.db},
-         kv_trx{system_context.db.kv->start_write()}
+       : system_context{system_context}, db{system_context.shared_db}, session{db.start_write()}
    {
       eosio::check(enable_undo, "TODO: revisit enable_undo option");
    }
 
    block_context::block_context(newchain::system_context& system_context, read_only)
-       : system_context{system_context},
-         db{system_context.db},
-         kv_trx{system_context.db.kv->start_read()}
+       : system_context{system_context}, db{system_context.shared_db}, session{db.start_read()}
    {
    }
 
@@ -21,11 +17,11 @@ namespace newchain
    void block_context::start(std::optional<eosio::time_point_sec> time)
    {
       eosio::check(!started, "block has already been started");
-      auto status = db.kv_get<status_row>(kv_trx, status_key());
+      auto status = db.kv_get<status_row>(status_key());
       if (!status)
       {
          status.emplace();
-         db.kv_set(kv_trx, status->key(), *status);
+         db.kv_set(status->key(), *status);
       }
 
       if (status->head)
@@ -72,14 +68,14 @@ namespace newchain
       eosio::check(!need_genesis_action, "missing genesis action in block");
       active = false;
 
-      auto status = db.kv_get<status_row>(kv_trx, status_key());
+      auto status = db.kv_get<status_row>(status_key());
       eosio::check(status.has_value(), "missing status record");
       status->head = current;
       if (is_genesis_block)
          status->chain_id = status->head->id;
-      db.kv_set(kv_trx, status->key(), *status);
+      db.kv_set(status->key(), *status);
 
-      kv_trx.commit();
+      session.commit();
    }
 
    void block_context::push_transaction(const signed_transaction& trx,
@@ -136,8 +132,7 @@ namespace newchain
             // TODO: limit billed time in block
             eosio::check(!(trx.flags & transaction::do_not_broadcast),
                          "cannot commit a do_not_broadcast transaction");
-            if (t.nested_kv_trx)
-               t.nested_kv_trx.commit();
+            t.session.commit();
             active = true;
          }
       }

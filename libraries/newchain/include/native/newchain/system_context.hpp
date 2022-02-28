@@ -7,7 +7,7 @@ namespace newchain
 {
    struct system_context
    {
-      database&                     db;
+      shared_database               shared_db;
       newchain::wasm_cache          wasm_cache;
       std::vector<execution_memory> execution_memories;
 
@@ -26,7 +26,7 @@ namespace newchain
    {
       const std::unique_ptr<shared_state_impl> impl;
 
-      shared_state(std::unique_ptr<database> db, newchain::wasm_cache wasm_cache);
+      shared_state(shared_database db, newchain::wasm_cache wasm_cache);
       ~shared_state();
 
       std::unique_ptr<system_context> get_system_context();

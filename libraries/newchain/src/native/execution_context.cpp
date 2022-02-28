@@ -36,7 +36,6 @@ namespace newchain
 
    // Only useful for genesis
    void set_code(database&           db,
-                 mdbx::txn_managed&  kv_trx,
                  account_num         contract,
                  uint8_t             vm_type,
                  uint8_t             vm_version,
@@ -47,16 +46,16 @@ namespace newchain
       eosio::check(code.remaining(), "native set_code can't clear code");
       auto code_hash = sha256(code.pos, code.remaining());
 
-      auto account = db.kv_get<account_row>(kv_trx, account_key(contract));
+      auto account = db.kv_get<account_row>(account_key(contract));
       eosio::check(account.has_value(), "set_code: unknown contract account");
       eosio::check(account->code_hash == eosio::checksum256{},
                    "native set_code can't replace code");
       account->code_hash  = code_hash;
       account->vm_type    = vm_type;
       account->vm_version = vm_version;
-      db.kv_set(kv_trx, account->key(), *account);
+      db.kv_set(account->key(), *account);
 
-      auto code_obj = db.kv_get<code_row>(kv_trx, code_key(code_hash, vm_type, vm_version));
+      auto code_obj = db.kv_get<code_row>(code_key(code_hash, vm_type, vm_version));
       if (!code_obj)
       {
          code_obj.emplace();
@@ -66,7 +65,7 @@ namespace newchain
          code_obj->code.assign(code.pos, code.end);
       }
       ++code_obj->ref_count;
-      db.kv_set(kv_trx, code_obj->key(), *code_obj);
+      db.kv_set(code_obj->key(), *code_obj);
    }  // set_code
 
    struct backend_entry
@@ -151,13 +150,12 @@ namespace newchain
                              account_num          contract)
           : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
-         auto ca = db.kv_get<account_row>(*trx_context.kv_trx, account_key(contract));
+         auto ca = db.kv_get<account_row>(account_key(contract));
          eosio::check(ca.has_value(), "unknown contract account");
          eosio::check(ca->code_hash != eosio::checksum256{}, "account has no code");
          contract_account = std::move(*ca);
-         auto code        = db.kv_get<code_row>(
-             *trx_context.kv_trx, code_key(contract_account.code_hash, contract_account.vm_type,
-                                           contract_account.vm_version));
+         auto code        = db.kv_get<code_row>(code_key(
+             contract_account.code_hash, contract_account.vm_type, contract_account.vm_version));
          eosio::check(code.has_value(), "code record is missing");
          rethrow_vm_except([&] {
             backend = trx_context.block_context.system_context.wasm_cache.impl->get(
@@ -263,20 +261,16 @@ namespace newchain
       // TODO: restrict contracts writing to other contracts' regions
       void kv_set(span<const char> key, span<const char> value)
       {
-         trx_context.kv_trx->upsert(db.kv_map, {key.data(), key.size()},
-                                    {value.data(), value.size()});
+         db.kv_set_raw({key.data(), key.size()}, {value.data(), value.size()});
       }
 
       // TODO: avoid copying value to result
       uint32_t kv_get(span<const char> key)
       {
-         mdbx::slice k{key.data(), key.size()};
-         mdbx::slice v;
-         auto        stat = ::mdbx_get(*trx_context.kv_trx, db.kv_map, &k, &v);
-         if (stat == MDBX_NOTFOUND)
+         auto v = db.kv_get_raw({key.data(), key.size()});
+         if (!v)
             return -1;
-         mdbx::error::success_or_throw(stat);
-         result.assign((const char*)v.data(), (const char*)v.data() + v.length());
+         result.assign(v->pos, v->end);
          return result.size();
       }
    };  // execution_context_impl

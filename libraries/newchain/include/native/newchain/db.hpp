@@ -7,73 +7,98 @@
 #include <eosio/from_bin.hpp>
 #include <eosio/to_key.hpp>
 #include <eosio/types.hpp>
-#include <mdbx.h++>
 
 namespace newchain
 {
+   struct shared_database_impl;
+   struct shared_database
+   {
+      std::shared_ptr<shared_database_impl> impl;
+
+      shared_database() = default;
+      shared_database(const boost::filesystem::path& dir);
+      shared_database(const shared_database&) = default;
+      shared_database(shared_database&&)      = default;
+
+      shared_database& operator=(const shared_database&) = default;
+      shared_database& operator=(shared_database&&) = default;
+   };
+
+   struct database_impl;
    struct database
    {
-      const std::unique_ptr<mdbx::env_managed> kv;
-      const mdbx::map_handle                   kv_map;
+      std::unique_ptr<database_impl> impl;
 
-      database(const boost::filesystem::path& dir)
-          : kv{construct_kv(dir)}, kv_map{construct_kv_map(*kv)}
+      struct session
       {
-      }
+         database* db = {};
 
-      static std::unique_ptr<mdbx::env_managed> construct_kv(const boost::filesystem::path& dir)
-      {
-         mdbx::env_managed::operate_parameters op;
-         op.options.nested_write_transactions = true;
-         op.options.orphan_read_transactions  = false;
+         session() = default;
+         session(database* db) : db{db} {}
+         session(const session&) = delete;
+         session(session&& src)
+         {
+            db     = src.db;
+            src.db = nullptr;
+         }
+         ~session()
+         {
+            if (db)
+               db->abort(*this);
+         }
 
-         return std::make_unique<mdbx::env_managed>(
-             dir.native(), mdbx::env_managed::create_parameters{mdbx::env_managed::geometry{}}, op);
-      }
+         session& operator=(const session&) = delete;
 
-      static mdbx::map_handle construct_kv_map(mdbx::env_managed& kv)
-      {
-         mdbx::map_handle kv_map;
-         auto             trx = kv.start_write();
-         kv_map               = trx.create_map(nullptr);
-         trx.commit();
-         return kv_map;
-      }
+         session& operator=(session&& src)
+         {
+            db     = src.db;
+            src.db = nullptr;
+            return *this;
+         }
 
-      void set_kv_raw(mdbx::txn& kv_trx, eosio::input_stream key, eosio::input_stream value)
-      {
-         kv_trx.upsert(kv_map, {key.pos, key.remaining()}, {value.pos, value.remaining()});
-      }
+         void commit()
+         {
+            if (db)
+               db->commit(*this);
+            db = nullptr;
+         }
+      };  // session
+
+      database(shared_database shared);
+      database(const database&) = delete;
+      ~database();
+
+      session start_read();
+      session start_write();
+      void    commit(session&);
+      void    abort(session&);
+
+      void kv_set_raw(eosio::input_stream key, eosio::input_stream value);
+      std::optional<eosio::input_stream> kv_get_raw(eosio::input_stream key);
 
       template <typename K, typename V>
-      auto kv_set(mdbx::txn& kv_trx, const K& key, const V& value)
+      auto kv_set(const K& key, const V& value)
           -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
       {
-         set_kv_raw(kv_trx, eosio::convert_to_key(key), eosio::convert_to_bin(value));
+         kv_set_raw(eosio::convert_to_key(key), eosio::convert_to_bin(value));
       }
 
       template <typename V, typename K>
-      std::optional<V> kv_get(mdbx::txn& kv_trx, const K& key)
+      std::optional<V> kv_get(const K& key)
       {
-         auto        kk = eosio::convert_to_key(key);
-         mdbx::slice k{kk.data(), kk.size()};
-         mdbx::slice v;
-         auto        stat = ::mdbx_get(kv_trx, kv_map, &k, &v);
-         if (stat == MDBX_NOTFOUND)
+         auto s = kv_get_raw(eosio::convert_to_key(key));
+         if (!s)
             return std::nullopt;
-         mdbx::error::success_or_throw(stat);
-         eosio::input_stream s{(const char*)v.data(), v.size()};
-         return eosio::from_bin<V>(s);
+         return eosio::from_bin<V>(*s);
       }
 
       template <typename V, typename K>
-      V kv_get_or_default(mdbx::txn& kv_trx, const K& key)
+      V kv_get_or_default(const K& key)
       {
-         auto obj = kv_get<V>(kv_trx, key);
+         auto obj = kv_get<V>(key);
          if (obj)
             return std::move(*obj);
          return {};
       }
    };  // database
-
 }  // namespace newchain

@@ -13,8 +13,8 @@ namespace newchain
    struct block_context
    {
       newchain::system_context& system_context;
-      database&                 db;
-      mdbx::txn_managed         kv_trx;
+      database                  db;
+      database::session         session;
       block                     current;
       bool                      is_genesis_block    = false;
       bool                      need_genesis_action = false;

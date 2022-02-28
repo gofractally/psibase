@@ -92,9 +92,9 @@ void run(const char* db_path, bool bootstrap, bool produce, bool api_server)
    execution_context::register_host_functions();
 
    // TODO: configurable wasm_cache size
-   auto db           = std::make_unique<database>(db_path);
-   auto shared_state = std::make_shared<newchain::shared_state>(std::move(db), wasm_cache{128});
-   auto system       = shared_state->get_system_context();
+   auto shared_state =
+       std::make_shared<newchain::shared_state>(shared_database{db_path}, wasm_cache{128});
+   auto system = shared_state->get_system_context();
 
    // TODO: config file
    auto http_config = std::make_shared<http::http_config>(http::http_config{

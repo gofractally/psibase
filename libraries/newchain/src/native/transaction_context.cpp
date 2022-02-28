@@ -17,14 +17,7 @@ namespace newchain
          transaction_trace{transaction_trace}
    {
       if (enable_undo)
-      {
-         nested_kv_trx = block_context.kv_trx.start_nested();
-         kv_trx        = &nested_kv_trx;
-      }
-      else
-      {
-         kv_trx = &block_context.kv_trx;
-      }
+         session = block_context.db.start_write();
    }
 
    static void exec_genesis_action(transaction_context& self, const action& act);
@@ -38,7 +31,7 @@ namespace newchain
 
       // Prepare for execution
       auto& db     = block_context.db;
-      auto  status = db.kv_get_or_default<status_row>(*kv_trx, status_key());
+      auto  status = db.kv_get_or_default<status_row>(status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
 
       if (block_context.need_genesis_action)
@@ -54,7 +47,7 @@ namespace newchain
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
-      status = db.kv_get_or_default<status_row>(*kv_trx, status_key());
+      status = db.kv_get_or_default<status_row>(status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
    }
 
@@ -72,9 +65,8 @@ namespace newchain
              .auth_contract = 1,
              .privileged    = true,
          };
-         db.kv_set(*self.kv_trx, account.key(), account);
-         set_code(db, *self.kv_trx, 1, data.vm_type, data.vm_version,
-                  {data.code.data(), data.code.size()});
+         db.kv_set(account.key(), account);
+         set_code(db, 1, data.vm_type, data.vm_version, {data.code.data(), data.code.size()});
       }
       catch (const std::exception& e)
       {
@@ -108,7 +100,7 @@ namespace newchain
    void transaction_context::exec_rpc(const action& act, action_trace& atrace)
    {
       auto& db     = block_context.db;
-      auto  status = db.kv_get_or_default<status_row>(*kv_trx, status_key());
+      auto  status = db.kv_get_or_default<status_row>(status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
 
       atrace.act        = act;

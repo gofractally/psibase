@@ -116,15 +116,15 @@ struct test_chain
    ::state&                                  state;
    std::set<test_chain_ref*>                 refs;
    fc::temp_directory                        dir;
-   std::unique_ptr<newchain::database>       db;
+   newchain::shared_database                 db;
    std::unique_ptr<newchain::system_context> sys;
    std::unique_ptr<newchain::block_context>  block;
 
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
       eosio::check(snapshot.empty(), "snapshots not implemented");
-      db  = std::make_unique<newchain::database>(dir.path());
-      sys = std::make_unique<newchain::system_context>(newchain::system_context{*db, {128}});
+      db  = {dir.path()};
+      sys = std::make_unique<newchain::system_context>(newchain::system_context{db, {128}});
    }
 
    test_chain(const test_chain&) = delete;
@@ -590,7 +590,7 @@ struct callbacks
       auto& c = assert_chain(chain);
       c.block.reset();
       c.sys.reset();
-      c.db.reset();
+      c.db = {};
    }
 
    uint32_t tester_get_chain_path(uint32_t chain, span<char> dest)

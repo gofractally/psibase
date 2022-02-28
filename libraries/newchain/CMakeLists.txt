@@ -100,6 +100,7 @@ function(add suffix)
         target_include_directories(newchain${suffix} PUBLIC include/native ../../external/libmdbx)
         target_sources(newchain${suffix} PRIVATE
             src/native/block_context.cpp
+            src/native/db.cpp
             src/native/execution_context.cpp
             src/native/system_context.cpp
             src/native/transaction_context.cpp
