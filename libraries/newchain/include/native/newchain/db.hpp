@@ -46,14 +46,14 @@ namespace newchain
       }
 
       template <typename K, typename V>
-      auto set_kv(mdbx::txn& kv_trx, const K& key, const V& value)
+      auto kv_set(mdbx::txn& kv_trx, const K& key, const V& value)
           -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
       {
          set_kv_raw(kv_trx, eosio::convert_to_key(key), eosio::convert_to_bin(value));
       }
 
       template <typename V, typename K>
-      std::optional<V> get_kv(mdbx::txn& kv_trx, const K& key)
+      std::optional<V> kv_get(mdbx::txn& kv_trx, const K& key)
       {
          auto        kk = eosio::convert_to_key(key);
          mdbx::slice k{kk.data(), kk.size()};
@@ -67,9 +67,9 @@ namespace newchain
       }
 
       template <typename V, typename K>
-      V get_kv_or_default(mdbx::txn& kv_trx, const K& key)
+      V kv_get_or_default(mdbx::txn& kv_trx, const K& key)
       {
-         auto obj = get_kv<V>(kv_trx, key);
+         auto obj = kv_get<V>(kv_trx, key);
          if (obj)
             return std::move(*obj);
          return {};

@@ -41,14 +41,14 @@ namespace newchain
       [[clang::import_name("set_retval")]] void set_retval(const char* retval, uint32_t len);
 
       // Set a key-value pair. If key already exists, then replace the existing value.
-      [[clang::import_name("set_kv")]] void set_kv(const char* key,
+      [[clang::import_name("kv_set")]] void kv_set(const char* key,
                                                    uint32_t    key_len,
                                                    const char* value,
                                                    uint32_t    value_len);
 
       // Get a key-value pair, if any. If key exists, then sets result to value and
       // returns size. If key does not exist, returns -1.
-      [[clang::import_name("get_kv")]] uint32_t get_kv(const char* key, uint32_t key_len);
+      [[clang::import_name("kv_get")]] uint32_t kv_get(const char* key, uint32_t key_len);
 
    }  // namespace raw
 
@@ -104,22 +104,22 @@ namespace newchain
    inline void set_retval_bytes(eosio::input_stream s) { raw::set_retval(s.pos, s.remaining()); }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
-   inline void set_kv_bytes(eosio::input_stream key, eosio::input_stream value)
+   inline void kv_set_bytes(eosio::input_stream key, eosio::input_stream value)
    {
-      raw::set_kv(key.pos, key.remaining(), value.pos, value.remaining());
+      raw::kv_set(key.pos, key.remaining(), value.pos, value.remaining());
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, typename V>
-   auto set_kv(const K& key, const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+   auto kv_set(const K& key, const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
-      set_kv_bytes(eosio::convert_to_key(key), eosio::convert_to_bin(value));
+      kv_set_bytes(eosio::convert_to_key(key), eosio::convert_to_bin(value));
    }
 
    // Size of key-value pair, if any
-   inline std::optional<uint32_t> get_kv_bytes_size(eosio::input_stream key)
+   inline std::optional<uint32_t> kv_get_bytes_size(eosio::input_stream key)
    {
-      auto size = raw::get_kv(key.pos, key.remaining());
+      auto size = raw::kv_get(key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
       return size;
@@ -127,15 +127,15 @@ namespace newchain
 
    // Size of key-value pair, if any
    template <typename K>
-   inline std::optional<uint32_t> get_kv_size(const K& key)
+   inline std::optional<uint32_t> kv_get_size(const K& key)
    {
-      return get_kv_bytes_size(eosio::convert_to_key(key));
+      return kv_get_bytes_size(eosio::convert_to_key(key));
    }
 
    // Get a key-value pair, if any
-   inline std::optional<std::vector<char>> get_kv_bytes(eosio::input_stream key)
+   inline std::optional<std::vector<char>> kv_get_bytes(eosio::input_stream key)
    {
-      auto size = raw::get_kv(key.pos, key.remaining());
+      auto size = raw::kv_get(key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
       return get_result(size);
@@ -143,9 +143,9 @@ namespace newchain
 
    // Get a key-value pair, if any
    template <typename V, typename K>
-   inline std::optional<V> get_kv(const K& key)
+   inline std::optional<V> kv_get(const K& key)
    {
-      auto v = get_kv_bytes(eosio::convert_to_key(key));
+      auto v = kv_get_bytes(eosio::convert_to_key(key));
       if (!v)
          return std::nullopt;
       return eosio::convert_from_bin<V>(*v);
@@ -153,9 +153,9 @@ namespace newchain
 
    // Get a value, or the default if not found
    template <typename V, typename K>
-   inline V get_kv_or_default(const K& key)
+   inline V kv_get_or_default(const K& key)
    {
-      auto obj = get_kv<V>(key);
+      auto obj = kv_get<V>(key);
       if (obj)
          return std::move(*obj);
       return {};

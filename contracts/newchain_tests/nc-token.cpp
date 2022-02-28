@@ -8,7 +8,7 @@ namespace token
 {
    eosio::asset get_balance(account_num this_contract, account_num acc, eosio::symbol sym)
    {
-      auto result = get_kv<eosio::asset>(std::tuple{this_contract, acc, sym.code()});
+      auto result = kv_get<eosio::asset>(std::tuple{this_contract, acc, sym.code()});
       if (!result)
          return {0, sym};
       check(result->symbol == sym, "symbol precision mismatch");
@@ -17,7 +17,7 @@ namespace token
 
    void set_balance(account_num this_contract, account_num acc, eosio::asset amount)
    {
-      set_kv(std::tuple{this_contract, acc, amount.symbol.code()}, amount);
+      kv_set(std::tuple{this_contract, acc, amount.symbol.code()}, amount);
    }
 
    // TODO: This does a blind issue; need to track created tokens and limits

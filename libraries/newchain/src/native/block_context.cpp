@@ -21,11 +21,11 @@ namespace newchain
    void block_context::start(std::optional<eosio::time_point_sec> time)
    {
       eosio::check(!started, "block has already been started");
-      auto status = db.get_kv<status_row>(kv_trx, status_key());
+      auto status = db.kv_get<status_row>(kv_trx, status_key());
       if (!status)
       {
          status.emplace();
-         db.set_kv(kv_trx, status->key(), *status);
+         db.kv_set(kv_trx, status->key(), *status);
       }
 
       if (status->head)
@@ -72,12 +72,12 @@ namespace newchain
       eosio::check(!need_genesis_action, "missing genesis action in block");
       active = false;
 
-      auto status = db.get_kv<status_row>(kv_trx, status_key());
+      auto status = db.kv_get<status_row>(kv_trx, status_key());
       eosio::check(status.has_value(), "missing status record");
       status->head = current;
       if (is_genesis_block)
          status->chain_id = status->head->id;
-      db.set_kv(kv_trx, status->key(), *status);
+      db.kv_set(kv_trx, status->key(), *status);
 
       kv_trx.commit();
    }

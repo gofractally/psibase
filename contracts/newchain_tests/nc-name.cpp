@@ -41,10 +41,10 @@ namespace name
 
    void register_acc(newchain::account_num num, const std::string& name)
    {
-      check(!get_kv_size(num_to_name_key(num)), "num already registered");
-      check(!get_kv_size(name_to_num_key(name)), "name already registered");
-      set_kv(num_to_name_key(num), num_to_name_row{num, name});
-      set_kv(name_to_num_key(name), name_to_num_row{num, name});
+      check(!kv_get_size(num_to_name_key(num)), "num already registered");
+      check(!kv_get_size(name_to_num_key(name)), "name already registered");
+      kv_set(num_to_name_key(num), num_to_name_row{num, name});
+      kv_set(name_to_num_key(name), name_to_num_row{num, name});
    }
 
    void exec(account_num this_contract, account_num sender, register_account& args)
@@ -54,7 +54,7 @@ namespace name
 
    newchain::account_num exec(account_num this_contract, account_num sender, create_account& args)
    {
-      auto auth_row = get_kv<name_to_num_row>(name_to_num_key(args.auth_contract));
+      auto auth_row = kv_get<name_to_num_row>(name_to_num_key(args.auth_contract));
       check(!!auth_row, "auth_contract not found");
       auto num = boot::call(this_contract, boot::create_account{
                                                .auth_contract = auth_row->num,
@@ -68,7 +68,7 @@ namespace name
                                              account_num  sender,
                                              get_by_name& args)
    {
-      auto row = get_kv<name_to_num_row>(name_to_num_key(args.name));
+      auto row = kv_get<name_to_num_row>(name_to_num_key(args.name));
       if (!!row)
          return row->num;
       return std::nullopt;
@@ -76,7 +76,7 @@ namespace name
 
    std::optional<std::string> exec(account_num this_contract, account_num sender, get_by_num& args)
    {
-      auto row = get_kv<num_to_name_row>(num_to_name_key(args.num));
+      auto row = kv_get<num_to_name_row>(num_to_name_key(args.num));
       if (!!row)
          return row->name;
       return std::nullopt;

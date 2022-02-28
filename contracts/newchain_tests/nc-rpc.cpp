@@ -32,7 +32,7 @@ namespace rpc
 
       if (req.method == "GET" && req.target == "/psiq/status")
       {
-         auto status = get_kv<status_row>(status_key());
+         auto status = kv_get<status_row>(status_key());
          return to_json(*status);
       }
       else if (req.method == "GET" && req.target == "/psiq/accounts")
@@ -40,7 +40,7 @@ namespace rpc
          std::vector<augmented_account_row> rows;
          for (account_num i = 1;; ++i)
          {
-            auto acc = get_kv<account_row>(account_key(i));
+            auto acc = kv_get<account_row>(account_key(i));
             if (!acc)
                break;
             augmented_account_row aug;

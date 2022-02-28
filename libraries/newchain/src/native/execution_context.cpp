@@ -47,16 +47,16 @@ namespace newchain
       eosio::check(code.remaining(), "native set_code can't clear code");
       auto code_hash = sha256(code.pos, code.remaining());
 
-      auto account = db.get_kv<account_row>(kv_trx, account_key(contract));
+      auto account = db.kv_get<account_row>(kv_trx, account_key(contract));
       eosio::check(account.has_value(), "set_code: unknown contract account");
       eosio::check(account->code_hash == eosio::checksum256{},
                    "native set_code can't replace code");
       account->code_hash  = code_hash;
       account->vm_type    = vm_type;
       account->vm_version = vm_version;
-      db.set_kv(kv_trx, account->key(), *account);
+      db.kv_set(kv_trx, account->key(), *account);
 
-      auto code_obj = db.get_kv<code_row>(kv_trx, code_key(code_hash, vm_type, vm_version));
+      auto code_obj = db.kv_get<code_row>(kv_trx, code_key(code_hash, vm_type, vm_version));
       if (!code_obj)
       {
          code_obj.emplace();
@@ -66,7 +66,7 @@ namespace newchain
          code_obj->code.assign(code.pos, code.end);
       }
       ++code_obj->ref_count;
-      db.set_kv(kv_trx, code_obj->key(), *code_obj);
+      db.kv_set(kv_trx, code_obj->key(), *code_obj);
    }  // set_code
 
    struct backend_entry
@@ -151,11 +151,11 @@ namespace newchain
                              account_num          contract)
           : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
-         auto ca = db.get_kv<account_row>(*trx_context.kv_trx, account_key(contract));
+         auto ca = db.kv_get<account_row>(*trx_context.kv_trx, account_key(contract));
          eosio::check(ca.has_value(), "unknown contract account");
          eosio::check(ca->code_hash != eosio::checksum256{}, "account has no code");
          contract_account = std::move(*ca);
-         auto code        = db.get_kv<code_row>(
+         auto code        = db.kv_get<code_row>(
              *trx_context.kv_trx, code_key(contract_account.code_hash, contract_account.vm_type,
                                            contract_account.vm_version));
          eosio::check(code.has_value(), "code record is missing");
@@ -261,14 +261,14 @@ namespace newchain
       // TODO: restrict key size
       // TODO: restrict value size
       // TODO: restrict contracts writing to other contracts' regions
-      void set_kv(span<const char> key, span<const char> value)
+      void kv_set(span<const char> key, span<const char> value)
       {
          trx_context.kv_trx->upsert(db.kv_map, {key.data(), key.size()},
                                     {value.data(), value.size()});
       }
 
       // TODO: avoid copying value to result
-      uint32_t get_kv(span<const char> key)
+      uint32_t kv_get(span<const char> key)
       {
          mdbx::slice k{key.data(), key.size()};
          mdbx::slice v;
@@ -299,8 +299,8 @@ namespace newchain
       rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
-      rhf_t::add<&execution_context_impl::set_kv>("env", "set_kv");
-      rhf_t::add<&execution_context_impl::get_kv>("env", "get_kv");
+      rhf_t::add<&execution_context_impl::kv_set>("env", "kv_set");
+      rhf_t::add<&execution_context_impl::kv_get>("env", "kv_get");
    }
 
    void execution_context::exec_process_transaction(action_context& act_context)

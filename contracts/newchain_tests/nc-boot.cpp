@@ -24,15 +24,15 @@ namespace boot
       // TODO: Bill RAM? A different resource?
       check(sender == boot::contract || sender == name::contract,
             "sender must be boot account or name account");
-      auto status = get_kv<status_row>(status_key());
+      auto status = kv_get<status_row>(status_key());
       check(status.has_value(), "missing status");
       account_row account{
           .num           = status->next_account_num++,
           .auth_contract = args.auth_contract,
           .privileged    = args.privileged,
       };
-      set_kv(status->key(), *status);
-      set_kv(account.key(), account);
+      kv_set(status->key(), *status);
+      kv_set(account.key(), account);
       return account.num;
    }  // create_account
 
@@ -40,7 +40,7 @@ namespace boot
    {
       // TODO: validate code
       check(sender == boot::contract, "sender must be boot account");
-      auto account = get_kv<account_row>(account_key(args.contract));
+      auto account = kv_get<account_row>(account_key(args.contract));
       check(account.has_value(), "can not set code on a missing account");
       auto code_hash = sha256(args.code.data(), args.code.size());
       if (args.vm_type == account->vm_type && args.vm_version == account->vm_version &&
@@ -50,10 +50,10 @@ namespace boot
       {
          // TODO: Refund RAM? A different resource?
          auto code_obj =
-             get_kv<code_row>(code_key(account->code_hash, account->vm_type, account->vm_version));
+             kv_get<code_row>(code_key(account->code_hash, account->vm_type, account->vm_version));
          check(code_obj.has_value(), "missing code object");
          if (--code_obj->ref_count)
-            set_kv(code_obj->key(), *code_obj);
+            kv_set(code_obj->key(), *code_obj);
          else
          {
             // TODO: erase code_obj
@@ -64,10 +64,10 @@ namespace boot
       account->code_hash  = code_hash;
       account->vm_type    = args.vm_type;
       account->vm_version = args.vm_version;
-      set_kv(account->key(), *account);
+      kv_set(account->key(), *account);
 
       auto code_obj =
-          get_kv<code_row>(code_key(account->code_hash, account->vm_type, account->vm_version));
+          kv_get<code_row>(code_key(account->code_hash, account->vm_type, account->vm_version));
       if (!code_obj)
       {
          code_obj.emplace(code_row{
@@ -78,7 +78,7 @@ namespace boot
          code_obj->code.assign(args.code.begin(), args.code.end());
       }
       ++code_obj->ref_count;
-      set_kv(code_obj->key(), *code_obj);
+      kv_set(code_obj->key(), *code_obj);
    }  // set_code
 
    extern "C" void called(account_num this_contract, account_num sender)
@@ -111,7 +111,7 @@ namespace boot
       auto trx = eosio::convert_from_bin<transaction>(top_act.raw_data);
       for (auto& act : trx.actions)
       {
-         auto account = get_kv<account_row>(account_key(act.sender));
+         auto account = kv_get<account_row>(account_key(act.sender));
          check(!!account, "unknown sender");
          // TODO: assumes same dispatch format (abi) as nc-boot
          // TODO: avoid inner raw_data copy
