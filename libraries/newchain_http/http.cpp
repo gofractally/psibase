@@ -244,7 +244,7 @@ namespace newchain::http
             transaction_context tc{bc, trx, {}, trace, false};
             action_trace        atrace;
             tc.exec_rpc(act, atrace);
-            auto result = eosio::convert_from_bin<rpc_reply_data>(atrace.retval);
+            auto result = eosio::convert_from_bin<rpc_reply_data>(atrace.raw_retval);
             return send(ok(std::move(result.reply), result.content_type.c_str()));
          }
          else if (http_config.static_dir.empty())

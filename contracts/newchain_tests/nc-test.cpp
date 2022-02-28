@@ -12,7 +12,7 @@ using namespace newchain;
 void show(bool include, transaction_trace t)
 {
    if (include || t.error)
-      std::cout << format_json(trim_raw_data(t)) << "\n";
+      std::cout << pretty_trace(trim_raw_data(t)) << "\n";
    check(!t.error, *t.error);
 }
 

@@ -16,7 +16,7 @@ namespace newchain
    {
       eosio::checksum256        chain_id;
       std::optional<block_info> head;
-      account_num               next_account_num       = 2;
+      account_num               next_account_num       = 2;  // TODO: move out of native
       uint32_t                  num_execution_memories = 32;
 
       static auto key() { return status_key(); }

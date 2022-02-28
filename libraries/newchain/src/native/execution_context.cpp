@@ -246,7 +246,7 @@ namespace newchain
              std::get<action_trace>(current_act_context->action_trace.inner_traces.back().inner);
          // TODO: avoid reserialization
          current_act_context->transaction_context.exec_called_action(act, inner_action_trace);
-         result = inner_action_trace.retval;
+         result = inner_action_trace.raw_retval;
 
          --current_act_context->transaction_context.call_depth;
          return result.size();
@@ -254,7 +254,7 @@ namespace newchain
 
       void set_retval(span<const char> data)
       {
-         current_act_context->action_trace.retval.assign(data.begin(), data.end());
+         current_act_context->action_trace.raw_retval.assign(data.begin(), data.end());
       }
 
       // TODO: track consumption

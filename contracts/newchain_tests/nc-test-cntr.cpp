@@ -25,7 +25,7 @@ extern "C" void called(account_num this_contract, account_num sender)
    // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
    auto act = get_current_action();
    auto pl  = eosio::convert_from_bin<payload>(act.raw_data);
-   printf("%s\n", eosio::convert_to_json(pl).c_str());
+   printf("payload: %s\n", eosio::convert_to_json(pl).c_str());
    if (pl.number)
    {
       auto r = eosio::convert_from_bin<int>(call({
@@ -37,7 +37,7 @@ extern "C" void called(account_num this_contract, account_num sender)
           }),
       }));
       printf("Child returned %d\n", r);
+      printf("Back to %d\n", pl.number);
    }
-   printf("Back to %d\n", pl.number);
    set_retval(pl.number);
 }
