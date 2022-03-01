@@ -2,14 +2,23 @@
 
 namespace newchain
 {
-   block_context::block_context(newchain::system_context& system_context, bool enable_undo)
-       : system_context{system_context}, db{system_context.shared_db}, session{db.start_write()}
+   block_context::block_context(newchain::system_context& system_context,
+                                bool                      is_producing,
+                                bool                      enable_undo)
+       : system_context{system_context},
+         db{system_context.shared_db},
+         session{db.start_write()},
+         is_producing{is_producing}
    {
       eosio::check(enable_undo, "TODO: revisit enable_undo option");
    }
 
    block_context::block_context(newchain::system_context& system_context, read_only)
-       : system_context{system_context}, db{system_context.shared_db}, session{db.start_read()}
+       : system_context{system_context},
+         db{system_context.shared_db},
+         session{db.start_read()},
+         is_producing{true},  // a read_only block is never replayed
+         is_read_only{true}
    {
    }
 

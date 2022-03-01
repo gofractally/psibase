@@ -208,6 +208,9 @@ namespace newchain
 
       kv_map get_map_write(uint32_t map, eosio::input_stream key)
       {
+         // Prevent poison block; subjective contracts skip execution while not in production
+         eosio::check(!(contract_account.flags & account_row::is_subjective),
+                      "subjective contracts may only write to kv_map::subjective");
          if (map == uint32_t(kv_map::contract))
          {
             uint32_t prefix = contract_account.num;
@@ -290,7 +293,8 @@ namespace newchain
          auto& inner_action_trace =
              std::get<action_trace>(current_act_context->action_trace.inner_traces.back().inner);
          // TODO: avoid reserialization
-         current_act_context->transaction_context.exec_called_action(act, inner_action_trace);
+         current_act_context->transaction_context.exec_called_action(contract_account.flags, act,
+                                                                     inner_action_trace);
          result = inner_action_trace.raw_retval;
 
          --current_act_context->transaction_context.call_depth;
@@ -299,6 +303,9 @@ namespace newchain
 
       void set_retval(span<const char> data)
       {
+         // TODO: record return values of top-most subjective calls in block
+         eosio::check(!(contract_account.flags & account_row::is_subjective),
+                      "set_retval not implemented for subjective contracts");
          current_act_context->action_trace.raw_retval.assign(data.begin(), data.end());
       }
 
@@ -353,8 +360,13 @@ namespace newchain
       });
    }
 
-   void execution_context::exec_called(action_context& act_context)
+   void execution_context::exec_called(uint64_t caller_flags, action_context& act_context)
    {
+      // Prevents a poison block
+      if (!(impl->contract_account.flags & account_row::is_subjective))
+         eosio::check(!(caller_flags & account_row::is_subjective),
+                      "subjective contracts may not call non-subjective ones");
+
       impl->exec(act_context, [&] {  //
          (*impl->backend)(*impl, "env", "called", (uint32_t)act_context.action.contract,
                           (uint32_t)act_context.action.sender);

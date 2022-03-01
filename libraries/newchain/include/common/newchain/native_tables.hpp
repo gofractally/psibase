@@ -32,13 +32,15 @@ namespace newchain
    }
    struct account_row
    {
-      static constexpr uint32_t allow_sudo            = 0x01;
-      static constexpr uint32_t allow_write_native    = 0x02;
-      static constexpr uint32_t transaction_psi_flags = allow_sudo | allow_write_native;
+      static constexpr uint64_t allow_sudo         = uint64_t(1) << 0;
+      static constexpr uint64_t allow_write_native = uint64_t(1) << 1;
+      static constexpr uint64_t is_subjective      = uint64_t(1) << 2;
+
+      static constexpr uint64_t transaction_psi_flags = allow_sudo | allow_write_native;
 
       account_num        num           = 0;
       account_num        auth_contract = 0;  // TODO: move out of native
-      uint32_t           flags         = 0;
+      uint64_t           flags         = 0;
       eosio::checksum256 code_hash     = {};
       uint8_t            vm_type       = 0;
       uint8_t            vm_version    = 0;

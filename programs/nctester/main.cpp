@@ -141,7 +141,7 @@ struct test_chain
       // TODO: time control
       // TODO: undo control
       finish_block();
-      block = std::make_unique<newchain::block_context>(*sys, true);
+      block = std::make_unique<newchain::block_context>(*sys, true, true);
       block->start();
    }
 

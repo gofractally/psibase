@@ -21,7 +21,7 @@ namespace newchain
                           bool                                  enable_undo);
 
       void exec_transaction();
-      void exec_called_action(const action& act, action_trace& atrace);
+      void exec_called_action(uint64_t caller_flags, const action& act, action_trace& atrace);
       void exec_rpc(const action& act, action_trace& atrace);
 
       execution_context& get_execution_context(account_num contract);

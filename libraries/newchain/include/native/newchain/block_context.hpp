@@ -16,12 +16,14 @@ namespace newchain
       database                  db;
       database::session         session;
       block                     current;
+      bool                      is_producing        = false;
+      bool                      is_read_only        = false;
       bool                      is_genesis_block    = false;
       bool                      need_genesis_action = false;
       bool                      started             = false;
       bool                      active              = false;
 
-      block_context(newchain::system_context& system_context, bool enable_undo);
+      block_context(newchain::system_context& system_context, bool is_producing, bool enable_undo);
       block_context(newchain::system_context& system_context, read_only);
 
       void check_active() { eosio::check(active, "block is not active"); }

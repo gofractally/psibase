@@ -44,7 +44,7 @@ void bootstrap_chain(system_context& system)
       bc.push_transaction(t);
    };
 
-   block_context bc{system, true};
+   block_context bc{system, true, true};
    bc.start();
    eosio::check(bc.is_genesis_block, "can not bootstrap non-empty chain");
    push(bc, 0, 0, genesis_action_data{.code = read_whole_file("nc-boot.wasm")});
@@ -118,7 +118,7 @@ void run(const char* db_path, bool bootstrap, bool produce, bool api_server)
       std::this_thread::sleep_for(std::chrono::milliseconds{1000});
       if (produce)
       {
-         block_context bc{*system, true};
+         block_context bc{*system, true, true};
          bc.start();
          bc.commit();
          std::cout << eosio::convert_to_json((block_header&)bc.current) << "\n";

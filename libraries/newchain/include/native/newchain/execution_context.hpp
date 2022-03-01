@@ -56,7 +56,7 @@ namespace newchain
       static void register_host_functions();
 
       void exec_process_transaction(action_context& act_context);
-      void exec_called(action_context& act_context);
+      void exec_called(uint64_t caller_flags, action_context& act_context);
       void exec_rpc(action_context& act_context);
    };
 

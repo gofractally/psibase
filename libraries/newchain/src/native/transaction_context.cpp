@@ -89,12 +89,14 @@ namespace newchain
       ec.exec_process_transaction(ac);
    }
 
-   void transaction_context::exec_called_action(const action& act, action_trace& atrace)
+   void transaction_context::exec_called_action(uint64_t      caller_flags,
+                                                const action& act,
+                                                action_trace& atrace)
    {
       atrace.act        = act;
       action_context ac = {*this, act, atrace};
       auto&          ec = get_execution_context(act.contract);
-      ec.exec_called(ac);
+      ec.exec_called(caller_flags, ac);
    }
 
    void transaction_context::exec_rpc(const action& act, action_trace& atrace)
