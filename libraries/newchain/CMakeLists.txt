@@ -3,7 +3,6 @@ find_package(OpenSSL REQUIRED Crypto)
 function(add suffix)
     add_library(newchain${suffix})
     target_link_libraries(newchain${suffix} PUBLIC abieos${suffix} boost OpenSSL::Crypto)
-    target_include_directories(newchain${suffix} PUBLIC include/common)
     target_sources(newchain${suffix} PRIVATE
         src/common/crypto.cpp
         src/common/trace.cpp
@@ -11,6 +10,7 @@ function(add suffix)
 
     if(DEFINED IS_WASM)
         target_link_libraries(newchain${suffix} PUBLIC wasm-base${suffix})
+        target_include_directories(newchain${suffix} PUBLIC include/common)
 
         add_library(newchain-contract-base${suffix})
         target_sources(newchain-contract-base${suffix} PRIVATE
@@ -97,7 +97,10 @@ function(add suffix)
 
     if(DEFINED IS_NATIVE)
         target_link_libraries(newchain${suffix} PUBLIC chain mdbx-static)
-        target_include_directories(newchain${suffix} PUBLIC include/native ../../external/libmdbx)
+        target_include_directories(newchain${suffix} PUBLIC
+            include/native
+            include/common
+            ../../external/libmdbx)
         target_sources(newchain${suffix} PRIVATE
             src/native/block_context.cpp
             src/native/db.cpp

@@ -31,7 +31,7 @@ namespace newchain
 
       // Prepare for execution
       auto& db     = block_context.db;
-      auto  status = db.kv_get_or_default<status_row>(status_key());
+      auto  status = db.kv_get_or_default<status_row>(status_row::kv_map, status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
 
       if (block_context.need_genesis_action)
@@ -47,7 +47,7 @@ namespace newchain
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
-      status = db.kv_get_or_default<status_row>(status_key());
+      status = db.kv_get_or_default<status_row>(status_row::kv_map, status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
    }
 
@@ -65,7 +65,7 @@ namespace newchain
              .auth_contract = 1,
              .flags         = account_row::transaction_psi_flags,
          };
-         db.kv_set(account.key(), account);
+         db.kv_set(account_row::kv_map, account.key(), account);
          set_code(db, 1, data.vm_type, data.vm_version, {data.code.data(), data.code.size()});
       }
       catch (const std::exception& e)
@@ -100,7 +100,7 @@ namespace newchain
    void transaction_context::exec_rpc(const action& act, action_trace& atrace)
    {
       auto& db     = block_context.db;
-      auto  status = db.kv_get_or_default<status_row>(status_key());
+      auto  status = db.kv_get_or_default<status_row>(status_row::kv_map, status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
 
       atrace.act        = act;

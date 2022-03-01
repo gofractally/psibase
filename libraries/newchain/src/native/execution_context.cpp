@@ -41,21 +41,20 @@ namespace newchain
                  uint8_t             vm_version,
                  eosio::input_stream code)
    {
-      eosio::check(vm_type == 0, "vm_type is not 0");
-      eosio::check(vm_version == 0, "vm_version is not 0");
       eosio::check(code.remaining(), "native set_code can't clear code");
       auto code_hash = sha256(code.pos, code.remaining());
 
-      auto account = db.kv_get<account_row>(account_key(contract));
+      auto account = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
       eosio::check(account.has_value(), "set_code: unknown contract account");
       eosio::check(account->code_hash == eosio::checksum256{},
                    "native set_code can't replace code");
       account->code_hash  = code_hash;
       account->vm_type    = vm_type;
       account->vm_version = vm_version;
-      db.kv_set(account->key(), *account);
+      db.kv_set(account_row::kv_map, account->key(), *account);
 
-      auto code_obj = db.kv_get<code_row>(code_key(code_hash, vm_type, vm_version));
+      auto code_obj =
+          db.kv_get<code_row>(code_row::kv_map, code_key(code_hash, vm_type, vm_version));
       if (!code_obj)
       {
          code_obj.emplace();
@@ -65,7 +64,7 @@ namespace newchain
          code_obj->code.assign(code.pos, code.end);
       }
       ++code_obj->ref_count;
-      db.kv_set(code_obj->key(), *code_obj);
+      db.kv_set(code_row::kv_map, code_obj->key(), *code_obj);
    }  // set_code
 
    struct backend_entry
@@ -150,13 +149,16 @@ namespace newchain
                              account_num          contract)
           : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
-         auto ca = db.kv_get<account_row>(account_key(contract));
+         auto ca = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
          eosio::check(ca.has_value(), "unknown contract account");
          eosio::check(ca->code_hash != eosio::checksum256{}, "account has no code");
          contract_account = std::move(*ca);
-         auto code        = db.kv_get<code_row>(code_key(
-             contract_account.code_hash, contract_account.vm_type, contract_account.vm_version));
+         auto code        = db.kv_get<code_row>(
+             code_row::kv_map, code_key(contract_account.code_hash, contract_account.vm_type,
+                                        contract_account.vm_version));
          eosio::check(code.has_value(), "code record is missing");
+         eosio::check(code->vm_type == 0, "vm_type is not 0");
+         eosio::check(code->vm_version == 0, "vm_version is not 0");
          rethrow_vm_except([&] {
             backend = trx_context.block_context.system_context.wasm_cache.impl->get(
                 contract_account.code_hash);
@@ -191,6 +193,50 @@ namespace newchain
             init();
          rethrow_vm_except(f);
          current_act_context = prev;
+      }
+
+      kv_map get_map_read(uint32_t map)
+      {
+         if (map == uint32_t(kv_map::contract))
+            return (kv_map)map;
+         if (map == uint32_t(kv_map::native_constrained))
+            return (kv_map)map;
+         if (map == uint32_t(kv_map::native_unconstrained))
+            return (kv_map)map;
+         throw std::runtime_error("map not available for reading");
+      }
+
+      kv_map get_map_write(uint32_t map, eosio::input_stream key)
+      {
+         if (map == uint32_t(kv_map::contract))
+         {
+            uint32_t prefix = contract_account.num;
+            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
+            eosio::check(
+                key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
+                "key prefix must match contract during write");
+            return (kv_map)map;
+         }
+         if (map == uint32_t(kv_map::native_constrained) &&
+             (contract_account.flags & account_row::allow_write_native))
+            return (kv_map)map;
+         if (map == uint32_t(kv_map::native_unconstrained) &&
+             (contract_account.flags & account_row::allow_write_native))
+            return (kv_map)map;
+         throw std::runtime_error("map not available for writing");
+      }
+
+      void verify_write_constrained(eosio::input_stream key, eosio::input_stream value)
+      {
+         // Only the code table currently lives in native_constrained
+         auto code = eosio::from_bin<code_row>(value);
+         eosio::check(!value.remaining(), "extra data after code_row");
+         auto code_hash = sha256(code.code.data(), code.code.size());
+         eosio::check(code.code_hash == code_hash, "code_row has incorrect code_hash");
+         auto expected_key = eosio::convert_to_key(code.key());
+         eosio::check(key.remaining() == expected_key.size() &&
+                          !memcmp(key.pos, expected_key.data(), key.remaining()),
+                      "code_row has incorrect key");
       }
 
       std::vector<char> result;
@@ -259,16 +305,18 @@ namespace newchain
       // TODO: track consumption
       // TODO: restrict key size
       // TODO: restrict value size
-      // TODO: restrict contracts writing to other contracts' regions
-      void kv_set(span<const char> key, span<const char> value)
+      void kv_set(uint32_t map, span<const char> key, span<const char> value)
       {
-         db.kv_set_raw({key.data(), key.size()}, {value.data(), value.size()});
+         if (map == uint32_t(kv_map::native_constrained))
+            verify_write_constrained({key.data(), key.size()}, {value.data(), value.size()});
+         db.kv_set_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()},
+                       {value.data(), value.size()});
       }
 
       // TODO: avoid copying value to result
-      uint32_t kv_get(span<const char> key)
+      uint32_t kv_get(uint32_t map, span<const char> key)
       {
-         auto v = db.kv_get_raw({key.data(), key.size()});
+         auto v = db.kv_get_raw(get_map_read(map), {key.data(), key.size()});
          if (!v)
             return -1;
          result.assign(v->pos, v->end);

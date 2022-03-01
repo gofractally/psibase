@@ -1,5 +1,7 @@
 #pragma once
 
+#include_next <newchain/db.hpp>
+
 #include <newchain/blob.hpp>
 #include <newchain/native_tables.hpp>
 
@@ -73,29 +75,29 @@ namespace newchain
       void    commit(session&);
       void    abort(session&);
 
-      void kv_set_raw(eosio::input_stream key, eosio::input_stream value);
-      std::optional<eosio::input_stream> kv_get_raw(eosio::input_stream key);
+      void kv_set_raw(kv_map map, eosio::input_stream key, eosio::input_stream value);
+      std::optional<eosio::input_stream> kv_get_raw(kv_map map, eosio::input_stream key);
 
       template <typename K, typename V>
-      auto kv_set(const K& key, const V& value)
+      auto kv_set(kv_map map, const K& key, const V& value)
           -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
       {
-         kv_set_raw(eosio::convert_to_key(key), eosio::convert_to_bin(value));
+         kv_set_raw(map, eosio::convert_to_key(key), eosio::convert_to_bin(value));
       }
 
       template <typename V, typename K>
-      std::optional<V> kv_get(const K& key)
+      std::optional<V> kv_get(kv_map map, const K& key)
       {
-         auto s = kv_get_raw(eosio::convert_to_key(key));
+         auto s = kv_get_raw(map, eosio::convert_to_key(key));
          if (!s)
             return std::nullopt;
          return eosio::from_bin<V>(*s);
       }
 
       template <typename V, typename K>
-      V kv_get_or_default(const K& key)
+      V kv_get_or_default(kv_map map, const K& key)
       {
-         auto obj = kv_get<V>(key);
+         auto obj = kv_get<V>(map, key);
          if (obj)
             return std::move(*obj);
          return {};

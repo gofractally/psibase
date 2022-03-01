@@ -9,13 +9,12 @@ namespace name
 {
    using table_num = uint32_t;
 
-   static constexpr account_num account           = 3;
-   static constexpr table_num   num_to_name_table = 1;
-   static constexpr table_num   name_to_num_table = 1;
+   static constexpr table_num num_to_name_table = 1;
+   static constexpr table_num name_to_num_table = 1;
 
    inline auto num_to_name_key(account_num num)
    {
-      return std::tuple{account, num_to_name_table, num};
+      return std::tuple{contract, num_to_name_table, num};
    }
    struct num_to_name_row
    {
@@ -28,7 +27,7 @@ namespace name
 
    inline auto name_to_num_key(const std::string& name)
    {
-      return std::tuple{account, name_to_num_table, name};
+      return std::tuple{contract, name_to_num_table, name};
    }
    struct name_to_num_row
    {
