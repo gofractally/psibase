@@ -762,7 +762,7 @@ static void run(const char*                               wasm,
    backend(cb, "env", "_start");
 }
 
-const char usage[] = "USAGE: cltester [OPTIONS] file.wasm [args for wasm]...\n";
+const char usage[] = "USAGE: nctester [OPTIONS] file.wasm [args for wasm]...\n";
 const char help[]  = R"(
 OPTIONS:
       -h, --help
