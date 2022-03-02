@@ -118,6 +118,10 @@ namespace boot
          check(!!account, "unknown sender");
          // TODO: assumes same dispatch format (abi) as nc-boot
          // TODO: avoid inner raw_data copy
+         // TODO: auth_contract needs a way to opt-in to being an auth contract.
+         //       Otherwise, it may misunderstand the action, and worse,
+         //       sender = 1, which provides transaction.psi's authorization
+         //       for a potentially-unknown action.
          newchain::action outer = {
              .sender   = 1,
              .contract = account->auth_contract,

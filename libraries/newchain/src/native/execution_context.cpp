@@ -203,14 +203,31 @@ namespace newchain
             return (kv_map)map;
          if (map == uint32_t(kv_map::native_unconstrained))
             return (kv_map)map;
-         throw std::runtime_error("map not available for reading");
+         if (map == uint32_t(kv_map::subjective))
+         {
+            // TODO: RPC contract queries currently can read subjective data to monitor node status.
+            //       However, there's a possibility this may make it easier on an active attacker.
+            //       Make this capability a node configuration toggle? Allow node config to whitelist
+            //       contracts for this?
+            if ((contract_account.flags & account_row::is_subjective) ||
+                trx_context.block_context.is_read_only)
+               return (kv_map)map;
+         }
+         throw std::runtime_error("contract may not read this map");
       }
 
       kv_map get_map_write(uint32_t map, eosio::input_stream key)
       {
+         eosio::check(!trx_context.block_context.is_read_only, "writes disabled during query");
+
+         if (map == uint32_t(kv_map::subjective) &&
+             (contract_account.flags & account_row::is_subjective))
+            return (kv_map)map;
+
          // Prevent poison block; subjective contracts skip execution while not in production
          eosio::check(!(contract_account.flags & account_row::is_subjective),
                       "subjective contracts may only write to kv_map::subjective");
+
          if (map == uint32_t(kv_map::contract))
          {
             uint32_t prefix = contract_account.num;
@@ -226,7 +243,7 @@ namespace newchain
          if (map == uint32_t(kv_map::native_unconstrained) &&
              (contract_account.flags & account_row::allow_write_native))
             return (kv_map)map;
-         throw std::runtime_error("map not available for writing");
+         throw std::runtime_error("contract may not write this map");
       }
 
       void verify_write_constrained(eosio::input_stream key, eosio::input_stream value)
@@ -312,6 +329,7 @@ namespace newchain
       // TODO: track consumption
       // TODO: restrict key size
       // TODO: restrict value size
+      // TODO: don't let timer abort db operation
       void kv_set(uint32_t map, span<const char> key, span<const char> value)
       {
          if (map == uint32_t(kv_map::native_constrained))
@@ -321,6 +339,7 @@ namespace newchain
       }
 
       // TODO: avoid copying value to result
+      // TODO: don't let timer abort db operation
       uint32_t kv_get(uint32_t map, span<const char> key)
       {
          auto v = db.kv_get_raw(get_map_read(map), {key.data(), key.size()});
