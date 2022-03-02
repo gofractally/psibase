@@ -16,13 +16,12 @@ namespace newchain
    {
       eosio::checksum256        chain_id;
       std::optional<block_info> head;
-      account_num               next_account_num       = 2;  // TODO: move out of native
       uint32_t                  num_execution_memories = 32;
 
       static constexpr auto kv_map = newchain::kv_map::native_unconstrained;
       static auto           key() { return status_key(); }
    };
-   EOSIO_REFLECT(status_row, chain_id, head, next_account_num, num_execution_memories)
+   EOSIO_REFLECT(status_row, chain_id, head, num_execution_memories)
 
    // TODO: Rename account to contract?
    inline auto account_key(account_num num)

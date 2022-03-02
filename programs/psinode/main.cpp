@@ -47,12 +47,24 @@ void bootstrap_chain(system_context& system)
    block_context bc{system, true, true};
    bc.start();
    eosio::check(bc.is_genesis_block, "can not bootstrap non-empty chain");
-   push(bc, 0, 0, genesis_action_data{.code = read_whole_file("nc-boot.wasm")});
-   push(bc, 1, 1, boot::action{boot::create_account{.auth_contract = 1}});
+   push(bc, 0, 0,
+        genesis_action_data{.contracts = {
+                                {
+                                    .contract      = 1,
+                                    .auth_contract = 1,
+                                    .flags         = account_row::transaction_psi_flags,
+                                    .code          = read_whole_file("nc-boot.wasm"),
+                                },
+                                {
+                                    .contract      = 2,
+                                    .auth_contract = 1,
+                                    .flags         = account_row::transaction_psi_flags,
+                                    .code          = read_whole_file("nc-name.wasm"),
+                                },
+                            }});
    push(bc, 1, 1,
-        boot::action{boot::set_code{
-            .contract = name::contract,
-            .code     = read_whole_file("nc-name.wasm"),
+        boot::action{boot::startup{
+            .next_account_num = 3,
         }});
    push(bc, name::contract, name::contract,
         name::action{name::register_account{

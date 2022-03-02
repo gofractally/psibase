@@ -19,13 +19,21 @@ namespace boot
       // TODO: check keys of act.sender
    }
 
+   void exec(account_num this_contract, account_num sender, startup& act)
+   {
+      check(!kv_get<status_row>(status_key()), "already started");
+      kv_set(status_key(), status_row{
+                               .next_account_num = act.next_account_num,
+                           });
+   }
+
    account_num exec(account_num this_contract, account_num sender, create_account& args)
    {
       // TODO: Bill RAM? A different resource?
       check(sender == boot::contract || sender == name::contract,
             "sender must be boot account or name account");
-      auto status = kv_get<status_row>(status_row::kv_map, status_key());
-      check(status.has_value(), "missing status");
+      auto status = kv_get<status_row>(status_key());
+      check(status.has_value(), "not started");
       uint32_t flags = 0;
       if (args.allow_sudo)
          flags |= account_row::allow_sudo;
@@ -34,7 +42,7 @@ namespace boot
           .auth_contract = args.auth_contract,
           .flags         = flags,
       };
-      kv_set(status->kv_map, status->key(), *status);
+      kv_set(status->key(), *status);
       kv_set(account.kv_map, account.key(), account);
       return account.num;
    }  // create_account

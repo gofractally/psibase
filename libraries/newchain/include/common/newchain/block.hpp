@@ -24,17 +24,26 @@ namespace newchain
    };
    EOSIO_REFLECT(action, sender, contract, raw_data)
 
+   struct genesis_contract
+   {
+      account_num       contract      = 0;
+      account_num       auth_contract = 0;
+      uint64_t          flags         = 0;
+      uint8_t           vm_type       = 0;
+      uint8_t           vm_version    = 0;
+      std::vector<char> code          = {};
+   };
+   EOSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
+
    // The genesis action is the first action of the first transaction of
-   // the first block. The action struct's fields (above) are ignored,
-   // except raw_data, which contains this struct.
+   // the first block. The action struct's fields are ignored, except
+   // raw_data, which contains this struct.
    struct genesis_action_data
    {
-      uint8_t           vm_type    = 0;
-      uint8_t           vm_version = 0;
-      std::string       memo;
-      std::vector<char> code;
+      std::string                   memo;
+      std::vector<genesis_contract> contracts;
    };
-   EOSIO_REFLECT(genesis_action_data, vm_type, vm_version, memo, code)
+   EOSIO_REFLECT(genesis_action_data, memo, contracts)
 
    // TODO: separate native-defined fields from contract-defined fields
    struct transaction

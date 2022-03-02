@@ -60,13 +60,21 @@ namespace newchain
          auto& db   = self.block_context.db;
          auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
                                                      "extra data in genesis payload");
-         account_row account{
-             .num           = 1,
-             .auth_contract = 1,
-             .flags         = account_row::transaction_psi_flags,
-         };
-         db.kv_set(account_row::kv_map, account.key(), account);
-         set_code(db, 1, data.vm_type, data.vm_version, {data.code.data(), data.code.size()});
+         for (auto& contract : data.contracts)
+         {
+            eosio::check(contract.contract, "account 0 is reserved");
+            eosio::check(
+                !db.kv_get<account_row>(account_row::kv_map, account_key(contract.contract)),
+                "account already created");
+            account_row account{
+                .num           = contract.contract,
+                .auth_contract = contract.auth_contract,
+                .flags         = contract.flags,
+            };
+            db.kv_set(account_row::kv_map, account.key(), account);
+            set_code(db, contract.contract, contract.vm_type, contract.vm_version,
+                     {contract.code.data(), contract.code.size()});
+         }
       }
       catch (const std::exception& e)
       {
