@@ -18,116 +18,14 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 if(IS_NATIVE)
-    ExternalProject_Add(eos
-        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/eos
-        BINARY_DIR eos
-        BUILD_ALWAYS 1
-        TEST_EXCLUDE_FROM_MAIN 1
-        EXCLUDE_FROM_ALL 1
-        BUILD_COMMAND cmake --build . -t eosio_chain -t appbase -t nodeos -t cleos -t keosd -j ${NUM_PROCS}
-        INSTALL_COMMAND sh -c "                                             \
-            mkdir -p ${ROOT_BINARY_DIR}/eos &&                              \
-            mkdir -p ${ROOT_BINARY_DIR}/clsdk/bin &&                        \
-            mkdir -p ${ROOT_BINARY_DIR}/clsdk/licenses &&                   \
-            cp -p `find . -name '*.a'` ${ROOT_BINARY_DIR}/eos &&            \
-            cp -p programs/nodeos/nodeos                                    \
-                  programs/cleos/cleos                                      \
-                  programs/keosd/keosd                                      \
-                  ${ROOT_BINARY_DIR}/clsdk/bin &&                           \
-            cp -a                                                           \
-                ${CMAKE_CURRENT_BINARY_DIR}/eos/licenses/eosio/LICENSE.*    \
-                ${ROOT_BINARY_DIR}/clsdk/licenses"
-        CMAKE_ARGS
-            -DENABLE_OC=OFF
-            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-            -DCMAKE_TARGET_MESSAGES=${CMAKE_TARGET_MESSAGES}
-            -DCMAKE_INSTALL_PREFIX=${ROOT_BINARY_DIR}/eos
-            -DCMAKE_INSTALL_LIBDIR=lib
-            -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
-            -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
-            -DEOSIO_ADDITIONAL_PLUGINS=${ROOT_SOURCE_DIR}/plugins/debug_plugin
-        BUILD_BYPRODUCTS
-            ${ROOT_BINARY_DIR}/clsdk/bin/cleos
-            ${ROOT_BINARY_DIR}/clsdk/bin/keosd
-            ${ROOT_BINARY_DIR}/clsdk/bin/nodeos
-            ${CMAKE_BINARY_DIR}/eos/libappbase.a
-            ${CMAKE_BINARY_DIR}/eos/libbuiltins.a
-            ${CMAKE_BINARY_DIR}/eos/libchainbase.a
-            ${CMAKE_BINARY_DIR}/eos/libeosio_chain.a
-            ${CMAKE_BINARY_DIR}/eos/libfc${FC_SUFFIX}.a
-            ${CMAKE_BINARY_DIR}/eos/libIR.a
-            ${CMAKE_BINARY_DIR}/eos/libLogging.a
-            ${CMAKE_BINARY_DIR}/eos/libRuntime.a
-            ${CMAKE_BINARY_DIR}/eos/libsecp256k1${FC_SUFFIX}.a
-            ${CMAKE_BINARY_DIR}/eos/libsoftfloat.a
-            ${CMAKE_BINARY_DIR}/eos/libstate_history.a
-            ${CMAKE_BINARY_DIR}/eos/libWASM.a
-            ${CMAKE_BINARY_DIR}/eos/libWAST.a
-    )
-
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/eos/libraries/fc/CMakeModules")
-    find_package(OpenSSL REQUIRED)
-    find_package(Threads REQUIRED)
-    find_package(ZLIB REQUIRED)
-    find_package(GMP REQUIRED)
-
     set(Boost_USE_MULTITHREADED ON)
     set(Boost_USE_STATIC_LIBS   ON)
     find_package(Boost 1.67 REQUIRED COMPONENTS date_time filesystem chrono iostreams)
 
-    add_library(chain INTERFACE)
-    target_include_directories(chain INTERFACE
-        ${GMP_INCLUDE_DIR}
-        ${OPENSSL_INCLUDE_DIR}
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/appbase/include
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/builtins
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/chain/include
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/chainbase/include
+    add_library(eos-vm INTERFACE)
+    target_include_directories(eos-vm INTERFACE
         ${ROOT_SOURCE_DIR}/external/eos/libraries/eos-vm/include
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/fc/include
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/softfloat/source/include
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/state_history/include
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/wasm-jit/Include
     )
-    target_link_libraries(chain INTERFACE
-        -L${ROOT_BINARY_DIR}/eos
-        -leosio_chain
-        -lRuntime
-        -lWASM
-        -lIR
-        -lLogging
-        -lWAST
-        -lbuiltins
-        -lsoftfloat
-        -lchainbase
-        -lfc${FC_SUFFIX}
-        -lsecp256k1${FC_SUFFIX}
-        -lstate_history
-        -lappbase
-        Boost::date_time Boost::filesystem Boost::chrono Boost::iostreams Threads::Threads
-        ${OPENSSL_LIBRARIES}
-        ${GMP_LIBRARIES}
-        ${ZLIB_LIBRARIES}
-    )
-    if(NOT APPLE)
-        target_link_libraries(chain INTERFACE -lrt)
-    endif()
-    add_dependencies(chain eos)
-
-    add_library(eos-fc INTERFACE)
-    target_include_directories(eos-fc INTERFACE
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/fc/include
-    )
-    target_link_libraries(eos-fc INTERFACE
-        -L${ROOT_BINARY_DIR}/eos
-        -lfc${FC_SUFFIX}
-        -lsecp256k1${FC_SUFFIX}
-        Boost::date_time Boost::filesystem Boost::chrono Boost::iostreams Threads::Threads
-        ${OPENSSL_LIBRARIES}
-        ${ZLIB_LIBRARIES}
-        ${GMP_LIBRARIES}
-    )
-    add_dependencies(eos-fc eos)
 
     set(MDBX_OUTPUT_DIR ${ROOT_BINARY_DIR}/mdbx)
     set(MDBX_BUILD_TIMESTAMP unknown)

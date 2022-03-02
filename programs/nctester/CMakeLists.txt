@@ -1,5 +1,7 @@
+find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
+
 add_executable(nctester main.cpp)
-target_link_libraries(nctester newchain abieos debug_eos_vm)
+target_link_libraries(nctester newchain abieos debug_eos_vm ${Boost_LIBRARIES})
 set_target_properties(nctester PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 add_custom_command(TARGET nctester POST_BUILD
     COMMAND mkdir -p ${ROOT_BINARY_DIR}/clsdk/bin

@@ -1,8 +1,8 @@
+#include <boost/filesystem/operations.hpp>
 #include <debug_eos_vm/debug_eos_vm.hpp>
 #include <eosio/chain_types.hpp>
 #include <eosio/fixed_bytes.hpp>
 #include <eosio/to_bin.hpp>
-#include <fc/filesystem.hpp>
 #include <newchain/block_context.hpp>
 
 #include <stdio.h>
@@ -115,7 +115,7 @@ struct test_chain
 {
    ::state&                                  state;
    std::set<test_chain_ref*>                 refs;
-   fc::temp_directory                        dir;
+   boost::filesystem::path                   dir;
    newchain::shared_database                 db;
    std::unique_ptr<newchain::system_context> sys;
    std::unique_ptr<newchain::block_context>  block;
@@ -123,7 +123,8 @@ struct test_chain
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
       eosio::check(snapshot.empty(), "snapshots not implemented");
-      db  = {dir.path()};
+      dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
+      db  = {dir};
       sys = std::make_unique<newchain::system_context>(newchain::system_context{db, {128}});
    }
 
@@ -134,6 +135,10 @@ struct test_chain
    {
       for (auto* ref : refs)
          ref->chain = nullptr;
+      block.reset();
+      sys.reset();
+      db = {};
+      boost::filesystem::remove_all(dir);
    }
 
    void start_block(int64_t skip_miliseconds = 0)
@@ -596,9 +601,8 @@ struct callbacks
    uint32_t tester_get_chain_path(uint32_t chain, span<char> dest)
    {
       auto& c = assert_chain(chain, false);
-      auto  s = c.dir.path().string();
-      memcpy(dest.data(), s.c_str(), std::min(dest.size(), s.size()));
-      return s.size();
+      memcpy(dest.data(), c.dir.c_str(), std::min(dest.size(), c.dir.size()));
+      return c.dir.size();
    }
 
    void tester_start_block(uint32_t chain_index, int64_t skip_miliseconds)

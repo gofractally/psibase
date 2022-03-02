@@ -20,9 +20,6 @@
 #include <boost/make_unique.hpp>
 #include <boost/optional.hpp>
 
-#include <fc/exception/exception.hpp>
-#include <fc/log/logger.hpp>
-
 #include <eosio/finally.hpp>
 #include <eosio/to_json.hpp>
 
@@ -68,7 +65,7 @@ namespace newchain::http
    // Report a failure
    static void fail(beast::error_code ec, const char* what)
    {
-      elog("${w}: ${s}", ("w", what)("s", ec.message()));
+      // TODO: elog("${w}: ${s}", ("w", what)("s", ec.message()));
    }
 
    // Return a reasonable mime type based on the extension of a file.
@@ -332,7 +329,7 @@ namespace newchain::http
       }
       catch (...)
       {
-         elog("query failed: unknown exception");
+         // TODO: elog("query failed: unknown exception");
          return send(
              error(bhttp::status::internal_server_error, "query failed: unknown exception\n"));
       }
@@ -647,7 +644,7 @@ namespace newchain::http
          auto check_ec = [&](const char* what) {
             if (!ec)
                return;
-            elog("${w}: ${m}", ("w", what)("m", ec.message()));
+            // TODO: elog("${w}: ${m}", ("w", what)("m", ec.message()));
             eosio::check(false, "unable to open listen socket");
          };
 
@@ -696,11 +693,12 @@ namespace newchain::http
                    if constexpr (std::is_same_v<Acceptor, tcp::acceptor>)
                    {
                       boost::system::error_code ec;
-                      dlog("Accepting connection from ${ra}:${rp} to ${la}:${lp}",
-                           ("ra", socket.remote_endpoint(ec).address().to_string())(
-                               "rp", socket.remote_endpoint(ec).port())(
-                               "la", socket.local_endpoint(ec).address().to_string())(
-                               "lp", socket.local_endpoint(ec).port()));
+                      // TODO:
+                      // dlog("Accepting connection from ${ra}:${rp} to ${la}:${lp}",
+                      //      ("ra", socket.remote_endpoint(ec).address().to_string())(
+                      //          "rp", socket.remote_endpoint(ec).port())(
+                      //          "la", socket.local_endpoint(ec).address().to_string())(
+                      //          "lp", socket.local_endpoint(ec).port()));
                       std::make_shared<tcp_http_session>(http_config, shared_state,
                                                          std::move(socket))
                           ->run();
@@ -709,7 +707,7 @@ namespace newchain::http
                    {
                       boost::system::error_code ec;
                       auto                      rep = socket.remote_endpoint(ec);
-                      dlog("Accepting connection from ${r}", ("r", rep.path()));
+                      // TODO: dlog("Accepting connection from ${r}", ("r", rep.path()));
                       std::make_shared<unix_http_session>(http_config, shared_state,
                                                           std::move(socket))
                           ->run();

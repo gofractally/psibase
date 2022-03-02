@@ -96,7 +96,9 @@ function(add suffix)
     endif()
 
     if(DEFINED IS_NATIVE)
-        target_link_libraries(newchain${suffix} PUBLIC chain mdbx-static)
+        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
+
+        target_link_libraries(newchain${suffix} PUBLIC eos-vm mdbx-static ${Boost_LIBRARIES})
         target_include_directories(newchain${suffix} PUBLIC
             include/native
             include/common
