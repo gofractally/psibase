@@ -1,5 +1,6 @@
 #include "nc-test.hpp"
 
+#include "nc-account.hpp"
 #include "nc-boot.hpp"
 #include "nc-token.hpp"
 
@@ -21,6 +22,53 @@ std::string show(bool include, transaction_trace t)
    return {};
 }
 
+void boot_minimal(test_chain& t)
+{
+   REQUIRE(                          //
+       show(false,                   //
+            t.push_transaction(      //
+                t.make_transaction(  //
+                    {
+                        {
+                            .sender   = 9999,
+                            .contract = 9999,
+                            .raw_data = eosio::convert_to_bin(genesis_action_data{
+                                .contracts = {{
+                                                  .contract      = 1,
+                                                  .auth_contract = 1,
+                                                  .flags         = boot::contract_flags,
+                                                  .code          = read_whole_file("nc-boot.wasm"),
+                                              },
+                                              {
+                                                  .contract      = 2,
+                                                  .auth_contract = 1,
+                                                  .flags         = account::contract_flags,
+                                                  .code = read_whole_file("nc-account.wasm"),
+                                              }},
+                            }),
+                        },
+                    }))) == "");
+
+   REQUIRE(                          //
+       show(false,                   //
+            t.push_transaction(      //
+                t.make_transaction(  //
+                    {
+                        {
+                            .sender   = boot::contract,
+                            .contract = account::contract,
+                            .raw_data = eosio::convert_to_bin(account::action{account::startup{
+                                .next_account_num = 3,
+                                .existing_accounts =
+                                    {
+                                        {1, "transaction.psi"},
+                                        {2, "account.psi"},
+                                    },
+                            }}),
+                        },
+                    }))) == "");
+}  // boot
+
 TEST_CASE("t1")
 {
    test_chain t;
@@ -32,59 +80,47 @@ TEST_CASE("t1")
    t.start_block();
    std::cout << format_json(t.get_head_block_info()) << "\n";
 
-   std::cout << "set first code\n";
-   REQUIRE(show(false, t.push_transaction(t.make_transaction(  //
-                           {{
-                               .sender   = 9999,
-                               .contract = 9999,
-                               .raw_data = eosio::convert_to_bin(genesis_action_data{
-                                   .contracts = {{
-                                       .contract      = 1,
-                                       .auth_contract = 1,
-                                       .flags         = account_row::transaction_psi_flags,
-                                       .code          = read_whole_file("nc-boot.wasm"),
-                                   }},
-                               }),
-                           }}))) == "");
+   std::cout << "boot\n";
+   boot_minimal(t);
 
-   REQUIRE(
-       show(false, t.push_transaction(t.make_transaction(  //
-                       {
-                           {
-                               .sender   = boot::contract,
-                               .contract = boot::contract,
-                               .raw_data = eosio::convert_to_bin(boot::action{boot::startup{
-                                   .next_account_num = 2,
-                               }}),
-                           },
-                           {
-                               .sender   = boot::contract,
-                               .contract = boot::contract,
-                               .raw_data = eosio::convert_to_bin(boot::action{boot::create_account{
-                                   .auth_contract = 1,
-                               }}),
-                           },
-                           {
-                               .sender   = boot::contract,
-                               .contract = boot::contract,
-                               .raw_data = eosio::convert_to_bin(boot::action{boot::set_code{
-                                   .contract   = 2,
-                                   .vm_type    = 0,
-                                   .vm_version = 0,
-                                   .code       = read_whole_file("nc-test-cntr.wasm"),
-                               }}),
-                           },
-                       }))) == "");
+   REQUIRE(                          //
+       show(false,                   //
+            t.push_transaction(      //
+                t.make_transaction(  //
+                    {
+                        {
+                            .sender   = boot::contract,
+                            .contract = account::contract,
+                            .raw_data =
+                                eosio::convert_to_bin(account::action{account::create_account{
+                                    .name          = "nc-test-cntr",
+                                    .auth_contract = "transaction.psi",
+                                }}),
+                        },
+                        {
+                            .sender   = boot::contract,
+                            .contract = boot::contract,
+                            .raw_data = eosio::convert_to_bin(boot::action{boot::set_code{
+                                .contract   = 3,
+                                .vm_type    = 0,
+                                .vm_version = 0,
+                                .code       = read_whole_file("nc-test-cntr.wasm"),
+                            }}),
+                        },
+                    }))) == "");
 
-   REQUIRE(show(false, t.push_transaction(t.make_transaction(  //
-                           {{
-                               .sender   = 2,
-                               .contract = 2,
-                               .raw_data = eosio::convert_to_bin(payload{
-                                   .number = 3,
-                                   .memo   = "Counting down",
-                               }),
-                           }}))) == "");
+   REQUIRE(                          //
+       show(false,                   //
+            t.push_transaction(      //
+                t.make_transaction(  //
+                    {{
+                        .sender   = 3,
+                        .contract = 3,
+                        .raw_data = eosio::convert_to_bin(payload{
+                            .number = 3,
+                            .memo   = "Counting down",
+                        }),
+                    }}))) == "");
 
    t.start_block();
    std::cout << format_json(t.get_head_block_info()) << "\n";
@@ -98,91 +134,87 @@ TEST_CASE("t2")
 {
    test_chain t;
    t.start_block();
-   REQUIRE(show(false, t.push_transaction(t.make_transaction(  //
-                           {{
-                               .sender   = 9999,
-                               .contract = 9999,
-                               .raw_data = eosio::convert_to_bin(genesis_action_data{
-                                   .contracts = {{
-                                       .contract      = 1,
-                                       .auth_contract = 1,
-                                       .flags         = account_row::transaction_psi_flags,
-                                       .code          = read_whole_file("nc-boot.wasm"),
-                                   }},
-                               }),
-                           }}))) == "");
+   boot_minimal(t);
+   REQUIRE(                          //
+       show(false,                   //
+            t.push_transaction(      //
+                t.make_transaction(  //
+                    {
+                        {
+                            .sender   = boot::contract,
+                            .contract = account::contract,
+                            .raw_data =
+                                eosio::convert_to_bin(account::action{account::create_account{
+                                    .name          = "token.psi",
+                                    .auth_contract = "transaction.psi",
+                                }}),
+                        },
+                        {
+                            .sender   = boot::contract,
+                            .contract = boot::contract,
+                            .raw_data = eosio::convert_to_bin(boot::action{boot::set_code{
+                                .contract   = token::contract,
+                                .vm_type    = 0,
+                                .vm_version = 0,
+                                .code       = read_whole_file("nc-token.wasm"),
+                            }}),
+                        },
+                    }))) == "");
 
-   REQUIRE(
-       show(false, t.push_transaction(t.make_transaction(  //
+   // Accounts 4-103
+   for (int i = 0; i < 100; ++i)
+      REQUIRE(                          //
+          show(false,                   //
+               t.push_transaction(      //
+                   t.make_transaction(  //
                        {
                            {
                                .sender   = boot::contract,
-                               .contract = boot::contract,
-                               .raw_data = eosio::convert_to_bin(boot::action{boot::startup{
-                                   .next_account_num = 2,
-                               }}),
-                           },
-                           {
-                               .sender   = boot::contract,
-                               .contract = boot::contract,
-                               .raw_data = eosio::convert_to_bin(boot::action{boot::create_account{
-                                   .auth_contract = boot::contract,
-                               }}),
-                           },
-                           {
-                               .sender   = boot::contract,
-                               .contract = boot::contract,
-                               .raw_data = eosio::convert_to_bin(boot::action{boot::set_code{
-                                   .contract   = 2,
-                                   .vm_type    = 0,
-                                   .vm_version = 0,
-                                   .code       = read_whole_file("nc-token.wasm"),
-                               }}),
+                               .contract = account::contract,
+                               .raw_data =
+                                   eosio::convert_to_bin(account::action{account::create_account{
+                                       .name          = "x" + std::to_string(i),
+                                       .auth_contract = "transaction.psi",
+                                   }}),
                            },
                        }))) == "");
 
-   // Accounts 3-102
-   for (int i = 0; i < 100; ++i)
-      REQUIRE(
-          show(false, t.push_transaction(t.make_transaction(  //
-                          {{
-                              .sender   = boot::contract,
-                              .contract = boot::contract,
-                              .raw_data = eosio::convert_to_bin(boot::action{boot::create_account{
-                                  .auth_contract = 1,
-                              }}),
-                          }}))) == "");
-
-   REQUIRE(show(false, t.push_transaction(t.make_transaction(  //
-                           {{
-                                .sender   = token::contract,
-                                .contract = token::contract,
-                                .raw_data = eosio::convert_to_bin(token::action{token::issue{
-                                    .to     = 3,
-                                    .amount = s2a("1.0000 TOK"),
-                                    .memo   = "issuing",
-                                }}),
-                            },
-                            {
-                                .sender   = 3,
-                                .contract = token::contract,
-                                .raw_data = eosio::convert_to_bin(token::action{token::transfer{
-                                    .to     = 4,
-                                    .amount = s2a("0.1000 TOK"),
-                                    .memo   = "3->4",
-                                }}),
-                            }}))) == "");
+   REQUIRE(                          //
+       show(false,                   //
+            t.push_transaction(      //
+                t.make_transaction(  //
+                    {{
+                         .sender   = token::contract,
+                         .contract = token::contract,
+                         .raw_data = eosio::convert_to_bin(token::action{token::issue{
+                             .to     = 3,
+                             .amount = s2a("1.0000 TOK"),
+                             .memo   = "issuing",
+                         }}),
+                     },
+                     {
+                         .sender   = 3,
+                         .contract = token::contract,
+                         .raw_data = eosio::convert_to_bin(token::action{token::transfer{
+                             .to     = 4,
+                             .amount = s2a("0.1000 TOK"),
+                             .memo   = "3->4",
+                         }}),
+                     }}))) == "");
 
    for (int i = 0; i < 100; ++i)
-      REQUIRE(show(false, t.push_transaction(t.make_transaction(  //
-                              {{
-                                  .sender   = 3,
-                                  .contract = token::contract,
-                                  .raw_data = eosio::convert_to_bin(token::action{token::transfer{
-                                      .to     = 4,
-                                      .amount = s2a("0.0001 TOK"),
-                                      .memo   = "3->4",
-                                  }}),
-                              }}))) == "");
+      REQUIRE(                          //
+          show(false,                   //
+               t.push_transaction(      //
+                   t.make_transaction(  //
+                       {{
+                           .sender   = 3,
+                           .contract = token::contract,
+                           .raw_data = eosio::convert_to_bin(token::action{token::transfer{
+                               .to     = 4,
+                               .amount = s2a("0.0001 TOK"),
+                               .memo   = "3->4",
+                           }}),
+                       }}))) == "");
 
 }  // t2

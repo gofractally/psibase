@@ -1,23 +1,28 @@
 #pragma once
 
 #include <newchain/intrinsic.hpp>
+#include <newchain/native_tables.hpp>
 
-#include <eosio/asset.hpp>
-#include <eosio/from_bin.hpp>
-#include <eosio/to_bin.hpp>
-
-namespace name
+namespace account
 {
    static constexpr newchain::account_num contract = 2;
+   static constexpr uint64_t contract_flags        = newchain::account_row::allow_write_native;
 
-   struct register_account
+   struct account_name
+   {
+      newchain::account_num num  = {};
+      std::string           name = {};
+   };
+   EOSIO_REFLECT(account_name, num, name)
+
+   struct startup
    {
       using return_type = void;
 
-      newchain::account_num account = {};
-      std::string           name    = {};
+      newchain::account_num     next_account_num  = 0;  // TODO: find this automatically
+      std::vector<account_name> existing_accounts = {};
    };
-   EOSIO_REFLECT(register_account, account, name)
+   EOSIO_REFLECT(startup, next_account_num, existing_accounts)
 
    struct create_account
    {
@@ -45,7 +50,7 @@ namespace name
    };
    EOSIO_REFLECT(get_by_num, num)
 
-   using action = std::variant<register_account, create_account, get_by_name, get_by_num>;
+   using action = std::variant<startup, create_account, get_by_name, get_by_num>;
 
    template <typename T, typename R = typename T::return_type>
    R call(newchain::account_num sender, T args)
@@ -58,4 +63,4 @@ namespace name
       if constexpr (!std::is_same_v<R, void>)
          return eosio::convert_from_bin<R>(result);
    }
-}  // namespace name
+}  // namespace account

@@ -1,5 +1,5 @@
+#include <nc-account.hpp>
 #include <nc-boot.hpp>
-#include <nc-name.hpp>
 #include <newchain/http.hpp>
 #include <newchain/rpc.hpp>
 #include <newchain/transaction_context.hpp>
@@ -50,49 +50,41 @@ void bootstrap_chain(system_context& system)
    push(bc, 0, 0,
         genesis_action_data{.contracts = {
                                 {
-                                    .contract      = 1,
-                                    .auth_contract = 1,
-                                    .flags         = account_row::transaction_psi_flags,
+                                    .contract      = boot::contract,
+                                    .auth_contract = boot::contract,
+                                    .flags         = boot::contract_flags,
                                     .code          = read_whole_file("nc-boot.wasm"),
                                 },
                                 {
-                                    .contract      = 2,
-                                    .auth_contract = 1,
-                                    .flags         = account_row::transaction_psi_flags,
-                                    .code          = read_whole_file("nc-name.wasm"),
+                                    .contract      = account::contract,
+                                    .auth_contract = boot::contract,
+                                    .flags         = account::contract_flags,
+                                    .code          = read_whole_file("nc-account.wasm"),
+                                },
+                                {
+                                    .contract      = rpc_contract_num,
+                                    .auth_contract = boot::contract,
+                                    .flags         = 0,
+                                    .code          = read_whole_file("nc-rpc.wasm"),
                                 },
                             }});
-   push(bc, 1, 1,
-        boot::action{boot::startup{
-            .next_account_num = 3,
+   push(bc, account::contract, account::contract,
+        account::action{account::startup{
+            .next_account_num = 4,
+            .existing_accounts =
+                {
+                    {boot::contract, "transaction.psi"},
+                    {account::contract, "account.psi"},
+                    {rpc_contract_num, "rpc.psi"},
+                },
         }});
-   push(bc, name::contract, name::contract,
-        name::action{name::register_account{
-            .account = 1,
-            .name    = "transaction.psi",
-        }});
-   push(bc, name::contract, name::contract,
-        name::action{name::register_account{
-            .account = 2,
-            .name    = "name.psi",
-        }});
-   push(bc, name::contract, name::contract,
-        name::action{name::create_account{
-            .name          = "rpc.psi",
-            .auth_contract = "transaction.psi",
-        }});
-   push(bc, 1, 1,
-        boot::action{boot::set_code{
-            .contract = rpc_contract_num,
-            .code     = read_whole_file("nc-rpc.wasm"),
-        }});
-   push(bc, name::contract, name::contract,
-        name::action{name::create_account{
+   push(bc, account::contract, account::contract,
+        account::action{account::create_account{
             .name          = "alice",
             .auth_contract = "transaction.psi",
         }});
-   push(bc, name::contract, name::contract,
-        name::action{name::create_account{
+   push(bc, account::contract, account::contract,
+        account::action{account::create_account{
             .name          = "bob",
             .auth_contract = "transaction.psi",
         }});
@@ -108,18 +100,21 @@ void run(const char* db_path, bool bootstrap, bool produce, bool api_server)
        std::make_shared<newchain::shared_state>(shared_database{db_path}, wasm_cache{128});
    auto system = shared_state->get_system_context();
 
-   // TODO: config file
-   auto http_config = std::make_shared<http::http_config>(http::http_config{
-       .num_threads      = 4,
-       .max_request_size = 1024,
-       .idle_timeout_ms  = std::chrono::milliseconds{1000},
-       .allow_origin     = "*",
-       .static_dir       = "",
-       .address          = "0.0.0.0",
-       .port             = "8080",
-       .unix_path        = "",
-   });
-   auto server      = http::server::create(http_config, shared_state);
+   if (api_server)
+   {
+      // TODO: config file
+      auto http_config = std::make_shared<http::http_config>(http::http_config{
+          .num_threads      = 4,
+          .max_request_size = 1024,
+          .idle_timeout_ms  = std::chrono::milliseconds{1000},
+          .allow_origin     = "*",
+          .static_dir       = "",
+          .address          = "0.0.0.0",
+          .port             = "8080",
+          .unix_path        = "",
+      });
+      auto server      = http::server::create(http_config, shared_state);
+   }
 
    if (bootstrap)
       bootstrap_chain(*system);

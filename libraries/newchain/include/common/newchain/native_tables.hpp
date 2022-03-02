@@ -35,8 +35,6 @@ namespace newchain
       static constexpr uint64_t allow_write_native = uint64_t(1) << 1;
       static constexpr uint64_t is_subjective      = uint64_t(1) << 2;
 
-      static constexpr uint64_t transaction_psi_flags = allow_sudo | allow_write_native;
-
       account_num        num           = 0;
       account_num        auth_contract = 0;  // TODO: move out of native
       uint64_t           flags         = 0;

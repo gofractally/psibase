@@ -1,4 +1,4 @@
-#include "nc-name.hpp"
+#include "nc-account.hpp"
 
 #include <newchain/intrinsic.hpp>
 #include <newchain/native_tables.hpp>
@@ -45,9 +45,10 @@ namespace rpc
             if (!acc)
                break;
             augmented_account_row aug;
-            (account_row&)aug      = *acc;
-            aug.name               = name::call(act.contract, name::get_by_num{aug.num});
-            aug.auth_contract_name = name::call(act.contract, name::get_by_num{aug.auth_contract});
+            (account_row&)aug = *acc;
+            aug.name          = account::call(act.contract, account::get_by_num{aug.num});
+            aug.auth_contract_name =
+                account::call(act.contract, account::get_by_num{aug.auth_contract});
             rows.push_back(std::move(aug));
          }
          return to_json(rows);

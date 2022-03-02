@@ -8,7 +8,7 @@
 
 namespace token
 {
-   static constexpr newchain::account_num contract = 2;
+   static constexpr newchain::account_num contract = 3;
 
    struct issue
    {
