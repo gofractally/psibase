@@ -17,7 +17,7 @@ namespace token
 
    void set_balance(account_num this_contract, account_num acc, eosio::asset amount)
    {
-      kv_set(std::tuple{this_contract, acc, amount.symbol.code()}, amount);
+      kv_put(std::tuple{this_contract, acc, amount.symbol.code()}, amount);
    }
 
    // TODO: This does a blind issue; need to track created tokens and limits

@@ -30,7 +30,7 @@ namespace psibase
       if (!status)
       {
          status.emplace();
-         db.kv_set(status_row::kv_map, status->key(), *status);
+         db.kv_put(status_row::kv_map, status->key(), *status);
       }
 
       if (status->head)
@@ -82,7 +82,7 @@ namespace psibase
       status->head = current;
       if (is_genesis_block)
          status->chain_id = status->head->id;
-      db.kv_set(status_row::kv_map, status->key(), *status);
+      db.kv_put(status_row::kv_map, status->key(), *status);
 
       session.commit();
    }

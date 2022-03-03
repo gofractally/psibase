@@ -51,7 +51,7 @@ namespace psibase
       account->code_hash  = code_hash;
       account->vm_type    = vm_type;
       account->vm_version = vm_version;
-      db.kv_set(account_row::kv_map, account->key(), *account);
+      db.kv_put(account_row::kv_map, account->key(), *account);
 
       auto code_obj =
           db.kv_get<code_row>(code_row::kv_map, code_key(code_hash, vm_type, vm_version));
@@ -64,7 +64,7 @@ namespace psibase
          code_obj->code.assign(code.pos, code.end);
       }
       ++code_obj->ref_count;
-      db.kv_set(code_row::kv_map, code_obj->key(), *code_obj);
+      db.kv_put(code_row::kv_map, code_obj->key(), *code_obj);
    }  // set_code
 
    struct backend_entry
@@ -330,11 +330,11 @@ namespace psibase
       // TODO: restrict key size
       // TODO: restrict value size
       // TODO: don't let timer abort db operation
-      void kv_set(uint32_t map, span<const char> key, span<const char> value)
+      void kv_put(uint32_t map, span<const char> key, span<const char> value)
       {
          if (map == uint32_t(kv_map::native_constrained))
             verify_write_constrained({key.data(), key.size()}, {value.data(), value.size()});
-         db.kv_set_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()},
+         db.kv_put_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()},
                        {value.data(), value.size()});
       }
 
@@ -368,7 +368,7 @@ namespace psibase
       rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
-      rhf_t::add<&execution_context_impl::kv_set>("env", "kv_set");
+      rhf_t::add<&execution_context_impl::kv_put>("env", "kv_put");
       rhf_t::add<&execution_context_impl::kv_get>("env", "kv_get");
    }
 

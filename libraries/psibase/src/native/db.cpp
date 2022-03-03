@@ -145,7 +145,7 @@ namespace psibase
       }
    }
 
-   void database::kv_set_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
+   void database::kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
    {
       impl->get_trx(map).upsert(impl->shared.impl->get_map(map), {key.pos, key.remaining()},
                                 {value.pos, value.remaining()});

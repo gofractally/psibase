@@ -35,7 +35,7 @@ namespace boot
              code_row::kv_map, code_key(account->code_hash, account->vm_type, account->vm_version));
          check(code_obj.has_value(), "missing code object");
          if (--code_obj->ref_count)
-            kv_set(code_obj->kv_map, code_obj->key(), *code_obj);
+            kv_put(code_obj->kv_map, code_obj->key(), *code_obj);
          else
          {
             // TODO: erase code_obj
@@ -46,7 +46,7 @@ namespace boot
       account->code_hash  = code_hash;
       account->vm_type    = args.vm_type;
       account->vm_version = args.vm_version;
-      kv_set(account->kv_map, account->key(), *account);
+      kv_put(account->kv_map, account->key(), *account);
 
       auto code_obj = kv_get<code_row>(
           code_row::kv_map, code_key(account->code_hash, account->vm_type, account->vm_version));
@@ -60,7 +60,7 @@ namespace boot
          code_obj->code.assign(args.code.begin(), args.code.end());
       }
       ++code_obj->ref_count;
-      kv_set(code_obj->kv_map, code_obj->key(), *code_obj);
+      kv_put(code_obj->kv_map, code_obj->key(), *code_obj);
    }  // set_code
 
    extern "C" void called(account_num this_contract, account_num sender)

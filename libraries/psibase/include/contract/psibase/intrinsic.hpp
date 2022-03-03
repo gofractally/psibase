@@ -42,7 +42,7 @@ namespace psibase
       [[clang::import_name("set_retval")]] void set_retval(const char* retval, uint32_t len);
 
       // Set a key-value pair. If key already exists, then replace the existing value.
-      [[clang::import_name("kv_set")]] void kv_set(kv_map      map,
+      [[clang::import_name("kv_put")]] void kv_put(kv_map      map,
                                                    const char* key,
                                                    uint32_t    key_len,
                                                    const char* value,
@@ -108,24 +108,24 @@ namespace psibase
    inline void set_retval_bytes(eosio::input_stream s) { raw::set_retval(s.pos, s.remaining()); }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
-   inline void kv_set_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
+   inline void kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
    {
-      raw::kv_set(map, key.pos, key.remaining(), value.pos, value.remaining());
+      raw::kv_put(map, key.pos, key.remaining(), value.pos, value.remaining());
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, typename V>
-   auto kv_set(kv_map map, const K& key, const V& value)
+   auto kv_put(kv_map map, const K& key, const V& value)
        -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
-      kv_set_raw(map, eosio::convert_to_key(key), eosio::convert_to_bin(value));
+      kv_put_raw(map, eosio::convert_to_key(key), eosio::convert_to_bin(value));
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, typename V>
-   auto kv_set(const K& key, const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+   auto kv_put(const K& key, const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
-      kv_set(kv_map::contract, key, value);
+      kv_put(kv_map::contract, key, value);
    }
 
    // Size of key-value pair, if any

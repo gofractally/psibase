@@ -55,14 +55,14 @@ namespace account
       check(!name.empty(), "name is empty");  // TODO: better name constraints
       check(!kv_get_size(num_to_name_key(num)), "num already registered");
       check(!kv_get_size(name_to_num_key(name)), "name already registered");
-      kv_set(num_to_name_key(num), num_to_name_row{num, name});
-      kv_set(name_to_num_key(name), name_to_num_row{num, name});
+      kv_put(num_to_name_key(num), num_to_name_row{num, name});
+      kv_put(name_to_num_key(name), name_to_num_row{num, name});
    }
 
    void exec(account_num this_contract, account_num sender, startup& act)
    {
       check(!kv_get<status_row>(status_key()), "already started");
-      kv_set(status_key(), status_row{
+      kv_put(status_key(), status_row{
                                .next_account_num = act.next_account_num,
                            });
       for (auto [num, name] : act.existing_accounts)
@@ -85,8 +85,8 @@ namespace account
           .auth_contract = auth_row->num,
           .flags         = flags,
       };
-      kv_set(status->key(), *status);
-      kv_set(account.kv_map, account.key(), account);
+      kv_put(status->key(), *status);
+      kv_put(account.kv_map, account.key(), account);
       register_acc(account.num, args.name);
       return account.num;
    }

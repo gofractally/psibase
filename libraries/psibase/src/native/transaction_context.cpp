@@ -71,7 +71,7 @@ namespace psibase
                 .auth_contract = contract.auth_contract,
                 .flags         = contract.flags,
             };
-            db.kv_set(account_row::kv_map, account.key(), account);
+            db.kv_put(account_row::kv_map, account.key(), account);
             set_code(db, contract.contract, contract.vm_type, contract.vm_version,
                      {contract.code.data(), contract.code.size()});
          }

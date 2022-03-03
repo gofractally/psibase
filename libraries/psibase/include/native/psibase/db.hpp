@@ -75,14 +75,14 @@ namespace psibase
       void    commit(session&);
       void    abort(session&);
 
-      void kv_set_raw(kv_map map, eosio::input_stream key, eosio::input_stream value);
+      void kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value);
       std::optional<eosio::input_stream> kv_get_raw(kv_map map, eosio::input_stream key);
 
       template <typename K, typename V>
-      auto kv_set(kv_map map, const K& key, const V& value)
+      auto kv_put(kv_map map, const K& key, const V& value)
           -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
       {
-         kv_set_raw(map, eosio::convert_to_key(key), eosio::convert_to_bin(value));
+         kv_put_raw(map, eosio::convert_to_key(key), eosio::convert_to_bin(value));
       }
 
       template <typename V, typename K>
