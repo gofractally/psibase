@@ -334,15 +334,66 @@ namespace psibase
       {
          if (map == uint32_t(kv_map::native_constrained))
             verify_write_constrained({key.data(), key.size()}, {value.data(), value.size()});
+         result.clear();
          db.kv_put_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()},
                        {value.data(), value.size()});
+      }
+
+      // TODO: track consumption
+      // TODO: don't let timer abort db operation
+      void kv_remove(uint32_t map, span<const char> key)
+      {
+         result.clear();
+         db.kv_remove_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()});
       }
 
       // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
       uint32_t kv_get(uint32_t map, span<const char> key)
       {
+         result.clear();
          auto v = db.kv_get_raw(get_map_read(map), {key.data(), key.size()});
+         if (!v)
+            return -1;
+         result.assign(v->pos, v->end);
+         return result.size();
+      }
+
+      // TODO: avoid copying value to result
+      // TODO: don't let timer abort db operation
+      uint32_t kv_greater_than(uint32_t map, span<const char> key, size_t match_key_size)
+      {
+         eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
+         result.clear();
+         auto v =
+             db.kv_greater_than_raw(get_map_read(map), {key.data(), key.size()}, match_key_size);
+         if (!v)
+            return -1;
+         result.assign(v->pos, v->end);
+         return result.size();
+      }
+
+      // TODO: avoid copying value to result
+      // TODO: don't let timer abort db operation
+      uint32_t kv_greater_equal(uint32_t map, span<const char> key, size_t match_key_size)
+      {
+         eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
+         result.clear();
+         auto v =
+             db.kv_greater_equal_raw(get_map_read(map), {key.data(), key.size()}, match_key_size);
+         if (!v)
+            return -1;
+         result.assign(v->pos, v->end);
+         return result.size();
+      }
+
+      // TODO: avoid copying value to result
+      // TODO: don't let timer abort db operation
+      uint32_t kv_less_than(uint32_t map, span<const char> key, size_t match_key_size)
+      {
+         eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
+         result.clear();
+         auto v = db.kv_less_than_raw(get_map_read(map), {key.data(), key.size()}, match_key_size);
          if (!v)
             return -1;
          result.assign(v->pos, v->end);
@@ -369,7 +420,11 @@ namespace psibase
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
       rhf_t::add<&execution_context_impl::kv_put>("env", "kv_put");
+      rhf_t::add<&execution_context_impl::kv_remove>("env", "kv_remove");
       rhf_t::add<&execution_context_impl::kv_get>("env", "kv_get");
+      rhf_t::add<&execution_context_impl::kv_greater_than>("env", "kv_greater_than");
+      rhf_t::add<&execution_context_impl::kv_greater_equal>("env", "kv_greater_equal");
+      rhf_t::add<&execution_context_impl::kv_less_than>("env", "kv_less_than");
    }
 
    void execution_context::exec_process_transaction(action_context& act_context)

@@ -76,7 +76,17 @@ namespace psibase
       void    abort(session&);
 
       void kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value);
+      void kv_remove_raw(kv_map map, eosio::input_stream key);
       std::optional<eosio::input_stream> kv_get_raw(kv_map map, eosio::input_stream key);
+      std::optional<eosio::input_stream> kv_greater_than_raw(kv_map              map,
+                                                             eosio::input_stream key,
+                                                             size_t              match_key_size);
+      std::optional<eosio::input_stream> kv_greater_equal_raw(kv_map              map,
+                                                              eosio::input_stream key,
+                                                              size_t              match_key_size);
+      std::optional<eosio::input_stream> kv_less_than_raw(kv_map              map,
+                                                          eosio::input_stream key,
+                                                          size_t              match_key_size);
 
       template <typename K, typename V>
       auto kv_put(kv_map map, const K& key, const V& value)
