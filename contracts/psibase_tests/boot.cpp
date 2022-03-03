@@ -99,7 +99,7 @@ namespace boot
          // TODO: avoid inner raw_data copy
          // TODO: auth_contract needs a way to opt-in to being an auth contract.
          //       Otherwise, it may misunderstand the action, and worse,
-         //       sender = 1, which provides transaction.psi's authorization
+         //       sender = 1, which provides transaction.sys's authorization
          //       for a potentially-unknown action.
          psibase::action outer = {
              .sender   = 1,

@@ -73,20 +73,20 @@ void bootstrap_chain(system_context& system)
             .next_account_num = 4,
             .existing_accounts =
                 {
-                    {boot::contract, "transaction.psi"},
-                    {account::contract, "account.psi"},
-                    {rpc_contract_num, "rpc.psi"},
+                    {boot::contract, "transaction.sys"},
+                    {account::contract, "account.sys"},
+                    {rpc_contract_num, "rpc.sys"},
                 },
         }});
    push(bc, account::contract, account::contract,
         account::action{account::create_account{
             .name          = "alice",
-            .auth_contract = "transaction.psi",
+            .auth_contract = "transaction.sys",
         }});
    push(bc, account::contract, account::contract,
         account::action{account::create_account{
             .name          = "bob",
-            .auth_contract = "transaction.psi",
+            .auth_contract = "transaction.sys",
         }});
    bc.commit();
 }

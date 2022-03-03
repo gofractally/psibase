@@ -60,8 +60,8 @@ void boot_minimal(test_chain& t)
                                 .next_account_num = 3,
                                 .existing_accounts =
                                     {
-                                        {1, "transaction.psi"},
-                                        {2, "account.psi"},
+                                        {1, "transaction.sys"},
+                                        {2, "account.sys"},
                                     },
                             }}),
                         },
@@ -93,7 +93,7 @@ TEST_CASE("t1")
                             .raw_data =
                                 eosio::convert_to_bin(account::action{account::create_account{
                                     .name          = "test-cntr",
-                                    .auth_contract = "transaction.psi",
+                                    .auth_contract = "transaction.sys",
                                 }}),
                         },
                         {
@@ -144,8 +144,8 @@ TEST_CASE("t2")
                             .contract = account::contract,
                             .raw_data =
                                 eosio::convert_to_bin(account::action{account::create_account{
-                                    .name          = "token.psi",
-                                    .auth_contract = "transaction.psi",
+                                    .name          = "token.sys",
+                                    .auth_contract = "transaction.sys",
                                 }}),
                         },
                         {
@@ -173,7 +173,7 @@ TEST_CASE("t2")
                                .raw_data =
                                    eosio::convert_to_bin(account::action{account::create_account{
                                        .name          = "x" + std::to_string(i),
-                                       .auth_contract = "transaction.psi",
+                                       .auth_contract = "transaction.sys",
                                    }}),
                            },
                        }))) == "");
