@@ -1,14 +1,14 @@
-#include <nc-account.hpp>
-#include <nc-boot.hpp>
-#include <newchain/http.hpp>
-#include <newchain/rpc.hpp>
-#include <newchain/transaction_context.hpp>
+#include <account.hpp>
+#include <boot.hpp>
+#include <psibase/http.hpp>
+#include <psibase/rpc.hpp>
+#include <psibase/transaction_context.hpp>
 
 #include <eosio/finally.hpp>
 #include <iostream>
 #include <thread>
 
-using namespace newchain;
+using namespace psibase;
 
 std::vector<char> read_whole_file(const char* filename)
 {
@@ -53,19 +53,19 @@ void bootstrap_chain(system_context& system)
                                     .contract      = boot::contract,
                                     .auth_contract = boot::contract,
                                     .flags         = boot::contract_flags,
-                                    .code          = read_whole_file("nc-boot.wasm"),
+                                    .code          = read_whole_file("boot.wasm"),
                                 },
                                 {
                                     .contract      = account::contract,
                                     .auth_contract = boot::contract,
                                     .flags         = account::contract_flags,
-                                    .code          = read_whole_file("nc-account.wasm"),
+                                    .code          = read_whole_file("account.wasm"),
                                 },
                                 {
                                     .contract      = rpc_contract_num,
                                     .auth_contract = boot::contract,
                                     .flags         = 0,
-                                    .code          = read_whole_file("nc-rpc.wasm"),
+                                    .code          = read_whole_file("rpc.wasm"),
                                 },
                             }});
    push(bc, account::contract, account::contract,
@@ -97,7 +97,7 @@ void run(const char* db_path, bool bootstrap, bool produce, bool api_server)
 
    // TODO: configurable wasm_cache size
    auto shared_state =
-       std::make_shared<newchain::shared_state>(shared_database{db_path}, wasm_cache{128});
+       std::make_shared<psibase::shared_state>(shared_database{db_path}, wasm_cache{128});
    auto system = shared_state->get_system_context();
 
    if (api_server)

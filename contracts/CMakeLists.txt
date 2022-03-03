@@ -1,1 +1,1 @@
-add_subdirectory(newchain_tests)
+add_subdirectory(psibase_tests)
