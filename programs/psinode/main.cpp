@@ -92,8 +92,8 @@ void bootstrap_chain(system_context& system)
                 {
                     {transaction_sys::contract, "transaction.sys"},
                     {account_sys::contract, "account.sys"},
-                    {auth_fake_sys::contract, "auth_fake_sys.sys"},
-                    {auth_ec_sys::contract, "auth_ec_sys.sys"},
+                    {auth_fake_sys::contract, "auth_fake.sys"},
+                    {auth_ec_sys::contract, "auth_ec.sys"},
                 },
         }});
    push(bc, account_sys::contract, account_sys::contract,

@@ -92,8 +92,8 @@ namespace psibase
                                           {
                                               {transaction_sys::contract, "transaction.sys"},
                                               {account_sys::contract, "account.sys"},
-                                              {auth_fake_sys::contract, "auth_fake_sys.sys"},
-                                              {auth_ec_sys::contract, "auth_ec_sys.sys"},
+                                              {auth_fake_sys::contract, "auth_fake.sys"},
+                                              {auth_ec_sys::contract, "auth_ec.sys"},
                                           },
                                   }}),
                           },
@@ -102,7 +102,7 @@ namespace psibase
 
    inline account_num add_account(test_chain& t,
                                   const char* name,
-                                  const char* auth_contract = "auth_fake_sys.sys",
+                                  const char* auth_contract = "auth_fake.sys",
                                   bool        show          = false)
    {
       auto trace = t.push_transaction(  //
@@ -125,7 +125,7 @@ namespace psibase
                                    const char* filename,
                                    bool        show = false)
    {
-      auto num = add_account(t, name, "auth_fake_sys.sys", show);
+      auto num = add_account(t, name, "auth_fake.sys", show);
       REQUIRE(                         //
           psibase::show(               //
               show,                    //
