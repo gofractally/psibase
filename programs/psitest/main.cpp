@@ -229,14 +229,6 @@ struct file
    }
 };
 
-struct push_trx_args
-{
-   eosio::input_stream             transaction;
-   std::vector<eosio::signature>   signatures;
-   std::vector<eosio::private_key> keys;
-};
-EOSIO_REFLECT(push_trx_args, transaction, signatures, keys)
-
 struct callbacks
 {
    ::state&          state;
@@ -628,16 +620,9 @@ struct callbacks
                                 uint32_t         cb_alloc_data,
                                 uint32_t         cb_alloc)
    {
-      auto&               chain = assert_chain(chain_index);
-      eosio::input_stream s     = {args_packed.data(), args_packed.size()};
-      auto                args  = eosio::from_bin<push_trx_args>(s);
-      auto                trx   = eosio::from_bin<psibase::transaction>(args.transaction);
-
-      psibase::signed_transaction signed_trx;
-      (psibase::transaction&)signed_trx = std::move(trx);
-      signed_trx.signatures             = std::move(args.signatures);
-
-      // TODO: sign with args.keys
+      auto&               chain      = assert_chain(chain_index);
+      eosio::input_stream s          = {args_packed.data(), args_packed.size()};
+      auto                signed_trx = eosio::from_bin<psibase::signed_transaction>(s);
 
       chain.start_if_needed();
       psibase::transaction_trace trace;

@@ -45,6 +45,13 @@ namespace psibase
    };
    EOSIO_REFLECT(genesis_action_data, memo, contracts)
 
+   struct claim
+   {
+      account_num       contract;
+      std::vector<char> raw_data;
+   };
+   EOSIO_REFLECT(claim, contract, raw_data)
+
    // TODO: separate native-defined fields from contract-defined fields
    struct transaction
    {
@@ -57,6 +64,7 @@ namespace psibase
       uint16_t              max_cpu_usage_ms    = 0;
       uint32_t              flags               = 0;
       std::vector<action>   actions;
+      std::vector<claim>    claims;  // TODO: Is there standard terminology that we could use?
    };
    EOSIO_REFLECT(transaction,
                  expiration,
@@ -65,17 +73,20 @@ namespace psibase
                  max_net_usage_words,
                  max_cpu_usage_ms,
                  flags,
-                 actions)
+                 actions,
+                 claims)
 
-   // TODO: context-free data?
-   // TODO: pruning signatures and context-free data?
+   // TODO: pruning proofs?
    // TODO: compression? There's a time/space tradeoff and it complicates client libraries.
    //       e.g. complication: there are at least 2 different header formats for gzip.
-   struct signed_transaction : transaction
+   struct signed_transaction
    {
-      std::vector<eosio::signature> signatures;
+      transaction trx;
+
+      // TODO: Is there standard terminology that we could use?
+      std::vector<std::vector<char>> proofs;
    };
-   EOSIO_REFLECT(signed_transaction, base transaction, signatures)
+   EOSIO_REFLECT(signed_transaction, trx, proofs)
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Producer & Rotation

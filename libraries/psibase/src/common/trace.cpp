@@ -17,7 +17,7 @@ namespace psibase
 
    transaction_trace trim_raw_data(transaction_trace t, size_t max)
    {
-      for (auto& a : t.trx.actions)
+      for (auto& a : t.trx.trx.actions)
          if (a.raw_data.size() > max)
             a.raw_data.resize(max);
       for (auto& at : t.action_traces)

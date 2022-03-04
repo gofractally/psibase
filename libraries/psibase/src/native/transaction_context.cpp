@@ -26,8 +26,8 @@ namespace psibase
    void transaction_context::exec_transaction()
    {
       // TODO: move checks into wasm
-      eosio::check(block_context.current.time < trx.expiration, "transaction expired");
-      eosio::check(!trx.actions.empty(), "transaction has no actions");
+      eosio::check(block_context.current.time < trx.trx.expiration, "transaction expired");
+      eosio::check(!trx.trx.actions.empty(), "transaction has no actions");
 
       // Prepare for execution
       auto& db     = block_context.db;
@@ -36,8 +36,9 @@ namespace psibase
 
       if (block_context.need_genesis_action)
       {
-         eosio::check(trx.actions.size() == 1, "genesis transaction must have exactly 1 action");
-         exec_genesis_action(*this, trx.actions[0]);
+         eosio::check(trx.trx.actions.size() == 1,
+                      "genesis transaction must have exactly 1 action");
+         exec_genesis_action(*this, trx.trx.actions[0]);
          block_context.need_genesis_action = false;
       }
       else

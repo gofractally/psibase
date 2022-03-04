@@ -3,6 +3,7 @@
 #include <base_contracts/account_sys.hpp>
 #include <base_contracts/auth_ec_sys.hpp>
 #include <base_contracts/auth_fake_sys.hpp>
+#include <base_contracts/prove_ec_sys.hpp>
 #include <base_contracts/transaction_sys.hpp>
 #include <catch2/catch.hpp>
 #include <psibase/native_tables.hpp>
@@ -71,6 +72,12 @@ namespace psibase
                                               .flags         = 0,
                                               .code          = read_whole_file("auth_ec_sys.wasm"),
                                           },
+                                          {
+                                              .contract      = prove_ec_sys::contract,
+                                              .auth_contract = auth_fake_sys::contract,
+                                              .flags         = 0,
+                                              .code          = read_whole_file("prove_ec_sys.wasm"),
+                                          },
                                       },
                               }),
                           },
@@ -94,6 +101,7 @@ namespace psibase
                                               {account_sys::contract, "account.sys"},
                                               {auth_fake_sys::contract, "auth_fake.sys"},
                                               {auth_ec_sys::contract, "auth_ec.sys"},
+                                              {prove_ec_sys::contract, "prove_ec.sys"},
                                           },
                                   }}),
                           },

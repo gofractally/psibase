@@ -1,6 +1,7 @@
 #include <base_contracts/account_sys.hpp>
 #include <base_contracts/auth_ec_sys.hpp>
 #include <base_contracts/auth_fake_sys.hpp>
+#include <base_contracts/prove_ec_sys.hpp>
 #include <base_contracts/transaction_sys.hpp>
 #include <psibase/http.hpp>
 #include <psibase/rpc.hpp>
@@ -37,8 +38,8 @@ void bootstrap_chain(system_context& system)
 {
    auto push = [&](auto& bc, account_num sender, account_num contract, const auto& data) {
       signed_transaction t;
-      t.expiration = bc.current.time + 1;
-      t.actions.push_back({
+      t.trx.expiration = bc.current.time + 1;
+      t.trx.actions.push_back({
           .sender   = sender,
           .contract = contract,
           .raw_data = eosio::convert_to_bin(data),
@@ -83,6 +84,12 @@ void bootstrap_chain(system_context& system)
                         .flags         = 0,
                         .code          = read_whole_file("auth_ec_sys.wasm"),
                     },
+                    {
+                        .contract      = prove_ec_sys::contract,
+                        .auth_contract = auth_fake_sys::contract,
+                        .flags         = 0,
+                        .code          = read_whole_file("prove_ec_sys.wasm"),
+                    },
                 },
         });
    push(bc, account_sys::contract, account_sys::contract,
@@ -94,6 +101,7 @@ void bootstrap_chain(system_context& system)
                     {account_sys::contract, "account.sys"},
                     {auth_fake_sys::contract, "auth_fake.sys"},
                     {auth_ec_sys::contract, "auth_ec.sys"},
+                    {prove_ec_sys::contract, "prove_ec.sys"},
                 },
         }});
    push(bc, account_sys::contract, account_sys::contract,
