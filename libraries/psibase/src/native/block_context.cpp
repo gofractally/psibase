@@ -52,7 +52,7 @@ namespace psibase
       {
          is_genesis_block    = true;
          need_genesis_action = true;
-         current.num         = 1;
+         current.num         = 2;
          if (time)
             current.time = *time;
       }
