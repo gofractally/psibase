@@ -24,6 +24,11 @@ function(add suffix)
     target_link_libraries(account${suffix} psibase-contract-simple-malloc)
     set_target_properties(account${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
+    add_executable(test_kv${suffix} test_kv.cpp)
+    target_include_directories(test_kv${suffix} PUBLIC include)
+    target_link_libraries(test_kv${suffix} psibase-contract-simple-malloc)
+    set_target_properties(test_kv${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+
     add_executable(tests${suffix} test.cpp)
     target_include_directories(tests${suffix} PUBLIC include)
     target_link_libraries(tests${suffix} nctestlib)

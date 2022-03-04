@@ -361,7 +361,7 @@ namespace psibase
 
       // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
-      uint32_t kv_greater_than(uint32_t map, span<const char> key, size_t match_key_size)
+      uint32_t kv_greater_than(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
          result.clear();
@@ -375,7 +375,7 @@ namespace psibase
 
       // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
-      uint32_t kv_greater_equal(uint32_t map, span<const char> key, size_t match_key_size)
+      uint32_t kv_greater_equal(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
          result.clear();
@@ -389,7 +389,7 @@ namespace psibase
 
       // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
-      uint32_t kv_less_than(uint32_t map, span<const char> key, size_t match_key_size)
+      uint32_t kv_less_than(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
          result.clear();

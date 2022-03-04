@@ -48,11 +48,25 @@ namespace psibase
                                                    const char* value,
                                                    uint32_t    value_len);
 
+      // Remove a key-value pair if it exists
+      [[clang::import_name("kv_remove")]] void kv_remove(kv_map      map,
+                                                         const char* key,
+                                                         uint32_t    key_len);
+
       // Get a key-value pair, if any. If key exists, then sets result to value and
-      // returns size. If key does not exist, returns -1.
+      // returns size. If key does not exist, returns -1 and clears result.
       [[clang::import_name("kv_get")]] uint32_t kv_get(kv_map      map,
                                                        const char* key,
                                                        uint32_t    key_len);
+
+      // Get a key-value pair immediately-before provided key. If one is found,
+      // and the first match_key_size bytes of the found key matches the provided
+      // key, then sets result to value and returns size. Otherwise returns -1
+      // and clears result.
+      [[clang::import_name("kv_less_than")]] uint32_t kv_less_than(kv_map      map,
+                                                                   const char* key,
+                                                                   uint32_t    key_len,
+                                                                   uint32_t    match_key_size);
 
    }  // namespace raw
 
@@ -128,6 +142,26 @@ namespace psibase
       kv_put(kv_map::contract, key, value);
    }
 
+   // Remove a key-value pair if it exists
+   inline void kv_remove_raw(kv_map map, eosio::input_stream key)
+   {
+      raw::kv_remove(map, key.pos, key.remaining());
+   }
+
+   // Remove a key-value pair if it exists
+   template <typename K>
+   void kv_remove(kv_map map, const K& key)
+   {
+      kv_remove_raw(map, eosio::convert_to_key(key));
+   }
+
+   // Remove a key-value pair if it exists
+   template <typename K>
+   void kv_remove(const K& key)
+   {
+      kv_remove(kv_map::contract, key);
+   }
+
    // Size of key-value pair, if any
    inline std::optional<uint32_t> kv_get_size_raw(kv_map map, eosio::input_stream key)
    {
@@ -193,4 +227,39 @@ namespace psibase
    {
       return kv_get_or_default<V>(kv_map::contract, key);
    }
+
+   // Get a key-value pair immediately-before provided key. If one is found,
+   // and the first match_key_size bytes of the found key matches the provided
+   // key, then sets result to value and returns size. Otherwise returns nullopt.
+   inline std::optional<std::vector<char>> kv_less_than_raw(kv_map              map,
+                                                            eosio::input_stream key,
+                                                            uint32_t            match_key_size)
+   {
+      auto size = raw::kv_less_than(map, key.pos, key.remaining(), match_key_size);
+      if (size == -1)
+         return std::nullopt;
+      return get_result(size);
+   }
+
+   // Get a key-value pair immediately-before provided key. If one is found,
+   // and the first match_key_size bytes of the found key matches the provided
+   // key, then sets result to value and returns size. Otherwise returns nullopt.
+   template <typename V, typename K>
+   inline std::optional<V> kv_less_than(kv_map map, const K& key, uint32_t match_key_size)
+   {
+      auto v = kv_less_than_raw(map, eosio::convert_to_key(key), match_key_size);
+      if (!v)
+         return std::nullopt;
+      return eosio::convert_from_bin<V>(*v);
+   }
+
+   // Get a key-value pair immediately-before provided key. If one is found,
+   // and the first match_key_size bytes of the found key matches the provided
+   // key, then sets result to value and returns size. Otherwise returns nullopt.
+   template <typename V, typename K>
+   inline std::optional<V> kv_less_than(const K& key, uint32_t match_key_size)
+   {
+      return kv_less_than<V>(kv_map::contract, key, match_key_size);
+   }
+
 }  // namespace psibase

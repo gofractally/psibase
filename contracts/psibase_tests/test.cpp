@@ -12,6 +12,8 @@
 using namespace eosio;
 using namespace psibase;
 
+static constexpr account_num test_kv_contract = 3;  // TODO: fetch dynamically
+
 std::string show(bool include, transaction_trace t)
 {
    if (include || t.error)
@@ -217,3 +219,39 @@ TEST_CASE("t2")
                        }}))) == "");
 
 }  // t2
+
+TEST_CASE("kv")
+{
+   test_chain t;
+   t.start_block();
+   boot_minimal(t);
+   REQUIRE(                          //
+       show(false,                   //
+            t.push_transaction(      //
+                t.make_transaction(  //
+                    {
+                        {
+                            .sender   = boot::contract,
+                            .contract = account::contract,
+                            .raw_data =
+                                eosio::convert_to_bin(account::action{account::create_account{
+                                    .name          = "test_kv.sys",
+                                    .auth_contract = "transaction.sys",
+                                }}),
+                        },
+                        {
+                            .sender   = boot::contract,
+                            .contract = boot::contract,
+                            .raw_data = eosio::convert_to_bin(boot::action{boot::set_code{
+                                .contract   = test_kv_contract,
+                                .vm_type    = 0,
+                                .vm_version = 0,
+                                .code       = read_whole_file("test_kv.wasm"),
+                            }}),
+                        },
+                        {
+                            .sender   = test_kv_contract,
+                            .contract = test_kv_contract,
+                        },
+                    }))) == "");
+}  // kv
