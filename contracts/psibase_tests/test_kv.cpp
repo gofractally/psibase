@@ -6,6 +6,8 @@
 
 using namespace psibase;
 
+static constexpr bool enable_print = false;
+
 struct item
 {
    std::vector<unsigned char> key;
@@ -56,13 +58,15 @@ std::vector<item> items = {
 
 void test(account_num this_contract)
 {
-   eosio::print("kv_put\n");
+   if (enable_print)
+      eosio::print("kv_put\n");
    for (const auto& item : items)
       if (item.add)
          kv_put_raw(kv_map::contract, item.get_key(this_contract),
                     eosio::convert_to_bin(item.value));
 
-   eosio::print("kv_remove\n");
+   if (enable_print)
+      eosio::print("kv_remove\n");
    for (const auto& item : items)
       if (!item.keep)
          kv_remove_raw(kv_map::contract, item.get_key(this_contract));
@@ -70,13 +74,15 @@ void test(account_num this_contract)
    auto run = [&](auto match_key_size, auto expected, const auto& key, auto f) {
       if (expected == skip)
       {
-         eosio::print("skip ");
+         if (enable_print)
+            eosio::print("skip ");
          return;
       }
       auto result = f(kv_map::contract, key, match_key_size);
       if (!result && !expected)
       {
-         eosio::print("ok   ");
+         if (enable_print)
+            eosio::print("ok   ");
          return;
       }
       check(!!result, "missing result");
@@ -84,46 +90,63 @@ void test(account_num this_contract)
       auto val = eosio::convert_from_bin<uint8_t>(*result);
       if (val != *expected)
       {
-         printf("0x%02x\n", val);
+         if (enable_print)
+            printf("0x%02x\n", val);
          abort_message("mismatched result");
       }
-      eosio::print("ok   ");
+      if (enable_print)
+         eosio::print("ok   ");
    };
 
-   eosio::print("kv_less_than\n");
+   if (enable_print)
+      eosio::print("kv_less_than\n");
    for (const auto& item : items)
    {
       auto key = item.get_key(this_contract);
-      printf("    0x%02x ", item.value);
-      fflush(stdout);
+      if (enable_print)
+      {
+         printf("    0x%02x ", item.value);
+         fflush(stdout);
+      }
       run(4, item.lt4, key, kv_less_than_raw);
       run(5, item.lt5, key, kv_less_than_raw);
       run(6, item.lt6, key, kv_less_than_raw);
-      eosio::print("\n");
+      if (enable_print)
+         eosio::print("\n");
    }  // kv_less_than
 
-   eosio::print("kv_greater_equal\n");
+   if (enable_print)
+      eosio::print("kv_greater_equal\n");
    for (const auto& item : items)
    {
       auto key = item.get_key(this_contract);
-      printf("    0x%02x ", item.value);
-      fflush(stdout);
+      if (enable_print)
+      {
+         printf("    0x%02x ", item.value);
+         fflush(stdout);
+      }
       run(4, item.ge4, key, kv_greater_equal_raw);
       run(5, item.ge5, key, kv_greater_equal_raw);
       run(6, item.ge6, key, kv_greater_equal_raw);
-      eosio::print("\n");
+      if (enable_print)
+         eosio::print("\n");
    }  // kv_greater_equal
 
-   eosio::print("kv_greater_than\n");
+   if (enable_print)
+      eosio::print("kv_greater_than\n");
    for (const auto& item : items)
    {
       auto key = item.get_key(this_contract);
-      printf("    0x%02x ", item.value);
-      fflush(stdout);
+      if (enable_print)
+      {
+         printf("    0x%02x ", item.value);
+         fflush(stdout);
+      }
       run(4, item.gt4, key, kv_greater_than_raw);
       run(5, item.gt5, key, kv_greater_than_raw);
       run(6, item.gt6, key, kv_greater_than_raw);
-      eosio::print("\n");
+      if (enable_print)
+         eosio::print("\n");
    }  // kv_greater_than
 
 }  // test()
