@@ -3,7 +3,7 @@
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
 
-namespace account
+namespace account_sys
 {
    static constexpr psibase::account_num contract       = 2;
    static constexpr uint64_t             contract_flags = psibase::account_row::allow_write_native;
@@ -63,4 +63,4 @@ namespace account
       if constexpr (!std::is_same_v<R, void>)
          return eosio::convert_from_bin<R>(result);
    }
-}  // namespace account
+}  // namespace account_sys

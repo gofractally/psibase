@@ -1,13 +1,13 @@
-#include <base_contracts/account.hpp>
+#include <base_contracts/account_sys.hpp>
 
-#include <base_contracts/transaction.hpp>
+#include <base_contracts/transaction_sys.hpp>
 #include <psibase/native_tables.hpp>
 
 using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-namespace account
+namespace account_sys
 {
    using table_num = uint32_t;
 
@@ -127,4 +127,4 @@ namespace account
 
    extern "C" void __wasm_call_ctors();
    extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
-}  // namespace account
+}  // namespace account_sys

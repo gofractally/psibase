@@ -1,5 +1,7 @@
-#include <base_contracts/account.hpp>
-#include <base_contracts/transaction.hpp>
+#include <base_contracts/account_sys.hpp>
+#include <base_contracts/auth_ec_sys.hpp>
+#include <base_contracts/auth_fake_sys.hpp>
+#include <base_contracts/transaction_sys.hpp>
 #include <psibase/http.hpp>
 #include <psibase/rpc.hpp>
 #include <psibase/transaction_context.hpp>
@@ -48,43 +50,59 @@ void bootstrap_chain(system_context& system)
    bc.start();
    eosio::check(bc.is_genesis_block, "can not bootstrap non-empty chain");
    push(bc, 0, 0,
-        genesis_action_data{.contracts = {
-                                {
-                                    .contract      = boot::contract,
-                                    .auth_contract = boot::contract,
-                                    .flags         = boot::contract_flags,
-                                    .code          = read_whole_file("transaction.wasm"),
-                                },
-                                {
-                                    .contract      = account::contract,
-                                    .auth_contract = boot::contract,
-                                    .flags         = account::contract_flags,
-                                    .code          = read_whole_file("account.wasm"),
-                                },
-                                {
-                                    .contract      = rpc_contract_num,
-                                    .auth_contract = boot::contract,
-                                    .flags         = 0,
-                                    .code          = read_whole_file("rpc.wasm"),
-                                },
-                            }});
-   push(bc, account::contract, account::contract,
-        account::action{account::startup{
-            .next_account_num = 4,
+        genesis_action_data{
+            .contracts =
+                {
+                    {
+                        .contract      = transaction_sys::contract,
+                        .auth_contract = auth_fake_sys::contract,
+                        .flags         = transaction_sys::contract_flags,
+                        .code          = read_whole_file("transaction_sys.wasm"),
+                    },
+                    {
+                        .contract      = account_sys::contract,
+                        .auth_contract = auth_fake_sys::contract,
+                        .flags         = account_sys::contract_flags,
+                        .code          = read_whole_file("account_sys.wasm"),
+                    },
+                    {
+                        .contract      = rpc_contract_num,
+                        .auth_contract = auth_fake_sys::contract,
+                        .flags         = 0,
+                        .code          = read_whole_file("rpc.wasm"),
+                    },
+                    {
+                        .contract      = auth_fake_sys::contract,
+                        .auth_contract = auth_fake_sys::contract,
+                        .flags         = 0,
+                        .code          = read_whole_file("auth_fake_sys.wasm"),
+                    },
+                    {
+                        .contract      = auth_ec_sys::contract,
+                        .auth_contract = auth_fake_sys::contract,
+                        .flags         = 0,
+                        .code          = read_whole_file("auth_ec_sys.wasm"),
+                    },
+                },
+        });
+   push(bc, account_sys::contract, account_sys::contract,
+        account_sys::action{account_sys::startup{
+            .next_account_num = 100,  // TODO: keep space reserved?
             .existing_accounts =
                 {
-                    {boot::contract, "transaction.sys"},
-                    {account::contract, "account.sys"},
-                    {rpc_contract_num, "rpc.sys"},
+                    {transaction_sys::contract, "transaction.sys"},
+                    {account_sys::contract, "account.sys"},
+                    {auth_fake_sys::contract, "auth_fake_sys.sys"},
+                    {auth_ec_sys::contract, "auth_ec_sys.sys"},
                 },
         }});
-   push(bc, account::contract, account::contract,
-        account::action{account::create_account{
+   push(bc, account_sys::contract, account_sys::contract,
+        account_sys::action{account_sys::create_account{
             .name          = "alice",
             .auth_contract = "transaction.sys",
         }});
-   push(bc, account::contract, account::contract,
-        account::action{account::create_account{
+   push(bc, account_sys::contract, account_sys::contract,
+        account_sys::action{account_sys::create_account{
             .name          = "bob",
             .auth_contract = "transaction.sys",
         }});

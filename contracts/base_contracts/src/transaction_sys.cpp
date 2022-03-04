@@ -1,4 +1,5 @@
-#include <base_contracts/transaction.hpp>
+#include <base_contracts/auth_fake_sys.hpp>
+#include <base_contracts/transaction_sys.hpp>
 
 #include <psibase/crypto.hpp>
 #include <psibase/native_tables.hpp>
@@ -7,21 +8,13 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-namespace boot
+namespace transaction_sys
 {
-   void exec(account_num this_contract, account_num sender, auth_check& act)
-   {
-      // TODO: avoid copying inner raw_data (occurs in "called()" dispatcher below)
-      if (enable_print)
-         eosio::print("auth_check\n");
-      check(sender == 1, "Only contract 1 may request auth checks");
-      // TODO: check keys of act.sender
-   }
-
+   // TODO: move to another contract
    void exec(account_num this_contract, account_num sender, set_code& args)
    {
       // TODO: validate code
-      check(sender == boot::contract, "sender must be boot account");
+      check(sender == args.contract, "sender must match contract account");
       auto account = kv_get<account_row>(account_row::kv_map, account_key(args.contract));
       check(account.has_value(), "can not set code on a missing account");
       auto code_hash = sha256(args.code.data(), args.code.size());
@@ -95,7 +88,7 @@ namespace boot
       {
          auto account = kv_get<account_row>(account_row::kv_map, account_key(act.sender));
          check(!!account, "unknown sender");
-         // TODO: assumes same dispatch format (abi) as boot
+         // TODO: assumes same dispatch format (abi) as auth_fake_sys
          // TODO: avoid inner raw_data copy
          // TODO: auth_contract needs a way to opt-in to being an auth contract.
          //       Otherwise, it may misunderstand the action, and worse,
@@ -104,7 +97,7 @@ namespace boot
          psibase::action outer = {
              .sender   = 1,
              .contract = account->auth_contract,
-             .raw_data = eosio::convert_to_bin(boot::action{act}),
+             .raw_data = eosio::convert_to_bin(auth_fake_sys::action{act}),
          };
          if (enable_print)
             eosio::print("call auth_check\n");
@@ -117,4 +110,4 @@ namespace boot
 
    extern "C" void __wasm_call_ctors();
    extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
-}  // namespace boot
+}  // namespace transaction_sys

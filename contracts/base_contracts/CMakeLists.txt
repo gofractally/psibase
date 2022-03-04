@@ -10,8 +10,10 @@ function(add suffix)
     target_include_directories(base_contracts${suffix} INTERFACE include)
 
     if(DEFINED IS_WASM)
-        contract(account${suffix} src/account.cpp)
-        contract(transaction${suffix} src/transaction.cpp)
+        contract(account_sys${suffix} src/account_sys.cpp)
+        contract(auth_ec_sys${suffix} src/auth_ec_sys.cpp)
+        contract(auth_fake_sys${suffix} src/auth_fake_sys.cpp)
+        contract(transaction_sys${suffix} src/transaction_sys.cpp)
     endif()
 endfunction(add)
 

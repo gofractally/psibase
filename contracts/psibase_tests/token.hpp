@@ -8,7 +8,7 @@
 
 namespace token
 {
-   static constexpr psibase::account_num contract = 3;
+   static constexpr psibase::account_num contract = 100;
 
    struct issue
    {

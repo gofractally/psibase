@@ -1,4 +1,4 @@
-#include "base_contracts/account.hpp"
+#include "base_contracts/account_sys.hpp"
 
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
@@ -46,9 +46,9 @@ namespace rpc
                break;
             augmented_account_row aug;
             (account_row&)aug = *acc;
-            aug.name          = account::call(act.contract, account::get_by_num{aug.num});
+            aug.name          = account_sys::call(act.contract, account_sys::get_by_num{aug.num});
             aug.auth_contract_name =
-                account::call(act.contract, account::get_by_num{aug.auth_contract});
+                account_sys::call(act.contract, account_sys::get_by_num{aug.auth_contract});
             rows.push_back(std::move(aug));
          }
          return to_json(rows);

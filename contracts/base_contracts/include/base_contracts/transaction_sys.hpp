@@ -3,13 +3,11 @@
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
 
-namespace boot
+namespace transaction_sys
 {
    static constexpr psibase::account_num contract = 1;
    static constexpr uint64_t             contract_flags =
        psibase::account_row::allow_sudo | psibase::account_row::allow_write_native;
-
-   using auth_check = psibase::action;
 
    struct set_code
    {
@@ -22,7 +20,7 @@ namespace boot
    };
    EOSIO_REFLECT(set_code, contract, vm_type, vm_version, code)
 
-   using action = std::variant<auth_check, set_code>;
+   using action = std::variant<set_code>;
 
    template <typename T, typename R = typename T::return_type>
    R call(psibase::account_num sender, T args)
@@ -35,4 +33,4 @@ namespace boot
       if constexpr (!std::is_same_v<R, void>)
          return eosio::convert_from_bin<R>(result);
    }
-}  // namespace boot
+}  // namespace transaction_sys

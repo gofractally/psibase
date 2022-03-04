@@ -1,7 +1,9 @@
 #pragma once
 
-#include <base_contracts/account.hpp>
-#include <base_contracts/transaction.hpp>
+#include <base_contracts/account_sys.hpp>
+#include <base_contracts/auth_ec_sys.hpp>
+#include <base_contracts/auth_fake_sys.hpp>
+#include <base_contracts/transaction_sys.hpp>
 #include <catch2/catch.hpp>
 #include <psibase/native_tables.hpp>
 #include <psibase/tester.hpp>
@@ -43,18 +45,33 @@ namespace psibase
                               .sender   = 9999,
                               .contract = 9999,
                               .raw_data = eosio::convert_to_bin(genesis_action_data{
-                                  .contracts = {{
-                                                    .contract      = 1,
-                                                    .auth_contract = 1,
-                                                    .flags         = boot::contract_flags,
-                                                    .code = read_whole_file("transaction.wasm"),
-                                                },
-                                                {
-                                                    .contract      = 2,
-                                                    .auth_contract = 1,
-                                                    .flags         = account::contract_flags,
-                                                    .code = read_whole_file("account.wasm"),
-                                                }},
+                                  .contracts =
+                                      {
+                                          {
+                                              .contract      = transaction_sys::contract,
+                                              .auth_contract = auth_fake_sys::contract,
+                                              .flags         = transaction_sys::contract_flags,
+                                              .code = read_whole_file("transaction_sys.wasm"),
+                                          },
+                                          {
+                                              .contract      = account_sys::contract,
+                                              .auth_contract = auth_fake_sys::contract,
+                                              .flags         = account_sys::contract_flags,
+                                              .code          = read_whole_file("account_sys.wasm"),
+                                          },
+                                          {
+                                              .contract      = auth_fake_sys::contract,
+                                              .auth_contract = auth_fake_sys::contract,
+                                              .flags         = 0,
+                                              .code = read_whole_file("auth_fake_sys.wasm"),
+                                          },
+                                          {
+                                              .contract      = auth_ec_sys::contract,
+                                              .auth_contract = auth_fake_sys::contract,
+                                              .flags         = 0,
+                                              .code          = read_whole_file("auth_ec_sys.wasm"),
+                                          },
+                                      },
                               }),
                           },
                       }))) == "");
@@ -66,31 +83,34 @@ namespace psibase
                   t.make_transaction(  //
                       {
                           {
-                              .sender   = boot::contract,
-                              .contract = account::contract,
-                              .raw_data = eosio::convert_to_bin(account::action{account::startup{
-                                  .next_account_num = 3,
-                                  .existing_accounts =
-                                      {
-                                          {1, "transaction.sys"},
-                                          {2, "account.sys"},
-                                      },
-                              }}),
+                              .sender   = transaction_sys::contract,
+                              .contract = account_sys::contract,
+                              .raw_data =
+                                  eosio::convert_to_bin(account_sys::action{account_sys::startup{
+                                      .next_account_num = 100,
+                                      .existing_accounts =
+                                          {
+                                              {transaction_sys::contract, "transaction.sys"},
+                                              {account_sys::contract, "account.sys"},
+                                              {auth_fake_sys::contract, "auth_fake_sys.sys"},
+                                              {auth_ec_sys::contract, "auth_ec_sys.sys"},
+                                          },
+                                  }}),
                           },
                       }))) == "");
    }  // boot_minimal()
 
    inline account_num add_account(test_chain& t,
                                   const char* name,
-                                  const char* auth_contract = "transaction.sys",
+                                  const char* auth_contract = "auth_fake_sys.sys",
                                   bool        show          = false)
    {
       auto trace = t.push_transaction(  //
           t.make_transaction(           //
               {{
-                  .sender   = boot::contract,
-                  .contract = account::contract,
-                  .raw_data = eosio::convert_to_bin(account::action{account::create_account{
+                  .sender   = transaction_sys::contract,
+                  .contract = account_sys::contract,
+                  .raw_data = eosio::convert_to_bin(account_sys::action{account_sys::create_account{
                       .name          = name,
                       .auth_contract = auth_contract,
                   }}),
@@ -105,21 +125,22 @@ namespace psibase
                                    const char* filename,
                                    bool        show = false)
    {
-      auto num = add_account(t, name, "transaction.sys", show);
+      auto num = add_account(t, name, "auth_fake_sys.sys", show);
       REQUIRE(                         //
           psibase::show(               //
               show,                    //
               t.push_transaction(      //
                   t.make_transaction(  //
                       {{
-                          .sender   = boot::contract,
-                          .contract = boot::contract,
-                          .raw_data = eosio::convert_to_bin(boot::action{boot::set_code{
-                              .contract   = num,
-                              .vm_type    = 0,
-                              .vm_version = 0,
-                              .code       = read_whole_file(filename),
-                          }}),
+                          .sender   = num,
+                          .contract = transaction_sys::contract,
+                          .raw_data = eosio::convert_to_bin(
+                              transaction_sys::action{transaction_sys::set_code{
+                                  .contract   = num,
+                                  .vm_type    = 0,
+                                  .vm_version = 0,
+                                  .code       = read_whole_file(filename),
+                              }}),
                       }}))) == "");
       return num;
    }  // add_contract()
