@@ -1,19 +1,19 @@
 name: ubuntu-2004-builder container
 
 on:
-  #workflow_dispatch:
-  #push:
-  #  branches:
-  #    - main
-  #    - "release/*"
-  #  paths:
-  #    - "docker/ubuntu-2004-builder.Dockerfile"
-  #    - ".github/workflows/ubuntu-2004-builder.yml"
-  #pull_request:
-  #  types: [assigned, opened, synchronize, reopened, labeled]
-  #  paths:
-  #    - "docker/ubuntu-2004-builder.Dockerfile"
-  #    - ".github/workflows/ubuntu-2004-builder.yml"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "release/*"
+    paths:
+      - "docker/ubuntu-2004-builder.Dockerfile"
+      - ".github/workflows/ubuntu-2004-builder.yml"
+  pull_request:
+    types: [assigned, opened, synchronize, reopened, labeled]
+    paths:
+      - "docker/ubuntu-2004-builder.Dockerfile"
+      - ".github/workflows/ubuntu-2004-builder.yml"
 
 jobs:
   ubuntu-2004-builder:
