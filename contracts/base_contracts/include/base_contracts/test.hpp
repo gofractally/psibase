@@ -1,7 +1,7 @@
 #pragma once
 
 #include <base_contracts/account.hpp>
-#include <base_contracts/boot.hpp>
+#include <base_contracts/transaction.hpp>
 #include <catch2/catch.hpp>
 #include <psibase/native_tables.hpp>
 #include <psibase/tester.hpp>
@@ -33,7 +33,7 @@ namespace psibase
                                                     .contract      = 1,
                                                     .auth_contract = 1,
                                                     .flags         = boot::contract_flags,
-                                                    .code          = read_whole_file("boot.wasm"),
+                                                    .code = read_whole_file("transaction.wasm"),
                                                 },
                                                 {
                                                     .contract      = 2,

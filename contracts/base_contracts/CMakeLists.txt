@@ -11,7 +11,7 @@ function(add suffix)
 
     if(DEFINED IS_WASM)
         contract(account${suffix} src/account.cpp)
-        contract(boot${suffix} src/boot.cpp)
+        contract(transaction${suffix} src/transaction.cpp)
     endif()
 endfunction(add)
 

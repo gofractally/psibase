@@ -1,5 +1,5 @@
 #include <base_contracts/account.hpp>
-#include <base_contracts/boot.hpp>
+#include <base_contracts/transaction.hpp>
 #include <psibase/http.hpp>
 #include <psibase/rpc.hpp>
 #include <psibase/transaction_context.hpp>
@@ -53,7 +53,7 @@ void bootstrap_chain(system_context& system)
                                     .contract      = boot::contract,
                                     .auth_contract = boot::contract,
                                     .flags         = boot::contract_flags,
-                                    .code          = read_whole_file("boot.wasm"),
+                                    .code          = read_whole_file("transaction.wasm"),
                                 },
                                 {
                                     .contract      = account::contract,

@@ -1,6 +1,6 @@
 #include <base_contracts/account.hpp>
 
-#include <base_contracts/boot.hpp>
+#include <base_contracts/transaction.hpp>
 #include <psibase/native_tables.hpp>
 
 using namespace psibase;
