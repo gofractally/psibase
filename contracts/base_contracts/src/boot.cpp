@@ -1,4 +1,4 @@
-#include "boot.hpp"
+#include <base_contracts/boot.hpp>
 
 #include <psibase/crypto.hpp>
 #include <psibase/native_tables.hpp>

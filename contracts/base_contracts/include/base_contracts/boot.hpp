@@ -3,9 +3,6 @@
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
 
-#include <eosio/from_bin.hpp>
-#include <eosio/to_bin.hpp>
-
 namespace boot
 {
    static constexpr psibase::account_num contract = 1;

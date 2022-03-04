@@ -1,4 +1,4 @@
-#include "account.hpp"
+#include "base_contracts/account.hpp"
 
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>

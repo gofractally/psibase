@@ -1,5 +1,5 @@
-#include <account.hpp>
-#include <boot.hpp>
+#include <base_contracts/account.hpp>
+#include <base_contracts/boot.hpp>
 #include <psibase/http.hpp>
 #include <psibase/rpc.hpp>
 #include <psibase/transaction_context.hpp>

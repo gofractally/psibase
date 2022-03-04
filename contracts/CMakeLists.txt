@@ -1,1 +1,2 @@
+add_subdirectory(base_contracts)
 add_subdirectory(psibase_tests)

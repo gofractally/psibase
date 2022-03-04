@@ -32,4 +32,5 @@ target_link_libraries(boost INTERFACE ${Boost_LIBRARIES})
 
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
+add_subdirectory(../contracts contracts)
 add_subdirectory(../programs programs)
