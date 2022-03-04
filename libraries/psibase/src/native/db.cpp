@@ -214,8 +214,9 @@ namespace psibase
       impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
       auto result = impl->cursor.lower_bound(k, false);
       if (!result)
-         return std::nullopt;
-      result = impl->cursor.to_previous(false);
+         result = impl->cursor.to_last(false);
+      else
+         result = impl->cursor.to_previous(false);
       if (!result)
          return std::nullopt;
       if (result.key.size() < match_key_size || memcmp(result.key.data(), key.pos, match_key_size))
