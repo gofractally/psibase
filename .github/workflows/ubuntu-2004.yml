@@ -1,11 +1,11 @@
 name: Ubuntu 20.04
 on:
-  push:
-    branches:
-      - main
-      - "release/*"
-  pull_request:
-    types: [assigned, opened, synchronize, reopened, labeled]
+  #push:
+  #  branches:
+  #    - main
+  #    - "release/*"
+  #pull_request:
+  #  types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
   UBUNTU_2004_IMAGE: "ghcr.io/gofractally/contract-lab-ubuntu-2004-builder:ccaa037795aca7ee3353d5d8e80a02f2df5b4384"
