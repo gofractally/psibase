@@ -17,6 +17,14 @@ struct item
    std::optional<uint8_t> lt5;
    std::optional<uint8_t> lt6;
 
+   std::optional<uint8_t> ge4;
+   std::optional<uint8_t> ge5;
+   std::optional<uint8_t> ge6;
+
+   std::optional<uint8_t> gt4;
+   std::optional<uint8_t> gt5;
+   std::optional<uint8_t> gt6;
+
    auto get_key(account_num this_contract) const
    {
       auto k = eosio::convert_to_key(this_contract);
@@ -25,19 +33,24 @@ struct item
    }
 };
 
-auto none = std::nullopt;
+auto    none = std::nullopt;
+uint8_t skip = 0xff;  // TODO: verify abort
 
 // clang-format off
 std::vector<item> items = {
-   //                         add    keep       lt4   lt5   lt6
-   {{},                 0x00, false, false,     none, none, none, },
-   {{0x10},             0x10, true,  true,      none, none, none, },
-   {{0x10, 0x00},       0x11, true,  true,      0x10, 0x10, none, },
-   {{0x10, 0x01},       0x12, true,  true,      0x11, 0x11, none, },
-   {{0x10, 0x10},       0x13, true,  false,     0x12, 0x12, none, },
-   {{0x10, 0x10, 0x00}, 0x14, true,  true,      0x12, 0x12, none, },
-   {{0x10, 0x10, 0x01}, 0x15, true,  true,      0x14, 0x14, 0x14, },
-   {{0x20},             0x20, false, false,     0x15, none, none, },
+   //                         add    keep       lt4   lt5   lt6      ge4   ge5   ge6      gt4   gt5   gt6
+   {{},                 0x00, false, false,     none, skip, skip,    0x10, skip, skip,    0x10, skip, skip},
+   {{0x10},             0x10, true,  true,      none, none, skip,    0x10, 0x10, skip,    0x11, 0x11, skip},
+   {{0x10, 0x00},       0x11, true,  true,      0x10, 0x10, none,    0x11, 0x11, 0x11,    0x12, 0x12, none},
+   {{0x10, 0x01},       0x12, true,  true,      0x11, 0x11, none,    0x12, 0x12, 0x12,    0x14, 0x14, none},
+   {{0x10, 0x10},       0x13, true,  false,     0x12, 0x12, none,    0x14, 0x14, 0x14,    0x14, 0x14, 0x14},
+   {{0x10, 0x10, 0x00}, 0x14, true,  true,      0x12, 0x12, none,    0x14, 0x14, 0x14,    0x15, 0x15, 0x15},
+   {{0x10, 0x10, 0x01}, 0x15, true,  true,      0x14, 0x14, 0x14,    0x15, 0x15, 0x15,    0x17, none, none},
+   {{0x11, 0x10, 0x02}, 0x16, true,  false,     0x15, none, none,    0x17, 0x17, none,    0x17, 0x17, none},
+   {{0x11, 0x11},       0x17, true,  true,      0x15, none, none,    0x17, 0x17, 0x17,    0x19, none, none},
+   {{0x12, 0x10, 0x02}, 0x18, false, false,     0x17, none, none,    0x19, none, none,    0x19, none, none},
+   {{0x13, 0x11},       0x19, true,  true,      0x17, none, none,    0x19, 0x19, 0x19,    none, none, none},
+   {{0x20},             0x20, false, false,     0x19, none, skip,    none, none, skip,    none, none, skip},
 };
 // clang-format on
 
@@ -54,36 +67,66 @@ void test(account_num this_contract)
       if (!item.keep)
          kv_remove_raw(kv_map::contract, item.get_key(this_contract));
 
+   auto run = [&](auto match_key_size, auto expected, const auto& key, auto f) {
+      if (expected == skip)
+      {
+         eosio::print("skip ");
+         return;
+      }
+      auto result = f(kv_map::contract, key, match_key_size);
+      if (!result && !expected)
+      {
+         eosio::print("ok   ");
+         return;
+      }
+      check(!!result, "missing result");
+      check(!!expected, "result exists");
+      auto val = eosio::convert_from_bin<uint8_t>(*result);
+      if (val != *expected)
+      {
+         printf("0x%02x\n", val);
+         abort_message("mismatched result");
+      }
+      eosio::print("ok   ");
+   };
+
    eosio::print("kv_less_than\n");
    for (const auto& item : items)
    {
       auto key = item.get_key(this_contract);
-      auto f   = [&](auto match_key_size, auto expected) {
-         if (match_key_size > key.size())
-         {
-            eosio::print("skip ");
-            return;
-         }
-         auto result = kv_less_than_raw(kv_map::contract, key, match_key_size);
-         if (!result && !expected)
-         {
-            eosio::print("ok   ");
-            return;
-         }
-         eosio::check(!!result, "missing result");
-         eosio::check(!!expected, "result exists");
-         auto val = eosio::convert_from_bin<uint8_t>(*result);
-         eosio::check(val == *expected, "mismatched result");
-         eosio::print("ok   ");
-      };
       printf("    0x%02x ", item.value);
       fflush(stdout);
-      f(4, item.lt4);
-      f(5, item.lt5);
-      f(6, item.lt6);
+      run(4, item.lt4, key, kv_less_than_raw);
+      run(5, item.lt5, key, kv_less_than_raw);
+      run(6, item.lt6, key, kv_less_than_raw);
       eosio::print("\n");
-   }
-}
+   }  // kv_less_than
+
+   eosio::print("kv_greater_equal\n");
+   for (const auto& item : items)
+   {
+      auto key = item.get_key(this_contract);
+      printf("    0x%02x ", item.value);
+      fflush(stdout);
+      run(4, item.ge4, key, kv_greater_equal_raw);
+      run(5, item.ge5, key, kv_greater_equal_raw);
+      run(6, item.ge6, key, kv_greater_equal_raw);
+      eosio::print("\n");
+   }  // kv_greater_equal
+
+   eosio::print("kv_greater_than\n");
+   for (const auto& item : items)
+   {
+      auto key = item.get_key(this_contract);
+      printf("    0x%02x ", item.value);
+      fflush(stdout);
+      run(4, item.gt4, key, kv_greater_than_raw);
+      run(5, item.gt5, key, kv_greater_than_raw);
+      run(6, item.gt6, key, kv_greater_than_raw);
+      eosio::print("\n");
+   }  // kv_greater_than
+
+}  // test()
 
 extern "C" void called(account_num this_contract, account_num sender)
 {
