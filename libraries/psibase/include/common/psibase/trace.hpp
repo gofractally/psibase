@@ -40,7 +40,7 @@ namespace psibase
    struct transaction_trace
    {
       signed_transaction         trx;
-      std::vector<action_trace>  action_traces;
+      std::vector<action_trace>  action_traces;  // TODO: redesign: this is normally size=1
       std::optional<std::string> error;
    };
    EOSIO_REFLECT(transaction_trace, trx, action_traces, error)

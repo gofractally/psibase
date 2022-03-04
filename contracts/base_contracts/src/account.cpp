@@ -52,6 +52,8 @@ namespace account
 
    void register_acc(psibase::account_num num, const std::string& name)
    {
+      if (enable_print)
+         eosio::print("register ", num, " ", name, "\n");
       check(!name.empty(), "name is empty");  // TODO: better name constraints
       check(!kv_get_size(num_to_name_key(num)), "num already registered");
       check(!kv_get_size(name_to_num_key(name)), "name already registered");
