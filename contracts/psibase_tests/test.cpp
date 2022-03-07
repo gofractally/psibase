@@ -20,7 +20,7 @@ TEST_CASE("recursion")
                     {{
                         .sender   = test_contract,
                         .contract = test_contract,
-                        .raw_data = eosio::convert_to_bin(payload{
+                        .raw_data = eosio::convert_to_bin(test_cntr::payload{
                             .number = 3,
                             .memo   = "Counting down",
                         }),

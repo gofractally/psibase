@@ -7,8 +7,14 @@ namespace auth_fake_sys
 {
    static constexpr psibase::account_num contract = 4;
 
-   using auth_check = psibase::action;
-   using action     = std::variant<auth_check>;
+   struct auth_check
+   {
+      psibase::action             action;
+      std::vector<psibase::claim> claims;
+   };
+   EOSIO_REFLECT(auth_check, action, claims)
+
+   using action = std::variant<auth_check>;
 
    template <typename T, typename R = typename T::return_type>
    R call(psibase::account_num sender, T args)

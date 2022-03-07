@@ -6,6 +6,7 @@
 #include <psibase/intrinsic.hpp>
 
 using namespace psibase;
+using namespace test_cntr;
 
 struct startup
 {

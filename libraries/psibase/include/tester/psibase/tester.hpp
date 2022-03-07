@@ -25,11 +25,11 @@ namespace psibase
    inline eosio::asset s2a(const char* s) { return string_to_asset(s); }
 
    /**
-    * Validates the status of a transaction.  If expected_except is nullptr, then the
+    * Validates the status of a transaction.  If expected_except is "", then the
     * transaction should succeed.  Otherwise it represents a string which should be
     * part of the error message.
     */
-   void expect(const transaction_trace& tt, const char* expected_except = nullptr);
+   void expect(transaction_trace t, const std::string& expected = "", bool always_show = false);
 
    /**
     * Sign a digest.  This is here and not in crypto.hpp, because it is

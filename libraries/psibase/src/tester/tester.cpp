@@ -89,37 +89,14 @@ eosio::asset psibase::string_to_asset(const char* s)
    return eosio::convert_from_string<eosio::asset>(s);
 }
 
-/**
- * Validates the status of a transaction.  If expected_except is nullptr, then the
- * transaction should succeed.  Otherwise it represents a string which should be
- * part of the error message.
- */
-void psibase::expect(const transaction_trace& tt, const char* expected_except)
+void psibase::expect(transaction_trace t, const std::string& expected, bool always_show)
 {
-   // TODO
-   /*
-   if (expected_except)
-   {
-      if (tt.status == transaction_status::executed)
-         eosio::check(false, "transaction succeeded, but was expected to fail with: " +
-                                 std::string(expected_except));
-      if (!tt.except)
-         eosio::check(false, "transaction has no failure message. expected: " +
-                                 std::string(expected_except));
-      if (tt.except->find(expected_except) == std::string::npos)
-         eosio::check(false, "transaction failed with <<<" + *tt.except +
-                                 ">>>, but was expected to fail with: <<<" + expected_except +
-                                 ">>>");
-   }
-   else
-   {
-      if (tt.status == transaction_status::executed)
-         return;
-      if (tt.except)
-         eosio::print("transaction has exception: ", *tt.except, "\n");
-      eosio::check(false, "transaction failed with status " + to_string(tt.status));
-   }
-   */
+   std::string error = t.error ? *t.error : "";
+   bool bad = (expected.empty() && !error.empty()) || error.find(expected) == std::string::npos;
+   if (bad || always_show)
+      std::cout << pretty_trace(trim_raw_data(std::move(t))) << "\n";
+   if (bad)
+      eosio::check(false, "transaction was expected to fail with " + expected);
 }
 
 eosio::signature psibase::sign(const eosio::private_key& key, const eosio::checksum256& digest)

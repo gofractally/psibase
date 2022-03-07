@@ -14,7 +14,6 @@ namespace auth_fake_sys
       // TODO: avoid copying inner raw_data (occurs in "called()" dispatcher below)
       if (enable_print)
          eosio::print("auth_check\n");
-      check(sender == 1, "Only contract 1 may request auth checks");
    }
 
    extern "C" void called(account_num this_contract, account_num sender)

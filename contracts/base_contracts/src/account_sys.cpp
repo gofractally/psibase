@@ -78,6 +78,8 @@ namespace account_sys
       auto auth_row = kv_get<name_to_num_row>(name_to_num_key(args.auth_contract));
       check(!!auth_row, "auth_contract not found");
       uint32_t flags = 0;
+      // TODO: restrict ability to set this flag
+      // TODO: support entire set of flags
       if (args.allow_sudo)
          flags |= account_row::allow_sudo;
       check(!kv_get<account_row>(account_row::kv_map, account_key(status->next_account_num)),

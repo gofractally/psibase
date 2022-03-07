@@ -4,9 +4,12 @@
 #include <eosio/reflection.hpp>
 #include <string>
 
-struct payload
+namespace test_cntr
 {
-   int         number;
-   std::string memo;
-};
-EOSIO_REFLECT(payload, number, memo)
+   struct payload
+   {
+      int         number;
+      std::string memo;
+   };
+   EOSIO_REFLECT(payload, number, memo)
+}  // namespace test_cntr

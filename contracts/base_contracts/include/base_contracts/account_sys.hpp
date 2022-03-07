@@ -29,7 +29,7 @@ namespace account_sys
       using return_type = psibase::account_num;
 
       std::string name          = {};
-      std::string auth_contract = {};
+      std::string auth_contract = {};  // TODO: use account_num? Presentation issues snuck in.
       bool        allow_sudo    = {};
    };
    EOSIO_REFLECT(create_account, name, auth_contract, allow_sudo)

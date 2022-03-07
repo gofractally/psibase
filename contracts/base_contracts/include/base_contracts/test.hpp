@@ -128,6 +128,26 @@ namespace psibase
       return eosio::convert_from_bin<account_num>(at.raw_retval);
    }  // add_contract()
 
+   inline account_num add_ec_account(test_chain&              t,
+                                     const char*              name,
+                                     const eosio::public_key& public_key,
+                                     bool                     show = false)
+   {
+      auto trace = t.push_transaction(  //
+          t.make_transaction(           //
+              {{
+                  .sender   = transaction_sys::contract,
+                  .contract = auth_ec_sys::contract,
+                  .raw_data = eosio::convert_to_bin(auth_ec_sys::action{auth_ec_sys::create_account{
+                      .name       = name,
+                      .public_key = public_key,
+                  }}),
+              }}));
+      REQUIRE(psibase::show(show, trace) == "");
+      auto& at = get_top_action(trace, 0);
+      return eosio::convert_from_bin<account_num>(at.raw_retval);
+   }  // add_ec_account()
+
    inline account_num add_contract(test_chain& t,
                                    const char* name,
                                    const char* filename,

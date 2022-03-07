@@ -11,7 +11,7 @@ function(add suffix)
     contract(rpc "${suffix}" rpc.cpp)
     contract(test_kv "${suffix}" test_kv.cpp)
 
-    add_executable(tests${suffix} test.cpp)
+    add_executable(tests${suffix} test.cpp test-ec.cpp)
     target_include_directories(tests${suffix} PUBLIC include)
     target_link_libraries(tests${suffix} base_contracts${suffix} nctestlib)
     set_target_properties(tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
