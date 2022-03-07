@@ -2,6 +2,7 @@
 
 #include <eosio/from_bin.hpp>
 #include <psibase/action_context.hpp>
+#include <psibase/contract_entry.hpp>
 #include <psibase/from_bin.hpp>
 
 namespace psibase
@@ -22,6 +23,7 @@ namespace psibase
 
    static void exec_genesis_action(transaction_context& self, const action& act);
    static void exec_process_transaction(transaction_context& self);
+   static void exec_verify_proofs(transaction_context& self);
 
    void transaction_context::exec_transaction()
    {
@@ -43,6 +45,7 @@ namespace psibase
       }
       else
       {
+         exec_verify_proofs(*this);
          exec_process_transaction(*this);
       }
 
@@ -96,6 +99,38 @@ namespace psibase
       action_context ac = {self, act, self.transaction_trace.action_traces.back()};
       auto&          ec = self.get_execution_context(1);
       ec.exec_process_transaction(ac);
+   }
+
+   // TODO: disable access to db
+   // TODO: parallel execution
+   // TODO: separate execution memories with smaller number of max active wasms
+   // TODO: separate execution_context pool for executing each proof
+   // TODO: time limit
+   static void exec_verify_proofs(transaction_context& self)
+   {
+      eosio::check(self.trx.proofs.size() == self.trx.trx.claims.size(),
+                   "proofs and claims must have same size");
+      auto id = sha256(self.trx.trx);
+      for (size_t i = 0; i < self.trx.proofs.size(); ++i)
+      {
+         auto&       claim = self.trx.trx.claims[i];
+         auto&       proof = self.trx.proofs[i];
+         verify_data data{
+             .transaction_hash = id,
+             .claim            = claim,
+             .proof            = proof,
+         };
+         action act{
+             .sender   = 0,
+             .contract = claim.contract,
+             .raw_data = eosio::convert_to_bin(data),
+         };
+         auto& atrace      = self.transaction_trace.action_traces.emplace_back();
+         atrace.act        = act;
+         action_context ac = {self, act, atrace};
+         auto&          ec = self.get_execution_context(claim.contract);
+         ec.exec_verify(ac);
+      }
    }
 
    void transaction_context::exec_called_action(uint64_t      caller_flags,

@@ -6,7 +6,7 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include "psibase/http.hpp"
-#include "psibase/rpc.hpp"
+#include "psibase/contract_entry.hpp"
 #include "psibase/transaction_context.hpp"
 
 #include <boost/asio/bind_executor.hpp>
@@ -233,7 +233,7 @@ namespace psibase::http
             bc.start();
             signed_transaction trx;
             action             act{
-                .sender   = rpc_contract_num,
+                .sender   = 0,
                 .contract = rpc_contract_num,
                 .raw_data = eosio::convert_to_bin(data),
             };

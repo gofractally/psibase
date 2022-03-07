@@ -241,14 +241,9 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
    return t;
 }
 
-// TODO: Change interface. Handle signing.
 [[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
-    const transaction&                     trx,
-    const std::vector<eosio::private_key>& keys,
-    const std::vector<eosio::signature>&   signatures)
+    const signed_transaction& signed_trx)
 {
-   signed_transaction signed_trx;
-   signed_trx.trx               = trx;
    std::vector<char> packed_trx = eosio::convert_to_bin(signed_trx);
    std::vector<char> bin;
    ::push_transaction(id, packed_trx.data(), packed_trx.size(), [&](size_t size) {
@@ -256,6 +251,17 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
       return bin.data();
    });
    return eosio::convert_from_bin<transaction_trace>(bin);
+}
+
+// TODO: Change interface. Handle signing.
+[[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
+    const transaction&                     trx,
+    const std::vector<eosio::private_key>& keys,
+    const std::vector<eosio::signature>&   signatures)
+{
+   signed_transaction signed_trx;
+   signed_trx.trx = trx;
+   return push_transaction(signed_trx);
 }
 
 psibase::transaction_trace psibase::test_chain::transact(

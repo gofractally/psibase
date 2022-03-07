@@ -103,6 +103,11 @@ namespace psibase
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
+      [[nodiscard]] transaction_trace push_transaction(const signed_transaction& signed_trx);
+
+      /**
+       * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
+       */
       [[nodiscard]] transaction_trace push_transaction(
           const transaction&                     trx,
           const std::vector<eosio::private_key>& keys       = {default_priv_key},

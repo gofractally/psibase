@@ -460,6 +460,13 @@ namespace psibase
       });
    }
 
+   void execution_context::exec_verify(action_context& act_context)
+   {
+      impl->exec(act_context, [&] {  //
+         (*impl->backend)(*impl, "env", "verify");
+      });
+   }
+
    void execution_context::exec_rpc(action_context& act_context)
    {
       impl->exec(act_context, [&] {  //

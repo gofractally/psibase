@@ -39,18 +39,23 @@ TEST_CASE("ec")
           }})),
           "no matching claim found");
 
-   auto missing_proof = t.make_transaction({{
+   auto ec_trx = t.make_transaction({{
        .sender   = sue,
        .contract = test_contract,
        .raw_data = eosio::convert_to_bin(test_cntr::payload{}),
    }});
-   missing_proof.claims.push_back({
-       .contract = prove_ec_sys::contract,
+   ec_trx.claims.push_back({
+       .contract = verify_ec_sys::contract,
        .raw_data = eosio::convert_to_bin(pub_key1),
    });
-   expect(t.push_transaction(missing_proof), "");  // TODO: proofs.size() != claims.size() error
+   expect(t.push_transaction(ec_trx), "proofs and claims must have same size");
 
-   // TODO: mismatched signature error
+   signed_transaction ec_signed = {
+       .trx    = ec_trx,
+       .proofs = {eosio::convert_to_bin(eosio::signature{})},
+   };
+   expect(t.push_transaction(ec_signed), "", true);  // TODO: mismatched signature error
+
    // TODO: success
 
 }  // ec

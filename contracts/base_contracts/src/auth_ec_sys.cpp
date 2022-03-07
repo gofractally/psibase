@@ -1,7 +1,7 @@
 #include <base_contracts/auth_ec_sys.hpp>
 
 #include <base_contracts/account_sys.hpp>
-#include <base_contracts/prove_ec_sys.hpp>
+#include <base_contracts/verify_ec_sys.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/native_tables.hpp>
 
@@ -32,7 +32,7 @@ namespace auth_ec_sys
       check(!!row, "sender does not have a public key");
       auto expected = eosio::convert_to_bin(row->pubkey);
       for (auto& claim : args.claims)
-         if (claim.contract == prove_ec_sys::contract && claim.raw_data == expected)
+         if (claim.contract == verify_ec_sys::contract && claim.raw_data == expected)
             return;
       abort_message("no matching claim found");
    }

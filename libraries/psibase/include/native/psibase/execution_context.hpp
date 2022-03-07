@@ -57,6 +57,7 @@ namespace psibase
 
       void exec_process_transaction(action_context& act_context);
       void exec_called(uint64_t caller_flags, action_context& act_context);
+      void exec_verify(action_context& act_context);
       void exec_rpc(action_context& act_context);
    };
 

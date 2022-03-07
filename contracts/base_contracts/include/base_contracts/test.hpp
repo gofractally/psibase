@@ -3,8 +3,8 @@
 #include <base_contracts/account_sys.hpp>
 #include <base_contracts/auth_ec_sys.hpp>
 #include <base_contracts/auth_fake_sys.hpp>
-#include <base_contracts/prove_ec_sys.hpp>
 #include <base_contracts/transaction_sys.hpp>
+#include <base_contracts/verify_ec_sys.hpp>
 #include <catch2/catch.hpp>
 #include <psibase/native_tables.hpp>
 #include <psibase/tester.hpp>
@@ -23,8 +23,18 @@ namespace psibase
    inline const action_trace& get_top_action(transaction_trace& t, size_t num)
    {
       // TODO: redesign transaction_trace to make this easier
-      eosio::check(t.action_traces.size() == 1, "unexpected transaction_trace layout");
-      auto&                            root = t.action_traces[0];
+      // Current layout:
+      //    verify proof 0
+      //    verify proof 1
+      //    ...
+      //    transaction.sys (below is interspersed with events, console, etc. in execution order)
+      //        check_auth
+      //        action 0
+      //        check_auth
+      //        action 1
+      //        ...
+      eosio::check(!t.action_traces.empty(), "transaction_trace has no actions");
+      auto&                            root = t.action_traces.back();
       std::vector<const action_trace*> top_traces;
       for (auto& inner : root.inner_traces)
          if (std::holds_alternative<action_trace>(inner.inner))
@@ -73,10 +83,10 @@ namespace psibase
                                               .code          = read_whole_file("auth_ec_sys.wasm"),
                                           },
                                           {
-                                              .contract      = prove_ec_sys::contract,
+                                              .contract      = verify_ec_sys::contract,
                                               .auth_contract = auth_fake_sys::contract,
                                               .flags         = 0,
-                                              .code          = read_whole_file("prove_ec_sys.wasm"),
+                                              .code = read_whole_file("verify_ec_sys.wasm"),
                                           },
                                       },
                               }),
@@ -101,7 +111,7 @@ namespace psibase
                                               {account_sys::contract, "account.sys"},
                                               {auth_fake_sys::contract, "auth_fake.sys"},
                                               {auth_ec_sys::contract, "auth_ec.sys"},
-                                              {prove_ec_sys::contract, "prove_ec.sys"},
+                                              {verify_ec_sys::contract, "verify_ec.sys"},
                                           },
                                   }}),
                           },

@@ -1,8 +1,8 @@
 #include "base_contracts/account_sys.hpp"
 
+#include <psibase/contract_entry.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
-#include <psibase/rpc.hpp>
 
 using namespace psibase;
 
