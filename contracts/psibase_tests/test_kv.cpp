@@ -23,10 +23,6 @@ struct item
    std::optional<uint8_t> ge5;
    std::optional<uint8_t> ge6;
 
-   std::optional<uint8_t> gt4;
-   std::optional<uint8_t> gt5;
-   std::optional<uint8_t> gt6;
-
    std::optional<uint8_t> max;
 
    auto get_key(account_num this_contract) const
@@ -42,19 +38,19 @@ uint8_t skip = 0xff;  // TODO: verify abort
 
 // clang-format off
 std::vector<item> items = {
-   //                         add    keep       lt4   lt5   lt6      ge4   ge5   ge6      gt4   gt5   gt6      max
-   {{},                 0x00, false, false,     none, skip, skip,    0x10, skip, skip,    0x10, skip, skip,    0x19},
-   {{0x10},             0x10, true,  true,      none, none, skip,    0x10, 0x10, skip,    0x11, 0x11, skip,    0x15},
-   {{0x10, 0x00},       0x11, true,  true,      0x10, 0x10, none,    0x11, 0x11, 0x11,    0x12, 0x12, none,    0x11},
-   {{0x10, 0x01},       0x12, true,  true,      0x11, 0x11, none,    0x12, 0x12, 0x12,    0x14, 0x14, none,    0x12},
-   {{0x10, 0x10},       0x13, true,  false,     0x12, 0x12, none,    0x14, 0x14, 0x14,    0x14, 0x14, 0x14,    0x15},
-   {{0x10, 0x10, 0x00}, 0x14, true,  true,      0x12, 0x12, none,    0x14, 0x14, 0x14,    0x15, 0x15, 0x15,    0x14},
-   {{0x10, 0x10, 0x01}, 0x15, true,  true,      0x14, 0x14, 0x14,    0x15, 0x15, 0x15,    0x17, none, none,    0x15},
-   {{0x11, 0x10, 0x02}, 0x16, true,  false,     0x15, none, none,    0x17, 0x17, none,    0x17, 0x17, none,    none},
-   {{0x11, 0x11},       0x17, true,  true,      0x15, none, none,    0x17, 0x17, 0x17,    0x19, none, none,    0x17},
-   {{0x12, 0x10, 0x02}, 0x18, false, false,     0x17, none, none,    0x19, none, none,    0x19, none, none,    none},
-   {{0x13, 0x11},       0x19, true,  true,      0x17, none, none,    0x19, 0x19, 0x19,    none, none, none,    0x19},
-   {{0x20},             0x20, false, false,     0x19, none, skip,    none, none, skip,    none, none, skip,    none},
+   //                         add    keep       lt4   lt5   lt6      ge4   ge5   ge6      max
+   {{},                 0x00, false, false,     none, skip, skip,    0x10, skip, skip,    0x19},
+   {{0x10},             0x10, true,  true,      none, none, skip,    0x10, 0x10, skip,    0x15},
+   {{0x10, 0x00},       0x11, true,  true,      0x10, 0x10, none,    0x11, 0x11, 0x11,    0x11},
+   {{0x10, 0x01},       0x12, true,  true,      0x11, 0x11, none,    0x12, 0x12, 0x12,    0x12},
+   {{0x10, 0x10},       0x13, true,  false,     0x12, 0x12, none,    0x14, 0x14, 0x14,    0x15},
+   {{0x10, 0x10, 0x00}, 0x14, true,  true,      0x12, 0x12, none,    0x14, 0x14, 0x14,    0x14},
+   {{0x10, 0x10, 0x01}, 0x15, true,  true,      0x14, 0x14, 0x14,    0x15, 0x15, 0x15,    0x15},
+   {{0x11, 0x10, 0x02}, 0x16, true,  false,     0x15, none, none,    0x17, 0x17, none,    none},
+   {{0x11, 0x11},       0x17, true,  true,      0x15, none, none,    0x17, 0x17, 0x17,    0x17},
+   {{0x12, 0x10, 0x02}, 0x18, false, false,     0x17, none, none,    0x19, none, none,    none},
+   {{0x13, 0x11},       0x19, true,  true,      0x17, none, none,    0x19, 0x19, 0x19,    0x19},
+   {{0x20},             0x20, false, false,     0x19, none, skip,    none, none, skip,    none},
 };
 // clang-format on
 
@@ -133,23 +129,6 @@ void test(account_num this_contract)
       if (enable_print)
          eosio::print("\n");
    }  // kv_greater_equal
-
-   if (enable_print)
-      eosio::print("kv_greater_than\n");
-   for (const auto& item : items)
-   {
-      auto key = item.get_key(this_contract);
-      if (enable_print)
-      {
-         printf("    0x%02x ", item.value);
-         fflush(stdout);
-      }
-      run(4, item.gt4, key, kv_greater_than_raw);
-      run(5, item.gt5, key, kv_greater_than_raw);
-      run(6, item.gt6, key, kv_greater_than_raw);
-      if (enable_print)
-         eosio::print("\n");
-   }  // kv_greater_than
 
    if (enable_print)
       eosio::print("kv_max\n");

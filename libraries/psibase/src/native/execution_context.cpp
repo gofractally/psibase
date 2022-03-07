@@ -361,20 +361,6 @@ namespace psibase
 
       // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
-      uint32_t kv_greater_than(uint32_t map, span<const char> key, uint32_t match_key_size)
-      {
-         eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
-         result.clear();
-         auto v =
-             db.kv_greater_than_raw(get_map_read(map), {key.data(), key.size()}, match_key_size);
-         if (!v)
-            return -1;
-         result.assign(v->pos, v->end);
-         return result.size();
-      }
-
-      // TODO: avoid copying value to result
-      // TODO: don't let timer abort db operation
       uint32_t kv_greater_equal(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
@@ -434,7 +420,6 @@ namespace psibase
       rhf_t::add<&execution_context_impl::kv_put>("env", "kv_put");
       rhf_t::add<&execution_context_impl::kv_remove>("env", "kv_remove");
       rhf_t::add<&execution_context_impl::kv_get>("env", "kv_get");
-      rhf_t::add<&execution_context_impl::kv_greater_than>("env", "kv_greater_than");
       rhf_t::add<&execution_context_impl::kv_greater_equal>("env", "kv_greater_equal");
       rhf_t::add<&execution_context_impl::kv_less_than>("env", "kv_less_than");
       rhf_t::add<&execution_context_impl::kv_max>("env", "kv_max");

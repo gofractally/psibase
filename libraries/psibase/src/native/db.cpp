@@ -168,30 +168,6 @@ namespace psibase
       return eosio::input_stream{(const char*)v.data(), v.size()};
    }
 
-   std::optional<eosio::input_stream> database::kv_greater_than_raw(kv_map              map,
-                                                                    eosio::input_stream key,
-                                                                    size_t match_key_size)
-   {
-      mdbx::slice k{key.pos, key.remaining()};
-      impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
-      // upper_bound() and key_upperbound don't exist even though MDBX_SET_UPPERBOUND does.
-      // The documentation for MDBX_SET_UPPERBOUND says it's identical to MDBX_SET_RANGE,
-      // so either it has really weird semantics, or the documentation is wrong. Working
-      // around it.
-      auto result = impl->cursor.lower_bound(k, false);
-      if (!result)
-         return std::nullopt;
-      if (result.key == k)
-      {
-         result = impl->cursor.to_next(false);
-         if (!result)
-            return std::nullopt;
-      }
-      if (result.key.size() < match_key_size || memcmp(result.key.data(), key.pos, match_key_size))
-         return std::nullopt;
-      return eosio::input_stream{(const char*)result.value.data(), result.value.size()};
-   }
-
    std::optional<eosio::input_stream> database::kv_greater_equal_raw(kv_map              map,
                                                                      eosio::input_stream key,
                                                                      size_t match_key_size)
