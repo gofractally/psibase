@@ -223,4 +223,37 @@ namespace psibase
          return std::nullopt;
       return eosio::input_stream{(const char*)result.value.data(), result.value.size()};
    }
+
+   std::optional<eosio::input_stream> database::kv_max_raw(kv_map map, eosio::input_stream key)
+   {
+      std::vector<unsigned char> next(reinterpret_cast<const unsigned char*>(key.pos),
+                                      reinterpret_cast<const unsigned char*>(key.end));
+      while (!next.empty())
+      {
+         if (++next.back())
+            break;
+         next.pop_back();
+      }
+      std::optional<mdbx::cursor::move_result> result;
+      if (next.empty())
+      {
+         result = impl->cursor.to_last(false);
+      }
+      else
+      {
+         mdbx::slice k{next.data(), next.size()};
+         result = impl->cursor.lower_bound(k, false);
+         if (!*result)
+            result = impl->cursor.to_last(false);
+         else
+            result = impl->cursor.to_previous(false);
+      }
+      if (!*result)
+         return std::nullopt;
+      if (result->key.size() < key.remaining() ||
+          memcmp(result->key.data(), key.pos, key.remaining()))
+         return std::nullopt;
+      return eosio::input_stream{(const char*)result->value.data(), result->value.size()};
+   }
+
 }  // namespace psibase

@@ -399,6 +399,18 @@ namespace psibase
          result.assign(v->pos, v->end);
          return result.size();
       }
+
+      // TODO: avoid copying value to result
+      // TODO: don't let timer abort db operation
+      uint32_t kv_max(uint32_t map, span<const char> key)
+      {
+         result.clear();
+         auto v = db.kv_max_raw(get_map_read(map), {key.data(), key.size()});
+         if (!v)
+            return -1;
+         result.assign(v->pos, v->end);
+         return result.size();
+      }
    };  // execution_context_impl
 
    execution_context::execution_context(transaction_context& trx_context,
@@ -425,6 +437,7 @@ namespace psibase
       rhf_t::add<&execution_context_impl::kv_greater_than>("env", "kv_greater_than");
       rhf_t::add<&execution_context_impl::kv_greater_equal>("env", "kv_greater_equal");
       rhf_t::add<&execution_context_impl::kv_less_than>("env", "kv_less_than");
+      rhf_t::add<&execution_context_impl::kv_max>("env", "kv_max");
    }
 
    void execution_context::exec_process_transaction(action_context& act_context)
