@@ -1,5 +1,7 @@
 #include <psibase/tester.hpp>
 
+#include <secp256k1.h>
+#include <base_contracts/verify_ec_sys.hpp>
 #include <eosio/abi.hpp>
 #include <eosio/authority.hpp>
 #include <eosio/from_string.hpp>
@@ -96,24 +98,32 @@ void psibase::expect(transaction_trace t, const std::string& expected, bool alwa
    if (bad || always_show)
       std::cout << pretty_trace(trim_raw_data(std::move(t))) << "\n";
    if (bad)
-      eosio::check(false, "transaction was expected to fail with " + expected);
+   {
+      if (expected.empty())
+         eosio::check(false, "transaction failed");
+      else
+         eosio::check(false, "transaction was expected to fail with " + expected);
+   }
 }
 
 eosio::signature psibase::sign(const eosio::private_key& key, const eosio::checksum256& digest)
 {
-   auto               raw_digest  = digest.extract_as_byte_array();
-   auto               raw_key     = eosio::convert_to_bin(key);
-   constexpr uint32_t buffer_size = 80;
-   std::vector<char>  buffer(buffer_size);
-   unsigned sz = ::tester_sign(raw_key.data(), raw_key.size(), raw_digest.data(), buffer.data(),
-                               buffer.size());
-   buffer.resize(sz);
-   if (sz > buffer_size)
-   {
-      ::tester_sign(raw_key.data(), raw_key.size(), raw_digest.data(), buffer.data(),
-                    buffer.size());
-   }
-   return eosio::convert_from_bin<eosio::signature>(buffer);
+   static auto context    = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+   auto        raw_digest = digest.extract_as_byte_array();
+   auto*       k1         = std::get_if<0>(&key);
+   eosio::check(k1, "only k1 currently supported");
+
+   secp256k1_ecdsa_signature sig;
+   eosio::check(
+       secp256k1_ecdsa_sign(context, &sig, raw_digest.data(), k1->data(), nullptr, nullptr) == 1,
+       "sign failed");
+
+   // TODO: we're currently ignoring byte 0 (recovery). Create a new signature type without it?
+   eosio::ecc_signature sigdata;
+   eosio::check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data() + 1, &sig) == 1,
+                "serialize signature failed");
+
+   return eosio::signature{std::in_place_index<0>, sigdata};
 }
 
 void psibase::internal_use_do_not_use::hex(const uint8_t* begin,
@@ -135,6 +145,7 @@ void psibase::internal_use_do_not_use::hex(const uint8_t* begin,
    }
 }
 
+// TODO: change defaults
 const eosio::public_key psibase::test_chain::default_pub_key =
     eosio::public_key_from_string("EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV");
 const eosio::private_key psibase::test_chain::default_priv_key =
@@ -232,8 +243,7 @@ void psibase::test_chain::fill_tapos(transaction& t, uint32_t expire_sec)
           sizeof(t.ref_block_prefix));
 }
 
-psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&& actions,
-                                                           std::vector<action>&& cfa)
+psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&& actions)
 {
    transaction t;
    fill_tapos(t);
@@ -253,21 +263,27 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
    return eosio::convert_from_bin<transaction_trace>(bin);
 }
 
-// TODO: Change interface. Handle signing.
 [[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
-    const transaction&                     trx,
-    const std::vector<eosio::private_key>& keys,
-    const std::vector<eosio::signature>&   signatures)
+    const transaction&                                                   trx,
+    const std::vector<std::pair<eosio::public_key, eosio::private_key>>& keys)
 {
    signed_transaction signed_trx;
    signed_trx.trx = trx;
+   for (auto& [pub, priv] : keys)
+      signed_trx.trx.claims.push_back({
+          .contract = verify_ec_sys::contract,
+          .raw_data = eosio::convert_to_bin(pub),
+      });
+   auto hash = sha256(signed_trx.trx);
+   for (auto& [pub, priv] : keys)
+      signed_trx.proofs.push_back(eosio::convert_to_bin(sign(priv, hash)));
    return push_transaction(signed_trx);
 }
 
 psibase::transaction_trace psibase::test_chain::transact(
-    std::vector<action>&&                  actions,
-    const std::vector<eosio::private_key>& keys,
-    const char*                            expected_except)
+    std::vector<action>&&                                                actions,
+    const std::vector<std::pair<eosio::public_key, eosio::private_key>>& keys,
+    const char*                                                          expected_except)
 {
    auto trace = push_transaction(make_transaction(std::move(actions)), keys);
    expect(trace, expected_except);
@@ -277,7 +293,7 @@ psibase::transaction_trace psibase::test_chain::transact(
 psibase::transaction_trace psibase::test_chain::transact(std::vector<action>&& actions,
                                                          const char*           expected_except)
 {
-   return transact(std::move(actions), {default_priv_key}, expected_except);
+   return transact(std::move(actions), {{default_pub_key, default_priv_key}}, expected_except);
 }
 
 std::ostream& eosio::operator<<(std::ostream& os, const eosio::time_point_sec& obj)

@@ -81,13 +81,20 @@ function(add suffix)
             psibase${suffix}
             catch2
             boost
+            -lsecp256k1
             -lc++
             -lc++abi
             -lc
             ${WASI_SDK_PREFIX}/lib/clang/11.0.0/lib/wasi/libclang_rt.builtins-wasm32.a
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
         )
-        target_include_directories(nctestlib${suffix} PUBLIC include/contract ../eosiolib/core/include ../eosiolib/contracts/include include/tester)
+        target_include_directories(nctestlib${suffix} PUBLIC
+            include/contract
+            ../eosiolib/core/include
+            ../eosiolib/contracts/include
+            include/tester
+            ../../contracts/base_contracts/include
+        )
         target_link_options(nctestlib${suffix} INTERFACE -Wl,--export-table)
         target_link_options(nctestlib${suffix} PUBLIC
             -Wl,--entry,_start

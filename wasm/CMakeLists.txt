@@ -40,11 +40,11 @@ file(COPY ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${ROOT_BINARY_DIR}/clsdk/licens
 
 add_library(wasm-base INTERFACE)
 target_compile_options(wasm-base INTERFACE -fno-exceptions -D__eosio_cdt__ -mthread-model single -O3)
-target_link_options(wasm-base INTERFACE -Wl,--strip-all -O3)
+target_link_options(wasm-base INTERFACE -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 add_library(wasm-base-debug INTERFACE)
 target_compile_options(wasm-base-debug INTERFACE -fno-exceptions -D__eosio_cdt__ -mthread-model single -ggdb)
-target_link_options(wasm-base-debug INTERFACE -ggdb)
+target_link_options(wasm-base-debug INTERFACE -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 # -clsdk variant of build targets need paths converted
 function(add_clsdk_base_lib suffix)
@@ -152,6 +152,27 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
                 CFLAGS=\"${OPENSSL_BUILD_FLAGS}\"                                           \
                 CXXFLAGS=\"${OPENSSL_BUILD_FLAGS}\"                                         \
             && make -j install_dev install_engines                                          \
+        "
+    )
+endif()
+
+if(NOT EXISTS ${DEP_PREFIX}/lib/libsecp256k1.a)
+    message("building secp256k1")
+    execute_process(
+        WORKING_DIRECTORY ${DEP_PREFIX}
+        COMMAND bash -c "\
+               rm -rf secp256k1                                                     \
+            && cp -r ${ROOT_SOURCE_DIR}/external/secp256k1 secp256k1                \
+            && cd secp256k1                                                         \
+            && ./autogen.sh                                                         \
+            && export CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"       \
+            && export CXX=\"${CMAKE_CXX_COMPILER_LAUNCHER} ${CMAKE_CXX_COMPILER}\"  \
+            && export AR=${CMAKE_AR}                                                \
+            && export RANLIB=${CMAKE_RANLIB}                                        \
+            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT}\"                         \
+            && ./configure --prefix=${DEP_PREFIX} --host=wasm32                     \
+            && make -j                                                              \
+            && make -j install                                                      \
         "
     )
 endif()

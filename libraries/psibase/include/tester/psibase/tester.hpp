@@ -32,8 +32,7 @@ namespace psibase
    void expect(transaction_trace t, const std::string& expected = "", bool always_show = false);
 
    /**
-    * Sign a digest.  This is here and not in crypto.hpp, because it is
-    * only available in the tester.
+    * Sign a digest
     */
    eosio::signature sign(const eosio::private_key& key, const eosio::checksum256& digest);
 
@@ -97,8 +96,7 @@ namespace psibase
       /*
        * Creates a transaction.
        */
-      transaction make_transaction(std::vector<action>&& actions  = {},
-                                   std::vector<action>&& cfaction = {});
+      transaction make_transaction(std::vector<action>&& actions = {});
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
@@ -109,18 +107,19 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] transaction_trace push_transaction(
-          const transaction&                     trx,
-          const std::vector<eosio::private_key>& keys       = {default_priv_key},
-          const std::vector<eosio::signature>&   signatures = {});
+          const transaction&                                                   trx,
+          const std::vector<std::pair<eosio::public_key, eosio::private_key>>& keys = {
+              {default_pub_key, default_priv_key}});
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        *
        * Validates the transaction status according to @ref eosio::expect.
        */
-      transaction_trace transact(std::vector<action>&&                  actions,
-                                 const std::vector<eosio::private_key>& keys,
-                                 const char*                            expected_except = nullptr);
+      transaction_trace transact(
+          std::vector<action>&&                                                actions,
+          const std::vector<std::pair<eosio::public_key, eosio::private_key>>& keys,
+          const char* expected_except = nullptr);
       transaction_trace transact(std::vector<action>&& actions,
                                  const char*           expected_except = nullptr);
 

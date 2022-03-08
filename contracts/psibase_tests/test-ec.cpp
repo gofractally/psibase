@@ -7,9 +7,14 @@ using namespace eosio;
 using namespace psibase;
 
 static auto priv_key1 =
-    eosio::private_key_from_string("PVT_R1_5WkGvLou463uDgKqVEZ86ET59Gueo9BjjwYDGQGepqq6bSJsm");
+    eosio::private_key_from_string("PVT_K1_KSm1gXENJdNCG9tJRErpZpdhut7NQDThVvkLQ3XYW5VksjPKV");
 static auto pub_key1 =
-    eosio::public_key_from_string("PUB_R1_6BVCPxQuEhq4mwiyP6szbvjJQimG8T4uCkTrtPwqcj6uHBaJ9b");
+    eosio::public_key_from_string("PUB_K1_67w57254khWfNoinC8A3AsRVh2jncUgMDcC6JGNZyERHz9TteV");
+
+static auto priv_key2 =
+    eosio::private_key_from_string("PVT_K1_KuuEeDKvFC6dSh7S5ACbkZPuxuvbU3J4buyEcjvg73NBxqdQz");
+static auto pub_key2 =
+    eosio::public_key_from_string("PUB_K1_5NpiqhMbcHQGUXbVbn2TfYVHKkF7LfSiGp1HLx6qw31Np8ttcD");
 
 TEST_CASE("ec")
 {
@@ -52,10 +57,33 @@ TEST_CASE("ec")
 
    signed_transaction ec_signed = {
        .trx    = ec_trx,
-       .proofs = {eosio::convert_to_bin(eosio::signature{})},
+       .proofs = {eosio::convert_to_bin(sign(priv_key2, sha256(ec_trx)))},
    };
-   expect(t.push_transaction(ec_signed), "", true);  // TODO: mismatched signature error
+   expect(t.push_transaction(ec_signed), "incorrect signature");
 
-   // TODO: success
+   ec_signed.proofs = {eosio::convert_to_bin(sign(priv_key1, sha256(ec_trx)))};
+   expect(t.push_transaction(ec_signed));
 
+   expect(t.push_transaction(t.make_transaction({{
+                                 .sender   = sue,
+                                 .contract = test_contract,
+                                 .raw_data = eosio::convert_to_bin(test_cntr::payload{}),
+                             }}),
+                             {{pub_key1, priv_key1}}));
+
+   expect(t.push_transaction(t.make_transaction({{
+                                 .sender   = sue,
+                                 .contract = test_contract,
+                                 .raw_data = eosio::convert_to_bin(test_cntr::payload{}),
+                             }}),
+                             {{pub_key2, priv_key2}}),
+          "no matching claim found");
+
+   expect(t.push_transaction(t.make_transaction({{
+                                 .sender   = sue,
+                                 .contract = test_contract,
+                                 .raw_data = eosio::convert_to_bin(test_cntr::payload{}),
+                             }}),
+                             {{pub_key1, priv_key2}}),
+          "incorrect signature");
 }  // ec

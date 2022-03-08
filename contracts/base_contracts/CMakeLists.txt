@@ -14,7 +14,9 @@ function(add suffix)
         contract(auth_ec_sys${suffix} src/auth_ec_sys.cpp)
         contract(auth_fake_sys${suffix} src/auth_fake_sys.cpp)
         contract(transaction_sys${suffix} src/transaction_sys.cpp)
+
         contract(verify_ec_sys${suffix} src/verify_ec_sys.cpp)
+        target_link_libraries(verify_ec_sys${suffix} -lsecp256k1)
     endif()
 endfunction(add)
 
