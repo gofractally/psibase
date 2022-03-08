@@ -1,0 +1,17 @@
+namespace cliofb;
+
+table action {
+   sender:uint32;
+   contract:uint32;
+   act:uint32;
+   data:[ubyte];
+}
+
+table transaction {
+   expire:uint32;
+   tapos:uint16; 
+   flags:uint16;
+   actions:[action];
+}
+
+root_type transaction;

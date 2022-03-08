@@ -1,0 +1,11 @@
+namespace contract;
+
+
+table transfer {
+from:uint32;
+to:uint32;
+amount:uint32;
+memo:string;
+}
+
+root_type transfer;
