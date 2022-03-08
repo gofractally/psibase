@@ -25,6 +25,14 @@ function(native_test N)
     )
 endfunction()
 
+function(native_and_wasm_test N)
+    add_test(
+        NAME n-${N}
+        WORKING_DIRECTORY ${ROOT_BINARY_DIR}
+        COMMAND ./${N}
+    )
+endfunction()
+
 find_package(Boost 1.40 REQUIRED)
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${Boost_INCLUDE_DIR})
@@ -32,5 +40,8 @@ target_link_libraries(boost INTERFACE ${Boost_LIBRARIES})
 
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
-add_subdirectory(../contracts contracts)
-add_subdirectory(../programs programs)
+
+if(NOT CLIO_ONLY)
+    add_subdirectory(../contracts contracts)
+    add_subdirectory(../programs programs)
+endif()

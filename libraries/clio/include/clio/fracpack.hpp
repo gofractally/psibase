@@ -1157,8 +1157,8 @@ namespace clio
          memcpy(_data.get(), data, size + sizeof(size));
       }
 
-      frac_ptr(){};
-      operator bool() const { return _data; }
+         frac_ptr(){};
+      operator bool() const { return _data != nullptr; }
 
       const auto* operator->() const { return get_view<T>(data() + 4); }
       auto*       operator->() { return get_view<T>(data() + 4); }

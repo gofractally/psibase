@@ -22,14 +22,16 @@ if(IS_NATIVE)
     set(Boost_USE_STATIC_LIBS   ON)
     find_package(Boost 1.67 REQUIRED COMPONENTS date_time filesystem chrono iostreams)
 
-    add_library(eos-vm INTERFACE)
-    target_include_directories(eos-vm INTERFACE
-        ${ROOT_SOURCE_DIR}/external/eos/libraries/eos-vm/include
-    )
+    if(NOT CLIO_ONLY)
+        add_library(eos-vm INTERFACE)
+        target_include_directories(eos-vm INTERFACE
+            ${ROOT_SOURCE_DIR}/external/eos/libraries/eos-vm/include
+        )
 
-    set(MDBX_OUTPUT_DIR ${ROOT_BINARY_DIR}/mdbx)
-    set(MDBX_BUILD_TIMESTAMP unknown)
-    add_subdirectory(libmdbx)
+        set(MDBX_OUTPUT_DIR ${ROOT_BINARY_DIR}/mdbx)
+        set(MDBX_BUILD_TIMESTAMP unknown)
+        add_subdirectory(libmdbx)
+    endif()
 endif()
 
 ExternalProject_Add(fmt-ext

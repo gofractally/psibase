@@ -12,6 +12,7 @@ endif()
 
 file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
+option(CLIO_ONLY "Only build clio" ON)
 
 option(BUILD_NATIVE "Build native code" ON)
 if(BUILD_NATIVE)
@@ -19,7 +20,7 @@ if(BUILD_NATIVE)
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\")\n")
 endif()
 
-if(DEFINED WASI_SDK_PREFIX)
+if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
         BINARY_DIR wasm
