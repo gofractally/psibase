@@ -22,3 +22,5 @@ if(DEFINED IS_WASM)
     add("")
     add("-debug")
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

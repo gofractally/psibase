@@ -57,3 +57,5 @@ if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
 else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)
