@@ -177,10 +177,14 @@ namespace psibase
       void init()
       {
          rethrow_vm_except([&] {
+            // auto start_time = std::chrono::steady_clock::now();
             backend->set_wasm_allocator(&wa);
             backend->initialize(this);
             (*backend)(*this, "env", "start", (uint32_t)current_act_context->action.contract);
             initialized = true;
+            // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
+            //     std::chrono::steady_clock::now() - start_time);
+            // std::cout << "init:   " << us.count() << " us\n";
          });
       }
 
@@ -448,7 +452,11 @@ namespace psibase
    void execution_context::exec_verify(action_context& act_context)
    {
       impl->exec(act_context, [&] {  //
+         // auto start_time = std::chrono::steady_clock::now();
          (*impl->backend)(*impl, "env", "verify");
+         // auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+         //     std::chrono::steady_clock::now() - start_time);
+         // std::cout << "verify: " << us.count() << " us\n";
       });
    }
 

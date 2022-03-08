@@ -1,16 +1,28 @@
-#include <secp256k1.h>
+#include <secp256k1_preallocated.h>
 #include <base_contracts/verify_ec_sys.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psibase/from_bin.hpp>
 
 using namespace psibase;
 
-// TODO: regenerate wasm with this already initialized
-auto context = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY);
+char               pre[1024];
+secp256k1_context* context = nullptr;
+
+extern "C" void __wasm_call_ctors();
+
+// Called by wasm-ctor-eval during build
+extern "C" [[clang::export_name("prestart")]] void prestart()
+{
+   __wasm_call_ctors();
+   check(secp256k1_context_preallocated_size(SECP256K1_CONTEXT_VERIFY) <= sizeof(pre), "?");
+   context = secp256k1_context_preallocated_create(&pre, SECP256K1_CONTEXT_VERIFY);
+}
 
 // TODO: r1
 extern "C" [[clang::export_name("verify")]] void verify()
 {
+   check(context, "verify_ec_sys not fully built");
+
    auto act     = get_current_action();
    auto data    = eosio::convert_from_bin<verify_data>(act.raw_data);
    auto pub_key = unpack_all<eosio::public_key>(data.claim.raw_data, "extra data in claim");
@@ -46,8 +58,5 @@ extern "C" void called(account_num this_contract, account_num sender)
    abort_message("this contract has no actions");
 }
 
-extern "C" void __wasm_call_ctors();
-extern "C" void start(account_num this_contract)
-{
-   __wasm_call_ctors();
-}
+// Caution! Don't replace with version in dispatcher!
+extern "C" void start(account_num this_contract) {}
