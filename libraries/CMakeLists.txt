@@ -1,6 +1,8 @@
 enable_testing()
 
-add_subdirectory(clio)
+if(CLIO_ONLY)
+    add_subdirectory(clio)
+endif()
 
 if(NOT CLIO_ONLY)
     add_subdirectory(abieos)
