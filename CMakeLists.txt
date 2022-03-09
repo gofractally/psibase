@@ -12,7 +12,7 @@ endif()
 
 file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
-option(CLIO_ONLY "Only build clio" ON)
+option(CLIO_ONLY "Only build clio" OFF)
 
 option(BUILD_NATIVE "Build native code" ON)
 if(BUILD_NATIVE)

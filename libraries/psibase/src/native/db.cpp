@@ -31,23 +31,28 @@ namespace psibase
    {
       const std::unique_ptr<mdbx::env_managed> state_env;
       const std::unique_ptr<mdbx::env_managed> subjective_env;
+      const std::unique_ptr<mdbx::env_managed> write_only_env;
       const mdbx::map_handle                   contract_map;
       const mdbx::map_handle                   native_constrained_map;
       const mdbx::map_handle                   native_unconstrained_map;
       const mdbx::map_handle                   subjective_map;
+      const mdbx::map_handle                   write_only_map;
 
       shared_database_impl(const boost::filesystem::path& dir)
           : state_env{construct_env(dir / "state", 3)},
             subjective_env{construct_env(dir / "subjective")},
+            write_only_env{construct_env(dir / "write_only")},
             contract_map{construct_kv_map(*state_env, "contract")},
             native_constrained_map{construct_kv_map(*state_env, "native_constrained")},
             native_unconstrained_map{construct_kv_map(*state_env, "native_unconstrained")},
-            subjective_map{construct_kv_map(*subjective_env, nullptr)}
+            subjective_map{construct_kv_map(*subjective_env, nullptr)},
+            write_only_map{construct_kv_map(*write_only_env, nullptr)}
       {
       }
 
       mdbx::map_handle get_map(kv_map map)
       {
+         // TODO: switch to array
          if (map == kv_map::contract)
             return contract_map;
          if (map == kv_map::native_constrained)
@@ -56,6 +61,8 @@ namespace psibase
             return native_unconstrained_map;
          if (map == kv_map::subjective)
             return subjective_map;
+         if (map == kv_map::write_only)
+            return write_only_map;
          throw std::runtime_error("unknown kv_map");
       }
    };
@@ -69,15 +76,26 @@ namespace psibase
    {
       shared_database                  shared;
       std::vector<mdbx::txn_managed>   transactions;
+      std::vector<mdbx::txn_managed>   write_only_transactions;
       std::optional<mdbx::txn_managed> subjective_transaction;
       mdbx::cursor_managed             cursor;
 
+      bool transactions_ok()
+      {
+         // This mismatch can occur if start_*() or commit() throw
+         return transactions.size() == write_only_transactions.size() &&
+                transactions.empty() == !subjective_transaction.has_value();
+      }
+
+      bool transactions_available() { return transactions_ok() && !transactions.empty(); }
+
       mdbx::txn_managed& get_trx(kv_map map)
       {
-         eosio::check(!transactions.empty() && subjective_transaction.has_value(),
-                      "no active database sessions");
+         eosio::check(transactions_available(), "no active database transactions");
          if (map == kv_map::subjective)
             return *subjective_transaction;
+         else if (map == kv_map::write_only)
+            return write_only_transactions.back();
          else
             return transactions.back();
       }
@@ -92,29 +110,39 @@ namespace psibase
 
    database::session database::start_read()
    {
+      eosio::check(impl->transactions_ok(), "database transactions mismatch");
+      impl->transactions.push_back(impl->shared.impl->state_env->start_read());
+      impl->write_only_transactions.push_back(impl->shared.impl->write_only_env->start_read());
       if (!impl->subjective_transaction)
          impl->subjective_transaction.emplace(impl->shared.impl->subjective_env->start_read());
-      impl->transactions.push_back(impl->shared.impl->state_env->start_read());
       return {this};
    }
 
    database::session database::start_write()
    {
-      if (!impl->subjective_transaction)
-         impl->subjective_transaction.emplace(impl->shared.impl->subjective_env->start_write());
+      eosio::check(impl->transactions_ok(), "database transactions mismatch");
       if (impl->transactions.empty())
+      {
          impl->transactions.push_back(impl->shared.impl->state_env->start_write());
+         impl->write_only_transactions.push_back(impl->shared.impl->write_only_env->start_write());
+         impl->subjective_transaction.emplace(impl->shared.impl->subjective_env->start_write());
+      }
       else
+      {
          impl->transactions.push_back(impl->transactions.back().start_nested());
+         impl->write_only_transactions.push_back(
+             impl->write_only_transactions.back().start_nested());
+      }
       return {this};
    }
 
    void database::commit(database::session&)
    {
-      eosio::check(!impl->transactions.empty() && impl->subjective_transaction.has_value(),
-                   "missing transactions during commit");
+      eosio::check(impl->transactions_available(), "no active database transactions during commit");
       impl->transactions.back().commit();
       impl->transactions.pop_back();
+      impl->write_only_transactions.back().commit();
+      impl->write_only_transactions.pop_back();
       if (impl->transactions.empty())
       {
          impl->subjective_transaction->commit();
@@ -124,7 +152,10 @@ namespace psibase
 
    void database::abort(database::session&)
    {
+      if (!impl->transactions_available())
+         return;
       impl->transactions.pop_back();
+      impl->write_only_transactions.pop_back();
       if (impl->transactions.empty() && impl->subjective_transaction.has_value())
       {
          // The subjective database has no undo stack and survives aborts; this

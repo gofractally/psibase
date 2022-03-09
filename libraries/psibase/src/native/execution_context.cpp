@@ -217,6 +217,8 @@ namespace psibase
                 trx_context.block_context.is_read_only)
                return (kv_map)map;
          }
+         if (map == uint32_t(kv_map::write_only) && trx_context.block_context.is_read_only)
+            return (kv_map)map;
          throw std::runtime_error("contract may not read this map");
       }
 
@@ -232,7 +234,7 @@ namespace psibase
          eosio::check(!(contract_account.flags & account_row::is_subjective),
                       "subjective contracts may only write to kv_map::subjective");
 
-         if (map == uint32_t(kv_map::contract))
+         if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
          {
             uint32_t prefix = contract_account.num;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
