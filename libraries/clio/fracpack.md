@@ -31,7 +31,7 @@ struct {
 ```
 
 | algo | task |  time  | % of google |
---------------------------------------
+|------|------|--------|-------------|
 |google | pack|     1.537 ms| |
 |fracpack|  pack|   1.4215 ms|  92% |
 |google|  unpack|   0.580166 ms| |
