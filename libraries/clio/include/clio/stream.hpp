@@ -373,9 +373,16 @@ namespace clio
       const char* pos;
       const char* end;
       size_t      total_read = 0;
+      size_t      size;
+      void add_total_read( uint32_t v ) {
+         total_read += v;
+         if(  size < total_read ) {
+            throw_error(stream_error::doubleread);
+         }
+      }
 
       check_input_stream() : pos{nullptr}, end{nullptr} {}
-      check_input_stream(const char* pos, size_t size) : begin(pos), pos{pos}, end{pos + size}
+      check_input_stream(const char* pos, size_t size) : begin(pos), pos{pos}, end{pos + size},size(size)
       {
          if (size < 0)
             throw_error(stream_error::overrun);

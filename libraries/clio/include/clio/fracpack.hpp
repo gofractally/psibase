@@ -1,3 +1,4 @@
+#pragma once
 #include <clio/error.hpp>
 #include <clio/name.hpp>
 #include <clio/stream.hpp>
@@ -547,7 +548,7 @@ namespace clio
             {
                check_input_stream insubstr(stream.pos + offset - sizeof(offset_ptr), stream.end);
                fraccheck<opt_type>(insubstr);
-               stream.total_read += insubstr.total_read;
+               stream.add_total_read(insubstr.total_read);
             }
          }
          /** unpack empty vector / string */
@@ -559,7 +560,7 @@ namespace clio
             {
                S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
                fraccheck<T>(insubstream);
-               stream.total_read += insubstream.total_read;
+               stream.add_total_read(insubstream.total_read);
             }
          }
          else
@@ -568,7 +569,7 @@ namespace clio
             stream.read(&offset, sizeof(offset));
             S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
             fraccheck<T>(insubstream);
-            stream.total_read += insubstream.total_read;
+            stream.add_total_read(insubstream.total_read);
          }
       }
       else
@@ -596,7 +597,6 @@ namespace clio
          using value_type = typename is_std_vector<T>::value_type;
          if constexpr (can_memcpy<value_type>())
          {
-            //uint16_t fix_size = fracpack_fixed_size<value_type>();
             uint32_t size;
             stream.read((char*)&size, sizeof(size));
             if (size > 0)
@@ -631,9 +631,6 @@ namespace clio
       {
          T::fracunpack_not_defined;
       }
-      // if(  (stream.end - stream.begin) < stream.total_read ) {
-      //    throw_error(stream_error::doubleread);
-      // }
    }  // fraccheck
 
    /** 
@@ -646,32 +643,6 @@ namespace clio
       size_stream size_str;
       return fracpack(v, size_str);
    }
-
-   /**
-     * These types are not extensible, but do contain dynamically sized fields
-     * that allocate data on the heap. If it contains any non-final 
-    template<typename T>
-    constexpr bool is_dynamic_fixed_structure() {
-       if constexpr( can_memcpy<T>() ) return false;
-       else if constexpr( clio::reflect<T>::is_struct ) {
-         if( std::alignment_of_v<T> != 1 ) 
-            return false;
-         if( not std::is_final_v<T> )
-            return false;
-
-         bool is_flat     = true;
-         /// all members that are not offset ptrs must be final....
-         /// 
-         clio::reflect<T>::for_each( [&]( const clio::meta& ref, auto mptr ){
-              using member_type = std::decay_t<decltype(clio::result_of_member(mptr))>;
-              is_flat &= member_offset(mptr) != last_pos;
-              is_flat &= can_memcpy<member_type>();
-              last_pos += sizeof(member_type);
-         });
-       }
-       return false;
-    }
-     */
 
    /** 
      *  Recursively checks the types for any field which requires dynamic allocation,
@@ -734,38 +705,6 @@ namespace clio
       static constexpr const auto value = get_contains_offset_ptr<Ts...>();
    };
 
-   /*
-    template<typename T>
-    constexpr uint32_t fracpack_size() {
-    //    if constexpr( is_flat_ptr<T>::value ) {
-    //        return sizeof(offset_ptr);
-    //    } else 
-        if constexpr( is_std_variant<T>::value ) {
-            return 16;
-        } else if constexpr( reflect<T>::is_struct ) {
-            uint32_t size = 0;
-            reflect<T>::for_each( [&]( const meta& ref, const auto& mptr ){
-                 using member_type = decltype(result_of_member(mptr));
-                 if constexpr ( contains_offset_ptr<member_type>() ) {
-                     size += sizeof(offset_ptr);
-                 } else {
-                     size += fracpack_size<member_type>();
-                 }
-            });
-            return size;
-        } else if constexpr( std::is_same_v<std::string,T> || is_std_vector<T>::value) {
-            return sizeof(offset_ptr);
-        } else if constexpr( std::is_arithmetic_v<T> ) {
-            return sizeof(T);
-        } else if constexpr( std::is_trivially_copyable<T>::value ) {
-            /// TODO: check alignment and padding
-            return sizeof(T);
-        } else {
-            T::fracpack_size_not_defined;
-        }
-    }
-    */
-
    template <uint32_t I, typename Tuple>
    struct get_tuple_offset;
 
@@ -795,255 +734,207 @@ namespace clio
       static constexpr const uint32_t value = get_offset<I, Args...>();
    };
 
-   struct frac_proxy_view;
-
-   /**
-     * A view of a flat buffer
-     */
-   template <typename T, typename Enable = void>
-   struct frac;
-
-   using frac_string_view = frac<std::string>;
+   template <typename View, typename Enable = void>
+   struct view;
 
    template <typename T>
-   struct frac<std::optional<T>>;
+   struct view<T, std::enable_if_t<std::is_arithmetic_v<T>>>;
 
-   template <typename T>
-   struct frac<std::vector<T>>;
-
-   template <typename T>
-   using frac_optional_view = frac<std::optional<T>>;
-
-   template <typename T>
-   struct frac_vector_view;
-   //template<typename T>
-   //struct frac_optional_view;
-
-   template <typename T>
-   struct frac<T, std::enable_if_t<reflect<T>::is_struct>>
-       : public reflect<T>::template proxy<clio::frac_proxy_view>
-   {
-   };
-
-   template <typename T>
-   struct frac<T, std::enable_if_t<std::is_arithmetic_v<T>>> : public unaligned_type<T>
-   {
-      using unaligned_type<T>::unaligned_type;
-      ;
-      using unaligned_type<T>::operator=;
-      using unaligned_type<T>::operator T;
-   };
-
-   template <typename T>
-   using frac_view = typename clio::reflect<T>::template proxy<clio::frac_proxy_view>;
-
-   template <typename T, typename P>
-   const auto* get_view(const P* ptr)
-   {
-      return reinterpret_cast<const frac<T>*>(ptr);
-   }
-   template <typename T, typename P>
-   auto* get_view(P* ptr)
-   {
-      return reinterpret_cast<frac<T>*>(ptr);
-   }
-
-   /** this point is cast to the char* buffer */
-   struct frac_proxy_view
-   {
-      /** This method is called by the reflection library to get the field */
-      template <uint32_t idx, uint64_t Name, auto MemberPtr>
-      constexpr auto* get()
-      {
-         using class_type  = decltype(clio::class_of_member(MemberPtr));
-         using tuple_type  = typename clio::reflect<class_type>::struct_tuple_type;
-         using member_type = decltype(clio::result_of_member(MemberPtr));
-
-         constexpr uint32_t offset =
-             clio::get_tuple_offset<idx, tuple_type>::value +
-             2 * (clio::is_ext_structure<
-                     class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
-
-         //            std::cout << "_idx: " << idx << " offset " << offset <<"\n";
-         char* out_ptr = ((char*)(this)) + offset;
-
-         if constexpr (is_std_optional<member_type>::value)
-         {
-            using opt_type  = typename is_std_optional<member_type>::value_type;
-            using view_type = decltype(get_view<opt_type>((char*)nullptr));
-
-            if constexpr (is_ext_structure<class_type>())
-            {
-               uint16_t start_heap = *reinterpret_cast<unaligned_type<uint16_t>*>(this);
-               //                 std::cout << "start_heap: " <<start_heap<<"\n";
-               if (start_heap < offset + 2)
-                  return view_type(nullptr);
-            }
-            auto ptr = reinterpret_cast<clio::offset_ptr*>(out_ptr);
-            if (ptr->offset < 4)
-               return view_type(nullptr);
-            return view_type(ptr->get<opt_type>());
-         }
-         else if constexpr (may_use_heap<member_type>())
-         {
-            auto ptr = reinterpret_cast<clio::offset_ptr*>(out_ptr);
-            return ptr->get<member_type>();
-            // } else if constexpr ( std::alignment_of_v<member_type> == 1 ) {
-            //     return reinterpret_cast< member_type *>(out_ptr);
-         }
-         else
-         {
-            return get_view<member_type>(
-                out_ptr);  //reinterpret_cast< unaligned_type<member_type> *>(out_ptr);
-         }
-      }
-
-      template <uint32_t idx, uint64_t Name, auto MemberPtr>
-      constexpr const auto* get() const
-      {
-         using class_type  = decltype(clio::class_of_member(MemberPtr));
-         using tuple_type  = typename clio::reflect<class_type>::struct_tuple_type;
-         using member_type = decltype(clio::result_of_member(MemberPtr));
-
-         constexpr uint32_t offset =
-             clio::get_tuple_offset<idx, tuple_type>::value +
-             2 * (clio::is_ext_structure<
-                     class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
-
-         //  std::cout << "idx: " << idx << "\n";
-         auto out_ptr = ((const char*)this) + offset;
-
-         if constexpr (is_std_optional<member_type>::value)
-         {
-            using opt_type  = typename is_std_optional<member_type>::value_type;
-            using view_type = decltype(get_view<opt_type>((const char*)nullptr));
-            if constexpr (is_ext_structure<class_type>())
-            {
-               uint16_t start_heap = *reinterpret_cast<const unaligned_type<uint16_t>*>(this);
-               //                  std::cout << "start_heap: " <<start_heap<<"\n";
-               if (start_heap < offset + 2)
-                  return view_type(nullptr);
-            }
-            auto ptr = reinterpret_cast<const clio::offset_ptr*>(out_ptr);
-            if (ptr->offset < 4)
-               return view_type(nullptr);
-            return ptr->get<opt_type>();
-         }
-         else if constexpr (may_use_heap<member_type>())
-         {
-            auto ptr = reinterpret_cast<const clio::offset_ptr*>(out_ptr);
-            return ptr->get<member_type>();
-            //  } else if constexpr ( std::alignment_of_v<member_type> == 1 ) {
-            //      return reinterpret_cast< const member_type *>(out_ptr);
-         }
-         else
-         {
-            //return reinterpret_cast< const member_type *>(out_ptr);
-            return get_view<member_type>(
-                out_ptr);  //reinterpret_cast< unaligned_type<member_type> *>(out_ptr);
-         }
-      }
-   };
-
-   /**
-     *   Serialized on the wire as
-     *
-     *   uint32_t   size
-     *   char[size] data;
-     */
    template <>
-   struct frac<std::string>
-   {
-     public:
-      using frac_type = std::string;
-      frac()          = default;
-
-      const char* data() const { return ((const char*)this) + 4; }
-      uint32_t    size() const { return *((unaligned_type<const uint32_t>*)this); }
-
-      operator std::string_view() const
-      {
-         if (size())
-            return std::string_view(data(), size());
-         else
-            return std::string_view((const char*)this, size());
-      }
-      operator std::string() const
-      {
-         if (size())
-            return std::string(data(), size());
-         else
-            return std::string();
-      }
-      auto str() const { return std::string_view(*this); }
-
-      template <typename S>
-      friend S& operator<<(S& stream, const frac& member)
-      {
-         return stream << member.str();
-      }
-   };
-
-   template <typename T>
-   struct frac<std::optional<T>>
-   {
-      using frac_type  = std::optional<T>;
-      using value_type = T;
-      bool valid() const
-      {
-         uint32_t offset = *((unaligned_type<const uint32_t>*)this);
-         return offset == 0 || offset > 1;
-      }
-
-      auto* operator->() const { return ((const offset_ptr*)this)->get<T>(); }
-      auto* operator->() { return ((offset_ptr*)this)->get<T>(); }
-      auto& operator*() const { return *((const offset_ptr*)this)->get<T>(); }
-      auto& operator*() { return *((offset_ptr*)this)->get<T>(); }
-   };
+   struct view<std::string>;
 
    template <typename... Ts>
-   struct frac<std::variant<Ts...>>
+   struct view<std::variant<Ts...>>;
+
+   template <typename T>
+   struct view<T, std::enable_if_t<reflect<T>::is_struct>>;
+
+   template <typename T>
+   auto get_offset(char* pos)
    {
-      using frac_type = std::variant<Ts...>;
-
-      uint8_t type = 0;
-      char    data[];
-
-      frac() = default;
-
-      template <typename Visitor>
-      void mvisit(Visitor&& v)
+      uint32_t off = *reinterpret_cast<unaligned_type<uint32_t>*>(pos);
+      if constexpr (std::is_same_v<std::string, T> || is_std_vector<T>::value)
       {
-         std::cout << "visit non const\n";
-         _visit_variant<Visitor, Ts...>(std::forward<Visitor>(v));
+         if (off == 0)
+            return view<T>(pos);
+         else
+            return view<T>(pos + off);
       }
+      return view<T>(pos + off);
+   }
 
-      template <typename Visitor>
-      void visit(Visitor&& v) const
+   struct frac_proxy_view2
+   {
+      frac_proxy_view2(char* c) : buffer(c) {}
+
+      /** This method is called by the reflection library to get the field */
+      template <uint32_t idx, uint64_t Name, auto MemberPtr>
+      auto get()
       {
-         std::cout << "visit  const\n";
-         _visit_variant<Visitor, Ts...>(std::forward<Visitor>(v));
+         using class_type  = decltype(clio::class_of_member(MemberPtr));
+         using tuple_type  = typename clio::reflect<class_type>::struct_tuple_type;
+         using member_type = decltype(clio::result_of_member(MemberPtr));
+
+         constexpr uint32_t offset =
+             clio::get_tuple_offset<idx, tuple_type>::value +
+             2 * (clio::is_ext_structure<
+                     class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
+
+         char* out_ptr = buffer + offset;
+
+         if constexpr (is_std_optional<member_type>::value)
+         {
+            using opt_type  = typename is_std_optional<member_type>::value_type;
+            using view_type = view<opt_type>;
+
+            if constexpr (is_ext_structure<class_type>())
+            {
+               uint16_t start_heap = *reinterpret_cast<unaligned_type<uint16_t>*>(buffer);
+               if (start_heap < offset + 2)
+                  return view_type(nullptr);
+            }
+            auto ptr = reinterpret_cast<clio::offset_ptr*>(out_ptr);
+            if (ptr->offset < 4)
+               return view_type(nullptr);
+            return get_offset<opt_type>(out_ptr);  //view_type(ptr->get<opt_type>());
+         }
+         else if constexpr (may_use_heap<member_type>())
+         {
+            return get_offset<member_type>(out_ptr);
+         }
+         else
+         {
+            return view<member_type>(out_ptr);
+         }
       }
 
      private:
-      template <typename Visitor, typename First, typename... Rest>
-      void _visit_variant(Visitor&& v) const
+      char* buffer;
+   };
+
+   template <typename View, typename Enable>
+   struct view
+   {
+      using View::not_defined;
+   };
+
+   template <typename T>
+   struct view<T, std::enable_if_t<std::is_arithmetic_v<T>>>
+   {
+      view(char* p = nullptr) : pos(p) {}
+      operator T() const { return *reinterpret_cast<const unaligned_type<T>*>(pos); }
+
+      template <typename V>
+      auto& operator=(V&& v)
       {
-         if (sizeof...(Rest) + 1 + type == sizeof...(Ts))
+         *reinterpret_cast<unaligned_type<T>*>(pos) = std::forward<V>(v);
+         return *this;
+      }
+
+      template <typename S>
+      friend S& operator<<(S& stream, const view& member)
+      {
+         return stream << (T) * reinterpret_cast<unaligned_type<T>*>(member.pos);
+      }
+
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+
+     private:
+      char* pos;
+   };
+
+   template <>
+   struct view<std::string>
+   {
+      view(const char* p = nullptr) : pos(p) {}
+
+      uint32_t size() const { return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos); }
+
+      bool valid() const { return pos != nullptr; }
+
+      operator std::string_view() const { return std::string_view(pos + 4, size()); }
+      operator std::string() const { return std::string(pos + 4, size()); }
+
+      template <typename S>
+      friend S& operator<<(S& stream, const view& member)
+      {
+         return stream << std::string_view(member);
+      }
+
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+
+     private:
+      const char* pos;
+   };
+
+   template <typename T>
+   struct view<std::vector<T>>
+   {
+      view(char* p = nullptr) : pos(p) {}
+
+      uint32_t size() const
+      {
+         constexpr uint16_t fix_size = fracpack_fixed_size<T>();
+         return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / fix_size;
+      }
+
+      auto operator[](uint32_t idx)
+      {
+         if constexpr (may_use_heap<T>())
          {
-            v(((get_view<First>(data))));
+            return get_offset<T>(pos + 4 + idx * sizeof(uint32_t));
          }
-         else if constexpr (sizeof...(Rest) > 0)
+         else
          {
-            _visit_variant<Visitor, Rest...>(std::forward<Visitor>(v));
+            return view<T>(pos + 4 + idx * fracpack_fixed_size<T>());
          }
       }
+
+      bool valid() const { return pos != nullptr; }
+
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+
+     private:
+      char* pos;
+   };
+
+   template <typename T>
+   struct view<T, std::enable_if_t<reflect<T>::is_struct>>
+       : public reflect<T>::template proxy<clio::frac_proxy_view2>
+   {
+      using base = typename reflect<T>::template proxy<clio::frac_proxy_view2>;
+      using base::base;
+
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+   };
+
+   template <typename... Ts>
+   struct view<std::variant<Ts...>>
+   {
+      view(char* p = nullptr) : pos(p) {}
+
+      template <typename Visitor>
+      void visit(Visitor&& v)
+      {
+         _visit_variant<Visitor, Ts...>(std::forward<Visitor>(v));
+      }
+
+      bool  valid() const { return pos != nullptr; }
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+
+     private:
+      char* pos;
       template <typename Visitor, typename First, typename... Rest>
       void _visit_variant(Visitor&& v)
       {
-         if (sizeof...(Rest) + 1 + type == sizeof...(Ts))
+         if (sizeof...(Rest) + 1 + *pos == sizeof...(Ts))
          {
-            v(((get_view<First>(data))));
+            v(view<First>(pos + 1));
          }
          else if constexpr (sizeof...(Rest) > 0)
          {
@@ -1051,79 +942,6 @@ namespace clio
          }
       }
    };
-
-   template <typename T>
-   struct frac<std::vector<T>>
-   {
-      using Vec        = std::vector<T>;
-      using value_type = T;  //typename is_std_vector<Vec>::value_type;
-      const char* data() const { return ((const char*)this) + 4; }
-      char*       data() { return ((char*)this) + 4; }
-      uint32_t    size() const
-      {
-         if constexpr (may_use_heap<value_type>())
-         {
-            return *((unaligned_type<const uint32_t>*)this) / sizeof(offset_ptr);
-         }
-         else
-         {
-            return *((unaligned_type<const uint32_t>*)this) / fracpack_fixed_size<value_type>();
-         }
-      }
-      auto& operator[](uint32_t index) const
-      {
-         if constexpr (may_use_heap<value_type>())
-         {
-            const char* d = data() + index * sizeof(offset_ptr);
-            auto        o = reinterpret_cast<const offset_ptr*>(d);
-            return *o->get<value_type>();
-         }
-         else
-         {
-            const char* d = data() + index * fracpack_fixed_size<value_type>();
-            return *get_view<value_type>(d);
-         }
-      }
-      auto& operator[](uint32_t index)
-      {
-         if constexpr (may_use_heap<value_type>())
-         {
-            char* d = data() + index * sizeof(offset_ptr);
-            auto  o = reinterpret_cast<offset_ptr*>(d);
-            return *o->get<value_type>();
-         }
-         else
-         {
-            char* d = data() + index * fracpack_fixed_size<value_type>();
-            return *get_view<value_type>(d);
-         }
-      }
-   };
-
-   template <typename T>
-   auto* offset_ptr::get() const
-   {
-      const auto ptr = ((char*)this) + offset;
-      if constexpr (std::is_same_v<std::string, T> || is_std_vector<T>::value)
-      {
-         if (offset == 0)
-            return reinterpret_cast<const frac<T>*>(this);
-         else
-            return reinterpret_cast<const frac<T>*>(ptr);
-      }
-      else if constexpr (reflect<T>::is_struct)
-      {
-         return reinterpret_cast<frac_view<T>*>(ptr);
-      }
-      else if constexpr (is_std_variant<T>::value)
-      {
-         return reinterpret_cast<const frac<T>*>(ptr);
-      }
-      else
-      {
-         T::is_not_reflected_for_offset_ptr;
-      }
-   }
 
    /**
      *  A shared_ptr<char> array containing the data
@@ -1132,12 +950,12 @@ namespace clio
      *  char[size]  fracpack(T) 
      */
    template <typename T>
-   class frac_ptr
+   class shared_view_ptr
    {
      public:
       typedef T value_type;
 
-      frac_ptr(const T& from)
+      shared_view_ptr(const T& from)
       {
          uint32_t size = fracpack_size(from);
 
@@ -1148,7 +966,7 @@ namespace clio
          clio::fracpack(from, out);
       }
 
-      frac_ptr(const char* data)
+      shared_view_ptr(const char* data)
       {
          uint32_t size = 0;
          memcpy(&size, data, sizeof(size));
@@ -1157,16 +975,11 @@ namespace clio
          memcpy(_data.get(), data, size + sizeof(size));
       }
 
-         frac_ptr(){};
+      shared_view_ptr(){};
       operator bool() const { return _data != nullptr; }
 
-      const auto* operator->() const { return get_view<T>(data() + 4); }
-      auto*       operator->() { return get_view<T>(data() + 4); }
-      frac<T>*    mget()
-      {
-         char* d = _data.get();
-         return get_view<T>(d);
-      }
+      const auto operator->() const { return view<T>(data() + 4); }
+      auto       operator->() { return view<T>(data() + 4); }
 
       const char* data() const { return _data.get(); }
       char*       data() { return _data.get(); }

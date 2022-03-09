@@ -129,16 +129,10 @@ struct FRACPACK test_view
 
 namespace clio
 {
-   template <typename T, typename P>
-   constexpr bool is_frac()
-   {
-      return std::is_same_v<frac<T>*, P>;
-   }
-   template <typename T, typename P>
-   constexpr bool is_const_frac()
-   {
-      return std::is_same_v<const frac<T>*, P>;
-   }
+
+   template<typename T, typename P>
+   constexpr bool view_is() { return std::is_same_v<view<T>,P>; }
+
 }  // namespace clio
 
 TEST_CASE("variant")
@@ -149,7 +143,7 @@ TEST_CASE("variant")
    vs.v = simple{.a = 1, .b = 2, .c = 3};
    REQUIRE(clio::fracpack_size(vs.v) == clio::fracpack_size(simple()) + 1);
 
-   clio::frac_ptr<varstr> p({.v = simple{.a = 111, .b = 222, .c = 333}});
+   clio::shared_view_ptr<varstr> p({.v = simple{.a = 111, .b = 222, .c = 333}});
    REQUIRE(p.size() == 1 + 2 + 4 + clio::fracpack_size(simple()));
 
    auto tv = reinterpret_cast<test_view*>(p.data());
@@ -159,14 +153,33 @@ TEST_CASE("variant")
    std::cout << "tv->b: " << tv->b << "\n";
    std::cout << "tv->c: " << tv->c << "\n";
 
+   clio::view<varstr> tmp2( p.data()+4 );
+   tmp2.v()->visit( [&]( auto v ) {
+          if constexpr (clio::view_is<int32_t, decltype(v)>()) {
+             std::cout << v;
+          } else if constexpr (clio::view_is<double, decltype(v)>())
+             std::cout << v;
+          else
+          {
+             // std::cout <<"offset: " << (char*)&v->a()->val - p.data()+4 <<"\n";
+             std::cout << "a.val: " << (uint32_t)v->a() << "\n";
+             std::cout << "b.val: " << (uint64_t)v->b() << "\n";
+             std::cout << "c.val: " << (uint16_t)v->c() << "\n";
+
+             v->a() = uint64_t(v->a()) + 2;
+             std::cout << "hello world!\n";
+          }
+   });
+
+/*
    p->v()->visit(
-       [&](auto v)
+       [&](auto v) /// v =  const frac<T>*
        {
-          if constexpr (clio::is_const_frac<int32_t, decltype(v)>())
+          if constexpr (clio::view_is<int32_t, decltype(v)>())
           {
              std::cout << (int32_t)*v;
           }
-          else if constexpr (clio::is_const_frac<double, decltype(v)>())
+          else if constexpr (clio::view_is<double, decltype(v)>())
           {
              std::cout << (double)*v;
           }
@@ -179,6 +192,7 @@ TEST_CASE("variant")
              std::cout << "hello world!\n";
           }
        });
+       */
 
    auto u = p.unpack();
 }
@@ -193,7 +207,7 @@ TEST_CASE("fracpack-not-final-nest")
    REQUIRE(clio::can_memcpy<nested_not_final_struct>() == false);
 
    nested_not_final_struct                 nfs{.a = 123, .nest = {.a = 456, .b = 789, .c = 321}};
-   clio::frac_ptr<nested_not_final_struct> ptr(nfs);
+   clio::shared_view_ptr<nested_not_final_struct> ptr(nfs);
 
    REQUIRE((int)ptr->a() == 123);
    REQUIRE((int)ptr->nest()->a() == 456);
@@ -218,7 +232,7 @@ TEST_CASE("fracpack-nest")
 
    nested_final_struct ex({.a = 42, .nest = {.s = "hello", .s2 = "world"}});
 
-   clio::frac_ptr<nested_final_struct> p(ex);
+   clio::shared_view_ptr<nested_final_struct> p(ex);
    std::cout << "p.size: " << p.size() << "\n";
 
    REQUIRE((uint32_t)p->a() == 42);
@@ -226,12 +240,14 @@ TEST_CASE("fracpack-nest")
    auto        n    = p->nest();
    auto        np   = &n;
    std::string strs = p->nest()->s();
+   /*
    std::cout << "n.s: " << p->nest()->s() << "\n";
    std::cout << "n.s2: " << p->nest()->s2() << "\n";
    std::cout << "n.s: " << n->s() << "\n";
    std::cout << "n.s: " << (*n).s() << "\n";
    std::cout << "p.a: " << p->a() << "\n";
    std::cout << "n.s: " << p->nest()->s() << "\n";
+   */
 
    REQUIRE(p->nest()->s() == std::string_view("hello"));
    REQUIRE(p->nest()->s2() == std::string_view("world"));
@@ -325,10 +341,10 @@ CLIO_REFLECT(struct_with_vector_str, test)
 
 TEST_CASE("fracpack_vector")
 {
-   clio::frac_ptr emptyp(struct_with_vector_char{.test = {}});
+   clio::shared_view_ptr emptyp(struct_with_vector_char{.test = {}});
    REQUIRE(emptyp.size() == (2 + 4));
 
-   clio::frac_ptr p(struct_with_vector_char{.test = {'1', '2', '3'}});
+   clio::shared_view_ptr p(struct_with_vector_char{.test = {'1', '2', '3'}});
    REQUIRE(p.size() == (2 + 4 + 4 + 3));
    std::cout << "size: " << p.size() << "\n";
 
@@ -348,7 +364,7 @@ TEST_CASE("fracpack_vector")
    std::cout << "\n\n--------------\n";
 
    {  /// testing with INT
-      clio::frac_ptr p(struct_with_vector_int{.test = {1, 2, 3}});
+      clio::shared_view_ptr p(struct_with_vector_int{.test = {1, 2, 3}});
       REQUIRE(p.size() == (2 + 4 + 4 + 3 * 4));
       std::cout << "size: " << p.size() << "\n";
 
@@ -382,7 +398,7 @@ TEST_CASE("fracpack_vector")
  */
 TEST_CASE("fracpack_vector_str")
 {
-   clio::frac_ptr p(struct_with_vector_str{.test = {"a|", "bc|"}});
+   clio::shared_view_ptr p(struct_with_vector_str{.test = {"a|", "bc|"}});
    std::cout << "size: " << p.size() << "\n";
    std::cout << "vecptr       0]  4  == " << *reinterpret_cast<uint32_t*>(p.data() + 0 + 4) << "\n";
    std::cout << "vecsize      4]  8  == " << *reinterpret_cast<uint32_t*>(p.data() + 4 + 4) << "\n";
@@ -425,7 +441,7 @@ TEST_CASE("nestfinal")
 {
    REQUIRE(clio::can_memcpy<outer>() == true);
 
-   clio::frac_ptr<outer> p({.in = {.a = 1, .b = 2}, .c = 3});
+   clio::shared_view_ptr<outer> p({.in = {.a = 1, .b = 2}, .c = 3});
    std::cout << p->in()->a() << "\n";
    std::cout << p->in()->b() << "\n";
 
@@ -434,6 +450,18 @@ TEST_CASE("nestfinal")
    REQUIRE(u.in.b == 2);
    REQUIRE(u.c == 3);
 }
+
+TEST_CASE( "frac2" ) {
+   clio::shared_view_ptr<outer> p({.in = {.a = 1, .b = 2}, .c = 3});
+   clio::view<outer> v( p.data()+4 );
+   std::cout<<"v.c: " << v.c() <<"\n";
+   v.in().get().a();
+   v.in()->a();
+   (*v.in()).a();
+  // std::cout<<"v.in.a: " << v.in().a() <<"\n";
+}
+
+
 struct vecstruct
 {
    std::vector<outer> vs;
@@ -443,7 +471,7 @@ CLIO_REFLECT(vecstruct, vs)
 TEST_CASE("vectorstruct")
 {
    vecstruct                 test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
-   clio::frac_ptr<vecstruct> p(test);
+   clio::shared_view_ptr<vecstruct> p(test);
    REQUIRE(p.size() == 2 + 4 + 4 + 3 * 12);
    REQUIRE((int)p->vs()[0].c() == 1);
    REQUIRE((int)p->vs()[1].c() == 2);
@@ -453,6 +481,19 @@ TEST_CASE("vectorstruct")
    REQUIRE(u.vs[0].c == 1);
    REQUIRE(u.vs[1].c == 2);
    REQUIRE(u.vs[2].c == 3);
+}
+
+TEST_CASE( "frac2vec" ) {
+   vecstruct                 test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
+   clio::shared_view_ptr<vecstruct> p(test);
+   clio::view<vecstruct> v( p.data()+4 );
+
+   REQUIRE( v.vs()->size() == 3 );
+   REQUIRE( v.vs()[0]->c() == 1 );
+   REQUIRE( v.vs()[1]->c() == 2 );
+   REQUIRE( v.vs()[2]->c() == 3 );
+   v.vs()[2]->c() = 4;
+   REQUIRE( v.vs()[2]->c() == 4 );
 }
 
 struct tree
@@ -468,7 +509,7 @@ TEST_CASE("tree")
    tree                 t{.i        = 1,
                           .s        = "one",
                           .children = {{.i = 2, .s = "two", .children = {{.i = 3, .s = "three"}}}}};
-   clio::frac_ptr<tree> p(t);
+   clio::shared_view_ptr<tree> p(t);
    REQUIRE((uint32_t)p->i() == 1);
    REQUIRE((std::string_view)p->s() == "one");
    REQUIRE((uint32_t)p->children()[0].i() == 2);
@@ -498,14 +539,14 @@ TEST_CASE("optstr")
    {
       REQUIRE(clio::fracpack_size(optstr{}) == 4);
       std::cout << "---packing---\n";
-      clio::frac_ptr<optstr> p(optstr{});
+      clio::shared_view_ptr<optstr> p(optstr{});
       REQUIRE(not p->str().valid());
       auto u = p.unpack();
       REQUIRE(!u.str);
    }
 
    {
-      clio::frac_ptr<optstr> p(optstr{.str = "hello"});
+      clio::shared_view_ptr<optstr> p(optstr{.str = "hello"});
       REQUIRE(p.size() == 13);  /// offset+size+"hello"
       REQUIRE((std::string_view)p->str() == "hello");
 
@@ -535,7 +576,7 @@ CLIO_REFLECT(ext_v2, a, b, c, d, e);
 
 TEST_CASE("extend")
 {
-   clio::frac_ptr<ext_v1> v1({"hello", "world", "again"});
+   clio::shared_view_ptr<ext_v1> v1({"hello", "world", "again"});
    REQUIRE(v1.size() == 2 + 4 + 4 + 5 + 4 + 4 + 5 + 4 + 4 + 5);
    REQUIRE((std::string_view)v1->c() == "again");
 
@@ -544,7 +585,7 @@ TEST_CASE("extend")
    REQUIRE((std::string_view)v1->b() == "world");
    REQUIRE(v1->c().valid());
 
-   clio::frac_ptr<ext_v2> v2(v1.data());
+   clio::shared_view_ptr<ext_v2> v2(v1.data());
    REQUIRE((std::string_view)v2->a() == "hello");
    REQUIRE(v2->b().valid());
 
@@ -557,13 +598,13 @@ TEST_CASE("extend")
    REQUIRE(!v2->d().valid());
    REQUIRE(!v2->e().valid());
 
-   clio::frac_ptr<ext_v2> v2a({"hello", "world", "again", "and", "extra"});
+   clio::shared_view_ptr<ext_v2> v2a({"hello", "world", "again", "and", "extra"});
    REQUIRE(v2a->d().valid());
    REQUIRE((std::string_view)v2a->d() == "and");
    REQUIRE(v2a->e().valid());
    REQUIRE((std::string_view)v2a->e() == "extra");
 
-   clio::frac_ptr<ext_v1> v1a(v2a.data());
+   clio::shared_view_ptr<ext_v1> v1a(v2a.data());
    REQUIRE((std::string_view)v1a->c() == "again");
    REQUIRE((std::string_view)v1a->a() == "hello");
    REQUIRE(v1a->b().valid());
@@ -640,7 +681,7 @@ TEST_CASE("blockchain")
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         auto tmp = clio::frac_ptr<transfer>(frtr);
+         auto tmp = clio::shared_view_ptr<transfer>(frtr);
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -665,7 +706,7 @@ TEST_CASE("blockchain")
       std::cout << "google unpack:   " << gt << " ms\n";
    }
    {
-      auto tmp   = clio::frac_ptr<transfer>(frtr);
+      auto tmp   = clio::shared_view_ptr<transfer>(frtr);
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
@@ -684,12 +725,12 @@ TEST_CASE("blockchain")
 
       auto     start = std::chrono::steady_clock::now();
       uint64_t x     = 0;
-      for (uint32_t i = 0; i < 10000; ++i)
+      for (uint32_t i = 0; i < 100000; ++i)
       {
          auto t = contract::Gettransfer(fbb.GetBufferPointer());
          x += t->from() + t->to() + t->amount() + t->memo()->size();
       }
-      REQUIRE(x == 10000 * (7 + 8 + 42 + 4));
+      REQUIRE(x == 100000 * (7 + 8 + 42 + 4));
       //REQUIRE( std::string_view(t->memo()->c_str()) == std::string_view("test") );
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -697,15 +738,19 @@ TEST_CASE("blockchain")
       std::cout << "google read:     " << gt << " ms\n";
    }
    {
-      auto     tmp   = clio::frac_ptr<transfer>(frtr);
+      auto     tmp   = clio::shared_view_ptr<transfer>(frtr);
+      clio::view<transfer> tmp2( tmp.data()+4 );
       auto     start = std::chrono::steady_clock::now();
       uint64_t x     = 0;
-      for (uint32_t i = 0; i < 10000; ++i)
+      for (uint32_t i = 0; i < 100000; ++i)
       {
+         x += (uint64_t)tmp2.from() + (uint64_t)tmp2.to() + (uint64_t)tmp2.amount() + tmp2.memo()->size();
+         /*
          x += (uint64_t)tmp->from() + (uint64_t)tmp->to() + (uint64_t)tmp->amount() +
               tmp->memo()->size();
+              */
       }
-      REQUIRE(x == 10000 * (7 + 8 + 42 + 4));
+      REQUIRE(x == 100000 * (7 + 8 + 42 + 4));
       //REQUIRE( std::string_view(tmp->memo()) == std::string_view("test") );
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -732,7 +777,7 @@ TEST_CASE("blockchain")
    }
 
    {
-      auto     tmp   = clio::frac_ptr<transfer>(frtr);
+      auto     tmp   = clio::shared_view_ptr<transfer>(frtr);
       auto     start = std::chrono::steady_clock::now();
       uint64_t x     = 0;
       for (uint32_t i = 0; i < 10000; ++i)
@@ -785,7 +830,7 @@ TEST_CASE("blockchain")
        .actions = {
            action(4, 5, 6, transfer{.from = 7, .to = 8, .amount = 42, .memo = "test"}),
            action(14, 15, 16, transfer{.from = 17, .to = 18, .amount = 142, .memo = "test"})}};
-   clio::frac_ptr<transaction> tp(t);
+   clio::shared_view_ptr<transaction> tp(t);
    auto                        t2 = tp.unpack();
    std::cout << "size: " << tp.size() << "\n";
 

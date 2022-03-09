@@ -112,21 +112,23 @@ namespace clio
                                              std::forward<Args>(args)...);                         \
    }
 
+
 #define CLIO_REFLECT_SMPROXY_MEMBER_BY_IDX_INTERNAL(r, OP, I, member)                           \
    clio::member_proxy<I, clio::hash_name(BOOST_PP_STRINGIZE(member)), &OP::member, ProxyObject> \
-                      member()                                                                  \
-   {                                                                                            \
-      return _clio_proxy_obj;                                                                   \
-   }                                                                                            \
+                       member()                                                                  \
+   {                                                                                             \
+      return _clio_proxy_obj;                                                                    \
+   }                                                                                             \
    clio::member_proxy<                                                                          \
-       I, clio::hash_name(BOOST_PP_STRINGIZE(member)), &OP::member, const ProxyObject> member() \
-           const                                                                                \
-   {                                                                                            \
-      return _clio_proxy_obj;                                                                   \
+       I, clio::hash_name(BOOST_PP_STRINGIZE(member)), &OP::member, const ProxyObject> member()  \
+           const                                                                                 \
+   {                                                                                             \
+      return _clio_proxy_obj;                                                                    \
    }
 
 #define CLIO_REFLECT_SMPROXY_MEMBER_BY_IDX_HELPER(QUERY_CLASS, MEMBER_IDXS) \
    BOOST_PP_SEQ_FOR_EACH_I(CLIO_REFLECT_SMPROXY_MEMBER_BY_IDX_INTERNAL, QUERY_CLASS, MEMBER_IDXS)
+
 
 #define CLIO_REFLECT_PROXY_MEMBER_BY_PB_INTERNAL(r, OP, member)                                  \
    template <typename... Args>                                                                   \
