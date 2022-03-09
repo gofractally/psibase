@@ -14,6 +14,12 @@ new optional fields at any time at the end of the structure but may not reorder
 or remove old fields.Empty fields are serialized as all 0's which allows them to be effeciently compressed,
 if desired, using the algorithm from Cap 'n' Proto.
 
+## Non Performance Benefits
+
+1. Data is smaller 
+2. There is a canonical representation (good for hashing )
+3. No CPU Bombs (structures packed such that the parse time is nor corelated to data size)
+
 This document describes the serialized format.
 
 ## Benchmark vs Google Flat Buffers
@@ -22,15 +28,44 @@ The following benchmark is representaive of serializing the following
 in an extensible way:
 
 ```c++
-struct { 
+struct transfer { 
    uint32_t from; 
    uint32_t to; 
    uint64_t amount; 
    string memo = "test"
 };
+
+struct action {
+   uint32_t sender;
+   uint32_t contract;
+   uint32_t act;
+   vector<char> data = packed(transfer)
+};
+struct transaction { 
+   uint32_t expire; 
+   uint16_t tapos; 
+   uint16_t flags; 
+   vector<action> actions; /// 2 transfers
+};
 ```
+### Performance of transaction
 
 | algo | task |  time  | % of google |
+|------|------|--------|-------------|
+|google|  pack    |4.31271 ms |
+|fracpack | pack      |1.93162 ms | 44.7891%
+|google|  unpack   |3.35075 ms |
+|fracpack | unpack |2.45717 ms | 73.3319%
+|google|  check     |0.3645 ms  |
+|fracpack | check   |0.493459 ms|  135.38%
+|google | read      |0.71925 ms |
+|fracpack | read  |0.139666 ms|  19.4183%
+|google|  size |    192 bytes| |
+|fracpack|  size |  126 bytes|  68% |
+                     
+### Here is the performance of just transfer struct.
+                     
+|| algo | task |  time  | % of google |
 |------|------|--------|-------------|
 |google | pack|     1.537 ms| |
 |fracpack|  pack|   1.4215 ms|  92% |
@@ -42,6 +77,7 @@ struct {
 |fracpack|  check|  0.085167 ms|  59% |
 |google|  size |    44 bytes| |
 |fracpack|  size |  30 bytes|  68% |
+
 
 ##Basic Types
  
