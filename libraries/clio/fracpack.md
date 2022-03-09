@@ -1,88 +1,109 @@
 #ƒracpack ƒormat
 
-ƒracpack is a                                                                       zero -
-    copy data serialization format that is a faster alternative to Google           FlatBuffers,
-    Cap 'n' Proto.It was created to optimize the performance of database access and inter -
-        contract                                                                    communication
-            .It is designed to pack faster and smaller than FlatBuffers and to work without any code
-                generation in c++(templates and macros aside)
-            .
+ƒracpack is a zero-copy data serialization format that is a faster alternative to Google
+FlatBuffers, Cap 'n' Proto. It was created to optimize the performance of database access 
+and inter-contract communication.
 
-        ƒracpack is designed to be forward and backward compatible,
-    allowing old code to read data packed by newer code and newer code to
-        transparently support data produced by old code.Data structures can add
-        new optional fields at any time at the end of the structure but may not reorder
-        or remove old fields.Empty fields are serialized as all
-           0's which allows them to be effeciently compressed,
-    if desired,
-    using the algorithm from Cap 'n' Proto
-                .
+It is designed to pack faster and smaller than FlatBuffers and to work without any code
+generation in c++(templates and macros aside)
 
-            This document describes the serialized format
-                .
+ƒracpack is designed to be forward and backward compatible,
+allowing old code to read data packed by newer code and newer code to
+transparently support data produced by old code. Data structures can add
+new optional fields at any time at the end of the structure but may not reorder
+or remove old fields.Empty fields are serialized as all 0's which allows them to be effeciently compressed,
+if desired, using the algorithm from Cap 'n' Proto.
 
-            ##Basic Types
+This document describes the serialized format.
 
-            The following basic types are serialized directly as if by `memcpy`.
+## Benchmark vs Google Flat Buffers
 
-            - char - uint8_t - uint16_t - uint32_t - uint64_t - int8_t - int16_t - int32_t - int64_t
-            - float32 -
-            float64
+The following benchmark is representaive of serializing the following 
+in an extensible way:
 
-            ##Simple Structs
+```c++
+struct { 
+   uint32_t from; 
+   uint32_t to; 
+   uint64_t amount; 
+   string memo = "test"
+};
+```
 
-            Simple structs are any struct which contain only basic types
-        or other simple structs
-               .These types are not extensible and are serialized as if using `
-           __attribute__((packed, aligned(1)))`
-               .
+| algo | task |  time  | % of google |
+google | pack|     1.537 ms| |
+fracpack|  pack|   1.4215 ms|  92% |
+google|  unpack|   0.580166 ms| |
+fracpack|  unpack| 0.756375 ms|  130% |
+google|  read|     0.095792 ms| |
+fracpack|  read|   0.0195 ms|  20% |
+google|  check|    0.142958 ms| |
+fracpack|  check|  0.085167 ms|  59% |
+google|  size |    44 bytes| |
+fracpack|  size |  30 bytes|  68% |
 
-           This makes serialization as fast as a memcpy
-               .Simple structs are used as members of extensible structs and are never
-           serialized on their own because they would lack size prefix.
+##Basic Types
+ 
+The following basic types are serialized directly as if by `memcpy`.
 
-           ##Extensible Structs
+  - char 
+  - uint8_t 
+  - uint16_t 
+  - uint32_t 
+  - uint64_t 
+  - int8_t 
+  - int16_t 
+  - int32_t 
+  - int64_t
+  - float32 
+  - float64
 
-           In addition to fundamental types and simple structs,
-    extensible structs may contain dynamically sized data, such as vectors, strings, optional fields
-    ,
-    and other extensible structs.
+##Simple Structs
 
-        The format of an extensibe struct is similar to the following C struct
+Simple structs are any struct which contain only basic types or other simple structs
+These types are not extensible and are serialized as if using `__attribute__((packed, aligned(1)))`.
 
-  ```c++ struct __attribute__((packed, aligned(1))) extensible
+This makes serialization as fast as a memcpy. Simple structs are used as members of 
+extensible structs and are never serialized on their own because they would lack size 
+prefix.
+
+##Extensible Structs
+
+In addition to fundamental types and simple structs, extensible structs may contain dynamically 
+sized data, such as vectors, strings, optional fields, and other extensible structs.
+
+The format of an extensibe struct is similar to the following C struct
+
+```c++ struct __attribute__((packed, aligned(1))) extensible
 {
-   uint32_t size;        ///< sizeof(fixed_fields)+sizeof(heap)+1
-   uint8_t  fixed_size;  ///< the number of 4-byte words `size` where the heap starts
-   char[] fixed_fields;  /// user defined fields, a multiple of 4 bytes in size
-   char[] heap;          /// dynamically allocated data pointed to by user fields
+   uint16_t          fixed_size;   ///< the number of bytes until start of heap
+   char[fixed_size]  fixed_fields; ///< user defined fields, a multiple of 4 bytes in size
+   char[]            heap;         ///< dynamically allocated data pointed to by user fields
 };
 
 struct __attribute__((packed, aligned(1))) user_struct
 {
-   extensible header;
-   type       userfields... char[] heap;
+   type       userfields... 
+   char[] heap;
 }
   ```
 
-        ##Strings
+##Strings
+Strings are serialized as if they were the following data structure where an empty
+string has a size of 0 and no data or nullterm are included.
 
-            Strings are serialized as if they were the following data structure where an empty
-                string has a size of 0 and
-        no data or
-    nullterm are included.
-
-  ```c++ struct string
+```c++ struct string
 {
-   uint32_t size char[size] data char nullterm;
+   uint32_t size 
+   char[size] data 
 }
-  ```
+```
 
-    ##Strings in Structs
+##Strings in Structs
 
-        Given the following struct :
+Given the following struct:
 
-  ```c++ struct strstruct
+```c++ struct strstruct
 {
    uint16_t    somefield;
    std::string str = "hello world";
@@ -90,7 +111,7 @@ struct __attribute__((packed, aligned(1))) user_struct
 };
 ```
 
-    It would be serialized as follows :
+ It would be serialized as follows :
 
   ```c++ uint32_t size                                           = 25 uint8_t fixed_size =
         2 words or 8 bytes-- --start fixed-- --uint16_t somefield = uint32_t    offset_ptr = 6 =
