@@ -1,7 +1,7 @@
 use std::mem;
 
 pub trait Packable: Sized {
-    fn fixed_size(&self) -> u32;
+    const FIXED_SIZE: u32;
     fn pack_fixed(&self, dest: &mut Vec<u8>);
     fn repack_fixed(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>);
     fn pack_variable(&self, dest: &mut Vec<u8>);
@@ -11,9 +11,7 @@ pub trait Packable: Sized {
 macro_rules! impl_fracpack_fixed {
     ($t:ty) => {
         impl Packable for $t {
-            fn fixed_size(&self) -> u32 {
-                mem::size_of::<$t> as u32
-            }
+            const FIXED_SIZE: u32 = mem::size_of::<u32>() as u32;
             fn pack_fixed(&self, dest: &mut Vec<u8>) {
                 dest.extend_from_slice(&self.to_le_bytes());
             }

@@ -4,7 +4,7 @@ use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Fields};
 
 struct Field<'a> {
     name: &'a proc_macro2::Ident,
-    _ty: &'a syn::Type,
+    ty: &'a syn::Type,
 }
 
 fn struct_fields(data: &DataStruct) -> Vec<Field> {
@@ -14,7 +14,7 @@ fn struct_fields(data: &DataStruct) -> Vec<Field> {
             .iter()
             .map(|field| Field {
                 name: field.ident.as_ref().unwrap(),
-                _ty: &field.ty,
+                ty: &field.ty,
             })
             .collect(),
         Fields::Unnamed(_) => unimplemented!("fracpack does not support unnamed fields"),
@@ -34,8 +34,8 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
     let fixed_size = fields
         .iter()
         .map(|field| {
-            let name = &field.name;
-            quote! {self.#name.fixed_size()}
+            let ty = &field.ty;
+            quote! {<#ty>::FIXED_SIZE}
         })
         .fold(quote! {2}, |acc, new| quote! {#acc + #new});
     let positions: Vec<syn::Ident> = fields
@@ -72,7 +72,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
         .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
         impl fracpack::Packable for #name #generics {
-            fn fixed_size(&self) -> u32 {4}
+            const FIXED_SIZE: u32 = 4;
             fn pack_fixed(&self, dest: &mut Vec<u8>) {
                 dest.extend_from_slice(&0u32.to_le_bytes());
             }
