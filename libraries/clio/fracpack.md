@@ -31,16 +31,17 @@ struct {
 ```
 
 | algo | task |  time  | % of google |
-google | pack|     1.537 ms| |
-fracpack|  pack|   1.4215 ms|  92% |
-google|  unpack|   0.580166 ms| |
-fracpack|  unpack| 0.756375 ms|  130% |
-google|  read|     0.095792 ms| |
-fracpack|  read|   0.0195 ms|  20% |
-google|  check|    0.142958 ms| |
-fracpack|  check|  0.085167 ms|  59% |
-google|  size |    44 bytes| |
-fracpack|  size |  30 bytes|  68% |
+--------------------------------------
+|google | pack|     1.537 ms| |
+|fracpack|  pack|   1.4215 ms|  92% |
+|google|  unpack|   0.580166 ms| |
+|fracpack|  unpack| 0.756375 ms|  130% |
+|google|  read|     0.095792 ms| |
+|fracpack|  read|   0.0195 ms|  20% |
+|google|  check|    0.142958 ms| |
+|fracpack|  check|  0.085167 ms|  59% |
+|google|  size |    44 bytes| |
+|fracpack|  size |  30 bytes|  68% |
 
 ##Basic Types
  
