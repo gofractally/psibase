@@ -663,8 +663,205 @@ TEST_CASE("blockchain")
    contract::transferT trobj{.from = 7, .to = 8, .amount = 42, .memo = "test"};
    transfer            frtr{.from = 7, .to = 8, .amount = 42, .memo = "test"};
 
+   cliofb::transactionT gtrx;
+   gtrx.expire = 1234; 
+   gtrx.tapos = 55; 
+   gtrx.flags = 4;
+   gtrx.actions.push_back(
+       std::unique_ptr<cliofb::actionT>(new cliofb::actionT{ .sender = 88, .contract = 92, .act = 50,
+                                                       .data = std::vector<uint8_t>(44) }) );
+   gtrx.actions.push_back( 
+        std::unique_ptr<cliofb::actionT>(new cliofb::actionT{ .sender = 88, .contract = 92, .act = 50,
+                                                       .data = std::vector<uint8_t>(44) }) );
+
+
+   transaction ftrx{
+       .expires = 123,
+       .tapos   = 2,
+       .flags   = 3,
+       .actions = {
+           action(4, 5, 6, transfer{.from = 7, .to = 8, .amount = 42, .memo = "test"}),
+           action(14, 15, 16, transfer{.from = 17, .to = 18, .amount = 142, .memo = "test"})}};
+                         
+
    double gt = 1;
    double ft = 1;
+
+
+   {
+      auto start = std::chrono::steady_clock::now();
+      for (uint32_t i = 0; i < 10000; ++i)
+      {
+         flatbuffers::FlatBufferBuilder fbb;
+         fbb.Finish(cliofb::transaction::Pack(fbb, &gtrx));
+      }
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      gt         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "google pack tx:     " << gt << " ms\n";
+   }
+
+   {
+      auto start = std::chrono::steady_clock::now();
+      for (uint32_t i = 0; i < 10000; ++i)
+      {
+         auto tmp = clio::shared_view_ptr<transaction>(ftrx);
+      }
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      ft         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "fracpack pack trx:   " << ft << " ms  " << 100 * ft / gt << "%\n";
+   }
+
+
+   {
+      flatbuffers::FlatBufferBuilder fbb;
+      fbb.Finish(cliofb::transaction::Pack(fbb, &gtrx));
+      std::cout << "fb size: " << fbb.GetSize() <<"\n";
+
+      auto start = std::chrono::steady_clock::now();
+      for (uint32_t i = 0; i < 10000; ++i)
+      {
+         cliofb::transactionT temp;
+         cliofb::Gettransaction(fbb.GetBufferPointer())->UnPackTo(&temp);
+      }
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      gt         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "google unpack tx:   " << gt << " ms\n";
+   }
+
+   {
+      auto tmp   = clio::shared_view_ptr<transaction>(ftrx);
+      std::cout << "frac trx size: " << tmp.size() <<"\n";
+      auto start = std::chrono::steady_clock::now();
+      for (uint32_t i = 0; i < 10000; ++i)
+      {
+         auto o = tmp.unpack();
+         //REQUIRE(o.memo == "test");
+      }
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      ft         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "fracpack unpack tx: " << ft << " ms  " << 100 * ft / gt << "%\n";
+   }
+
+
+
+   {
+      flatbuffers::FlatBufferBuilder fbb;
+      fbb.Finish(cliofb::transaction::Pack(fbb, &gtrx));
+
+      auto     start = std::chrono::steady_clock::now();
+      uint64_t x     = 0;
+      for (uint32_t i = 0; i < 10000; ++i)
+      {
+         auto                  t = cliofb::Gettransaction(fbb.GetBufferPointer());
+         flatbuffers::Verifier v(fbb.GetBufferPointer(), fbb.GetSize());
+         t->Verify(v);
+      }
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      gt         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "google check tx:    " << gt << " ms\n";
+   }
+
+   {
+      auto     tmp   = clio::shared_view_ptr<transaction>(ftrx);
+      auto     start = std::chrono::steady_clock::now();
+      uint64_t x     = 0;
+      for (uint32_t i = 0; i < 10000; ++i)
+      {
+         tmp.validate();
+      }
+      //REQUIRE( std::string_view(tmp->memo()) == std::string_view("test") );
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      ft         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "fracpack check tx:  " << ft << " ms  " << 100 * ft / gt << "%\n";
+   }
+
+
+   {
+      flatbuffers::FlatBufferBuilder fbb;
+      fbb.Finish(cliofb::transaction::Pack(fbb, &gtrx));
+
+      auto     start = std::chrono::steady_clock::now();
+      uint64_t x     = 0;
+      for (uint32_t i = 0; i < 100000; ++i)
+      {
+         auto t = cliofb::Gettransaction(fbb.GetBufferPointer());
+         x += i;
+         if( i % 13 == 0 ) continue; /// prevent optimizer from killing loop
+         x += t->expire() + t->tapos() + t->flags();
+         uint32_t si = t->actions()->size();
+         for( uint32_t i = 0 ; i < si ; ++i ) {
+            auto item = t->actions()->Get(i);
+            x += item->sender();
+            x += item->contract();
+            x += item->act();
+            x += item->data()->size();
+         }
+      }
+      std::cout << x <<"\n";
+   //   REQUIRE(x == 100000 * (7 + 8 + 42 + 4));
+      //REQUIRE( std::string_view(t->memo()->c_str()) == std::string_view("test") );
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      gt         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "google read tx:     " << gt << " ms\n";
+   }
+
+   {
+      auto     tmp   = clio::shared_view_ptr<transaction>(ftrx);
+      clio::view<transaction> tmp2( tmp.data()+4 );
+      auto     start = std::chrono::steady_clock::now();
+      uint64_t x     = 0;
+      for (uint32_t i = 0; i < 100000; ++i)
+      {
+         x += i;
+         if( i % 13 == 0 ) continue; /// prevent optimizer from killing loop
+         x += (int64_t)tmp2.expires() + (int64_t)tmp2.tapos() + (int64_t)tmp2.flags();
+         auto acts = tmp2.actions();
+         uint32_t s = acts->size();
+         for( uint32_t i = 0; i < s; ++i ) {
+            auto item = acts[i];
+            x += (int64_t)item.sender();
+            x += (int64_t)item.contract();
+            x += (int64_t)item.act();
+            x += item.data()->size();
+         }
+      }
+      std::cout << x <<"\n";
+   //   REQUIRE(x == 100000 * (7 + 8 + 42 + 4));
+      //REQUIRE( std::string_view(tmp->memo()) == std::string_view("test") );
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      ft         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "fracpack read trx:   " << ft << " ms  " << 100 * ft / gt << "%\n";
+   }
+
+   std::cout << "\n\n=================================\n\n";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    {
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)

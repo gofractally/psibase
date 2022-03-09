@@ -376,10 +376,11 @@ namespace clio
       size_t      size;
       void add_total_read( uint32_t v ) {
          total_read += v;
-         if(  size < total_read ) {
+         if(  size < get_total_read() ) {
             throw_error(stream_error::doubleread);
          }
       }
+      size_t get_total_read()const { return total_read + (pos-begin); }
 
       check_input_stream() : pos{nullptr}, end{nullptr} {}
       check_input_stream(const char* pos, size_t size) : begin(pos), pos{pos}, end{pos + size},size(size)
@@ -419,7 +420,6 @@ namespace clio
          if (size > size_t(end - pos))
             throw_error(stream_error::overrun);
          pos += size;
-         total_read += size;
       }
       void read(void* dest, size_t size)
       {
@@ -427,7 +427,6 @@ namespace clio
             throw_error(stream_error::overrun);
          memcpy(dest, pos, size);
          pos += size;
-         total_read += size;
       }
 
       template <typename T>
@@ -441,7 +440,6 @@ namespace clio
          if (size > size_t(end - pos))
             throw_error(stream_error::overrun);
          pos += size;
-         total_read += size;
       }
 
       void read_reuse_storage(const char*& result, size_t size)
@@ -450,7 +448,6 @@ namespace clio
             throw_error(stream_error::overrun);
          result = pos;
          pos += size;
-         total_read += size;
       }
    };
 

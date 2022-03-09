@@ -524,7 +524,7 @@ namespace clio
             {
                check_input_stream insubstr(stream.pos + offset - sizeof(offset_ptr), stream.end);
                fraccheck<opt_type>(insubstr);
-               stream.add_total_read(insubstr.total_read);
+               stream.add_total_read(insubstr.get_total_read());
             }
          }
          /** unpack empty vector / string */
@@ -536,7 +536,7 @@ namespace clio
             {
                S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
                fraccheck<T>(insubstream);
-               stream.add_total_read(insubstream.total_read);
+               stream.add_total_read(insubstream.get_total_read());
             }
          }
          else
@@ -545,7 +545,7 @@ namespace clio
             stream.read(&offset, sizeof(offset));
             S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
             fraccheck<T>(insubstream);
-            stream.add_total_read(insubstream.total_read);
+            stream.add_total_read(insubstream.get_total_read());
          }
       }
       else
@@ -595,6 +595,7 @@ namespace clio
             stream.read(&start_heap, sizeof(start_heap));
          }
          const char* heap = stream.pos + start_heap;
+         
          reflect<T>::for_each(
              [&](const meta& ref, const auto& mptr)
              {
