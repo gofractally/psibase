@@ -1,0 +1,2 @@
+[workspace]
+members = ["fracpack", "psi_macros", "test_m"]
