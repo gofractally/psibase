@@ -351,22 +351,6 @@ namespace clio
       static void get(const std::string_view& m, L&& lambda);
    };
 
-   /*
-   using std::string;
-   CLIO_REFLECT_TYPENAME( int32_t )
-   CLIO_REFLECT_TYPENAME( int64_t )
-   CLIO_REFLECT_TYPENAME( int16_t )
-   CLIO_REFLECT_TYPENAME( int8_t )
-   CLIO_REFLECT_TYPENAME( uint32_t )
-   CLIO_REFLECT_TYPENAME( uint64_t )
-   CLIO_REFLECT_TYPENAME( uint16_t )
-   CLIO_REFLECT_TYPENAME( uint8_t )
-   CLIO_REFLECT_TYPENAME( float )
-   CLIO_REFLECT_TYPENAME( double )
-   CLIO_REFLECT_TYPENAME( char )
-   CLIO_REFLECT_TYPENAME( bool )
-   CLIO_REFLECT_TYPENAME( string )
-   */
 
    template <typename QueryClass>
    reflect_undefined<QueryClass> get_reflect_impl(const QueryClass&);

@@ -23,9 +23,6 @@ namespace clio
    };
 
    template <typename T>
-   struct tuple_contains_offset;
-
-   template <typename T>
    constexpr uint16_t fracpack_fixed_size();
 
    /**
@@ -48,8 +45,6 @@ namespace clio
       {
          if constexpr (clio::reflect<T>::is_struct)
          {
-            // if( std::alignment_of_v<T> != 1 )
-            //    return false;
             if (not std::is_final_v<T>)
                return false;
 
@@ -131,10 +126,6 @@ namespace clio
          return true;
       else if constexpr (can_memcpy<T>())
          return false;
-      //    } else if constexpr( is_std_tuple<T>::value ) {
-      //       return tuple_contains_offset<T>::value;
-      //    } else if constexpr( is_std_variant<T>::value ) {
-      //       return contains_offset_ptr<typename is_std_variant<T>::alts_as_tuple>();
       else if constexpr (std::is_same_v<std::string, T>)
          return true;
       else if constexpr (is_std_vector<T>::value)
@@ -379,10 +370,8 @@ namespace clio
    template <typename T, typename S>
    void fracunpack_member(T& member, S& stream)
    {
-      //      std::cout<<"unpack member...\n";
       if constexpr (may_use_heap<T>())
       {
-         //      std::cout<<"... may use heap\n";
          if constexpr (is_std_optional<T>::value)
          {
             uint32_t offset;
@@ -430,19 +419,6 @@ namespace clio
       }
    }
 
-   /*
-    template<uint8_t S, typename V, typename First, typename... Rest> 
-    bool init_variant_by_index( uint8_t index, V& v ){
-        if( sizeof...(Rest) + 1 + index == S ) {
-           v = First();
-           return true;
-        }
-        else if constexpr( sizeof...(Rest) > 0 ) {
-           return init_variant_by_index<S+1, Rest...>( index, v );
-        }
-        return false;
-    }
-    */
    template <typename V, typename First, typename... Rest>
    bool init_type(uint8_t i, V& v)
    {
@@ -644,66 +620,6 @@ namespace clio
       return fracpack(v, size_str);
    }
 
-   /** 
-     *  Recursively checks the types for any field which requires dynamic allocation,
-     */
-   template <typename T>
-   constexpr bool contains_offset_ptr()
-   {
-      if constexpr (is_std_optional<T>::value)
-         return true;
-      else if constexpr (is_std_tuple<T>::value)
-      {
-         return tuple_contains_offset<T>::value;
-      }
-      else if constexpr (is_std_variant<T>::value)
-      {
-         /// TODO: if any ALT is bigger than 8 bytes then it will contain
-         /// an offset... this as written doesn't work if a simple struct
-         /// is included as one of the alts
-         return contains_offset_ptr<typename is_std_variant<T>::alts_as_tuple>();
-      }
-      else if constexpr (std::is_same_v<std::string, T>)
-      {
-         return true;
-      }
-      else if constexpr (is_std_vector<T>::value)
-      {
-         return true;
-      }
-      else if constexpr (clio::reflect<T>::is_struct)
-      {
-         bool is_flat = true;
-         clio::reflect<T>::for_each(
-             [&](const clio::meta& ref, auto mptr)
-             {
-                using member_type = std::decay_t<decltype(clio::result_of_member(mptr))>;
-                is_flat &= not contains_offset_ptr<member_type>();
-             });
-         return not is_flat;
-      }
-      else if constexpr (std::is_arithmetic_v<T>)
-      {
-         return false;
-      }
-      else if constexpr (std::is_trivially_copyable<T>::value)
-      {
-         /// TODO: this should be "is_simple_struct" where simple struct
-         /// is defined as aligned(1) with no padding and no members which
-         /// are not also fundamental types or simple structs
-         return false;
-      }
-      else
-      {
-         T::contains_offset_ptr_not_defined;
-      }
-   }
-
-   template <typename... Ts>
-   struct tuple_contains_offset<std::tuple<Ts...>>
-   {
-      static constexpr const auto value = get_contains_offset_ptr<Ts...>();
-   };
 
    template <uint32_t I, typename Tuple>
    struct get_tuple_offset;
@@ -715,13 +631,13 @@ namespace clio
       if constexpr (Idx == 0)
          return 0;
       else if constexpr (sizeof...(Ts) == 0)
-         if constexpr (contains_offset_ptr<First>())
+         if constexpr (may_use_heap<First>())
             return 4;
          else
             return fracpack_fixed_size<First>();
       else
       {
-         if constexpr (contains_offset_ptr<First>())
+         if constexpr (may_use_heap<First>())
             return get_offset<Idx - 1, Ts...>() + 4;
          else
             return get_offset<Idx - 1, Ts...>() + fracpack_fixed_size<First>();
