@@ -1,5 +1,3 @@
-use fracpack;
-
 fn main() {
     println!("Hello, world!");
 }
