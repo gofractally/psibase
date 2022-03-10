@@ -70,6 +70,15 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
+    let unpack = fields
+        .iter()
+        .map(|field| {
+            let name = &field.name;
+            quote! {
+                self.#name.unpack_inplace(&mut inner)?;
+            }
+        })
+        .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
         impl fracpack::Packable for #name #generics {
             const FIXED_SIZE: u32 = 4;
@@ -90,6 +99,20 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             fn pack(&self, dest: &mut Vec<u8>) {
                 self.pack_variable(dest);
             }
+            fn unpack_inplace(&mut self, outer: &mut &[u8]) -> std::io::Result<()> {
+                let orig: &[u8] = outer;
+                let offset = u32::unpack(outer)?;
+                if (offset < 4) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "offset too small",
+                    ));
+                }
+                let mut inner = &orig[offset as usize..];
+                let heap_size = u16::unpack(&mut inner)?;
+                #unpack
+                Ok(())
+            }
         }
     })
-}
+} // fracpack_macro_impl
