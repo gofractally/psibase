@@ -47,9 +47,9 @@ struct action FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint32_t>(verifier, VT_SENDER, 4) &&
-           VerifyField<uint32_t>(verifier, VT_CONTRACT, 4) &&
-           VerifyField<uint32_t>(verifier, VT_ACT, 4) &&
+           VerifyField<uint32_t>(verifier, VT_SENDER) &&
+           VerifyField<uint32_t>(verifier, VT_CONTRACT) &&
+           VerifyField<uint32_t>(verifier, VT_ACT) &&
            VerifyOffset(verifier, VT_DATA) &&
            verifier.VerifyVector(data()) &&
            verifier.EndTable();
@@ -123,10 +123,6 @@ struct transactionT : public flatbuffers::NativeTable {
   uint16_t tapos = 0;
   uint16_t flags = 0;
   std::vector<std::unique_ptr<cliofb::actionT>> actions{};
-  transactionT() = default;
-  transactionT(const transactionT &o);
-  transactionT(transactionT&&) FLATBUFFERS_NOEXCEPT = default;
-  transactionT &operator=(transactionT o) FLATBUFFERS_NOEXCEPT;
 };
 
 struct transaction FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
@@ -152,9 +148,9 @@ struct transaction FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint32_t>(verifier, VT_EXPIRE, 4) &&
-           VerifyField<uint16_t>(verifier, VT_TAPOS, 2) &&
-           VerifyField<uint16_t>(verifier, VT_FLAGS, 2) &&
+           VerifyField<uint32_t>(verifier, VT_EXPIRE) &&
+           VerifyField<uint16_t>(verifier, VT_TAPOS) &&
+           VerifyField<uint16_t>(verifier, VT_FLAGS) &&
            VerifyOffset(verifier, VT_ACTIONS) &&
            verifier.VerifyVector(actions()) &&
            verifier.VerifyVectorOfTables(actions()) &&
@@ -258,22 +254,6 @@ inline flatbuffers::Offset<action> Createaction(flatbuffers::FlatBufferBuilder &
       _data);
 }
 
-inline transactionT::transactionT(const transactionT &o)
-      : expire(o.expire),
-        tapos(o.tapos),
-        flags(o.flags) {
-  actions.reserve(o.actions.size());
-  for (const auto &v : o.actions) { actions.emplace_back((v) ? new cliofb::actionT(*v) : nullptr); }
-}
-
-inline transactionT &transactionT::operator=(transactionT o) FLATBUFFERS_NOEXCEPT {
-  std::swap(expire, o.expire);
-  std::swap(tapos, o.tapos);
-  std::swap(flags, o.flags);
-  std::swap(actions, o.actions);
-  return *this;
-}
-
 inline transactionT *transaction::UnPack(const flatbuffers::resolver_function_t *_resolver) const {
   auto _o = std::unique_ptr<transactionT>(new transactionT());
   UnPackTo(_o.get(), _resolver);
@@ -286,7 +266,7 @@ inline void transaction::UnPackTo(transactionT *_o, const flatbuffers::resolver_
   { auto _e = expire(); _o->expire = _e; }
   { auto _e = tapos(); _o->tapos = _e; }
   { auto _e = flags(); _o->flags = _e; }
-  { auto _e = actions(); if (_e) { _o->actions.resize(_e->size()); for (flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { if(_o->actions[_i]) { _e->Get(_i)->UnPackTo(_o->actions[_i].get(), _resolver); } else { _o->actions[_i] = std::unique_ptr<cliofb::actionT>(_e->Get(_i)->UnPack(_resolver)); }; } } }
+  { auto _e = actions(); if (_e) { _o->actions.resize(_e->size()); for (flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { _o->actions[_i] = std::unique_ptr<cliofb::actionT>(_e->Get(_i)->UnPack(_resolver)); } } }
 }
 
 inline flatbuffers::Offset<transaction> transaction::Pack(flatbuffers::FlatBufferBuilder &_fbb, const transactionT* _o, const flatbuffers::rehasher_function_t *_rehasher) {

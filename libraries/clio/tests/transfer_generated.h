@@ -43,9 +43,9 @@ struct transfer FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint32_t>(verifier, VT_FROM, 4) &&
-           VerifyField<uint32_t>(verifier, VT_TO, 4) &&
-           VerifyField<uint32_t>(verifier, VT_AMOUNT, 4) &&
+           VerifyField<uint32_t>(verifier, VT_FROM) &&
+           VerifyField<uint32_t>(verifier, VT_TO) &&
+           VerifyField<uint32_t>(verifier, VT_AMOUNT) &&
            VerifyOffset(verifier, VT_MEMO) &&
            verifier.VerifyString(memo()) &&
            verifier.EndTable();
