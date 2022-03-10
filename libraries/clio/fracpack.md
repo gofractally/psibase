@@ -50,38 +50,40 @@ struct transaction {
 ```
 ### Performance of transaction
 
-| algo | task |  time  | % of google |
-|------|------|--------|-------------|
-|google|  pack    |4.31271 ms |
-|fracpack | pack      |1.93162 ms | 44.7891%
-|google|  unpack   |3.35075 ms |
-|fracpack | unpack |2.45717 ms | 73.3319%
-|google|  check     |0.3645 ms  |
-|fracpack | check   |0.493459 ms|  135.38%
-|google | read      |0.71925 ms |
-|fracpack | read  |0.139666 ms|  19.4183%
-|google|  size |    192 bytes| |
-|fracpack|  size |  126 bytes|  68% |
+| algo    | task    |  time     | % of google |
+|---------|---------|-----------|-------------|
+|google   | pack    |4.31271 ms |             |
+|fracpack | pack    |1.93162 ms | 44%         |
+|google   | unpack  |3.35075 ms |             |
+|fracpack | unpack  |2.45717 ms | 73%         |
+|google   | check   |0.3645 ms  |             |
+|fracpack | check   |0.493459 ms| 135%        |
+|google   | read    |0.71925 ms |             |
+|fracpack | read    |0.139666 ms| 19%         |
+|google   | size    |192 bytes  |             |
+|fracpack | size    |126 bytes  | 68%         |
                      
 ### Here is the performance of just transfer struct.
                      
-|| algo | task |  time  | % of google |
-|------|------|--------|-------------|
-|google | pack|     1.537 ms| |
-|fracpack|  pack|   1.4215 ms|  92% |
-|google|  unpack|   0.580166 ms| |
-|fracpack|  unpack| 0.756375 ms|  130% |
-|google|  read|     0.095792 ms| |
-|fracpack|  read|   0.0195 ms|  20% |
-|google|  check|    0.142958 ms| |
-|fracpack|  check|  0.085167 ms|  59% |
-|google|  size |    44 bytes| |
-|fracpack|  size |  30 bytes|  68% |
+| algo    | task    |  time     | % of google |
+|---------|---------|-----------|-------------|
+|google   |  pack   |  1.537 ms |             |
+|fracpack |  pack   |  1.421 ms |  92%        |
+|google   |  unpack |  0.580 ms |             |
+|fracpack |  unpack |  0.756 ms |  130%       |
+|google   |  read   |  0.095 ms |             |
+|fracpack |  read   |  0.019 ms |  20%        |
+|google   |  check  |  0.142 ms |             |
+|fracpack |  check  |  0.085 ms |  59%        |
+|google   |  size   |  44 bytes |             |
+|fracpack |  size   |  30 bytes |  68%        |
 
 
-##Basic Types
+## Basic Types
  
-The following basic types are serialized directly as if by `memcpy`.
+The following basic types are serialized directly as if by `memcpy`, a
+struct consisting of only basic types is also considered a basic type and
+is serialized as if using `__attribute__((packed, aligned(1)))`.
 
   - char 
   - uint8_t 
@@ -95,19 +97,37 @@ The following basic types are serialized directly as if by `memcpy`.
   - float32 
   - float64
 
-##Simple Structs
+## Dynamic Types
 
-Simple structs are any struct which contain only basic types or other simple structs
-These types are not extensible and are serialized as if using `__attribute__((packed, aligned(1)))`.
+  The following dynamic types have a data-dependent serialization size, this includes:
 
-This makes serialization as fast as a memcpy. Simple structs are used as members of 
-extensible structs and are never serialized on their own because they would lack size 
-prefix.
+  - string
+  - vector<T>
+  - optional<T>
+  - variant<T1,T2,...>
 
-##Extensible Structs
+  Any struct that contains one of these types is also considered dynamic.
 
-In addition to fundamental types and simple structs, extensible structs may contain dynamically 
-sized data, such as vectors, strings, optional fields, and other extensible structs.
+## Fixed Structs
+
+These structs have a fixed number of fields and therefore have no forward or backward
+compatibility. They may contain basic or dynamic types.
+
+## Extensible Structs
+
+An extensible struct is designed to support forward and backward compatibility. This means
+that old code can read data serialized by new code and new code can read data serialized with old code.
+
+This is only possible if all new fields are `optional<T>` which forces the client code to check
+to see if they are present. Old code will ignore the new fields, and new code will see missing fields
+as non-present optionals.
+
+The overhead for Extensible Structs is a 2 byte prefix which indicates the static size of the struct and
+therefore the "start" of the heap. Any "optional" fields that have an offset greater than the static size
+are interpreted as being "not present" by new code. 
+
+All extensible structs are presumed to be dynamic because they will require "heap" allocation if any
+new optonal fields are added in the future.
 
 The format of an extensibe struct is similar to the following C struct
 
