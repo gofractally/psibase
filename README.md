@@ -67,6 +67,9 @@ npm i -g yarn
 brew install   \
     binaryen   \
     cmake      \
+    autoconf   \
+    automake   \
+    zlib       \
     gdb        \
     git        \
     boost      \
