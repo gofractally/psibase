@@ -82,6 +82,7 @@ pub fn option_pack_variable<T: Packable>(opt: &Option<T>, dest: &mut Vec<u8>) {
     }
 }
 
+// TODO: check if past fixed area
 pub fn option_unpack_inplace<T: Packable + Default>(
     opt: &mut Option<T>,
     outer: &mut &[u8],
@@ -161,13 +162,11 @@ impl<T: Packable + Sized + Default> Packable for Option<T> {
     }
 
     fn unpack_inplace_skip_offset(&mut self, _src: &mut &[u8]) -> Result<()> {
-        // TODO: prevent Option<Option<T>> at compile time
-        unimplemented!()
+        todo!("Does the spec support Option<Option<T>>?")
     }
 
     fn option_pack_fixed(_opt: &Option<Self>, _dest: &mut Vec<u8>) {
-        // TODO: prevent Option<Option<T>> at compile time
-        unimplemented!()
+        todo!("Does the spec support Option<Option<T>>?")
     }
 
     fn option_repack_fixed(
@@ -176,17 +175,14 @@ impl<T: Packable + Sized + Default> Packable for Option<T> {
         _heap_pos: u32,
         _dest: &mut Vec<u8>,
     ) {
-        // TODO: prevent Option<Option<T>> at compile time
-        unimplemented!()
+        todo!("Does the spec support Option<Option<T>>?")
     }
 
     fn option_pack_variable(_opt: &Option<Self>, _dest: &mut Vec<u8>) {
-        // TODO: prevent Option<Option<T>> at compile time
-        unimplemented!()
+        todo!("Does the spec support Option<Option<T>>?")
     }
 
     fn option_unpack_inplace(_opt: &mut Option<Self>, _src: &mut &[u8]) -> Result<()> {
-        // TODO: prevent Option<Option<T>> at compile time
-        unimplemented!()
+        todo!("Does the spec support Option<Option<T>>?")
     }
 } // impl Packable for Option<T>
