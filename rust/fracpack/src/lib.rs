@@ -112,8 +112,8 @@ macro_rules! scalar_impl_fracpack {
             }
             fn repack_fixed(&self, _fixed_pos: u32, _heap_pos: u32, _dest: &mut Vec<u8>) {}
             fn pack_variable(&self, _dest: &mut Vec<u8>) {}
-            fn pack(&self, dest: &mut Vec<u8>) {
-                self.pack_fixed(dest)
+            fn pack(&self, _dest: &mut Vec<u8>) {
+                todo!("Can scalars be at the top level?")
             }
             fn unpack_inplace(&mut self, src: &mut &[u8]) -> Result<()> {
                 *self = <$t>::from_le_bytes(read_u8_arr(src)?.into());
@@ -136,3 +136,57 @@ scalar_impl_fracpack! {u32}
 scalar_impl_fracpack! {u64}
 scalar_impl_fracpack! {f32}
 scalar_impl_fracpack! {f64}
+
+impl<T: Packable + Sized + Default> Packable for Option<T> {
+    const FIXED_SIZE: u32 = 4;
+
+    fn pack_fixed(&self, dest: &mut Vec<u8>) {
+        T::option_pack_fixed(self, dest);
+    }
+
+    fn repack_fixed(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+        T::option_repack_fixed(self, fixed_pos, heap_pos, dest)
+    }
+
+    fn pack_variable(&self, dest: &mut Vec<u8>) {
+        T::option_pack_variable(self, dest)
+    }
+
+    fn pack(&self, _dest: &mut Vec<u8>) {
+        todo!("Can option<T> be at the top level?")
+    }
+
+    fn unpack_inplace(&mut self, src: &mut &[u8]) -> Result<()> {
+        T::option_unpack_inplace(self, src)
+    }
+
+    fn unpack_inplace_skip_offset(&mut self, _src: &mut &[u8]) -> Result<()> {
+        // TODO: prevent Option<Option<T>> at compile time
+        unimplemented!()
+    }
+
+    fn option_pack_fixed(_opt: &Option<Self>, _dest: &mut Vec<u8>) {
+        // TODO: prevent Option<Option<T>> at compile time
+        unimplemented!()
+    }
+
+    fn option_repack_fixed(
+        _opt: &Option<Self>,
+        _fixed_pos: u32,
+        _heap_pos: u32,
+        _dest: &mut Vec<u8>,
+    ) {
+        // TODO: prevent Option<Option<T>> at compile time
+        unimplemented!()
+    }
+
+    fn option_pack_variable(_opt: &Option<Self>, _dest: &mut Vec<u8>) {
+        // TODO: prevent Option<Option<T>> at compile time
+        unimplemented!()
+    }
+
+    fn option_unpack_inplace(_opt: &mut Option<Self>, _src: &mut &[u8]) -> Result<()> {
+        // TODO: prevent Option<Option<T>> at compile time
+        unimplemented!()
+    }
+} // impl Packable for Option<T>
