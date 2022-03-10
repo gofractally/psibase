@@ -113,7 +113,7 @@ is serialized as if using `__attribute__((packed, aligned(1)))`.
 These structs have a fixed number of fields and therefore have no forward or backward
 compatibility. They may contain basic or dynamic types.
 
-## Extensible Structs
+## Extensible Structs   (always on heap, accessed via offset ptr )
 
 An extensible struct is designed to support forward and backward compatibility. This means
 that old code can read data serialized by new code and new code can read data serialized with old code.
