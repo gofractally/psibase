@@ -58,21 +58,21 @@ sequenceDiagram
     participant transaction_context
     participant execution_context
     participant transaction.sys (wasm)
-    ProducerThread->>ProducerThread: new block_context
+
+    note right of ProducerThread: new block_context
     Alice->>ProducerThread: push signed transaction
     ProducerThread->>block_context: push_transaction
-    block_context->>block_context: new transaction_context
+    note right of block_context: new transaction_context
     block_context->>transaction_context: exec_transaction
-    transaction_context->>transaction_context: new action(transaction)
-    transaction_context->>transaction_context: new action_context(action)
-    transaction_context->>transaction_context: new execution_context(transaction.sys)
+    note right of transaction_context: new action_context(new action(transaction))
+    note right of transaction_context: new execution_context(transaction.sys)
     transaction_context->>execution_context: exec_process_transaction
     execution_context->>transaction.sys (wasm): process_transaction
     loop for each action in transaction
         transaction.sys (wasm)->>execution_context: call auth_check
         transaction.sys (wasm)->>execution_context: call action
         execution_context->>transaction_context: exec_called_action
-        transaction_context->>transaction_context: get_execution_context
+        note right of transaction_context: get_execution_context
         transaction_context->>execution_context: exec_called 
         execution_context->>wasm: called (action dispatcher)
     end
