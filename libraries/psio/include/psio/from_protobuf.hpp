@@ -1,6 +1,7 @@
 #pragma once
 #include <psio/from_bin.hpp>
 #include <psio/tuple.hpp>
+#include <psio/to_protobuf.hpp>
 
 namespace psio
 {

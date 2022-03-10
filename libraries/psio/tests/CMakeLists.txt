@@ -6,7 +6,7 @@ if(DEFINED IS_NATIVE)
         fracpack.cpp
         psio_tests.cpp
 #        flat_views.cpp
-#        benchmark.cpp
+        benchmark.cpp
 #        crypto.cpp
     )
     target_link_libraries(psio-tests psio catch2 Threads::Threads)
@@ -17,7 +17,7 @@ if(DEFINED IS_WASM)
         fracpack.cpp
         psio_tests.cpp
 #        flat_views.cpp
-#        benchmark.cpp
+        benchmark.cpp
     )
     target_link_libraries(psio-tests psio catch2 boost nctestlib )
 endif()

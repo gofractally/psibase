@@ -2,21 +2,23 @@
 #include <catch2/catch.hpp>
 #include <iostream>
 
-#include <clio/compress.hpp>
-#include <clio/from_bin/varint.hpp>
-#include <clio/from_json/varint.hpp>
-#include <clio/json/any.hpp>
-#include <clio/to_bin/varint.hpp>
-#include <clio/to_json/varint.hpp>
+#include <psio/compress.hpp>
+#include <psio/from_bin/varint.hpp>
+#include <psio/from_json/varint.hpp>
+#include <psio/json/any.hpp>
+#include <psio/to_bin/varint.hpp>
+#include <psio/to_json/varint.hpp>
 
-#include <clio/bytes/from_json.hpp>
-#include <clio/bytes/to_json.hpp>
-#include <clio/to_json/map.hpp>
-#include <clio/translator.hpp>
+#include <psio/bytes/from_json.hpp>
+#include <psio/bytes/to_json.hpp>
+#include <psio/to_json/map.hpp>
+#include <psio/translator.hpp>
 #include <fstream>
 
 #include <chrono>
-#include <clio/flatbuf.hpp>
+
+#include <psio/fracpack.hpp>
+
 namespace benchmark
 {
    struct no_sub
@@ -25,7 +27,7 @@ namespace benchmark
       uint16_t my16 = 22;
       ;
    };
-   CLIO_REFLECT(no_sub, myd, my16);
+   PSIO_REFLECT(no_sub, myd, my16);
 
    struct sub_obj
    {
@@ -34,7 +36,7 @@ namespace benchmark
       std::string substr;
       no_sub      ns;
    };
-   CLIO_REFLECT(sub_obj, a, b, ns, substr);
+   PSIO_REFLECT(sub_obj, a, b, ns, substr);
 
    struct flat_object
    {
@@ -47,7 +49,7 @@ namespace benchmark
       std::vector<flat_object> nested;
       sub_obj                  sub;
    };
-   CLIO_REFLECT(flat_object, x, y, z, veci, vecstr, vecns, nested, sub);
+   PSIO_REFLECT(flat_object, x, y, z, veci, vecstr, vecns, nested, sub);
 }  // namespace benchmark
 
 TEST_CASE("benchmark")
@@ -65,261 +67,240 @@ TEST_CASE("benchmark")
    tester.sub.a      = 3;
    tester.sub.b      = 4;
 
-   SECTION("unpacking from flat")
+ //  SECTION("unpacking from flat")
    {
-      clio::size_stream ss;
-      clio::flatpack(tester, ss);
+      psio::shared_view_ptr<flat_object> p(tester);
 
-      std::vector<char>      buf(ss.size);
-      clio::fixed_buf_stream ps(buf.data(), buf.size());
-      clio::flatpack(tester, ps);
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         flat_object        temp;
-         clio::input_stream in(buf.data(), buf.size());
-         clio::flatunpack(temp, in);
+         p.unpack();
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
 
       std::cout << "unpack flat:    " << std::chrono::duration<double, std::milli>(delta).count()
-                << " ms  size: " << ss.size << "  ";
+                << " ms  size: " << p.size()<< "  ";
 
-      auto compressed   = clio::capn_compress(buf);
-      auto uncompressed = clio::capn_uncompress(compressed);
+      std::vector<char> buf(p.size()+4);
+      memcpy( buf.data(), p.data(), buf.size() );
+      /*
+      std::vector<char>      buf(p.data(),p.data()+p.size()+4);
+      */
 
-      clio::size_stream  capsize;
-      clio::input_stream capin(buf.data(), buf.size());
-      clio::capp_pack(capin, capsize);
+      auto compressed   = psio::capn_compress(buf);
+      auto uncompressed = psio::capn_uncompress(compressed);
+
+      psio::size_stream  capsize;
+      psio::input_stream capin(buf.data(), buf.size());
+      psio::capp_pack(capin, capsize);
 
       //          std::cout <<"compressed.size: " << compressed.size() <<"\n";
       std::cout << "capsize: " << capsize.size << "\n";
       //          std::cout <<"uncompressed.size: " << uncompressed.size() <<"\n";
    }
-   SECTION("validating flat without unpacking")
-   {
-      clio::size_stream ss;
-      clio::flatpack(tester, ss);
 
-      std::vector<char>      buf(ss.size);
-      clio::fixed_buf_stream ps(buf.data(), buf.size());
-      clio::flatpack(tester, ps);
+ //  SECTION("validating flat without unpacking")
+   {
+      psio::shared_view_ptr<flat_object> p(tester);
 
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         clio::input_stream in(buf.data(), buf.size());
-         clio::flatcheck<flat_object>(in);
+         p.validate();
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
 
       std::cout << "check flat:    " << std::chrono::duration<double, std::milli>(delta).count()
-                << " ms  size: " << ss.size << "  ";
-
-      auto compressed   = clio::capn_compress(buf);
-      auto uncompressed = clio::capn_uncompress(compressed);
-
-      clio::size_stream  capsize;
-      clio::input_stream capin(buf.data(), buf.size());
-      clio::capp_pack(capin, capsize);
-
-      //          std::cout <<"compressed.size: " << compressed.size() <<"\n";
-      std::cout << "capsize: " << capsize.size << "\n";
-      //          std::cout <<"uncompressed.size: " << uncompressed.size() <<"\n";
+                << " ms  size: " << p.size() << "  \n";
    }
 
-   SECTION("flat unpack and uncompress")
+//   SECTION("flat unpack and uncompress")
    {
-      clio::size_stream ss;
-      clio::flatpack(tester, ss);
+     if( 0 ) { 
+      psio::size_stream ss;
+      psio::fracpack(tester, ss);
 
       std::vector<char>      buf(ss.size);
-      clio::fixed_buf_stream ps(buf.data(), buf.size());
-      clio::flatpack(tester, ps);
+      psio::fixed_buf_stream ps(buf.data(), buf.size());
+      psio::fracpack(tester, ps);
 
-      auto compressed = clio::capn_compress(buf);
+      auto compressed = psio::capn_compress(buf);
 
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
          flat_object        temp;
-         auto               uncompressed = clio::capn_uncompress(compressed);
-         clio::input_stream in(uncompressed.data(), uncompressed.size());
-         clio::flatunpack(temp, in);
+         auto               uncompressed = psio::capn_uncompress(compressed);
+         psio::input_stream in(uncompressed.data(), uncompressed.size());
+         psio::fracunpack(temp, in);
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
 
       std::cout << "unpack flat&cap: " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << ss.size << "  ";
-      clio::size_stream  capsize;
-      clio::input_stream capin(buf.data(), buf.size());
-      clio::capp_pack(capin, capsize);
+      psio::size_stream  capsize;
+      psio::input_stream capin(buf.data(), buf.size());
+      psio::capp_pack(capin, capsize);
 
       std::cout << "capsize: " << capsize.size << "\n";
+     }
    }
 
-   SECTION("protbuf unpack")
+   //SECTION("protbuf unpack")
    {
-      clio::size_stream ss;
-      clio::to_protobuf(tester, ss);
+      psio::size_stream ss;
+      psio::to_protobuf(tester, ss);
 
       std::vector<char>      buf(ss.size);
-      clio::fixed_buf_stream ps(buf.data(), buf.size());
-      clio::to_protobuf(tester, ps);
+      psio::fixed_buf_stream ps(buf.data(), buf.size());
+      psio::to_protobuf(tester, ps);
 
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
          flat_object temp;
 
-         clio::input_stream in(buf.data(), buf.size());
-         clio::from_protobuf_object(temp, in);
+         psio::input_stream in(buf.data(), buf.size());
+         psio::from_protobuf_object(temp, in);
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
       std::cout << "unpack pb:      " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << ss.size << "   ";
-      clio::size_stream  capsize;
-      clio::input_stream capin(buf.data(), buf.size());
-      clio::capp_pack(capin, capsize);
+      psio::size_stream  capsize;
+      psio::input_stream capin(buf.data(), buf.size());
+      psio::capp_pack(capin, capsize);
 
       std::cout << "capsize: " << capsize.size << "\n";
    }
 
-   SECTION("protbuf unpack and uncompress")
+//   SECTION("protbuf unpack and uncompress")
    {
-      clio::size_stream ss;
-      clio::to_protobuf(tester, ss);
+      psio::size_stream ss;
+      psio::to_protobuf(tester, ss);
 
       std::vector<char>      buf(ss.size);
-      clio::fixed_buf_stream ps(buf.data(), buf.size());
-      clio::to_protobuf(tester, ps);
+      psio::fixed_buf_stream ps(buf.data(), buf.size());
+      psio::to_protobuf(tester, ps);
 
-      auto compressed = clio::capn_compress(buf);
+      auto compressed = psio::capn_compress(buf);
 
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
          flat_object temp;
-         auto        uncompressed = clio::capn_uncompress(compressed);
+         auto        uncompressed = psio::capn_uncompress(compressed);
 
-         clio::input_stream in(uncompressed.data(), uncompressed.size());
-         clio::from_protobuf_object(temp, in);
+         psio::input_stream in(uncompressed.data(), uncompressed.size());
+         psio::from_protobuf_object(temp, in);
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
       std::cout << "unpack pb&cap:   " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << ss.size << "   ";
-      clio::size_stream  capsize;
-      clio::input_stream capin(buf.data(), buf.size());
-      clio::capp_pack(capin, capsize);
+      psio::size_stream  capsize;
+      psio::input_stream capin(buf.data(), buf.size());
+      psio::capp_pack(capin, capsize);
 
       std::cout << "capsize: " << capsize.size << "\n";
    }
 
-   SECTION("bin unpack")
+   //SECTION("bin unpack")
    {
-      clio::size_stream ss;
-      clio::to_bin(tester, ss);
+      psio::size_stream ss;
+      psio::to_bin(tester, ss);
 
       std::vector<char>      buf(ss.size);
-      clio::fixed_buf_stream ps(buf.data(), buf.size());
-      clio::to_bin(tester, ps);
+      psio::fixed_buf_stream ps(buf.data(), buf.size());
+      psio::to_bin(tester, ps);
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
          flat_object        temp;
-         clio::input_stream in(buf.data(), buf.size());
-         clio::from_bin(temp, in);
+         psio::input_stream in(buf.data(), buf.size());
+         psio::from_bin(temp, in);
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
       std::cout << "unpack bin:     " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << ss.size << "   ";
-      clio::size_stream  capsize;
-      clio::input_stream capin(buf.data(), buf.size());
-      clio::capp_pack(capin, capsize);
+      psio::size_stream  capsize;
+      psio::input_stream capin(buf.data(), buf.size());
+      psio::capp_pack(capin, capsize);
 
       std::cout << "capsize: " << capsize.size << "\n";
    }
-   SECTION("bin unpack and uncompress")
+   //SECTION("bin unpack and uncompress")
    {
-      clio::size_stream ss;
-      clio::to_bin(tester, ss);
+      psio::size_stream ss;
+      psio::to_bin(tester, ss);
 
       std::vector<char>      buf(ss.size);
-      clio::fixed_buf_stream ps(buf.data(), buf.size());
-      clio::to_bin(tester, ps);
+      psio::fixed_buf_stream ps(buf.data(), buf.size());
+      psio::to_bin(tester, ps);
 
-      auto compressed = clio::capn_compress(buf);
+      auto compressed = psio::capn_compress(buf);
 
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
          flat_object temp;
-         auto        uncompressed = clio::capn_uncompress(compressed);
+         auto        uncompressed = psio::capn_uncompress(compressed);
 
-         clio::input_stream in(uncompressed.data(), uncompressed.size());
-         clio::from_bin(temp, in);
+         psio::input_stream in(uncompressed.data(), uncompressed.size());
+         psio::from_bin(temp, in);
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
       std::cout << "unpack bin&cap: " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << ss.size << "   ";
-      clio::size_stream  capsize;
-      clio::input_stream capin(buf.data(), buf.size());
-      clio::capp_pack(capin, capsize);
+      psio::size_stream  capsize;
+      psio::input_stream capin(buf.data(), buf.size());
+      psio::capp_pack(capin, capsize);
 
       std::cout << "capsize: " << capsize.size << "\n";
    }
 
    SECTION("json unpack")
    {
-      clio::size_stream ss;
-      clio::to_json(tester, ss);
+      psio::size_stream ss;
+      psio::to_json(tester, ss);
 
       std::vector<char> buf(ss.size + 1);
       std::vector<char> buf2(ss.size + 1);
       buf.back() = 0;
-      clio::fixed_buf_stream ps(buf.data(), buf.size());
-      clio::to_json(tester, ps);
+      psio::fixed_buf_stream ps(buf.data(), buf.size());
+      psio::to_json(tester, ps);
       buf2       = buf;
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
          flat_object             temp;
-         clio::json_token_stream in(buf.data());
-         clio::from_json(temp, in);
+         psio::json_token_stream in(buf.data());
+         psio::from_json(temp, in);
          buf = buf2;
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
       std::cout << "unpack json:    " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << ss.size << " capsize: ";
-      clio::size_stream  capsize;
-      clio::input_stream capin(buf.data(), buf.size());
-      clio::capp_pack(capin, capsize);
+      psio::size_stream  capsize;
+      psio::input_stream capin(buf.data(), buf.size());
+      psio::capp_pack(capin, capsize);
 
       std::cout << "capsize: " << capsize.size << "\n";
    }
 
-   SECTION("packing")
    {
       size_t s     = 0;
       auto   start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         clio::size_stream ss;
-         clio::flatpack(tester, ss);
-         s = ss.size;
-
-         std::vector<char>      buf(ss.size);
-         clio::fixed_buf_stream ps(buf.data(), buf.size());
-         clio::flatpack(tester, ps);
-         // std::cout <<"capsize: " << capsize.size <<"\n";
+         psio::shared_view_ptr<flat_object> p(tester);
+         s = p.size();
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -328,22 +309,23 @@ TEST_CASE("benchmark")
 
       s     = 0;
       start = std::chrono::steady_clock::now();
+
+
+      std::vector<char>      buf;
+      std::vector<char>      buf2;
+      s = psio::fracpack_size(tester);
+      buf.resize(s);
+      buf2.resize(s);
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         clio::size_stream ss;
-         clio::flatpack(tester, ss);
-         s = ss.size;
+         psio::fixed_buf_stream ps(buf.data(), buf.size());
+         psio::fracpack(tester, ps);
 
-         std::vector<char>      buf(ss.size);
-         clio::fixed_buf_stream ps(buf.data(), buf.size());
-         clio::flatpack(tester, ps);
+         // psio::size_stream capsize;
 
-         // clio::size_stream capsize;
-
-         std::vector<char>      buf2(ss.size);
-         clio::fixed_buf_stream capout(buf2.data(), buf2.size());
-         clio::input_stream     capin(buf.data(), buf.size());
-         clio::capp_pack(capin, capout);
+         psio::fixed_buf_stream capout(buf2.data(), buf2.size());
+         psio::input_stream     capin(buf.data(), buf.size());
+         psio::capp_pack(capin, capout);
          s = buf2.size() - capout.remaining();  // capsize.size;
 
          // std::cout <<"capsize: " << capsize.size <<"\n";
@@ -356,13 +338,13 @@ TEST_CASE("benchmark")
       start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         clio::size_stream ss;
-         clio::to_protobuf(tester, ss);
+         psio::size_stream ss;
+         psio::to_protobuf(tester, ss);
          s = ss.size;
 
          std::vector<char>      buf(ss.size);
-         clio::fixed_buf_stream ps(buf.data(), buf.size());
-         clio::to_protobuf(tester, ps);
+         psio::fixed_buf_stream ps(buf.data(), buf.size());
+         psio::to_protobuf(tester, ps);
       }
       end   = std::chrono::steady_clock::now();
       delta = end - start;
@@ -372,13 +354,13 @@ TEST_CASE("benchmark")
       start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         clio::size_stream ss;
-         clio::to_bin(tester, ss);
+         psio::size_stream ss;
+         psio::to_bin(tester, ss);
          s = ss.size;
 
          std::vector<char>      buf(ss.size);
-         clio::fixed_buf_stream ps(buf.data(), buf.size());
-         clio::to_bin(tester, ps);
+         psio::fixed_buf_stream ps(buf.data(), buf.size());
+         psio::to_bin(tester, ps);
       }
       end   = std::chrono::steady_clock::now();
       delta = end - start;
@@ -388,24 +370,17 @@ TEST_CASE("benchmark")
       start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         clio::size_stream ss;
-         clio::to_json(tester, ss);
+         psio::size_stream ss;
+         psio::to_json(tester, ss);
          s = ss.size;
 
          std::vector<char>      buf(ss.size);
-         clio::fixed_buf_stream ps(buf.data(), buf.size());
-         clio::to_json(tester, ps);
+         psio::fixed_buf_stream ps(buf.data(), buf.size());
+         psio::to_json(tester, ps);
       }
       end   = std::chrono::steady_clock::now();
       delta = end - start;
       std::cout << "pack json: " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << s << "\n";
    }
-
-   std::vector<char> buffer;
-   buffer.resize(4);
-   buffer[0] = 1;
-   buffer[1] = 2;
-   buffer[2] = 3;
-   buffer[3] = 4;
 }

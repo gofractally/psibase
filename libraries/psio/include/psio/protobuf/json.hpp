@@ -22,8 +22,8 @@ namespace psio
          json::any   args;    /// args as json encoded tuple, or named object
          json_query  filter;  /// apply to result
       };
-      CLIO_REFLECT(json_field_query, name, args, filter)
-      CLIO_REFLECT(json_query, fields)
+      PSIO_REFLECT(json_field_query, name, args, filter)
+      PSIO_REFLECT(json_query, fields)
 
       /**
          * Given a json description of the query and an assumed reflected type (used to interpret names to numbers),

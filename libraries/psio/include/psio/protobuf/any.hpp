@@ -28,7 +28,7 @@ namespace psio
          uint32_t   number;
          value_type value;
       };
-      CLIO_REFLECT(entry, number, value)
+      PSIO_REFLECT(entry, number, value)
 
       /**
          *  This class can be used to hold the
@@ -74,7 +74,7 @@ namespace psio
             members.push_back(entry{field, *reinterpret_cast<int32_t*>(&s)});
          }
       };
-      CLIO_REFLECT(any, members)
+      PSIO_REFLECT(any, members)
 
       template <typename Stream>
       void to_bin(const any& a, Stream& s)

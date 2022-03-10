@@ -31,9 +31,9 @@ namespace psio
          query     filter;  /// apply to result
       };
 
-      CLIO_REFLECT(variant_query, type, fields)
-      CLIO_REFLECT(field_query, number, args, filter)
-      CLIO_REFLECT(query, fields, variant_fields)
+      PSIO_REFLECT(variant_query, type, fields)
+      PSIO_REFLECT(field_query, number, args, filter)
+      PSIO_REFLECT(query, fields, variant_fields)
 
       template <typename T>
       any dispatch(T&& obj, const query& q)

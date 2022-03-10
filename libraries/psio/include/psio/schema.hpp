@@ -1,5 +1,4 @@
 #pragma once
-#include <psio/flatbuf.hpp>
 #include <psio/reflect.hpp>
 #include <psio/varint.hpp>
 #include <map>

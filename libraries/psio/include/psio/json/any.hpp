@@ -106,9 +106,9 @@ namespace psio
          std::string key;
          any         value;
       };
-      CLIO_REFLECT(entry, key, value)
-      CLIO_REFLECT_TYPENAME(null_t)
-      CLIO_REFLECT(error_t, what)
+      PSIO_REFLECT(entry, key, value)
+      PSIO_REFLECT_TYPENAME(null_t)
+      PSIO_REFLECT(error_t, what)
 
       inline any any::operator[](const std::string_view& key) const
       {
