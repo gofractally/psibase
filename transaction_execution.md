@@ -31,14 +31,14 @@ A transaction context represents a transaction while it’s being executed. Ther
 
 The purpose of exec_transaction is not to read through and execute all actions in a transaction, because in PsiBase that happens in a contract, not in native code. Therefore, all it does is start up the execution context for transaction.sys (the contract that handles transaction execution), create a single action which contains the entire transaction, and sends it to the transaction.sys execution context.
 
-A transaction context contains a cache of execution contexts. That way if sync calls are made to the same contract more than once in a transaction, the token contract execution context is only started up once.
+A transaction context contains a cache of execution contexts. That way if sync calls are made to the same contract more than once in a transaction, the target contract execution context is only started up once.
 
 ## Execution Context
 
 An execution context represents an executing contract. This object is basically responsible for communicating across the native/wasm boundary with contracts. It defines the interface of functions that a wasm is allowed to call back into native code, and it knows about the four wasm entry points. 
 
 It has a function that exposes the four wasm entry points to the outside world:
-1. exec_process_transaction(action_context& act_context) - Only called once per transaction. Executes process_transaction on the actual wasm.
+1. exec_process_transaction(action_context& act_context) - Only called once per transaction. Executes process_transaction on the transaction.sys wasm.
 2. exec_called(uint64_t caller_flags, action_context& act_context) - Calls the “called” wasm entry point whenever a particular action is called. This is the action dispatcher.
 3. exec_verify(action_context& act_context);
 4. exec_rpc(action_context& act_context);
