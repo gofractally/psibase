@@ -67,7 +67,7 @@ void check_same(const auto& rust, const auto& cpp)
    throw std::runtime_error("rust and c++ packed differ");
 }
 
-void tests1(size_t index, rust::Slice<const ::std::uint8_t> blob)
+void tests1(size_t index, rust::Slice<const uint8_t> blob)
 {
    psio::shared_view_ptr<TestType> p(tests1_data[index]);
    check_same(blob, p);

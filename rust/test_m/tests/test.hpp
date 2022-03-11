@@ -58,4 +58,4 @@ PSIO_REFLECT(TestType,
              field_option_f32,
              field_option_f64)
 
-void tests1(size_t index, rust::Slice<const ::std::uint8_t> blob);
+void tests1(size_t index, rust::Slice<const uint8_t> blob);
