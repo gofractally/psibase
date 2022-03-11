@@ -22,6 +22,8 @@ fn struct_fields(data: &DataStruct) -> Vec<Field> {
     }
 }
 
+// TODO: compile time: verify no non-optionals are after an optional
+// TODO: unpack: check optionals not in heap
 pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
@@ -92,7 +94,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             fn pack_variable(&self, dest: &mut Vec<u8>) {
                 // TODO: check if fixed_size is too big
                 let heap = #fixed_size;
-                (heap as u16).pack(dest);
+                (heap as u16).pack_fixed(dest);
                 #pack_fixed_members
                 #pack_variable_members
             }
@@ -102,7 +104,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             fn unpack_inplace(&mut self, outer: &mut &[u8]) -> fracpack::Result<()> {
                 let orig: &[u8] = outer;
                 let offset = u32::unpack(outer)?;
-                if (offset < 4) {
+                if offset < 4 {
                     return Err(fracpack::Error::OffsetTooSmall);
                 }
                 let mut inner = orig
@@ -111,7 +113,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
                 self.unpack_inplace_skip_offset(&mut inner)
             }
             fn unpack_inplace_skip_offset(&mut self, src: &mut &[u8]) -> fracpack::Result<()> {
-                let heap_size = u16::unpack(src)?;
+                let _heap_size = u16::unpack(src)?;
                 #unpack
                 Ok(())
             }

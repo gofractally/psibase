@@ -10,6 +10,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 fn read_u8_arr<const SIZE: usize>(src: &mut &[u8]) -> Result<[u8; SIZE]> {
     let mut bytes: [u8; SIZE] = [0; SIZE];
     bytes.copy_from_slice(src.get(..SIZE).ok_or(Error::EndOfStream)?);
+    *src = &src[SIZE..];
     Ok(bytes)
 }
 
@@ -27,7 +28,7 @@ pub trait Packable {
         Self: Default,
     {
         let mut result: Self = Default::default();
-        result.unpack_inplace(src)?;
+        result.unpack_inplace_skip_offset(src)?;
         Ok(result)
     }
 
@@ -35,36 +36,36 @@ pub trait Packable {
     where
         Self: Sized,
     {
-        crate::option_pack_fixed(opt, dest)
+        self::option_pack_fixed(opt, dest)
     }
 
     fn option_repack_fixed(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>)
     where
         Self: Sized,
     {
-        crate::option_repack_fixed(opt, fixed_pos, heap_pos, dest)
+        self::option_repack_fixed(opt, fixed_pos, heap_pos, dest)
     }
 
     fn option_pack_variable(opt: &Option<Self>, dest: &mut Vec<u8>)
     where
         Self: Sized,
     {
-        crate::option_pack_variable(opt, dest)
+        self::option_pack_variable(opt, dest)
     }
 
     fn option_unpack_inplace(opt: &mut Option<Self>, src: &mut &[u8]) -> Result<()>
     where
         Self: Sized + Default,
     {
-        crate::option_unpack_inplace(opt, src)
+        self::option_unpack_inplace(opt, src)
     }
 } // Packable
 
-pub fn option_pack_fixed<T: Packable>(_opt: &Option<T>, dest: &mut Vec<u8>) {
+fn option_pack_fixed<T: Packable>(_opt: &Option<T>, dest: &mut Vec<u8>) {
     dest.extend_from_slice(&1u32.to_le_bytes())
 }
 
-pub fn option_repack_fixed<T: Packable>(
+fn option_repack_fixed<T: Packable>(
     opt: &Option<T>,
     fixed_pos: u32,
     heap_pos: u32,
@@ -76,14 +77,14 @@ pub fn option_repack_fixed<T: Packable>(
     }
 }
 
-pub fn option_pack_variable<T: Packable>(opt: &Option<T>, dest: &mut Vec<u8>) {
+fn option_pack_variable<T: Packable>(opt: &Option<T>, dest: &mut Vec<u8>) {
     if let Some(x) = opt {
         x.pack(dest)
     }
 }
 
 // TODO: check if past fixed area
-pub fn option_unpack_inplace<T: Packable + Default>(
+fn option_unpack_inplace<T: Packable + Default>(
     opt: &mut Option<T>,
     outer: &mut &[u8],
 ) -> Result<()> {
@@ -113,15 +114,15 @@ macro_rules! scalar_impl_fracpack {
             }
             fn repack_fixed(&self, _fixed_pos: u32, _heap_pos: u32, _dest: &mut Vec<u8>) {}
             fn pack_variable(&self, _dest: &mut Vec<u8>) {}
-            fn pack(&self, _dest: &mut Vec<u8>) {
-                todo!("Can scalars be at the top level?")
+            fn pack(&self, dest: &mut Vec<u8>) {
+                self.pack_fixed(dest)
             }
             fn unpack_inplace(&mut self, src: &mut &[u8]) -> Result<()> {
-                *self = <$t>::from_le_bytes(read_u8_arr(src)?.into());
-                Ok(())
+                self.unpack_inplace_skip_offset(src)
             }
             fn unpack_inplace_skip_offset(&mut self, src: &mut &[u8]) -> Result<()> {
-                self.unpack_inplace(src)
+                *self = <$t>::from_le_bytes(read_u8_arr(src)?.into());
+                Ok(())
             }
         }
     };
@@ -162,7 +163,7 @@ impl<T: Packable + Sized + Default> Packable for Option<T> {
     }
 
     fn unpack_inplace_skip_offset(&mut self, _src: &mut &[u8]) -> Result<()> {
-        todo!("Does the spec support Option<Option<T>>?")
+        todo!("Does the spec support Option<Option<T>> or top-level Option<T>?")
     }
 
     fn option_pack_fixed(_opt: &Option<Self>, _dest: &mut Vec<u8>) {
