@@ -108,7 +108,7 @@ fn option_unpack_inplace<T: Packable + Default>(
 macro_rules! scalar_impl_fracpack {
     ($t:ty) => {
         impl Packable for $t {
-            const FIXED_SIZE: u32 = mem::size_of::<u32>() as u32;
+            const FIXED_SIZE: u32 = mem::size_of::<$t>() as u32;
             fn pack_fixed(&self, dest: &mut Vec<u8>) {
                 dest.extend_from_slice(&self.to_le_bytes());
             }

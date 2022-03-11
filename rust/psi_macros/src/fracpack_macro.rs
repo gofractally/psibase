@@ -39,7 +39,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             let ty = &field.ty;
             quote! {<#ty>::FIXED_SIZE}
         })
-        .fold(quote! {2}, |acc, new| quote! {#acc + #new});
+        .fold(quote! {0}, |acc, new| quote! {#acc + #new});
     let positions: Vec<syn::Ident> = fields
         .iter()
         .map(|field| {
