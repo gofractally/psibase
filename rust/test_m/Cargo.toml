@@ -2,7 +2,12 @@
 name = "test_m"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 [dependencies]
+cxx = "1.0"
 fracpack = { version = "0.1.0", path = "../fracpack" }
 psi_macros = { version = "0.1.0", path = "../psi_macros" }
+
+[build-dependencies]
+cxx-build = "1.0"

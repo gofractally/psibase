@@ -22,6 +22,8 @@ fn struct_fields(data: &DataStruct) -> Vec<Field> {
     }
 }
 
+// TODO: compile time: verify no non-optionals are after an optional
+// TODO: unpack: check optionals not in heap
 pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
@@ -37,7 +39,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             let ty = &field.ty;
             quote! {<#ty>::FIXED_SIZE}
         })
-        .fold(quote! {2}, |acc, new| quote! {#acc + #new});
+        .fold(quote! {0}, |acc, new| quote! {#acc + #new});
     let positions: Vec<syn::Ident> = fields
         .iter()
         .map(|field| {
@@ -75,7 +77,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
         .map(|field| {
             let name = &field.name;
             quote! {
-                self.#name.unpack_inplace(&mut inner)?;
+                self.#name.unpack_inplace(src)?;
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -87,29 +89,31 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             }
             fn repack_fixed(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
                 dest[fixed_pos as usize..fixed_pos as usize + 4]
-                    .copy_from_slice(&(heap_pos-fixed_pos).to_le_bytes());
+                    .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
             }
             fn pack_variable(&self, dest: &mut Vec<u8>) {
                 // TODO: check if fixed_size is too big
                 let heap = #fixed_size;
-                (heap as u16).pack(dest);
+                (heap as u16).pack_fixed(dest);
                 #pack_fixed_members
                 #pack_variable_members
             }
             fn pack(&self, dest: &mut Vec<u8>) {
                 self.pack_variable(dest);
             }
-            fn unpack_inplace(&mut self, outer: &mut &[u8]) -> std::io::Result<()> {
+            fn unpack_inplace(&mut self, outer: &mut &[u8]) -> fracpack::Result<()> {
                 let orig: &[u8] = outer;
                 let offset = u32::unpack(outer)?;
-                if (offset < 4) {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "offset too small",
-                    ));
+                if offset < 4 {
+                    return Err(fracpack::Error::OffsetTooSmall);
                 }
-                let mut inner = &orig[offset as usize..];
-                let heap_size = u16::unpack(&mut inner)?;
+                let mut inner = orig
+                    .get(offset as usize..)
+                    .ok_or(fracpack::Error::EndOfStream)?;
+                self.unpack_inplace_skip_offset(&mut inner)
+            }
+            fn unpack_inplace_skip_offset(&mut self, src: &mut &[u8]) -> fracpack::Result<()> {
+                let _heap_size = u16::unpack(src)?;
                 #unpack
                 Ok(())
             }

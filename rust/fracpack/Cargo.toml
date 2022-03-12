@@ -2,5 +2,10 @@
 name = "fracpack"
 version = "0.1.0"
 edition = "2021"
+publish = false
+
+[lib]
+path = "src/fracpack.rs"
 
 [dependencies]
+custom_error = "1.9.2"
