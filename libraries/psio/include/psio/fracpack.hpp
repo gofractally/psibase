@@ -6,6 +6,60 @@
 
 namespace psio
 {
+   template <typename T>
+   class shared_view_ptr;
+
+   template <typename>
+   struct is_shared_view_ptr : std::false_type
+   {
+   };
+
+   template <typename T>
+   struct is_shared_view_ptr<shared_view_ptr<T>> : std::true_type
+   {
+      using value_type = T;
+   };
+
+   template <typename View, typename Enable=void>
+   struct view;
+
+   template <typename... Ts>
+   struct view<std::variant<Ts...>>;
+
+   template <typename... Ts>
+   struct view<const std::variant<Ts...>>;
+
+   template <typename T>
+   struct view<T, std::enable_if_t<std::is_arithmetic_v<T>>>;
+
+   template <>
+   struct view<std::string>;
+
+   template <typename T>
+   struct view<T, std::enable_if_t<reflect<T>::is_struct>>;
+
+
+
+   template <typename View, typename Enable=void>
+   struct const_view;
+
+   template <typename... Ts>
+   struct const_view<std::variant<Ts...>>;
+
+   template <typename... Ts>
+   struct const_view<const std::variant<Ts...>>;
+
+   template <typename T>
+   struct const_view<T, std::enable_if_t<std::is_arithmetic_v<T>>>;
+
+   template <>
+   struct const_view<std::string>;
+
+   template <typename T>
+   struct const_view<T, std::enable_if_t<reflect<T>::is_struct>>;
+
+
+
 
    struct offset_ptr
    {
@@ -67,6 +121,26 @@ namespace psio
          return false;
    }
 
+   template<typename T>
+   constexpr bool has_non_optional_after_optional() {
+      if constexpr ( psio::reflect<T>::is_struct ) {
+         bool found_optional = false;
+         bool has_error = false;
+         psio::reflect<T>::for_each(
+             [&](const psio::meta& ref, auto mptr)
+             {
+                using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                if constexpr( is_std_optional<member_type>() ) {
+                  found_optional = true;
+                } else {
+                  has_error |= found_optional;
+                }
+             });
+          return has_error;
+      }
+      return false;
+   }
+
    /**
      *  The number of fields on the struct cannot be extended because
      *  the struct is final and all members are either heap allocated 
@@ -79,6 +153,8 @@ namespace psio
          return true;
       else if constexpr (is_std_variant<T>::value)
          return false;
+      else if constexpr (is_shared_view_ptr<T>::value)
+         return is_fixed_structure<typename is_shared_view_ptr<T>::value_type>();
       else if constexpr (can_memcpy<T>())
          return true;
       else if constexpr (std::is_same_v<std::string, T>)
@@ -87,8 +163,10 @@ namespace psio
          return true;
       else if constexpr (psio::reflect<T>::is_struct)
       {
-         if (not std::is_final_v<T>)
+         if (not std::is_final_v<T>) {
+            static_assert( not has_non_optional_after_optional<T>(), "extendable types must not have non-optional after optional member");
             return false;
+         }
          bool is_fixed = true;
          psio::reflect<T>::for_each(
              [&](const psio::meta& ref, auto mptr)
@@ -120,6 +198,8 @@ namespace psio
          return true;
       if constexpr (is_std_variant<T>::value)
          return true;
+      if constexpr (is_shared_view_ptr<T>::value)
+         return may_use_heap<is_shared_view_ptr<T>::value_type>();
       if constexpr (std::is_arithmetic_v<T>)
          return false;
       if constexpr (not std::is_final_v<T>)
@@ -150,11 +230,14 @@ namespace psio
    template <typename T>
    constexpr uint16_t fracpack_fixed_size()
    {
-      if constexpr (can_memcpy<T>())
+      if constexpr( is_shared_view_ptr<T>::value ) {
+         return fracpack_fixed_size<is_shared_view_ptr<T>::value_type>();
+      }
+      else if constexpr (can_memcpy<T>())
       {
          return sizeof(T);
       }
-      else if constexpr (is_std_variant<T>::value)
+      else if constexpr (is_std_variant<T>::value )
       {
          return sizeof(offset_ptr);
       }
@@ -181,6 +264,29 @@ namespace psio
          return size;
       }
    }
+
+   template<typename T>
+   constexpr uint32_t fixed_size_before_optional() {
+      if constexpr ( psio::reflect<T>::is_struct ) {
+         bool found_optional = false;
+         uint32_t fixed_size = 0;
+         psio::reflect<T>::for_each(
+             [&](const psio::meta& ref, auto mptr)
+             {
+                using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+
+                if constexpr( is_std_optional<member_type>() ) {
+                  found_optional = true;
+                }
+
+                if( not found_optional )
+                   fixed_size += fracpack_fixed_size<member_type>();
+             });
+          return fixed_size;
+      }
+      return fracpack_fixed_size<T>();
+   }
+
 
    template <typename T>
    uint32_t fracpack_size(const T& v);
@@ -227,7 +333,8 @@ namespace psio
             {
                using opt_type = typename is_std_optional<T>::value_type;
                if constexpr (is_std_vector<opt_type>::value ||
-                             std::is_same_v<opt_type, std::string>)
+                             std::is_same_v<opt_type, std::string> 
+                             )
                {
                   fracpack_member(start_heap, *member, stream);
                   return;
@@ -238,6 +345,21 @@ namespace psio
                }
             }
             return;
+         }
+         /** shared views are packed as if there was not a pointer, they are not
+          *  nullable because the view/unpack functions don't have a way to represent
+          *  a null shared view ptr.
+          */
+         else if constexpr (is_shared_view_ptr<T>::value) {
+            if( member.size() == 0 )
+            {  
+               throw_error( "shared_view_ptr is not allowed to be null" );
+               /*
+               uint32_t offset = 0;
+               stream.write(&offset, sizeof(offset));
+               */
+               return; 
+            }
          }
          /** pack empty vector */
          else if constexpr (is_std_vector<T>::value)
@@ -267,6 +389,11 @@ namespace psio
          fracpack(member, stream);
       }
    }
+   template <typename T, typename S>
+   uint32_t fracpack(const shared_view_ptr<T>& v, S& stream) {
+      stream.write( v.data(), v.size()+4 );
+      return v.size()+4;
+   }
 
    /**
      *  Writes v to a stream...without a size prefix
@@ -278,9 +405,13 @@ namespace psio
       {
          uint8_t idx = v.index();
          stream.write(&idx, sizeof(idx));
-         uint32_t msize = 1;
-         std::visit([&](const auto& iv) { msize += fracpack(iv, stream); }, v);
-         return msize;
+         uint32_t varsize = 0;
+         std::visit([&](const auto& iv) { 
+              varsize += fracpack_size(iv);
+              stream.write( &varsize, sizeof(varsize) );
+              fracpack(iv, stream);
+         }, v);
+         return 1+ sizeof(varsize) + varsize;
       }
       else if constexpr (is_std_optional<T>::value)
       {
@@ -393,6 +524,17 @@ namespace psio
                member.reset();
          }
          /** unpack empty vector / string */
+         else if constexpr (is_shared_view_ptr<T>::value ) {
+            uint32_t offset;
+            stream.read(&offset, sizeof(offset));
+            if (offset >= 4)
+            {
+               input_stream insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
+               fracunpack(member, insubstream);
+            }
+            else
+               member.reset(0);
+         }
          else if constexpr (is_std_vector<T>::value || std::is_same_v<T, std::string>)
          {
             uint32_t offset;
@@ -442,12 +584,27 @@ namespace psio
    template <typename T, typename S>
    void fracunpack(T& v, S& stream)
    {
-      if constexpr (is_std_variant<T>::value)
+      if constexpr (is_shared_view_ptr<T>::value) {
+         v.reset(0);
+         uint32_t size;
+         stream.read((char*)&size, sizeof(size));
+         v.resize( size );
+         stream.read( v.data()+4, size );
+      } 
+      else if constexpr (is_std_variant<T>::value)
       {
          uint8_t idx;
          stream.read(&idx, 1);
-         init_variant_by_index(idx, v);
-         std::visit([&](auto& iv) { fracunpack(iv, stream); }, v);
+         bool known = init_variant_by_index(idx, v);
+         uint32_t size;
+         stream.read(&size, sizeof(size));
+         if( known && size ) {
+            S substr( stream.pos, stream.pos + size );
+            stream.skip( size );
+            std::visit([&](auto& iv) { fracunpack(iv, substr); }, v);
+         } else {
+            stream.skip( size );
+         }
       }
       else if constexpr (can_memcpy<T>())
       {
@@ -554,6 +711,221 @@ namespace psio
       }
    }
 
+
+   struct check_stream {
+      check_stream( const char* startptr, const char* endptr )
+      :begin(startptr),end(endptr),heap(startptr),pos(startptr),valid(false),unknown(false){
+
+      }
+      const char* begin;       ///< the start of the stream
+      const char* end;         ///< the absolute limit on reads
+      const char* heap;        ///< the location of the heap
+      const char* pos;         ///< the highest point read
+      bool        valid;       ///< no errors detected
+      bool        unknown;     ///< unknown fields detected, TODO: move from bools to ints
+
+      template<typename T>
+      friend check_stream fracval( const char* b, size_t e  );
+   };
+
+
+   template<typename T>
+   check_stream fracval( const char* b, const char* e  );
+   template<typename T>
+   check_stream fracval_view( const view<T>& v, const char* p, const char* e );
+
+
+   /**
+    * @pre b is valid pointer
+    * @pre e > b
+    */
+   template<typename T>
+   check_stream fracval( const char* b, const char* e  ) {
+     // std::cout <<"fracval...\n";
+      check_stream stream(b, e);
+      if constexpr( is_shared_view_ptr<T>::value ) {
+         return fracval<is_shared_view_ptr<T>::value_type>( b, e );
+      }
+      else if constexpr( not may_use_heap<T>() ) {
+         //std::cout <<"   no heap\n";
+         stream.pos      = stream.begin + fracpack_fixed_size<T>(); 
+         stream.heap     = stream.pos;
+         stream.valid    = stream.pos <= stream.end;
+         return stream;
+      }
+      else if constexpr( std::is_same_v<T,std::string> ) {
+        // std::cout <<"   is string\n";
+         if( bool(stream.valid = stream.begin + 4 < stream.end) ) {
+            uint32_t offset;
+            memcpy( &offset, stream.begin, sizeof(offset) );
+            stream.pos     += 4 + offset;
+            stream.heap     = stream.pos;
+            stream.valid    = stream.pos <= stream.end;
+         } else {
+            std::cout <<"string reads beyond end\n";
+         }
+         return stream;
+      }
+      else if constexpr( is_std_vector<T>::value ) {
+        // std::cout << "is std::vector\n";
+         using member_type = typename is_std_vector<T>::value_type;
+         if( bool(stream.valid = stream.begin + 4 <= stream.end) ) {
+            uint32_t size;
+            memcpy( &size, stream.begin, sizeof(size) );
+       //     std::cout <<"vec size: " << size<<"\n";
+            stream.pos  += 4;
+            stream.heap = stream.pos; /// heap starts after size bytes
+            if constexpr( not may_use_heap<member_type>() ) {
+         //       std::cout << " members don't use heap...\n";
+                stream.pos   = stream.heap; /// TODO: is this required for return
+                stream.valid = (size % fracpack_fixed_size<member_type>() == 0)
+                               and stream.heap <= stream.end;
+                return stream;
+            } else if(  bool(stream.valid = (size % sizeof(uint32_t)==0)) ) {/// must be a multiple of offset
+      //         std::cout << "members may use heap\n";
+                stream.heap += size;
+                auto end = stream.heap;
+                while( stream.pos != end ) {
+                   uint32_t offset;
+                   memcpy( &offset, stream.pos, sizeof(offset) );
+                   if( not bool( stream.valid = (stream.heap == stream.pos + offset) ) )
+                      return stream;
+
+                   auto substr = fracval<member_type>( stream.heap, stream.end );
+                   stream.heap = substr.heap;
+                   stream.pos += sizeof(offset); 
+                   stream.unknown |= substr.unknown;
+                   if( not (stream.valid = substr.valid) )
+                      return stream;
+                }
+            } else {
+               std::cout << "uses heap but size isn't multiple of offsetptr size\n";
+            }
+         } else {
+            std::cout <<"not enough space to read size\n";   
+         }
+      }
+      else if constexpr( is_std_variant<T>::value ) {
+         if( not bool(stream.valid = stream.begin + 4 + 1 <= stream.end) ) {
+            std::cout << "invalid... not 5+\n";
+            return stream;
+         }
+         uint8_t type = *stream.pos;
+         stream.pos++;
+         uint32_t size;
+         memcpy( &size, stream.pos, sizeof(size) );
+         stream.pos += 4;
+         if( type >= is_std_variant<T>::num_types ) {
+            stream.unknown = true;
+            stream.valid = stream.pos + size <= stream.end;
+            return stream;
+         } 
+         const_view<T> v( stream.begin );
+
+         check_stream substr(0,0);
+         v->visit( [&]( auto i ){
+               substr = fracval_view( i, stream.pos, stream.end );
+         });
+
+         stream.valid   &= substr.valid;
+         stream.unknown |= substr.unknown;
+         stream.heap     = substr.heap;
+         stream.pos      = substr.pos;
+         return stream;
+      }
+      else if constexpr( is_fixed_structure<T>() ) {
+     //    std::cout << "is fixed structure\n";
+         stream.pos         = stream.begin + fracpack_fixed_size<T>(); 
+         stream.heap        = stream.pos;
+         stream.valid       = stream.pos <= stream.end;
+
+         const char* memptr = stream.begin;
+         // visit each offset ptr
+         reflect<T>::for_each(
+             [&](const meta& ref, const auto& mptr) {
+               if( stream.valid ) {
+                  using member_type = decltype(result_of_member(mptr));
+                  /// heap use requires offset ptr, so we must check bounds
+                  if constexpr( may_use_heap<member_type>() ) {
+                     uint32_t offset;
+                     memcpy( &offset, memptr, sizeof(offset) );
+                     if( offset >= 4 ) {
+                        /// the next offset ptr must point at expected start of heap
+                        if( bool(stream.valid = (memptr + offset) == stream.heap ) ) {
+                            auto substr  = fracval<member_type>( stream.heap, stream.end );
+                            stream.pos   = substr.pos;
+                            stream.heap  = substr.heap;
+                            stream.valid = substr.valid;
+                            stream.unknown |= substr.unknown;
+                        }
+                     } else { 
+                        /// only optionals can have offset > 0 and offset < 4
+                        /// and the only valid options are 0 or 1
+                        stream.valid = (offset < 2); 
+                     }
+                  }
+                  /// go to the next member ptr
+                  memptr += fracpack_fixed_size<member_type>();
+              }
+          });
+      } else {
+         uint16_t start_heap;
+         memcpy( &start_heap, stream.pos, sizeof(start_heap) );
+
+         stream.pos     += sizeof(start_heap);
+         stream.heap    = stream.pos + start_heap;
+
+         stream.valid    = start_heap >= fixed_size_before_optional<T>();//fracpack_fixed_size<T>();
+         //stream.valid    = start_heap >= fracpack_fixed_size<T>();
+         stream.unknown |= start_heap > fracpack_fixed_size<T>();
+
+         const char* memptr = stream.pos;
+         // visit each offset ptr
+         reflect<T>::for_each(
+             [&](const meta& ref, const auto& mptr) {
+           //    std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid <<"  unknown: " << stream.unknown <<"\n";
+               if( stream.valid ) {
+            //      std::cout<<"    stream.valid\n";
+                  using member_type = decltype(result_of_member(mptr));
+                  /// heap use requires offset ptr, so we must check bounds
+                  if constexpr( may_use_heap<member_type>() ) {
+                     uint32_t offset;
+                     memcpy( &offset, memptr, sizeof(offset) );
+             //        std::cout << "offset to member...: " << offset <<"\n";
+                     if( offset >= 4 ) {
+                        /// the next offset ptr must point at expected start of heap
+                        if( bool(stream.valid = (memptr + offset) == stream.heap ) ) {
+                            auto substr  = fracval<member_type>( stream.heap, stream.end );
+                            stream.pos   = substr.pos;
+                            stream.heap  = substr.heap;
+                            stream.valid = substr.valid;
+                            stream.unknown |= substr.unknown;
+                        } else {
+                            stream.valid = false;
+                            std::cout << "unexpected offset ptr\n";
+                        }
+                     } else { 
+                        /// only optionals can have offset > 0 and offset < 4
+                        /// and the only valid options are 0 or 1
+                        stream.valid = (offset < 2); 
+                     }
+                  }
+                  /// go to the next member ptr
+                  memptr += fracpack_fixed_size<member_type>();
+              }
+          });
+
+
+      }
+      return stream;
+   }
+
+   template<typename T>
+   check_stream fracval_view( const_view<T>& v, const char* p, const char* e ) {
+      return fracval<T>(p, e);
+   }
+
+
    template <typename T, typename S>
    void fraccheck(S& stream)
    {
@@ -651,21 +1023,6 @@ namespace psio
       static constexpr const uint32_t value = get_offset<I, Args...>();
    };
 
-   template <typename View, typename Enable = void>
-   struct view;
-
-   template <typename T>
-   struct view<T, std::enable_if_t<std::is_arithmetic_v<T>>>;
-
-   template <>
-   struct view<std::string>;
-
-   template <typename... Ts>
-   struct view<std::variant<Ts...>>;
-
-   template <typename T>
-   struct view<T, std::enable_if_t<reflect<T>::is_struct>>;
-
    template <typename T>
    auto get_offset(char* pos)
    {
@@ -679,10 +1036,68 @@ namespace psio
       }
       return view<T>(pos + off);
    }
-
-   struct frac_proxy_view2
+   template <typename T>
+   auto get_offset(const char* pos)
    {
-      frac_proxy_view2(char* c) : buffer(c) {}
+      uint32_t off = *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
+      if constexpr (std::is_same_v<std::string, T> || is_std_vector<T>::value)
+      {
+         if (off == 0)
+            return const_view<T>(pos);
+         else
+            return const_view<T>(pos + off);
+      }
+      return const_view<T>(pos + off);
+   }
+
+   struct const_frac_proxy_view {
+
+      const_frac_proxy_view( const char* c) : buffer(c) {}
+
+      template <uint32_t idx, uint64_t Name, auto MemberPtr>
+      auto get()const
+      {
+         using class_type  = decltype(psio::class_of_member(MemberPtr));
+         using tuple_type  = typename psio::reflect<class_type>::struct_tuple_type;
+         using member_type = decltype(psio::result_of_member(MemberPtr));
+
+         constexpr uint32_t offset =
+             psio::get_tuple_offset<idx, tuple_type>::value +
+             2 * (psio::is_ext_structure<
+                     class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
+
+         auto out_ptr = buffer + offset;
+
+         if constexpr (is_std_optional<member_type>::value)
+         {
+            using opt_type  = typename is_std_optional<member_type>::value_type;
+            using const_view_type = const_view<opt_type>;
+
+            if constexpr (is_ext_structure<class_type>())
+            {
+               uint16_t start_heap = *reinterpret_cast<const unaligned_type<uint16_t>*>(buffer);
+               if (start_heap < offset + 2)
+                  return const_view_type(nullptr);
+            }
+            auto ptr = reinterpret_cast<const psio::offset_ptr*>(out_ptr);
+            if (ptr->offset < 4)
+               return const_view_type(nullptr);
+            return get_offset<opt_type>(out_ptr);  //view_type(ptr->get<opt_type>());
+         }
+         else if constexpr (may_use_heap<member_type>())
+         {
+            return get_offset<member_type>(out_ptr);
+         }
+         else
+         {
+            return view<member_type>(out_ptr);
+         }
+      }
+      const char* buffer;
+   };
+   struct frac_proxy_view
+   {
+      frac_proxy_view( char* c) : buffer(c) {}
 
       /** This method is called by the reflection library to get the field */
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
@@ -734,11 +1149,17 @@ namespace psio
    {
       using View::not_defined;
    };
+   template <typename View, typename Enable>
+   struct const_view
+   {
+      using View::not_defined;
+   };
 
    template <typename T>
    struct view<T, std::enable_if_t<std::is_arithmetic_v<T>>>
    {
-      view(char* p = nullptr) : pos(p) {}
+      using char_ptr = char*;
+      view(char_ptr p = nullptr) : pos(p) {}
       operator T() const { return *reinterpret_cast<const unaligned_type<T>*>(pos); }
 
       template <typename V>
@@ -756,15 +1177,38 @@ namespace psio
 
       auto* operator->() { return this; }
       auto& operator*() { return *this; }
+      auto* operator->()const { return this; }
+      auto& operator*()const { return *this; }
 
      private:
-      char* pos;
+      char_ptr pos;
    };
+
+   template <typename T>
+   struct const_view<T, std::enable_if_t<std::is_arithmetic_v<T>>>
+   {
+      using char_ptr = const char*;
+      const_view(char_ptr p = nullptr) : pos(p) {}
+      operator T() const { return *reinterpret_cast<const unaligned_type<T>*>(pos); }
+
+      template <typename S>
+      friend S& operator<<(S& stream, const const_view& member)
+      {
+         return stream << (T) * reinterpret_cast<const unaligned_type<T>*>(member.pos);
+      }
+
+      auto* operator->()const { return this; }
+      auto& operator*()const { return *this; }
+
+     private:
+      char_ptr pos;
+   };
+
 
    template <>
    struct view<std::string>
    {
-      view(const char* p = nullptr) : pos(p) {}
+      view(char* p = nullptr) : pos(p) {}
 
       uint32_t size() const { return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos); }
 
@@ -782,9 +1226,81 @@ namespace psio
       auto* operator->() { return this; }
       auto& operator*() { return *this; }
 
+      // TODO: add [] operators for mutation in place
+
+     private:
+      char* pos;
+   };
+
+   template <>
+   struct const_view<std::string>
+   {
+      const_view(const char* p = nullptr) : pos(p) {}
+
+      uint32_t size() const { return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos); }
+
+      bool valid() const { return pos != nullptr; }
+
+      operator std::string_view() const { return std::string_view(pos + 4, size()); }
+      operator std::string() const { return std::string(pos + 4, size()); }
+
+      template <typename S>
+      friend S& operator<<(S& stream, const const_view& member)
+      {
+         return stream << std::string_view(member);
+      }
+
+      auto* operator->()const { return this; }
+      auto& operator*()const { return *this; }
+
      private:
       const char* pos;
    };
+
+
+   template<typename T>
+   struct view< shared_view_ptr<T> >  {
+      view(char* p = nullptr) : pos(p) {}
+      auto operator->() { 
+         auto s =*reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
+         if( not s ) return view<T>(nullptr);
+         return view<T>(pos+4); 
+      }
+      auto operator*() { 
+         if( not pos ) return view<T>(nullptr);
+         return view<T>(pos+4); 
+      }
+      bool valid() const { 
+         return pos != nullptr &&
+              0 != *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
+      }
+      private: 
+         char* pos;
+   };
+
+
+   template<typename T>
+   struct const_view< shared_view_ptr<T> >  {
+      const_view(const char* p = nullptr) : pos(p) {}
+
+      auto operator->()const { 
+         auto s =*reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
+         if( not s ) return const_view<T>(nullptr);
+         return view<T>(pos+4); 
+      }
+      auto operator*()const { 
+         if( not pos ) return const_view<T>(nullptr);
+         return const_view<T>(pos+4); 
+      }
+
+      bool valid() const { 
+         return pos != nullptr &&
+              0 != *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
+      }
+      private: 
+         const char* pos;
+   };
+
 
    template <typename T>
    struct view<std::vector<T>>
@@ -819,14 +1335,59 @@ namespace psio
    };
 
    template <typename T>
-   struct view<T, std::enable_if_t<reflect<T>::is_struct>>
-       : public reflect<T>::template proxy<psio::frac_proxy_view2>
+   struct const_view<std::vector<T>>
    {
-      using base = typename reflect<T>::template proxy<psio::frac_proxy_view2>;
+      const_view(const char* p = nullptr) : pos(p) {}
+
+      uint32_t size() const
+      {
+         constexpr uint16_t fix_size = fracpack_fixed_size<T>();
+         return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / fix_size;
+      }
+
+      auto operator[](uint32_t idx)const
+      {
+         if constexpr (may_use_heap<T>())
+         {
+            return get_offset<T>(pos + 4 + idx * sizeof(uint32_t));
+         }
+         else
+         {
+            return const_view<T>(pos + 4 + idx * fracpack_fixed_size<T>());
+         }
+      }
+
+      bool valid() const { return pos != nullptr; }
+
+      auto* operator->()const  { return this; }
+      auto& operator*()const { return *this; }
+
+     private:
+      const char* pos;
+   };
+
+
+
+   template <typename T>
+   struct view<T, std::enable_if_t<reflect<T>::is_struct>>
+       : public reflect<T>::template proxy<psio::frac_proxy_view >
+   {
+      using base = typename reflect<T>::template proxy<psio::frac_proxy_view>;
       using base::base;
 
       auto* operator->() { return this; }
       auto& operator*() { return *this; }
+   };
+
+   template <typename T>
+   struct const_view<T, std::enable_if_t<reflect<T>::is_struct>>
+       : public reflect<T>::template proxy<psio::const_frac_proxy_view>
+   {
+      using base = typename reflect<T>::template proxy<psio::const_frac_proxy_view>;
+      using base::base;
+
+      auto* operator->()const { return this; }
+      auto& operator*()const { return *this; }
    };
 
    template <typename... Ts>
@@ -841,6 +1402,11 @@ namespace psio
       }
 
       bool  valid() const { return pos != nullptr; }
+      uint8_t  type()const { return *pos; }
+      uint32_t size()const {
+         return *reinterpret_cast<unaligned_type<uint32_t>*>(pos+1);
+      }
+      char*    data(){ return pos + 5; }
       auto* operator->() { return this; }
       auto& operator*() { return *this; }
 
@@ -851,7 +1417,42 @@ namespace psio
       {
          if (sizeof...(Rest) + 1 + *pos == sizeof...(Ts))
          {
-            v(view<First>(pos + 1));
+            v(view<First>(pos + 1+4));
+         }
+         else if constexpr (sizeof...(Rest) > 0)
+         {
+            _visit_variant<Visitor, Rest...>(std::forward<Visitor>(v));
+         }
+      }
+   };
+   template <typename... Ts>
+   struct const_view<std::variant<Ts...>>
+   {
+      const_view(const char* p = nullptr) : pos(p) {}
+
+      template <typename Visitor>
+      void visit(Visitor&& v)const
+      {
+         _visit_variant<Visitor, Ts...>(std::forward<Visitor>(v));
+      }
+
+      bool  valid() const { return pos != nullptr; }
+      uint8_t  type()const { return *pos; }
+      uint32_t size()const {
+         return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos+1);
+      }
+      const char*  data()const{ return pos + 5; }
+      auto* operator->()const { return this; }
+      auto& operator*()const { return *this; }
+
+     private:
+      const char* pos;
+      template <typename Visitor, typename First, typename... Rest>
+      void _visit_variant(Visitor&& v)const
+      {
+         if (sizeof...(Rest) + 1 + *pos == sizeof...(Ts))
+         {
+            v(const_view<First>(pos + 1+4));
          }
          else if constexpr (sizeof...(Rest) > 0)
          {
@@ -883,39 +1484,56 @@ namespace psio
          psio::fracpack(from, out);
       }
 
-      shared_view_ptr(const char* data)
+      shared_view_ptr(const char* data, uint32_t size )
       {
-         uint32_t size = 0;
-         memcpy(&size, data, sizeof(size));
-
          _data = std::shared_ptr<char>(new char[size + sizeof(size)], [](char* c) { delete[] c; });
-         memcpy(_data.get(), data, size + sizeof(size));
+         memcpy(_data.get(), &size, sizeof(size));
+         memcpy(_data.get()+sizeof(size), data, size );
       }
 
       shared_view_ptr(){};
       operator bool() const { return _data != nullptr; }
 
-      const auto operator->() const { return view<T>(data() + 4); }
-      auto       operator->() { return view<T>(data() + 4); }
+      const auto operator->() const { return view<T>(data()); }
+      auto       operator->() { return view<T>(data()); }
 
-      const char* data() const { return _data.get(); }
-      char*       data() { return _data.get(); }
+      const auto operator*() const { return view<T>(data()); }
+      auto       operator*() { return view<T>(data()); }
 
-      /** @return the number of bytes of packed data */
+      /** returns the data with a size prefix */
+      const char* data() const { return _data.get()+4; }
+      /** returns the data with a size prefix */
+      char*       data() { return _data.get()+4; }
+
+      std::string_view data_with_size_prefix() const { return std::string_view(_data.get(), size()+sizeof(uint32_t)); }
+      /** returns the data with a size prefix */
+      //char*       data_with_size_prefix() { return _data.get(); }
+
+      /** @return the number of bytes of packed data after the size prefix */
       size_t size() const
       {
+         if( _data == nullptr ) return 0;
          uint32_t s;
          memcpy(&s, _data.get(), sizeof(s));
          return s;
       }
 
-      void reset(size_t s = 0) { _data.reset(); }
+      void reset() { _data.reset(); }
+
+      void resize(uint32_t size ) {
+         _data.reset();
+         _data = std::shared_ptr<char>(new char[size + sizeof(size)], [](char* c) { delete[] c; });
+         memcpy(_data.get(), &size, sizeof(size));
+      }
 
       operator T() const { return unpack(); }
 
+      bool validate2 () const {
+         return psio::fracval<T>( data(), data() + size() ).valid;
+      }
       bool validate() const
       {
-         psio::check_input_stream in(data() + 4, size());
+         psio::check_input_stream in(data(), size());
          psio::fraccheck<T>(in);
          return in.total_read <= size();
       }

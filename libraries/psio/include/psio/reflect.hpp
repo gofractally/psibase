@@ -49,9 +49,9 @@ namespace psio
    struct meta
    {
       const char*                        name;
-      int32_t                            number;
       uint64_t                           offset = 0;
       std::initializer_list<const char*> param_names;
+      int32_t                            number;
    };
 
 #define PSIO_REFLECT_ARGS_INTERNAL(r, OP, i, PARAM) BOOST_PP_COMMA_IF(i) BOOST_PP_STRINGIZE(PARAM)
@@ -70,17 +70,17 @@ namespace psio
 #define PSIO_REFLECT_FOREACH_PB_INTERNAL(r, OP, member)                     \
    {                                                                        \
       auto off = __builtin_offsetof(OP, member);                            \
-      lambda(psio::meta{.number      = PSIO_REFLECT_FILTER_IDX    member,   \
-                        .name        = PSIO_REFLECT_FILTER_NAME_STR member, \
+      lambda(psio::meta{.name        = PSIO_REFLECT_FILTER_NAME_STR member, \
                         .offset      = off,                                 \
-                        .param_names = PSIO_REFLECT_FILTER_PARAMS member},  \
+                        .param_names = PSIO_REFLECT_FILTER_PARAMS member,  \
+                        .number      = PSIO_REFLECT_FILTER_IDX    member},   \
              &OP::PSIO_REFLECT_FILTER_NAME member);                         \
    }
 
 #define PSIO_REFLECT_FOREACH_INTERNAL(r, OP, i, member)                                            \
    {                                                                                               \
       auto off = __builtin_offsetof(OP, member);                                                   \
-      (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(member), .number = i + 1, .offset = off}, \
+      (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(member), .offset = off, .number = i + 1},  \
                               &OP::member);                                                        \
    }
 
@@ -398,6 +398,7 @@ namespace psio
             return std::string(get_type_name<First>()) + "|";
       }
       using alts_as_tuple = std::tuple<T...>;
+      constexpr static const uint16_t num_types = sizeof...(T);
    };
 
    template <typename>

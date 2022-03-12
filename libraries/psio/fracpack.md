@@ -1,5 +1,6 @@
 #ƒracpack ƒormat
 
+
 ƒracpack is a zero-copy data serialization format that is a faster alternative to Google
 FlatBuffers, Cap 'n' Proto. It was created to optimize the performance of database access 
 and inter-contract communication.
@@ -14,10 +15,19 @@ new optional fields at any time at the end of the structure but may not reorder
 or remove old fields.Empty fields are serialized as all 0's which allows them to be effeciently compressed,
 if desired, using the algorithm from Cap 'n' Proto.
 
+## TODO
+
+1. variant needs a size prefix for forward/backward compatibility
+2. must check that heap offset >= fixed_size 
+3. must require that all fields after first optional are optional (compile time check)
+4. must test structs with size 0, useful for variant tags, may not be used in vectors
+5. must require that each offset value is a particular value
+6. must signal when valid, but unknown types/fields are present
+
 ## Non Performance Benefits
 
 1. Data is smaller 
-2. There is a canonical representation (good for hashing )
+2. There is a canonical representation (good for hashing and security )
 3. No CPU Bombs (structures packed such that the parse time is nor corelated to data size)
 
 This document describes the serialized format.
@@ -277,11 +287,18 @@ char[size] string::data = "hello world" char string::nullterm = "\0";
 int                                          extra-- -- -- -- -- -- -- -- -- -- -
   ```
 
-    ##Variants
+##Variants
 
-        A variant is serialized in the following way :
+A variant is serialized in the following way:
 
-  ```c++ uint32_t size;  // the number bytes
+```c++ uint32_t size;  // the number bytes
 uint8_t            type;  // up to 255 types
-char[] data;
+uint32_t           size;
+char[size]         data;
 ```
+A variant has a size to enable forward/backward compatibility when adding new
+types that old code has not seen. A size of zero is acceptable.
+
+TODO: consider empty string or empty vector optimization.
+
+
