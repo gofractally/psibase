@@ -23,7 +23,16 @@ function(add_cltester_test N)
     add_test(
         NAME t-${N}
         WORKING_DIRECTORY ${ROOT_BINARY_DIR}
-        COMMAND ./cltester -v ${N}.wasm -s
+        COMMAND ./psitest -v ${N}.wasm -s
+    )
+    set_tests_properties(t-${N} PROPERTIES ENVIRONMENT NODE_PATH=dist)
+endfunction()
+
+function(native_and_wasm_test N)
+    add_test(
+        NAME t-${N}
+        WORKING_DIRECTORY ${ROOT_BINARY_DIR}
+        COMMAND ./psitest  ${N}.wasm -s
     )
     set_tests_properties(t-${N} PROPERTIES ENVIRONMENT NODE_PATH=dist)
 endfunction()
@@ -69,6 +78,9 @@ set(OPENSSL_ARCHIVE openssl-1.1.1k.tar.gz)
 set(OPENSSL_EXTRACTED openssl-1.1.1k)
 set(ZLIB_ARCHIVE zlib-1.2.11.tar.gz)
 set(ZLIB_EXTRACTED zlib-1.2.11)
+set(FLAT_BUFFERS_URL https://github.com/google/flatbuffers/archive/refs/tags )
+set(FLAT_BUFFERS_ARCHIVE v2.0.0.tar.gz )
+set(FLAT_BUFFERS_EXTRACTED flatbuffers )
 set(DEP_PREFIX ${CMAKE_BINARY_DIR}/deps)
 
 function(download url archive)
@@ -88,7 +100,6 @@ function(download url archive)
 endfunction()
 
 # These builds are done at generation time so cmake's find_* commands can find them
-
 if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
     download(${DEP_URL}/${ZLIB_ARCHIVE} ${DEP_PREFIX}/${ZLIB_ARCHIVE})
     message("building zlib")
@@ -131,11 +142,10 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
         "
     )
 endif()
-
 if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
     download(${DEP_URL}/${OPENSSL_ARCHIVE} ${DEP_PREFIX}/${OPENSSL_ARCHIVE})
     message("building openssl")
-    set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY")
+    set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL  -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY")
     execute_process(
         WORKING_DIRECTORY ${DEP_PREFIX}
         COMMAND bash -c "\
