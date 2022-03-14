@@ -166,6 +166,10 @@ impl<T: Packable + Sized + Default> Packable for Option<T> {
         todo!("Does the spec support Option<Option<T>> or top-level Option<T>?")
     }
 
+    fn unpack(_src: &mut &[u8]) -> Result<Self> {
+        todo!("Can option<T> be at the top level?")
+    }
+
     fn option_pack_fixed(_opt: &Option<Self>, _dest: &mut Vec<u8>) {
         todo!("Does the spec support Option<Option<T>>?")
     }
@@ -187,3 +191,102 @@ impl<T: Packable + Sized + Default> Packable for Option<T> {
         todo!("Does the spec support Option<Option<T>>?")
     }
 } // impl Packable for Option<T>
+
+impl Packable for String {
+    const FIXED_SIZE: u32 = 4;
+
+    fn pack_fixed(&self, dest: &mut Vec<u8>) {
+        dest.extend_from_slice(&0u32.to_le_bytes());
+    }
+
+    fn repack_fixed(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+        if self.is_empty() {
+            return;
+        }
+        dest[fixed_pos as usize..fixed_pos as usize + 4]
+            .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
+    }
+
+    fn pack_variable(&self, dest: &mut Vec<u8>) {
+        if self.is_empty() {
+            return;
+        }
+        dest.extend_from_slice(&(self.len() as u32).to_le_bytes());
+        dest.extend_from_slice(self.as_bytes());
+    }
+
+    fn pack(&self, _dest: &mut Vec<u8>) {
+        todo!("Does the spec support top-level string?");
+    }
+
+    fn unpack_inplace(&mut self, outer: &mut &[u8]) -> Result<()> {
+        let orig: &[u8] = outer;
+        let offset = u32::unpack(outer)?;
+        if offset == 0 {
+            self.clear();
+            return Ok(());
+        }
+        if offset < 4 {
+            return Err(Error::OffsetTooSmall);
+        }
+        let mut inner = orig.get(offset as usize..).ok_or(Error::EndOfStream)?;
+        self.unpack_inplace_skip_offset(&mut inner)
+    }
+
+    fn unpack_inplace_skip_offset(&mut self, src: &mut &[u8]) -> Result<()> {
+        let len = u32::unpack(src)?;
+        let bytes = src.get(..len as usize).ok_or(Error::EndOfStream)?;
+        *src = src.get(len as usize..).ok_or(Error::EndOfStream)?;
+        // TODO: from_utf8 (error if bad) instead?
+        *self = String::from_utf8_lossy(bytes).into_owned();
+        Ok(())
+    }
+
+    fn unpack(_src: &mut &[u8]) -> Result<Self> {
+        todo!("Does the spec support top-level string?");
+    }
+
+    fn option_pack_fixed(_opt: &Option<Self>, dest: &mut Vec<u8>) {
+        dest.extend_from_slice(&1u32.to_le_bytes())
+    }
+
+    fn option_repack_fixed(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+        if let Some(x) = opt {
+            if x.is_empty() {
+                dest[fixed_pos as usize..fixed_pos as usize + 4]
+                    .copy_from_slice(&(0 as u32).to_le_bytes())
+            } else {
+                dest[fixed_pos as usize..fixed_pos as usize + 4]
+                    .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes())
+            }
+        }
+    }
+
+    fn option_pack_variable(opt: &Option<Self>, dest: &mut Vec<u8>) {
+        if let Some(x) = opt {
+            x.pack_variable(dest)
+        }
+    }
+
+    fn option_unpack_inplace(opt: &mut Option<Self>, outer: &mut &[u8]) -> Result<()> {
+        let orig: &[u8] = outer;
+        let offset = u32::unpack(outer)?;
+        if offset == 1 {
+            *opt = None;
+            return Ok(());
+        }
+        if offset == 0 {
+            *opt = Some(String::from(""));
+            return Ok(());
+        }
+        if offset < 4 {
+            return Err(Error::OffsetTooSmall);
+        }
+        let mut inner = orig.get(offset as usize..).ok_or(Error::EndOfStream)?;
+        *opt = Some(Default::default());
+        if let Some(ref mut x) = *opt {
+            String::unpack_inplace_skip_offset(x, &mut inner)?;
+        }
+        Ok(())
+    }
+} // impl Packable for String
