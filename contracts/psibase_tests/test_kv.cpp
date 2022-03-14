@@ -79,6 +79,7 @@ void test(account_num this_contract)
       auto result = f(kv_map::contract, key, match_key_size);
       if (!result && !expected)
       {
+         check(get_key().empty(), "get_key() not empty");
          if (enable_print)
             eosio::print("ok   ");
          return;
@@ -92,6 +93,15 @@ void test(account_num this_contract)
             printf("0x%02x\n", val);
          abort_message("mismatched result");
       }
+      bool found = false;
+      for (auto& item : items)
+      {
+         if (item.value != *expected)
+            continue;
+         check(item.get_key(this_contract) == get_key(), "get_key() does not match");
+         found = true;
+      }
+      check(found, "matching value missing in items");
       if (enable_print)
          eosio::print("ok   ");
    };

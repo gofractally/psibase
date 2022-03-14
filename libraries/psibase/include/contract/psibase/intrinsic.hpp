@@ -16,6 +16,10 @@ namespace psibase
       [[clang::import_name("get_result")]] uint32_t get_result(const char* dest,
                                                                uint32_t    dest_size);
 
+      // Intrinsics which return keys do it by storing it in a key buffer.
+      // get_key copies min(dest_size, key_size) bytes into dest and returns key_size.
+      [[clang::import_name("get_key")]] uint32_t get_key(const char* dest, uint32_t dest_size);
+
       // Write message to console. Message should be UTF8.
       [[clang::import_name("write_console")]] void write_console(const char* message, uint32_t len);
 
@@ -61,8 +65,8 @@ namespace psibase
 
       // Get the first key-value pair which is greater than or equal to the provided
       // key. If one is found, and the first match_key_size bytes of the found key
-      // matches the provided key, then sets result to value and returns size.
-      // Otherwise returns -1 and clears result.
+      // matches the provided key, then sets result to value and returns size. Also
+      // sets key (use get_key). Otherwise returns -1 and clears result.
       [[clang::import_name("kv_greater_equal")]] uint32_t kv_greater_equal(kv_map      map,
                                                                            const char* key,
                                                                            uint32_t    key_len,
@@ -70,16 +74,16 @@ namespace psibase
 
       // Get the key-value pair immediately-before provided key. If one is found,
       // and the first match_key_size bytes of the found key matches the provided
-      // key, then sets result to value and returns size. Otherwise returns -1
-      // and clears result.
+      // key, then sets result to value and returns size. Also sets key (use get_key).
+      // Otherwise returns -1 and clears result.
       [[clang::import_name("kv_less_than")]] uint32_t kv_less_than(kv_map      map,
                                                                    const char* key,
                                                                    uint32_t    key_len,
                                                                    uint32_t    match_key_size);
 
       // Get the maximum key-value pair which has key as a prefix. If one is found,
-      // then sets result to value and returns size. Otherwise returns -1 and
-      // clears result.
+      // then sets result to value and returns size. Also sets key (use get_key).
+      // Otherwise returns -1 and clears result.
       [[clang::import_name("kv_max")]] uint32_t kv_max(kv_map      map,
                                                        const char* key,
                                                        uint32_t    key_len);
@@ -90,6 +94,9 @@ namespace psibase
 
    // Get result when size is unknown
    std::vector<char> get_result();
+
+   // Get key
+   std::vector<char> get_key();
 
    // Abort with message. Message should be UTF8.
    [[noreturn]] inline void abort_message(std::string_view msg)
@@ -245,7 +252,7 @@ namespace psibase
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
-   // returns the value. Otherwise returns nullopt.
+   // returns the value. Also sets key (use get_key). Otherwise returns nullopt.
    inline std::optional<std::vector<char>> kv_greater_equal_raw(kv_map              map,
                                                                 eosio::input_stream key,
                                                                 uint32_t            match_key_size)
@@ -258,7 +265,7 @@ namespace psibase
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
-   // returns the value. Otherwise returns nullopt.
+   // returns the value. Also sets key (use get_key). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_greater_equal(kv_map map, const K& key, uint32_t match_key_size)
    {
@@ -270,7 +277,7 @@ namespace psibase
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
-   // returns the value. Otherwise returns nullopt.
+   // returns the value. Also sets key (use get_key). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_greater_equal(const K& key, uint32_t match_key_size)
    {
@@ -279,7 +286,7 @@ namespace psibase
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // match_key_size bytes of the found key matches the provided key, then returns the value.
-   // Otherwise returns nullopt.
+   // Also sets key (use get_key). Otherwise returns nullopt.
    inline std::optional<std::vector<char>> kv_less_than_raw(kv_map              map,
                                                             eosio::input_stream key,
                                                             uint32_t            match_key_size)
@@ -292,7 +299,7 @@ namespace psibase
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // match_key_size bytes of the found key matches the provided key, then returns the value.
-   // Otherwise returns nullopt.
+   // Also sets key (use get_key). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_less_than(kv_map map, const K& key, uint32_t match_key_size)
    {
@@ -304,7 +311,7 @@ namespace psibase
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // match_key_size bytes of the found key matches the provided key, then returns the value.
-   // Otherwise returns nullopt.
+   // Also sets key (use get_key). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_less_than(const K& key, uint32_t match_key_size)
    {
@@ -312,7 +319,7 @@ namespace psibase
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Otherwise returns nullopt.
+   // value. Also sets key (use get_key). Otherwise returns nullopt.
    inline std::optional<std::vector<char>> kv_max_raw(kv_map map, eosio::input_stream key)
    {
       auto size = raw::kv_max(map, key.pos, key.remaining());
@@ -322,7 +329,7 @@ namespace psibase
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Otherwise returns nullopt.
+   // value. Also sets key (use get_key). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_max(kv_map map, const K& key)
    {
@@ -333,7 +340,7 @@ namespace psibase
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Otherwise returns nullopt.
+   // value. Also sets key (use get_key). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_max(const K& key)
    {

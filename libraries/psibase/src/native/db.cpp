@@ -199,7 +199,7 @@ namespace psibase
       return eosio::input_stream{(const char*)v.data(), v.size()};
    }
 
-   std::optional<eosio::input_stream> database::kv_greater_equal_raw(kv_map              map,
+   std::optional<database::kv_result> database::kv_greater_equal_raw(kv_map              map,
                                                                      eosio::input_stream key,
                                                                      size_t match_key_size)
    {
@@ -210,10 +210,13 @@ namespace psibase
          return std::nullopt;
       if (result.key.size() < match_key_size || memcmp(result.key.data(), key.pos, match_key_size))
          return std::nullopt;
-      return eosio::input_stream{(const char*)result.value.data(), result.value.size()};
+      return database::kv_result{
+          eosio::input_stream{(const char*)result.key.data(), result.key.size()},
+          eosio::input_stream{(const char*)result.value.data(), result.value.size()},
+      };
    }
 
-   std::optional<eosio::input_stream> database::kv_less_than_raw(kv_map              map,
+   std::optional<database::kv_result> database::kv_less_than_raw(kv_map              map,
                                                                  eosio::input_stream key,
                                                                  size_t              match_key_size)
    {
@@ -228,10 +231,13 @@ namespace psibase
          return std::nullopt;
       if (result.key.size() < match_key_size || memcmp(result.key.data(), key.pos, match_key_size))
          return std::nullopt;
-      return eosio::input_stream{(const char*)result.value.data(), result.value.size()};
+      return database::kv_result{
+          eosio::input_stream{(const char*)result.key.data(), result.key.size()},
+          eosio::input_stream{(const char*)result.value.data(), result.value.size()},
+      };
    }
 
-   std::optional<eosio::input_stream> database::kv_max_raw(kv_map map, eosio::input_stream key)
+   std::optional<database::kv_result> database::kv_max_raw(kv_map map, eosio::input_stream key)
    {
       std::vector<unsigned char> next(reinterpret_cast<const unsigned char*>(key.pos),
                                       reinterpret_cast<const unsigned char*>(key.end));
@@ -260,7 +266,10 @@ namespace psibase
       if (result->key.size() < key.remaining() ||
           memcmp(result->key.data(), key.pos, key.remaining()))
          return std::nullopt;
-      return eosio::input_stream{(const char*)result->value.data(), result->value.size()};
+      return database::kv_result{
+          eosio::input_stream{(const char*)result->key.data(), result->key.size()},
+          eosio::input_stream{(const char*)result->value.data(), result->value.size()},
+      };
    }
 
 }  // namespace psibase
