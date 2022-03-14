@@ -2,6 +2,12 @@ use fracpack::*;
 use psi_macros::*;
 
 #[derive(Fracpack, Default, PartialEq, Debug)]
+pub struct InnerStruct {
+    inner_u32: u32,
+    inner_option_u32: Option<u32>,
+}
+
+#[derive(Fracpack, Default, PartialEq, Debug)]
 pub struct TestType {
     field_u8: u8,
     field_u16: u16,
@@ -13,6 +19,7 @@ pub struct TestType {
     field_i64: i64,
     field_f32: f32,
     field_f64: f64,
+    field_inner: InnerStruct,
     field_option_u8: Option<u8>,
     field_option_u16: Option<u16>,
     field_option_u32: Option<u32>,
@@ -23,6 +30,7 @@ pub struct TestType {
     field_option_i64: Option<i64>,
     field_option_f32: Option<f32>,
     field_option_f64: Option<f64>,
+    field_option_inner: Option<InnerStruct>,
 }
 
 #[cxx::bridge]
@@ -46,6 +54,10 @@ const TESTS1: [TestType; 2] = [
         field_i64: -8,
         field_f32: 9.24,
         field_f64: -10.5,
+        field_inner: InnerStruct {
+            inner_u32: 1234,
+            inner_option_u32: None,
+        },
         field_option_u8: Some(11),
         field_option_u16: Some(12),
         field_option_u32: None,
@@ -56,6 +68,7 @@ const TESTS1: [TestType; 2] = [
         field_option_i64: None,
         field_option_f32: Some(-17.5),
         field_option_f64: None,
+        field_option_inner: None,
     },
     TestType {
         field_u8: 0xff,
@@ -68,6 +81,10 @@ const TESTS1: [TestType; 2] = [
         field_i64: -0x7fff_ffff_ffff_fffc,
         field_f32: 9.24,
         field_f64: -10.5,
+        field_inner: InnerStruct {
+            inner_u32: 1234,
+            inner_option_u32: Some(0x1234),
+        },
         field_option_u8: None,
         field_option_u16: None,
         field_option_u32: Some(0xffff_fff7),
@@ -78,6 +95,10 @@ const TESTS1: [TestType; 2] = [
         field_option_i64: Some(0x7fff_ffff_ffff_fff5),
         field_option_f32: None,
         field_option_f64: Some(12.0),
+        field_option_inner: Some(InnerStruct {
+            inner_u32: 1234,
+            inner_option_u32: Some(0x1234),
+        }),
     },
 ];
 

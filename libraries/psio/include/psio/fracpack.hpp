@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 #include <psio/error.hpp>
 #include <psio/name.hpp>
 #include <psio/stream.hpp>
