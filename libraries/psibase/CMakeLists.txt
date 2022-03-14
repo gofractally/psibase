@@ -29,6 +29,8 @@ function(add suffix)
         )
         target_include_directories(psibase-contract-base${suffix} PUBLIC include/contract ../eosiolib/core/include ../eosiolib/contracts/include)
 
+        file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
+
         # Contract with simple malloc/free
         add_library(psibase-contract-simple-malloc${suffix} INTERFACE)
         target_link_libraries(psibase-contract-simple-malloc${suffix} INTERFACE
@@ -40,7 +42,7 @@ function(add suffix)
             -lc-no-malloc${suffix}
             simple-malloc${suffix}
             eosio-contracts-wasi-polyfill${suffix}
-            ${WASI_SDK_PREFIX}/lib/clang/11.0.0/lib/wasi/libclang_rt.builtins-wasm32.a
+            ${LIBCLANG_RT_BUILTINS}
         )
 
         # Contract with full malloc/free
@@ -52,7 +54,7 @@ function(add suffix)
             c++abi-replacements${suffix}
             -lc
             eosio-contracts-wasi-polyfill${suffix}
-            ${WASI_SDK_PREFIX}/lib/clang/11.0.0/lib/wasi/libclang_rt.builtins-wasm32.a
+            ${LIBCLANG_RT_BUILTINS}
         )
 
         add_library(nctestlib${suffix})
@@ -85,7 +87,7 @@ function(add suffix)
             -lc++
             -lc++abi
             -lc
-            ${WASI_SDK_PREFIX}/lib/clang/11.0.0/lib/wasi/libclang_rt.builtins-wasm32.a
+            ${LIBCLANG_RT_BUILTINS}
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
         )
         target_include_directories(nctestlib${suffix} PUBLIC
