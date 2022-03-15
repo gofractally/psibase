@@ -110,8 +110,9 @@ namespace psibase
       {
          if (sz >= 0)
          {
+            sz = raw::get_key(nullptr, 0);
             key.resize(sz);
-            raw::get_result(key.data(), key.size());
+            raw::get_key(key.data(), key.size());
             is_end = false;
          }
          else
