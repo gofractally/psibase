@@ -191,41 +191,41 @@ namespace psibase
    };
 
    template <typename T, typename U>
-   concept CompatibleKeyUnqual = std::same_as<T, U> || compatible_tuple<T, U>::value;
+   concept compatible_key_unqual = std::same_as<T, U> || compatible_tuple<T, U>::value;
 
    template <typename T, typename U>
-   concept CompatibleKey = CompatibleKeyUnqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
+   concept compatible_key = compatible_key_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
 
    template <typename... T, typename... U>
-   requires(CompatibleKey<T, U>&&...) struct compatible_tuple<std::tuple<T...>, std::tuple<U...>>
+   requires(compatible_key<T, U>&&...) struct compatible_tuple<std::tuple<T...>, std::tuple<U...>>
    {
       static constexpr bool value = true;
    };
 
    template <typename T, typename U>
-   struct prefix_compatible_tuple
+   struct compatible_tuple_prefix
    {
       static constexpr bool value = false;
    };
    template <typename... T, typename... U>
    requires(sizeof...(T) <=
-            sizeof...(U)) struct prefix_compatible_tuple<std::tuple<T...>, std::tuple<U...>>
+            sizeof...(U)) struct compatible_tuple_prefix<std::tuple<T...>, std::tuple<U...>>
    {
       static constexpr bool value =
           compatible_tuple<boost::mp11::mp_take_c<std::tuple<U...>, sizeof...(T)>,
                            std::tuple<T...>>::value;
    };
    template <typename T, typename... U>
-   requires(sizeof...(U) >= 1) struct prefix_compatible_tuple<T, std::tuple<U...>>
+   requires(sizeof...(U) >= 1) struct compatible_tuple_prefix<T, std::tuple<U...>>
    {
-      static constexpr bool value = CompatibleKey<boost::mp11::mp_front<std::tuple<U...>>, T>;
+      static constexpr bool value = compatible_key<boost::mp11::mp_front<std::tuple<U...>>, T>;
    };
 
    template <typename T, typename U>
-   concept PrefixCompatibleKeyUnqual = std::same_as<T, U> || prefix_compatible_tuple<T, U>::value;
+   concept compatible_key_prefix_unqual = std::same_as<T, U> || compatible_tuple_prefix<T, U>::value;
    template <typename T, typename U>
-   concept PrefixCompatibleKey =
-       PrefixCompatibleKeyUnqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
+   concept compatible_key_prefix =
+       compatible_key_prefix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
 
    template <typename T, typename U>
    struct key_suffix_unqual
@@ -235,12 +235,12 @@ namespace psibase
    template <typename... T, typename... U>
    struct key_suffix_unqual<std::tuple<T...>, std::tuple<U...>>
    {
-      using type = boost::mp11::mp_drop_c<std::tuple<T...>, sizeof...(U)>;
+      using type = boost::mp11::mp_drop_c<std::tuple<U...>, sizeof...(T)>;
    };
-   template <typename... T, typename U>
-   struct key_suffix_unqual<std::tuple<T...>, U>
+   template <typename T, typename... U>
+   struct key_suffix_unqual<T, std::tuple<U...>>
    {
-      using type = boost::mp11::mp_drop_c<std::tuple<T...>, 1>;
+      using type = boost::mp11::mp_drop_c<std::tuple<U...>, 1>;
    };
    template <typename T>
    struct key_suffix_unqual<T, T>
@@ -268,7 +268,7 @@ namespace psibase
          auto copy = prefix;
          return kv_iterator<T>(std::move(copy), prefix.size(), is_secondary());
       }
-      kv_iterator<T> lower_bound(PrefixCompatibleKey<K> auto&& k) const
+      kv_iterator<T> lower_bound(compatible_key_prefix<K> auto&& k) const
       {
          key_view       key_base{{prefix.data(), prefix.size()}};
          auto           key = eosio::convert_to_key(std::tie(key_base, k));
@@ -277,7 +277,7 @@ namespace psibase
          result.move_to(res);
          return result;
       }
-      kv_iterator<T> upper_bound(PrefixCompatibleKey<K> auto&& k) const
+      kv_iterator<T> upper_bound(compatible_key_prefix<K> auto&& k) const
       {
          key_view key_base{{prefix.data(), prefix.size()}};
          auto     key = eosio::convert_to_key(std::tie(key_base, k));
@@ -297,14 +297,14 @@ namespace psibase
          result.move_to(res);
          return result;
       }
-      template <PrefixCompatibleKey<K> K2>
-      index<T, key_suffix<K, K2>> subindex(K2&& k)
+      template <compatible_key_prefix<K> K2>
+      index<T, key_suffix<K2, K>> subindex(K2&& k)
       {
          key_view key_base{{prefix.data(), prefix.size()}};
          auto     key = eosio::convert_to_key(std::tie(key_base, k));
-         return index<T, key_suffix<K, K2>>(std::move(key));
+         return index<T, key_suffix<K2, K>>(std::move(key));
       }
-      std::optional<T> get(CompatibleKey<K> auto&& k) const
+      std::optional<T> get(compatible_key<K> auto&& k) const
       {
          key_view key_base{{prefix.data(), prefix.size()}};
          auto     buffer = eosio::convert_to_key(std::tie(key_base, k));
