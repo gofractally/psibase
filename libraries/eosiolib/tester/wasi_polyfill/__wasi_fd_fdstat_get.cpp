@@ -1,6 +1,7 @@
 #include <wasi/api.h>
+#include "polyfill.hpp"
 
-extern "C" __wasi_errno_t __wasi_fd_fdstat_get(__wasi_fd_t fd, __wasi_fdstat_t* stat)
+extern "C" __wasi_errno_t POLYFILL_NAME(fd_fdstat_get)(__wasi_fd_t fd, __wasi_fdstat_t* stat)
     __attribute__((__import_module__("wasi_snapshot_preview1"), __import_name__("fd_fdstat_get")))
 {
    [[clang::import_name("tester_fdstat_get")]] uint32_t tester_fdstat_get(

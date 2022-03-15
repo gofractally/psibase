@@ -102,4 +102,10 @@ extern "C"
    }
 
    void free(void* ptr) {}
+
+   // Define these to satisfy musl references.
+   void *__libc_malloc(size_t) __attribute__((alias("malloc")));
+   void __libc_free(void *) __attribute__((alias("free")));
+   void *__libc_calloc(size_t nmemb, size_t size) __attribute__((alias("calloc")));
+
 }
