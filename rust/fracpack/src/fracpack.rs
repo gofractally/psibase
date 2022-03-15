@@ -26,7 +26,7 @@ pub trait Packable {
     fn pack(&self, dest: &mut Vec<u8>);
     fn unpack_inplace(&mut self, src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32)
         -> Result<()>;
-    fn unpack_inplace_skip_offset(&mut self, src: &[u8], pos: &mut u32) -> Result<()>;
+    fn unpack_maybe_heap(&mut self, src: &[u8], pos: &mut u32) -> Result<()>;
 
     fn unpack(src: &[u8], pos: &mut u32) -> Result<Self>
     where
@@ -106,7 +106,7 @@ fn option_unpack_inplace<T: Packable + Default>(
     }
     *opt = Some(Default::default());
     if let Some(ref mut x) = *opt {
-        T::unpack_inplace_skip_offset(x, src, heap_pos)?;
+        x.unpack_maybe_heap(src, heap_pos)?;
     }
     Ok(())
 }
@@ -129,15 +129,15 @@ macro_rules! scalar_impl_fracpack {
                 fixed_pos: &mut u32,
                 _heap_pos: &mut u32,
             ) -> Result<()> {
-                self.unpack_inplace_skip_offset(src, fixed_pos)
+                self.unpack_maybe_heap(src, fixed_pos)
             }
-            fn unpack_inplace_skip_offset(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
+            fn unpack_maybe_heap(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
                 *self = <$t>::from_le_bytes(read_u8_arr(src, pos)?.into());
                 Ok(())
             }
             fn unpack(src: &[u8], pos: &mut u32) -> Result<Self> {
                 let mut val: $t = Default::default();
-                val.unpack_inplace_skip_offset(src, pos)?;
+                val.unpack_maybe_heap(src, pos)?;
                 Ok(val)
             }
         }
@@ -183,7 +183,7 @@ impl<T: Packable + Sized + Default> Packable for Option<T> {
         T::option_unpack_inplace(self, src, fixed_pos, heap_pos)
     }
 
-    fn unpack_inplace_skip_offset(&mut self, _src: &[u8], _pos: &mut u32) -> Result<()> {
+    fn unpack_maybe_heap(&mut self, _src: &[u8], _pos: &mut u32) -> Result<()> {
         todo!("Does the spec support Option<Option<T>> or top-level Option<T>?")
     }
 
@@ -260,10 +260,10 @@ impl Packable for String {
         if *heap_pos != orig_pos + offset {
             return Err(Error::BadOffset);
         }
-        self.unpack_inplace_skip_offset(src, heap_pos)
+        self.unpack_maybe_heap(src, heap_pos)
     }
 
-    fn unpack_inplace_skip_offset(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
+    fn unpack_maybe_heap(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
         let len = u32::unpack(src, pos)?;
         if len == 0 {
             return Err(Error::BadEmptyEncoding);
@@ -324,7 +324,7 @@ impl Packable for String {
         }
         *opt = Some(Default::default());
         if let Some(ref mut x) = *opt {
-            x.unpack_inplace_skip_offset(src, heap_pos)?;
+            x.unpack_maybe_heap(src, heap_pos)?;
         }
         Ok(())
     }
@@ -380,10 +380,10 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
         if *heap_pos != orig_pos + offset {
             return Err(Error::BadOffset);
         }
-        self.unpack_inplace_skip_offset(src, heap_pos)
+        self.unpack_maybe_heap(src, heap_pos)
     }
 
-    fn unpack_inplace_skip_offset(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
+    fn unpack_maybe_heap(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
         let len = u32::unpack(src, pos)?;
         if len == 0 {
             return Err(Error::BadEmptyEncoding);
@@ -457,7 +457,7 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
         }
         *opt = Some(Default::default());
         if let Some(ref mut x) = *opt {
-            x.unpack_inplace_skip_offset(src, heap_pos)?;
+            x.unpack_maybe_heap(src, heap_pos)?;
         }
         Ok(())
     }

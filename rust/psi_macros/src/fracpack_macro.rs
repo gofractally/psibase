@@ -107,9 +107,9 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
                 if *heap_pos != orig_pos + offset {
                     return Err(Error::BadOffset);
                 }
-                self.unpack_inplace_skip_offset(src, heap_pos)
+                self.unpack_maybe_heap(src, heap_pos)
             }
-            fn unpack_inplace_skip_offset(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
+            fn unpack_maybe_heap(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
                 let heap_size = u16::unpack(src, pos)?;
                 let mut heap_pos = *pos + heap_size as u32;
                 #unpack
@@ -121,7 +121,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
                 Self: Default,
             {
                 let mut result: Self = Default::default();
-                result.unpack_inplace_skip_offset(src, pos)?;
+                result.unpack_maybe_heap(src, pos)?;
                 Ok(result)
             }
         }
