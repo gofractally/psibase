@@ -30,7 +30,7 @@ RUN cd /root \
 
 RUN cd /opt \
     && curl -LO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz \
-    && tar xf wasi-sdk-12.0-linux.tar.gz \
+    && tar xf wasi-sdk-14.0-linux.tar.gz \
     && curl -LO https://nodejs.org/dist/v14.16.0/node-v14.16.0-linux-x64.tar.xz \
     && tar xf node-v14.16.0-linux-x64.tar.xz \
     && rm *.tar.* \
