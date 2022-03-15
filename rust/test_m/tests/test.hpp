@@ -13,13 +13,20 @@
 
 struct InnerStruct
 {
-   uint32_t                   inner_u32;
-   std::optional<uint32_t>    inner_option_u32;
-   std::optional<std::string> inner_option_str;
+   uint32_t                                            inner_u32;
+   std::optional<uint32_t>                             inner_option_u32;
+   std::optional<std::string>                          inner_option_str;
+   std::optional<std::vector<uint16_t>>                inner_option_vec_u16;
+   std::optional<std::vector<std::optional<uint16_t>>> inner_o_vec_o_u16;
 
    auto operator<=>(const InnerStruct& b) const = default;
 };
-PSIO_REFLECT(InnerStruct, inner_u32, inner_option_u32, inner_option_str)
+PSIO_REFLECT(InnerStruct,
+             inner_u32,
+             inner_option_u32,
+             inner_option_str,
+             inner_option_vec_u16,
+             inner_o_vec_o_u16)
 
 struct TestType
 {
@@ -35,6 +42,7 @@ struct TestType
    float                      field_f32;
    double                     field_f64;
    InnerStruct                field_inner;
+   std::vector<InnerStruct>   field_v_inner;
    std::optional<uint8_t>     field_option_u8;
    std::optional<uint16_t>    field_option_u16;
    std::optional<uint32_t>    field_option_u32;
@@ -63,6 +71,7 @@ PSIO_REFLECT(TestType,
              field_f32,
              field_f64,
              field_inner,
+             field_v_inner,
              field_option_u8,
              field_option_u16,
              field_option_u32,
