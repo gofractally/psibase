@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <psio/fracpack.hpp>
+#include <psio/schema.hpp>
 #include <psio/to_bin.hpp>
 #include "trans_generated.h"
 #include "transfer_generated.h"
@@ -145,7 +146,7 @@ TEST_CASE("variant")
    REQUIRE(psio::fracpack_size(vs.v) == psio::fracpack_size(simple()) + 1+4);
 
    psio::shared_view_ptr<varstr> p({.v = simple{.a = 1111, .b = 222, .c = 333}});
-   REQUIRE(p.validate2());
+   REQUIRE(p.validate());
    REQUIRE(p.size() == 1 + 2 + 4 + 4 + psio::fracpack_size(simple()));
 
    auto tv = reinterpret_cast<test_view*>(p.data()-4);
@@ -228,7 +229,7 @@ TEST_CASE("fracpack-nest")
    psio::shared_view_ptr<nested_final_struct> p(ex);
 
    p.validate();
-   REQUIRE( p.validate2() );
+   REQUIRE( p.validate() );
    std::cout << "p.size: " << p.size() << "\n";
 
    REQUIRE((uint32_t)p->a() == 42);
@@ -348,13 +349,13 @@ TEST_CASE("non_opt_after_opt") {
 TEST_CASE("fracpack_vector")
 {
    psio::shared_view_ptr emptyp(struct_with_vector_char{.test = {}});
-   emptyp.validate2();
+   emptyp.validate();
    REQUIRE(emptyp.size() == (2 + 4));
 
    psio::shared_view_ptr p(struct_with_vector_char{.test = {'1', '2', '3'}});
    REQUIRE(p.size() == (2 + 4 + 4 + 3));
    std::cout << "struct with vector char\n";
-   REQUIRE( p.validate2() );
+   REQUIRE( p.validate() );
    std::cout << "size: " << p.size() << "\n";
 
    std::cout << "test->size() = " << p->test()->size() << "\n";
@@ -374,7 +375,7 @@ TEST_CASE("fracpack_vector")
 
    {  /// testing with INT
       psio::shared_view_ptr p(struct_with_vector_int{.test = {1, 2, 3}});
-      REQUIRE( p.validate2() );
+      REQUIRE( p.validate() );
       REQUIRE(p.size() == (2 + 4 + 4 + 3 * 4));
       std::cout << "size: " << p.size() << "\n";
 
@@ -409,7 +410,7 @@ TEST_CASE("fracpack_vector")
 TEST_CASE("fracpack_vector_str")
 {
    psio::shared_view_ptr p(struct_with_vector_str{.test = {"a|", "bc|"}});
-   REQUIRE( p.validate2() );
+   REQUIRE( p.validate() );
    std::cout << "size: " << p.size() << "\n";
    std::cout << "vecptr       0]  4  == " << *reinterpret_cast<uint32_t*>(p.data() + 0 ) << "\n";
    std::cout << "vecsize      4]  8  == " << *reinterpret_cast<uint32_t*>(p.data()  + 4) << "\n";
@@ -453,7 +454,7 @@ TEST_CASE("nestfinal")
    REQUIRE(psio::can_memcpy<outer>() == true);
 
    psio::shared_view_ptr<outer> p({.in = {.a = 1, .b = 2}, .c = 3});
-   REQUIRE( p.validate2() );
+   REQUIRE( p.validate() );
    std::cout << p->in()->a() << "\n";
    std::cout << p->in()->b() << "\n";
 
@@ -465,7 +466,7 @@ TEST_CASE("nestfinal")
 
 TEST_CASE( "frac2" ) {
    psio::shared_view_ptr<outer> p({.in = {.a = 1, .b = 2}, .c = 3});
-   REQUIRE( p.validate2() );
+   REQUIRE( p.validate() );
    psio::view<outer> v( p.data() );
    std::cout<<"v.c: " << v.c() <<"\n";
    v.in().get().a();
@@ -485,7 +486,7 @@ TEST_CASE("vectorstruct")
 {
    vecstruct                 test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
    psio::shared_view_ptr<vecstruct> p(test);
-   REQUIRE( p.validate2() );
+   REQUIRE( p.validate() );
    REQUIRE(p.size() == 2 + 4 + 4 + 3 * 12);
    REQUIRE((int)p->vs()[0].c() == 1);
    REQUIRE((int)p->vs()[1].c() == 2);
@@ -500,7 +501,7 @@ TEST_CASE("vectorstruct")
 TEST_CASE( "frac2vec" ) {
    vecstruct                 test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
    psio::shared_view_ptr<vecstruct> p(test);
-   REQUIRE( p.validate2() );
+   REQUIRE( p.validate() );
    psio::view<vecstruct> v( p.data() );
 
    REQUIRE( v.vs()->size() == 3 );
@@ -704,10 +705,10 @@ TEST_CASE("blockchain")
 
    {
       auto start = std::chrono::steady_clock::now();
+      std::vector<flatbuffers::FlatBufferBuilder> fbb(10000);
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         flatbuffers::FlatBufferBuilder fbb;
-         fbb.Finish(cliofb::transaction::Pack(fbb, &gtrx));
+         fbb[i].Finish(cliofb::transaction::Pack(fbb[i], &gtrx));
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -717,14 +718,28 @@ TEST_CASE("blockchain")
 
    {
       auto start = std::chrono::steady_clock::now();
+      std::vector<psio::shared_view_ptr<transaction>> save(10000);
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         auto tmp = psio::shared_view_ptr<transaction>(ftrx);
+         save[i] = psio::shared_view_ptr<transaction>(ftrx);
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
       ft         = std::chrono::duration<double, std::milli>(delta).count();
       std::cout << "fracpack pack trx:   " << ft << " ms  " << 100 * ft / gt << "%\n";
+   }
+
+   {
+      auto start = std::chrono::steady_clock::now();
+      std::vector<uint32_t> r(10000);
+      for (uint32_t i = 0; i < 10000; ++i)
+      {
+         ftrx.expires =psio::fracpack_size(ftrx); //psio::shared_view_ptr<transaction>(ftrx);
+      }
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      ft         = std::chrono::duration<double, std::milli>(delta).count();
+      std::cout << "fracpack pack_size trx:   " << ft << " ms  " << 100 * ft / gt << "%\n";
    }
 
 
@@ -780,20 +795,6 @@ TEST_CASE("blockchain")
       std::cout << "google check tx:    " << gt << " ms\n";
    }
 
-   {
-      auto     tmp   = psio::shared_view_ptr<transaction>(ftrx);
-      auto     start = std::chrono::steady_clock::now();
-      uint64_t x     = 0;
-      for (uint32_t i = 0; i < 10000; ++i)
-      {
-         tmp.validate();
-      }
-      //REQUIRE( std::string_view(tmp->memo()) == std::string_view("test") );
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-      ft         = std::chrono::duration<double, std::milli>(delta).count();
-      std::cout << "fracpack check tx:  " << ft << " ms  " << 100 * ft / gt << "%\n";
-   }
 
    {
       auto     tmp   = psio::shared_view_ptr<transaction>(ftrx);
@@ -801,7 +802,7 @@ TEST_CASE("blockchain")
       uint64_t x     = 0;
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         tmp.validate2();
+         tmp.validate();
       }
       //REQUIRE( std::string_view(tmp->memo()) == std::string_view("test") );
       auto end   = std::chrono::steady_clock::now();
@@ -1010,20 +1011,6 @@ TEST_CASE("blockchain")
       for (uint32_t i = 0; i < 10000; ++i)
       {
          tmp.validate();
-      }
-      //REQUIRE( std::string_view(tmp->memo()) == std::string_view("test") );
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-      ft         = std::chrono::duration<double, std::milli>(delta).count();
-      std::cout << "fracpack check:  " << ft << " ms  " << 100 * ft / gt << "%\n";
-   }
-   {
-      auto     tmp   = psio::shared_view_ptr<transfer>(frtr);
-      auto     start = std::chrono::steady_clock::now();
-      uint64_t x     = 0;
-      for (uint32_t i = 0; i < 10000; ++i)
-      {
-         tmp.validate2();
       }
       //REQUIRE( std::string_view(tmp->memo()) == std::string_view("test") );
       auto end   = std::chrono::steady_clock::now();

@@ -1,7 +1,7 @@
 enable_testing()
 
 add_library( psio INTERFACE )
-target_link_libraries( psio INTERFACE rapidjson )
+target_link_libraries( psio INTERFACE rapidjson simdjson )
 target_include_directories( psio INTERFACE include ${Boost_INCLUDE_DIRS} )
 add_compile_options( -Wall -Wstrict-aliasing )
 

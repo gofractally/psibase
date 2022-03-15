@@ -5,6 +5,10 @@
 #include <psio/stream.hpp>
 #include <psio/unaligned_type.hpp>
 
+/// required for UTF8 validation of strings
+#include <simdjson.h>
+#include <rapidjson/encodings.h>
+
 namespace psio
 {
    template <typename T>
@@ -692,8 +696,21 @@ namespace psio
             stream.read(&offset, sizeof(offset));
             if (offset >= 4)
             {
+
                S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
                fraccheck<T>(insubstream);
+
+               /** this is safe to read after the above lone because it already checked
+                *  the bounds. This enforces that an empty string or vector is always
+                *  encoded as a zero offset rather than an offset to a 0 allocated on the
+                *  heap.
+                */
+               uint32_t vec_str_size = 0;
+               memcpy( &vec_str_size, stream.pos + offset, sizeof(vec_str_size) );
+
+               if( vec_str_size == 0 ) 
+                  throw_error( stream_error::empty_vec_used_offset );
+
                stream.add_total_read(insubstream.get_total_read());
             }
          }
@@ -726,14 +743,34 @@ namespace psio
       bool        unknown;     ///< unknown fields detected, TODO: move from bools to ints
 
       template<typename T>
-      friend check_stream fracval( const char* b, size_t e  );
+      friend check_stream fracvalidate( const char* b, size_t e  );
    };
 
 
    template<typename T>
-   check_stream fracval( const char* b, const char* e  );
+   check_stream fracvalidate( const char* b, const char* e  );
    template<typename T>
-   check_stream fracval_view( const view<T>& v, const char* p, const char* e );
+   check_stream fracvalidate_view( const view<T>& v, const char* p, const char* e );
+
+
+
+#ifdef __wasm__
+   // Adaptors for rapidjson
+   struct rapidjson_stream_adaptor
+   {
+      rapidjson_stream_adaptor(const char* src, int sz)
+      {
+         int chars = std::min(sz, 4);
+         memcpy(buf, src, chars);
+         memset(buf + chars, 0, 4 - chars);
+      }
+      void Put(char ch) {}
+      char Take() { return buf[idx++]; }
+      char buf[4];
+      int idx = 0;
+   };
+#endif
+
 
 
    /**
@@ -741,49 +778,51 @@ namespace psio
     * @pre e > b
     */
    template<typename T>
-   check_stream fracval( const char* b, const char* e  ) {
-     // std::cout <<"fracval...\n";
+   check_stream fracvalidate( const char* b, const char* e  ) {
       check_stream stream(b, e);
       if constexpr( is_shared_view_ptr<T>::value ) {
-         return fracval<is_shared_view_ptr<T>::value_type>( b, e );
+         return fracvalidate<is_shared_view_ptr<T>::value_type>( b, e );
       }
       else if constexpr( not may_use_heap<T>() ) {
-         //std::cout <<"   no heap\n";
          stream.pos      = stream.begin + fracpack_fixed_size<T>(); 
          stream.heap     = stream.pos;
          stream.valid    = stream.pos <= stream.end;
          return stream;
       }
       else if constexpr( std::is_same_v<T,std::string> ) {
-        // std::cout <<"   is string\n";
-         if( bool(stream.valid = stream.begin + 4 < stream.end) ) {
-            uint32_t offset;
-            memcpy( &offset, stream.begin, sizeof(offset) );
-            stream.pos     += 4 + offset;
+         if( bool(stream.valid = stream.begin + 4 <= stream.end) ) {
+            uint32_t strsize;
+            memcpy( &strsize, stream.begin, sizeof(strsize) );
+            stream.pos     += sizeof(strsize) + strsize;
             stream.heap     = stream.pos;
-            stream.valid    = stream.pos <= stream.end;
+
+            if( (stream.valid &= (stream.pos <= stream.end)) ) {
+#if 1 //ndef __wasm__
+               stream.valid &= simdjson::validate_utf8(stream.begin+sizeof(strsize), strsize);
+#else
+               rapidjson_stream_adaptor s2(stream.begin+sizeof(strsize), strsize);
+               stream.valid = rapidjson::UTF8<>::Validate(s2, s2);
+#endif
+
+            }
          } else {
-            std::cout <<"string reads beyond end\n";
+            // throw_error( stream_error::overrun );
          }
          return stream;
       }
       else if constexpr( is_std_vector<T>::value ) {
-        // std::cout << "is std::vector\n";
          using member_type = typename is_std_vector<T>::value_type;
          if( bool(stream.valid = stream.begin + 4 <= stream.end) ) {
             uint32_t size;
             memcpy( &size, stream.begin, sizeof(size) );
-       //     std::cout <<"vec size: " << size<<"\n";
             stream.pos  += 4;
             stream.heap = stream.pos; /// heap starts after size bytes
             if constexpr( not may_use_heap<member_type>() ) {
-         //       std::cout << " members don't use heap...\n";
                 stream.pos   = stream.heap; /// TODO: is this required for return
                 stream.valid = (size % fracpack_fixed_size<member_type>() == 0)
                                and stream.heap <= stream.end;
                 return stream;
             } else if(  bool(stream.valid = (size % sizeof(uint32_t)==0)) ) {/// must be a multiple of offset
-      //         std::cout << "members may use heap\n";
                 stream.heap += size;
                 auto end = stream.heap;
                 while( stream.pos != end ) {
@@ -792,7 +831,7 @@ namespace psio
                    if( not bool( stream.valid = (stream.heap == stream.pos + offset) ) )
                       return stream;
 
-                   auto substr = fracval<member_type>( stream.heap, stream.end );
+                   auto substr = fracvalidate<member_type>( stream.heap, stream.end );
                    stream.heap = substr.heap;
                    stream.pos += sizeof(offset); 
                    stream.unknown |= substr.unknown;
@@ -825,7 +864,7 @@ namespace psio
 
          check_stream substr(0,0);
          v->visit( [&]( auto i ){
-               substr = fracval_view( i, stream.pos, stream.end );
+               substr = fracvalidate_view( i, stream.pos, stream.end );
          });
 
          stream.valid   &= substr.valid;
@@ -853,10 +892,15 @@ namespace psio
                      if( offset >= 4 ) {
                         /// the next offset ptr must point at expected start of heap
                         if( bool(stream.valid = (memptr + offset) == stream.heap ) ) {
-                            auto substr  = fracval<member_type>( stream.heap, stream.end );
+                            auto substr  = fracvalidate<member_type>( stream.heap, stream.end );
+                            if constexpr( is_std_vector<member_type>() || std::is_same_v<member_type,std::string> ) {
+                              uint32_t data_size;
+                              memcpy( &data_size, stream.heap, sizeof(data_size) );
+                              stream.valid &= (data_size != 0);
+                            }
                             stream.pos   = substr.pos;
                             stream.heap  = substr.heap;
-                            stream.valid = substr.valid;
+                            stream.valid &= substr.valid;
                             stream.unknown |= substr.unknown;
                         }
                      } else { 
@@ -876,8 +920,7 @@ namespace psio
          stream.pos     += sizeof(start_heap);
          stream.heap    = stream.pos + start_heap;
 
-         stream.valid    = start_heap >= fixed_size_before_optional<T>();//fracpack_fixed_size<T>();
-         //stream.valid    = start_heap >= fracpack_fixed_size<T>();
+         stream.valid    = start_heap >= fixed_size_before_optional<T>();
          stream.unknown |= start_heap > fracpack_fixed_size<T>();
 
          const char* memptr = stream.pos;
@@ -885,35 +928,46 @@ namespace psio
          reflect<T>::for_each(
              [&](const meta& ref, const auto& mptr) {
            //    std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid <<"  unknown: " << stream.unknown <<"\n";
-               if( stream.valid ) {
             //      std::cout<<"    stream.valid\n";
                   using member_type = decltype(result_of_member(mptr));
                   /// heap use requires offset ptr, so we must check bounds
                   if constexpr( may_use_heap<member_type>() ) {
-                     uint32_t offset;
-                     memcpy( &offset, memptr, sizeof(offset) );
-             //        std::cout << "offset to member...: " << offset <<"\n";
-                     if( offset >= 4 ) {
-                        /// the next offset ptr must point at expected start of heap
-                        if( bool(stream.valid = (memptr + offset) == stream.heap ) ) {
-                            auto substr  = fracval<member_type>( stream.heap, stream.end );
-                            stream.pos   = substr.pos;
-                            stream.heap  = substr.heap;
-                            stream.valid = substr.valid;
-                            stream.unknown |= substr.unknown;
-                        } else {
-                            stream.valid = false;
-                            std::cout << "unexpected offset ptr\n";
+                     if( stream.valid ) {
+                        uint32_t offset;
+                        memcpy( &offset, memptr, sizeof(offset) );
+                //        std::cout << "offset to member...: " << offset <<"\n";
+                        if( offset >= 4 ) {
+                           /// the next offset ptr must point at expected start of heap
+                           if( bool(stream.valid = (memptr + offset) == stream.heap ) ) {
+                               auto substr  = fracvalidate<member_type>( stream.heap, stream.end );
+                               stream.valid &= substr.valid;
+                               stream.unknown |= substr.unknown;
+
+                               /* offset ptr pointing to an to empty string/vector is invalid */
+                               if constexpr( std::is_same_v<std::string,member_type> || 
+                                             is_std_vector<member_type>::value )
+                               {
+                                  /* we can safely read stream.heap because we already verified that a valid string
+                                   * or vector is present above, we just need to double check that it isn't empty.
+                                   */
+                                  if( stream.valid )
+                                     stream.valid = (*reinterpret_cast<const unaligned_type<uint32_t>*>(stream.heap)) != 0;
+                               }
+
+                               /// we use stream.heap above so this must come after
+                               stream.pos   = substr.pos;
+                               stream.heap  = substr.heap;
+                           }
+
+                        } else { 
+                           /// only optionals can have offset > 0 and offset < 4
+                           /// and the only valid options are 0 or 1
+                           stream.valid = (offset < 2); 
                         }
-                     } else { 
-                        /// only optionals can have offset > 0 and offset < 4
-                        /// and the only valid options are 0 or 1
-                        stream.valid = (offset < 2); 
                      }
                   }
                   /// go to the next member ptr
                   memptr += fracpack_fixed_size<member_type>();
-              }
           });
 
 
@@ -922,8 +976,8 @@ namespace psio
    }
 
    template<typename T>
-   check_stream fracval_view( const_view<T>& v, const char* p, const char* e ) {
-      return fracval<T>(p, e);
+   check_stream fracvalidate_view( const_view<T>& v, const char* p, const char* e ) {
+      return fracvalidate<T>(p, e);
    }
 
 
@@ -1529,14 +1583,8 @@ namespace psio
 
       operator T() const { return unpack(); }
 
-      bool validate2 () const {
-         return psio::fracval<T>( data(), data() + size() ).valid;
-      }
-      bool validate() const
-      {
-         psio::check_input_stream in(data(), size());
-         psio::fraccheck<T>(in);
-         return in.total_read <= size();
+      bool validate() const {
+         return _data != nullptr && psio::fracvalidate<T>( data(), data() + size() ).valid;
       }
 
       T unpack() const

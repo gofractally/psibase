@@ -5,6 +5,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <psio/fracpack.hpp>
 
 namespace psio
 {
@@ -81,11 +82,11 @@ namespace psio
    {
       struct member
       {
-         string    name;
-         type_name type;
-         int32_t   number = 0;
-         uint32_t  offset = 0;
-         uint32_t  size   = 0;
+         string    name; ///< the member name
+         type_name type; 
+         int32_t   number = 0; ///< the index of the member 
+         uint32_t  offset = 0; ///< the offset to the member from the start of the object
+         uint32_t  size   = 0; ///< the size of the member in the fixed part of object (not in heap)
 
          template <typename R, typename T, typename... Args>
          void set_params(std::initializer_list<const char*> names, R (T::*method)(Args...))
@@ -136,8 +137,9 @@ namespace psio
       }
 
       vector<member> members;
-      uint32_t       size    = 0;      /// size of the flat, non-dynamic part
-      bool           dynamic = false;  /// binary size may vary
+      uint32_t       size    = 0;      /// size of the object minus the heap
+      uint32_t       min_size = 0;     /// the minimum size of fields excluding heap and excluding the optional fields
+      bool           dynamic  = false;  /// whether or not the object may use the heap
    };
 
    using object_member       = object_type::member;
@@ -303,7 +305,10 @@ namespace psio
                          generate<member_type>(on_generate);
 
                          auto tn   = get_type_name<member_type>();
-                         auto size = flatpack_size<member_type>();
+                         auto size = fracpack_fixed_size<member_type>();
+                         if constexpr( may_use_heap<member_type>() ) {
+                            size = 4;
+                         }
 
                          ot.members.push_back({.name   = r.name,
                                                .type   = tn,
@@ -324,6 +329,7 @@ namespace psio
                    });
                ot.size  = offset;
                types[n] = ot;
+               ot.dynamic = is_ext_structure<T>();
             }
          }
       }  /// generate
