@@ -14,6 +14,16 @@ namespace psibase
 
    std::vector<char> get_result() { return get_result(raw::get_result(nullptr, 0)); }
 
+   std::vector<char> get_key(uint32_t size)
+   {
+      std::vector<char> key(size);
+      if (size)
+         raw::get_key(key.data(), key.size());
+      return key;
+   }
+
+   std::vector<char> get_key() { return get_key(raw::get_key(nullptr, 0)); }
+
    action get_current_action()
    {
       auto data = get_result(raw::get_current_action());

@@ -31,6 +31,12 @@ namespace psibase
    {
       std::unique_ptr<database_impl> impl;
 
+      struct kv_result
+      {
+         eosio::input_stream key;
+         eosio::input_stream value;
+      };
+
       struct session
       {
          database* db = {};
@@ -78,13 +84,13 @@ namespace psibase
       void kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value);
       void kv_remove_raw(kv_map map, eosio::input_stream key);
       std::optional<eosio::input_stream> kv_get_raw(kv_map map, eosio::input_stream key);
-      std::optional<eosio::input_stream> kv_greater_equal_raw(kv_map              map,
+      std::optional<kv_result>           kv_greater_equal_raw(kv_map              map,
                                                               eosio::input_stream key,
                                                               size_t              match_key_size);
-      std::optional<eosio::input_stream> kv_less_than_raw(kv_map              map,
+      std::optional<kv_result>           kv_less_than_raw(kv_map              map,
                                                           eosio::input_stream key,
                                                           size_t              match_key_size);
-      std::optional<eosio::input_stream> kv_max_raw(kv_map map, eosio::input_stream key);
+      std::optional<kv_result>           kv_max_raw(kv_map map, eosio::input_stream key);
 
       template <typename K, typename V>
       auto kv_put(kv_map map, const K& key, const V& value)

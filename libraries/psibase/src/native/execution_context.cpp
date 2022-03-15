@@ -265,14 +265,54 @@ namespace psibase
                       "code_row has incorrect key");
       }
 
-      std::vector<char> result;
+      std::vector<char> result_key;
+      std::vector<char> result_value;
+
+      uint32_t clear_result()
+      {
+         result_key.clear();
+         result_value.clear();
+         return -1;
+      }
+
+      uint32_t set_result(std::vector<char> result)
+      {
+         result_key.clear();
+         result_value = std::move(result);
+         return result_value.size();
+      }
+
+      uint32_t set_result(const std::optional<eosio::input_stream>& o)
+      {
+         if (!o)
+            return clear_result();
+         result_key.clear();
+         result_value.assign(o->pos, o->end);
+         return result_value.size();
+      }
+
+      uint32_t set_result(const std::optional<database::kv_result>& o)
+      {
+         if (!o)
+            return clear_result();
+         result_key.assign(o->key.pos, o->key.end);
+         result_value.assign(o->value.pos, o->value.end);
+         return result_value.size();
+      }
 
       // TODO: offset
       uint32_t get_result(span<char> dest)
       {
-         if (!result.empty())
-            memcpy(dest.data(), result.data(), std::min(result.size(), dest.size()));
-         return result.size();
+         if (!result_value.empty())
+            memcpy(dest.data(), result_value.data(), std::min(result_value.size(), dest.size()));
+         return result_value.size();
+      }
+
+      uint32_t get_key(span<char> dest)
+      {
+         if (!result_key.empty())
+            memcpy(dest.data(), result_key.data(), std::min(result_key.size(), dest.size()));
+         return result_key.size();
       }
 
       void write_console(span<const char> str)
@@ -286,6 +326,7 @@ namespace psibase
              std::get<console_trace>(current_act_context->action_trace.inner_traces.back().inner)
                  .console;
          console.append(str.begin(), str.end());
+         clear_result();
       }
 
       void abort_message(span<const char> str)
@@ -296,8 +337,7 @@ namespace psibase
 
       uint32_t get_current_action()
       {
-         result = eosio::convert_to_bin(current_act_context->action);
-         return result.size();
+         return set_result(eosio::convert_to_bin(current_act_context->action));
       }
 
       uint32_t call(span<const char> data)
@@ -318,10 +358,10 @@ namespace psibase
          // TODO: avoid reserialization
          current_act_context->transaction_context.exec_called_action(contract_account.flags, act,
                                                                      inner_action_trace);
-         result = inner_action_trace.raw_retval;
+         set_result(inner_action_trace.raw_retval);
 
          --current_act_context->transaction_context.call_depth;
-         return result.size();
+         return result_value.size();
       }
 
       void set_retval(span<const char> data)
@@ -330,6 +370,7 @@ namespace psibase
          eosio::check(!(contract_account.flags & account_row::is_subjective),
                       "set_retval not implemented for subjective contracts");
          current_act_context->action_trace.raw_retval.assign(data.begin(), data.end());
+         clear_result();
       }
 
       // TODO: track consumption
@@ -340,7 +381,7 @@ namespace psibase
       {
          if (map == uint32_t(kv_map::native_constrained))
             verify_write_constrained({key.data(), key.size()}, {value.data(), value.size()});
-         result.clear();
+         clear_result();
          db.kv_put_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()},
                        {value.data(), value.size()});
       }
@@ -349,59 +390,36 @@ namespace psibase
       // TODO: don't let timer abort db operation
       void kv_remove(uint32_t map, span<const char> key)
       {
-         result.clear();
+         clear_result();
          db.kv_remove_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()});
       }
 
-      // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
       uint32_t kv_get(uint32_t map, span<const char> key)
       {
-         result.clear();
-         auto v = db.kv_get_raw(get_map_read(map), {key.data(), key.size()});
-         if (!v)
-            return -1;
-         result.assign(v->pos, v->end);
-         return result.size();
+         return set_result(db.kv_get_raw(get_map_read(map), {key.data(), key.size()}));
       }
 
-      // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
       uint32_t kv_greater_equal(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
-         result.clear();
-         auto v =
-             db.kv_greater_equal_raw(get_map_read(map), {key.data(), key.size()}, match_key_size);
-         if (!v)
-            return -1;
-         result.assign(v->pos, v->end);
-         return result.size();
+         return set_result(
+             db.kv_greater_equal_raw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
 
-      // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
       uint32_t kv_less_than(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
-         result.clear();
-         auto v = db.kv_less_than_raw(get_map_read(map), {key.data(), key.size()}, match_key_size);
-         if (!v)
-            return -1;
-         result.assign(v->pos, v->end);
-         return result.size();
+         return set_result(
+             db.kv_less_than_raw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
 
-      // TODO: avoid copying value to result
       // TODO: don't let timer abort db operation
       uint32_t kv_max(uint32_t map, span<const char> key)
       {
-         result.clear();
-         auto v = db.kv_max_raw(get_map_read(map), {key.data(), key.size()});
-         if (!v)
-            return -1;
-         result.assign(v->pos, v->end);
-         return result.size();
+         return set_result(db.kv_max_raw(get_map_read(map), {key.data(), key.size()}));
       }
    };  // execution_context_impl
 
@@ -418,6 +436,7 @@ namespace psibase
    void execution_context::register_host_functions()
    {
       rhf_t::add<&execution_context_impl::get_result>("env", "get_result");
+      rhf_t::add<&execution_context_impl::get_key>("env", "get_key");
       rhf_t::add<&execution_context_impl::write_console>("env", "write_console");
       rhf_t::add<&execution_context_impl::abort_message>("env", "abort_message");
       rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
