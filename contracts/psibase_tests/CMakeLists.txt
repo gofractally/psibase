@@ -10,6 +10,7 @@ function(add suffix)
     contract(token "${suffix}" token.cpp)
     contract(rpc "${suffix}" rpc.cpp)
     contract(test_kv "${suffix}" test_kv.cpp)
+    contract(test_table "${suffix}" test_table.cpp)
 
     add_executable(tests${suffix} test.cpp test-ec.cpp)
     target_include_directories(tests${suffix} PUBLIC include)
