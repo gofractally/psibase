@@ -166,14 +166,6 @@ namespace psibase
       kv_raw_iterator base;
    };
 
-   template <typename T>
-   void append_to_key(std::vector<char>& key, const T& t)
-   {
-      eosio::size_stream ss;
-      eosio::to_key(t, ss);
-      key.resize(key.size() + ss.size);
-   }
-
    struct key_view
    {
       std::string_view data;
