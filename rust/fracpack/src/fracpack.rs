@@ -5,6 +5,7 @@ custom_error! {pub Error
     ReadPastEnd         = "Read past end",
     BadOffset           = "Bad offset",
     BadEmptyEncoding    = "Bad empty encoding",
+    BadUTF8             = "Bad UTF-8 encoding",
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -31,6 +32,10 @@ pub trait Packable {
     fn unpack(src: &[u8], pos: &mut u32) -> Result<Self>
     where
         Self: Default;
+
+    fn verify_inplace(src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()>;
+    fn verify_maybe_heap(src: &[u8], pos: &mut u32) -> Result<()>;
+    fn verify(src: &[u8], pos: &mut u32) -> Result<()>;
 
     fn option_pack_fixed(opt: &Option<Self>, dest: &mut Vec<u8>)
     where
@@ -64,6 +69,13 @@ pub trait Packable {
     {
         self::option_unpack_inplace(opt, src, fixed_pos, heap_pos)
     }
+
+    fn option_verify_inplace(src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()>
+    where
+        Self: Sized,
+    {
+        self::option_verify_inplace::<Self>(src, fixed_pos, heap_pos)
+    }
 } // Packable
 
 fn option_pack_fixed<T: Packable>(_opt: &Option<T>, dest: &mut Vec<u8>) {
@@ -88,7 +100,6 @@ fn option_pack_variable<T: Packable>(opt: &Option<T>, dest: &mut Vec<u8>) {
     }
 }
 
-// TODO: check if past fixed area
 fn option_unpack_inplace<T: Packable + Default>(
     opt: &mut Option<T>,
     src: &[u8],
@@ -101,13 +112,30 @@ fn option_unpack_inplace<T: Packable + Default>(
         *opt = None;
         return Ok(());
     }
-    if *heap_pos != orig_pos + offset {
+    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
         return Err(Error::BadOffset);
     }
     *opt = Some(Default::default());
     if let Some(ref mut x) = *opt {
         x.unpack_maybe_heap(src, heap_pos)?;
     }
+    Ok(())
+}
+
+fn option_verify_inplace<T: Packable>(
+    src: &[u8],
+    fixed_pos: &mut u32,
+    heap_pos: &mut u32,
+) -> Result<()> {
+    let orig_pos = *fixed_pos;
+    let offset = u32::unpack(src, fixed_pos)?;
+    if offset == 1 {
+        return Ok(());
+    }
+    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+        return Err(Error::BadOffset);
+    }
+    T::verify_maybe_heap(src, heap_pos)?;
     Ok(())
 }
 
@@ -139,6 +167,20 @@ macro_rules! scalar_impl_fracpack {
                 let mut val: $t = Default::default();
                 val.unpack_maybe_heap(src, pos)?;
                 Ok(val)
+            }
+            fn verify_inplace(src: &[u8], fixed_pos: &mut u32, _heap_pos: &mut u32) -> Result<()> {
+                Self::verify_maybe_heap(src, fixed_pos)
+            }
+            fn verify_maybe_heap(src: &[u8], pos: &mut u32) -> Result<()> {
+                if (*pos as u64 + Self::FIXED_SIZE as u64 > src.len() as u64) {
+                    Err(Error::ReadPastEnd)
+                } else {
+                    *pos += Self::FIXED_SIZE;
+                    Ok(())
+                }
+            }
+            fn verify(src: &[u8], pos: &mut u32) -> Result<()> {
+                Self::verify_maybe_heap(src, pos)
             }
         }
     };
@@ -191,6 +233,18 @@ impl<T: Packable + Sized + Default> Packable for Option<T> {
         todo!("Can option<T> be at the top level?")
     }
 
+    fn verify_inplace(src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+        T::option_verify_inplace(src, fixed_pos, heap_pos)
+    }
+
+    fn verify_maybe_heap(_src: &[u8], _pos: &mut u32) -> Result<()> {
+        todo!("Does the spec support Option<Option<T>> or top-level Option<T>?")
+    }
+
+    fn verify(_src: &[u8], _pos: &mut u32) -> Result<()> {
+        todo!("Can option<T> be at the top level?")
+    }
+
     fn option_pack_fixed(_opt: &Option<Self>, _dest: &mut Vec<u8>) {
         todo!("Does the spec support Option<Option<T>>?")
     }
@@ -214,6 +268,10 @@ impl<T: Packable + Sized + Default> Packable for Option<T> {
         _fixed_pos: &mut u32,
         _heap_pos: &mut u32,
     ) -> Result<()> {
+        todo!("Does the spec support Option<Option<T>>?")
+    }
+
+    fn option_verify_inplace(_src: &[u8], _fixed_pos: &mut u32, _heap_pos: &mut u32) -> Result<()> {
         todo!("Does the spec support Option<Option<T>>?")
     }
 } // impl Packable for Option<T>
@@ -257,7 +315,7 @@ impl Packable for String {
             self.clear();
             return Ok(());
         }
-        if *heap_pos != orig_pos + offset {
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
         self.unpack_maybe_heap(src, heap_pos)
@@ -272,12 +330,40 @@ impl Packable for String {
             .get(*pos as usize..(*pos + len) as usize)
             .ok_or(Error::ReadPastEnd)?;
         *pos += len;
-        // TODO: from_utf8 (error if bad) instead?
-        *self = String::from_utf8_lossy(bytes).into_owned();
+        *self = String::from_utf8(bytes.to_vec()).or(Err(Error::BadUTF8))?;
         Ok(())
     }
 
     fn unpack(_src: &[u8], _pos: &mut u32) -> Result<Self> {
+        todo!("Does the spec support top-level string?");
+    }
+
+    fn verify_inplace(src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+        let orig_pos = *fixed_pos;
+        let offset = u32::unpack(src, fixed_pos)?;
+        if offset == 0 {
+            return Ok(());
+        }
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+            return Err(Error::BadOffset);
+        }
+        Self::verify_maybe_heap(src, heap_pos)
+    }
+
+    fn verify_maybe_heap(src: &[u8], pos: &mut u32) -> Result<()> {
+        let len = u32::unpack(src, pos)?;
+        if len == 0 {
+            return Err(Error::BadEmptyEncoding);
+        }
+        let bytes = src
+            .get(*pos as usize..(*pos + len) as usize)
+            .ok_or(Error::ReadPastEnd)?;
+        std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
+        *pos += len;
+        Ok(())
+    }
+
+    fn verify(_src: &[u8], _pos: &mut u32) -> Result<()> {
         todo!("Does the spec support top-level string?");
     }
 
@@ -319,7 +405,7 @@ impl Packable for String {
             *opt = Some(String::from(""));
             return Ok(());
         }
-        if *heap_pos != orig_pos + offset {
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
         *opt = Some(Default::default());
@@ -327,6 +413,18 @@ impl Packable for String {
             x.unpack_maybe_heap(src, heap_pos)?;
         }
         Ok(())
+    }
+
+    fn option_verify_inplace(src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+        let orig_pos = *fixed_pos;
+        let offset = u32::unpack(src, fixed_pos)?;
+        if offset == 1 || offset == 0 {
+            return Ok(());
+        }
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+            return Err(Error::BadOffset);
+        }
+        Self::verify_maybe_heap(src, heap_pos)
     }
 } // impl Packable for String
 
@@ -344,6 +442,7 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
         }
     }
 
+    // TODO: optimize scalar
     fn pack_variable(&self, dest: &mut Vec<u8>) {
         if self.is_empty() {
             return;
@@ -377,18 +476,23 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
             self.clear();
             return Ok(());
         }
-        if *heap_pos != orig_pos + offset {
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
         self.unpack_maybe_heap(src, heap_pos)
     }
 
+    // TODO: optimize scalar
     fn unpack_maybe_heap(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
         let len = u32::unpack(src, pos)?;
         if len == 0 {
             return Err(Error::BadEmptyEncoding);
         }
-        let mut heap_pos = *pos + len * T::FIXED_SIZE;
+        let hp = *pos as u64 + len as u64 * T::FIXED_SIZE as u64;
+        let mut heap_pos = hp as u32;
+        if heap_pos as u64 != hp {
+            return Err(Error::ReadPastEnd);
+        }
         self.clear();
         self.resize(len as usize, Default::default());
         for x in self {
@@ -399,6 +503,40 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
     }
 
     fn unpack(_src: &[u8], _pos: &mut u32) -> Result<Self> {
+        todo!("Does the spec support top-level vector?");
+    }
+
+    fn verify_inplace(src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+        let orig_pos = *fixed_pos;
+        let offset = u32::unpack(src, fixed_pos)?;
+        if offset == 0 {
+            return Ok(());
+        }
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+            return Err(Error::BadOffset);
+        }
+        Self::verify_maybe_heap(src, heap_pos)
+    }
+
+    // TODO: optimize scalar
+    fn verify_maybe_heap(src: &[u8], pos: &mut u32) -> Result<()> {
+        let len = u32::unpack(src, pos)?;
+        if len == 0 {
+            return Err(Error::BadEmptyEncoding);
+        }
+        let hp = *pos as u64 + len as u64 * T::FIXED_SIZE as u64;
+        let mut heap_pos = hp as u32;
+        if heap_pos as u64 != hp {
+            return Err(Error::ReadPastEnd);
+        }
+        for _ in 0..len {
+            <T>::verify_inplace(src, pos, &mut heap_pos)?;
+        }
+        *pos = heap_pos;
+        Ok(())
+    }
+
+    fn verify(_src: &[u8], _pos: &mut u32) -> Result<()> {
         todo!("Does the spec support top-level vector?");
     }
 
@@ -452,7 +590,7 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
             *opt = Some(Default::default());
             return Ok(());
         }
-        if *heap_pos != orig_pos + offset {
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
         *opt = Some(Default::default());
@@ -460,5 +598,20 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
             x.unpack_maybe_heap(src, heap_pos)?;
         }
         Ok(())
+    }
+
+    fn option_verify_inplace(src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()>
+    where
+        Self: Sized,
+    {
+        let orig_pos = *fixed_pos;
+        let offset = u32::unpack(src, fixed_pos)?;
+        if offset == 1 || offset == 0 {
+            return Ok(());
+        }
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+            return Err(Error::BadOffset);
+        }
+        Self::verify_maybe_heap(src, heap_pos)
     }
 } // impl<T> Packable for Vec<T>

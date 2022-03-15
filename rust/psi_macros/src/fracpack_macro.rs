@@ -81,6 +81,15 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
+    let verify = fields
+        .iter()
+        .map(|field| {
+            let ty = &field.ty;
+            quote! {
+                <#ty>::verify_inplace(src, pos, &mut heap_pos)?;
+            }
+        })
+        .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
         impl fracpack::Packable for #name #generics {
             const FIXED_SIZE: u32 = 4;
@@ -104,7 +113,7 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
             fn unpack_inplace(&mut self, src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
                 let orig_pos = *fixed_pos;
                 let offset = u32::unpack(src, fixed_pos)?;
-                if *heap_pos != orig_pos + offset {
+                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
                 self.unpack_maybe_heap(src, heap_pos)
@@ -123,6 +132,27 @@ pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
                 let mut result: Self = Default::default();
                 result.unpack_maybe_heap(src, pos)?;
                 Ok(result)
+            }
+            fn verify_inplace(src: &[u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+                let orig_pos = *fixed_pos;
+                let offset = u32::unpack(src, fixed_pos)?;
+                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                    return Err(Error::BadOffset);
+                }
+                Self::verify_maybe_heap(src, heap_pos)
+            }
+            fn verify_maybe_heap(src: &[u8], pos: &mut u32) -> Result<()> {
+                let heap_size = u16::unpack(src, pos)?;
+                let mut heap_pos = *pos + heap_size as u32;
+                #verify
+                *pos = heap_pos;
+                Ok(())
+            }
+            fn verify(src: &[u8], pos: &mut u32) -> Result<()>
+            where
+                Self: Default,
+            {
+                Self::verify_maybe_heap(src, pos)
             }
         }
     })

@@ -119,6 +119,7 @@ fn t1() -> Result<()> {
     for (i, t) in get_tests1().iter().enumerate() {
         let mut packed = Vec::<u8>::new();
         t.pack(&mut packed);
+        TestType::verify(&packed[..], &mut 0)?;
         let unpacked = TestType::unpack(&packed[..], &mut 0)?;
         assert_eq!(*t, unpacked);
         ffi::tests1(i, &packed[..]);
