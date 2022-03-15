@@ -21,10 +21,13 @@ TestType tests1_data[] = {
         .field_f64 = -10.5,
         .field_inner =
             InnerStruct{
-                .inner_u32        = 1234,
-                .inner_option_u32 = None,
-                .inner_option_str = ""s,
+                .inner_u32            = 1234,
+                .inner_option_u32     = None,
+                .inner_option_str     = ""s,
+                .inner_option_vec_u16 = None,
+                .inner_o_vec_o_u16    = None,
             },
+        .field_v_inner      = {},
         .field_option_u8    = Some(11),
         .field_option_u16   = Some(12),
         .field_option_u32   = None,
@@ -52,9 +55,28 @@ TestType tests1_data[] = {
         .field_f64 = -10.5,
         .field_inner =
             InnerStruct{
-                .inner_u32        = 1234,
-                .inner_option_u32 = Some(0x1234),
-                .inner_option_str = None,
+                .inner_u32            = 1234,
+                .inner_option_u32     = Some(0x1234),
+                .inner_option_str     = None,
+                .inner_option_vec_u16 = std::vector<uint16_t>{},
+                .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+            },
+        .field_v_inner =
+            {
+                InnerStruct{
+                    .inner_u32            = 1234,
+                    .inner_option_u32     = Some(0x1234),
+                    .inner_option_str     = None,
+                    .inner_option_vec_u16 = std::vector<uint16_t>{},
+                    .inner_o_vec_o_u16 = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+                },
+                InnerStruct{
+                    .inner_u32            = 0x9876,
+                    .inner_option_u32     = None,
+                    .inner_option_str     = "xyz"s,
+                    .inner_option_vec_u16 = None,
+                    .inner_o_vec_o_u16    = None,
+                },
             },
         .field_option_u8  = None,
         .field_option_u16 = None,
@@ -69,9 +91,11 @@ TestType tests1_data[] = {
         .field_option_f64 = Some(12.0),
         .field_option_inner =
             InnerStruct{
-                .inner_u32        = 1234,
-                .inner_option_u32 = Some(0x1234),
-                .inner_option_str = "testing"s,
+                .inner_u32            = 1234,
+                .inner_option_u32     = Some(0x1234),
+                .inner_option_str     = "testing"s,
+                .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
+                .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
             },
     },
 };

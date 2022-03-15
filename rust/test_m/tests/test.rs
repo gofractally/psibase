@@ -1,11 +1,13 @@
 use fracpack::*;
 use psi_macros::*;
 
-#[derive(Fracpack, Default, PartialEq, Debug)]
+#[derive(Fracpack, Default, PartialEq, Clone, Debug)]
 pub struct InnerStruct {
     inner_u32: u32,
     inner_option_u32: Option<u32>,
     inner_option_str: Option<String>,
+    inner_option_vec_u16: Option<Vec<u16>>,
+    inner_o_vec_o_u16: Option<Vec<Option<u16>>>,
 }
 
 #[derive(Fracpack, Default, PartialEq, Debug)]
@@ -22,6 +24,7 @@ pub struct TestType {
     field_f32: f32,
     field_f64: f64,
     field_inner: InnerStruct,
+    field_v_inner: Vec<InnerStruct>,
     field_option_u8: Option<u8>,
     field_option_u16: Option<u16>,
     field_option_u32: Option<u32>,
@@ -63,7 +66,10 @@ fn get_tests1() -> [TestType; 2] {
                 inner_u32: 1234,
                 inner_option_u32: None,
                 inner_option_str: Some("".to_string()),
+                inner_option_vec_u16: None,
+                inner_o_vec_o_u16: None,
             },
+            field_v_inner: vec![],
             field_option_u8: Some(11),
             field_option_u16: Some(12),
             field_option_u32: None,
@@ -93,7 +99,25 @@ fn get_tests1() -> [TestType; 2] {
                 inner_u32: 1234,
                 inner_option_u32: Some(0x1234),
                 inner_option_str: None,
+                inner_option_vec_u16: Some(vec![]),
+                inner_o_vec_o_u16: Some(vec![None, Some(0x3456), None]),
             },
+            field_v_inner: vec![
+                InnerStruct {
+                    inner_u32: 1234,
+                    inner_option_u32: Some(0x1234),
+                    inner_option_str: None,
+                    inner_option_vec_u16: Some(vec![]),
+                    inner_o_vec_o_u16: Some(vec![None, Some(0x3456), None]),
+                },
+                InnerStruct {
+                    inner_u32: 0x9876,
+                    inner_option_u32: None,
+                    inner_option_str: Some("xyz".to_string()),
+                    inner_option_vec_u16: None,
+                    inner_o_vec_o_u16: None,
+                },
+            ],
             field_option_u8: None,
             field_option_u16: None,
             field_option_u32: Some(0xffff_fff7),
@@ -109,6 +133,8 @@ fn get_tests1() -> [TestType; 2] {
                 inner_u32: 1234,
                 inner_option_u32: Some(0x1234),
                 inner_option_str: Some("testing".to_string()),
+                inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
+                inner_o_vec_o_u16: Some(vec![]),
             }),
         },
     ]

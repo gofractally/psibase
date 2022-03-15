@@ -4,6 +4,7 @@ use std::mem;
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
     BadOffset           = "Bad offset",
+    BadSize             = "Bad size",
     BadEmptyEncoding    = "Bad empty encoding",
     BadUTF8             = "Bad UTF-8 encoding",
 }
@@ -447,8 +448,9 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
         if self.is_empty() {
             return;
         }
-        dest.extend_from_slice(&(self.len() as u32).to_le_bytes());
-        dest.reserve(self.len() * (T::FIXED_SIZE as usize));
+        let num_bytes = self.len() as u32 * T::FIXED_SIZE;
+        dest.extend_from_slice(&num_bytes.to_le_bytes());
+        dest.reserve(num_bytes as usize);
         let start = dest.len();
         for x in self {
             x.pack_fixed(dest);
@@ -484,17 +486,20 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
 
     // TODO: optimize scalar
     fn unpack_maybe_heap(&mut self, src: &[u8], pos: &mut u32) -> Result<()> {
-        let len = u32::unpack(src, pos)?;
-        if len == 0 {
+        let num_bytes = u32::unpack(src, pos)?;
+        if num_bytes == 0 {
             return Err(Error::BadEmptyEncoding);
         }
-        let hp = *pos as u64 + len as u64 * T::FIXED_SIZE as u64;
+        if num_bytes % T::FIXED_SIZE != 0 {
+            return Err(Error::BadSize);
+        }
+        let hp = *pos as u64 + num_bytes as u64;
         let mut heap_pos = hp as u32;
         if heap_pos as u64 != hp {
             return Err(Error::ReadPastEnd);
         }
         self.clear();
-        self.resize(len as usize, Default::default());
+        self.resize((num_bytes / T::FIXED_SIZE) as usize, Default::default());
         for x in self {
             x.unpack_inplace(src, pos, &mut heap_pos)?;
         }
@@ -520,16 +525,19 @@ impl<T: Packable + Default + Clone> Packable for Vec<T> {
 
     // TODO: optimize scalar
     fn verify_maybe_heap(src: &[u8], pos: &mut u32) -> Result<()> {
-        let len = u32::unpack(src, pos)?;
-        if len == 0 {
+        let num_bytes = u32::unpack(src, pos)?;
+        if num_bytes == 0 {
             return Err(Error::BadEmptyEncoding);
         }
-        let hp = *pos as u64 + len as u64 * T::FIXED_SIZE as u64;
+        if num_bytes % T::FIXED_SIZE != 0 {
+            return Err(Error::BadSize);
+        }
+        let hp = *pos as u64 + num_bytes as u64;
         let mut heap_pos = hp as u32;
         if heap_pos as u64 != hp {
             return Err(Error::ReadPastEnd);
         }
-        for _ in 0..len {
+        for _ in 0..num_bytes / T::FIXED_SIZE {
             <T>::verify_inplace(src, pos, &mut heap_pos)?;
         }
         *pos = heap_pos;
