@@ -7,6 +7,7 @@ custom_error! {pub Error
     BadSize             = "Bad size",
     BadEmptyEncoding    = "Bad empty encoding",
     BadUTF8             = "Bad UTF-8 encoding",
+    BadEnumIndex        = "Bad enum index",
 }
 pub type Result<T> = std::result::Result<T, Error>;
 

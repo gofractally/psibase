@@ -7,13 +7,17 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
+#pragma GCC diagnostic ignored "-Wambiguous-reversed-operator"
 #include <psio/bytes/to_json.hpp>
 #include <psio/fracpack.hpp>
 #pragma GCC diagnostic pop
 
+using Variant = std::variant<uint32_t, std::string>;
+
 struct InnerStruct
 {
    uint32_t                                            inner_u32;
+   std::optional<Variant>                              var;
    std::optional<uint32_t>                             inner_option_u32;
    std::optional<std::string>                          inner_option_str;
    std::optional<std::vector<uint16_t>>                inner_option_vec_u16;
@@ -23,6 +27,7 @@ struct InnerStruct
 };
 PSIO_REFLECT(InnerStruct,
              inner_u32,
+             var,
              inner_option_u32,
              inner_option_str,
              inner_option_vec_u16,
