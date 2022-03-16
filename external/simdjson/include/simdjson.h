@@ -151,11 +151,13 @@
 
 #ifdef SIMDJSON_IS_32BITS
 #ifndef SIMDJSON_NO_PORTABILITY_WARNING
+#ifndef __wasm__
 #pragma message("The simdjson library is designed \
 for 64-bit processors and it seems that you are not \
 compiling for a known 64-bit platform. All fast kernels \
 will be disabled and performance may be poor. Please \
 use a 64-bit target such as x64, 64-bit ARM or 64-bit PPC.")
+#endif
 #endif // SIMDJSON_NO_PORTABILITY_WARNING
 #endif // SIMDJSON_IS_32BITS
 

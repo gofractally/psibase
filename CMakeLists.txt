@@ -10,6 +10,16 @@ if(NOT DEFINED WASI_SDK_PREFIX AND DEFINED ENV{WASI_SDK_PREFIX})
     set(WASI_SDK_PREFIX $ENV{WASI_SDK_PREFIX})
 endif()
 
+
+option (FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
+if (${FORCE_COLORED_OUTPUT})
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+       add_compile_options (-fdiagnostics-color=always)
+    else ()
+       add_compile_options(-fcolor-diagnostics)
+    endif ()
+endif ()
+
 file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
 option(CLIO_ONLY "Only build clio" OFF)
