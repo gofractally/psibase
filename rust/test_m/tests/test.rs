@@ -1,9 +1,25 @@
 use fracpack::*;
 use psi_macros::*;
 
+// TODO: test reading variant with future index
+#[derive(Fracpack, PartialEq, Clone, Debug)]
+pub enum Variant {
+    ItemU32(u32),
+    ItemStr(String),
+    // ItemOptStr(Option<String>),  TODO: broken in C++
+}
+
+// TODO
+impl Default for Variant {
+    fn default() -> Self {
+        Variant::ItemU32(0)
+    }
+}
+
 #[derive(Fracpack, Default, PartialEq, Clone, Debug)]
 pub struct InnerStruct {
     inner_u32: u32,
+    var: Option<Variant>,
     inner_option_u32: Option<u32>,
     inner_option_str: Option<String>,
     inner_option_vec_u16: Option<Vec<u16>>,
@@ -64,6 +80,7 @@ fn get_tests1() -> [TestType; 2] {
             field_f64: -10.5,
             field_inner: InnerStruct {
                 inner_u32: 1234,
+                var: None,
                 inner_option_u32: None,
                 inner_option_str: Some("".to_string()),
                 inner_option_vec_u16: None,
@@ -97,6 +114,7 @@ fn get_tests1() -> [TestType; 2] {
             field_f64: -10.5,
             field_inner: InnerStruct {
                 inner_u32: 1234,
+                var: Some(Variant::ItemStr("".to_string())),
                 inner_option_u32: Some(0x1234),
                 inner_option_str: None,
                 inner_option_vec_u16: Some(vec![]),
@@ -105,6 +123,7 @@ fn get_tests1() -> [TestType; 2] {
             field_v_inner: vec![
                 InnerStruct {
                     inner_u32: 1234,
+                    var: Some(Variant::ItemStr("var".to_string())),
                     inner_option_u32: Some(0x1234),
                     inner_option_str: None,
                     inner_option_vec_u16: Some(vec![]),
@@ -112,6 +131,7 @@ fn get_tests1() -> [TestType; 2] {
                 },
                 InnerStruct {
                     inner_u32: 0x9876,
+                    var: Some(Variant::ItemU32(3421)),
                     inner_option_u32: None,
                     inner_option_str: Some("xyz".to_string()),
                     inner_option_vec_u16: None,
@@ -131,6 +151,7 @@ fn get_tests1() -> [TestType; 2] {
             field_option_f64: Some(12.0),
             field_option_inner: Some(InnerStruct {
                 inner_u32: 1234,
+                var: Some(Variant::ItemU32(0)),
                 inner_option_u32: Some(0x1234),
                 inner_option_str: Some("testing".to_string()),
                 inner_option_vec_u16: Some(vec![0x1234, 0x5678]),

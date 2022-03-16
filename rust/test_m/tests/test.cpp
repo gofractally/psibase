@@ -22,6 +22,7 @@ TestType tests1_data[] = {
         .field_inner =
             InnerStruct{
                 .inner_u32            = 1234,
+                .var                  = None,
                 .inner_option_u32     = None,
                 .inner_option_str     = ""s,
                 .inner_option_vec_u16 = None,
@@ -56,6 +57,7 @@ TestType tests1_data[] = {
         .field_inner =
             InnerStruct{
                 .inner_u32            = 1234,
+                .var                  = ""s,
                 .inner_option_u32     = Some(0x1234),
                 .inner_option_str     = None,
                 .inner_option_vec_u16 = std::vector<uint16_t>{},
@@ -65,6 +67,7 @@ TestType tests1_data[] = {
             {
                 InnerStruct{
                     .inner_u32            = 1234,
+                    .var                  = "var"s,
                     .inner_option_u32     = Some(0x1234),
                     .inner_option_str     = None,
                     .inner_option_vec_u16 = std::vector<uint16_t>{},
@@ -72,6 +75,7 @@ TestType tests1_data[] = {
                 },
                 InnerStruct{
                     .inner_u32            = 0x9876,
+                    .var                  = Variant{std::in_place_type_t<uint32_t>{}, 3421},
                     .inner_option_u32     = None,
                     .inner_option_str     = "xyz"s,
                     .inner_option_vec_u16 = None,
@@ -92,6 +96,7 @@ TestType tests1_data[] = {
         .field_option_inner =
             InnerStruct{
                 .inner_u32            = 1234,
+                .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
                 .inner_option_u32     = Some(0x1234),
                 .inner_option_str     = "testing"s,
                 .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
