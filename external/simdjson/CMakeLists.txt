@@ -1,4 +1,4 @@
-add_library(simdjson_headeronly INTERFACE include/simdjson.h )
+add_library(simdjson_headeronly INTERFACE  )
 target_sources( simdjson_headeronly INTERFACE include/simdjson.h )
 target_include_directories( simdjson_headeronly INTERFACE include )
 
