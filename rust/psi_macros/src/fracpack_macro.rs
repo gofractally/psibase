@@ -61,7 +61,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
         .iter()
         .map(|field| {
             let ty = &field.ty;
-            quote! {<#ty>::FIXED_SIZE}
+            quote! {<#ty as fracpack::Packable>::FIXED_SIZE}
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
     let positions: Vec<syn::Ident> = fields
@@ -77,10 +77,11 @@ fn process_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
         .enumerate()
         .map(|(i, field)| {
             let name = &field.name;
+            let ty = &field.ty;
             let pos = &positions[i];
             quote! {
                 let #pos = dest.len() as u32;
-                self.#name.embedded_fixed_pack(dest);
+                <#ty as fracpack::Packable>::embedded_fixed_pack(&self.#name, dest);
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -89,10 +90,11 @@ fn process_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
         .enumerate()
         .map(|(i, field)| {
             let name = &field.name;
+            let ty = &field.ty;
             let pos = &positions[i];
             quote! {
-                self.#name.embedded_fixed_repack(#pos, dest.len() as u32, dest);
-                self.#name.embedded_variable_pack(dest);
+                <#ty as fracpack::Packable>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
+                <#ty as fracpack::Packable>::embedded_variable_pack(&self.#name, dest);
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -102,7 +104,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
             let name = &field.name;
             let ty = &field.ty;
             quote! {
-                #name: <#ty>::embedded_unpack(src, pos, &mut heap_pos)?,
+                #name: <#ty as fracpack::Packable>::embedded_unpack(src, pos, &mut heap_pos)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -113,7 +115,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
         .map(|field| {
             let ty = &field.ty;
             quote! {
-                <#ty>::embedded_verify(src, pos, &mut heap_pos)?;
+                <#ty as fracpack::Packable>::embedded_verify(src, pos, &mut heap_pos)?;
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -123,13 +125,13 @@ fn process_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
 
             fn pack(&self, dest: &mut Vec<u8>) {
                 let heap = #fixed_size;
-                assert!(heap as u16 as u32 == heap);
-                (heap as u16).pack(dest);
+                assert!(heap as u16 as u32 == heap); // TODO: return error
+                <u16 as fracpack::Packable>::pack(&(heap as u16), dest);
                 #pack_fixed_members
                 #pack_variable_members
             }
             fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-                let heap_size = u16::unpack(src, pos)?;
+                let heap_size = <u16 as fracpack::Packable>::unpack(src, pos)?;
                 let mut heap_pos = *pos + heap_size as u32;
                 if heap_pos < *pos {
                     return Err(fracpack::Error::BadOffset);
@@ -141,7 +143,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
                 Ok(result)
             }
             fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-                let heap_size = u16::unpack(src, pos)?;
+                let heap_size = <u16 as fracpack::Packable>::unpack(src, pos)?;
                 let mut heap_pos = *pos + heap_size as u32;
                 if heap_pos < *pos {
                     return Err(fracpack::Error::BadOffset);
@@ -158,57 +160,77 @@ fn process_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
                     .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
             }
             fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-                self.pack(dest)
+                <Self as fracpack::Packable>::pack(&self, dest)
             }
-            fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> fracpack::Result<Self> {
+            fn embedded_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> fracpack::Result<Self> {
                 let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
+                let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(fracpack::Error::BadOffset);
                 }
-                Self::unpack(src, heap_pos)
+                <Self as fracpack::Packable>::unpack(src, heap_pos)
             }
-            fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> fracpack::Result<()> {
+            fn embedded_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> fracpack::Result<()> {
                 let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
+                let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(fracpack::Error::BadOffset);
                 }
-                Self::verify(src, heap_pos)
+                <Self as fracpack::Packable>::verify(src, heap_pos)
             }
             fn option_fixed_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
                 match opt {
-                    Some(x) => x.embedded_fixed_pack(dest),
+                    Some(x) => <Self as fracpack::Packable>::embedded_fixed_pack(x, dest),
                     None => dest.extend_from_slice(&1u32.to_le_bytes()),
                 }
             }
             fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
                 match opt {
-                    Some(x) => x.embedded_fixed_repack(fixed_pos, heap_pos, dest),
+                    Some(x) => {
+                        <Self as fracpack::Packable>::embedded_fixed_repack(x, fixed_pos, heap_pos, dest)
+                    }
                     None => (),
                 }
             }
             fn option_variable_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
                 match opt {
-                    Some(x) => x.embedded_variable_pack(dest),
+                    Some(x) => <Self as fracpack::Packable>::embedded_variable_pack(x, dest),
                     None => (),
                 }
             }
-            fn option_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> fracpack::Result<Option<Self>> {
-                let offset = u32::unpack(src, fixed_pos)?;
+            fn option_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> fracpack::Result<Option<Self>> {
+                let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(None);
                 }
                 *fixed_pos -= 4;
-                Ok(Some(Self::embedded_unpack(src, fixed_pos, heap_pos)?))
+                Ok(Some(<Self as fracpack::Packable>::embedded_unpack(
+                    src, fixed_pos, heap_pos,
+                )?))
             }
-            fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> fracpack::Result<()> {
-                let offset = u32::unpack(src, fixed_pos)?;
+            fn option_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> fracpack::Result<()> {
+                let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(());
                 }
                 *fixed_pos -= 4;
-                Self::embedded_verify(src, fixed_pos, heap_pos)
+                <Self as fracpack::Packable>::embedded_verify(src, fixed_pos, heap_pos)
             }
         }
     })
@@ -218,6 +240,7 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
     let name = &input.ident;
     let generics = &input.generics;
     let fields = enum_fields(data);
+    // TODO: 128? also check during verify and unpack
     assert!(fields.len() < 256);
     let pack_items = fields
         .iter()
@@ -225,11 +248,12 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
         .map(|(i, field)| {
             let index = i as u8;
             let field_name = &field.name;
+            let ty = &field.ty;
             quote! {#name::#field_name(x) => {
                 dest.push(#index);
                 size_pos = dest.len();
                 dest.extend_from_slice(&0_u32.to_le_bytes());
-                x.pack(dest);
+                <#ty as fracpack::Packable>::pack(&x, dest);
             }}
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -241,7 +265,7 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
             let field_name = &field.name;
             let ty = &field.ty;
             quote! {
-                #index => #name::#field_name(<#ty>::unpack(src, pos)?),
+                #index => #name::#field_name(<#ty as fracpack::Packable>::unpack(src, pos)?),
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -252,7 +276,7 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
             let index = i as u8;
             let ty = &field.ty;
             quote! {
-                #index => <#ty>::verify(src, pos)?,
+                #index => <#ty as fracpack::Packable>::verify(src, pos)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -266,16 +290,15 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
                     #pack_items
                 };
                 let size = (dest.len() - size_pos - 4) as u32;
-                dest[size_pos..size_pos + 4]
-                    .copy_from_slice(&size.to_le_bytes());
+                dest[size_pos..size_pos + 4].copy_from_slice(&size.to_le_bytes());
             }
             fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-                let index = u8::unpack(src, pos)?;
+                let index = <u8 as fracpack::Packable>::unpack(src, pos)?;
                 let size_pos = *pos;
-                let size = u32::unpack(src, pos)?;
+                let size = <u32 as fracpack::Packable>::unpack(src, pos)?;
                 let result = match index {
                     #unpack_items
-                    _ => return Err(fracpack::Error::BadEnumIndex)
+                    _ => return Err(fracpack::Error::BadEnumIndex),
                 };
                 if *pos != size_pos + 4 + size {
                     return Err(fracpack::Error::BadSize);
@@ -284,15 +307,15 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
             }
             // TODO: option to error on unknown index
             fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-                let index = u8::unpack(src, pos)?;
+                let index = <u8 as fracpack::Packable>::unpack(src, pos)?;
                 let size_pos = *pos;
-                let size = u32::unpack(src, pos)?;
+                let size = <u32 as fracpack::Packable>::unpack(src, pos)?;
                 match index {
                     #verify_items
                     _ => {
                         *pos = size_pos + 4 + size;
-                        return Ok(())
-                    },
+                        return Ok(());
+                    }
                 }
                 if *pos != size_pos + 4 + size {
                     return Err(fracpack::Error::BadSize);
@@ -307,57 +330,77 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
                     .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
             }
             fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-                self.pack(dest)
+                <Self as fracpack::Packable>::pack(&self, dest)
             }
-            fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> fracpack::Result<Self> {
+            fn embedded_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> fracpack::Result<Self> {
                 let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
+                let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(fracpack::Error::BadOffset);
                 }
-                Self::unpack(src, heap_pos)
+                <Self as fracpack::Packable>::unpack(src, heap_pos)
             }
-            fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> fracpack::Result<()> {
+            fn embedded_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> fracpack::Result<()> {
                 let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
+                let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(fracpack::Error::BadOffset);
                 }
-                Self::verify(src, heap_pos)
+                <Self as fracpack::Packable>::verify(src, heap_pos)
             }
             fn option_fixed_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
                 match opt {
-                    Some(x) => x.embedded_fixed_pack(dest),
+                    Some(x) => <Self as fracpack::Packable>::embedded_fixed_pack(x, dest),
                     None => dest.extend_from_slice(&1u32.to_le_bytes()),
                 }
             }
             fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
                 match opt {
-                    Some(x) => x.embedded_fixed_repack(fixed_pos, heap_pos, dest),
+                    Some(x) => {
+                        <Self as fracpack::Packable>::embedded_fixed_repack(x, fixed_pos, heap_pos, dest)
+                    }
                     None => (),
                 }
             }
             fn option_variable_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
                 match opt {
-                    Some(x) => x.embedded_variable_pack(dest),
+                    Some(x) => <Self as fracpack::Packable>::embedded_variable_pack(x, dest),
                     None => (),
                 }
             }
-            fn option_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> fracpack::Result<Option<Self>> {
-                let offset = u32::unpack(src, fixed_pos)?;
+            fn option_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> fracpack::Result<Option<Self>> {
+                let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(None);
                 }
                 *fixed_pos -= 4;
-                Ok(Some(Self::embedded_unpack(src, fixed_pos, heap_pos)?))
+                Ok(Some(<Self as fracpack::Packable>::embedded_unpack(
+                    src, fixed_pos, heap_pos,
+                )?))
             }
-            fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> fracpack::Result<()> {
-                let offset = u32::unpack(src, fixed_pos)?;
+            fn option_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> fracpack::Result<()> {
+                let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(());
                 }
                 *fixed_pos -= 4;
-                Self::embedded_verify(src, fixed_pos, heap_pos)
+                <Self as fracpack::Packable>::embedded_verify(src, fixed_pos, heap_pos)
             }
         }
     })

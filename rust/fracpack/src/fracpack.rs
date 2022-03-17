@@ -219,7 +219,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
     }
 
     fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-        if let Some(_) = opt {
+        if opt.is_some() {
             dest[fixed_pos as usize..fixed_pos as usize + 4]
                 .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes())
         }
