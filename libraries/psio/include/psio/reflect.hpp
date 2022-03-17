@@ -35,6 +35,8 @@ namespace psio
    R result_of(R (C::*)(Args...) const);
    template <typename R, typename C, typename... Args>
    R result_of(R (C::*)(Args...));
+   template <typename R, typename... Args>
+   R result_of(R (*)(Args...));
 
    template <typename R, typename C>
    constexpr R result_of_member(R(C::*));
@@ -199,7 +201,7 @@ namespace psio
        template<typename ProxyObject> \
        struct proxy { \
             template<typename... Args> \
-            proxy( Args&&... args ):_psio_proxy_obj( std::forward<Args>(args)... ){}\
+            explicit proxy( Args&&... args ):_psio_proxy_obj( std::forward<Args>(args)... ){}\
             ProxyObject* operator->(){ return &_psio_proxy_obj; } \
             const ProxyObject* operator->()const{ return &_psio_proxy_obj; } \
             ProxyObject& operator*(){ return _psio_proxy_obj; } \
@@ -257,7 +259,7 @@ namespace psio
                                                                                                    \
         public:                                                                                    \
          template <typename... Args>                                                               \
-         proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)                      \
+         explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)                      \
          {                                                                                         \
          }                                                                                         \
          ProxyObject*       operator->() { return &_psio_proxy_obj; }                              \

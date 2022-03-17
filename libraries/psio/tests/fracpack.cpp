@@ -135,14 +135,6 @@ struct FRACPACK test_view
    uint16_t c;
 };
 
-namespace psio
-{
-
-   template<typename T, typename P>
-   constexpr bool view_is() { return std::is_same_v<view<T>,P>; }
-
-}  // namespace psio
-
 TEST_CASE("variant")
 {
    varstr vs{.v = double(42.1234)};  //mixed_simple{.a=1, .b=2, .c=3} };
@@ -155,8 +147,21 @@ TEST_CASE("variant")
    bool unknown = false;
    REQUIRE(p.validate(unknown));
    REQUIRE( not unknown );
-   REQUIRE(p.size() == 1 + 2 + 4 + 4 + psio::fracpack_size(simple()));
 
+   struct FRACPACK expected_view {
+      uint32_t v_offset = 4;
+      uint8_t  v_type = 0;
+      uint32_t v_size = sizeof( simple );
+      simple   v_value = { .a = 1111, .b = 222, .c = 333 };
+   };
+
+   expected_view ev;
+
+   REQUIRE(p.size() == sizeof(expected_view) ); //1 + 2 + 4 + 4 + psio::fracpack_size(simple()));
+   REQUIRE( memcmp( &ev, p.data(), sizeof(expected_view) ) == 0 );
+   
+
+   /*
    auto tv = reinterpret_cast<test_view*>(p.data()-4);
    std::cout << "tv->heap: " << tv->heap << "\n";
    std::cout << "tv->offset_v: " << tv->offset_v << "\n";
@@ -164,6 +169,7 @@ TEST_CASE("variant")
    std::cout << "tv->a: " << tv->a << "\n";
    std::cout << "tv->b: " << tv->b << "\n";
    std::cout << "tv->c: " << tv->c << "\n";
+   */
 
    psio::view<varstr> tmp2( p.data() );
    tmp2.v()->visit( [&]( auto v ) {
@@ -209,8 +215,31 @@ TEST_CASE("fracpack-not-final-nest")
    REQUIRE(psio::can_memcpy<nested_not_final_struct>() == false);
 
    nested_not_final_struct                 nfs{.a = 123, .nest = {.a = 456, .b = 789, .c = 321}};
-   psio::shared_view_ptr<nested_not_final_struct> ptr(nfs);
 
+   struct FRACPACK expected_view {
+      uint32_t a = 123;
+      uint32_t nest_offset = 4;
+      uint16_t heap = 4+8+2; // 14
+      uint32_t nest_a = 456;
+      uint64_t nest_b = 789;
+      uint16_t nest_c = 321;
+   };
+   REQUIRE( psio::fracpack_size( nfs ) == sizeof( expected_view ) );
+   std::cout <<"............ packing.............\n";
+   psio::shared_view_ptr<nested_not_final_struct> ptr(nfs);
+   auto ev = reinterpret_cast<const expected_view*>(ptr.data());
+   bool unknown = false;
+   REQUIRE( ptr.validate(unknown) );
+   REQUIRE( not unknown );
+
+   REQUIRE((int)ev->a == 123);
+   REQUIRE((int)ev->nest_offset == 4);
+   REQUIRE((int)ev->heap == 4+8+2);
+   REQUIRE((int)ev->nest_a == 456);
+   REQUIRE((int)ev->nest_b == 789);
+   REQUIRE((int)ev->nest_c == 321);
+
+   std::cout <<"............ testing view .............\n";
    REQUIRE((int)ptr->a() == 123);
    REQUIRE((int)ptr->nest()->a() == 456);
    REQUIRE((int)ptr->nest()->b() == 789);
@@ -219,11 +248,13 @@ TEST_CASE("fracpack-not-final-nest")
    ptr->nest()->c() = 345;
    REQUIRE((int)ptr->nest()->c() == 345);
 
+   std::cout << "............ unpacking ................\n";
    auto u = ptr.unpack();
    REQUIRE(u.a == 123);
    REQUIRE(u.nest.a == 456);
    REQUIRE(u.nest.b == 789);
    REQUIRE(u.nest.c == 345);
+
 }
 TEST_CASE("fracpack-nest")
 {
@@ -452,13 +483,13 @@ TEST_CASE("fracpack_vector_str")
    REQUIRE(u.test[1] == "bc|");
 }
 
-struct inner final
+struct FRACPACK inner final
 {
    uint32_t a;
    uint32_t b;
 };
 PSIO_REFLECT(inner, a, b)
-struct outer final
+struct FRACPACK outer final
 {
    inner    in;
    uint32_t c;
@@ -501,7 +532,23 @@ PSIO_REFLECT(vecstruct, vs)
 TEST_CASE("vectorstruct")
 {
    vecstruct                 test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
+
+   struct FRACPACK expected_view {
+      uint16_t heap = 4;
+      uint32_t offset = 4;
+      uint32_t size   = 3*sizeof(outer);
+      outer    one = {.c=1};
+      outer    two = {.c=2};
+      outer    three = {.c=3};
+   };
+   expected_view ev;
+
+   std::cout <<"----- packsize ----\n";
+   REQUIRE( psio::fracpack_size(test) == sizeof(expected_view) );
+
+   std::cout <<"----- packing----\n";
    psio::shared_view_ptr<vecstruct> p(test);
+   REQUIRE( memcmp( p.data(), &ev, sizeof(expected_view) ) == 0 );
    REQUIRE( p.validate() );
    REQUIRE(p.size() == 2 + 4 + 4 + 3 * 12);
    REQUIRE((int)p->vs()[0].c() == 1);
@@ -1164,4 +1211,45 @@ TEST_CASE( "vector_ext_struct" ) {
    REQUIRE( po.validate(unknown) );
    REQUIRE( unknown );
   
+}
+   struct test_get_by_name //get_account_by_name
+   {
+      //using return_type = std::optional<psibase::account_num>;
+
+      std::string name;// = {};
+   };
+   PSIO_REFLECT(test_get_by_name, name)
+
+
+
+struct account_name
+{
+   uint32_t        num  = {};
+   std::string     name = {};
+};
+PSIO_REFLECT(account_name, num, name );
+
+struct startup
+{
+   uint32_t       next_account_num  = 0; 
+   std::vector<account_name> existing_accounts = {};
+};
+PSIO_REFLECT(startup, next_account_num, existing_accounts) 
+using actionv = std::variant<startup, strv2>;
+
+TEST_CASE( "vec_struct_string"  ) {
+  startup su{ .next_account_num = 100,
+            .existing_accounts = {
+               { 1, "one more time" },
+               { 2, "two more times" }
+             }
+          };
+  psio::shared_view_ptr<startup> st{su};
+  REQUIRE( st.validate() );
+  std::cout << "st.size: " << st.size() <<"\n";
+
+  auto vec = psio::convert_to_frac( actionv(su) );
+  psio::shared_view_ptr<actionv> p{actionv(su)};
+  std::cout << "vec.size: " << vec.size() <<"\n";
+  REQUIRE( p.validate() );
 }

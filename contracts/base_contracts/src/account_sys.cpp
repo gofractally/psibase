@@ -15,6 +15,7 @@ namespace account_sys
    static constexpr table_num num_to_name_table = 2;
    static constexpr table_num name_to_num_table = 3;
 
+
    inline auto status_key() { return std::tuple{contract, status_table}; }
    struct status_row
    {
@@ -37,6 +38,7 @@ namespace account_sys
    };
    EOSIO_REFLECT(num_to_name_row, num, name)
 
+  
    inline auto name_to_num_key(const std::string& name)
    {
       return std::tuple{contract, name_to_num_table, name};
@@ -61,26 +63,38 @@ namespace account_sys
       kv_put(name_to_num_key(name), name_to_num_row{num, name});
    }
 
-   void exec(account_num this_contract, account_num sender, startup& act)
+   void startup::run( account_num sender, psio::const_view<startup> act)
    {
       check(!kv_get<status_row>(status_key()), "already started");
       kv_put(status_key(), status_row{
-                               .next_account_num = act.next_account_num,
+                               .next_account_num = act->next_account_num(),
                            });
+      auto ea = act->existing_accounts();
+      auto s = ea->size();
+      eosio::print( "existing accounts size: ", s, "\n" );
+      for( uint32_t i = 0; i < s; ++i ) {
+         auto r = ea[i];
+         eosio::print( (uint32_t)r->num(), " ", std::string_view(r->name()), "\n" );
+         register_acc( r->num(), r->name() );
+      }
+      /*
       for (auto [num, name] : act.existing_accounts)
          register_acc(num, name);
+         */
    }
 
-   psibase::account_num exec(account_num this_contract, account_num sender, create_account& args)
+   psibase::account_num create_account::run(account_num sender, psio::const_view<create_account> args)
    {
       auto status = kv_get<status_row>(status_key());
       check(status.has_value(), "not started");
-      auto auth_row = kv_get<name_to_num_row>(name_to_num_key(args.auth_contract));
+      write_console( "auth con: " );
+      write_console( args->auth_contract() );
+      auto auth_row = kv_get<name_to_num_row>(name_to_num_key(args->auth_contract()));
       check(!!auth_row, "auth_contract not found");
       uint32_t flags = 0;
       // TODO: restrict ability to set this flag
       // TODO: support entire set of flags
-      if (args.allow_sudo)
+      if( args->allow_sudo() )
          flags |= account_row::allow_sudo;
       check(!kv_get<account_row>(account_row::kv_map, account_key(status->next_account_num)),
             "internal error: next_account_num already exists");
@@ -91,42 +105,59 @@ namespace account_sys
       };
       kv_put(status->key(), *status);
       kv_put(account.kv_map, account.key(), account);
-      register_acc(account.num, args.name);
+      register_acc(account.num, args->name());
       return account.num;
    }
 
-   std::optional<psibase::account_num> exec(account_num  this_contract,
-                                            account_num  sender,
-                                            get_by_name& args)
+   std::optional<psibase::account_num> get_account_by_name::run( account_num  sender,
+                                            psio::const_view<get_account_by_name> args)
    {
-      auto row = kv_get<name_to_num_row>(name_to_num_key(args.name));
+      auto row = kv_get<name_to_num_row>(name_to_num_key(args->name()));
       if (!!row)
          return row->num;
       return std::nullopt;
    }
 
-   std::optional<std::string> exec(account_num this_contract, account_num sender, get_by_num& args)
+   std::optional<std::string> get_account_by_num::run( account_num sender, psio::const_view<get_account_by_num> args)
    {
-      auto row = kv_get<num_to_name_row>(num_to_name_key(args.num));
+      auto row = kv_get<num_to_name_row>(num_to_name_key(args->num()));
       if (!!row)
          return row->name;
       return std::nullopt;
    }
 
+   // invoked on a sync call
    extern "C" void called(account_num this_contract, account_num sender)
    {
       auto act  = get_current_action();
-      auto data = eosio::convert_from_bin<action>(act.raw_data);
+      if( not psio::fracvalidate<account_sys::action>( act.raw_data.data(), act.raw_data.size() ).valid_and_known() )
+         abort_message( "invalid action raw data" );
+
+      psio::const_view<account_sys::action> v(act.raw_data.data() );
+      v->visit( [&]( const auto& av ){
+             using action_type = typename psio::is_view<std::decay_t<decltype(av)>>::value_type; 
+             if constexpr (std::is_same_v<decltype(action_type::run(sender, av)), void>)
+                action_type::run(sender, av);
+             else
+                set_frac_retval(action_type::run(sender, av));
+      });
+
+      /*
+      auto data = psio::convert_from_frac<account_sys::action>(act.raw_data);
       std::visit(
           [&](auto& x) {
              if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
                 exec(this_contract, sender, x);
              else
-                set_retval(exec(this_contract, sender, x));
+                set_frac_retval(exec(this_contract, sender, x));
           },
           data);
+          */
    }
 
-   extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
+   extern "C" void __wasm_call_ctors(); /// produced by linker to init global vars
+
+   /// called once on first time contract loaded in a transaction, multiple actions in 
+   /// transaction will only see this called ONCE
+   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); } 
 }  // namespace account_sys

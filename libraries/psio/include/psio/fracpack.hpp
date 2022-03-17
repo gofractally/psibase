@@ -1,5 +1,5 @@
 #pragma once
-#include <iostream>
+//#include <iostream>
 #include <psio/error.hpp>
 #include <psio/name.hpp>
 #include <psio/stream.hpp>
@@ -27,6 +27,11 @@ namespace psio
 
    template <typename View, typename Enable=void>
    struct view;
+   template <typename View, typename Enable=void>
+   struct const_view;
+
+   template<typename T, typename P>
+   constexpr bool view_is() { return std::is_same_v<view<T>,P> || std::is_same_v<const_view<T>,P>; }
 
    template <typename... Ts>
    struct view<std::variant<Ts...>>;
@@ -44,10 +49,6 @@ namespace psio
    struct view<T, std::enable_if_t<reflect<T>::is_struct>>;
 
 
-
-   template <typename View, typename Enable=void>
-   struct const_view;
-
    template <typename... Ts>
    struct const_view<std::variant<Ts...>>;
 
@@ -64,6 +65,21 @@ namespace psio
    struct const_view<T, std::enable_if_t<reflect<T>::is_struct>>;
 
 
+   template <typename>
+   struct is_view : std::false_type
+   {
+   };
+
+   template <typename T>
+   struct is_view<view<T>> : std::true_type
+   {
+      using value_type = T;
+   };
+   template <typename T>
+   struct is_view<const_view<T>> : std::true_type
+   {
+      using value_type = T;
+   };
 
 
    struct offset_ptr
@@ -301,11 +317,12 @@ namespace psio
    template <typename T>
    uint32_t fracpack_size(const T& v);
 
+   using char_ptr = char*;
    /**
      *  used to pack a member of a struct or vector
      */
    template <typename T, typename S>
-   void fracpack_member(uint16_t& start_heap, const T& member, S& stream)
+   void fracpack_member( char_ptr& heap, const T& member, S& stream)
    {
       if constexpr (may_use_heap<T>())
       {
@@ -313,21 +330,21 @@ namespace psio
          // case that T is an optional
          auto pack_on_heap = [&](const auto& mem)
          {
+            uint32_t ps = fracpack_size(mem);
             if constexpr (std::is_same_v<size_stream, S>)
             {
                stream.skip(sizeof(uint32_t));  /// skip offset
-               auto heapsize = fracpack_size(mem);
-               start_heap += heapsize;
+               stream.skip(ps); /// data
             }
             else
             {
-               uint32_t offset = start_heap - stream.consumed();
-             //  std::cout << "offset: " << offset <<"\n";
-               fixed_buf_stream substream(stream.pos + offset,
-                                          stream.end - stream.pos);
+               uint32_t offset = heap - stream.pos;
                stream.write(&offset, sizeof(offset));
-               auto ps = fracpack(mem, substream);
-               start_heap += ps;
+             //  std::cout << "offset: " << offset <<"\n";
+               fixed_buf_stream substream(heap,
+                                          stream.end - heap);
+               fracpack(mem, substream);
+               heap += ps;
             }
          };
 
@@ -346,7 +363,7 @@ namespace psio
                              std::is_same_v<opt_type, std::string> 
                              )
                {
-                  fracpack_member(start_heap, *member, stream);
+                  fracpack_member(heap, *member, stream);
                   return;
                }
                else
@@ -400,28 +417,29 @@ namespace psio
       }
    }
    template <typename T, typename S>
-   uint32_t fracpack(const shared_view_ptr<T>& v, S& stream) {
-      stream.write( v.data(), v.size()+4 );
-      return v.size()+4;
+   void fracpack(const shared_view_ptr<T>& v, S& stream) {
+      stream.write( v.data(), v.size() );
    }
 
    /**
      *  Writes v to a stream...without a size prefix
      */
    template <typename T, typename S>
-   uint32_t fracpack(const T& v, S& stream)
+   void fracpack(const T& v, S& stream)
    {
       if constexpr (is_std_variant<T>::value)
       {
          uint8_t idx = v.index();
+     //    std::cout << "packing variant: " << int(idx) <<"\n";
          stream.write(&idx, sizeof(idx));
          uint32_t varsize = 0;
          std::visit([&](const auto& iv) { 
-              varsize += fracpack_size(iv);
+              varsize = fracpack_size(iv);
+        //      std::cout << "  element size: " << varsize <<"\n";
               stream.write( &varsize, sizeof(varsize) );
               fracpack(iv, stream);
          }, v);
-         return 1+ sizeof(varsize) + varsize;
+       //  return 1+ sizeof(varsize) + varsize;
       }
       else if constexpr (is_std_optional<T>::value)
       {
@@ -429,19 +447,18 @@ namespace psio
          {
             uint32_t tomb = 1;
             stream.write(&tomb, sizeof(tomb));
-            return 4;
+        //    return 4;
          }
          else
          {
             uint32_t heap = 4;
             stream.write(&heap, sizeof(heap));
-            return 4 + fracpack(*v, stream);
+            fracpack(*v, stream);
          }
       }
       else if constexpr (can_memcpy<T>())
       {
          stream.write(&v, sizeof(T));
-         return sizeof(T);
       }
       else if constexpr (std::is_same_v<std::string, T>)
       {
@@ -449,7 +466,6 @@ namespace psio
          stream.write(&s, sizeof(s));
          if (s > 0)
             stream.write(v.data(), s);
-         return s + sizeof(s);
       }
       else if constexpr (is_std_vector<T>::value)
       {
@@ -463,7 +479,6 @@ namespace psio
             stream.write(&s, sizeof(s));
             if (s > 0)
                stream.write(v.data(), s);
-            return s + sizeof(s);
          } 
          else if constexpr( not may_use_heap<value_type>() ) {
          //   std::cout << "packing vector of not may use heap\n";
@@ -475,40 +490,52 @@ namespace psio
             for( const auto& item: v ) {
                fracpack( item, stream ); 
             }
-            return s + sizeof(s);
+          //  return s + sizeof(s);
          }
          else
          {
             uint32_t s = v.size() * sizeof(offset_ptr);
             stream.write(&s, sizeof(s));
-            uint16_t start_heap = s + 4;  // why 4... it is needed
+       //     uint16_t start_heap = s + 4;  // why 4... it is needed
+            char* heap = nullptr;
+
+            if constexpr (not std::is_same_v<size_stream, S>)
+                heap = stream.pos + s;
             for (const auto& item : v)
             {
-               fracpack_member(start_heap, item, stream);
+               fracpack_member(heap, item, stream);
             }
-            return start_heap;
+           // return start_heap;
          }
       }
       else if constexpr (psio::reflect<T>::is_struct)
       {
+       //  std::cout << "packing struct: \n";
          uint16_t start_heap = fracpack_fixed_size<T>();
-         if constexpr (is_ext_structure<T>())
+         if constexpr (not std::is_final_v<T> )//is_ext_structure<T>())
          {
-          //  std::cout << "ext struct heap: " <<start_heap<<"\n";
+        //    std::cout << "ext struct heap: " <<start_heap<<"\n";
             stream.write(&start_heap, sizeof(start_heap));
-            start_heap += sizeof(start_heap);
          }
+         char* heap = nullptr;
+
+         if constexpr (not std::is_same_v<size_stream, S>)
+            heap = stream.pos + start_heap;
+
          /// no need to write start_heap, it is always the same because
          /// the structure is "fixed" and cannot be extended in the future
          reflect<T>::for_each(
              [&](const meta& ref, const auto& mptr)
              {
-            //    using member_type = decltype(result_of_member(mptr));
-            //    std::cout << "member: " << ref.name << " may use heap: " << may_use_heap<member_type>() <<"\n";
-                fracpack_member(start_heap, v.*mptr, stream);
+                using member_type = decltype(result_of_member(mptr));
+                
+            //    if constexpr (not std::is_same_v<size_stream, S>)
+            //    std::cout << "member: " << ref.name << " may use heap: " << may_use_heap<member_type>() 
+            //              <<"  " << heap - stream.begin  <<"\n";
+                fracpack_member(heap, v.*mptr, stream);
              });
          //         std::cout <<"return start_heap: " << start_heap <<"\n";
-         return start_heap;  /// it has been advanced and now points at end of heap
+         //return start_heap;  /// it has been advanced and now points at end of heap
       }
       else
       {
@@ -666,11 +693,16 @@ namespace psio
                fracunpack_member(e, stream);
             }
          }
-      }
-      else if constexpr (reflect<T>::is_struct)
+      } else if constexpr ( is_std_optional<T>::value ) {
+         uint32_t offset;
+         stream.read( &offset, sizeof(offset) );
+         if( offset != 4 ) v = T();
+         v = typename is_std_optional<T>::value_type();
+         fracunpack( *v, stream );
+      } else if constexpr (reflect<T>::is_struct)
       {
          uint16_t start_heap = fracpack_fixed_size<T>();
-         if constexpr (is_ext_structure<T>())
+         if constexpr ( not std::is_final_v<T> ) //is_ext_structure<T>())
          {
             stream.read(&start_heap, sizeof(start_heap));
          }
@@ -758,6 +790,8 @@ namespace psio
       bool        valid;       ///< no errors detected
       bool        unknown;     ///< unknown fields detected, TODO: move from bools to ints
 
+      bool valid_and_known()const { return valid and not unknown; }
+
       template<typename T>
       friend check_stream fracvalidate( const char* b, const char* e  );
 
@@ -774,6 +808,11 @@ namespace psio
 
    template<typename T>
    check_stream fracvalidate( const char* b, const char* e  );
+
+   template<typename T>
+   check_stream fracvalidate( const char* b, size_t s ) {
+      return fracvalidate<T>( b, b + s );
+   }
    template<typename T>
    check_stream fracvalidate_view( const view<T>& v, const char* p, const char* e );
 
@@ -864,10 +903,10 @@ namespace psio
                       return stream;
                 }
             } else {
-               std::cout << "uses heap but size isn't multiple of offsetptr size\n";
+               //std::cout << "uses heap but size isn't multiple of offsetptr size\n";
             }
          } else {
-            std::cout <<"not enough space to read size\n";   
+          //  std::cout <<"not enough space to read size\n";   
          }
       }
       else if constexpr( is_std_optional<T>::value ) {
@@ -913,7 +952,7 @@ namespace psio
          stream.pos      = substr.pos;
          return stream;
       }
-      else if constexpr( is_fixed_structure<T>() ) {
+      else if constexpr( reflect<T>::is_struct and std::is_final_v<T> ) { //is_fixed_structure<T>() ) {
      //    std::cout << "is fixed structure\n";
          stream.pos         = stream.begin + fracpack_fixed_size<T>(); 
          stream.heap        = stream.pos;
@@ -1091,7 +1130,8 @@ namespace psio
    uint32_t fracpack_size(const T& v)
    {
       size_stream size_str;
-      return fracpack(v, size_str);
+      fracpack(v, size_str);
+      return size_str.size;
    }
 
 
@@ -1164,8 +1204,9 @@ namespace psio
 
          constexpr uint32_t offset =
              psio::get_tuple_offset<idx, tuple_type>::value +
-             2 * (psio::is_ext_structure<
-                     class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
+             2 * (not std::is_final_v<class_type>);
+
+         //psio::is_ext_structure<class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
 
          auto out_ptr = buffer + offset;
 
@@ -1191,7 +1232,7 @@ namespace psio
          }
          else
          {
-            return view<member_type>(out_ptr);
+            return const_view<member_type>(out_ptr);
          }
       }
       const char* buffer;
@@ -1210,10 +1251,10 @@ namespace psio
 
          constexpr uint32_t offset =
              psio::get_tuple_offset<idx, tuple_type>::value +
-             2 * (psio::is_ext_structure<
-                     class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
+             2 * (not std::is_final_v<class_type>);
 
          char* out_ptr = buffer + offset;
+  //       std::cout << "offset: " << offset <<"\n";
 
          if constexpr (is_std_optional<member_type>::value)
          {
@@ -1410,8 +1451,12 @@ namespace psio
 
       uint32_t size() const
       {
-         constexpr uint16_t fix_size = fracpack_fixed_size<T>();
-         return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / fix_size;
+         if constexpr (not may_use_heap<T>()) {
+            constexpr uint16_t fix_size = fracpack_fixed_size<T>();
+            return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / fix_size;
+         } else {
+            return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / 4;
+         }
       }
 
       auto operator[](uint32_t idx)
@@ -1442,8 +1487,12 @@ namespace psio
 
       uint32_t size() const
       {
-         constexpr uint16_t fix_size = fracpack_fixed_size<T>();
-         return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / fix_size;
+         if constexpr (not may_use_heap<T>()) {
+            constexpr uint16_t fix_size = fracpack_fixed_size<T>();
+            return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / fix_size;
+         } else {
+            return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / 4;
+         }
       }
 
       auto operator[](uint32_t idx)const
@@ -1561,6 +1610,21 @@ namespace psio
          }
       }
    };
+
+   template<typename T>
+   std::vector<char> convert_to_frac( const T& v ) {
+      std::vector<char> result( fracpack_size(v) );
+      fixed_buf_stream buf(result.data(), result.size() );
+      fracpack(v,buf);
+      return result;
+   }
+   template<typename T>
+   T convert_from_frac( const std::vector<char>& v ) {
+      T tmp;
+      input_stream buf(v.data(), v.size() );
+      fracunpack(tmp, buf );
+      return tmp;
+   }
 
    /**
      *  A shared_ptr<char> array containing the data

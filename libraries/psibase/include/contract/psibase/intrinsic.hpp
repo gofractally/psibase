@@ -4,6 +4,7 @@
 #include <eosio/to_key.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
+#include <psio/fracpack.hpp>
 
 namespace psibase
 {
@@ -138,6 +139,24 @@ namespace psibase
    {
       auto data = eosio::convert_to_bin(retval);
       raw::set_retval(data.data(), data.size());
+   }
+
+   template <typename T>
+   void set_frac_retval(const T& retval)
+   {
+      size_t s = psio::fracpack_size( retval );
+      if( false ) { //s < 1024 ) {
+         char* buffer = (char*)alloca( s );
+         psio::fixed_buf_stream stream( buffer, s );
+         psio::fracpack( retval, stream );
+         raw::set_retval( buffer, s );
+      }
+      else {
+         std::vector<char> buffer(s);
+         psio::fixed_buf_stream stream( buffer.data(), s );
+         psio::fracpack( retval, stream );
+         raw::set_retval( buffer.data(), s );
+      }
    }
 
    // Set the return value of the currently-executing action
@@ -345,6 +364,10 @@ namespace psibase
    inline std::optional<V> kv_max(const K& key)
    {
       return kv_max<V>(kv_map::contract, key);
+   }
+
+   inline void write_console(const std::string_view& sv ) {
+      raw::write_console( sv.data(), sv.size() );
    }
 
 }  // namespace psibase

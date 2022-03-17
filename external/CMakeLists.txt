@@ -6,7 +6,7 @@ ProcessorCount(NUM_PROCS)
 add_subdirectory( simdjson )
 
 add_library(rapidjson INTERFACE)
-target_include_directories(rapidjson INTERFACE rapidjson/include)
+target_include_directories(rapidjson INTERFACE rapidjson/include )
 
 if(IS_WASM)
     copy_headers(rapidjson/include/rapidjson rapidjson/include/rapidjson)

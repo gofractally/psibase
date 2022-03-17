@@ -1,7 +1,7 @@
 function(contract name)
     add_executable(${name} ${ARGN})
     target_include_directories(${name} PUBLIC include)
-    target_link_libraries(${name} psibase-contract-simple-malloc)
+    target_link_libraries(${name} psibase-contract-simple-malloc )
     set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 

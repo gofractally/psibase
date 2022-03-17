@@ -9,7 +9,7 @@ if(DEFINED IS_NATIVE)
         benchmark.cpp
 #        crypto.cpp
     )
-    target_link_libraries(psio-tests psio catch2 Threads::Threads)
+    target_link_libraries(psio-tests psio catch2 Threads::Threads )
 endif()
 
 if(DEFINED IS_WASM)
