@@ -1,4 +1,4 @@
-#include "test_m/tests/test.hpp"
+#include "test_fracpack/tests/test.hpp"
 
 using namespace std::literals;
 
@@ -107,8 +107,6 @@ TestType tests1_data[] = {
 
 void check_same(const auto& rust, const auto& cpp)
 {
-   if (rust.size() == cpp.size() && !memcmp(rust.data(), cpp.data(), rust.size()))
-      return;
    printf("rust: %s\n", psio::convert_to_json(psio::bytes{std::vector<char>(
                                                   (const char*)rust.data(),
                                                   (const char*)(rust.data() + rust.size()))})
@@ -117,6 +115,8 @@ void check_same(const auto& rust, const auto& cpp)
           psio::convert_to_json(
               psio::bytes{std::vector<char>(cpp.data(), (const char*)(cpp.data() + cpp.size()))})
               .c_str());
+   if (rust.size() == cpp.size() && !memcmp(rust.data(), cpp.data(), rust.size()))
+      return;
    throw std::runtime_error("rust and c++ packed differ");
 }
 

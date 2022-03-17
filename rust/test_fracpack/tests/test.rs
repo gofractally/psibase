@@ -1,61 +1,5 @@
 use fracpack::{Packable, Result};
-use psi_macros::Fracpack;
-
-// TODO: test reading variant with future index
-#[derive(Fracpack, PartialEq, Debug)]
-pub enum Variant {
-    ItemU32(u32),
-    ItemStr(String),
-    // ItemOptStr(Option<String>),  TODO: broken in C++
-}
-
-#[derive(Fracpack, PartialEq, Debug)]
-pub struct InnerStruct {
-    inner_u32: u32,
-    var: Option<Variant>,
-    inner_option_u32: Option<u32>,
-    inner_option_str: Option<String>,
-    inner_option_vec_u16: Option<Vec<u16>>,
-    inner_o_vec_o_u16: Option<Vec<Option<u16>>>,
-}
-
-#[derive(Fracpack, PartialEq, Debug)]
-pub struct TestType {
-    field_u8: u8,
-    field_u16: u16,
-    field_u32: u32,
-    field_u64: u64,
-    field_i8: i8,
-    field_i16: i16,
-    field_i32: i32,
-    field_i64: i64,
-    field_str: String,
-    field_f32: f32,
-    field_f64: f64,
-    field_inner: InnerStruct,
-    field_v_inner: Vec<InnerStruct>,
-    field_option_u8: Option<u8>,
-    field_option_u16: Option<u16>,
-    field_option_u32: Option<u32>,
-    field_option_u64: Option<u64>,
-    field_option_i8: Option<i8>,
-    field_option_i16: Option<i16>,
-    field_option_i32: Option<i32>,
-    field_option_i64: Option<i64>,
-    field_option_str: Option<String>,
-    field_option_f32: Option<f32>,
-    field_option_f64: Option<f64>,
-    field_option_inner: Option<InnerStruct>,
-}
-
-#[cxx::bridge]
-mod ffi {
-    unsafe extern "C++" {
-        include!("test_m/tests/test.hpp");
-
-        fn tests1(index: usize, blob: &[u8]);
-    }
-}
+use test_fracpack::*;
 
 fn get_tests1() -> [TestType; 2] {
     [
@@ -162,7 +106,7 @@ fn t1() -> Result<()> {
         TestType::verify(&packed[..], &mut 0)?;
         let unpacked = TestType::unpack(&packed[..], &mut 0)?;
         assert_eq!(*t, unpacked);
-        ffi::tests1(i, &packed[..]);
+        test_fracpack::bridge::ffi::tests1(i, &packed[..]);
         // TODO: optionals after fixed-data portion ends
     }
     Ok(())

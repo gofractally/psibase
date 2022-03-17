@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include "test_m/tests/test.rs.h"
+#include "test_fracpack/src/bridge.rs.h"
 
 // TODO: fix warnings
 #pragma GCC diagnostic push

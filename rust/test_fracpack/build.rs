@@ -1,12 +1,12 @@
 use std::path::Path;
 
 fn main() {
-    cxx_build::bridge("tests/test.rs")
+    cxx_build::bridge("src/bridge.rs")
         .file("tests/test.cpp")
         .flag("-std=gnu++2a")
         .include(Path::new("../../libraries/psio/include"))
         .include(Path::new("../../external/rapidjson/include"))
         .include(Path::new("../../external/simdjson/include"))
         .cpp_link_stdlib(Some("stdc++")) // TODO: doc says this should be auto detected
-        .compile("test_m");
+        .compile("test_fracpack");
 }
