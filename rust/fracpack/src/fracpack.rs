@@ -157,7 +157,7 @@ macro_rules! scalar_impl {
             }
         }
     };
-} // scalar_impl_fracpack
+} // scalar_impl
 
 scalar_impl! {bool}
 scalar_impl! {i8}
@@ -260,30 +260,46 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
     }
 } // impl<T> Packable for Option<T>
 
-trait StringConversion<'a>: Sized {
-    fn fracpack_from_utf8(bytes: &'a [u8]) -> Result<Self>;
+trait BytesConversion<'a>: Sized {
+    fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self>;
+    fn fracpack_as_bytes(&'a self) -> &'a [u8];
 }
 
-impl<'a> StringConversion<'a> for String {
-    fn fracpack_from_utf8(bytes: &'a [u8]) -> Result<Self> {
+impl<'a> BytesConversion<'a> for String {
+    fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self> {
         Self::from_utf8(bytes.to_vec()).or(Err(Error::BadUTF8))
     }
-}
-
-impl<'a> StringConversion<'a> for &'a str {
-    fn fracpack_from_utf8(bytes: &'a [u8]) -> Result<Self> {
-        std::str::from_utf8(bytes).or(Err(Error::BadUTF8))
+    fn fracpack_as_bytes(&'a self) -> &'a [u8] {
+        self.as_bytes()
     }
 }
 
-macro_rules! string_impl {
+impl<'a> BytesConversion<'a> for &'a str {
+    fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self> {
+        std::str::from_utf8(bytes).or(Err(Error::BadUTF8))
+    }
+    fn fracpack_as_bytes(&self) -> &'a [u8] {
+        self.as_bytes()
+    }
+}
+
+impl<'a> BytesConversion<'a> for &'a [u8] {
+    fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self> {
+        Ok(bytes)
+    }
+    fn fracpack_as_bytes(&self) -> &'a [u8] {
+        self
+    }
+}
+
+macro_rules! bytes_impl {
     ($t:ty) => {
         impl<'a> Packable<'a> for $t {
             const FIXED_SIZE: u32 = 4;
 
             fn pack(&self, dest: &mut Vec<u8>) {
                 dest.extend_from_slice(&(self.len() as u32).to_le_bytes());
-                dest.extend_from_slice(self.as_bytes());
+                dest.extend_from_slice(self.fracpack_as_bytes());
             }
 
             fn unpack(src: &'a [u8], pos: &mut u32) -> Result<$t> {
@@ -292,7 +308,7 @@ macro_rules! string_impl {
                     .get(*pos as usize..(*pos + len) as usize)
                     .ok_or(Error::ReadPastEnd)?;
                 *pos += len;
-                <$t>::fracpack_from_utf8(bytes)
+                <$t>::fracpack_from_bytes(bytes)
             }
 
             fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
@@ -345,7 +361,7 @@ macro_rules! string_impl {
                     .get(*heap_pos as usize..(*heap_pos + len) as usize)
                     .ok_or(Error::ReadPastEnd)?;
                 *heap_pos += len;
-                <$t>::fracpack_from_utf8(bytes)
+                <$t>::fracpack_from_bytes(bytes)
             }
 
             fn embedded_verify(
@@ -422,10 +438,11 @@ macro_rules! string_impl {
             }
         } // impl Packable for $t
     };
-} // string_impl
+} // bytes_impl
 
-string_impl! {String}
-string_impl! {&'a str}
+bytes_impl! {String}
+bytes_impl! {&'a str}
+bytes_impl! {&'a [u8]}
 
 impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
     const FIXED_SIZE: u32 = 4;
