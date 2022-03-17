@@ -1,22 +1,15 @@
-use fracpack::*;
-use psi_macros::*;
+use fracpack::{Packable, Result};
+use psi_macros::Fracpack;
 
 // TODO: test reading variant with future index
-#[derive(Fracpack, PartialEq, Clone, Debug)]
+#[derive(Fracpack, PartialEq, Debug)]
 pub enum Variant {
     ItemU32(u32),
     ItemStr(String),
     // ItemOptStr(Option<String>),  TODO: broken in C++
 }
 
-// TODO
-impl Default for Variant {
-    fn default() -> Self {
-        Variant::ItemU32(0)
-    }
-}
-
-#[derive(Fracpack, Default, PartialEq, Clone, Debug)]
+#[derive(Fracpack, PartialEq, Debug)]
 pub struct InnerStruct {
     inner_u32: u32,
     var: Option<Variant>,
@@ -26,7 +19,7 @@ pub struct InnerStruct {
     inner_o_vec_o_u16: Option<Vec<Option<u16>>>,
 }
 
-#[derive(Fracpack, Default, PartialEq, Debug)]
+#[derive(Fracpack, PartialEq, Debug)]
 pub struct TestType {
     field_u8: u8,
     field_u16: u16,

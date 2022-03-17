@@ -8,6 +8,7 @@ custom_error! {pub Error
     BadEmptyEncoding    = "Bad empty encoding",
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
+    ExtraData           = "Extra data in buffer",
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -17,6 +18,15 @@ pub trait Packable: Sized {
     fn pack(&self, dest: &mut Vec<u8>);
     fn unpack(src: &[u8], pos: &mut u32) -> Result<Self>;
     fn verify(src: &[u8], pos: &mut u32) -> Result<()>;
+
+    fn verify_no_extra(src: &[u8]) -> Result<()> {
+        let mut pos = 0;
+        Self::verify(src, &mut pos)?;
+        if pos as usize != src.len() {
+            return Err(Error::ExtraData);
+        }
+        Ok(())
+    }
 
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>);
     fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>);
@@ -365,7 +375,7 @@ impl Packable for String {
     }
 } // impl Packable for String
 
-impl<T: Packable + Default + Clone> Packable for Vec<T> {
+impl<T: Packable> Packable for Vec<T> {
     const FIXED_SIZE: u32 = 4;
 
     // TODO: optimize scalar
