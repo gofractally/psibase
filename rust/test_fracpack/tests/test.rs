@@ -98,9 +98,59 @@ fn get_tests1() -> [TestType; 2] {
     ]
 } // get_tests1()
 
+fn round_trip_field<T: fracpack::PackableOwned + PartialEq + std::fmt::Debug>(
+    field: &T,
+    name: &str,
+) -> T {
+    println!("    {}", name);
+    let mut packed = Vec::<u8>::new();
+    field.pack(&mut packed);
+    T::verify_no_extra(&packed[..]).unwrap();
+    let unpacked = T::unpack(&packed[..], &mut 0).unwrap();
+    assert_eq!(*field, unpacked);
+    unpacked
+}
+
+macro_rules! do_rt {
+    ($obj:ident, $field:ident) => {
+        round_trip_field(&$obj.$field, stringify!($field));
+    };
+}
+
+fn round_trip_fields(obj: &TestType) {
+    do_rt!(obj, field_u8);
+    do_rt!(obj, field_u16);
+    do_rt!(obj, field_u32);
+    do_rt!(obj, field_u64);
+    do_rt!(obj, field_i8);
+    do_rt!(obj, field_i16);
+    do_rt!(obj, field_i32);
+    do_rt!(obj, field_i64);
+    do_rt!(obj, field_str);
+    do_rt!(obj, field_f32);
+    do_rt!(obj, field_f64);
+    do_rt!(obj, field_inner);
+    do_rt!(obj, field_v_inner);
+    do_rt!(obj, field_option_u8);
+    do_rt!(obj, field_option_u16);
+    do_rt!(obj, field_option_u32);
+    do_rt!(obj, field_option_u64);
+    do_rt!(obj, field_option_i8);
+    do_rt!(obj, field_option_i16);
+    do_rt!(obj, field_option_i32);
+    do_rt!(obj, field_option_i64);
+    do_rt!(obj, field_option_str);
+    do_rt!(obj, field_option_f32);
+    do_rt!(obj, field_option_f64);
+    do_rt!(obj, field_option_inner);
+}
+
 #[test]
 fn t1() -> Result<()> {
     for (i, t) in get_tests1().iter().enumerate() {
+        println!("index {}", i);
+        round_trip_fields(t);
+        println!("    whole");
         let mut packed = Vec::<u8>::new();
         t.pack(&mut packed);
         TestType::verify(&packed[..], &mut 0)?;

@@ -12,6 +12,9 @@ custom_error! {pub Error
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub trait PackableOwned: for<'a> Packable<'a> {}
+impl<T> PackableOwned for T where T: for<'a> Packable<'a> {}
+
 pub trait Packable<'a>: Sized {
     const FIXED_SIZE: u32;
 
