@@ -1,7 +1,7 @@
 use fracpack::{Packable, Result};
 use test_fracpack::*;
 
-fn get_tests1() -> [OuterStruct; 2] {
+fn get_tests1() -> [OuterStruct; 3] {
     [
         OuterStruct {
             field_u8: 1,
@@ -36,6 +36,10 @@ fn get_tests1() -> [OuterStruct; 2] {
             field_option_f32: Some(-17.5),
             field_option_f64: None,
             field_option_inner: None,
+            field_o_o_i8: None,
+            field_o_o_str: None,
+            field_o_o_str2: Some(Some("".into())),
+            field_o_o_inner: None,
         },
         OuterStruct {
             field_u8: 0xff,
@@ -94,6 +98,69 @@ fn get_tests1() -> [OuterStruct; 2] {
                 inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
                 inner_o_vec_o_u16: Some(vec![]),
             }),
+            field_o_o_i8: Some(None),
+            field_o_o_str: Some(None),
+            field_o_o_str2: None,
+            field_o_o_inner: Some(None),
+        },
+        OuterStruct {
+            field_u8: 0xff,
+            field_u16: 0xfffe,
+            field_u32: 0xffff_fffd,
+            field_u64: 0xffff_ffff_ffff_fffc,
+            field_i8: -0x80,
+            field_i16: -0x7fff,
+            field_i32: -0x7fff_fffe,
+            field_i64: -0x7fff_ffff_ffff_fffc,
+            field_str: "ab cd ef".to_string(),
+            field_f32: 9.24,
+            field_f64: -10.5,
+            field_inner: InnerStruct {
+                inner_u32: 1234,
+                var: Some(Variant::ItemStr("".to_string())),
+                inner_option_u32: Some(0x1234),
+                inner_option_str: None,
+                inner_option_vec_u16: Some(vec![]),
+                inner_o_vec_o_u16: Some(vec![None, Some(0x3456), None]),
+            },
+            field_v_inner: vec![InnerStruct {
+                inner_u32: 1234,
+                var: Some(Variant::ItemStr("var".to_string())),
+                inner_option_u32: Some(0x1234),
+                inner_option_str: None,
+                inner_option_vec_u16: Some(vec![]),
+                inner_o_vec_o_u16: Some(vec![None, Some(0x3456), None]),
+            }],
+            field_option_u8: None,
+            field_option_u16: None,
+            field_option_u32: Some(0xffff_fff7),
+            field_option_u64: None,
+            field_option_i8: None,
+            field_option_i16: Some(0x7ff6),
+            field_option_i32: None,
+            field_option_i64: Some(0x7fff_ffff_ffff_fff5),
+            field_option_str: Some("hi kl lmnop".to_string()),
+            field_option_f32: None,
+            field_option_f64: Some(12.0),
+            field_option_inner: Some(InnerStruct {
+                inner_u32: 1234,
+                var: Some(Variant::ItemU32(0)),
+                inner_option_u32: Some(0x1234),
+                inner_option_str: Some("testing".to_string()),
+                inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
+                inner_o_vec_o_u16: Some(vec![]),
+            }),
+            field_o_o_i8: Some(Some(123)),
+            field_o_o_str: Some(Some("a string".into())),
+            field_o_o_str2: None,
+            field_o_o_inner: Some(Some(InnerStruct {
+                inner_u32: 1234,
+                var: Some(Variant::ItemU32(0)),
+                inner_option_u32: Some(0x1234),
+                inner_option_str: Some("testing".to_string()),
+                inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
+                inner_o_vec_o_u16: Some(vec![]),
+            })),
         },
     ]
 } // get_tests1()
@@ -145,6 +212,10 @@ fn round_trip_fields(index: usize, obj: &OuterStruct) {
     do_rt!(index, obj, field_option_f32);
     do_rt!(index, obj, field_option_f64);
     do_rt!(index, obj, field_option_inner);
+    do_rt!(index, obj, field_o_o_i8);
+    do_rt!(index, obj, field_o_o_str);
+    do_rt!(index, obj, field_o_o_str2);
+    do_rt!(index, obj, field_o_o_inner);
 }
 
 #[test]

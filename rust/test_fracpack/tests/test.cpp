@@ -41,6 +41,10 @@ OuterStruct tests1_data[] = {
         .field_option_f32   = Some(-17.5),
         .field_option_f64   = None,
         .field_option_inner = None,
+        .field_o_o_i8       = None,
+        .field_o_o_str      = None,
+        .field_o_o_str2     = std::optional<std::string>{""s},
+        .field_o_o_inner    = None,
     },
     OuterStruct{
         .field_u8  = 0xff,
@@ -102,6 +106,74 @@ OuterStruct tests1_data[] = {
                 .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
                 .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
             },
+        .field_o_o_i8    = std::optional<int8_t>{None},
+        .field_o_o_str   = std::optional<std::string>{None},
+        .field_o_o_str2  = None,
+        .field_o_o_inner = std::optional<InnerStruct>{None},
+    },
+    OuterStruct{
+        .field_u8  = 0xff,
+        .field_u16 = 0xfffe,
+        .field_u32 = 0xffff'fffd,
+        .field_u64 = 0xffff'ffff'ffff'fffc,
+        .field_i8  = -0x80,
+        .field_i16 = -0x7fff,
+        .field_i32 = -0x7fff'fffe,
+        .field_i64 = -0x7fff'ffff'ffff'fffc,
+        .field_str = "ab cd ef"s,
+        .field_f32 = 9.24,
+        .field_f64 = -10.5,
+        .field_inner =
+            InnerStruct{
+                .inner_u32            = 1234,
+                .var                  = ""s,
+                .inner_option_u32     = Some(0x1234),
+                .inner_option_str     = None,
+                .inner_option_vec_u16 = std::vector<uint16_t>{},
+                .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+            },
+        .field_v_inner =
+            {
+                InnerStruct{
+                    .inner_u32            = 1234,
+                    .var                  = "var"s,
+                    .inner_option_u32     = Some(0x1234),
+                    .inner_option_str     = None,
+                    .inner_option_vec_u16 = std::vector<uint16_t>{},
+                    .inner_o_vec_o_u16 = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+                },
+            },
+        .field_option_u8  = None,
+        .field_option_u16 = None,
+        .field_option_u32 = Some(0xffff'fff7),
+        .field_option_u64 = None,
+        .field_option_i8  = None,
+        .field_option_i16 = Some(0x7ff6),
+        .field_option_i32 = None,
+        .field_option_i64 = Some(0x7fff'ffff'ffff'fff5),
+        .field_option_str = "hi kl lmnop"s,
+        .field_option_f32 = None,
+        .field_option_f64 = Some(12.0),
+        .field_option_inner =
+            InnerStruct{
+                .inner_u32            = 1234,
+                .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
+                .inner_option_u32     = Some(0x1234),
+                .inner_option_str     = "testing"s,
+                .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
+                .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
+            },
+        .field_o_o_i8    = std::optional<int8_t>{123},
+        .field_o_o_str   = std::optional<std::string>{"a string"s},
+        .field_o_o_str2  = None,
+        .field_o_o_inner = std::optional<InnerStruct>{InnerStruct{
+            .inner_u32            = 1234,
+            .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
+            .inner_option_u32     = Some(0x1234),
+            .inner_option_str     = "testing"s,
+            .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
+            .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
+        }},
     },
 };
 
@@ -171,5 +243,9 @@ void round_trip_outer_struct_field(size_t                     index,
    HANDLE(field_option_f32);
    HANDLE(field_option_f64);
    HANDLE(field_option_inner);
+   HANDLE(field_o_o_i8);
+   HANDLE(field_o_o_str);
+   HANDLE(field_o_o_str2);
+   HANDLE(field_o_o_inner);
    throw std::runtime_error("unknown field");
 }

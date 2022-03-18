@@ -47,4 +47,8 @@ pub struct OuterStruct {
     pub field_option_f32: Option<f32>,
     pub field_option_f64: Option<f64>,
     pub field_option_inner: Option<InnerStruct>,
+    pub field_o_o_i8: Option<Option<i8>>,
+    pub field_o_o_str: Option<Option<String>>,
+    pub field_o_o_str2: Option<Option<String>>,
+    pub field_o_o_inner: Option<Option<InnerStruct>>,
 }
