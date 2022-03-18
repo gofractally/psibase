@@ -306,7 +306,12 @@ namespace psio
                 }
 
                 if( not found_optional )
-                   fixed_size += fracpack_fixed_size<member_type>();
+                {
+                   if constexpr( may_use_heap<member_type>() )
+                      fixed_size += 4;
+                   else
+                      fixed_size += fracpack_fixed_size<member_type>();
+                }
              });
           return fixed_size;
       }
@@ -443,18 +448,12 @@ namespace psio
       }
       else if constexpr (is_std_optional<T>::value)
       {
-         if (not v)
-         {
-            uint32_t tomb = 1;
-            stream.write(&tomb, sizeof(tomb));
-        //    return 4;
-         }
-         else
-         {
-            uint32_t heap = 4;
-            stream.write(&heap, sizeof(heap));
-            fracpack(*v, stream);
-         }
+         char* heap = nullptr;
+
+         if constexpr (not std::is_same_v<size_stream, S>) 
+            heap = stream.pos + 4;
+
+         fracpack_member<T>( heap, v, stream );
       }
       else if constexpr (can_memcpy<T>())
       {
@@ -694,11 +693,14 @@ namespace psio
             }
          }
       } else if constexpr ( is_std_optional<T>::value ) {
+         fracunpack_member( v, stream );
+         /*
          uint32_t offset;
          stream.read( &offset, sizeof(offset) );
          if( offset != 4 ) v = T();
          v = typename is_std_optional<T>::value_type();
          fracunpack( *v, stream );
+         */
       } else if constexpr (reflect<T>::is_struct)
       {
          uint16_t start_heap = fracpack_fixed_size<T>();
@@ -843,6 +845,7 @@ namespace psio
     */
    template<typename T>
    check_stream fracvalidate( const char* b, const char* e  ) {
+     // std::cout <<"frac validate...\n";
       check_stream stream(b, e);
       if constexpr( is_shared_view_ptr<T>::value ) {
          return fracvalidate<is_shared_view_ptr<T>::value_type>( b, e );
@@ -953,7 +956,7 @@ namespace psio
          return stream;
       }
       else if constexpr( reflect<T>::is_struct and std::is_final_v<T> ) { //is_fixed_structure<T>() ) {
-     //    std::cout << "is fixed structure\n";
+    //     std::cout << "is fixed structure\n";
          stream.pos         = stream.begin + fracpack_fixed_size<T>(); 
          stream.heap        = stream.pos;
          stream.valid       = stream.pos <= stream.end;
@@ -993,34 +996,40 @@ namespace psio
               }
           });
       } else {
+        // std::cout << "is extendable structure\n";
          uint16_t start_heap;
          memcpy( &start_heap, stream.pos, sizeof(start_heap) );
 
          stream.pos     += sizeof(start_heap);
          stream.heap    = stream.pos + start_heap;
 
+       //  std::cout << "start_heap: " << start_heap << "  fixed before opt: " << fixed_size_before_optional<T>() <<"\n";
          stream.valid    = start_heap >= fixed_size_before_optional<T>();
          stream.unknown |= start_heap > fracpack_fixed_size<T>();
 
+      //   std::cout << "stream.valid = " << stream.valid <<"\n";
          const char* memptr = stream.pos;
          // visit each offset ptr
          reflect<T>::for_each(
              [&](const meta& ref, const auto& mptr) {
-           //    std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid <<"  unknown: " << stream.unknown <<"\n";
+            //   std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid <<"  unknown: " << stream.unknown <<"\n";
             //      std::cout<<"    stream.valid\n";
                   using member_type = decltype(result_of_member(mptr));
                   /// heap use requires offset ptr, so we must check bounds
                   if constexpr( may_use_heap<member_type>() ) {
+         //             std::cout << "may use heap\n";
                      if( stream.valid ) {
                         uint32_t offset;
                         memcpy( &offset, memptr, sizeof(offset) );
-                //        std::cout << "offset to member...: " << offset <<"\n";
+          //              std::cout << "offset to member...: " << offset <<"\n";
                         if( offset >= 4 ) {
                            /// the next offset ptr must point at expected start of heap
-                           if( bool(stream.valid = (memptr + offset) == stream.heap ) ) {
+                           if( bool(stream.valid = (stream.heap - memptr) == offset ) ) {
                                check_stream substr;
-                               if constexpr( is_std_optional<member_type>::value )
+                               if constexpr( is_std_optional<member_type>::value ) {
+                                  std::cout <<"validate optional...\n";
                                   substr = fracvalidate<typename is_std_optional<member_type>::value_type>( stream.heap, stream.end );
+                               }
                                else
                                   substr = fracvalidate<member_type>( stream.heap, stream.end );
                                stream.valid &= substr.valid;

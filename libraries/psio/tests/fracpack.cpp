@@ -1253,3 +1253,323 @@ TEST_CASE( "vec_struct_string"  ) {
   std::cout << "vec.size: " << vec.size() <<"\n";
   REQUIRE( p.validate() );
 }
+
+
+TEST_CASE( "opt_empty_string" ) {
+   auto v = psio::convert_to_frac( std::optional<std::string>("") );
+   struct FRACPACK expected_view {
+      uint32_t size = 0;
+   };
+   REQUIRE( v.size() == sizeof(expected_view) );
+
+   expected_view ev;
+   REQUIRE(memcmp( &ev, v.data(), v.size() ) == 0 );
+
+   {
+     psio::shared_view_ptr<std::optional<std::string>> p{std::optional<std::string>("")};
+     REQUIRE( p.validate() );
+     auto u = p.unpack();
+     REQUIRE( !!u );
+   }
+   {
+     psio::shared_view_ptr<std::optional<std::string>> p{std::optional<std::string>()};
+     REQUIRE( p.validate() );
+     auto u = p.unpack();
+     REQUIRE( !u );
+   }
+}
+
+struct null_opt {
+   int a;
+   std::optional<int> b;
+   std::optional<int> c;
+};
+PSIO_REFLECT( null_opt, a, b, c )
+TEST_CASE( "null_opt" ) {
+
+     psio::shared_view_ptr<null_opt> p{null_opt()};
+     REQUIRE( p.validate() );
+     auto null_opt = p.unpack();
+}
+
+
+static const auto None = std::nullopt;
+#define Some(x) x
+
+using Variant = std::variant<uint32_t, std::string>;
+
+struct expected_view {
+   uint16_t outer_heap = 4;
+   uint32_t offset_to_field_inner = 4;
+   uint16_t inner_heap = 6;
+   uint16_t inner_u32;
+   uint32_t offset_to_inner_option_u32 = 4;
+   uint32_t inner_option_u32;
+};
+struct InnerStruct
+{
+   uint16_t                                            inner_u32;
+   std::optional<Variant>                              var;
+   std::optional<uint32_t>                             inner_option_u32;
+   std::optional<std::string>                          inner_option_str;
+   std::optional<std::vector<uint16_t>>                inner_option_vec_u16;
+   std::optional<std::vector<std::optional<uint16_t>>> inner_o_vec_o_u16;
+
+   //auto operator <=> (const InnerStruct& b) const = default;
+};
+PSIO_REFLECT(InnerStruct,
+             inner_u32,
+             inner_option_u32
+             /*var,
+             inner_option_u32,
+             inner_option_str,
+             inner_option_vec_u16,
+             inner_o_vec_o_u16*/)
+
+struct OuterStruct
+{
+   uint8_t                                   field_u8;
+   uint16_t                                  field_u16;
+   uint32_t                                  field_u32;
+   uint64_t                                  field_u64;
+   int8_t                                    field_i8;
+   int16_t                                   field_i16;
+   int32_t                                   field_i32;
+   int64_t                                   field_i64;
+   std::string                               field_str;
+   float                                     field_f32;
+   double                                    field_f64;
+   InnerStruct                               field_inner;
+   std::vector<InnerStruct>                  field_v_inner;
+   std::optional<uint8_t>                    field_option_u8;
+   std::optional<uint16_t>                   field_option_u16;
+   std::optional<uint32_t>                   field_option_u32;
+   std::optional<uint64_t>                   field_option_u64;
+   std::optional<int8_t>                     field_option_i8;
+   std::optional<int16_t>                    field_option_i16;
+   std::optional<int32_t>                    field_option_i32;
+   std::optional<int64_t>                    field_option_i64;
+   std::optional<std::string>                field_option_str;
+   std::optional<float>                      field_option_f32;
+   std::optional<double>                     field_option_f64;
+   std::optional<InnerStruct>                field_option_inner;
+   std::optional<std::optional<int8_t>>      field_o_o_i8;
+   std::optional<std::optional<std::string>> field_o_o_str;
+   std::optional<std::optional<std::string>> field_o_o_str2;
+   std::optional<std::optional<InnerStruct>> field_o_o_inner;
+
+ //  auto operator<=>(const OuterStruct& b) const = default;
+};
+PSIO_REFLECT(OuterStruct,
+/*             field_u8,
+             field_u16,
+             field_u32,
+             field_u64,
+             field_i8,
+             field_i16,
+             field_i32,
+             field_i64,
+             field_str,
+             field_f32, 
+             field_f64,*/
+             field_inner/*,
+             field_v_inner,
+             field_option_u8 */
+            )/*
+             field_option_u16,
+             field_option_u32,
+             field_option_u64,
+             field_option_i8,
+             field_option_i16,
+             field_option_i32,
+             field_option_i64,
+             field_option_str,
+             field_option_f32,
+             field_option_f64,
+             field_option_inner,
+             field_o_o_i8,
+             field_o_o_str,
+             field_o_o_str2,
+             field_o_o_inner)*/
+
+
+TEST_CASE( "OuterStruct" ) {
+
+OuterStruct tests1_data[] = {
+    OuterStruct{
+        .field_u8  = 1,
+        .field_u16 = 2,
+        .field_u32 = 3,
+        .field_u64 = 4,
+        .field_i8  = -5,
+        .field_i16 = -6,
+        .field_i32 = -7,
+        .field_i64 = -8,
+        .field_str = "",
+        .field_f32 = 9.24,
+        .field_f64 = -10.5,
+        .field_inner =
+            InnerStruct{
+                .inner_u32            = 1234,
+                .var                  = None,
+                .inner_option_u32     = None,
+                .inner_option_str     = "",
+                .inner_option_vec_u16 = None,
+                .inner_o_vec_o_u16    = None,
+            },
+        .field_v_inner      = {},
+        .field_option_u8    = Some(11),
+        .field_option_u16   = Some(12),
+        .field_option_u32   = None,
+        .field_option_u64   = Some(13),
+        .field_option_i8    = Some(-14),
+        .field_option_i16   = None,
+        .field_option_i32   = Some(-15),
+        .field_option_i64   = None,
+        .field_option_str   = "",
+        .field_option_f32   = Some(-17.5),
+        .field_option_f64   = None,
+        .field_option_inner = None,
+        .field_o_o_i8       = None,
+        .field_o_o_str      = None,
+        .field_o_o_str2     = std::optional<std::string>{""},
+        .field_o_o_inner    = None,
+    },
+    OuterStruct{
+        .field_u8  = 0xff,
+        .field_u16 = 0xfffe,
+        .field_u32 = 0xffff'fffd,
+        .field_u64 = 0xffff'ffff'ffff'fffc,
+        .field_i8  = -0x80,
+        .field_i16 = -0x7fff,
+        .field_i32 = -0x7fff'fffe,
+        .field_i64 = -0x7fff'ffff'ffff'fffc,
+        .field_str = "ab cd ef",
+        .field_f32 = 9.24,
+        .field_f64 = -10.5,
+        .field_inner =
+            InnerStruct{
+                .inner_u32            = 1234,
+                .var                  = "",
+                .inner_option_u32     = Some(0x1234),
+                .inner_option_str     = None,
+                .inner_option_vec_u16 = std::vector<uint16_t>{},
+                .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+            },
+        .field_v_inner =
+            {
+                InnerStruct{
+                    .inner_u32            = 1234,
+                    .var                  = "var",
+                    .inner_option_u32     = Some(0x1234),
+                    .inner_option_str     = None,
+                    .inner_option_vec_u16 = std::vector<uint16_t>{},
+                    .inner_o_vec_o_u16 = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+                },
+                InnerStruct{
+                    .inner_u32            = 0x9876,
+                    .var                  = Variant{std::in_place_type_t<uint32_t>{}, 3421},
+                    .inner_option_u32     = None,
+                    .inner_option_str     = "xyz",
+                    .inner_option_vec_u16 = None,
+                    .inner_o_vec_o_u16    = None,
+                },
+            },
+        .field_option_u8  = None,
+        .field_option_u16 = None,
+        .field_option_u32 = Some(0xffff'fff7),
+        .field_option_u64 = None,
+        .field_option_i8  = None,
+        .field_option_i16 = Some(0x7ff6),
+        .field_option_i32 = None,
+        .field_option_i64 = Some(0x7fff'ffff'ffff'fff5),
+        .field_option_str = "hi kl lmnop",
+        .field_option_f32 = None,
+        .field_option_f64 = Some(12.0),
+        .field_option_inner =
+            InnerStruct{
+                .inner_u32            = 1234,
+                .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
+                .inner_option_u32     = Some(0x1234),
+                .inner_option_str     = "testing",
+                .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
+                .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
+            },
+        .field_o_o_i8    = std::optional<int8_t>{None},
+        .field_o_o_str   = std::optional<std::string>{None},
+        .field_o_o_str2  = None,
+        .field_o_o_inner = std::optional<InnerStruct>{None},
+    },
+    OuterStruct{
+        .field_u8  = 0xff,
+        .field_u16 = 0xfffe,
+        .field_u32 = 0xffff'fffd,
+        .field_u64 = 0xffff'ffff'ffff'fffc,
+        .field_i8  = -0x80,
+        .field_i16 = -0x7fff,
+        .field_i32 = -0x7fff'fffe,
+        .field_i64 = -0x7fff'ffff'ffff'fffc,
+        .field_str = "ab cd ef",
+        .field_f32 = 9.24,
+        .field_f64 = -10.5,
+        .field_inner =
+            InnerStruct{
+                .inner_u32            = 1234,
+                .var                  = "",
+                .inner_option_u32     = Some(0x1234),
+                .inner_option_str     = None,
+                .inner_option_vec_u16 = std::vector<uint16_t>{},
+                .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+            },
+        .field_v_inner =
+            {
+                InnerStruct{
+                    .inner_u32            = 1234,
+                    .var                  = "var",
+                    .inner_option_u32     = Some(0x1234),
+                    .inner_option_str     = None,
+                    .inner_option_vec_u16 = std::vector<uint16_t>{},
+                    .inner_o_vec_o_u16 = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+                },
+            },
+        .field_option_u8  = None,
+        .field_option_u16 = None,
+        .field_option_u32 = Some(0xffff'fff7),
+        .field_option_u64 = None,
+        .field_option_i8  = None,
+        .field_option_i16 = Some(0x7ff6),
+        .field_option_i32 = None,
+        .field_option_i64 = Some(0x7fff'ffff'ffff'fff5),
+        .field_option_str = "hi kl lmnop",
+        .field_option_f32 = None,
+        .field_option_f64 = Some(12.0),
+        .field_option_inner =
+            InnerStruct{
+                .inner_u32            = 1234,
+                .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
+                .inner_option_u32     = Some(0x1234),
+                .inner_option_str     = "testing",
+                .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
+                .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
+            },
+        .field_o_o_i8    = std::optional<int8_t>{123},
+        .field_o_o_str   = std::optional<std::string>{"a string"},
+        .field_o_o_str2  = None,
+        .field_o_o_inner = std::optional<InnerStruct>{InnerStruct{
+            .inner_u32            = 1234,
+            .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
+            .inner_option_u32     = Some(0x1234),
+            .inner_option_str     = "testing",
+            .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
+            .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
+        }},
+    },
+};
+
+   REQUIRE( psio::fixed_size_before_optional<InnerStruct>() == 2 );
+   REQUIRE( psio::fixed_size_before_optional<OuterStruct>() == 4 );
+
+   psio::shared_view_ptr<OuterStruct> p(tests1_data[0]);
+   REQUIRE(p.validate());
+   p.unpack();
+}
