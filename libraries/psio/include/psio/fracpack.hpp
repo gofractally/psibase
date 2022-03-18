@@ -5,6 +5,8 @@
 #include <psio/stream.hpp>
 #include <psio/unaligned_type.hpp>
 
+#include <boost/hana/for_each.hpp>
+
 /// required for UTF8 validation of strings
 #include <simdjson.h>
 #include <rapidjson/encodings.h>
@@ -248,10 +250,23 @@ namespace psio
       }
    }
 
+
    template <typename T>
    constexpr uint16_t fracpack_fixed_size()
    {
-      if constexpr( is_shared_view_ptr<T>::value ) {
+      if constexpr( is_std_tuple<T>::value ) {
+         uint16_t fixed_size = 0;
+         boost::hana::for_each( T(), [&]( auto& x ) {
+            using member_type = std::decay_t<decltype(x)>;
+            if constexpr( may_use_heap<member_type>() ) {
+                fixed_size += 4;
+            } else {
+                fixed_size += fracpack_fixed_size<member_type>();
+            }
+         });
+         return fixed_size;
+      }
+      else if constexpr( is_shared_view_ptr<T>::value ) {
          return fracpack_fixed_size<is_shared_view_ptr<T>::value_type>();
       }
       else if constexpr( is_std_optional<T>::value ) {
@@ -432,7 +447,20 @@ namespace psio
    template <typename T, typename S>
    void fracpack(const T& v, S& stream)
    {
-      if constexpr (is_std_variant<T>::value)
+      if constexpr (is_std_tuple<T>::value ) {
+         uint16_t start_heap  = fracpack_fixed_size<T>();
+         stream.write( &start_heap, sizeof(start_heap) );
+
+         char* heap = nullptr;
+         if constexpr (not std::is_same_v<size_stream, S>)
+            heap = stream.pos + start_heap;
+
+         boost::hana::for_each( v, [&]( auto& x ) {
+            using member_type = std::decay_t<decltype(x)>;
+            fracpack_member(heap, x, stream);
+         });
+      }
+      else if constexpr (is_std_variant<T>::value)
       {
          uint8_t idx = v.index();
      //    std::cout << "packing variant: " << int(idx) <<"\n";
@@ -633,7 +661,17 @@ namespace psio
    template <typename T, typename S>
    void fracunpack(T& v, S& stream)
    {
-      if constexpr (is_shared_view_ptr<T>::value) {
+      if constexpr (is_std_tuple<T>::value ) {
+         uint16_t start_heap;
+         stream.read( &start_heap, sizeof(start_heap) );
+
+         const char* heap = stream.pos + start_heap;
+         boost::hana::for_each( v, [&]( auto& x ) {
+             if (stream.pos < heap)
+                fracunpack_member(x, stream);
+         });
+      }
+      else if constexpr (is_shared_view_ptr<T>::value) {
          v.reset(0);
          uint32_t size;
          stream.read((char*)&size, sizeof(size));
@@ -845,7 +883,6 @@ namespace psio
     */
    template<typename T>
    check_stream fracvalidate( const char* b, const char* e  ) {
-     // std::cout <<"frac validate...\n";
       check_stream stream(b, e);
       if constexpr( is_shared_view_ptr<T>::value ) {
          return fracvalidate<is_shared_view_ptr<T>::value_type>( b, e );
@@ -996,29 +1033,29 @@ namespace psio
               }
           });
       } else {
-        // std::cout << "is extendable structure\n";
+      //   std::cout << "is extendable structure\n";
          uint16_t start_heap;
          memcpy( &start_heap, stream.pos, sizeof(start_heap) );
 
          stream.pos     += sizeof(start_heap);
          stream.heap    = stream.pos + start_heap;
 
-       //  std::cout << "start_heap: " << start_heap << "  fixed before opt: " << fixed_size_before_optional<T>() <<"\n";
+   //      std::cout << "start_heap: " << start_heap << "  fixed before opt: " << fixed_size_before_optional<T>() <<"\n";
          stream.valid    = start_heap >= fixed_size_before_optional<T>();
          stream.unknown |= start_heap > fracpack_fixed_size<T>();
 
-      //   std::cout << "stream.valid = " << stream.valid <<"\n";
+    //     std::cout << "stream.valid = " << stream.valid <<"\n";
          const char* memptr = stream.pos;
          // visit each offset ptr
          reflect<T>::for_each(
              [&](const meta& ref, const auto& mptr) {
-            //   std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid <<"  unknown: " << stream.unknown <<"\n";
-            //      std::cout<<"    stream.valid\n";
+      //         std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid <<"  unknown: " << stream.unknown <<"\n";
                   using member_type = decltype(result_of_member(mptr));
                   /// heap use requires offset ptr, so we must check bounds
                   if constexpr( may_use_heap<member_type>() ) {
-         //             std::cout << "may use heap\n";
+       //               std::cout << "may use heap\n";
                      if( stream.valid ) {
+        //                std::cout<<"    stream.valid\n";
                         uint32_t offset;
                         memcpy( &offset, memptr, sizeof(offset) );
           //              std::cout << "offset to member...: " << offset <<"\n";
@@ -1027,7 +1064,7 @@ namespace psio
                            if( bool(stream.valid = (stream.heap - memptr) == offset ) ) {
                                check_stream substr;
                                if constexpr( is_std_optional<member_type>::value ) {
-                                  std::cout <<"validate optional...\n";
+                                  //std::cout <<"validate optional...\n";
                                   substr = fracvalidate<typename is_std_optional<member_type>::value_type>( stream.heap, stream.end );
                                }
                                else
@@ -1049,17 +1086,22 @@ namespace psio
                                /// we use stream.heap above so this must come after
                                stream.pos   = substr.pos;
                                stream.heap  = substr.heap;
+                           } else {
+                   //           std::cout << "stream.heap - memptr: " << stream.heap-memptr <<" offset: " <<offset<<"\n";
                            }
 
                         } else { 
+                    //       std::cout << "...........offset: " << offset<<"\n";
                            /// only optionals can have offset > 0 and offset < 4
                            /// and the only valid options are 0 or 1
                            stream.valid = (offset < 2); 
                         }
-                     }
+                        memptr += 4;
+                     } // stream.valid
+                  } else {
+                     /// go to the next member ptr
+                     memptr += fracpack_fixed_size<member_type>();
                   }
-                  /// go to the next member ptr
-                  memptr += fracpack_fixed_size<member_type>();
           });
 
 
@@ -1279,7 +1321,7 @@ namespace psio
             auto ptr = reinterpret_cast<psio::offset_ptr*>(out_ptr);
             if (ptr->offset < 4)
                return view_type(nullptr);
-            return get_offset<opt_type>(out_ptr);  //view_type(ptr->get<opt_type>());
+            return get_offset<opt_type>(out_ptr); 
          }
          else if constexpr (may_use_heap<member_type>())
          {

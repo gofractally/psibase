@@ -1298,13 +1298,16 @@ static const auto None = std::nullopt;
 
 using Variant = std::variant<uint32_t, std::string>;
 
-struct expected_view {
-   uint16_t outer_heap = 4;
-   uint32_t offset_to_field_inner = 4;
+struct FRACPACK expected_view {
+   uint16_t outer_heap = 8;
+   uint32_t offset_to_field_inner = 8;
+   uint32_t offset_to_field_option_u8 = 4+6+2;
+
    uint16_t inner_heap = 6;
-   uint16_t inner_u32;
-   uint32_t offset_to_inner_option_u32 = 4;
-   uint32_t inner_option_u32;
+   uint16_t inner_u32 = 1234;
+   uint32_t offset_to_inner_option_u32 = 1; /// not there
+
+   uint8_t  u8 = 11;
 };
 struct InnerStruct
 {
@@ -1319,12 +1322,11 @@ struct InnerStruct
 };
 PSIO_REFLECT(InnerStruct,
              inner_u32,
-             inner_option_u32
-             /*var,
+             var,
              inner_option_u32,
              inner_option_str,
              inner_option_vec_u16,
-             inner_o_vec_o_u16*/)
+             inner_o_vec_o_u16)
 
 struct OuterStruct
 {
@@ -1361,7 +1363,7 @@ struct OuterStruct
  //  auto operator<=>(const OuterStruct& b) const = default;
 };
 PSIO_REFLECT(OuterStruct,
-/*             field_u8,
+             field_u8,
              field_u16,
              field_u32,
              field_u64,
@@ -1371,11 +1373,10 @@ PSIO_REFLECT(OuterStruct,
              field_i64,
              field_str,
              field_f32, 
-             field_f64,*/
-             field_inner/*,
+             field_f64,
+             field_inner,
              field_v_inner,
-             field_option_u8 */
-            )/*
+             field_option_u8,
              field_option_u16,
              field_option_u32,
              field_option_u64,
@@ -1390,7 +1391,7 @@ PSIO_REFLECT(OuterStruct,
              field_o_o_i8,
              field_o_o_str,
              field_o_o_str2,
-             field_o_o_inner)*/
+             field_o_o_inner)
 
 
 TEST_CASE( "OuterStruct" ) {
@@ -1566,10 +1567,11 @@ OuterStruct tests1_data[] = {
     },
 };
 
-   REQUIRE( psio::fixed_size_before_optional<InnerStruct>() == 2 );
-   REQUIRE( psio::fixed_size_before_optional<OuterStruct>() == 4 );
 
    psio::shared_view_ptr<OuterStruct> p(tests1_data[0]);
+//   REQUIRE(p.size() == sizeof(expected_view) );
+//   expected_view ev;
+//   REQUIRE( memcmp( &ev, p.data(), sizeof(ev) ) == 0 );
    REQUIRE(p.validate());
    p.unpack();
 }
