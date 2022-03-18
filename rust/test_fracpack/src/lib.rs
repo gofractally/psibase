@@ -21,7 +21,7 @@ pub struct InnerStruct {
 }
 
 #[derive(Fracpack, PartialEq, Debug)]
-pub struct TestType {
+pub struct OuterStruct {
     pub field_u8: u8,
     pub field_u16: u16,
     pub field_u32: u32,

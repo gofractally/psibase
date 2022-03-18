@@ -33,7 +33,7 @@ PSIO_REFLECT(InnerStruct,
              inner_option_vec_u16,
              inner_o_vec_o_u16)
 
-struct TestType
+struct OuterStruct
 {
    uint8_t                    field_u8;
    uint16_t                   field_u16;
@@ -61,9 +61,9 @@ struct TestType
    std::optional<double>      field_option_f64;
    std::optional<InnerStruct> field_option_inner;
 
-   auto operator<=>(const TestType& b) const = default;
+   auto operator<=>(const OuterStruct& b) const = default;
 };
-PSIO_REFLECT(TestType,
+PSIO_REFLECT(OuterStruct,
              field_u8,
              field_u16,
              field_u32,
@@ -90,4 +90,7 @@ PSIO_REFLECT(TestType,
              field_option_f64,
              field_option_inner)
 
-void tests1(size_t index, rust::Slice<const uint8_t> blob);
+void round_trip_outer_struct(size_t index, rust::Slice<const uint8_t> blob);
+void round_trip_outer_struct_field(size_t                     index,
+                                   rust::Str                  field_name,
+                                   rust::Slice<const uint8_t> blob);

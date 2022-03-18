@@ -3,6 +3,7 @@ use std::path::Path;
 fn main() {
     cxx_build::bridge("src/bridge.rs")
         .file("tests/test.cpp")
+        .file("../../external/simdjson/simdjson.cpp")
         .flag("-std=gnu++2a")
         .include(Path::new("../../libraries/psio/include"))
         .include(Path::new("../../external/rapidjson/include"))

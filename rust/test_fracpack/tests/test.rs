@@ -1,9 +1,9 @@
 use fracpack::{Packable, Result};
 use test_fracpack::*;
 
-fn get_tests1() -> [TestType; 2] {
+fn get_tests1() -> [OuterStruct; 2] {
     [
-        TestType {
+        OuterStruct {
             field_u8: 1,
             field_u16: 2,
             field_u32: 3,
@@ -37,7 +37,7 @@ fn get_tests1() -> [TestType; 2] {
             field_option_f64: None,
             field_option_inner: None,
         },
-        TestType {
+        OuterStruct {
             field_u8: 0xff,
             field_u16: 0xfffe,
             field_u32: 0xffff_fffd,
@@ -99,64 +99,66 @@ fn get_tests1() -> [TestType; 2] {
 } // get_tests1()
 
 fn round_trip_field<T: fracpack::PackableOwned + PartialEq + std::fmt::Debug>(
+    index: usize,
     field: &T,
-    name: &str,
+    field_name: &str,
 ) -> T {
-    println!("    {}", name);
+    println!("    {}", field_name);
     let mut packed = Vec::<u8>::new();
     field.pack(&mut packed);
     T::verify_no_extra(&packed[..]).unwrap();
     let unpacked = T::unpack(&packed[..], &mut 0).unwrap();
     assert_eq!(*field, unpacked);
+    test_fracpack::bridge::ffi::round_trip_outer_struct_field(index, field_name, &packed[..]);
     unpacked
 }
 
 macro_rules! do_rt {
-    ($obj:ident, $field:ident) => {
-        round_trip_field(&$obj.$field, stringify!($field));
+    ($index:expr, $obj:ident, $field:ident) => {
+        round_trip_field($index, &$obj.$field, stringify!($field));
     };
 }
 
-fn round_trip_fields(obj: &TestType) {
-    do_rt!(obj, field_u8);
-    do_rt!(obj, field_u16);
-    do_rt!(obj, field_u32);
-    do_rt!(obj, field_u64);
-    do_rt!(obj, field_i8);
-    do_rt!(obj, field_i16);
-    do_rt!(obj, field_i32);
-    do_rt!(obj, field_i64);
-    do_rt!(obj, field_str);
-    do_rt!(obj, field_f32);
-    do_rt!(obj, field_f64);
-    do_rt!(obj, field_inner);
-    do_rt!(obj, field_v_inner);
-    do_rt!(obj, field_option_u8);
-    do_rt!(obj, field_option_u16);
-    do_rt!(obj, field_option_u32);
-    do_rt!(obj, field_option_u64);
-    do_rt!(obj, field_option_i8);
-    do_rt!(obj, field_option_i16);
-    do_rt!(obj, field_option_i32);
-    do_rt!(obj, field_option_i64);
-    do_rt!(obj, field_option_str);
-    do_rt!(obj, field_option_f32);
-    do_rt!(obj, field_option_f64);
-    do_rt!(obj, field_option_inner);
+fn round_trip_fields(index: usize, obj: &OuterStruct) {
+    do_rt!(index, obj, field_u8);
+    do_rt!(index, obj, field_u16);
+    do_rt!(index, obj, field_u32);
+    do_rt!(index, obj, field_u64);
+    do_rt!(index, obj, field_i8);
+    do_rt!(index, obj, field_i16);
+    do_rt!(index, obj, field_i32);
+    do_rt!(index, obj, field_i64);
+    do_rt!(index, obj, field_str);
+    do_rt!(index, obj, field_f32);
+    do_rt!(index, obj, field_f64);
+    do_rt!(index, obj, field_inner);
+    do_rt!(index, obj, field_v_inner);
+    do_rt!(index, obj, field_option_u8);
+    do_rt!(index, obj, field_option_u16);
+    do_rt!(index, obj, field_option_u32);
+    do_rt!(index, obj, field_option_u64);
+    do_rt!(index, obj, field_option_i8);
+    do_rt!(index, obj, field_option_i16);
+    do_rt!(index, obj, field_option_i32);
+    do_rt!(index, obj, field_option_i64);
+    do_rt!(index, obj, field_option_str);
+    do_rt!(index, obj, field_option_f32);
+    do_rt!(index, obj, field_option_f64);
+    do_rt!(index, obj, field_option_inner);
 }
 
 #[test]
 fn t1() -> Result<()> {
     for (i, t) in get_tests1().iter().enumerate() {
         println!("index {}", i);
-        round_trip_fields(t);
+        round_trip_fields(i, t);
         println!("    whole");
         let mut packed = Vec::<u8>::new();
         t.pack(&mut packed);
-        TestType::verify(&packed[..], &mut 0)?;
-        let unpacked = TestType::unpack(&packed[..], &mut 0)?;
+        OuterStruct::verify(&packed[..], &mut 0)?;
+        let unpacked = OuterStruct::unpack(&packed[..], &mut 0)?;
         assert_eq!(*t, unpacked);
-        test_fracpack::bridge::ffi::tests1(i, &packed[..]);
+        test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
         // TODO: optionals after fixed-data portion ends
     }
     Ok(())
