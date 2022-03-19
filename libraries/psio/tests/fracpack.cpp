@@ -1575,3 +1575,38 @@ OuterStruct tests1_data[] = {
    REQUIRE(p.validate());
    p.unpack();
 }
+
+
+
+
+
+
+
+
+
+
+TEST_CASE( "tuple" ) {
+   
+   using tup_type = std::tuple<uint32_t, uint64_t, uint8_t>;
+   psio::shared_view_ptr<tup_type> p( {1,2,3} );
+   REQUIRE( p.size() == 2+4+8+1 );
+   REQUIRE( p.validate() );
+   auto out = p.unpack();
+}
+TEST_CASE( "tuple_string" ) {
+   
+   using tup_type = std::tuple<uint32_t, std::string, uint8_t>;
+   psio::shared_view_ptr<tup_type> p( {1,"hello",3} );
+   REQUIRE( p.size() == 2+4+4+4+5+1 );
+   REQUIRE( p.validate() );
+   auto out = p.unpack();
+   REQUIRE( out == tup_type{1,"hello",3} );
+}
+
+/** TODO:
+1. validate does not currently check vectors with types that allocate on the heap
+2. validation of optionals is off
+3. Undefined behavior in validate check of stream.heap and memptr
+4. potentially refactor code from tuple, final struct, and extensible struct validation
+
+*/
