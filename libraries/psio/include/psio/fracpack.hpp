@@ -1463,6 +1463,7 @@ namespace psio
       auto& operator*()const { return *this; }
 
      private:
+      friend struct const_view<T>;
       char_ptr pos;
    };
 
@@ -1471,6 +1472,8 @@ namespace psio
    {
       using char_ptr = const char*;
       const_view(char_ptr p = nullptr) : pos(p) {}
+      const_view(view<T> v) : pos(v.pos) {}
+
       operator T() const { return *reinterpret_cast<const unaligned_type<T>*>(pos); }
 
       template <typename S>
@@ -1511,6 +1514,7 @@ namespace psio
       // TODO: add [] operators for mutation in place
 
      private:
+      friend struct const_view<std::string>;
       char* pos;
    };
 
@@ -1518,6 +1522,7 @@ namespace psio
    struct const_view<std::string>
    {
       const_view(const char* p = nullptr) : pos(p) {}
+      const_view( view<std::string> v ):pos(v.pos){}
 
       uint32_t size() const { return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos); }
 
@@ -1557,6 +1562,7 @@ namespace psio
               0 != *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
       }
       private: 
+         friend const_view< shared_view_ptr<T> >;
          char* pos;
    };
 
@@ -1564,6 +1570,7 @@ namespace psio
    template<typename T>
    struct const_view< shared_view_ptr<T> >  {
       const_view(const char* p = nullptr) : pos(p) {}
+      const_view( view<shared_view_ptr<T>> v ) : pos(v.pos) {}
 
       auto operator->()const { 
          auto s =*reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
@@ -1617,6 +1624,7 @@ namespace psio
       auto& operator*() { return *this; }
 
      private:
+      friend struct const_view<std::vector<T>>;
       char* pos;
    };
 
@@ -1624,6 +1632,7 @@ namespace psio
    struct const_view<std::vector<T>>
    {
       const_view(const char* p = nullptr) : pos(p) {}
+      const_view( view<std::vector<T>> v ) : pos(v.pos) {}
 
       uint32_t size() const
       {
@@ -1665,6 +1674,7 @@ namespace psio
       using base = typename reflect<T>::template proxy<psio::frac_proxy_view>;
       using base::base;
 
+      friend struct const_view<T>;
       auto* operator->() { return this; }
       auto& operator*() { return *this; }
    };
@@ -1675,6 +1685,7 @@ namespace psio
    {
       using base = typename reflect<T>::template proxy<psio::const_frac_proxy_view>;
       using base::base;
+      const_view( view<T> v ):base(v.pos){}
 
       auto* operator->()const { return this; }
       auto& operator*()const { return *this; }
@@ -1708,12 +1719,75 @@ namespace psio
          }
       }
 
+      template <typename Lamda>
+      auto call( Lamda&& fun) {
+         return _call( std::forward<Lamda>(fun), std::make_index_sequence<sizeof...(Ts)>{} ); 
+      }
+
       char* data()       { return pos;   }
       auto* operator->() { return this;  }
       auto& operator*()  { return *this; }
       private:
+        friend struct const_view<std::tuple<Ts...>>;
+
+        template<typename Function, size_t... I>
+        auto _call( Function&& f, std::index_sequence<I...> ) {
+           return f( get<I>()... );
+        }
+
+
        char* pos;
    };
+
+   template <typename... Ts>
+   struct const_view<std::tuple<Ts...>>
+   {
+      using tuple_type = std::tuple<Ts...>;
+      const_view(const char* p = nullptr) : pos(p) {}
+      const_view( view<std::tuple<Ts...>> v ) : pos(v.pos) {}
+
+      template<uint8_t I>
+      auto get()const  {
+         using element_type = std::tuple_element_t<I,tuple_type>;
+         const auto i_offset = get_offset<I,Ts...>(); 
+         uint16_t start_heap = 0;
+         memcpy(&start_heap, pos, sizeof(start_heap) );
+
+         if constexpr( may_use_heap<element_type>() ) {
+            if constexpr( is_std_optional<element_type>::value ) {
+               if( i_offset + 4 > start_heap )
+                  return view<element_type>(nullptr);
+               if( reinterpret_cast<unaligned_type<uint32_t>*>(pos + sizeof(start_heap) + i_offset)->val < 4 )
+                  return view<element_type>(nullptr);
+            }
+            return get_offset<element_type>( pos + sizeof(start_heap) + i_offset );
+         }
+         else {
+            return view<element_type>( pos + sizeof(start_heap) + i_offset );
+         }
+      }
+
+
+      template <typename Lamda>
+      auto call( Lamda&& fun)const {
+         return _call( std::forward<Lamda>(fun), std::make_index_sequence<sizeof...(Ts)>{} ); 
+      }
+
+      const char* data()const        { return pos;   }
+      const auto* operator->()const  { return this;  }
+      const auto& operator*()const   { return *this; }
+      private:
+        friend struct const_view<std::tuple<Ts...>>;
+
+        template<typename Function, size_t... I>
+        auto _call( Function&& f, std::index_sequence<I...> )const {
+           return f( get<I>()... );
+        }
+
+
+       const char* pos;
+   };
+
 
 
    template <typename... Ts>
@@ -1738,6 +1812,7 @@ namespace psio
       auto& operator*() { return *this; }
 
      private:
+      friend struct const_view<std::variant<Ts...>>;
       char* pos;
       template <typename Visitor, typename First, typename... Rest>
       void _visit_variant(Visitor&& v)
@@ -1756,6 +1831,7 @@ namespace psio
    struct const_view<std::variant<Ts...>>
    {
       const_view(const char* p = nullptr) : pos(p) {}
+      const_view( view<std::variant<Ts...>> v ) : pos(v.pos) {}
 
       template <typename Visitor>
       void visit(Visitor&& v)const
@@ -1831,6 +1907,10 @@ namespace psio
          _data = std::shared_ptr<char>(new char[size + sizeof(size)], [](char* c) { delete[] c; });
          memcpy(_data.get(), &size, sizeof(size));
          memcpy(_data.get()+sizeof(size), data, size );
+      }
+
+      shared_view_ptr( const shared_view_ptr<std::vector<char>>& p ){
+         _data = p._data;
       }
 
       shared_view_ptr(){};

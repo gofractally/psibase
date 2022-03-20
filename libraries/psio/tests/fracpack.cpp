@@ -1615,3 +1615,30 @@ TEST_CASE( "array" ) {
    REQUIRE( p.validate() );
    p.unpack();
 }
+
+uint64_t sum( uint8_t a, uint32_t b, uint64_t c )
+{
+   return a + b + c;
+}
+
+std::string cat( psio::view<std::string> a, psio::const_view<std::string> b ) {
+   return std::string( std::string_view(a) ) + std::string( b );
+}
+
+TEST_CASE( "tuple_call" ) {
+
+   {
+   using tup = decltype( psio::args_as_tuple( sum ) );
+   psio::shared_view_ptr<tup> p( tup{1, 2, 3} );
+
+   auto result = p->call( sum );
+   REQUIRE( result == 6 );
+   }
+   {
+   using tup = decltype( tuple_remove_view(psio::args_as_tuple(cat)) );
+   psio::shared_view_ptr<tup> p( tup{"hello","world"} );
+
+   auto result = p->call( cat);
+   REQUIRE( result == "helloworld" );
+   }
+}

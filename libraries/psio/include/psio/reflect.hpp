@@ -47,6 +47,9 @@ namespace psio
    template <typename R, typename C, typename... Args>
    std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...) const);
 
+   template <typename R, typename... Args>
+   std::tuple<std::decay_t<Args>...> args_as_tuple(R (*)(Args...) );
+
    template <typename R, typename C, typename... Args>
    R result_of(R (C::*)(Args...) const);
    template <typename R, typename C, typename... Args>
