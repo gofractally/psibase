@@ -28,15 +28,19 @@ fn is_action_attr(attr: &Attribute) -> bool {
     false
 }
 
+// TODO: don't auto number actions
 fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
-    if iface_mod_name == impl_mod.ident {
+    let impl_mod_name = &impl_mod.ident;
+    if iface_mod_name == *impl_mod_name {
         abort!(
             iface_mod_name,
             "interface module name is same as implementation module name"
         );
     }
     let mut iface_use = proc_macro2::TokenStream::new();
-    let mut iface_items = proc_macro2::TokenStream::new();
+    let mut action_structs = proc_macro2::TokenStream::new();
+    let mut enum_body = proc_macro2::TokenStream::new();
+    let mut dispatch_body = proc_macro2::TokenStream::new();
     if let Some((_, items)) = &mut impl_mod.content {
         let mut action_fns: Vec<usize> = Vec::new();
         for (item_index, item) in items.iter_mut().enumerate() {
@@ -55,7 +59,19 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
         }
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
-                process_action(&mut iface_items, f);
+                let mut invoke_args = quote! {};
+                process_action(f, &mut action_structs, &mut invoke_args);
+                let name = &f.sig.ident;
+                enum_body = quote! {
+                    #enum_body
+                    #name(actions::#name),
+                };
+                dispatch_body = quote! {
+                    #dispatch_body
+                    action::#name(args) => {
+                        super::#impl_mod_name::#name(#invoke_args);
+                    }
+                };
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
                     f.attrs.remove(i);
                 }
@@ -68,42 +84,69 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
         )
     }
     let item_mod_stream = impl_mod.to_token_stream();
-    let impl_mod_name = &impl_mod.ident;
     quote! {
         #item_mod_stream
-        mod #iface_mod_name {
-            #iface_use
-            use #impl_mod_name::*;
-            #iface_items
+        #[automatically_derived]
+        #[allow(non_snake_case)]
+        #[allow(non_camel_case_types)]
+        #[allow(non_upper_case_globals)]
+        pub mod #iface_mod_name {
+            pub mod actions {
+                #iface_use
+                use super::super::#impl_mod_name::*;
+                #action_structs
+            }
+            #[derive(psi_macros::Fracpack)]
+            pub enum action {
+                #enum_body
+            }
+            pub fn dispatch<'a>(src: &'a [u8]) -> fracpack::Result<()> {
+                // TODO: view instead of unpack
+                // TODO: sender
+                let act = <action as fracpack::Packable>::unpack(src, &mut 0)?;
+                let result = match act {
+                    #dispatch_body
+                };
+                Ok(())
+            }
         }
-    }
+    } // quote!
     .into()
-}
+} // process_mod
 
-fn process_action(new_items: &mut proc_macro2::TokenStream, f: &ItemFn) {
+fn process_action(
+    f: &ItemFn,
+    new_items: &mut proc_macro2::TokenStream,
+    invoke_args: &mut proc_macro2::TokenStream,
+) {
     match f.vis {
         Visibility::Public(_) => (),
         _ => abort!(f, "action must be public"),
     }
-    let struct_members = f
-        .sig
-        .inputs
-        .iter()
-        .map(|input| match input {
-            FnArg::Receiver(_) => quote! {}, // Compiler generates better errors on self args
+    let mut struct_members = proc_macro2::TokenStream::new();
+    for input in f.sig.inputs.iter() {
+        match input {
+            FnArg::Receiver(_) => (), // Compiler generates errors on self args
             FnArg::Typed(pat_type) => match &*pat_type.pat {
                 Pat::Ident(name) => {
                     let ty = &*pat_type.ty;
-                    quote! {pub #name: #ty,}
+                    struct_members = quote! {
+                        #struct_members
+                        pub #name: #ty,
+                    };
+                    *invoke_args = quote! {
+                        #invoke_args
+                        args.#name,
+                    };
                 }
                 _ => abort!(*pat_type.pat, "expected identifier"),
             },
-        })
-        .fold(quote! {}, |acc, new| quote! {#acc #new});
+        };
+    }
     let fn_name = &f.sig.ident;
     *new_items = quote! {
         #new_items
-        // #[derive(psi_macros::Fracpack)]
+        #[derive(psi_macros::Fracpack)]
         pub struct #fn_name {
             #struct_members
         }
