@@ -270,6 +270,24 @@ namespace psio
       }
    }
 
+   template<typename T>
+   constexpr bool known_members_may_use_heap() {
+      if constexpr (psio::reflect<T>::is_struct)
+      {
+         bool use_heap = false;
+         psio::reflect<T>::for_each(
+             [&](const psio::meta& ref, auto mptr)
+             {
+                using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                if constexpr (psio::reflect<member_type>::is_struct)
+                   use_heap |= known_members_may_use_heap<member_type>();
+                else
+                   use_heap |= may_use_heap<member_type>();
+             });
+         return use_heap;
+      }
+   }
+
 
    template <typename T>
    constexpr uint16_t fracpack_fixed_size()
@@ -973,33 +991,34 @@ namespace psio
 
    template<typename MemberType>
    uint32_t fracvalidate_member( const char* memptr, check_stream& stream ) {
-      if( stream.valid ) {
          if constexpr( may_use_heap<MemberType>() ) { 
-            uint32_t offset;
-            memcpy( &offset, memptr, sizeof(offset) );
+            if( stream.valid /*&= (stream.end - memptr >= 4)*/ ) {
+               uint32_t offset;
+               memcpy( &offset, memptr, sizeof(offset) );
 
-            if constexpr( may_be_zero_offset<MemberType>() ) {
-               if( offset == 0 ) 
-               return 4;
-            }
-            if constexpr( is_std_optional<MemberType>::value ) {
-               if( offset == 1 ) 
+               if constexpr( may_be_zero_offset<MemberType>() ) {
+                  if( offset == 0 ) 
                   return 4;
-               if( offset <  4 ) {
-                  stream.valid = false;
-               } else {
-                  using opt_member_type = typename is_std_optional<MemberType>::value_type;
-                  fracvalidate_offset<opt_member_type>(offset, memptr, stream);
                }
-               return 4;
-            } else {
-               fracvalidate_offset<MemberType>( offset, memptr, stream );
-               return 4;
-            }
-         } else {
+               if constexpr( is_std_optional<MemberType>::value ) {
+                  if( offset == 1 ) 
+                     return 4;
+                  if( offset <  4 ) {
+                     stream.valid = false;
+                  } else {
+                     using opt_member_type = typename is_std_optional<MemberType>::value_type;
+                     fracvalidate_offset<opt_member_type>(offset, memptr, stream);
+                  }
+                  return 4;
+               } else {
+                  fracvalidate_offset<MemberType>( offset, memptr, stream );
+                  return 4;
+               }
+            } 
+            return 0;
+         } else { 
             return fracpack_fixed_size<MemberType>();
          }
-      } else return 0;
    }
 
    /**
@@ -1141,18 +1160,23 @@ namespace psio
          stream.heap        = stream.pos;
          stream.valid       = stream.pos <= stream.end;
 
-         const char* memptr = stream.begin;
-         // visit each offset ptr
-         reflect<T>::for_each(
-             [&](const meta& ref, const auto& mptr) {
-              using member_type = decltype(result_of_member(mptr));
+         
+         if constexpr ( known_members_may_use_heap<T>() ) {
+            if( stream.valid ) {
+               const char* memptr = stream.begin;
+               // visit each offset ptr
+               reflect<T>::for_each(
+                   [&](const meta& ref, const auto& mptr) {
+                    using member_type = decltype(result_of_member(mptr));
 
-   //          std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid 
-    //                   <<"  unknown: " << stream.unknown <<"  heap: " << stream.heap - stream.begin ;
+         //          std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid 
+          //                   <<"  unknown: " << stream.unknown <<"  heap: " << stream.heap - stream.begin ;
 
-              memptr += fracvalidate_member<member_type>( memptr, stream );
-     //         std::cout <<"  endheap: " << stream.heap - stream.begin <<"\n";
-          });
+                    memptr += fracvalidate_member<member_type>( memptr, stream );
+           //         std::cout <<"  endheap: " << stream.heap - stream.begin <<"\n";
+                });
+            }
+         }
       } else {
          uint16_t start_heap;
          memcpy( &start_heap, stream.pos, sizeof(start_heap) );
@@ -1161,27 +1185,24 @@ namespace psio
          stream.heap    = stream.pos + start_heap;
 
 //         std::cout << "start_heap: " << start_heap << "  fixed before opt: " << fixed_size_before_optional<T>() <<"\n";
-         stream.valid    = start_heap >= fixed_size_before_optional<T>();
+         stream.valid    = start_heap >= fixed_size_before_optional<T>() and stream.end >= stream.heap;
          stream.unknown |= start_heap > fracpack_fixed_size<T>();
 
  //        std::cout << "stream.valid = " << stream.valid <<"\n";
   //       std::cout << "stream.unknown= " << stream.unknown <<"\n";
-         const char* memptr = stream.pos;
 
 
          // visit each offset ptr
-         reflect<T>::for_each(
-             [&](const meta& ref, const auto& mptr) {
-                     using member_type = decltype(result_of_member(mptr));
-
-                 if( memptr < sizeof(start_heap) + stream.begin + start_heap ){
-             //      std::cout << "ext ref.name: " << ref.name << "  valid: " << stream.valid 
-              //               <<"  unknown: " << stream.unknown <<"  heap: " << stream.heap - stream.begin ;
+         if constexpr ( known_members_may_use_heap<T>() ) {
+            if( stream.valid ) {
+               const char* memptr = stream.pos;
+               reflect<T>::for_each(
+                   [&](const meta& ref, const auto& mptr) {
+                           using member_type = decltype(result_of_member(mptr));
                     memptr += fracvalidate_member<member_type>( memptr, stream );
-               //     std::cout <<"  endheap: " << stream.heap - stream.begin <<"\n";
-                 }
-
-          });
+                });
+            }
+         }
       }
       return stream;
    }
