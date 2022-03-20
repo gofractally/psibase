@@ -1603,10 +1603,15 @@ TEST_CASE( "tuple_string" ) {
    REQUIRE( out == tup_type{1,"hello",3} );
 }
 
-/** TODO:
-1. validate does not currently check vectors with types that allocate on the heap
-2. validation of optionals is off
-3. Undefined behavior in validate check of stream.heap and memptr
-4. potentially refactor code from tuple, final struct, and extensible struct validation
+TEST_CASE( "array" ) {
+   REQUIRE( psio::fracpack_size( std::array<uint64_t,8>() ) == 8*8 );
+   REQUIRE( psio::fracpack_size( std::array<std::string,8>() ) == 8*4 ); /// empty string optimization
 
-*/
+   /// first element has size + "hello"
+   REQUIRE( psio::fracpack_size( std::array<std::string,8>({"hello"}) ) == 8*4+4+5 ); 
+
+   using type = std::array<std::string,8>;
+   psio::shared_view_ptr<type> p( type{"hello","world"} );
+   REQUIRE( p.validate() );
+   p.unpack();
+}

@@ -3,6 +3,60 @@
 
 namespace psio
 {
+   // TODO: test this for faster compression... https://github.com/charlesw1234/densityxx
+   // C https://github.com/k0dai/density#quick-start-a-simple-example-using-the-api
+   //
+
+   // https://jameshfisher.com/2017/01/24/bitwise-check-for-zero-byte/
+   constexpr bool contains_zero_byte(uint64_t v) {
+     return (v - uint64_t(0x0101010101010101)) & ~(v) & uint64_t(0x8080808080808080);
+   }
+
+   /// TODO: test and finish this
+   void capp_pack2(const uint8_t* begin, const uint8_t* end, uint8_t* obegin, uint8_t* oend ) {
+
+        auto ipos = begin;
+        auto opos = obegin;
+
+        while( ipos < end ) {
+           uint8_t bits = 0;
+           bits = (0x01 & -uint8_t(ipos[0]!=0))
+                | (0x02 & -uint8_t(ipos[1]!=0))
+                | (0x04 & -uint8_t(ipos[2]!=0))
+                | (0x08 & -uint8_t(ipos[3]!=0))
+                | (0x10 & -uint8_t(ipos[4]!=0))
+                | (0x20 & -uint8_t(ipos[5]!=0))
+                | (0x40 & -uint8_t(ipos[6]!=0))
+                | (0x80 & -uint8_t(ipos[7]!=0));
+
+           *opos = bits; ++opos;
+           for( uint32_t i = 0; i < 8; ++i ) {
+              *opos = ipos[i];
+              opos += bits & 0x01;
+              bits >>= 1; 
+           }
+           ipos += 8;
+        }
+   }
+
+   /// TODO: test and finish this
+   void capp_unpack2(const uint8_t* begin, const uint8_t* end, uint8_t* obegin, uint8_t* oend ) {
+        auto inpos = begin;
+        auto opos  = obegin;
+        while( inpos != end ) {
+           uint8_t word_bits = *inpos;
+           ++inpos;
+           
+           for( uint32_t i = 0; i < 8; ++i ) {
+              const uint8_t bit = word_bits & 0x01;
+              *opos = -bit & *inpos; 
+              opos++;
+              inpos += bit;
+              word_bits >>= 1;
+           }
+        }
+   }
+
 
    template <typename InStream, typename OutStream>
    void capp_unpack(InStream& in, OutStream& out)

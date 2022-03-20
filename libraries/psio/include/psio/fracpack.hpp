@@ -88,6 +88,7 @@ namespace psio
    };
 
 
+   /*
    struct offset_ptr
    {
       offset_ptr(uint32_t i = 0) : offset(i) {}
@@ -102,6 +103,8 @@ namespace psio
       template <typename T>
       auto* get() const;
    };
+   */
+   using offset_ptr = uint32_t;
 
    template <typename T>
    constexpr uint16_t fracpack_fixed_size();
@@ -188,12 +191,14 @@ namespace psio
    template <typename T>
    constexpr bool is_fixed_structure()
    {
-      if constexpr (is_std_optional<T>::value)
-         return true;
+      if constexpr( is_std_array<T>::value ) 
+         return true;  /// number of fields is constant
+      if constexpr (is_std_optional<T>::value) 
+         return true;  /// always the size of an offset 
       else if constexpr (is_std_variant<T>::value)
-         return false;
+         return false; /// why isn't this true... type size heap_data[size]
       else if constexpr (is_std_tuple<T>::value)
-         return false;
+         return false; /// this type is extensible...
       else if constexpr (is_shared_view_ptr<T>::value)
          return is_fixed_structure<typename is_shared_view_ptr<T>::value_type>();
       else if constexpr (can_memcpy<T>())
@@ -201,7 +206,7 @@ namespace psio
       else if constexpr (std::is_same_v<std::string, T>)
          return true;
       else if constexpr (is_std_vector<T>::value)
-         return true;
+         return true; // size followed by heap
       else if constexpr (psio::reflect<T>::is_struct)
       {
          if (not std::is_final_v<T>) {
@@ -235,6 +240,8 @@ namespace psio
    template <typename T>
    constexpr bool may_use_heap()
    {
+      if constexpr (is_std_array<T>::value) 
+         return may_use_heap<is_std_array<T>::value_type>();
       if constexpr (is_std_optional<T>::value)
          return true;
       if constexpr (is_std_tuple<T>::value)
@@ -292,7 +299,14 @@ namespace psio
    template <typename T>
    constexpr uint16_t fracpack_fixed_size()
    {
-      if constexpr( is_std_tuple<T>::value ) {
+      if constexpr( is_array<T>() ) {
+        if constexpr( may_use_heap<typename is_std_array<T>::value_type>() ) {
+           return sizeof(offset_ptr) * is_std_array<T>::size;
+        } else  {
+           return fracpack_fixed_size<typename is_std_array<T>::value_type>() * is_std_array<T>::size;
+        }
+      }
+      else if constexpr( is_std_tuple<T>::value ) {
          uint16_t fixed_size = 0;
          tuple_foreach( T(), [&]( const auto& x ) {
             using member_type = std::decay_t<decltype(x)>;
@@ -589,6 +603,23 @@ namespace psio
            // return start_heap;
          }
       }
+      else if constexpr (is_std_array<T>::value ) {
+         uint16_t start_heap = fracpack_fixed_size<T>();
+
+         using member_type = typename is_std_array<T>::value_type;
+
+         char* heap = nullptr;
+
+         if constexpr (not std::is_same_v<size_stream, S>)
+            heap = stream.pos + start_heap;
+
+         if constexpr( can_memcpy<member_type>() ) {
+            stream.write( &v[0], sizeof(member_type)*is_std_array<T>::size );
+         } else {
+            for( const auto& i : v )
+               fracpack_member( heap, i, stream );
+         }
+      }
       else if constexpr (psio::reflect<T>::is_struct)
       {
        //  std::cout << "packing struct: \n";
@@ -715,7 +746,25 @@ namespace psio
    template <typename T, typename S>
    void fracunpack(T& v, S& stream)
    {
-      if constexpr (is_std_tuple<T>::value ) {
+      if constexpr (std::is_same_v<std::string, T>)
+      {
+         uint32_t size;
+         stream.read((char*)&size, sizeof(size));
+         v.resize(size);
+         if (size > 0)
+            stream.read(v.data(), size);
+      }
+      else if constexpr (is_std_array<T>::value ) {
+         using member_type = typename is_std_array<T>::value_type;
+
+         if constexpr( can_memcpy<member_type>() ) {
+            stream.read( &v[0], sizeof(member_type)*is_std_array<T>::size );
+         } else {
+            for( auto& i : v )
+               fracunpack_member( i, stream );
+         }
+      }
+      else if constexpr (is_std_tuple<T>::value ) {
          uint16_t start_heap;
          stream.read( &start_heap, sizeof(start_heap) );
 
@@ -751,14 +800,6 @@ namespace psio
       {
          stream.read((char*)&v, sizeof(T));
       }
-      else if constexpr (std::is_same_v<std::string, T>)
-      {
-         uint32_t size;
-         stream.read((char*)&size, sizeof(size));
-         v.resize(size);
-         if (size > 0)
-            stream.read(v.data(), size);
-      }
       else if constexpr (is_std_vector<T>::value)
       {
          using value_type = typename is_std_vector<T>::value_type;
@@ -793,7 +834,8 @@ namespace psio
          v = typename is_std_optional<T>::value_type();
          fracunpack( *v, stream );
          */
-      } else if constexpr (reflect<T>::is_struct)
+      } 
+      else if constexpr (reflect<T>::is_struct)
       {
          uint16_t start_heap = fracpack_fixed_size<T>();
          if constexpr ( not std::is_final_v<T> ) //is_ext_structure<T>())
@@ -997,23 +1039,20 @@ namespace psio
                memcpy( &offset, memptr, sizeof(offset) );
 
                if constexpr( may_be_zero_offset<MemberType>() ) {
-                  if( offset == 0 ) 
-                  return 4;
+                  if( offset == 0 ) return 4;
                }
                if constexpr( is_std_optional<MemberType>::value ) {
-                  if( offset == 1 ) 
-                     return 4;
+                  if( offset == 1 ) return 4;
                   if( offset <  4 ) {
                      stream.valid = false;
                   } else {
                      using opt_member_type = typename is_std_optional<MemberType>::value_type;
                      fracvalidate_offset<opt_member_type>(offset, memptr, stream);
                   }
-                  return 4;
                } else {
                   fracvalidate_offset<MemberType>( offset, memptr, stream );
-                  return 4;
                }
+               return 4;
             } 
             return 0;
          } else { 
@@ -1028,7 +1067,17 @@ namespace psio
    template<typename T>
    check_stream fracvalidate( const char* b, const char* e  ) {
       check_stream stream(b, e);
-      if constexpr( is_shared_view_ptr<T>::value ) {
+      if constexpr( is_std_array<T>::value ) {
+         using member_type = typename is_std_array<T>::value_type;
+         stream.heap  = stream.pos + fracpack_fixed_size<T>(); 
+         stream.valid = stream.heap <= stream.end;
+         if constexpr ( may_use_heap<member_type>() ) {
+            for( uint32_t i = 0; stream.valid and i < is_std_array<T>::size; ++i ) {
+              stream.pos += fracvalidate_member<member_type>( stream.pos, stream );
+            }
+         }
+         return stream;
+      } else if constexpr( is_shared_view_ptr<T>::value ) {
          return fracvalidate<is_shared_view_ptr<T>::value_type>( b, e );
       }
       else if constexpr( not may_use_heap<T>() ) {
@@ -1312,8 +1361,8 @@ namespace psio
                if (start_heap < offset + 2)
                   return const_view_type(nullptr);
             }
-            auto ptr = reinterpret_cast<const psio::offset_ptr*>(out_ptr);
-            if (ptr->offset < 4)
+            auto ptr = reinterpret_cast<const unaligned_type<offset_ptr>*>(out_ptr);
+            if (ptr->val < 4)
                return const_view_type(nullptr);
             return get_offset<opt_type>(out_ptr);  //view_type(ptr->get<opt_type>());
          }
@@ -1358,8 +1407,8 @@ namespace psio
                if (start_heap < offset + 2)
                   return view_type(nullptr);
             }
-            auto ptr = reinterpret_cast<psio::offset_ptr*>(out_ptr);
-            if (ptr->offset < 4)
+            auto ptr = reinterpret_cast<const unaligned_type<offset_ptr>*>(out_ptr);
+            if (ptr->val < 4)
                return view_type(nullptr);
             return get_offset<opt_type>(out_ptr); 
          }
@@ -1859,8 +1908,6 @@ namespace psio
    template<typename T>
    using remove_view_t = typename remove_view<T>::type;
 
-
-
    template<typename T, typename R, typename... Args>
    constexpr auto tuple_from_function_args( R (T::*func)(Args...) ) -> std::tuple<std::decay_t<Args>...>;
 
@@ -1873,7 +1920,8 @@ namespace psio
 
 
 
-
+/// TODO: remove is_fixed_structure and is_ext_structure they are not being used properly
+///       and are likely poorly defined
 
 
 

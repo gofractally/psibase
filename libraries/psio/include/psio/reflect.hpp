@@ -398,10 +398,23 @@ namespace psio
       using value_type = T;
    };
 
+   template<typename>
+   struct is_std_array : std::false_type{};
+
+   template<typename T,std::size_t N>
+   struct is_std_array<std::array<T,N>> : std::true_type{
+      using value_type = T;
+      constexpr static const std::size_t size = N;
+   };
+
+   template<typename T>
+   constexpr bool is_array() { return is_std_array<T>::value; }
+
    template <typename>
    struct is_std_variant : std::false_type
    {
    };
+
 
    template <typename... T>
    struct is_std_variant<std::variant<T...>> : std::true_type
