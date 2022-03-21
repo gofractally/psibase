@@ -5,6 +5,7 @@ if(DEFINED IS_NATIVE)
     add_executable(psio-tests
         fracpack.cpp
         psio_tests.cpp
+        reflect.cpp
 #        flat_views.cpp
         benchmark.cpp
 #        crypto.cpp
@@ -16,6 +17,7 @@ if(DEFINED IS_WASM)
     add_executable(psio-tests
         fracpack.cpp
         psio_tests.cpp
+        reflect.cpp
 #        flat_views.cpp
         benchmark.cpp
     )

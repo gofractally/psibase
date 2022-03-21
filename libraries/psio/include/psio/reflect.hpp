@@ -25,6 +25,40 @@
 
 namespace psio
 {
+   template <typename R, typename C, typename... Args>
+   constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...)) { return {}; }
+   template <typename R, typename C, typename... Args>
+   constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...) const) { return {}; }
+   template <typename R, typename... Args>
+   constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (*)(Args...) ){ return {}; }
+
+
+   template<typename Tuple, size_t...I>
+   auto prune_tuple_h( Tuple t, std::index_sequence<I...> ) {
+      return std::make_tuple( std::get<I>(t)... );
+   }
+
+   template<typename...Ts>
+   auto prune_tuple( std::tuple<Ts...> t ) {
+      return prune_tuple_h( t, 
+          std::make_index_sequence<std::tuple_size<std::tuple<Ts...>>::value-1>{} );
+   }
+
+   template<typename Tuple, size_t...I>
+   auto get_tuple_args_h( Tuple t, std::index_sequence<I...> ) {
+      return std::make_tuple( args_as_tuple( std::get<I>(t) )... );
+   }
+
+   template<typename...MPtrs>
+   auto get_tuple_args( std::tuple<MPtrs...> t ) {
+      return get_tuple_args_h( t, 
+          std::make_index_sequence<std::tuple_size<std::tuple<MPtrs...>>::value>{} );
+   }
+
+   template<typename... Ts>
+   std::variant<Ts...> tuple_to_variant( std::tuple<Ts...> );
+
+
    template<int i, typename T, typename S>
    void tuple_foreach_i( T&& t, S&& f) {
       if constexpr( i < std::tuple_size_v<std::decay_t<T>> ) {
@@ -42,13 +76,6 @@ namespace psio
       tuple_foreach_i<0>( obj, std::forward<S>(s) );
    }
 
-   template <typename R, typename C, typename... Args>
-   std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...));
-   template <typename R, typename C, typename... Args>
-   std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...) const);
-
-   template <typename R, typename... Args>
-   std::tuple<std::decay_t<Args>...> args_as_tuple(R (*)(Args...) );
 
    template <typename R, typename C, typename... Args>
    R result_of(R (C::*)(Args...) const);
@@ -61,6 +88,10 @@ namespace psio
    constexpr R result_of_member(R(C::*));
    template <typename R, typename C>
    constexpr C class_of_member(R(C::*));
+   template <typename R, typename C, typename... Args>
+   constexpr C class_of_member(R(C::*)(Args...));
+   template <typename R, typename C, typename... Args>
+   constexpr C class_of_member(R(C::*)(Args...)const);
 
    template <typename R, typename C, typename... Args>
    void result_of_member(R (C::*)(Args...) const);
@@ -89,14 +120,14 @@ namespace psio
 #define PSIO_REFLECT_FILTER_IDX(NAME, IDX, ...) IDX
 
 #define PSIO_REFLECT_FOREACH_PB_INTERNAL(r, OP, member)                     \
-   {                                                                        \
-      auto off = __builtin_offsetof(OP, member);                            \
       lambda(psio::meta{.name        = PSIO_REFLECT_FILTER_NAME_STR member, \
-                        .offset      = off,                                 \
                         .param_names = PSIO_REFLECT_FILTER_PARAMS member,  \
                         .number      = PSIO_REFLECT_FILTER_IDX    member},   \
              &OP::PSIO_REFLECT_FILTER_NAME member);                         \
-   }
+
+#define PSIO_REFLECT_FOREACH_PTR_INTERNAL(r, OP, member)                     \
+      &OP::PSIO_REFLECT_FILTER_NAME member,                                  \
+
 
 #define PSIO_REFLECT_FOREACH_INTERNAL(r, OP, i, member)                                            \
    {                                                                                               \
@@ -147,8 +178,24 @@ namespace psio
       return _psio_proxy_obj;                                                                    \
    }
 
+
+#define PSIO_REFLECT_PB_PROXY_MEMBER_BY_IDX_INTERNAL(r, OP, I, member)                           \
+   template <typename... Args>                                                                     \
+   auto PSIO_REFLECT_FILTER_NAME member( Args... args ) \
+   {                                                                                             \
+      psio::member_proxy<I, psio::hash_name(PSIO_REFLECT_FILTER_NAME_STR member),                         \
+                        &OP:: PSIO_REFLECT_FILTER_NAME member, ProxyObject>    m(_psio_proxy_obj);                         \
+      return m.call( std::forward<decltype(args)>(args)... );                                    \
+   }                                                                                             \
+
+
+
 #define PSIO_REFLECT_SMPROXY_MEMBER_BY_IDX_HELPER(QUERY_CLASS, MEMBER_IDXS) \
    BOOST_PP_SEQ_FOR_EACH_I(PSIO_REFLECT_SMPROXY_MEMBER_BY_IDX_INTERNAL, QUERY_CLASS, MEMBER_IDXS)
+
+
+#define PSIO_REFLECT_PB_PROXY_MEMBER_BY_IDX_HELPER(QUERY_CLASS, MEMBER_IDXS) \
+   BOOST_PP_SEQ_FOR_EACH_I(PSIO_REFLECT_PB_PROXY_MEMBER_BY_IDX_INTERNAL, QUERY_CLASS, MEMBER_IDXS)
 
 
 #define PSIO_REFLECT_PROXY_MEMBER_BY_PB_INTERNAL(r, OP, member)                                  \
@@ -192,6 +239,10 @@ namespace psio
 
 #define PSIO_REFLECT_FOREACH_MEMBER_PB_HELPER(QUERY_CLASS, MEMBERS) \
    BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_FOREACH_PB_INTERNAL, QUERY_CLASS, MEMBERS)
+
+
+#define PSIO_REFLECT_FOREACH_MEMBER_PTR_HELPER(QUERY_CLASS, MEMBERS) \
+   BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_FOREACH_PTR_INTERNAL, QUERY_CLASS, MEMBERS)
 
 #define PSIO_REFLECT_MEMBER_INDEX_HELPER(QUERY_CLASS, MEMBER_IDXS) \
    BOOST_PP_SEQ_FOR_EACH_I(PSIO_REFLECT_MEMBER_PB_INTERNAL, QUERY_CLASS, MEMBER_IDXS)
@@ -319,6 +370,31 @@ namespace psio
          }                                                                                         \
          return false;                                                                             \
       }                                                                                            \
+      static constexpr auto member_pointers() \
+      { \
+         return psio::prune_tuple( std::make_tuple( \
+         PSIO_REFLECT_FOREACH_MEMBER_PTR_HELPER(QUERY_CLASS, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)) \
+          0));                                                                 \
+      }\
+  \
+      template <typename ProxyObject>                                                              \
+      struct proxy                                                                                 \
+      {                                                                                            \
+        private:                                                                                   \
+         ProxyObject _psio_proxy_obj;                                                              \
+                                                                                                   \
+        public:                                                                                    \
+         template <typename... Args>                                                               \
+         explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)              \
+         {                                                                                         \
+         }                                                                                         \
+         ProxyObject*       operator->() { return &_psio_proxy_obj; }                              \
+         const ProxyObject* operator->() const { return &_psio_proxy_obj; }                        \
+         ProxyObject&       operator*() { return _psio_proxy_obj; }                                \
+         const ProxyObject& operator*() const { return _psio_proxy_obj; }                          \
+         PSIO_REFLECT_PB_PROXY_MEMBER_BY_IDX_HELPER(QUERY_CLASS,                                    \
+                                                   BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))          \
+      };                                                                                           \
    };                                                                                              \
    reflect_impl_##QUERY_CLASS get_reflect_impl(const QUERY_CLASS&);
 

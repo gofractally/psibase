@@ -79,6 +79,11 @@ namespace psio
      public:
       member_proxy(ProxyObject& o) : _proxy(o) {}
 
+      template <typename... Args>
+      auto call( Args&&... args )const {
+         return _proxy.template call<I, Name, mptr, Args...>( std::forward<Args>(args)... ); 
+      }
+
       constexpr const auto get() const { return _proxy.template get<I, Name, mptr>(); }
       constexpr auto       get() { return _proxy.template get<I, Name, mptr>(); }
 
