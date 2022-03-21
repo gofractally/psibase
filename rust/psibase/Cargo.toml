@@ -5,3 +5,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
+fracpack = { version = "0.1.0", path = "../fracpack" }
+psi_macros = { version = "0.1.0", path = "../psi_macros" }
+serde = { version = "1.0", features = ["derive"] }

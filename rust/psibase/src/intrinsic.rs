@@ -2,6 +2,16 @@
 // with other libraries. e.g. libc++'s abort_message
 pub mod raw {
     extern "C" {
+        /// Write `message` to console
+        ///
+        /// Message should be UTF8.
+        pub fn write_console(message: *const u8, len: u32);
+
+        /// Abort with `message`
+        ///
+        /// Message should be UTF8.
+        pub fn abort_message(message: *const u8, len: u32) -> !;
+
         /// Copy `min(dest_size, result_size)` bytes of the most-recent result
         /// into dest and return `result_size`
         ///
@@ -13,16 +23,6 @@ pub mod raw {
         ///
         /// Other functions set the key.
         pub fn get_key(dest: *mut u8, dest_size: u32) -> u32;
-
-        /// Write `message` to console
-        ///
-        /// Message should be UTF8.
-        pub fn write_console(message: *const u8, len: u32);
-
-        /// Abort with `message`
-        ///
-        /// Message should be UTF8.
-        pub fn abort_message(message: *const u8, len: u32) -> !;
 
         /// Store the currently-executing action into result and return the result size
         ///
@@ -104,35 +104,6 @@ pub mod raw {
     }
 }
 
-/// Get the most-recent result
-///
-/// Other functions set the result.
-pub fn get_result() -> Vec<u8> {
-    unsafe {
-        let size = raw::get_result(std::ptr::null_mut(), 0);
-        let mut result = Vec::with_capacity(size as usize);
-        if size > 0 {
-            raw::get_result(result.as_mut_ptr(), size);
-            result.set_len(size as usize);
-        }
-        result
-    }
-}
-
-/// Get the most-recent result when the size is known in advance
-///
-/// Other functions set the result.
-pub fn get_result_known_size(size: u32) -> Vec<u8> {
-    let mut result = Vec::with_capacity(size as usize);
-    if size > 0 {
-        unsafe {
-            let actual_size = raw::get_result(result.as_mut_ptr(), size);
-            result.set_len(std::cmp::min(size, actual_size) as usize);
-        }
-    }
-    result
-}
-
 /// Write message to console
 ///
 /// Message should be UTF8.
@@ -165,4 +136,55 @@ pub fn abort_message_bytes(message: &[u8]) -> ! {
 /// Abort with message
 pub fn abort_message(message: &str) -> ! {
     abort_message_bytes(message.as_bytes());
+}
+
+/// Abort with message if condition is false
+pub fn check(condition: bool, message: &str) {
+    if !condition {
+        abort_message_bytes(message.as_bytes());
+    }
+}
+
+/// Get the most-recent result
+///
+/// Other functions set the result.
+pub fn get_result() -> Vec<u8> {
+    unsafe {
+        let size = raw::get_result(std::ptr::null_mut(), 0);
+        let mut result = Vec::with_capacity(size as usize);
+        if size > 0 {
+            raw::get_result(result.as_mut_ptr(), size);
+            result.set_len(size as usize);
+        }
+        result
+    }
+}
+
+/// Get the most-recent result when the size is known in advance
+///
+/// Other functions set the result.
+pub fn get_result_known_size(size: u32) -> Vec<u8> {
+    let mut result = Vec::with_capacity(size as usize);
+    if size > 0 {
+        unsafe {
+            let actual_size = raw::get_result(result.as_mut_ptr(), size);
+            result.set_len(std::cmp::min(size, actual_size) as usize);
+        }
+    }
+    result
+}
+
+/// Get the most-recent key
+///
+/// Other functions set the key.
+pub fn get_key() -> Vec<u8> {
+    unsafe {
+        let size = raw::get_key(std::ptr::null_mut(), 0);
+        let mut result = Vec::with_capacity(size as usize);
+        if size > 0 {
+            raw::get_key(result.as_mut_ptr(), size);
+            result.set_len(size as usize);
+        }
+        result
+    }
 }
