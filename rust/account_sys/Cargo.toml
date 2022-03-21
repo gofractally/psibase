@@ -1,0 +1,12 @@
+[package]
+name = "account_sys"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+fracpack = { version = "0.1.0", path = "../fracpack" }
+psi_macros = { version = "0.1.0", path = "../psi_macros" }
