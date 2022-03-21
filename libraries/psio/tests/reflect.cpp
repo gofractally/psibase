@@ -46,7 +46,7 @@ PSIO_REFLECT_PB( contr,
    (sell, 1, quantity, token)
 )
 */
-PSIO_REFLECT_PB( contr,
+PSIO_REFLECT_INTERFACE( contr,
    (buy, 0),
    (sell, 1, quantity, token)
 )

@@ -342,7 +342,7 @@ namespace psio
    };                                                                                              \
    reflect_impl_##QUERY_CLASS get_reflect_impl(const QUERY_CLASS&);
 
-#define PSIO_REFLECT_PB(QUERY_CLASS, ...)                                                          \
+#define PSIO_REFLECT_INTERFACE(QUERY_CLASS, ...)                                                          \
    PSIO_REFLECT_TYPENAME(QUERY_CLASS)                                                              \
    struct reflect_impl_##QUERY_CLASS                                                               \
    {                                                                                               \

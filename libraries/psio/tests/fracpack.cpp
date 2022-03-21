@@ -1642,3 +1642,19 @@ TEST_CASE( "tuple_call" ) {
    REQUIRE( result == "helloworld" );
    }
 }
+
+TEST_CASE( "bugtest" ) 
+{
+   auto data = InnerStruct{
+    .inner_u32            = 1234,
+    .var                  = "",
+    .inner_option_u32     = std::optional<uint32_t>(0x1234),
+    .inner_option_str     = None,
+    .inner_option_vec_u16 = std::vector<uint16_t>{},
+    .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+   };
+   psio::shared_view_ptr<InnerStruct> p(data);
+   REQUIRE(p.validate());
+}
+    
+

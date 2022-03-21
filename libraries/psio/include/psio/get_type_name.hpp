@@ -19,6 +19,17 @@ namespace psio
 #define PSIO_REFLECT_TYPENAME_CUSTOM(T, CUSTOM) \
    constexpr const char* get_type_name(const T*) { return BOOST_PP_STRINGIZE(CUSTOM); }
 
+   template <typename T>
+   constexpr const char* get_type_name(const std::optional<T>*);
+   template <typename T>
+   constexpr const char* get_type_name(const std::vector<T>*);
+   template <typename T,size_t S>
+   constexpr const char* get_type_name(const std::array<T,S>*);
+   template <typename... T>
+   constexpr const char* get_type_name(const std::tuple<T...>*);
+   template <typename... T>
+   constexpr const char* get_type_name(const std::variant<T...>*);
+
    constexpr const char* get_type_name(const bool*) { return "bool"; }
    constexpr const char* get_type_name(const int8_t*) { return "int8"; }
    constexpr const char* get_type_name(const uint8_t*) { return "uint8"; }
@@ -75,6 +86,9 @@ namespace psio
    template <typename T>
    constexpr auto vector_type_name = append_type_name<T>("[]");
 
+   template <typename T,size_t S>
+   constexpr auto array_type_name = append_type_name<T>("[#]");
+
    template <typename T>
    constexpr auto optional_type_name = append_type_name<T>("?");
 
@@ -83,6 +97,12 @@ namespace psio
    {
       return vector_type_name<T>.data();
    }
+   template <typename T,size_t S>
+   constexpr const char* get_type_name(const std::array<T,S>*)
+   {
+      return array_type_name<T,S>.data();
+   }
+
 
    template <typename T>
    constexpr const char* get_type_name(const std::optional<T>*)
@@ -134,6 +154,12 @@ namespace psio
    {
       return variant_type_name<T...>.data();
    }
+   template <typename... T>
+   constexpr const char* get_type_name(const std::tuple<T...>*)
+   {
+      return get_tuple_type_name<T...>().data();
+   }
+
 
    template <typename T>
    constexpr const char* get_type_name()
