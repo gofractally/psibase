@@ -1,0 +1,10 @@
+[build]
+target = "wasm32-wasi"
+
+[profile.release]
+lto = true
+opt-level = 's'
+
+[unstable]
+build-std = ["std", "panic_abort"]
+build-std-features = ["panic_immediate_abort", "compiler-builtins-no-asm"]
