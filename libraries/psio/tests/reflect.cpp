@@ -27,9 +27,13 @@ struct sync_call_proxy {
 };
 
 
+
 class contr {
    public:
       int buy( int quantity, std::string token ) { 
+    //     base_contract::get_sender();
+    //     base_contract::get_receiver();
+
          std::cout << "  buy " << quantity << " " << token <<"\n";
          return 22; 
       }
@@ -63,9 +67,31 @@ struct actor : public psio::reflect<T>::template proxy<sync_call_proxy> {
 
 TEST_CASE( "contract_proxy" ) {
    actor<contr> prox( 1, 2 );
-   auto x = prox.sell( 3, 5.3 );
+   auto x = prox.sell( 3 );
+
+   /*
+   block_reint( [&](){
+
+   });
+   block_reint x; (void)x;
+
+
+  
+   prox.no_reintranc().sell(...)
+   auto tmp = prox.no();
+   tmp.sell();
+   tmp.sell();
+   tmp.sell();
+   prox.sell();
+   */
 
    contr c;
+   // cast to reference to base to set sender/receiver
+   //set_sender( c, sender );
+   //set_receiver( c, receiver);
+   //c.base_contract::set_sender(...)
+
+
    x->visit( [&]( auto tview ){
       tview->call( [&]( auto... args ){
           std::cout << "args...\n";

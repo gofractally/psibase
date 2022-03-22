@@ -34,29 +34,29 @@ namespace psio
 
 
    template<typename Tuple, size_t...I>
-   auto prune_tuple_h( Tuple t, std::index_sequence<I...> ) {
+   constexpr auto prune_tuple_h( Tuple t, std::index_sequence<I...> ) {
       return std::make_tuple( std::get<I>(t)... );
    }
 
    template<typename...Ts>
-   auto prune_tuple( std::tuple<Ts...> t ) {
+   constexpr auto prune_tuple( std::tuple<Ts...> t ) {
       return prune_tuple_h( t, 
           std::make_index_sequence<std::tuple_size<std::tuple<Ts...>>::value-1>{} );
    }
 
    template<typename Tuple, size_t...I>
-   auto get_tuple_args_h( Tuple t, std::index_sequence<I...> ) {
+   constexpr auto get_tuple_args_h( Tuple t, std::index_sequence<I...> ) {
       return std::make_tuple( args_as_tuple( std::get<I>(t) )... );
    }
 
    template<typename...MPtrs>
-   auto get_tuple_args( std::tuple<MPtrs...> t ) {
+   constexpr auto get_tuple_args( std::tuple<MPtrs...> t ) {
       return get_tuple_args_h( t, 
           std::make_index_sequence<std::tuple_size<std::tuple<MPtrs...>>::value>{} );
    }
 
    template<typename... Ts>
-   std::variant<Ts...> tuple_to_variant( std::tuple<Ts...> );
+   constexpr std::variant<Ts...> tuple_to_variant( std::tuple<Ts...> );
 
 
    template<int i, typename T, typename S>

@@ -100,7 +100,7 @@ namespace psio
    template <typename T,size_t S>
    constexpr const char* get_type_name(const std::array<T,S>*)
    {
-      return array_type_name<T,S>.data();
+      return "array";//array_type_name<T,S>.data();
    }
 
 

@@ -1260,6 +1260,7 @@ TEST_CASE( "opt_empty_string" ) {
    struct FRACPACK expected_view {
       uint32_t size = 0;
    };
+   std::cout <<"v.size: " <<v.size() <<"\n";
    REQUIRE( v.size() == sizeof(expected_view) );
 
    expected_view ev;
@@ -1267,12 +1268,14 @@ TEST_CASE( "opt_empty_string" ) {
 
    {
      psio::shared_view_ptr<std::optional<std::string>> p{std::optional<std::string>("")};
+   std::cout <<"v.size: " <<v.size() <<"\n";
      REQUIRE( p.validate() );
      auto u = p.unpack();
      REQUIRE( !!u );
    }
    {
      psio::shared_view_ptr<std::optional<std::string>> p{std::optional<std::string>()};
+   std::cout <<"v.size: " <<v.size() <<"\n";
      REQUIRE( p.validate() );
      auto u = p.unpack();
      REQUIRE( !u );
@@ -1366,7 +1369,7 @@ PSIO_REFLECT(OuterStruct,
              field_u8,
              field_u16,
              field_u32,
-             field_u64,
+            field_u64,
              field_i8,
              field_i16,
              field_i32,
@@ -1388,10 +1391,14 @@ PSIO_REFLECT(OuterStruct,
              field_option_f32,
              field_option_f64,
              field_option_inner,
+        
              field_o_o_i8,
-             field_o_o_str,
-             field_o_o_str2,
-             field_o_o_inner)
+             field_o_o_str
+             ,
+             field_o_o_str2
+             ,
+             field_o_o_inner
+             )
 
 
 TEST_CASE( "OuterStruct" ) {
@@ -1554,7 +1561,7 @@ OuterStruct tests1_data[] = {
                 .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
             },
         .field_o_o_i8    = std::optional<int8_t>{123},
-        .field_o_o_str   = std::optional<std::string>{"a string"},
+        .field_o_o_str   = std::optional<std::string>{"a str"},
         .field_o_o_str2  = None,
         .field_o_o_inner = std::optional<InnerStruct>{InnerStruct{
             .inner_u32            = 1234,
@@ -1568,12 +1575,88 @@ OuterStruct tests1_data[] = {
 };
 
 
+{
    psio::shared_view_ptr<OuterStruct> p(tests1_data[0]);
-//   REQUIRE(p.size() == sizeof(expected_view) );
-//   expected_view ev;
-//   REQUIRE( memcmp( &ev, p.data(), sizeof(ev) ) == 0 );
    REQUIRE(p.validate());
    p.unpack();
+}
+
+{
+   expected_view ev;
+   expected_view av;
+   psio::shared_view_ptr<OuterStruct> p(tests1_data[1]);
+   REQUIRE(p.validate());
+   p.unpack();
+}
+{
+   struct FRACPACK expected_view{
+      uint16_t heap_start = 5;           // 0
+      uint8_t  field_u8 = 0xff;          // 2
+      uint32_t oos = 8;                  // 3
+      uint32_t ooin = 4; //+4+4+5;       // 7
+      uint32_t os = 4;                   // 11
+      uint32_t s_size = 5;               // 15
+      char     a = 'a';                  // 19
+      char     sp = ' ';
+      char     s = 's';
+      char     t = 't';
+      char     r = 'r';
+      uint32_t oin = 4; /// this is an optional<Inner> // 24
+      uint16_t inner_heap = 4+2; /// THIS IS INNER     // 28
+      uint16_t inner_u32 = 1234;                       // 30 
+      uint32_t in_i_o_vec_o_u16 = 0;                   // 32
+   //   uint32_t extra_bytes = 9999; ///               // size = 36
+   };
+
+
+   psio::shared_view_ptr<OuterStruct> p(tests1_data[2]);
+   /*
+   auto s = psio::fracpack_size(tests1_data[2]);
+   std::cout << "\n\n     size: " << s <<"   vs " << sizeof(expected_view) <<" \n\n";
+   std::cout << "\n\n     packed: " << p.size() <<"\n\n";
+   REQUIRE( sizeof(expected_view) >= p.size() );
+   expected_view ev;
+   std::cout << "heap: " << ev.heap_start<<"\n";
+   std::cout << "u8: " << (int)ev.field_u8<<"\n";
+   std::cout << "oos: " << ev.oos <<"\n";
+   std::cout << "ooin: " << ev.ooin<<"\n";
+   std::cout << "os: " << ev.os<<"\n";
+   std::cout << "s_size: " << ev.s_size<<"\n";
+   std::cout << "s_data: " << std::string_view( &ev.a, 5 )<<"\n";
+   std::cout << "oin: " << ev.oin<<"\n";
+   std::cout << "iheap : " << ev.inner_heap<<"\n";
+   std::cout << "inner_u16: " << ev.inner_u32<<"\n";
+   std::cout << "in_io_vec_o_u16: " << ev.in_i_o_vec_o_u16<<"\n";
+//   std::cout << "ev.extrabytes: " << ev.extra_bytes<<"\n";
+   std::cout<<"----------\n";
+   REQUIRE( sizeof(expected_view) == p.size() );
+   memcpy( &ev, p.data(), p.size() );
+   std::cout << "heap: " << ev.heap_start<<"\n";
+   std::cout << "u8: " << (int)ev.field_u8<<"\n";
+   std::cout << "oos: " << ev.oos <<"\n";
+   std::cout << "ooin: " << ev.ooin<<"\n";
+   std::cout << "os: " << ev.os<<"\n";
+   std::cout << "s_size: " << ev.s_size<<"\n";
+   std::cout << "s_data: " << std::string_view( &ev.a, 5 )<<"\n";
+   std::cout << "oin: " << ev.oin<<"\n";
+   std::cout << "iheap : " << ev.inner_heap<<"\n";
+   std::cout << "inner_u16: " << ev.inner_u32<<"\n";
+   std::cout << "in_io_vec_o_u16: " << ev.in_i_o_vec_o_u16<<"\n";
+ //  std::cout << "ev.extrabytes: " << ev.extra_bytes<<"\n";
+
+   std::cout<<" INNER: FIXED SIZE: " << psio::fracpack_fixed_size<InnerStruct>() <<"\n";
+   */
+
+
+   auto out = p.unpack();
+   std::cout << "\n\nout.field_o_o_inner: " << !!out.field_o_o_inner <<"\n";
+   std::cout << "*out.field_o_o_inner: " << !!*out.field_o_o_inner <<"\n";
+   std::cout << "out.field_o_o_inner->u32: " << (*out.field_o_o_inner)->inner_u32 <<"\n";
+   std::cout << "out.field_o_o_inner->oveco: " << !!(*out.field_o_o_inner)->inner_o_vec_o_u16<<"\n";
+   std::cout <<"\n\n start validate \n\n";
+   REQUIRE(p.validate());
+}
+
 }
 
 

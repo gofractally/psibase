@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <vector>
 
+#include <iostream>
 namespace psio
 {
    enum class stream_error
@@ -217,6 +218,66 @@ namespace psio
       size_t consumed() const { return pos - begin; }
    };
 
+
+
+
+
+
+   /**
+    * Does not bounds checking, assuming packsize was done first.
+    */
+   struct fast_buf_stream
+   {
+      char* begin;
+      char* pos;
+      char* end;
+
+      fast_buf_stream(char* pos, size_t size) : begin(pos), pos{pos}, end{pos + size} {}
+
+      void write(char ch)
+      {
+         *pos++ = ch;
+      }
+
+      void write(const void* src, size_t size)
+      {
+         memcpy(pos, src, size);
+         pos += size;
+      }
+
+      template <int size>
+      void write(const char (&src)[size])
+      {
+         write(src, size - 1);
+      }
+
+      template <typename T>
+      void write_raw(const T& v)
+      {
+         write(&v, sizeof(v));
+      }
+
+      void write(const std::string& v) { write(v.c_str(), v.size()); }
+
+      void skip(int32_t s)
+      {
+         pos += s;
+      }
+      auto get_pos() const { return pos; }
+
+      size_t remaining() { return end - pos; }
+      size_t consumed() const { return pos - begin; }
+   };
+
+
+
+
+
+
+
+
+
+
    struct size_stream
    {
       size_t size = 0;
@@ -225,7 +286,9 @@ namespace psio
       void   write(char ch) { ++size; }
       size_t consumed() const { return size; }
 
-      void write(const void* src, size_t size) { this->size += size; }
+      void write(const void* src, size_t size) { 
+         this->size += size; 
+      }
 
       template <int size>
       void write(const char (&src)[size])
@@ -241,7 +304,9 @@ namespace psio
 
       void write(const std::string& v) { write(v.c_str(), v.size()); }
 
-      void skip(int32_t s) { size += s; }
+      void skip(int32_t s) { 
+         size += s; 
+      }
    };
 
    template <typename S>
