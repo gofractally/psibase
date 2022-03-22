@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+custom_error = "1.9.2"
 fracpack = { version = "0.1.0", path = "../fracpack" }
 psi_macros = { version = "0.1.0", path = "../psi_macros" }
 serde = { version = "1.0", features = ["derive"] }

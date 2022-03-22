@@ -16,7 +16,7 @@ impl serde::de::Error for Error {
     }
 }
 
-/// [crate::from_bin] and [crate::to_bin] are incomplete. They'll disappear when switch to fracpack is complete.
+/// [crate::from_bin()] and [crate::to_bin()] are incomplete. They'll disappear when switch to fracpack is complete.
 pub fn from_bin<'de, T: de::Deserialize<'de>>(mut data: &'de [u8]) -> Result<T, Error> {
     T::deserialize(Deserializer { data: &mut data })
 }
@@ -126,17 +126,14 @@ impl<'de, 'a> serde::Deserializer<'de> for Deserializer<'de, 'a> {
         let len = read_varuint32(self.data)? as usize;
         let result = self.data.get(0..len).ok_or(Error::ReadPastEnd)?;
         *self.data = self.data.get(len..).ok_or(Error::ReadPastEnd)?;
-        visitor.visit_bytes(result)
+        visitor.visit_borrowed_bytes(result)
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        let len = read_varuint32(self.data)? as usize;
-        let result = self.data.get(0..len).ok_or(Error::ReadPastEnd)?;
-        *self.data = self.data.get(len..).ok_or(Error::ReadPastEnd)?;
-        visitor.visit_byte_buf(result.into())
+        self.deserialize_bytes(visitor)
     }
 
     fn deserialize_option<V>(self, _visitor: V) -> Result<V::Value, Self::Error>

@@ -48,7 +48,7 @@ pub mod raw {
         ///
         /// Don't use [get_key] after calling this.
         pub fn kv_put(
-            map: crate::db::KvMap,
+            map: crate::KvMap,
             key: *const u8,
             key_len: u32,
             value: *const u8,
@@ -58,7 +58,7 @@ pub mod raw {
         /// Remove a key-value pair if it exists
         ///
         /// Don't use [get_key] after calling this.
-        pub fn kv_remove(map: crate::db::KvMap, key: *const u8, key_len: u32);
+        pub fn kv_remove(map: crate::KvMap, key: *const u8, key_len: u32);
 
         /// Get a key-value pair, if any
         ///
@@ -66,7 +66,7 @@ pub mod raw {
         /// exist, returns `-1` and clears result. Use [get_result] to get result.
         ///
         /// Don't use [get_key] after calling this.
-        pub fn kv_get(map: crate::db::KvMap, key: *const u8, key_len: u32) -> u32;
+        pub fn kv_get(map: crate::KvMap, key: *const u8, key_len: u32) -> u32;
 
         /// Get the first key-value pair which is greater than or equal to the provided
         /// key
@@ -76,7 +76,7 @@ pub mod raw {
         /// sets key. Otherwise returns `-1` and clears result. Use [get_result] to get
         /// result and [get_key] to get found key.
         pub fn kv_greater_equal(
-            map: crate::db::KvMap,
+            map: crate::KvMap,
             key: *const u8,
             key_len: u32,
             match_key_size: u32,
@@ -89,7 +89,7 @@ pub mod raw {
         /// Also sets key. Otherwise returns `-1` and clears result. Use [get_result]
         /// to get result and [get_key] to get found key.
         pub fn kv_less_than(
-            map: crate::db::KvMap,
+            map: crate::KvMap,
             key: *const u8,
             key_len: u32,
             match_key_size: u32,
@@ -100,7 +100,7 @@ pub mod raw {
         /// If one is found, then sets result to value and returns size. Also sets key.
         /// Otherwise returns `-1` and clears result. Use [get_result] to get result
         /// and [get_key] to get found key.
-        pub fn kv_max(map: crate::db::KvMap, key: *const u8, key_len: u32) -> u32;
+        pub fn kv_max(map: crate::KvMap, key: *const u8, key_len: u32) -> u32;
     }
 }
 
@@ -148,7 +148,7 @@ pub fn check(condition: bool, message: &str) {
 /// Get the most-recent result
 ///
 /// Other functions set the result.
-pub fn get_result() -> Vec<u8> {
+pub fn get_result_bytes() -> Vec<u8> {
     unsafe {
         let size = raw::get_result(std::ptr::null_mut(), 0);
         let mut result = Vec::with_capacity(size as usize);
@@ -163,7 +163,7 @@ pub fn get_result() -> Vec<u8> {
 /// Get the most-recent result when the size is known in advance
 ///
 /// Other functions set the result.
-pub fn get_result_known_size(size: u32) -> Vec<u8> {
+pub fn get_result_bytes_known_size(size: u32) -> Vec<u8> {
     let mut result = Vec::with_capacity(size as usize);
     if size > 0 {
         unsafe {
@@ -187,4 +187,53 @@ pub fn get_key() -> Vec<u8> {
         }
         result
     }
+}
+
+/// Get the currently-executing action.
+///
+/// If the contract, while handling action A, calls itself with action B:
+///    * Before the call to B, [get_current_action] returns A.
+///    * After the call to B, [get_current_action] returns B.
+///    * After B returns, [get_current_action] returns A.
+///
+/// Note: The above only applies if the contract uses [call].
+pub fn get_current_action_bytes() -> Vec<u8> {
+    let size;
+    unsafe {
+        size = raw::get_current_action();
+    };
+    get_result_bytes_known_size(size)
+}
+
+/// Get the currently-executing action.
+///
+/// This version creates an extra copy of [crate::Action::raw_data];
+/// consider using [with_current_action] instead.
+///
+/// If the contract, while handling action A, calls itself with action B:
+///    * Before the call to B, [get_current_action] returns A.
+///    * After the call to B, [get_current_action] returns B.
+///    * After B returns, [get_current_action] returns A.
+///
+/// Note: The above only applies if the contract uses [call].
+pub fn get_current_action() -> crate::Action {
+    let bytes = get_current_action_bytes();
+    crate::from_bin::<crate::Action>(&bytes[..]).unwrap() // unwrap won't panic
+}
+
+/// Get the currently-executing action and pass it to `f`.
+///
+/// This is more efficient than [get_current_action] since it avoids
+/// creating an extra copy of [crate::Action::raw_data].
+///
+/// If the contract, while handling action A, calls itself with action B:
+///    * Before the call to B, [get_current_action] returns A.
+///    * After the call to B, [get_current_action] returns B.
+///    * After B returns, [get_current_action] returns A.
+///
+/// Note: The above only applies if the contract uses [call].
+pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
+    let bytes = get_current_action_bytes();
+    let act = crate::from_bin::<crate::SharedAction>(&bytes[..]).unwrap(); // unwrap won't panic
+    f(act)
 }
