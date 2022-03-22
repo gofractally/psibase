@@ -22,7 +22,7 @@ struct sync_call_proxy {
       
       /// construct tuple from args as defined by MemberPtr and constructed from args
       /// serialize... dispatch... read result as shared_view_ptr<>
-      return psio::shared_view_ptr<arg_var>( arg_var(std::in_place_index_t<idx>(), param_tuple(args...)) );
+      return psio::shared_view_ptr<arg_var>( arg_var(std::in_place_index_t<idx>(), param_tuple(args..., 999999)) );
    }
 };
 
