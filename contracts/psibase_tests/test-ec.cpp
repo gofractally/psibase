@@ -21,9 +21,13 @@ TEST_CASE("ec")
    test_chain t;
    t.start_block();
    boot_minimal(t);
+
+   // use fake auth
    auto test_contract = add_contract(t, "test-cntr", "test-cntr.wasm");
    auto alice         = add_account(t, "alice");
    auto bob           = add_account(t, "bob", "auth_ec.sys");
+
+   // use "real" auth
    auto sue           = add_ec_account(t, "sue", pub_key1);
    expect(t.push_transaction(t.make_transaction({{
               .sender   = bob,
@@ -64,6 +68,8 @@ TEST_CASE("ec")
    ec_signed.proofs = {eosio::convert_to_bin(sign(priv_key1, sha256(ec_trx)))};
    expect(t.push_transaction(ec_signed));
 
+   /// make_transaction adds tapos
+   ///   - assuming 
    expect(t.push_transaction(t.make_transaction({{
                                  .sender   = sue,
                                  .contract = test_contract,
@@ -85,5 +91,5 @@ TEST_CASE("ec")
                                  .raw_data = eosio::convert_to_bin(test_cntr::payload{}),
                              }}),
                              {{pub_key1, priv_key2}}),
-          "incorrect signature");
+          "incorrect signature", true/*pretty print trace*/);
 }  // ec

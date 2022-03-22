@@ -46,13 +46,18 @@ namespace auth_ec_sys
 
    account_num exec(account_num this_contract, account_num sender, create_account& args)
    {
+      write_console( "account_sys::create_account" );
       // TODO: restrict ability to set allow_sudo
       // TODO: support entire set of flags
+
+      psibase::actor<account_sys> asys( this_contract, account_sys::contract );
+      account_num_type num = asys.create_account( args.name, "auth_ec.sys", args.allow_sudo );
+      /*
       auto     num = account_sys::call(this_contract, account_sys::create_account{
                                                       .name          = args.name,
                                                       .auth_contract = "auth_ec.sys",  // TODO: icky
                                                       .allow_sudo = args.allow_sudo,
-                                                  });
+                                                  });*/
       auth_row row{num, args.public_key};
       kv_put(row.key(), row);
       return num;

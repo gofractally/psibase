@@ -10,6 +10,7 @@
 #include <eosio/fixed_bytes.hpp>
 #include <eosio/time.hpp>
 #include <psibase/crypto.hpp>
+#include <psio/fracpack.hpp>
 
 namespace psibase
 {
@@ -24,6 +25,7 @@ namespace psibase
       account_num       contract = 0;
       std::vector<char> raw_data;
    };
+   PSIO_REFLECT(action, sender, contract, raw_data)
    EOSIO_REFLECT(action, sender, contract, raw_data)
 
    struct genesis_contract
@@ -35,6 +37,7 @@ namespace psibase
       uint8_t           vm_version    = 0;
       std::vector<char> code          = {};
    };
+   PSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
    EOSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
 
    // The genesis action is the first action of the first transaction of
@@ -46,6 +49,7 @@ namespace psibase
       std::vector<genesis_contract> contracts;
    };
    EOSIO_REFLECT(genesis_action_data, memo, contracts)
+   PSIO_REFLECT(genesis_action_data, memo, contracts)
 
    struct claim
    {
@@ -53,6 +57,7 @@ namespace psibase
       std::vector<char> raw_data;
    };
    EOSIO_REFLECT(claim, contract, raw_data)
+   PSIO_REFLECT(claim, contract, raw_data)
 
    // TODO: separate native-defined fields from contract-defined fields
    struct transaction
@@ -78,6 +83,16 @@ namespace psibase
                  actions,
                  claims)
 
+   PSIO_REFLECT(transaction,
+                 expiration,
+                 ref_block_num,
+                 ref_block_prefix,
+                 max_net_usage_words,
+                 max_cpu_usage_ms,
+                 flags,
+                 actions,
+                 claims)
+
    // TODO: pruning proofs?
    // TODO: compression? There's a time/space tradeoff and it complicates client libraries.
    //       e.g. complication: there are at least 2 different header formats for gzip.
@@ -89,6 +104,7 @@ namespace psibase
       std::vector<std::vector<char>> proofs;
    };
    EOSIO_REFLECT(signed_transaction, trx, proofs)
+   PSIO_REFLECT(signed_transaction, trx, proofs)
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Producer & Rotation
@@ -103,13 +119,16 @@ namespace psibase
       eosio::time_point_sec time;
    };
    EOSIO_REFLECT(block_header, previous, num, time)
+   PSIO_REFLECT(block_header, previous, num, time)
 
+   /// TODO: move block header as member of block, psio doesn't do inheritance
    struct block : block_header
    {
       std::vector<signed_transaction> transactions;  // TODO: move inside receipts
    };
    EOSIO_REFLECT(block, base block_header, transactions)
 
+   /// TODO: you have signed block headers, not signed blocks
    struct signed_block : block
    {
       eosio::signature signature;

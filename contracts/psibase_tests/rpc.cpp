@@ -37,6 +37,7 @@ namespace rpc
       }
       else if (req.method == "GET" && req.target == "/psiq/accounts")
       {
+         actor<account_sys> asys(act.contract, account_sys::contract);
          // TODO: don't stop on deleted accounts
          std::vector<augmented_account_row> rows;
          for (account_num i = 1;; ++i)
@@ -45,10 +46,9 @@ namespace rpc
             if (!acc)
                break;
             augmented_account_row aug;
-            (account_row&)aug = *acc;
-            aug.name          = account_sys::call(act.contract, account_sys::get_by_num{aug.num});
-            aug.auth_contract_name =
-                account_sys::call(act.contract, account_sys::get_by_num{aug.auth_contract});
+            (account_row&)aug      = *acc;
+            aug.name               = asys.get_account_by_num(aug.num);
+            aug.auth_contract_name = asys.get_account_by_num(aug.auth_contract);
             rows.push_back(std::move(aug));
          }
          return to_json(rows);

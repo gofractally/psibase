@@ -116,6 +116,7 @@ namespace psibase
           char     an0_name[sizeof("transaction.sys")] = "transaction.sys";
           */
       };
+      /*
       auto vec = psio::convert_to_frac(account_sys::action{account_sys::startup{
            .next_account_num = 100, 
            .existing_accounts =
@@ -140,7 +141,9 @@ namespace psibase
 
       psio::view<account_sys::startup>  vi( vec.data() + 5 );
       std::cout << "el.existing_accounts.size: " << vi->existing_accounts()->size() <<"\n";
+      */
 
+      transactor<account_sys> asys(transaction_sys::contract, account_sys::contract);
 
 
       REQUIRE(                         //
@@ -149,6 +152,15 @@ namespace psibase
               t.push_transaction(      //
                   t.make_transaction(  //
                       {
+                           asys.startup( 100, 
+                                          vector<account_name>{
+                                              {transaction_sys::contract, "transaction.sys"},
+                                              {account_sys::contract, "account.sys"},
+                                              {auth_fake_sys::contract, "auth_fake.sys"},
+                                              {auth_ec_sys::contract, "auth_ec.sys"},
+                                              {verify_ec_sys::contract, "verify_ec.sys"},
+                                          } )
+                               /*
                           { // init account_sys contract 
                               // must be valid, but could be any account num
                               .sender   = transaction_sys::contract, 
@@ -166,7 +178,7 @@ namespace psibase
                                               {verify_ec_sys::contract, "verify_ec.sys"},
                                           },
                                   }}),
-                          },
+                                  */
                       }))) == "");
    }  // boot_minimal()
 
@@ -175,16 +187,11 @@ namespace psibase
                                   const char* auth_contract = "auth_fake.sys",
                                   bool        show          = false)
    {
+      transactor<account_sys> asys(transaction_sys::contract, account_sys::contract);
       auto trace = t.push_transaction(  //
-          t.make_transaction(           //
-              {{
-                  .sender   = transaction_sys::contract,
-                  .contract = account_sys::contract,
-                  .raw_data = psio::convert_to_frac(account_sys::action{account_sys::create_account{
-                      .name          = name,
-                      .auth_contract = auth_contract,
-                  }}),
-              }}));
+          t.make_transaction({ asys.create_account( name, auth_contract, false ) })
+      );
+
       REQUIRE(psibase::show(show, trace) == "");
       auto& at = get_top_action(trace, 0);
       return psio::convert_from_frac<account_num>(at.raw_retval);

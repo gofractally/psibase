@@ -5,11 +5,11 @@
 #include <psio/unaligned_type.hpp>
 #include <psio/get_type_name.hpp>
 
-#include <boost/hana/for_each.hpp>
+//#include <boost/hana/for_each.hpp>
 
 /// required for UTF8 validation of strings
 #include <simdjson.h>
-#include <rapidjson/encodings.h>
+//#include <rapidjson/encodings.h>
 
 // #define DEBUG
 // #include <iostream>
@@ -1017,7 +1017,7 @@ namespace psio
       /// has some unknowns, but for data with no unknowns we maintain the stricter check
       if( stream.unknown ) {
          if( not (stream.valid = (obj_start >= stream.heap) and obj_start < stream.end ) ) {
-                     std::cerr<< ".......obj start < expected stream.heap\n";
+//                     std::cerr<< ".......obj start < expected stream.heap\n";
             return;
          }
       } else {
@@ -1207,7 +1207,7 @@ namespace psio
             return stream;
          } else {
 #ifdef DEBUG
-            std::cerr<< ".................. stream not long enough\n";
+//            std::cerr<< ".................. stream not long enough\n";
 #endif
          }
          return stream;
@@ -1813,7 +1813,7 @@ namespace psio
             return get_offset<element_type>( pos + sizeof(start_heap) + i_offset );
          }
          else {
-            return view<element_type>( pos + sizeof(start_heap) + i_offset );
+            return const_view<element_type>( pos + sizeof(start_heap) + i_offset );
          }
       }
 
@@ -1929,6 +1929,8 @@ namespace psio
       return tmp;
    }
 
+   /* used so as not to confuse with other types that might be used to consrtuct shared_view*/
+   struct size_tag { uint32_t size; };
    /**
      *  A shared_ptr<char> array containing the data
      *  
@@ -1962,6 +1964,12 @@ namespace psio
 
       shared_view_ptr( const shared_view_ptr<std::vector<char>>& p ){
          _data = p._data;
+      }
+
+      /** allocate the memory so another function can fill it in */
+      explicit shared_view_ptr( size_tag s ) {
+         _data = std::shared_ptr<char>(new char[s.size+sizeof(s.size)], [](char* c) { delete[] c; });
+         memcpy(_data.get(), &s.size, sizeof(s.size));
       }
 
       shared_view_ptr(){};

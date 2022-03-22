@@ -1,96 +1,51 @@
 #pragma once
-
 #include <psibase/intrinsic.hpp>
+#include <psibase/actor.hpp>
 #include <psibase/native_tables.hpp>
-#include <psio/fracpack.hpp>
 
-namespace account_sys
+namespace psibase 
 {
-   using psibase::account_num;
-   static constexpr account_num contract       = 2;
-   static constexpr uint64_t    contract_flags = psibase::account_row::allow_write_native;
+   using psibase::account_num_type;
+   using std::string;
+   using std::vector;
+   using std::optional;
+
+   template<typename T>
+   using const_view = psio::const_view<T>;
+
 
    struct account_name
    {
-      psibase::account_num num  = {};
-      std::string          name = {};
+      account_num_type num;
+      string           name;
    };
    PSIO_REFLECT(account_name, num, name );
    EOSIO_REFLECT(account_name, num, name );
 
-   struct startup
-   {
-      using return_type = void;
+   class account_sys: public psibase::contract {
+      public:
+         static constexpr account_num_type  contract = 2; /// hard coded...?
+         static constexpr uint64_t    contract_flags = psibase::account_row::allow_write_native;
 
-      psibase::account_num      next_account_num  = 0;  // TODO: find this automatically
-      std::vector<account_name> existing_accounts = {};
+         void startup( account_num_type next_account_num,
+                       const_view<vector<account_name>> existing_accounts );
+         
+         account_num_type           create_account( const_view<string> name, 
+                                                    const_view<string> auth_contract,
+                                                    bool allow_sudo );
 
-      static void run( account_num sender, 
-                       psio::const_view<startup> data );
+         optional<account_num_type> get_account_by_name( const_view<string> name );
+
+         optional<string>           get_account_by_num( account_num_type num );
+         void assert_account_name( account_num_type num, const_view<string> name );
    };
-   PSIO_REFLECT(startup, next_account_num, existing_accounts) 
-   EOSIO_REFLECT(startup, next_account_num, existing_accounts) 
 
-   struct create_account 
-   {
-      std::string name          = {};
-      std::string auth_contract = {};  // TODO: use account_num? Presentation issues snuck in.
-      bool        allow_sudo    = {};
+   PSIO_REFLECT_INTERFACE( account_sys, 
+       (startup,             0, next_account_num, existing_accounts),
+       (create_account,      1, name, auth_contract ),
+       (get_account_by_name, 2, name ),
+       (get_account_by_num,  3, num  ),
+       (assert_account_name, 4, num, name)
+   )
 
-      static account_num run( account_num sender, 
-                              psio::const_view<create_account> data );
-   };
-   PSIO_REFLECT(create_account, name, auth_contract, allow_sudo)
-   EOSIO_REFLECT(create_account, name, auth_contract, allow_sudo)
-
-   struct get_account_by_name 
-   {
-      static std::optional<psibase::account_num> run( account_num sender, 
-                                                      psio::const_view<get_account_by_name> data );
-
-      std::string name = {};
-   };
-   PSIO_REFLECT(get_account_by_name, name)
-   EOSIO_REFLECT(get_account_by_name, name)
-
-   struct get_account_by_num 
-   {
-      static std::optional<std::string> run( account_num sender,
-                                             psio::const_view<get_account_by_num> data );
-
-      psibase::account_num num = {};
-   };
-   PSIO_REFLECT(get_account_by_num, num)
-   EOSIO_REFLECT(get_account_by_num, num)
-
-   using action = std::variant<startup, create_account, get_account_by_name, get_account_by_num>;
-
-   /* other contracts include this header, and then call this function in order to
-    * dispatch actions to this contract... tempoary until real dispatcher is in place 
-    */
-   template <typename T, typename R = decltype(result_of(&T::run)) >
-   R call(psibase::account_num sender, T&& args)
-   {
-      auto result = psibase::call(psibase::action{ // not account_sys::action
-          .sender   = sender,
-          .contract = account_sys::contract, 
-          // TODO: remove name conflicts between action types
-          .raw_data = psio::convert_to_frac( account_sys::action( std::forward<T>(args) ) )
-      });
-      if constexpr (!std::is_same_v<R, void>) {
-      //   return eosio::convert_from_bin<R>(result);
-          return psio::convert_from_frac<R>(result);
-      }
-   }
-
-
-   /*
-   proxy
-   dispatcher
-   rpc
-   contract<>
-   actor<account_sys::action> 
-   caller<action> d(sender_self, receiver);
-   d.run<get_account_by_name>( anything that goes to constructor of get_account_by_name )
-   */
-}  // namespace account_sys
+}  // namespace psibase

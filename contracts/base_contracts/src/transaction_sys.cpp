@@ -71,6 +71,8 @@ namespace transaction_sys
           data);
    }
 
+   // hard coded to account 1, which deploys transaction_sys (or avariant of) and native code
+   // knows to call this method
    extern "C" [[clang::export_name("process_transaction")]] void process_transaction()
    {
       if (enable_print)
@@ -97,8 +99,9 @@ namespace transaction_sys
          psibase::action outer = {
              .sender   = 1,
              .contract = account->auth_contract,
+             /// TODO: auth_contract will have to register action #
              .raw_data = eosio::convert_to_bin(auth_fake_sys::action{auth_fake_sys::auth_check{
-                 .action = act,
+                 .action = act, /// act to be authorized
                  .claims = trx.claims,
              }}),
          };
