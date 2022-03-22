@@ -6,7 +6,14 @@ pub type AccountNum = u32;
 
 #[derive(psi_macros::Fracpack, Serialize, Deserialize)]
 pub struct Action {
-    sender: AccountNum,
-    contract: AccountNum,
-    raw_data: Vec<u8>,
+    pub sender: AccountNum,
+    pub contract: AccountNum,
+    pub raw_data: Vec<u8>,
+}
+
+#[derive(psi_macros::Fracpack, Serialize, Deserialize)]
+pub struct SharedAction<'a> {
+    pub sender: AccountNum,
+    pub contract: AccountNum,
+    pub raw_data: &'a [u8],
 }
