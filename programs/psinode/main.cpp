@@ -38,7 +38,7 @@ void bootstrap_chain(system_context& system)
 {
    auto push = [&](auto& bc, account_num sender, account_num contract, const auto& data) {
       signed_transaction t;
-      t.trx.expiration = bc.current.time + 1;
+      t.trx.expiration = bc.current.header.time + 1;
       t.trx.actions.push_back({
           .sender   = sender,
           .contract = contract,
@@ -48,7 +48,7 @@ void bootstrap_chain(system_context& system)
    };
    auto push_action = [&](auto& bc, action a ) {
       signed_transaction t;
-      t.trx.expiration = bc.current.time + 1;
+      t.trx.expiration = bc.current.header.time + 1;
       t.trx.actions.push_back({a});
       bc.push_transaction(t);
    };

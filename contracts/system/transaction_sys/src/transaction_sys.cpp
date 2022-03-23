@@ -85,7 +85,7 @@ namespace transaction_sys
       // TODO: limit execution time
       auto top_act = get_current_action();
       // TODO: avoid copying inner raw_data during unpack
-      auto trx = eosio::convert_from_bin<transaction>(top_act.raw_data);
+      auto trx = psio::convert_from_frac<transaction>(top_act.raw_data);
       for (auto& act : trx.actions)
       {
          auto account = kv_get<account_row>(account_row::kv_map, account_key(act.sender));

@@ -1,10 +1,10 @@
 #include <psibase/tester.hpp>
 
+#include <secp256k1.h>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <eosio/abi.hpp>
 #include <eosio/authority.hpp>
 #include <eosio/from_string.hpp>
-#include <secp256k1.h>
 
 namespace
 {
@@ -209,7 +209,7 @@ void psibase::test_chain::start_block(std::string_view time)
 void psibase::test_chain::start_block(eosio::time_point tp)
 {
    finish_block();
-   auto head_time = get_head_block_info().time;
+   auto head_time = get_head_block_info().header.time;
    auto skip      = (tp - head_time).count() / 1000 - 500;
    start_block(skip);
 }
@@ -229,7 +229,7 @@ const psibase::block_info& psibase::test_chain::get_head_block_info()
          bin.resize(size);
          return bin.data();
       });
-      head_block_info = eosio::convert_from_bin<block_info>(bin);
+      head_block_info = psio::convert_from_frac<block_info>(bin);
    }
    return *head_block_info;
 }
@@ -237,8 +237,8 @@ const psibase::block_info& psibase::test_chain::get_head_block_info()
 void psibase::test_chain::fill_tapos(transaction& t, uint32_t expire_sec)
 {
    auto& info      = get_head_block_info();
-   t.expiration    = info.time + expire_sec;
-   t.ref_block_num = info.num;
+   t.expiration    = info.header.time + expire_sec;
+   t.ref_block_num = info.header.num;
    memcpy(&t.ref_block_prefix, info.id.extract_as_byte_array().data() + 8,
           sizeof(t.ref_block_prefix));
 }
@@ -254,13 +254,13 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
 [[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
     const signed_transaction& signed_trx)
 {
-   std::vector<char> packed_trx = eosio::convert_to_bin(signed_trx);
+   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx);
    std::vector<char> bin;
    ::push_transaction(id, packed_trx.data(), packed_trx.size(), [&](size_t size) {
       bin.resize(size);
       return bin.data();
    });
-   return eosio::convert_from_bin<transaction_trace>(bin);
+   return psio::convert_from_frac<transaction_trace>(bin);
 }
 
 [[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
@@ -274,7 +274,9 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
           .contract = verify_ec_sys::contract,
           .raw_data = eosio::convert_to_bin(pub),
       });
-   auto hash = sha256(signed_trx.trx);
+   // TODO: don't pack twice
+   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx.trx);
+   auto              hash       = sha256(packed_trx.data(), packed_trx.size());
    for (auto& [pub, priv] : keys)
       signed_trx.proofs.push_back(eosio::convert_to_bin(sign(priv, hash)));
    return push_transaction(signed_trx);

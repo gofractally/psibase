@@ -5,13 +5,14 @@
 
 namespace psibase
 {
-   eosio::checksum256 sha256(const char* data, uint32_t length);
+   eosio::checksum256 sha256(const char* data, size_t length);
 
-   inline eosio::checksum256 sha256(const unsigned char* data, uint32_t length)
+   inline eosio::checksum256 sha256(const unsigned char* data, size_t length)
    {
       return sha256(reinterpret_cast<const char*>(data), length);
    }
 
+   // TODO: remove; assumes a specific packing format
    template <typename T>
    eosio::checksum256 sha256(const T& obj)
    {

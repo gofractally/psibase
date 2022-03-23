@@ -28,7 +28,7 @@ namespace psibase
    void transaction_context::exec_transaction()
    {
       // TODO: move checks into wasm
-      eosio::check(block_context.current.time < trx.trx.expiration, "transaction expired");
+      eosio::check(block_context.current.header.time < trx.trx.expiration, "transaction expired");
       eosio::check(!trx.trx.actions.empty(), "transaction has no actions");
 
       // Prepare for execution
@@ -92,7 +92,7 @@ namespace psibase
       action act{
           .sender   = 0,
           .contract = 1,
-          .raw_data = eosio::convert_to_bin(self.trx),
+          .raw_data = psio::convert_to_frac(self.trx.trx),
       };
       auto& atrace      = self.transaction_trace.action_traces.emplace_back();
       atrace.act        = act;  // TODO: avoid copy and redundancy between act and atrace.act
@@ -110,7 +110,9 @@ namespace psibase
    {
       eosio::check(self.trx.proofs.size() == self.trx.trx.claims.size(),
                    "proofs and claims must have same size");
-      auto id = sha256(self.trx.trx);
+      // TODO: don't pack trx twice
+      auto packed_trx = psio::convert_to_frac(self.trx.trx);
+      auto id         = sha256(packed_trx.data(), packed_trx.size());
       for (size_t i = 0; i < self.trx.proofs.size(); ++i)
       {
          auto&       claim = self.trx.trx.claims[i];
