@@ -1,9 +1,5 @@
 // TODO: Remove inheritance for compatability with Rust and other languages
 
-// TODO: A serialization format which allows
-//       * Easier support in other languages
-//       * Extension of these types in the future
-
 #pragma once
 
 #include <eosio/crypto.hpp>

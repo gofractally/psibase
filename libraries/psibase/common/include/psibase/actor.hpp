@@ -79,7 +79,7 @@ struct action_builder_proxy {
 
 template<typename T>
 psio::shared_view_ptr<T> fraccall( const action& a ) {
-   auto packed_action  = eosio::convert_to_bin(a); /// TODO: avoid double copy of action data
+   auto packed_action  = psio::convert_to_frac(a); /// TODO: avoid double copy of action data
    auto result_size    = raw::call(packed_action.data(),packed_action.size());
    if constexpr( not std::is_same_v<void,T> ) {
       psio::shared_view_ptr<T> result(psio::size_tag{result_size});

@@ -1928,6 +1928,13 @@ namespace psio
       fracunpack(tmp, buf );
       return tmp;
    }
+   template <typename T>
+   T convert_from_frac(input_stream buf)
+   {
+      T tmp;
+      fracunpack(tmp, buf);
+      return tmp;
+   }
 
    /* used so as not to confuse with other types that might be used to consrtuct shared_view*/
    struct size_tag { uint32_t size; };
