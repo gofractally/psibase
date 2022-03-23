@@ -1,9 +1,8 @@
-#include <base_contracts/account_sys.hpp>
+#include <contracts/system/account_sys.hpp>
 
-#include <base_contracts/transaction_sys.hpp>
-#include <psibase/native_tables.hpp>
+#include <contracts/system/transaction_sys.hpp>
 #include <psibase/dispatch.hpp>
-
+#include <psibase/native_tables.hpp>
 
 static constexpr bool enable_print = false;
 

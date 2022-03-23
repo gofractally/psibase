@@ -95,7 +95,9 @@ function(add suffix)
             ../eosiolib/core/include
             ../eosiolib/contracts/include
             tester/include
-            ../../contracts/base_contracts/include
+        )
+        target_include_directories(nctestlib${suffix} PRIVATE
+            ../../contracts/system/verify_ec_sys/include
         )
         target_link_options(nctestlib${suffix} INTERFACE -Wl,--export-table)
         target_link_options(nctestlib${suffix} PUBLIC

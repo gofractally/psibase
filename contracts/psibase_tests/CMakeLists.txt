@@ -1,7 +1,7 @@
 function(contract name suffix)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC include)
-    target_link_libraries(${name}${suffix} base_contracts${suffix} psibase-contract-simple-malloc )
+    target_link_libraries(${name}${suffix} contracts_system${suffix} psibase-contract-simple-malloc )
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 
@@ -14,7 +14,7 @@ function(add suffix)
 
     add_executable(tests${suffix} test.cpp test-ec.cpp)
     target_include_directories(tests${suffix} PUBLIC include)
-    target_link_libraries(tests${suffix} base_contracts${suffix} nctestlib )
+    target_link_libraries(tests${suffix} contracts_system${suffix} nctestlib )
     set_target_properties(tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add)
 

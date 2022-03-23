@@ -1,5 +1,5 @@
-#include <base_contracts/auth_ec_sys.hpp>
-#include <base_contracts/test.hpp>
+#include <contracts/system/auth_ec_sys.hpp>
+#include <contracts/system/test.hpp>
 
 #include "test-cntr.hpp"
 

@@ -1,7 +1,7 @@
-#include <base_contracts/auth_ec_sys.hpp>
+#include <contracts/system/auth_ec_sys.hpp>
 
-#include <base_contracts/account_sys.hpp>
-#include <base_contracts/verify_ec_sys.hpp>
+#include <contracts/system/account_sys.hpp>
+#include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/native_tables.hpp>
 

@@ -1,5 +1,5 @@
-#include <base_contracts/auth_fake_sys.hpp>
-#include <base_contracts/transaction_sys.hpp>
+#include <contracts/system/auth_fake_sys.hpp>
+#include <contracts/system/transaction_sys.hpp>
 
 #include <psibase/crypto.hpp>
 #include <psibase/native_tables.hpp>

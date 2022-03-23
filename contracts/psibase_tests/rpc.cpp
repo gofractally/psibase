@@ -1,4 +1,4 @@
-#include "base_contracts/account_sys.hpp"
+#include "contracts/system/account_sys.hpp"
 
 #include <psibase/contract_entry.hpp>
 #include <psibase/intrinsic.hpp>

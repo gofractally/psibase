@@ -1,10 +1,10 @@
 #include <psibase/tester.hpp>
 
-#include <secp256k1.h>
-#include <base_contracts/verify_ec_sys.hpp>
+#include <contracts/system/verify_ec_sys.hpp>
 #include <eosio/abi.hpp>
 #include <eosio/authority.hpp>
 #include <eosio/from_string.hpp>
+#include <secp256k1.h>
 
 namespace
 {

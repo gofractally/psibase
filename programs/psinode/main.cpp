@@ -1,8 +1,8 @@
-#include <base_contracts/account_sys.hpp>
-#include <base_contracts/auth_ec_sys.hpp>
-#include <base_contracts/auth_fake_sys.hpp>
-#include <base_contracts/transaction_sys.hpp>
-#include <base_contracts/verify_ec_sys.hpp>
+#include <contracts/system/account_sys.hpp>
+#include <contracts/system/auth_ec_sys.hpp>
+#include <contracts/system/auth_fake_sys.hpp>
+#include <contracts/system/transaction_sys.hpp>
+#include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psibase/http.hpp>
 #include <psibase/transaction_context.hpp>
