@@ -1,33 +1,23 @@
 #pragma once
 
-#include <psibase/intrinsic.hpp>
+#include <psibase/actor.hpp>
 #include <psibase/native_tables.hpp>
 
-namespace nft_sys
+namespace psibase
 {
-   static constexpr psibase::account_num contract = 100;
-
-   struct mint
+   class nft_sys : public psibase::contract
    {
-      using return_type = uint64_t;
-      using sub_id_type = uint32_t;
+     public:
+      static constexpr psibase::account_num contract = 100;
+      using sub_id_type                              = uint32_t;
 
-      psibase::account_num issuer;
-      sub_id_type          sub_id;
+      uint64_t mint(psibase::account_num issuer, sub_id_type sub_id);
+      void     transfer(psibase::account_num actor,
+                        psibase::account_num to,
+                        uint64_t             nid,
+                        std::string          memo);
    };
-   EOSIO_REFLECT(mint, issuer, sub_id)
 
-   using action = std::variant<mint>;
+   PSIO_REFLECT_INTERFACE(nft_sys, (mint, 0, issuer, sub_id), (transfer, 1, actor, to, nid, memo));
 
-   template <typename T, typename R = typename T::return_type>
-   R call(psibase::account_num sender, T args)
-   {
-      auto result = psibase::call(psibase::action{
-          .sender   = sender,
-          .contract = contract,
-          .raw_data = eosio::convert_to_bin(action{std::move(args)}),
-      });
-      if constexpr (!std::is_same_v<R, void>)
-         return eosio::convert_from_bin<R>(result);
-   }
-}  // namespace nft_sys
+}  // namespace psibase

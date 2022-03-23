@@ -1,4 +1,5 @@
 #define CATCH_CONFIG_MAIN
+#include <psio/fracpack.hpp>
 #include <test/include/contracts/system/test.hpp>
 
 #include "nft_sys.hpp"
@@ -15,6 +16,7 @@ namespace
       auto                ret_val = eosio::convert_from_bin<T>(at.raw_retval);
       return ret_val;
    }
+
 }  // namespace
 
 TEST_CASE("Mint nft")
@@ -27,15 +29,13 @@ TEST_CASE("Mint nft")
                                         std::to_string(nft_sys::contract) + " to " +
                                         std::to_string(cnum));
    auto alice = add_account(t, "alice");
+   std::cout << "Alice account number is " << alice << "\n";
 
-   transaction_trace trace = t.push_transaction(  //
-       t.make_transaction(                        //
-           {{
-               .sender   = alice,
-               .contract = nft_sys::contract,
-               .raw_data = eosio::convert_to_bin(
-                   nft_sys::action{nft_sys::mint{.issuer = alice, .sub_id = 1}}),
-           }}));
+   transactor<nft_sys> nfts(nft_sys::contract, nft_sys::contract);
+
+   transaction_trace trace = t.push_transaction(t.make_transaction({nfts.mint(alice, 1)}));
+   //show(true, trace);
+
    REQUIRE(show(false, trace) == "");
    auto ret = get_return_val<uint64_t>(trace);
    printf("Return value is %" PRId64 "\n", ret);

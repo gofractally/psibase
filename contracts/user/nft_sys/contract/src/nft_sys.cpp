@@ -1,18 +1,22 @@
 #include "nft_sys.hpp"
 
 #include <contracts/system/transaction_sys.hpp>
+#include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
+#include <psio/fracpack.hpp>
+#include <psio/from_bin.hpp>
+#include <psio/reflect.hpp>
 
 using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-namespace nft_sys
+namespace psibase
 {
    using table_num                      = uint32_t;
    static constexpr table_num nft_table = 1;
 
-   inline auto nft_key(uint64_t nftid) { return std::tuple{contract, nft_table, nftid}; }
+   inline auto nft_key(uint64_t nftid) { return std::tuple{nft_sys::contract, nft_table, nftid}; }
 
    struct mi_table_wrapper
    {
@@ -64,14 +68,14 @@ namespace nft_sys
       };
    }  // namespace
 
-   uint64_t exec(account_num this_contract, account_num sender, mint& args)
+   uint64_t nft_sys::mint(psibase::account_num issuer, sub_id_type sub_id)
    {
       auto status = kv_get<status_row>(status_key());
 
-      account_num ram_payer = args.issuer;
+      account_num ram_payer = issuer;
       require_auth(ram_payer);
 
-      uint64_t new_id = generate(args.issuer, args.sub_id);
+      uint64_t new_id = generate(issuer, sub_id);
 
       check(!nft_id::exists(new_id), "Nft already exists");
       check(nft_id::valid(new_id), "Nft ID invalid");
@@ -81,28 +85,22 @@ namespace nft_sys
       // Emplace the new nft
       nfts.emplace<nft>(ram_payer, [&](auto& row) {
          row.nftid            = new_id;
-         row.issuer           = args.issuer;
-         row.owner            = args.issuer;
+         row.issuer           = issuer;
+         row.owner            = issuer;
          row.approved_account = 0;
       });
 
       return new_id;
    }
 
-   extern "C" void called(account_num this_contract, account_num sender)
+   void nft_sys::transfer(psibase::account_num actor,
+                          psibase::account_num to,
+                          uint64_t             nid,
+                          std::string          memo)
    {
-      auto act  = get_current_action();
-      auto data = eosio::convert_from_bin<action>(act.raw_data);
-      std::visit(
-          [&](auto& x) {
-             if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
-                exec(this_contract, sender, x);
-             else
-                set_retval(exec(this_contract, sender, x));
-          },
-          data);
+      printf("Transfer was called.");
    }
 
-   extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
-}  // namespace nft_sys
+}  // namespace psibase
+
+PSIBASE_DISPATCH(psibase::nft_sys)
