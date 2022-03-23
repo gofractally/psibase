@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_MAIN
-#include <base_contracts/test.hpp>
+#include <test/include/contracts/system/test.hpp>
 
 #include "nft_sys.hpp"
 

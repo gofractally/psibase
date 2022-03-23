@@ -1,6 +1,6 @@
-#include "core_contracts/nft_sys.hpp"
+#include "nft_sys.hpp"
 
-#include <base_contracts/transaction_sys.hpp>
+#include <contracts/system/transaction_sys.hpp>
 #include <psibase/native_tables.hpp>
 
 using namespace psibase;
