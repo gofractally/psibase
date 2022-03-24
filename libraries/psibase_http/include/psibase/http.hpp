@@ -12,8 +12,9 @@ namespace psibase::http
       std::string               allow_origin     = {};
       std::string               static_dir       = {};
       std::string               address          = {};
-      std::string               port             = {};
+      unsigned short            port             = {};
       std::string               unix_path        = {};
+      std::string               host             = {};
    };
 
    struct server

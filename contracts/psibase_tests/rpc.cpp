@@ -30,6 +30,14 @@ namespace rpc
          });
       };
 
+      if (req.host.size() > req.configured_host.size() + 1 &&
+          req.host.ends_with(req.configured_host) &&
+          req.host[req.host.size() - req.configured_host.size() - 1] == '.')
+      {
+         std::string contract{req.host.begin(), req.host.end() - req.configured_host.size() - 1};
+         return to_json("todo: dispatch to contract '" + contract + "'");
+      }
+
       if (req.method == "GET" && req.target == "/psiq/status")
       {
          auto status = kv_get<status_row>(status_row::kv_map, status_key());
