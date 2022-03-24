@@ -1,10 +1,25 @@
 #pragma once
 
+#include <compare>
 #include <psibase/actor.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/table.hpp>
 
 namespace psibase
 {
+   using nid = uint64_t;
+   struct nft
+   {
+      nid         nftid;
+      account_num issuer;
+      account_num owner;
+      account_num approved_account;
+
+      friend std::strong_ordering operator<=>(const nft&, const nft&) = default;
+   };
+   EOSIO_REFLECT(nft, nftid, issuer, owner, approved_account);
+   using nft_table_t = table<nft, &nft::nftid>;
+
+   using tables = contract_tables<nft_table_t>;
    class nft_sys : public psibase::contract
    {
      public:

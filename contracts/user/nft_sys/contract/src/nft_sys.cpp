@@ -3,48 +3,16 @@
 #include <contracts/system/transaction_sys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
+
 #include <psio/fracpack.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/reflect.hpp>
 
 using namespace psibase;
 
-static constexpr bool enable_print = false;
-
 namespace psibase
 {
-   using table_num                      = uint32_t;
-   static constexpr table_num nft_table = 1;
-
-   inline auto nft_key(uint64_t nftid) { return std::tuple{nft_sys::contract, nft_table, nftid}; }
-
-   struct mi_table_wrapper
-   {
-      template <typename T>
-      void emplace(account_num ram_payer, auto&& construct)
-      {
-         T t;
-         construct(t);
-         kv_put(nft_key(t.nftid), t);
-      }
-   };
-
-   struct nft
-   {
-      uint64_t    nftid;
-      account_num issuer;
-      account_num owner;
-      account_num approved_account;
-
-      inline bool operator==(const nft& rhs) const
-      {
-         return nftid == rhs.nftid && issuer == rhs.issuer && owner == rhs.owner &&
-                approved_account == rhs.approved_account;
-      }
-
-      auto key() const { return nft_key(nftid); }
-   };
-   EOSIO_REFLECT(nft, nftid, issuer, owner, approved_account);
+   using table_num = uint32_t;
 
    namespace
    {
@@ -58,37 +26,26 @@ namespace psibase
       }
       struct nft_id
       {
-         static bool              exists(uint64_t id) { return false; }
-         static bool              valid(uint64_t id) { return true; }
-         static mi_table_wrapper& get_table()
-         {
-            static mi_table_wrapper table;
-            return table;
-         }
+         static bool exists(nid id) { return false; }
+         static bool valid(nid id) { return true; }
       };
    }  // namespace
 
-   uint64_t nft_sys::mint(psibase::account_num issuer, sub_id_type sub_id)
+   uint64_t nft_sys::mint(account_num issuer, sub_id_type sub_id)
    {
-      auto status = kv_get<status_row>(status_key());
-
       account_num ram_payer = issuer;
       require_auth(ram_payer);
 
       uint64_t new_id = generate(issuer, sub_id);
 
-      check(!nft_id::exists(new_id), "Nft already exists");
+      tables t{contract};
+      auto   nft_table = t.open<nft_table_t>();
+      auto   nft_idx   = nft_table.get_index<0>();
+
+      check(nft_idx.get(new_id) == std::nullopt, "Nft already exists");
       check(nft_id::valid(new_id), "Nft ID invalid");
 
-      auto&& nfts{nft_id::get_table()};
-
-      // Emplace the new nft
-      nfts.emplace<nft>(ram_payer, [&](auto& row) {
-         row.nftid            = new_id;
-         row.issuer           = issuer;
-         row.owner            = issuer;
-         row.approved_account = 0;
-      });
+      nft_table.put(nft{new_id, issuer, issuer, 0});
 
       return new_id;
    }
