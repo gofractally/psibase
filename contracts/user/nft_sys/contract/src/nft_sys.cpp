@@ -1,5 +1,6 @@
 #include "nft_sys.hpp"
 
+#include <contracts/system/account_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
@@ -9,55 +10,72 @@
 #include <psio/reflect.hpp>
 
 using namespace psibase;
+using psio::const_view;
+using std::string;
 
-namespace psibase
+namespace
 {
-   using table_num = uint32_t;
-
-   namespace
+   uint64_t generate(uint32_t a, uint32_t b)
    {
-      // Replace with auth calls when available
-      bool require_auth(account_num acc) { return true; }
-
-      // Move to nft_id class
-      uint64_t generate(uint32_t a, uint32_t b)
-      {
-         return (static_cast<uint64_t>(a) << 32 | static_cast<uint64_t>(b));
-      }
-      struct nft_id
-      {
-         static bool exists(nid id) { return false; }
-         static bool valid(nid id) { return true; }
-      };
-   }  // namespace
-
-   uint64_t nft_sys::mint(account_num issuer, sub_id_type sub_id)
-   {
-      account_num ram_payer = issuer;
-      require_auth(ram_payer);
-
-      uint64_t new_id = generate(issuer, sub_id);
-
-      tables t{contract};
-      auto   nft_table = t.open<nft_table_t>();
-      auto   nft_idx   = nft_table.get_index<0>();
-
-      check(nft_idx.get(new_id) == std::nullopt, "Nft already exists");
-      check(nft_id::valid(new_id), "Nft ID invalid");
-
-      nft_table.put(nft{new_id, issuer, issuer, 0});
-
-      return new_id;
+      return (static_cast<uint64_t>(a) << 32 | static_cast<uint64_t>(b));
    }
+}  // namespace
 
-   void nft_sys::transfer(psibase::account_num actor,
-                          psibase::account_num to,
-                          uint64_t             nid,
-                          std::string          memo)
-   {
-      printf("Transfer was called.");
-   }
+namespace stubs
+{
+   // Replace with auth calls when available
+   bool require_auth(account_num acc) { return true; }
+}  // namespace stubs
 
-}  // namespace psibase
+uint64_t nft_sys::mint(account_num issuer, sub_id_type sub_id)
+{
+   account_num ram_payer = issuer;
+   stubs::require_auth(ram_payer);
+
+   uint64_t new_id = generate(issuer, sub_id);
+
+   auto nft_table = db.open<nft_table_t>();
+   auto nft_idx   = nft_table.get_index<0>();
+
+   check(nft_idx.get(new_id) == std::nullopt, "Nft already exists");
+   check(nft::is_valid_key(new_id), "Nft ID invalid");
+
+   nft_table.put(nft{new_id, issuer, issuer, 0});
+
+   return new_id;
+}
+
+void nft_sys::transfer(account_num from, account_num to, nid nft_id, const_view<std::string> memo)
+{
+   stubs::require_auth(from);
+
+   check(to != account_sys::null_account, "Target account invalid");
+
+   actor<account_sys> asys{nft_sys::contract, account_sys::contract};
+   check(asys.exists(to), "Target account DNE");
+
+   check(to != from, "Cannot transfer NFT to self");
+
+   check(nft::is_valid_key(nft_id), "NFT invalid");
+
+   auto nft_table = db.open<nft_table_t>();
+   auto nft_idx   = nft_table.get_index<0>();
+   auto item_opt  = nft_idx.get(nft_id);
+   check(item_opt != std::nullopt, "Nft DNE");
+
+   nft item = item_opt.value();
+   check(item.owner == from, "You don't own this NFT");
+
+   // Modify the owner and reinsert into the database
+   item.owner = to;
+   nft_table.put(item);
+}
+
+std::optional<nft> nft_sys::get_nft(nid nft_id)
+{
+   auto nft_table = db.open<nft_table_t>();
+   auto nft_idx   = nft_table.get_index<0>();
+   return nft_idx.get(nft_id);
+}
 
 PSIBASE_DISPATCH(psibase::nft_sys)

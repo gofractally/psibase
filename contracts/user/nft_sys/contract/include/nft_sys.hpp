@@ -14,9 +14,13 @@ namespace psibase
       account_num owner;
       account_num approved_account;
 
+      static bool is_valid_key(const nid& id) { return id != 0; }
+
       friend std::strong_ordering operator<=>(const nft&, const nft&) = default;
    };
    EOSIO_REFLECT(nft, nftid, issuer, owner, approved_account);
+   PSIO_REFLECT(nft, nftid, issuer, owner, approved_account);
+
    using nft_table_t = table<nft, &nft::nftid>;
 
    using tables = contract_tables<nft_table_t>;
@@ -26,13 +30,26 @@ namespace psibase
       static constexpr psibase::account_num contract = 100;
       using sub_id_type                              = uint32_t;
 
+      // Mutate
       uint64_t mint(psibase::account_num issuer, sub_id_type sub_id);
-      void     transfer(psibase::account_num actor,
-                        psibase::account_num to,
-                        uint64_t             nid,
-                        std::string          memo);
+      void     transfer(psibase::account_num          from,
+                        psibase::account_num          to,
+                        uint64_t                      nid,
+                        psio::const_view<std::string> memo);
+
+      // Read-only interface
+      std::optional<nft> get_nft(nid nft_id);
+
+     private:
+      tables db{contract};
    };
 
-   PSIO_REFLECT_INTERFACE(nft_sys, (mint, 0, issuer, sub_id), (transfer, 1, actor, to, nid, memo));
+   // clang-format off
+   PSIO_REFLECT_INTERFACE(nft_sys, 
+      (mint, 0, issuer, sub_id), 
+      (transfer, 1, actor, to, nid, memo),
+      (get_nft, 2, nft_id)
+   );
+   // clang-format on
 
 }  // namespace psibase
