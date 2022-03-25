@@ -76,6 +76,8 @@ std::optional<nft> nft_sys::get_nft(nid nft_id)
    auto nft_table = db.open<nft_table_t>();
    auto nft_idx   = nft_table.get_index<0>();
    return nft_idx.get(nft_id);
+
+   //printf("Contract 2: NFT ID is %" PRId64 "\n", (*nft).nftid);
 }
 
 PSIBASE_DISPATCH(psibase::nft_sys)

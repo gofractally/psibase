@@ -29,7 +29,7 @@ TEST_CASE("Mint nft")
    auto push = [&](std::vector<action>&& actions) {
       transaction_trace trace =
           t.push_transaction(t.make_transaction(std::forward<std::vector<action>&&>(actions)));
-      REQUIRE(show(false, trace) == "");
+      REQUIRE(show(true, trace) == "");
       return trace;
    };
 
@@ -51,14 +51,14 @@ TEST_CASE("Mint nft")
    trace    = push({nfts.get_nft(nft_id)});
    auto nft = get_return_val<std::optional<psibase::nft>>(trace);
    REQUIRE(nft != std::nullopt);
-   printf("Return owner is %" PRIu32 "\n", nft.value().owner);
+   printf("NFT owner number is %" PRIu32 "\n", (*nft).owner);
 
    // Confirm owner is "alice"
    transactor<account_sys> asys(alice, account_sys::contract);
    trace           = push({asys.get_account_by_num(nft.value().owner)});
    auto owner_name = get_return_val<optional<string>>(trace);
    REQUIRE(owner_name != std::nullopt);
-   printf("NFT ID is %s \n", owner_name.value().c_str());
+   printf("NFT owner name is %s \n", (*owner_name).c_str());
 
    // Transfer it
 

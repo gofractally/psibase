@@ -3,6 +3,7 @@
 #include <compare>
 #include <psibase/actor.hpp>
 #include <psibase/table.hpp>
+#include <string_view>
 
 namespace psibase
 {
@@ -27,8 +28,10 @@ namespace psibase
    class nft_sys : public psibase::contract
    {
      public:
-      static constexpr psibase::account_num contract = 100;
-      using sub_id_type                              = uint32_t;
+      static constexpr psibase::account_num contract     = 100;
+      static constexpr std::string_view     account_name = "nft.sys";
+
+      using sub_id_type = uint32_t;
 
       // Mutate
       uint64_t mint(psibase::account_num issuer, sub_id_type sub_id);
