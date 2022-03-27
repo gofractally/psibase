@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_MAIN
-#include <base_contracts/test.hpp>
+#include <contracts/system/test.hpp>
 
 #include "test-cntr.hpp"
 #include "token.hpp"

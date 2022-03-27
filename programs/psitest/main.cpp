@@ -612,7 +612,7 @@ struct callbacks
       // auto*                obj = chain.db->db.find<psibase::status_object>();
       // if (obj && obj->head)
       //    bi = *obj->head;
-      set_data(cb_alloc_data, cb_alloc, convert_to_bin(bi));
+      set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(bi));
    }
 
    void tester_push_transaction(uint32_t         chain_index,
@@ -620,9 +620,10 @@ struct callbacks
                                 uint32_t         cb_alloc_data,
                                 uint32_t         cb_alloc)
    {
-      auto&               chain      = assert_chain(chain_index);
-      eosio::input_stream s          = {args_packed.data(), args_packed.size()};
-      auto                signed_trx = eosio::from_bin<psibase::signed_transaction>(s);
+      auto&               chain = assert_chain(chain_index);
+      eosio::input_stream s     = {args_packed.data(), args_packed.size()};
+      auto                signed_trx =
+          psio::convert_from_frac<psibase::signed_transaction>(psio::input_stream{s.pos, s.end});
 
       chain.start_if_needed();
       psibase::transaction_trace trace;
@@ -640,7 +641,7 @@ struct callbacks
           std::chrono::steady_clock::now() - start_time);
       std::cout << "psibase transaction took " << us.count() << " us\n";
       // std::cout << eosio::format_json(trace) << "\n";
-      set_data(cb_alloc_data, cb_alloc, convert_to_bin(trace));
+      set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(trace));
    }
 
    void tester_select_chain_for_db(uint32_t chain_index)

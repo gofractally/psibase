@@ -4,18 +4,18 @@ function(add suffix)
     add_library(psibase${suffix})
     target_link_libraries(psibase${suffix} PUBLIC abieos${suffix} psio boost OpenSSL::Crypto)
     target_sources(psibase${suffix} PRIVATE
-        src/common/crypto.cpp
-        src/common/trace.cpp
+        common/src/crypto.cpp
+        common/src/trace.cpp
     )
 
     if(DEFINED IS_WASM)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
-        target_include_directories(psibase${suffix} PUBLIC include/common)
+        target_include_directories(psibase${suffix} PUBLIC common/include)
 
         add_library(psibase-contract-base${suffix})
         target_sources(psibase-contract-base${suffix} PRIVATE
-            src/contract/eosio_polyfill.cpp
-            src/contract/intrinsic.cpp
+            contract/src/eosio_polyfill.cpp
+            contract/src/intrinsic.cpp
         )
         target_link_libraries(psibase-contract-base${suffix} PUBLIC psibase${suffix})
         target_compile_options(psibase-contract-base${suffix} PUBLIC -DCOMPILING_CONTRACT)
@@ -27,7 +27,7 @@ function(add suffix)
             -Wl,--no-merge-data-segments
             -nostdlib
         )
-        target_include_directories(psibase-contract-base${suffix} PUBLIC include/contract ../eosiolib/core/include ../eosiolib/contracts/include)
+        target_include_directories(psibase-contract-base${suffix} PUBLIC contract/include ../eosiolib/core/include ../eosiolib/contracts/include)
 
         file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
@@ -59,8 +59,8 @@ function(add suffix)
 
         add_library(nctestlib${suffix})
         target_sources(nctestlib${suffix} PRIVATE
-            src/tester/tester.cpp
-            src/contract/intrinsic.cpp
+            tester/src/tester.cpp
+            contract/src/intrinsic.cpp
             ../eosiolib/tester/tester_intrinsics.cpp
             ../eosiolib/tester/wasi_polyfill/__wasi_args_get.cpp
             ../eosiolib/tester/wasi_polyfill/__wasi_args_sizes_get.cpp
@@ -91,11 +91,13 @@ function(add suffix)
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
         )
         target_include_directories(nctestlib${suffix} PUBLIC
-            include/contract
+            contract/include
             ../eosiolib/core/include
             ../eosiolib/contracts/include
-            include/tester
-            ../../contracts/base_contracts/include
+            tester/include
+        )
+        target_include_directories(nctestlib${suffix} PRIVATE
+            ../../contracts/system/verify_ec_sys/include
         )
         target_link_options(nctestlib${suffix} INTERFACE -Wl,--export-table)
         target_link_options(nctestlib${suffix} PUBLIC
@@ -109,15 +111,15 @@ function(add suffix)
 
         target_link_libraries(psibase${suffix} PUBLIC eos-vm mdbx-static ${Boost_LIBRARIES})
         target_include_directories(psibase${suffix} PUBLIC
-            include/native
-            include/common
+            native/include
+            common/include
             ../../external/libmdbx)
         target_sources(psibase${suffix} PRIVATE
-            src/native/block_context.cpp
-            src/native/db.cpp
-            src/native/execution_context.cpp
-            src/native/system_context.cpp
-            src/native/transaction_context.cpp
+            native/src/block_context.cpp
+            native/src/db.cpp
+            native/src/execution_context.cpp
+            native/src/system_context.cpp
+            native/src/transaction_context.cpp
         )
     endif()
 endfunction()
