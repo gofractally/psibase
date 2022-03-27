@@ -28,6 +28,7 @@ namespace psio
       invalid_name_char13,
       name_too_long,
       json_writer_error, 
+      invalid_frac_encoding,
       empty_vec_used_offset// !!!
    };                     // stream_error
 }  // namespace psio

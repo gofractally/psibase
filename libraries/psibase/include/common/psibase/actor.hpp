@@ -1,7 +1,7 @@
 #pragma once
+#include <psibase/intrinsic.hpp>
 #include <psio/fracpack.hpp>
 #include <psibase/block.hpp>
-#include <psibase/intrinsic.hpp>
 
 namespace psibase {
    using account_num_type = uint32_t;

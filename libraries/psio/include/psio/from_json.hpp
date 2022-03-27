@@ -242,6 +242,10 @@ namespace psio
             throw_error(from_json_error::expected_end);
       }
 
+      bool is_null() {
+         auto t = peek_token();
+         return (t.get().type == json_token_type::type_null);
+      }
       void get_null()
       {
          auto t = peek_token();
@@ -603,8 +607,9 @@ void from_json(int32_t& result, S& stream) {
    void from_json(std::optional<T>& result, S& stream)
    {
       result = std::optional<T>();
-      if (stream.get_null())
+      if (stream.is_null())
       {
+         stream.get_null();
          result = std::nullopt;
       }
       else

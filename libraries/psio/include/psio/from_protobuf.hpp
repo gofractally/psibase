@@ -134,7 +134,12 @@ namespace psio
    template <typename T, typename S>
    void from_protobuf_member(T& obj, S& stream)
    {
-      if constexpr (std::is_same_v<T, std::string>)
+      if constexpr (is_std_optional<T>::value) 
+      {
+         obj = typename is_std_optional<T>::value_type{};
+         from_protobuf_member( *obj, stream );
+      }
+      else if constexpr (std::is_same_v<T, std::string>)
       {
          uint32_t size = 0;
          varuint32_from_bin(size, stream);

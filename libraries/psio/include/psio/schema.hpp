@@ -114,7 +114,7 @@ namespace psio
                          std::initializer_list<const char*>::iterator end)
          {
             params.push_back(
-                {.name = begin != end ? *begin : "", .type = get_type_name<std::decay_t<A>>()});
+                {.name = begin != end ? *begin : "", .type = get_type_name<remove_view_t<std::remove_cv_t<A>>>()});
             if constexpr (sizeof...(Args) > 0)
                push_param<Args...>(begin != end ? ++begin : end, end);
          }
@@ -202,10 +202,11 @@ namespace psio
       template <typename T, typename L>
       bool add_type(schema_type t, L&& on_generate)
       {
-         auto tn = get_type_name<T>();
+         using type = std::remove_cv_t<T>;
+         auto tn = get_type_name<type>();
          if (types.find(tn) == types.end())
          {
-            on_generate(static_cast<T*>(nullptr));
+            on_generate(static_cast<type*>(nullptr));
             types[tn] = t;
             return true;
          }
@@ -221,7 +222,7 @@ namespace psio
       template <typename L, typename A, typename... Args>
       void generate_variant(const std::tuple<A, Args...>* v, L&& on_generate)
       {
-         if (add_type<std::tuple<A, Args...>>(tuple_type(), on_generate))
+         if (add_type<std::tuple<std::remove_cv_t<A>, std::remove_cv_t<Args>...>>(tuple_type(), on_generate))
          {
             tuple_type vt;
             generate_helper<L, tuple_type, A, Args...>(vt, on_generate);
@@ -252,10 +253,17 @@ namespace psio
          }
       }
 
-      template <typename T>
-      void generate()
-      {
+
+      template <typename T, typename... Ts>
+      void generate() {
          generate<T>([](auto) {});
+         if constexpr( sizeof...(Ts) > 0 )
+            generate<Ts...>();
+      }
+      template <typename... Ts>
+      void generate_tuple_members( const std::tuple<Ts...>* ) {
+         if constexpr( sizeof...(Ts)  > 0)
+            generate<Ts...>();
       }
 
       template <typename T, typename L>
@@ -321,6 +329,10 @@ namespace psio
                       else
                       {
                          using member_type = decltype(result_of(m));
+                         using args_tuple = decltype(tuple_remove_view(args_as_tuple(m)));
+                         generate_tuple_members( (const args_tuple*)nullptr );
+
+                         
                          generate<member_type>(on_generate);
                          auto tn = get_type_name<member_type>();
                          ot.members.push_back({.name = r.name, .type = tn, .number = r.number});
@@ -329,7 +341,7 @@ namespace psio
                    });
                ot.size  = offset;
                types[n] = ot;
-               ot.dynamic = is_ext_structure<T>();
+               ot.dynamic = std::is_final_v<T>;
             }
          }
       }  /// generate

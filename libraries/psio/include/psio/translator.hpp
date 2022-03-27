@@ -3,6 +3,7 @@
 #include <psio/from_json.hpp>
 #include <psio/from_protobuf.hpp>
 #include <psio/protobuf/json.hpp>
+#include <psio/fracpack.hpp>
 #include <psio/protobuf/schema.hpp>
 #include <psio/schema.hpp>
 #include <psio/to_bin.hpp>
@@ -20,14 +21,21 @@ namespace psio
       virtual ~meta_type_base() {}
       virtual const char* name() const = 0;
 
+      virtual std::vector<char> json_to_frac(std::string json) const     = 0;
       virtual std::vector<char> json_to_protobuf(std::string json) const = 0;
       virtual std::vector<char> json_to_bin(std::string json) const      = 0;
 
+      virtual std::vector<char> protobuf_to_frac(const std::vector<char>& b) const = 0;
       virtual std::string       protobuf_to_json(const std::vector<char>& b) const = 0;
       virtual std::vector<char> protobuf_to_bin(const std::vector<char>& b) const  = 0;
 
+      virtual std::string       frac_to_json(const std::vector<char>& b) const     = 0;
+      virtual std::vector<char> frac_to_protobuf(const std::vector<char>& b) const = 0;
+      virtual std::vector<char> frac_to_bin(const std::vector<char>& b) const      = 0;
+
       virtual std::vector<char> bin_to_protobuf(const std::vector<char>& b) const = 0;
       virtual std::string       bin_to_json(const std::vector<char>& b) const     = 0;
+      virtual std::vector<char> bin_to_frac(const std::vector<char>& b) const     = 0;
 
       uint32_t number() const { return _number; }
 
@@ -47,7 +55,13 @@ namespace psio
          return get_type_name<T>();  //reflect<T>::name();
       }
 
-      virtual std::vector<char> json_to_protobuf(std::string json) const override
+      virtual std::vector<char> json_to_frac(std::string json) const override 
+      {
+         auto t = from_json<T>(json);
+         return to_frac(t);
+      }
+
+      virtual std::vector<char> json_to_protobuf(std::string json) const override 
       {
          auto t = from_json<T>(json);
          return to_protobuf(t);
@@ -70,12 +84,44 @@ namespace psio
          auto t = from_protobuf<T>(b);
          return to_bin(t);
       }
+      virtual std::vector<char> protobuf_to_frac(const std::vector<char>& b) const override
+      {
+         auto t = from_protobuf<T>(b);
+         return to_frac(t);
+      }
+
+      virtual std::string frac_to_json(const std::vector<char>& b) const override
+      {
+         auto t = from_frac<T>(b);
+         return to_json(t);
+      }
+
+      virtual std::vector<char> frac_to_bin(const std::vector<char>& b) const override
+      {
+         auto t = from_frac<T>(b);
+         return to_bin(t);
+      }
+
+      virtual std::vector<char> frac_to_protobuf(const std::vector<char>& b) const override
+      {
+         auto t = from_frac<T>(b);
+         return to_protobuf(t);
+      }
+
+
 
       virtual std::vector<char> bin_to_protobuf(const std::vector<char>& b) const override
       {
          auto t = from_bin<T>(b);
          return to_protobuf(t);
       }
+
+      virtual std::vector<char> bin_to_frac(const std::vector<char>& b) const override
+      {
+         auto t = from_bin<T>(b);
+         return to_frac(t);
+      }
+
 
       virtual std::string bin_to_json(const std::vector<char>& b) const override
       {
@@ -96,7 +142,7 @@ namespace psio
       }
       string get_json_schema() const { return format_json(_schema); }
       string get_protobuf_schema() { return to_protobuf_schema(_schema); }
-      //   string get_gql_schema();
+      string get_gql_schema()const;
 
       uint32_t get_type_num(const string& type_name) const
       {
@@ -113,6 +159,13 @@ namespace psio
          return string();
       }
 
+      std::vector<char> json_to_frac(uint32_t type_num, std::string json) const
+      {
+         if (type_num < _types.size())
+            return _types[type_num]->json_to_frac(json);
+         return std::vector<char>();
+      }
+
       std::vector<char> json_to_bin(uint32_t type_num, std::string json) const
       {
          if (type_num < _types.size())
@@ -124,6 +177,25 @@ namespace psio
       {
          if (type_num < _types.size())
             return _types[type_num]->json_to_protobuf(json);
+         return std::vector<char>();
+      }
+
+      string frac_to_json(int type_num, const std::vector<char>& frac) const
+      {
+         if (type_num < _types.size())
+            return _types[type_num]->frac_to_json(frac);
+         return string();
+      }
+      std::vector<char> frac_to_protobuf(int type_num, const std::vector<char>& frac) const
+      {
+         if (type_num < _types.size())
+            return _types[type_num]->frac_to_protobuf(frac);
+         return {};
+      }
+      std::vector<char> frac_to_bin(int type_num, const std::vector<char>& frac) const
+      {
+         if (type_num < _types.size())
+            return _types[type_num]->frac_to_bin(frac);
          return std::vector<char>();
       }
 
@@ -139,6 +211,12 @@ namespace psio
             return _types[type_num]->bin_to_protobuf(bin);
          return std::vector<char>();
       }
+      std::vector<char> bin_to_frac(int type_num, const std::vector<char>& bin) const
+      {
+         if (type_num < _types.size())
+            return _types[type_num]->bin_to_frac(bin);
+         return std::vector<char>();
+      }
 
       string protobuf_to_json(int type_num, const std::vector<char>& pbuf) const
       {
@@ -150,6 +228,12 @@ namespace psio
       {
          if (type_num < _types.size())
             return _types[type_num]->protobuf_to_bin(pbuf);
+         return std::vector<char>();
+      }
+      std::vector<char> protobuf_to_frac(int type_num, const std::vector<char>& pbuf) const
+      {
+         if (type_num < _types.size())
+            return _types[type_num]->protobuf_to_frac(pbuf);
          return std::vector<char>();
       }
 
@@ -480,6 +564,75 @@ namespace psio
       }
       out.write('}');
       return true;
+   }
+   template<typename T>
+   string translator<T>::get_gql_schema()const {
+
+      auto transform_type= []( auto s ) {
+         if( s == "int32" ) s = "Int";
+         if( s == "int32[]" ) s = "Int[]";
+         if( s == "int32?" ) s = "Int?";
+         if( s == "string" ) s = "String";
+         if( s == "string[]" ) s = "String[]";
+         if( s == "string?" ) s = "String?";
+         if( s.back() == ']' ) {
+            if( s.size() > 3 ) {
+               if( s[s.size()-3] == '?' )
+                  return '[' + s.substr(0,s.size()-3)+"]!";
+               else
+                  return '[' + s.substr(0,s.size()-2)+"!]!";
+            }
+            return '[' + s.substr(0,s.size()-2)+"]!";
+         }
+         if( s.back() == '?' )
+            return s.substr(0,s.size()-1);
+         return s +"!";
+      };
+
+      std::stringstream ss;
+      ss << "directive @psibase( \n";
+      ss << "   index: Int \n";
+      ss << "   final: Boolean\n";
+      ss << ") on FIELD_DEFINITION\n\n";
+      ss << "scalar Int64\n";
+      ss << "scalar UInt64\n";
+      ss << "scalar UInt32\n";
+      ss << "scalar UInt16\n";
+      ss << "scalar UInt8\n";
+      ss << "scalar Int64\n";
+      ss << "scalar Int16\n";
+      ss << "scalar Int8\n";
+      ss << "scalar Char\n";
+
+      for( auto& items : _schema.types ) {
+        std::visit( [&]( auto i ){
+          if constexpr( std::is_same_v<decltype(i),object_type> ) {
+        ss << "type " << items.first << " { \n";
+              for( auto member : i.members ) {
+                  ss << "   " << member.name;
+                  if( member.params.size() ) {
+                     ss<<"(";
+                        int first = 0;
+                        for( auto param : member.params ) {
+                          if( first++ )
+                             ss << ", ";
+                          ss << param.name << ": " << transform_type(param.type);
+                        }
+                     ss<<")";
+                  }
+
+                  ss << ": " << transform_type(member.type) <<"  @psibase( index:" << member.number <<" )";
+                  ss <<"\n"; 
+
+
+              }
+        ss << "}\n\n";
+          } else {
+        //      ss << "   other\n";
+          }
+        }, items.second );
+      }
+      return ss.str();
    }
 
 };  // namespace psio
