@@ -10,6 +10,7 @@ function(add suffix)
     target_include_directories(base_contracts${suffix} INTERFACE include)
 
     if(DEFINED IS_WASM)
+        contract(mincon_sys${suffix} src/mincon.cpp)
         contract(account_sys${suffix} src/account_sys.cpp)
         contract(auth_ec_sys${suffix} src/auth_ec_sys.cpp)
         contract(auth_fake_sys${suffix} src/auth_fake_sys.cpp)
