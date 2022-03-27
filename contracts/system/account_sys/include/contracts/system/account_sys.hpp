@@ -2,6 +2,7 @@
 #include <psibase/actor.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
+#include <psibase/name.hpp>
 
 namespace psibase 
 {

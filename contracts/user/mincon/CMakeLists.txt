@@ -1,5 +1,5 @@
 function(add suffix)
-    add_user_contract("${suffix}" mincon contract/src/mincon.cpp)
+    add_user_contract("${suffix}" mincon src/mincon.cpp)
 endfunction(add)
 
 add("")
