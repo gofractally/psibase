@@ -9,6 +9,21 @@
 #include "trans_generated.h"
 #include "transfer_generated.h"
 
+#include <psio/fracpack.hpp>
+#include <psio/schema.hpp>
+#include <iostream>
+
+#include <psio/from_bin/varint.hpp>
+#include <psio/from_json/varint.hpp>
+#include <psio/json/any.hpp>
+#include <psio/to_bin/varint.hpp>
+#include <psio/to_json/varint.hpp>
+
+#include <psio/bytes/from_json.hpp>
+#include <psio/bytes/to_json.hpp>
+#include <psio/to_json/map.hpp>
+#include <psio/translator.hpp>
+
 /**  
  
   # Types of Data
@@ -1400,9 +1415,6 @@ PSIO_REFLECT(OuterStruct,
              field_o_o_inner
              )
 
-
-TEST_CASE( "OuterStruct" ) {
-
 OuterStruct tests1_data[] = {
     OuterStruct{
         .field_u8  = 1,
@@ -1574,6 +1586,9 @@ OuterStruct tests1_data[] = {
     },
 };
 
+TEST_CASE( "OuterStruct" ) {
+
+
 
 {
    psio::shared_view_ptr<OuterStruct> p(tests1_data[0]);
@@ -1721,8 +1736,8 @@ TEST_CASE( "tuple_call" ) {
    using tup = decltype( tuple_remove_view(psio::args_as_tuple(cat)) );
    psio::shared_view_ptr<tup> p( tup{"hello","world"} );
 
-   auto result = p->call( cat);
-   REQUIRE( result == "helloworld" );
+   //auto result = p->call( cat);
+   //REQUIRE( result == "helloworld" );
    }
 }
 
@@ -1741,3 +1756,31 @@ TEST_CASE( "bugtest" )
 }
     
 
+TEST_CASE( "translate" ) {
+  psio::schema apischema;
+  apischema.generate<OuterStruct>();
+  std::cout << "flat schema: " << format_json(apischema) << "\n";
+
+  psio::translator<OuterStruct> tr;
+ // std::cout << "flat schema: " << tr.get_protobuf_schema() << "\n";
+
+
+  std::cout << "================\n" 
+            << psio::format_json( tests1_data[0] );
+  std::cout << "================\n" 
+            << psio::format_json( tests1_data[1] );
+  std::cout << "================\n" 
+            << psio::format_json( tests1_data[2] );
+  auto t1d2_json = psio::to_json( tests1_data[2] );
+  auto t1d2_frac = tr.json_to_frac( tr.get_type_num( "OuterStruct" ), t1d2_json );
+  auto t1d2_json2 = tr.frac_to_json( tr.get_type_num( "OuterStruct" ), t1d2_frac );
+
+//  std::cout<<t1d2_json<<"\n\n";
+//  std::cout<<t1d2_json2<<"\n\n";
+  REQUIRE( t1d2_json == t1d2_json2 );
+
+//  auto t1d2_protobuf = tr.json_to_protobuf( tr.get_type_num( "OuterStruct" ), t1d2_json );
+ // auto t1d2_json3 = tr.protobuf_to_json( tr.get_type_num( "OuterStruct" ), t1d2_protobuf );
+//  std::cout<<t1d2_json3<<"\n\n";
+//  REQUIRE( t1d2_json == t1d2_json3 );
+}

@@ -27,7 +27,7 @@ namespace psibase
    action get_current_action()
    {
       auto data = get_result(raw::get_current_action());
-      return eosio::convert_from_bin<action>(data);
+      return psio::convert_from_frac<action>(data);
    }
 
    std::vector<char> call(const char* action, uint32_t len)
@@ -40,5 +40,5 @@ namespace psibase
       return get_result(raw::call(action.pos, action.remaining()));
    }
 
-   std::vector<char> call(const action& action) { return call(eosio::convert_to_bin(action)); }
+   std::vector<char> call(const action& action) { return call(psio::convert_to_frac(action)); }
 }  // namespace psibase

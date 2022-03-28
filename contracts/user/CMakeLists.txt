@@ -2,6 +2,7 @@ function(add_user_contract suffix name)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC 
         contract/include
+        include
         ../../system/account_sys/include
         ../../system/auth_ec_sys/include
         ../../system/auth_fake_sys/include
@@ -39,6 +40,7 @@ add("-debug")
 
 if(DEFINED IS_WASM)
     add_subdirectory(nft_sys)
+    add_subdirectory(mincon)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

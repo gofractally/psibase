@@ -59,7 +59,11 @@ namespace psio
    template <typename T, typename S>
    void to_protobuf_member(const T& obj, S& stream)
    {
-      if constexpr (std::is_same_v<T, std::string>)
+      if constexpr (is_std_optional<T>::value) {
+         if( not obj ) return;
+         to_protobuf_member( *obj, stream );
+      }
+      else if constexpr (std::is_same_v<T, std::string>)
       {
          varuint32_to_bin(obj.size(), stream);
          stream.write(obj.data(), obj.size());
@@ -94,7 +98,10 @@ namespace psio
    template <typename Member, typename Stream>
    void write_protobuf_field(int field, const Member& member, Stream& stream)
    {
-      if constexpr (is_std_vector<std::decay_t<Member>>::value)
+      if constexpr (is_std_optional<Member>::value) {
+         if( !member ) return;
+      }
+      else if constexpr (is_std_vector<std::decay_t<Member>>::value)
       {
          if (member.size() == 0)
             return;

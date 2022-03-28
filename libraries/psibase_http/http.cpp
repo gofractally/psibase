@@ -213,7 +213,13 @@ namespace psibase::http
 
       try
       {
-         if (req.target().starts_with("/psiq"))
+         auto host  = req.at("Host");
+         auto colon = host.find(':');
+         if (colon != host.npos)
+            host.remove_suffix(host.size() - colon);
+
+         if (req.target().starts_with("/psiq") ||
+             host != http_config.host && host.ends_with(http_config.host))
          {
             rpc_request_data data;
             if (req.method() == bhttp::verb::get)
@@ -223,8 +229,10 @@ namespace psibase::http
             else
                return send(error(bhttp::status::bad_request,
                                  "Unsupported HTTP-method for " + req.target().to_string() + "\n"));
-            data.target = req.target().to_string();
-            data.body   = req.body();
+            data.host            = {host.begin(), host.size()};
+            data.configured_host = http_config.host;
+            data.target          = req.target().to_string();
+            data.body            = req.body();
 
             // TODO: time limit
             auto           system = shared_state.get_system_context();
@@ -607,8 +615,7 @@ namespace psibase::http
                                         e.what());
             }
 
-            start_listen(tcp_acceptor,
-                         tcp::endpoint{a, (unsigned short)std::atoi(http_config->port.c_str())});
+            start_listen(tcp_acceptor, tcp::endpoint{a, http_config->port});
          }
 
          if (http_config->unix_path.size())

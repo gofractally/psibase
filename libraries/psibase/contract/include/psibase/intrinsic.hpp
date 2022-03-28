@@ -144,18 +144,20 @@ namespace psibase
    template <typename T>
    void set_frac_retval(const T& retval)
    {
-      size_t s = psio::fracpack_size( retval );
-      if( false ) { //s < 1024 ) {
-         char* buffer = (char*)alloca( s );
-         psio::fixed_buf_stream stream( buffer, s );
-         psio::fracpack( retval, stream );
-         raw::set_retval( buffer, s );
+      size_t s = psio::fracpack_size(retval);
+      if (false)
+      {  //s < 1024 ) {
+         char*                  buffer = (char*)alloca(s);
+         psio::fixed_buf_stream stream(buffer, s);
+         psio::fracpack(retval, stream);
+         raw::set_retval(buffer, s);
       }
-      else {
-         std::vector<char> buffer(s);
-         psio::fixed_buf_stream stream( buffer.data(), s );
-         psio::fracpack( retval, stream );
-         raw::set_retval( buffer.data(), s );
+      else
+      {
+         std::vector<char>      buffer(s);
+         psio::fixed_buf_stream stream(buffer.data(), s);
+         psio::fracpack(retval, stream);
+         raw::set_retval(buffer.data(), s);
       }
    }
 
@@ -366,8 +368,9 @@ namespace psibase
       return kv_max<V>(kv_map::contract, key);
    }
 
-   inline void write_console(const std::string_view& sv ) {
-      raw::write_console( sv.data(), sv.size() );
+   inline void write_console(const std::string_view& sv)
+   {
+      raw::write_console(sv.data(), sv.size());
    }
 
 }  // namespace psibase

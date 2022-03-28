@@ -15,6 +15,7 @@ namespace psibase
       std::optional<std::string> error;
    };
    EOSIO_REFLECT(action_trace, act, raw_retval, inner_traces, error)
+   PSIO_REFLECT(action_trace, act, raw_retval, inner_traces, error)
 
    // TODO: need event definitions in ABI
    struct event_trace
@@ -23,18 +24,21 @@ namespace psibase
       std::vector<char> data;
    };
    EOSIO_REFLECT(event_trace, name, data)
+   PSIO_REFLECT(event_trace, name, data)
 
    struct console_trace
    {
       std::string console;
    };
    EOSIO_REFLECT(console_trace, console)
+   PSIO_REFLECT(console_trace, console)
 
    struct inner_trace
    {
       std::variant<console_trace, event_trace, action_trace> inner;
    };
    EOSIO_REFLECT(inner_trace, inner)
+   PSIO_REFLECT(inner_trace, inner)
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct transaction_trace
@@ -44,6 +48,7 @@ namespace psibase
       std::optional<std::string> error;
    };
    EOSIO_REFLECT(transaction_trace, trx, action_traces, error)
+   PSIO_REFLECT(transaction_trace, trx, action_traces, error)
 
    void              trim_raw_data(action_trace& t, size_t max = 32);
    transaction_trace trim_raw_data(transaction_trace t, size_t max = 32);

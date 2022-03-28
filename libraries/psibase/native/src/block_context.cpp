@@ -35,26 +35,26 @@ namespace psibase
 
       if (status->head)
       {
-         current.previous = status->head->id;
-         current.num      = status->head->num + 1;
+         current.header.previous = status->head->id;
+         current.header.num      = status->head->header.num + 1;
          if (time)
          {
-            eosio::check(time->utc_seconds > status->head->time.utc_seconds,
+            eosio::check(time->utc_seconds > status->head->header.time.utc_seconds,
                          "block is in the past");
-            current.time = *time;
+            current.header.time = *time;
          }
          else
          {
-            current.time = status->head->time + 1;
+            current.header.time = status->head->header.time + 1;
          }
       }
       else
       {
          is_genesis_block    = true;
          need_genesis_action = true;
-         current.num         = 2;
+         current.header.num  = 2;
          if (time)
-            current.time = *time;
+            current.header.time = *time;
       }
       started = true;
       active  = true;
@@ -63,10 +63,11 @@ namespace psibase
    // TODO: (or elsewhere) check block signature
    void block_context::start(block&& src)
    {
-      start(src.time);
+      start(src.header.time);
       active = false;
-      eosio::check(src.previous == current.previous, "block previous does not match expected");
-      eosio::check(src.num == current.num, "block num does not match expected");
+      eosio::check(src.header.previous == current.header.previous,
+                   "block previous does not match expected");
+      eosio::check(src.header.num == current.header.num, "block num does not match expected");
       current = std::move(src);
       active  = true;
    }

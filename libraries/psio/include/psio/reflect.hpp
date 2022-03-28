@@ -26,7 +26,7 @@
 namespace psio
 {
    template <typename R, typename C, typename... Args>
-   constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...)) { return {}; }
+   constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...));// { return ; }
    template <typename R, typename C, typename... Args>
    constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...) const) { return {}; }
    template <typename R, typename... Args>
@@ -332,6 +332,7 @@ namespace psio
          explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)                      \
          {                                                                                         \
          }                                                                                         \
+         auto& psio_get_proxy()const { return _psio_proxy_obj; } \
          ProxyObject*       operator->() { return &_psio_proxy_obj; }                              \
          const ProxyObject* operator->() const { return &_psio_proxy_obj; }                        \
          ProxyObject&       operator*() { return _psio_proxy_obj; }                                \
@@ -350,18 +351,18 @@ namespace psio
       static constexpr bool               is_struct  = true;                                       \
       static inline constexpr const char* name() { return BOOST_PP_STRINGIZE(QUERY_CLASS); }       \
       template <typename L>                                                                        \
-      inline static void for_each(L&& lambda)                                                      \
+      inline static constexpr void for_each(L&& lambda)                                                      \
       {                                                                                            \
          PSIO_REFLECT_FOREACH_MEMBER_PB_HELPER(QUERY_CLASS, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)) \
       }                                                                                            \
       template <typename L>                                                                        \
-      inline static bool get(const std::string_view& m, L&& lambda)                                \
+      inline static constexpr bool get(const std::string_view& m, L&& lambda)                                \
       {                                                                                            \
          PSIO_REFLECT_MEMBER_BY_STR_PB_HELPER(QUERY_CLASS, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))  \
          return false;                                                                             \
       }                                                                                            \
       template <typename L>                                                                        \
-      inline static bool get(int64_t m, L&& lambda)                                                \
+      inline static constexpr bool get(int64_t m, L&& lambda)                                                \
       {                                                                                            \
          switch (m)                                                                                \
          {                                                                                         \
@@ -388,6 +389,7 @@ namespace psio
          explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)              \
          {                                                                                         \
          }                                                                                         \
+         auto& psio_get_proxy()const { return _psio_proxy_obj; } \
          ProxyObject*       operator->() { return &_psio_proxy_obj; }                              \
          const ProxyObject* operator->() const { return &_psio_proxy_obj; }                        \
          ProxyObject&       operator*() { return _psio_proxy_obj; }                                \
@@ -404,23 +406,23 @@ namespace psio
    {                                                                                               \
       static constexpr bool     is_defined = true;                                                 \
       static constexpr bool     is_struct  = true;                                                 \
-      static inline const char* name()                                                             \
+      static inline constexpr const char* name()                                                             \
       {                                                                                            \
          return BOOST_PP_STRINGIZE(QUERY_CLASS) "<" BOOST_PP_STRINGIZE(TPARAM) ">";                \
       }                                                                                            \
       template <typename L>                                                                        \
-      inline static void for_each(L&& lambda)                                                      \
+      inline static constexpr void for_each(L&& lambda)                                                      \
       {                                                                                            \
          PSIO_REFLECT_FOREACH_MEMBER_HELPER(QUERY_CLASS<T>, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)) \
       }                                                                                            \
       template <typename L>                                                                        \
-      inline static void get(const std::string_view& m, L&& lambda)                                \
+      inline static constexpr void get(const std::string_view& m, L&& lambda)                                \
       {                                                                                            \
          PSIO_REFLECT_MEMBER_HELPER(QUERY_CLASS<T>, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))         \
          return false;                                                                             \
       }                                                                                            \
       template <typename L>                                                                        \
-      inline static void get(int64_t m, L&& lambda)                                                \
+      inline static constexpr void get(int64_t m, L&& lambda)                                                \
       {                                                                                            \
          switch (m)                                                                                \
          {                                                                                         \
@@ -433,7 +435,7 @@ namespace psio
                                                      BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))>       \
    };                                                                                              \
    template <typename T>                                                                           \
-   reflect_impl_##QUERY_CLASS<T> get_reflect_impl(const QUERY_CLASS<T>&);                          \
+   constexpr reflect_impl_##QUERY_CLASS<T> get_reflect_impl(const QUERY_CLASS<T>&);                          \
    constexpr const char*         get_type_name(QUERY_CLASS<T>*)                                    \
    {                                                                                               \
       return reflect_impl_##QUERY_CLASS ::name();                                                  \

@@ -337,7 +337,7 @@ namespace psibase
 
       uint32_t get_current_action()
       {
-         return set_result(eosio::convert_to_bin(current_act_context->action));
+         return set_result(psio::convert_to_frac(current_act_context->action));
       }
 
       uint32_t call(span<const char> data)
@@ -347,7 +347,9 @@ namespace psibase
             eosio::check(false, "call depth exceeded (temporary rule)");
 
          // TODO: don't unpack raw_data
-         auto act = unpack_all<action>({data.data(), data.size()}, "extra data in call");
+         eosio::check(psio::fracvalidate<action>(data.data(), data.end()).valid_and_known(),
+                      "call: invalid data format");
+         auto act = psio::convert_from_frac<action>({data.data(), data.size()});
          eosio::check(act.sender == contract_account.num ||
                           (contract_account.flags & account_row::allow_sudo),
                       "contract is not authorized to call as another sender");

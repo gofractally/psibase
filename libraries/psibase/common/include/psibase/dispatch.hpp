@@ -28,6 +28,7 @@ namespace psibase {
       action act = get_current_action();
       check( act.raw_data.size() >= 5, "action data too short" );
       auto& rvv = *reinterpret_cast<const detail::raw_variant_view*>(act.raw_data.data());
+      check( act.raw_data.size()-5 == rvv.size, "invalid size encoded" );
 
       bool called = psio::reflect<Contract>::get( rvv.action_idx, [&]( auto member_func ) {
          using result_type = decltype( psio::result_of(member_func) );

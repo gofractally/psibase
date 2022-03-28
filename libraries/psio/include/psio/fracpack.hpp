@@ -35,6 +35,17 @@ namespace psio
    template <typename View, typename Enable=void>
    struct const_view;
 
+   template<typename T>
+   struct remove_view { using type = T; };
+   template<typename T>
+   struct remove_view<view<T>> { using type = T; };
+   template<typename T>
+   struct remove_view<const_view<T>> { using type = T; };
+
+   template<typename T>
+   using remove_view_t = typename remove_view<T>::type;
+
+
    template<typename T, typename P>
    constexpr bool view_is() { return std::is_same_v<view<T>,P> || std::is_same_v<const_view<T>,P>; }
 
@@ -140,10 +151,13 @@ namespace psio
             psio::reflect<T>::for_each(
                 [&](const psio::meta& ref, auto mptr)
                 {
-                   using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
-                   is_flat &= ref.offset == last_pos;
-                   is_flat &= can_memcpy<member_type>();
-                   last_pos += sizeof(member_type);
+                   if constexpr ( not std::is_member_function_pointer_v<decltype(mptr)> )
+                   {
+                      using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                      is_flat &= ref.offset == last_pos;
+                      is_flat &= can_memcpy<member_type>();
+                      last_pos += sizeof(member_type);
+                   }
                 });
             return (is_flat) and (last_pos == sizeof(T));
          }
@@ -162,11 +176,14 @@ namespace psio
          psio::reflect<T>::for_each(
              [&](const psio::meta& ref, auto mptr)
              {
-                using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
-                if constexpr( is_std_optional<member_type>() ) {
-                  found_optional = true;
-                } else {
-                  has_error |= found_optional;
+                if constexpr ( not std::is_member_function_pointer_v<decltype(mptr)> )
+                {
+                   using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                   if constexpr( is_std_optional<member_type>() ) {
+                     found_optional = true;
+                   } else {
+                     has_error |= found_optional;
+                   }
                 }
              });
           return has_error;
@@ -220,8 +237,11 @@ namespace psio
          psio::reflect<T>::for_each(
              [&](const psio::meta& ref, auto mptr)
              {
-                using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
-                is_fixed &= is_fixed_structure<member_type>();
+                if constexpr ( not std::is_member_function_pointer_v<decltype(mptr)> )
+                {
+                   using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                   is_fixed &= is_fixed_structure<member_type>();
+                }
              });
          return is_fixed;
       }
@@ -288,11 +308,13 @@ namespace psio
          psio::reflect<T>::for_each(
              [&](const psio::meta& ref, auto mptr)
              {
-                using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
-                if constexpr (psio::reflect<member_type>::is_struct)
-                   use_heap |= known_members_may_use_heap<member_type>();
-                else
-                   use_heap |= may_use_heap<member_type>();
+               if constexpr( not std::is_member_function_pointer_v<decltype(mptr)> )  {
+                   using member_type = std::remove_cv_t<decltype(psio::result_of_member(mptr))>;
+                   if constexpr (psio::reflect<member_type>::is_struct)
+                      use_heap |= known_members_may_use_heap<member_type>();
+                   else
+                      use_heap |= may_use_heap<member_type>();
+               }
              });
          return use_heap;
       }
@@ -345,14 +367,16 @@ namespace psio
          reflect<T>::for_each(
              [&](const meta& ref, const auto& mptr)
              {
-                using member_type = decltype(result_of_member(mptr));
-                if constexpr (may_use_heap<member_type>())
-                {
-                   size += sizeof(offset_ptr);
-                }
-                else
-                {
-                   size += fracpack_fixed_size<member_type>();
+                if constexpr( not std::is_member_function_pointer_v<decltype(mptr)> ){
+                   using member_type = decltype(result_of_member(mptr));
+                   if constexpr (may_use_heap<member_type>())
+                   {
+                      size += sizeof(offset_ptr);
+                   }
+                   else
+                   {
+                      size += fracpack_fixed_size<member_type>();
+                   }
                 }
              });
          return size;
@@ -369,18 +393,20 @@ namespace psio
          psio::reflect<T>::for_each(
              [&](const psio::meta& ref, auto mptr)
              {
-                using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                if constexpr( not std::is_member_function_pointer_v<decltype(mptr)> ){
+                   using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
 
-                if constexpr( is_std_optional<member_type>() ) {
-                  found_optional = true;
-                }
+                   if constexpr( is_std_optional<member_type>() ) {
+                     found_optional = true;
+                   }
 
-                if( not found_optional )
-                {
-                   if constexpr( may_use_heap<member_type>() )
-                      fixed_size += 4;
-                   else
-                      fixed_size += fracpack_fixed_size<member_type>();
+                   if( not found_optional )
+                   {
+                      if constexpr( may_use_heap<member_type>() )
+                         fixed_size += 4;
+                      else
+                         fixed_size += fracpack_fixed_size<member_type>();
+                   }
                 }
              });
           return fixed_size;
@@ -409,6 +435,15 @@ namespace psio
    uint32_t fracpack_size(const T& v);
 
    using char_ptr = char*;
+
+
+   template <typename T, typename P, typename S>
+   void fracpack_member( char_ptr& heap, const T& member, P ptr, S& stream)
+   {
+      if constexpr( not std::is_member_function_pointer_v<P> )
+        fracpack_member( heap, member.*ptr, stream );
+   }
+
    /**
      *  used to pack a member of a struct or vector
      */
@@ -646,16 +681,10 @@ namespace psio
          /// no need to write start_heap, it is always the same because
          /// the structure is "fixed" and cannot be extended in the future
          reflect<T>::for_each(
-             [&](const meta& ref, const auto& mptr)
+             [&](const meta& ref, auto mptr)
              {
                 using member_type = decltype(result_of_member(mptr));
-                
-            //    if constexpr (not std::is_same_v<size_stream, S>)
-            //    std::cout << "member: " << ref.name << " may use heap: " << may_use_heap<member_type>() 
-            //              <<"  " << heap - stream.begin  <<"\n";
-//            std::cout << "before member: " << ref.name << ": " << stream.consumed() <<"\n";
-                fracpack_member(heap, v.*mptr, stream);
-//            std::cout << "after member: " << ref.name << ": " << stream.consumed() <<"\n";
+                fracpack_member(heap, v, mptr, stream);
              });
 
          if constexpr (not std::is_same_v<size_stream, S>)
@@ -673,6 +702,12 @@ namespace psio
    void fracunpack(T& v, S& stream);
    template <typename T, typename S>
    void fraccheck(S& stream);
+
+   template <typename T, typename P, typename S>
+   void fracunpack_member(T& member, P ptr,  S& stream) {
+      if constexpr( not std::is_member_function_pointer_v<P> )
+         fracunpack_member( member.*ptr, stream );
+   }
 
    template <typename T, typename S>
    void fracunpack_member(T& member, S& stream)
@@ -860,8 +895,8 @@ namespace psio
          reflect<T>::for_each(
              [&](const meta& ref, const auto& mptr)
              {
-                if (stream.pos < heap)
-                   fracunpack_member(v.*mptr, stream);
+                 if (stream.pos < heap)
+                    fracunpack_member(v, mptr, stream);
              });
       }
       else
@@ -1258,7 +1293,7 @@ namespace psio
 
          return stream;
 
-      } else if constexpr( reflect<T>::is_struct and std::is_final_v<T> ) { //is_fixed_structure<T>() ) {
+      } else if constexpr( reflect<T>::is_struct and std::is_final_v<T> ) { 
          stream.pos         = stream.begin + fracpack_fixed_size<T>(); 
          stream.heap        = stream.pos;
          stream.valid       = stream.pos <= stream.end;
@@ -1268,15 +1303,11 @@ namespace psio
             if( stream.valid ) {
                const char* memptr = stream.begin;
                // visit each offset ptr
-               reflect<T>::for_each(
-                   [&](const meta& ref, const auto& mptr) {
-                    using member_type = decltype(result_of_member(mptr));
-
-         //          std::cout << "ref.name: " << ref.name << "  valid: " << stream.valid 
-          //                   <<"  unknown: " << stream.unknown <<"  heap: " << stream.heap - stream.begin ;
-
-                    memptr += fracvalidate_member<member_type>( memptr, stream );
-           //         std::cout <<"  endheap: " << stream.heap - stream.begin <<"\n";
+               reflect<T>::for_each( [&](const meta& ref, const auto& mptr) {
+                    if constexpr ( not std::is_member_function_pointer_v<decltype(mptr)> ) {
+                       using member_type = decltype(result_of_member(mptr));
+                       memptr += fracvalidate_member<member_type>( memptr, stream );
+                    }
                 });
             }
          }
@@ -1295,10 +1326,11 @@ namespace psio
          if constexpr ( known_members_may_use_heap<T>() ) {
             if( stream.valid ) {
                const char* memptr = stream.pos;
-               reflect<T>::for_each(
-                   [&](const meta& ref, const auto& mptr) {
-                           using member_type = decltype(result_of_member(mptr));
-                    memptr += fracvalidate_member<member_type>( memptr, stream );
+               reflect<T>::for_each( [&](const meta& ref, const auto& mptr) {
+                    if constexpr ( not std::is_member_function_pointer_v<decltype(mptr)> ) {
+                       using member_type = decltype(result_of_member(mptr));
+                       memptr += fracvalidate_member<member_type>( memptr, stream );
+                    }
                 });
             }
          }
@@ -1472,7 +1504,7 @@ namespace psio
          }
       }
 
-     private:
+     //private:
       char* buffer;
    };
 
@@ -1723,10 +1755,18 @@ namespace psio
    {
       using base = typename reflect<T>::template proxy<psio::frac_proxy_view>;
       using base::base;
+      view( char* p ):base(p){}
 
       friend struct const_view<T>;
       auto* operator->() { return this; }
       auto& operator*() { return *this; }
+
+      operator T() const { 
+         input_stream in(this->psio_get_proxy().buffer, this->psio_get_proxy().buffer+0xfffffff); /// TOOD: maintain real end
+         T tmp;
+         fracunpack<T>(tmp,in);
+         return tmp;
+      }
    };
 
    template <typename T>
@@ -1736,6 +1776,14 @@ namespace psio
       using base = typename reflect<T>::template proxy<psio::const_frac_proxy_view>;
       using base::base;
       const_view( view<T> v ):base(v.pos){}
+      const_view( char* p ):base(p){}
+
+      operator T() const { 
+         input_stream in(this->psio_get_proxy().buffer, this->psio_get_proxy().buffer+0xfffffff); /// TOOD: maintain real end
+         T tmp;
+         fracunpack<T>(tmp,in);
+         return tmp;
+      }
 
       auto* operator->()const { return this; }
       auto& operator*()const { return *this; }
@@ -1745,7 +1793,7 @@ namespace psio
    template <typename... Ts>
    struct view<std::tuple<Ts...>>
    {
-      using tuple_type = std::tuple<Ts...>;
+      using tuple_type = std::tuple<typename remove_view<Ts>::type...>;
       view(char* p = nullptr) : pos(p) {}
 
       template<uint8_t I>
@@ -1928,6 +1976,13 @@ namespace psio
       fracunpack(tmp, buf );
       return tmp;
    }
+   template <typename T>
+   T convert_from_frac(input_stream buf)
+   {
+      T tmp;
+      fracunpack(tmp, buf);
+      return tmp;
+   }
 
    /* used so as not to confuse with other types that might be used to consrtuct shared_view*/
    struct size_tag { uint32_t size; };
@@ -2037,15 +2092,6 @@ namespace psio
    };
 
 
-   template<typename T>
-   struct remove_view { using type = T; };
-   template<typename T>
-   struct remove_view<view<T>> { using type = T; };
-   template<typename T>
-   struct remove_view<const_view<T>> { using type = T; };
-
-   template<typename T>
-   using remove_view_t = typename remove_view<T>::type;
 
    template<typename T, typename R, typename... Args>
    constexpr auto tuple_from_function_args( R (T::*func)(Args...) ) -> std::tuple<std::decay_t<Args>...>;
@@ -2063,6 +2109,20 @@ namespace psio
 ///       and are likely poorly defined
 
 
+   template<typename T>
+   std::vector<char> to_frac( const T& v ) {
+      std::vector<char> result( fracpack_size(v) );
+      fast_buf_stream s(result.data(), result.size());
+      fracpack( v, s);
+      return result;
+   }
+
+   template<typename T>
+   T from_frac( const std::vector<char>& b ) {
+      if( fracvalidate<T>( b.data(), b.data()+b.size() ).valid )
+         return convert_from_frac<T>( b );
+      throw_error(stream_error::invalid_frac_encoding);
+   }
 
 
 

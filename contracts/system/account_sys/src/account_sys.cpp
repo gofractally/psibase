@@ -136,8 +136,7 @@ namespace psibase
 
    int64_t account_sys::exists(account_num_type num)
    {
-      auto os = get_account_by_num(num);
-      return (os != std::nullopt) ? 1 : 0;
+      return (get_account_by_num(num) != std::nullopt) ? 1 : 0;
    }
 
 }  // namespace psibase

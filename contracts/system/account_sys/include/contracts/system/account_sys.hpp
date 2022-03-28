@@ -1,6 +1,7 @@
 #pragma once
 #include <psibase/actor.hpp>
 #include <psibase/intrinsic.hpp>
+#include <psibase/name.hpp>
 #include <psibase/native_tables.hpp>
 
 namespace psibase
@@ -38,8 +39,7 @@ namespace psibase
       optional<account_num_type> get_account_by_name(const_view<string> name);
 
       optional<string> get_account_by_num(account_num_type num);
-
-      void assert_account_name(account_num_type num, const_view<string> name);
+      void             assert_account_name(account_num_type num, const_view<string> name);
 
       int64_t exists(account_num_type num);
    };

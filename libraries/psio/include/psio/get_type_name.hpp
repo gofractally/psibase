@@ -46,10 +46,6 @@ namespace psio
    constexpr const char* get_type_name(const __int128*) { return "int128"; }
    constexpr const char* get_type_name(const unsigned __int128*) { return "uint128"; }
 
-#ifdef __eosio_cdt__
-   constexpr const char* get_type_name(const long double*) { return "float128"; }
-#endif
-
    template <std::size_t N, std::size_t M>
    constexpr std::array<char, N + M> array_cat(std::array<char, N> lhs, std::array<char, M> rhs)
    {

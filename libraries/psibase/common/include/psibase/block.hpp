@@ -1,9 +1,3 @@
-// TODO: Remove inheritance for compatability with Rust and other languages
-
-// TODO: A serialization format which allows
-//       * Easier support in other languages
-//       * Extension of these types in the future
-
 #pragma once
 
 #include <eosio/crypto.hpp>
@@ -11,6 +5,12 @@
 #include <eosio/time.hpp>
 #include <psibase/crypto.hpp>
 #include <psio/fracpack.hpp>
+
+// TODO
+namespace eosio
+{
+   PSIO_REFLECT(time_point_sec, utc_seconds)
+}
 
 namespace psibase
 {
@@ -84,14 +84,14 @@ namespace psibase
                  claims)
 
    PSIO_REFLECT(transaction,
-                 expiration,
-                 ref_block_num,
-                 ref_block_prefix,
-                 max_net_usage_words,
-                 max_cpu_usage_ms,
-                 flags,
-                 actions,
-                 claims)
+                expiration,
+                ref_block_num,
+                ref_block_prefix,
+                max_net_usage_words,
+                max_cpu_usage_ms,
+                flags,
+                actions,
+                claims)
 
    // TODO: pruning proofs?
    // TODO: compression? There's a time/space tradeoff and it complicates client libraries.
@@ -119,30 +119,38 @@ namespace psibase
       eosio::time_point_sec time;
    };
    EOSIO_REFLECT(block_header, previous, num, time)
-   PSIO_REFLECT(block_header, previous, num, time)
+   PSIO_REFLECT(block_header, /*previous,*/ num, time)
 
-   /// TODO: move block header as member of block, psio doesn't do inheritance
-   struct block : block_header
+   struct block
    {
+      block_header                    header;
       std::vector<signed_transaction> transactions;  // TODO: move inside receipts
    };
-   EOSIO_REFLECT(block, base block_header, transactions)
+   EOSIO_REFLECT(block, header, transactions)
+   PSIO_REFLECT(block, header, transactions)
 
    /// TODO: you have signed block headers, not signed blocks
-   struct signed_block : block
+   struct signed_block
    {
+      psibase::block   block;
       eosio::signature signature;
    };
-   EOSIO_REFLECT(signed_block, base block, signature)
+   EOSIO_REFLECT(signed_block, block, signature)
+   PSIO_REFLECT(signed_block, block /*, signature*/)
 
-   struct block_info : block_header
+   struct block_info
    {
+      block_header       header;
       eosio::checksum256 id;
 
       block_info()                  = default;
       block_info(const block_info&) = default;
-      block_info(const block& b) : block_header{b}, id{sha256(b)} {}
+
+      // TODO: switch to fracpack for sha
+      // TODO: don't repack to compute sha
+      block_info(const block& b) : header{b.header}, id{sha256(b)} {}
    };
-   EOSIO_REFLECT(block_info, base block_header, id)
+   EOSIO_REFLECT(block_info, header, id)
+   PSIO_REFLECT(block_info, header /*, id*/)
 
 }  // namespace psibase

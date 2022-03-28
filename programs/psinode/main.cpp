@@ -38,7 +38,7 @@ void bootstrap_chain(system_context& system)
 {
    auto push = [&](auto& bc, account_num sender, account_num contract, const auto& data) {
       signed_transaction t;
-      t.trx.expiration = bc.current.time + 1;
+      t.trx.expiration = bc.current.header.time + 1;
       t.trx.actions.push_back({
           .sender   = sender,
           .contract = contract,
@@ -46,13 +46,12 @@ void bootstrap_chain(system_context& system)
       });
       bc.push_transaction(t);
    };
-   auto push_action = [&](auto& bc, action a ) {
+   auto push_action = [&](auto& bc, action a) {
       signed_transaction t;
-      t.trx.expiration = bc.current.time + 1;
+      t.trx.expiration = bc.current.header.time + 1;
       t.trx.actions.push_back({a});
       bc.push_transaction(t);
    };
-
 
    block_context bc{system, true, true};
    bc.start();
@@ -100,23 +99,23 @@ void bootstrap_chain(system_context& system)
                 },
         });
 
-   transactor<account_sys> asys( account_sys::contract, account_sys::contract );
-   push_action(bc, asys.startup(  100,  // TODO: keep space reserved?
-            vector<account_name> {
-                    {transaction_sys::contract, "transaction.sys"},
-                    {account_sys::contract, "account.sys"},
-                    {auth_fake_sys::contract, "auth_fake.sys"},
-                    {auth_ec_sys::contract, "auth_ec.sys"},
-                    {verify_ec_sys::contract, "verify_ec.sys"},
-                } ) );
+   transactor<account_sys> asys(account_sys::contract, account_sys::contract);
+   push_action(bc, asys.startup(100,  // TODO: keep space reserved?
+                                vector<account_name>{
+                                    {transaction_sys::contract, "transaction.sys"},
+                                    {account_sys::contract, "account.sys"},
+                                    {auth_fake_sys::contract, "auth_fake.sys"},
+                                    {auth_ec_sys::contract, "auth_ec.sys"},
+                                    {verify_ec_sys::contract, "verify_ec.sys"},
+                                }));
 
-   push_action(bc, asys.create_account( "alice", "transaction.sys", false ) );
-   push_action(bc, asys.create_account( "bob", "transaction.sys", false ) );
+   push_action(bc, asys.create_account("alice", "transaction.sys", false));
+   push_action(bc, asys.create_account("bob", "transaction.sys", false));
 
    bc.commit();
 }
 
-void run(const char* db_path, bool bootstrap, bool produce, bool api_server)
+void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 {
    execution_context::register_host_functions();
 
@@ -125,7 +124,7 @@ void run(const char* db_path, bool bootstrap, bool produce, bool api_server)
        std::make_shared<psibase::shared_state>(shared_database{db_path}, wasm_cache{128});
    auto system = shared_state->get_system_context();
 
-   if (api_server)
+   if (host)
    {
       // TODO: config file
       auto http_config = std::make_shared<http::http_config>(http::http_config{
@@ -135,8 +134,9 @@ void run(const char* db_path, bool bootstrap, bool produce, bool api_server)
           .allow_origin     = "*",
           .static_dir       = "",
           .address          = "0.0.0.0",
-          .port             = "8080",
+          .port             = 8080,
           .unix_path        = "",
+          .host             = host,
       });
       auto server      = http::server::create(http_config, shared_state);
    }
@@ -167,7 +167,7 @@ OPTIONS:
       -p, --produce
             Produce blocks
 
-      -a, --api-server
+      -o, --host <name>
             Enable API server
 
       -h, --help
@@ -177,12 +177,12 @@ OPTIONS:
 // TODO: use a command-line parser
 int main(int argc, char* argv[])
 {
-   bool show_usage = false;
-   bool error      = false;
-   bool bootstrap  = false;
-   bool produce    = false;
-   bool api_server = false;
-   int  next_arg   = 1;
+   bool        show_usage = false;
+   bool        error      = false;
+   bool        bootstrap  = false;
+   bool        produce    = false;
+   const char* host       = nullptr;
+   int         next_arg   = 1;
    while (next_arg < argc && argv[next_arg][0] == '-')
    {
       if (!strcmp(argv[next_arg], "-h") || !strcmp(argv[next_arg], "--help"))
@@ -191,8 +191,9 @@ int main(int argc, char* argv[])
          bootstrap = true;
       else if (!strcmp(argv[next_arg], "-p") || !strcmp(argv[next_arg], "--produce"))
          produce = true;
-      else if (!strcmp(argv[next_arg], "-a") || !strcmp(argv[next_arg], "--api-server"))
-         api_server = true;
+      else if ((!strcmp(argv[next_arg], "-o") || !strcmp(argv[next_arg], "--host")) &&
+               next_arg + 1 < argc)
+         host = argv[++next_arg];
       else
       {
          std::cerr << "unknown option: " << argv[next_arg] << "\n";
@@ -211,7 +212,7 @@ int main(int argc, char* argv[])
    }
    try
    {
-      run(argv[next_arg], bootstrap, produce, api_server);
+      run(argv[next_arg], bootstrap, produce, host);
       return 0;
    }
    catch (std::exception& e)

@@ -1,5 +1,5 @@
-// These use mangled names instead of extern "C" to prevent collisions
-// with other libraries. e.g. libc++'s abort_message
+use fracpack::Packable;
+
 pub mod raw {
     extern "C" {
         /// Write `message` to console
@@ -218,7 +218,7 @@ pub fn get_current_action_bytes() -> Vec<u8> {
 /// Note: The above only applies if the contract uses [call].
 pub fn get_current_action() -> crate::Action {
     let bytes = get_current_action_bytes();
-    crate::from_bin::<crate::Action>(&bytes[..]).unwrap() // unwrap won't panic
+    <crate::Action>::unpack(&bytes[..], &mut 0).unwrap() // unwrap won't panic
 }
 
 /// Get the currently-executing action and pass it to `f`.
@@ -234,6 +234,6 @@ pub fn get_current_action() -> crate::Action {
 /// Note: The above only applies if the contract uses [call].
 pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
     let bytes = get_current_action_bytes();
-    let act = crate::from_bin::<crate::SharedAction>(&bytes[..]).unwrap(); // unwrap won't panic
+    let act = <crate::SharedAction>::unpack(&bytes[..], &mut 0).unwrap(); // unwrap won't panic
     f(act)
 }
