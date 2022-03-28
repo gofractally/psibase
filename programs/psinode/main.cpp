@@ -76,7 +76,7 @@ void bootstrap_chain(system_context& system)
                         .contract      = rpc_contract_num,
                         .auth_contract = auth_fake_sys::contract,
                         .flags         = 0,
-                        .code          = read_whole_file("rpc.wasm"),
+                        .code          = read_whole_file("rpc_sys.wasm"),
                     },
                     {
                         .contract      = auth_fake_sys::contract,

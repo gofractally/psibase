@@ -24,6 +24,7 @@ namespace psibase
       std::vector<char> body;
    };
    EOSIO_REFLECT(rpc_request_data, host, configured_host, method, target, body)
+   PSIO_REFLECT(rpc_request_data, host, configured_host, method, target, body)
 
    struct rpc_reply_data
    {
@@ -31,5 +32,6 @@ namespace psibase
       std::vector<char> reply;
    };
    EOSIO_REFLECT(rpc_reply_data, content_type, reply)
+   PSIO_REFLECT(rpc_reply_data, content_type, reply)
 
 }  // namespace psibase
