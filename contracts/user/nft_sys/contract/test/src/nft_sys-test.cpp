@@ -1,7 +1,8 @@
 #define CATCH_CONFIG_MAIN
 #include <psio/fracpack.hpp>
-#include <test/include/contracts/system/test.hpp>
 
+#include <contracts/system/account_sys.hpp>
+#include <contracts/system/test.hpp>
 #include "nft_sys.hpp"
 
 using namespace eosio;
@@ -24,6 +25,14 @@ TEST_CASE("Mint nft")
    test_chain t;
    t.start_block();
    boot_minimal(t);
+
+   auto push = [&](std::vector<action>&& actions) {
+      transaction_trace trace =
+          t.push_transaction(t.make_transaction(std::forward<std::vector<action>&&>(actions)));
+      REQUIRE(show(true, trace) == "");
+      return trace;
+   };
+
    auto cnum = add_contract(t, "nft.sys", "nft_sys.wasm");
    check(nft_sys::contract == cnum, "nft contract num changed from " +
                                         std::to_string(nft_sys::contract) + " to " +
@@ -31,13 +40,27 @@ TEST_CASE("Mint nft")
    auto alice = add_account(t, "alice");
    std::cout << "Alice account number is " << alice << "\n";
 
-   transactor<nft_sys> nfts(nft_sys::contract, nft_sys::contract);
+   transactor<nft_sys> nfts(alice, nft_sys::contract);
 
-   transaction_trace trace = t.push_transaction(t.make_transaction({nfts.mint(alice, 1)}));
-   //show(true, trace);
+   // Mint an NFT
+   transaction_trace trace  = push({nfts.mint(alice, 1)});
+   auto              nft_id = get_return_val<uint64_t>(trace);
+   printf("NFT ID is %" PRId64 "\n", nft_id);
 
-   REQUIRE(show(false, trace) == "");
-   auto ret = get_return_val<uint64_t>(trace);
-   printf("Return value is %" PRId64 "\n", ret);
+   // Confirm it's owned by alice
+   trace    = push({nfts.get_nft(nft_id)});
+   auto nft = get_return_val<std::optional<psibase::nft>>(trace);
+   REQUIRE(nft != std::nullopt);
+   printf("NFT owner number is %" PRIu32 "\n", (*nft).owner);
 
-}  // transfer
+   // Confirm owner is "alice"
+   transactor<account_sys> asys(alice, account_sys::contract);
+   trace           = push({asys.get_account_by_num(nft.value().owner)});
+   auto owner_name = get_return_val<optional<string>>(trace);
+   REQUIRE(owner_name != std::nullopt);
+   printf("NFT owner name is %s \n", (*owner_name).c_str());
+
+   // Transfer it
+
+   // Confirm owner changed
+}

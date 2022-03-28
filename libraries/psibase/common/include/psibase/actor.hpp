@@ -1,31 +1,34 @@
 #pragma once
+#include <psibase/block.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psio/fracpack.hpp>
-#include <psibase/block.hpp>
 
-namespace psibase {
+namespace psibase
+{
    using account_num_type = uint32_t;
 
    /** all contracts should derive from psibase::contract */
-   class contract {
-      public:
-         account_num_type get_sender()const   { return _sender;   }
-         account_num_type get_receiver()const { return _receiver; }
+   class contract
+   {
+     public:
+      account_num_type get_sender() const { return _sender; }
+      account_num_type get_receiver() const { return _receiver; }
 
-      private:
-         template<typename Contract>
-         friend void dispatch( account_num_type receiver, account_num_type sender );
+     private:
+      template <typename Contract>
+      friend void dispatch(account_num_type receiver, account_num_type sender);
 
-         /* called by dispatch */
-         void dispatch_set_sender_receiver( account_num_type sender, account_num_type receiver ) {
-            _sender   = sender;
-            _receiver = receiver;
-         }
-         account_num_type _sender;
-         account_num_type _receiver;
+      /* called by dispatch */
+      void dispatch_set_sender_receiver(account_num_type sender, account_num_type receiver)
+      {
+         _sender   = sender;
+         _receiver = receiver;
+      }
+      account_num_type _sender;
+      account_num_type _receiver;
    };
 
-/**
+   /**
  *  When an action is called it returns 
  *
  *  psibase::action {
@@ -36,106 +39,115 @@ namespace psibase {
  *
  *  This is useful for tester
  */
-struct action_builder_proxy {
-   action_builder_proxy( uint32_t s, uint32_t r ):sender(s),receiver(r){}
+   struct action_builder_proxy
+   {
+      action_builder_proxy(uint32_t s, uint32_t r) : sender(s), receiver(r) {}
 
-   uint32_t sender;
-   uint32_t receiver;
+      uint32_t sender;
+      uint32_t receiver;
 
-   template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
-   auto call( Args&&... args )const {
-      using member_class = decltype(psio::class_of_member(MemberPtr));
-      using param_tuple = decltype( psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
+      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+      auto call(Args&&... args) const
+      {
+         using member_class = decltype(psio::class_of_member(MemberPtr));
+         using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
 
-      param_tuple tup( std::forward<Args>(args)... );
+         param_tuple tup(std::forward<Args>(args)...);
 
-      struct FRACPACK raw_variant_view {
-         uint8_t  action_idx = idx;
-         uint32_t size;
-         char     data[];
-      };
+         struct FRACPACK raw_variant_view
+         {
+            uint8_t  action_idx = idx;
+            uint32_t size;
+            char     data[];
+         };
 
-      auto param_tuple_size = psio::fracpack_size(tup);
+         auto param_tuple_size = psio::fracpack_size(tup);
 
+         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
+                       "insufficient arguments passed to method");
 
-      static_assert( std::tuple_size<param_tuple>() == sizeof...(Args), 
-                     "insufficient arguments passed to method" );
+         //  auto data = arg_var(std::in_place_index_t<idx>(),
+         //                      param_tuple(std::forward<Args>(args)...));
 
-    //  auto data = arg_var(std::in_place_index_t<idx>(), 
-    //                      param_tuple(std::forward<Args>(args)...));
+         psibase::action act{sender, receiver};
+         act.raw_data.resize(5 + param_tuple_size);
+         auto rvv        = reinterpret_cast<raw_variant_view*>(act.raw_data.data());
+         rvv->action_idx = idx;
+         rvv->size       = param_tuple_size;
 
-      psibase::action act { sender, receiver };
-      act.raw_data.resize( 5 + param_tuple_size );
-      auto rvv = reinterpret_cast<raw_variant_view*>(act.raw_data.data());
-      rvv->action_idx = idx;
-      rvv->size       = param_tuple_size;
+         psio::fast_buf_stream stream(rvv->data, param_tuple_size);
+         psio::fracpack(tup, stream);
 
-      psio::fast_buf_stream stream( rvv->data, param_tuple_size );
-      psio::fracpack( tup, stream );
-      
-      return act;
+         return act;
+      }
+   };
+
+   template <typename T>
+   psio::shared_view_ptr<T> fraccall(const action& a)
+   {
+      auto packed_action = psio::convert_to_frac(a);  /// TODO: avoid double copy of action data
+      auto result_size   = raw::call(packed_action.data(), packed_action.size());
+      if constexpr (not std::is_same_v<void, T>)
+      {
+         psio::shared_view_ptr<T> result(psio::size_tag{result_size});
+         raw::get_result(result.data(), result_size);
+         check(result.validate(), "value returned was not serialized as expected");
+         return result;
+      }
+      return {};
    }
-};
 
-template<typename T>
-psio::shared_view_ptr<T> fraccall( const action& a ) {
-   auto packed_action  = psio::convert_to_frac(a); /// TODO: avoid double copy of action data
-   auto result_size    = raw::call(packed_action.data(),packed_action.size());
-   if constexpr( not std::is_same_v<void,T> ) {
-      psio::shared_view_ptr<T> result(psio::size_tag{result_size});
-      raw::get_result( result.data(), result_size );
-      check( result.validate(), "value returned was not serialized as expected" );
-      return result;
-   }
-   return {};
-}
-
-
-/**
+   /**
  *  This will dispatch a sync call and grab the return 
  */
-struct sync_call_proxy {
-   sync_call_proxy( uint32_t s, uint32_t r ):sender(s),receiver(r){}
+   struct sync_call_proxy
+   {
+      sync_call_proxy(uint32_t s, uint32_t r) : sender(s), receiver(r) {}
 
-   uint32_t sender;
-   uint32_t receiver;
+      uint32_t sender;
+      uint32_t receiver;
 
-   template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
-   auto call( Args&&... args )const {
-      auto act = action_builder_proxy(sender,receiver).call<idx,Name,MemberPtr,Args...>( std::forward<Args>(args)...);
-      using result_type = decltype( psio::result_of(MemberPtr) );
-      if constexpr( not std::is_same_v<void,result_type> ) {
-         return psibase::fraccall<result_type>( act );
-      } else {
-         psibase::fraccall<void>( act );
+      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+      auto call(Args&&... args) const
+      {
+         auto act = action_builder_proxy(sender, receiver)
+                        .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
+         using result_type = decltype(psio::result_of(MemberPtr));
+         if constexpr (not std::is_same_v<void, result_type>)
+         {
+            return psibase::fraccall<result_type>(act);
+         }
+         else
+         {
+            psibase::fraccall<void>(act);
+         }
       }
-   }
-};
+   };
 
-
-/**
+   /**
  * Makes calls to other contracts and gets the results
  */
-template<typename T>
-struct actor : public psio::reflect<T>::template proxy<sync_call_proxy> {
-   using base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
-   using base::base;
+   template <typename T>
+   struct actor : public psio::reflect<T>::template proxy<sync_call_proxy>
+   {
+      using base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
+      using base::base;
 
-   auto* operator->()const { return this; }
-   auto& operator*()const { return *this; }
-};
+      auto* operator->() const { return this; }
+      auto& operator*() const { return *this; }
+   };
 
-/**
+   /**
  *  Builds actions to add to transactions
  */
-template<typename T>
-struct transactor : public psio::reflect<T>::template proxy<action_builder_proxy> {
-   using base = typename psio::reflect<T>::template proxy<action_builder_proxy>;
-   using base::base;
+   template <typename T>
+   struct transactor : public psio::reflect<T>::template proxy<action_builder_proxy>
+   {
+      using base = typename psio::reflect<T>::template proxy<action_builder_proxy>;
+      using base::base;
 
-   auto* operator->()const { return this; }
-   auto& operator*()const { return *this; }
-};
+      auto* operator->() const { return this; }
+      auto& operator*() const { return *this; }
+   };
 
-
-} // namespace psibase
+}  // namespace psibase

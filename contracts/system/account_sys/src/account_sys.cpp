@@ -134,6 +134,11 @@ namespace psibase
       check(*os == std::string_view(name), "account name doesn't match number");
    }
 
+   int64_t account_sys::exists(account_num_type num)
+   {
+      return (get_account_by_num(num) != std::nullopt) ? 1 : 0;
+   }
+
 }  // namespace psibase
 
 PSIBASE_DISPATCH(psibase::account_sys)

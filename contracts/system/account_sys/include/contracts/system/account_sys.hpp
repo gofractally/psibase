@@ -27,6 +27,7 @@ namespace psibase
      public:
       static constexpr account_num_type contract       = 2;  /// hard coded...?
       static constexpr uint64_t         contract_flags = psibase::account_row::allow_write_native;
+      static constexpr account_num_type null_account   = 0;
 
       void startup(account_num_type                 next_account_num,
                    const_view<vector<account_name>> existing_accounts);
@@ -39,6 +40,8 @@ namespace psibase
 
       optional<string> get_account_by_num(account_num_type num);
       void             assert_account_name(account_num_type num, const_view<string> name);
+
+      int64_t exists(account_num_type num);
    };
 
    PSIO_REFLECT_INTERFACE(account_sys,
@@ -46,6 +49,7 @@ namespace psibase
                           (create_account, 1, name, auth_contract),
                           (get_account_by_name, 2, name),
                           (get_account_by_num, 3, num),
-                          (assert_account_name, 4, num, name))
+                          (assert_account_name, 4, num, name),
+                          (exists, 5, num))
 
 }  // namespace psibase
