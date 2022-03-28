@@ -43,14 +43,6 @@ PSIBASE_DISPATCH(psibase::rpc_sys)
 
 namespace psibase
 {
-   // TODO: move to another contract
-   struct augmented_account_row : account_row
-   {
-      std::optional<std::string> name;
-      std::optional<std::string> auth_contract_name;
-   };
-   EOSIO_REFLECT(augmented_account_row, base account_row, name, auth_contract_name)
-
    extern "C" [[clang::export_name("rpc")]] void rpc()
    {
       auto act = get_current_action();
@@ -83,6 +75,7 @@ namespace psibase
          // TODO: avoid repacking (both directions)
          psibase::actor<rpc_interface> iface(act.contract, reg->rpc_contract);
          set_retval(iface.rpc_sys(req).unpack());
+         return;
       }
 
       // TODO: move elsewhere
@@ -92,27 +85,7 @@ namespace psibase
          return to_json(*status);
       }
 
-      // TODO: move elsewhere
-      if (req.method == "GET" && req.target == "/psiq/accounts")
-      {
-         actor<account_sys> asys(act.contract, account_sys::contract);
-         // TODO: don't stop on deleted accounts
-         std::vector<augmented_account_row> rows;
-         for (account_num i = 1;; ++i)
-         {
-            auto acc = kv_get<account_row>(account_row::kv_map, account_key(i));
-            if (!acc)
-               break;
-            augmented_account_row aug;
-            (account_row&)aug      = *acc;
-            aug.name               = asys.get_account_by_num(aug.num);
-            aug.auth_contract_name = asys.get_account_by_num(aug.auth_contract);
-            rows.push_back(std::move(aug));
-         }
-         return to_json(rows);
-      }
-
-      abort_message("Unknown endpoint");
+      abort_message("rpc_sys: unknown endpoint");
    }  // rpc()
 
 }  // namespace psibase

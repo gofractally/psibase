@@ -5,6 +5,7 @@
 
 namespace psibase
 {
+   // TODO: replace with a name type?
    using table_num = uint32_t;
 
    static constexpr table_num status_table  = 1;
