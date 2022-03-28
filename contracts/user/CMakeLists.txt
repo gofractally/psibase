@@ -3,6 +3,11 @@ function(add_user_contract suffix name)
     target_include_directories(${name}${suffix} PUBLIC 
         contract/include
         include
+        ../name_sys/contract/include
+        ../nft_sys/contract/include
+        ../symbol_sys/contract/include
+        ../tokens_sys/contract/include
+        ../exchange_sys/contract/include
         ../../system/account_sys/include
         ../../system/auth_ec_sys/include
         ../../system/auth_fake_sys/include
@@ -18,6 +23,11 @@ function(add_user_test suffix name)
     add_executable(${TARGET} ${ARGN})
     target_include_directories(${TARGET} PUBLIC 
       ../include
+      ../../../name_sys/contract/include
+      ../../../nft_sys/contract/include
+      ../../../symbol_sys/contract/include
+      ../../../tokens_sys/contract/include
+      ../../../exchange_sys/contract/include
       ../../../../system/account_sys/include
       ../../../../system/auth_ec_sys/include
       ../../../../system/auth_fake_sys/include
@@ -39,8 +49,12 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
+    add_subdirectory(mincon)    
     add_subdirectory(nft_sys)
-    add_subdirectory(mincon)
+    add_subdirectory(name_sys)
+    add_subdirectory(symbol_sys)
+    add_subdirectory(tokens_sys)
+    add_subdirectory(exchange_sys)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

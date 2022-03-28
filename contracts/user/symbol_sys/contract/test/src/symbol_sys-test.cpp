@@ -3,7 +3,7 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/test.hpp>
-#include "name_sys.hpp"
+#include "symbol_sys.hpp"
 
 using namespace psibase;
 

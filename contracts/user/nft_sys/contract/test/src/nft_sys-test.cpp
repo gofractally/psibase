@@ -6,6 +6,7 @@
 #include "nft_sys.hpp"
 
 using namespace eosio;
+using namespace nft_sys;
 using namespace psibase;
 
 namespace
@@ -34,13 +35,13 @@ TEST_CASE("Mint nft")
    };
 
    auto cnum = add_contract(t, "nft.sys", "nft_sys.wasm");
-   check(nft_sys::contract == cnum, "nft contract num changed from " +
-                                        std::to_string(nft_sys::contract) + " to " +
-                                        std::to_string(cnum));
+   check(nft_contract::contract == cnum, "nft contract num changed from " +
+                                             std::to_string(nft_contract::contract) + " to " +
+                                             std::to_string(cnum));
    auto alice = add_account(t, "alice");
    std::cout << "Alice account number is " << alice << "\n";
 
-   transactor<nft_sys> nfts(alice, nft_sys::contract);
+   transactor<nft_contract> nfts(alice, nft_contract::contract);
 
    // Mint an NFT
    transaction_trace trace  = push({nfts.mint(alice, 1)});
@@ -49,7 +50,7 @@ TEST_CASE("Mint nft")
 
    // Confirm it's owned by alice
    trace    = push({nfts.get_nft(nft_id)});
-   auto nft = get_return_val<std::optional<psibase::nft>>(trace);
+   auto nft = get_return_val<std::optional<nft_sys::nft>>(trace);
    REQUIRE(nft != std::nullopt);
    printf("NFT owner number is %" PRIu32 "\n", (*nft).owner);
 

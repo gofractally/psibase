@@ -5,15 +5,15 @@
 #include <psibase/table.hpp>
 #include <string_view>
 
-namespace psibase
+namespace nft_sys
 {
    using nid = uint64_t;
    struct nft
    {
-      nid         nftid;
-      account_num issuer;
-      account_num owner;
-      account_num approved_account;
+      nid                  nftid;
+      psibase::account_num issuer;
+      psibase::account_num owner;
+      psibase::account_num approved_account;
 
       static bool is_valid_key(const nid& id) { return id != 0; }
 
@@ -22,14 +22,14 @@ namespace psibase
    EOSIO_REFLECT(nft, nftid, issuer, owner, approved_account);
    PSIO_REFLECT(nft, nftid, issuer, owner, approved_account);
 
-   using nft_table_t = table<nft, &nft::nftid>;
+   using nft_table_t = psibase::table<nft, &nft::nftid>;
 
-   using tables = contract_tables<nft_table_t>;
-   class nft_sys : public psibase::contract
+   using tables = psibase::contract_tables<nft_table_t>;
+   class nft_contract : public psibase::contract
    {
      public:
       static constexpr psibase::account_num contract     = 100;
-      static constexpr std::string_view     account_name = "nft.sys";
+      static constexpr std::string_view     account_name = "nft_sys";
 
       using sub_id_type = uint32_t;
 
@@ -48,11 +48,11 @@ namespace psibase
    };
 
    // clang-format off
-   PSIO_REFLECT_INTERFACE(nft_sys, 
+   PSIO_REFLECT_INTERFACE(nft_contract, 
       (mint, 0, issuer, sub_id), 
       (transfer, 1, actor, to, nid, memo),
       (get_nft, 2, nft_id)
    );
    // clang-format on
 
-}  // namespace psibase
+}  // namespace nft_sys

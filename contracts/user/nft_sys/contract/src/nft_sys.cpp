@@ -10,6 +10,7 @@
 #include <psio/reflect.hpp>
 
 using namespace psibase;
+using namespace nft_sys;
 using psio::const_view;
 using std::string;
 
@@ -27,7 +28,7 @@ namespace stubs
    bool require_auth(account_num acc) { return true; }
 }  // namespace stubs
 
-uint64_t nft_sys::mint(account_num issuer, sub_id_type sub_id)
+uint64_t nft_contract::mint(account_num issuer, sub_id_type sub_id)
 {
    account_num ram_payer = issuer;
    stubs::require_auth(ram_payer);
@@ -45,13 +46,16 @@ uint64_t nft_sys::mint(account_num issuer, sub_id_type sub_id)
    return new_id;
 }
 
-void nft_sys::transfer(account_num from, account_num to, nid nft_id, const_view<std::string> memo)
+void nft_contract::transfer(account_num              from,
+                            account_num              to,
+                            nid                      nft_id,
+                            psio::const_view<string> memo)
 {
    stubs::require_auth(from);
 
    check(to != account_sys::null_account, "Target account invalid");
 
-   actor<account_sys> asys{nft_sys::contract, account_sys::contract};
+   actor<account_sys> asys{nft_contract::contract, account_sys::contract};
    check(asys.exists(to), "Target account DNE");
 
    check(to != from, "Cannot transfer NFT to self");
@@ -71,7 +75,7 @@ void nft_sys::transfer(account_num from, account_num to, nid nft_id, const_view<
    nft_table.put(item);
 }
 
-std::optional<nft> nft_sys::get_nft(nid nft_id)
+std::optional<nft> nft_contract::get_nft(nid nft_id)
 {
    auto nft_table = db.open<nft_table_t>();
    auto nft_idx   = nft_table.get_index<0>();
@@ -80,4 +84,4 @@ std::optional<nft> nft_sys::get_nft(nid nft_id)
    //printf("Contract 2: NFT ID is %" PRId64 "\n", (*nft).nftid);
 }
 
-PSIBASE_DISPATCH(psibase::nft_sys)
+PSIBASE_DISPATCH(nft_sys::nft_contract)
