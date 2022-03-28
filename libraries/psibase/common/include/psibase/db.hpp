@@ -11,6 +11,7 @@ namespace psibase
       native_constrained,    // Native tables which enforce constraints during write
       native_unconstrained,  // Native tables which don't enforce constraints during write
       subjective,            // Data that is not part of consensus
-      write_only,            // Write-only during transactions. Readable during RPC, also subjectively writable by node operator
+      write_only,            // Write-only during transactions. Readable during RPC,
+                             //   also subjectively writable by node operator.
    };
-}
+}  // namespace psibase

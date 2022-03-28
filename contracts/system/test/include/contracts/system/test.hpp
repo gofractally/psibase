@@ -49,61 +49,62 @@ namespace psibase
    inline void boot_minimal(test_chain& t, bool show = false)
    {
       REQUIRE(                         //
-          psibase::show(               // if show is false, nothing is printed
-              show,                    // if show is true or failure then pretty print
+          psibase::show(               //
+              show,                    //
               t.push_transaction(      //
                   t.make_transaction(  //
                       {
                           {
-                              .sender   = 9999, // genesis action... these values are ignored
-                              .contract = 9999, // to prove that they don't matter
+                              .sender   = 9999,  // genesis action... these values are ignored
+                              .contract = 9999,  // to prove that they don't matter
                               .raw_data = eosio::convert_to_bin(genesis_action_data{
-                                  .contracts = // g.a.d--^ is config file for gen
+                                  .contracts =  // g.a.d--^ is config file for gen
+                                  {
                                       {
-                                          { 
-                                              .contract      = transaction_sys::contract, //< account number
-                                              .auth_contract = auth_fake_sys::contract,
-                                              .flags         = transaction_sys::contract_flags,
-                                              .code = read_whole_file("transaction_sys.wasm"),
-                                          },
-                                          { 
-                                              .contract      = account_sys::contract, //< account number
-                                              .auth_contract = auth_fake_sys::contract,
-                                              .flags         = account_sys::contract_flags,
-                                              .code          = read_whole_file("account_sys.wasm"),
-                                          },
-                                          { 
-                                              .contract      = auth_fake_sys::contract, //< account number
-                                              .auth_contract = auth_fake_sys::contract,
-                                              .flags         = 0,
-                                              .code = read_whole_file("auth_fake_sys.wasm"),
-                                          },
-                                          { 
-                                              .contract      = auth_ec_sys::contract, //< account number
-                                              .auth_contract = auth_fake_sys::contract,
-                                              .flags         = 0,
-                                              .code          = read_whole_file("auth_ec_sys.wasm"),
-                                          },
-                                          { 
-                                              .contract      = verify_ec_sys::contract, //< account number
-                                              .auth_contract = auth_fake_sys::contract,
-                                              .flags         = 0,
-                                              .code = read_whole_file("verify_ec_sys.wasm"),
-                                          },
+                                          .contract      = transaction_sys::contract,
+                                          .auth_contract = auth_fake_sys::contract,
+                                          .flags         = transaction_sys::contract_flags,
+                                          .code          = read_whole_file("transaction_sys.wasm"),
                                       },
+                                      {
+                                          .contract      = account_sys::contract,
+                                          .auth_contract = auth_fake_sys::contract,
+                                          .flags         = account_sys::contract_flags,
+                                          .code          = read_whole_file("account_sys.wasm"),
+                                      },
+                                      {
+                                          .contract      = auth_fake_sys::contract,
+                                          .auth_contract = auth_fake_sys::contract,
+                                          .flags         = 0,
+                                          .code          = read_whole_file("auth_fake_sys.wasm"),
+                                      },
+                                      {
+                                          .contract      = auth_ec_sys::contract,
+                                          .auth_contract = auth_fake_sys::contract,
+                                          .flags         = 0,
+                                          .code          = read_whole_file("auth_ec_sys.wasm"),
+                                      },
+                                      {
+                                          .contract      = verify_ec_sys::contract,
+                                          .auth_contract = auth_fake_sys::contract,
+                                          .flags         = 0,
+                                          .code          = read_whole_file("verify_ec_sys.wasm"),
+                                      },
+                                  },
                               }),
                           },
                       }))) == "");
 
-      std::cout << "sizeof(psibase::acount_num)" << sizeof(psibase::account_num) <<"\n";
-      struct FRACPACK expected_layout {
-          uint8_t  type = 0;
-          uint32_t size = 167;
-          uint16_t heap = 8;
-          uint32_t next_account_num = 100;
-          uint32_t existing_accounts_offset = 4;
-          uint32_t existing_accounts_size_bytes = 5*4; /// offset ptrs
-          /*
+      std::cout << "sizeof(psibase::acount_num)" << sizeof(psibase::account_num) << "\n";
+      struct FRACPACK expected_layout
+      {
+         uint8_t  type                         = 0;
+         uint32_t size                         = 167;
+         uint16_t heap                         = 8;
+         uint32_t next_account_num             = 100;
+         uint32_t existing_accounts_offset     = 4;
+         uint32_t existing_accounts_size_bytes = 5 * 4;  /// offset ptrs
+                                                         /*
           uint32_t off0;
           uint32_t off1;
           uint32_t off2;
@@ -145,22 +146,21 @@ namespace psibase
 
       transactor<account_sys> asys(transaction_sys::contract, account_sys::contract);
 
-
       REQUIRE(                         //
           psibase::show(               //
-              true ||show,                    //
+              true || show,            //
               t.push_transaction(      //
                   t.make_transaction(  //
                       {
-                           asys.startup( 100, 
-                                          vector<account_name>{
-                                              {transaction_sys::contract, "transaction.sys"},
-                                              {account_sys::contract, "account.sys"},
-                                              {auth_fake_sys::contract, "auth_fake.sys"},
-                                              {auth_ec_sys::contract, "auth_ec.sys"},
-                                              {verify_ec_sys::contract, "verify_ec.sys"},
-                                          } )
-                               /*
+                          asys.startup(100,
+                                       vector<account_name>{
+                                           {transaction_sys::contract, "transaction.sys"},
+                                           {account_sys::contract, "account.sys"},
+                                           {auth_fake_sys::contract, "auth_fake.sys"},
+                                           {auth_ec_sys::contract, "auth_ec.sys"},
+                                           {verify_ec_sys::contract, "verify_ec.sys"},
+                                       })
+                          /*
                           { // init account_sys contract 
                               // must be valid, but could be any account num
                               .sender   = transaction_sys::contract, 
@@ -188,9 +188,8 @@ namespace psibase
                                   bool        show          = false)
    {
       transactor<account_sys> asys(transaction_sys::contract, account_sys::contract);
-      auto trace = t.push_transaction(  //
-          t.make_transaction({ asys.create_account( name, auth_contract, false ) })
-      );
+      auto                    trace = t.push_transaction(  //
+          t.make_transaction({asys.create_account(name, auth_contract, false)}));
 
       REQUIRE(psibase::show(show, trace) == "");
       auto& at = get_top_action(trace, 0);

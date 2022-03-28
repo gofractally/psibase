@@ -99,9 +99,9 @@ namespace transaction_sys
          psibase::action outer = {
              .sender   = 1,
              .contract = account->auth_contract,
-             /// TODO: auth_contract will have to register action #
+             // TODO: auth_contract will have to register action #
              .raw_data = eosio::convert_to_bin(auth_fake_sys::action{auth_fake_sys::auth_check{
-                 .action = act, /// act to be authorized
+                 .action = act,  // act to be authorized
                  .claims = trx.claims,
              }}),
          };
