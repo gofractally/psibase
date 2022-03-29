@@ -56,36 +56,32 @@ namespace psibase
          });
       };
 
-      if (req.host.size() > req.configured_host.size() + 1 &&
-          req.host.ends_with(req.configured_host) &&
-          req.host[req.host.size() - req.configured_host.size() - 1] == '.')
-      {
-         std::string contract_name{req.host.begin(),
-                                   req.host.end() - req.configured_host.size() - 1};
+      std::string contract_name;
 
-         // TODO: remove lookup after account number type is changed
-         psibase::actor<account_sys> asys(act.contract, account_sys::contract);
-         auto                        account_num = asys.get_account_by_name(contract_name).unpack();
-         check(!!account_num, "unknown contract");
+      // Path reserved across all subdomains
+      if (req.target.starts_with("/roothost"))
+         contract_name = "rpc.roothost.sys";
+      else if (req.host.size() > req.root_host.size() + 1 && req.host.ends_with(req.root_host) &&
+               req.host[req.host.size() - req.root_host.size() - 1] == '.')
+         contract_name.assign(req.host.begin(), req.host.end() - req.root_host.size() - 1);
+      else
+         contract_name = "rpc.roothost.sys";
 
-         auto reg =
-             kv_get<registered_contract_row>(registered_contract_key(act.contract, *account_num));
-         check(!!reg, "contract not registered");
+      // TODO: remove lookup after account number type is changed
+      psibase::actor<account_sys> asys(act.contract, account_sys::contract);
+      auto                        account_num = asys.get_account_by_name(contract_name).unpack();
+      if (!account_num)
+         abort_message("unknown contract: " + contract_name);
 
-         // TODO: avoid repacking (both directions)
-         psibase::actor<rpc_interface> iface(act.contract, reg->rpc_contract);
-         set_retval(iface.rpc_sys(req).unpack());
-         return;
-      }
+      auto reg =
+          kv_get<registered_contract_row>(registered_contract_key(act.contract, *account_num));
+      check(!!reg, "contract not registered");
+      if (!reg)
+         abort_message("contract not registered: " + contract_name);
 
-      // TODO: move elsewhere
-      if (req.method == "GET" && req.target == "/psiq/status")
-      {
-         auto status = kv_get<status_row>(status_row::kv_map, status_key());
-         return to_json(*status);
-      }
-
-      abort_message("rpc_sys: unknown endpoint");
+      // TODO: avoid repacking (both directions)
+      psibase::actor<rpc_interface> iface(act.contract, reg->rpc_contract);
+      set_retval(iface.rpc_sys(req).unpack());
    }  // rpc()
 
 }  // namespace psibase

@@ -5,6 +5,7 @@ function(add_user_contract suffix name)
         include
         ../name_sys/contract/include
         ../nft_sys/contract/include
+        ../rpc_roothost_sys/contract/include
         ../symbol_sys/contract/include
         ../tokens_sys/contract/include
         ../exchange_sys/contract/include
@@ -52,6 +53,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(mincon)    
     add_subdirectory(nft_sys)
     add_subdirectory(name_sys)
+    add_subdirectory(rpc_roothost_sys)
     add_subdirectory(symbol_sys)
     add_subdirectory(tokens_sys)
     add_subdirectory(exchange_sys)

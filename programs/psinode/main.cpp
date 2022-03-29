@@ -87,12 +87,6 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("account_sys.wasm"),
                     },
                     {
-                        .contract      = 20,
-                        .auth_contract = auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("rpc_account_sys.wasm"),
-                    },
-                    {
                         .contract      = rpc_contract_num,
                         .auth_contract = auth_fake_sys::contract,
                         .flags         = 0,
@@ -116,6 +110,18 @@ void bootstrap_chain(system_context& system)
                         .flags         = 0,
                         .code          = read_whole_file("verify_ec_sys.wasm"),
                     },
+                    {
+                        .contract      = 20,
+                        .auth_contract = auth_fake_sys::contract,
+                        .flags         = 0,
+                        .code          = read_whole_file("rpc_roothost_sys.wasm"),
+                    },
+                    {
+                        .contract      = 21,
+                        .auth_contract = auth_fake_sys::contract,
+                        .flags         = 0,
+                        .code          = read_whole_file("rpc_account_sys.wasm"),
+                    },
                 },
         });
 
@@ -124,16 +130,22 @@ void bootstrap_chain(system_context& system)
                                 vector<account_name>{
                                     {transaction_sys::contract, "transaction.sys"},
                                     {account_sys::contract, "account.sys"},
-                                    {20, "rpc.account.sys"},
                                     {rpc_contract_num, "rpc.sys"},
                                     {auth_fake_sys::contract, "auth_fake.sys"},
                                     {auth_ec_sys::contract, "auth_ec.sys"},
                                     {verify_ec_sys::contract, "verify_ec.sys"},
+                                    {20, "rpc.roothost.sys"},
+                                    {21, "rpc.account.sys"},
                                 }));
 
-   reg_rpc(bc, account_sys::contract, 20);
-   upload(bc, 20, "/", "text/html", "../contracts/system/rpc_account_sys/ui/index.html");
-   upload(bc, 20, "/index.js", "text/html", "../contracts/system/rpc_account_sys/ui/index.js");
+   reg_rpc(bc, 20, 20);
+   upload(bc, 20, "/", "text/html", "../contracts/user/rpc_roothost_sys/ui/index.html");
+   upload(bc, 20, "/ui/index.js", "text/javascript",
+          "../contracts/user/rpc_roothost_sys/ui/index.js");
+
+   reg_rpc(bc, account_sys::contract, 21);
+   upload(bc, 21, "/", "text/html", "../contracts/system/rpc_account_sys/ui/index.html");
+   upload(bc, 21, "/ui/index.js", "text/html", "../contracts/system/rpc_account_sys/ui/index.js");
 
    push_action(bc, asys.create_account("alice", "transaction.sys", false));
    push_action(bc, asys.create_account("bob", "transaction.sys", false));

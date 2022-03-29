@@ -218,7 +218,8 @@ namespace psibase::http
          if (colon != host.npos)
             host.remove_suffix(host.size() - colon);
 
-         if (req.target().starts_with("/psiq") ||
+         if (req.target() == "/" || req.target().starts_with("/rpc") ||
+             req.target().starts_with("/roothost") || req.target().starts_with("/ui") ||
              host != http_config.host && host.ends_with(http_config.host))
          {
             rpc_request_data data;
@@ -229,10 +230,10 @@ namespace psibase::http
             else
                return send(error(bhttp::status::bad_request,
                                  "Unsupported HTTP-method for " + req.target().to_string() + "\n"));
-            data.host            = {host.begin(), host.size()};
-            data.configured_host = http_config.host;
-            data.target          = req.target().to_string();
-            data.body            = req.body();
+            data.host      = {host.begin(), host.size()};
+            data.root_host = http_config.host;
+            data.target    = req.target().to_string();
+            data.body      = req.body();
 
             // TODO: time limit
             auto           system = shared_state.get_system_context();

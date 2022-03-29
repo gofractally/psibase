@@ -18,13 +18,13 @@ namespace psibase
    struct rpc_request_data
    {
       std::string       host;
-      std::string       configured_host;
+      std::string       root_host;
       std::string       method;
       std::string       target;
       std::vector<char> body;
    };
-   EOSIO_REFLECT(rpc_request_data, host, configured_host, method, target, body)
-   PSIO_REFLECT(rpc_request_data, host, configured_host, method, target, body)
+   EOSIO_REFLECT(rpc_request_data, host, root_host, method, target, body)
+   PSIO_REFLECT(rpc_request_data, host, root_host, method, target, body)
 
    struct rpc_reply_data
    {
