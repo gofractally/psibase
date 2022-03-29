@@ -164,6 +164,7 @@ namespace psibase
                                        vector<account_name>{
                                            {transaction_sys::contract, "transaction.sys"},
                                            {account_sys::contract, "account.sys"},
+                                           {rpc_contract_num, "rpc.sys"},
                                            {auth_fake_sys::contract, "auth_fake.sys"},
                                            {auth_ec_sys::contract, "auth_ec.sys"},
                                            {verify_ec_sys::contract, "verify_ec.sys"},
