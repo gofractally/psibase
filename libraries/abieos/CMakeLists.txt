@@ -6,7 +6,7 @@ function(add_abieos suffix)
         src/abi.cpp
         src/crypto.cpp
     )
-    target_link_libraries(abieos${suffix} PUBLIC rapidjson)
+    target_link_libraries(abieos${suffix} PUBLIC rapidjson psio)
     target_include_directories(abieos${suffix} PUBLIC include)
 
     if(IS_WASM)

@@ -51,7 +51,7 @@ namespace auth_ec_sys
       // TODO: support entire set of flags
 
       psibase::actor<account_sys> asys(this_contract, account_sys::contract);
-      account_num_type num = asys.create_account(args.name, "auth_ec.sys", args.allow_sudo);
+      account_num num = asys.create_account(args.name, "auth_ec.sys", args.allow_sudo);
       /*
       auto     num = account_sys::call(this_contract, account_sys::create_account{
                                                       .name          = args.name,

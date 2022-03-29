@@ -10,6 +10,15 @@ namespace psibase {
          uint32_t size;
          char     data[];
       };
+
+      /*
+      struct FRACPACK action_view final {
+          uint64_t       sender;
+          uint64_t       receiver;
+          uint64_t       action;
+          vector<char>   param;
+      };
+      */
    };
 
    /**
@@ -18,14 +27,14 @@ namespace psibase {
     *  used the PSIO_REFLECT_INTERFACE macro.
     */
    template<typename Contract>
-   void dispatch( account_num_type sender, account_num_type receiver) {
+   void dispatch( account_num sender, account_num receiver) {
       Contract contract;
       contract.psibase::contract::dispatch_set_sender_receiver( sender, receiver );
       /*
       uint32_t action_size = raw::get_current_action();
       auto data = get_result(action_size);
       */
-      action act = get_current_action();
+      action act = get_current_action(); /// action view...
       check( act.raw_data.size() >= 5, "action data too short" );
       auto& rvv = *reinterpret_cast<const detail::raw_variant_view*>(act.raw_data.data());
       check( act.raw_data.size()-5 == rvv.size, "invalid size encoded" );
@@ -52,9 +61,9 @@ namespace psibase {
 }
 
 #define PSIBASE_DISPATCH( CONTRACT ) \
-   extern "C" void called(psibase::account_num receiver, psibase::account_num sender) \
+   extern "C" void called(psibase::account_num receiver, psibase::account_num sender ) \
    {  \
-      psibase::dispatch<CONTRACT>( sender, receiver); \
+      psibase::dispatch<CONTRACT>( sender, receiver ); \
    } \
    extern "C" void __wasm_call_ctors();  \
-   extern "C" void start(psibase::account_num_type this_contract) { __wasm_call_ctors(); }  \
+   extern "C" void start(psibase::account_num this_contract) { __wasm_call_ctors(); }  \

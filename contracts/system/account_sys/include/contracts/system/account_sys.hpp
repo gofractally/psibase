@@ -6,7 +6,7 @@
 
 namespace psibase
 {
-   using psibase::account_num_type;
+   using psibase::account_num;
    using std::optional;
    using std::string;
    using std::vector;
@@ -16,7 +16,7 @@ namespace psibase
 
    struct account_name
    {
-      account_num_type num;
+      account_num      num;
       string           name;
    };
    PSIO_REFLECT(account_name, num, name);
@@ -25,23 +25,23 @@ namespace psibase
    class account_sys : public psibase::contract
    {
      public:
-      static constexpr account_num_type contract       = 2;  /// hard coded...?
+      static constexpr account_num contract       = 2;  /// hard coded...?
       static constexpr uint64_t         contract_flags = psibase::account_row::allow_write_native;
-      static constexpr account_num_type null_account   = 0;
+      static constexpr account_num null_account   = 0;
 
-      void startup(account_num_type                 next_account_num,
+      void startup(account_num                 next_account_num,
                    const_view<vector<account_name>> existing_accounts);
 
-      account_num_type create_account(const_view<string> name,
+      account_num create_account(const_view<string> name,
                                       const_view<string> auth_contract,
                                       bool               allow_sudo);
 
-      optional<account_num_type> get_account_by_name(const_view<string> name);
+      optional<account_num> get_account_by_name(const_view<string> name);
 
-      optional<string> get_account_by_num(account_num_type num);
-      void             assert_account_name(account_num_type num, const_view<string> name);
+      optional<string> get_account_by_num(account_num num);
+      void             assert_account_name(account_num num, const_view<string> name);
 
-      int64_t exists(account_num_type num);
+      int64_t exists(account_num num);
    };
 
    PSIO_REFLECT_INTERFACE(account_sys,
