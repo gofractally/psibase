@@ -15,7 +15,8 @@ namespace eosio
 namespace psibase
 {
    // TODO: Rename to contract_num?
-   using account_num = uint32_t;
+   using account_num = uint64_t;
+   using method_num  = uint64_t;
 
    using block_num = uint32_t;
 
@@ -23,10 +24,11 @@ namespace psibase
    {
       account_num       sender   = 0;
       account_num       contract = 0;
+      method_num        method   = 0;
       std::vector<char> raw_data;
    };
-   PSIO_REFLECT(action, sender, contract, raw_data)
-   EOSIO_REFLECT(action, sender, contract, raw_data)
+   PSIO_REFLECT(action, sender, contract, method, raw_data)
+   EOSIO_REFLECT(action, sender, contract, method, raw_data)
 
    struct genesis_contract
    {

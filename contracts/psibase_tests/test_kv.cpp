@@ -76,7 +76,7 @@ void test(account_num this_contract)
             eosio::print("skip ");
          return;
       }
-      auto result = f(kv_map::contract, key, match_key_size);
+      auto result = f(kv_map::contract, key, match_key_size + 4);
       if (!result && !expected)
       {
          check(get_key().empty(), "get_key() not empty");

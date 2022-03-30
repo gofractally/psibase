@@ -180,7 +180,7 @@ namespace psibase
             // auto start_time = std::chrono::steady_clock::now();
             backend->set_wasm_allocator(&wa);
             backend->initialize(this);
-            (*backend)(*this, "env", "start", (uint32_t)current_act_context->action.contract);
+            (*backend)(*this, "env", "start", (uint64_t)current_act_context->action.contract);
             initialized = true;
             // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
             //     std::chrono::steady_clock::now() - start_time);
@@ -236,7 +236,8 @@ namespace psibase
 
          if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
          {
-            uint32_t prefix = contract_account.num;
+            uint64_t prefix = contract_account.num;
+            // TODO DAN: remove this later...
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             eosio::check(
                 key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
@@ -467,8 +468,8 @@ namespace psibase
                       "subjective contracts may not call non-subjective ones");
 
       impl->exec(act_context, [&] {  //
-         (*impl->backend)(*impl, "env", "called", (uint32_t)act_context.action.contract,
-                          (uint32_t)act_context.action.sender);
+         (*impl->backend)(*impl, "env", "called", (uint64_t)act_context.action.contract,
+                          (uint64_t)act_context.action.sender);
       });
    }
 

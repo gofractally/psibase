@@ -52,7 +52,7 @@ namespace psibase
    };
    EOSIO_REFLECT(name_to_num_row, num, name)
 
-   void register_acc(account_num_type num, const std::string& name)
+   void register_acc(account_num num, const std::string& name)
    {
       if (enable_print)
          eosio::print("register ", num, " ", name, "\n");
@@ -63,7 +63,7 @@ namespace psibase
       kv_put(name_to_num_key(name), name_to_num_row{num, name});
    }
 
-   void account_sys::startup(account_num_type                 next_account_n,
+   void account_sys::startup(account_num                 next_account_n,
                              const_view<vector<account_name>> existing_accounts)
    {
       check(!kv_get<account_sys_status_row>(account_sys_status_key()), "already started");
@@ -80,7 +80,7 @@ namespace psibase
       }
    }
 
-   account_num_type account_sys::create_account(const_view<string> name,
+   account_num account_sys::create_account(const_view<string> name,
                                                 const_view<string> auth_contract,
                                                 bool               allow_sudo)
    {
@@ -111,7 +111,7 @@ namespace psibase
       return account.num;
    }
 
-   optional<account_num_type> account_sys::get_account_by_name(const_view<string> name)
+   optional<account_num> account_sys::get_account_by_name(const_view<string> name)
    {
       auto row = kv_get<name_to_num_row>(name_to_num_key(name));
       if (!!row)
@@ -119,7 +119,7 @@ namespace psibase
       return std::nullopt;
    }
 
-   optional<string> account_sys::get_account_by_num(account_num_type num)
+   optional<string> account_sys::get_account_by_num(account_num num)
    {
       auto row = kv_get<num_to_name_row>(num_to_name_key(num));
       if (!!row)
@@ -127,14 +127,14 @@ namespace psibase
       return std::nullopt;
    }
 
-   void account_sys::assert_account_name(account_num_type num, const_view<string> name)
+   void account_sys::assert_account_name(account_num num, const_view<string> name)
    {
       auto os = get_account_by_num(num);
       check(!!os, "invalid account number");
       check(*os == std::string_view(name), "account name doesn't match number");
    }
 
-   int64_t account_sys::exists(account_num_type num)
+   int64_t account_sys::exists(account_num num)
    {
       return (get_account_by_num(num) != std::nullopt) ? 1 : 0;
    }

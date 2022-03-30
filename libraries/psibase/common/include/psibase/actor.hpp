@@ -5,27 +5,25 @@
 
 namespace psibase
 {
-   using account_num_type = uint32_t;
-
    /** all contracts should derive from psibase::contract */
    class contract
    {
      public:
-      account_num_type get_sender() const { return _sender; }
-      account_num_type get_receiver() const { return _receiver; }
+      account_num get_sender() const { return _sender; }
+      account_num get_receiver() const { return _receiver; }
 
      private:
       template <typename Contract>
-      friend void dispatch(account_num_type receiver, account_num_type sender);
+      friend void dispatch(account_num receiver, account_num sender);
 
       /* called by dispatch */
-      void dispatch_set_sender_receiver(account_num_type sender, account_num_type receiver)
+      void dispatch_set_sender_receiver(account_num sender, account_num receiver)
       {
          _sender   = sender;
          _receiver = receiver;
       }
-      account_num_type _sender;
-      account_num_type _receiver;
+      account_num _sender;
+      account_num _receiver;
    };
 
    /**

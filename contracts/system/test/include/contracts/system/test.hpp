@@ -4,8 +4,10 @@
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/auth_ec_sys.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
+#include <contracts/system/rpc_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
+#include <psibase/contract_entry.hpp>
 #include <psibase/native_tables.hpp>
 #include <psibase/tester.hpp>
 
@@ -97,6 +99,12 @@ namespace psibase
                                           .code          = read_whole_file("account_sys.wasm"),
                                       },
                                       {
+                                          .contract      = rpc_contract_num,
+                                          .auth_contract = auth_fake_sys::contract,
+                                          .flags         = 0,
+                                          .code          = read_whole_file("rpc_sys.wasm"),
+                                      },
+                                      {
                                           .contract      = auth_fake_sys::contract,
                                           .auth_contract = auth_fake_sys::contract,
                                           .flags         = 0,
@@ -180,6 +188,7 @@ namespace psibase
                                        vector<account_name>{
                                            {transaction_sys::contract, "transaction.sys"},
                                            {account_sys::contract, "account.sys"},
+                                           {rpc_contract_num, "rpc.sys"},
                                            {auth_fake_sys::contract, "auth_fake.sys"},
                                            {auth_ec_sys::contract, "auth_ec.sys"},
                                            {verify_ec_sys::contract, "verify_ec.sys"},
