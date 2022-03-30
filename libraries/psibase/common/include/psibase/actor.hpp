@@ -39,7 +39,7 @@ namespace psibase
  */
    struct action_builder_proxy
    {
-      action_builder_proxy( AccountNumber s,  AccountNumber r) : sender(s), receiver(r) {}
+      action_builder_proxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
 
       AccountNumber sender;
       AccountNumber receiver;
@@ -100,7 +100,7 @@ namespace psibase
  */
    struct sync_call_proxy
    {
-      sync_call_proxy( AccountNumber s,  AccountNumber r) : sender(s), receiver(r) {}
+      sync_call_proxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
 
       AccountNumber sender;
       AccountNumber receiver;
@@ -125,39 +125,46 @@ namespace psibase
    /**
  * Makes calls to other contracts and gets the results
  */
-   template <typename T=void>
+   template <typename T = void>
    struct actor : public psio::reflect<T>::template proxy<sync_call_proxy>
    {
       using base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
       using base::base;
 
-      auto su( AccountNumber other )const { return actor( other, base::receiver ); }
+      auto su(AccountNumber other) const { return actor(other, base::receiver); }
 
-      template<typename Other, uint64_t OtherReceiver>
-      auto at()const { return actor<Other>( base::sender, AccountNumber(OtherReceiver)); }
+      template <typename Other, uint64_t OtherReceiver>
+      auto at() const
+      {
+         return actor<Other>(base::sender, AccountNumber(OtherReceiver));
+      }
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
    };
 
    template <>
-   struct actor<void> 
+   struct actor<void>
    {
       AccountNumber sender;
       AccountNumber receiver;
 
-      actor( AccountNumber s = AccountNumber(), AccountNumber r = AccountNumber() ):sender(s),receiver(r){}
+      actor(AccountNumber s = AccountNumber(), AccountNumber r = AccountNumber())
+          : sender(s), receiver(r)
+      {
+      }
 
-      auto su( AccountNumber other )const { return actor( other, receiver ); }
+      auto su(AccountNumber other) const { return actor(other, receiver); }
 
-      template<typename Other, uint64_t OtherReceiver>
-      auto at()const { return actor<Other>( sender, AccountNumber(OtherReceiver)); }
+      template <typename Other, uint64_t OtherReceiver>
+      auto at() const
+      {
+         return actor<Other>(sender, AccountNumber(OtherReceiver));
+      }
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
    };
-
-
 
    /**
  *  Builds actions to add to transactions
@@ -168,10 +175,13 @@ namespace psibase
       using base = typename psio::reflect<T>::template proxy<action_builder_proxy>;
       using base::base;
 
-      auto su( AccountNumber other )const { return transactor( other, base::receiver ); }
+      auto su(AccountNumber other) const { return transactor(other, base::receiver); }
 
-      template<typename Other, uint64_t OtherReceiver>
-      auto at()const { return transactor<Other>( base::sender, OtherReceiver); }
+      template <typename Other, uint64_t OtherReceiver>
+      auto at() const
+      {
+         return transactor<Other>(base::sender, OtherReceiver);
+      }
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
