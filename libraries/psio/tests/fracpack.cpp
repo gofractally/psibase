@@ -1733,6 +1733,19 @@ TEST_CASE("stdarray")
    REQUIRE(not psio::may_use_heap<std::array<uint32_t, 5>>());
 };
 
+struct str_with_bool final
+{
+   bool b;
+   int  x;
+};
+PSIO_REFLECT(str_with_bool, b, x)
+
+TEST_CASE("bool")
+{
+   REQUIRE(psio::fracpack_fixed_size<bool>() == 1);
+   REQUIRE(psio::fracpack_size(str_with_bool{}) == 5);
+}
+
 TEST_CASE("translate")
 {
    psio::schema apischema;
