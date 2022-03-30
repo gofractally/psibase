@@ -9,9 +9,9 @@
 #include "trans_generated.h"
 #include "transfer_generated.h"
 
+#include <iostream>
 #include <psio/fracpack.hpp>
 #include <psio/schema.hpp>
-#include <iostream>
 
 #include <psio/from_bin/varint.hpp>
 #include <psio/from_json/varint.hpp>
@@ -156,25 +156,25 @@ TEST_CASE("variant")
 
    REQUIRE(psio::fracpack_size(vs.v) == 13);
    vs.v = simple{.a = 1, .b = 2, .c = 3};
-   REQUIRE(psio::fracpack_size(vs.v) == psio::fracpack_size(simple()) + 1+4);
+   REQUIRE(psio::fracpack_size(vs.v) == psio::fracpack_size(simple()) + 1 + 4);
 
    psio::shared_view_ptr<varstr> p({.v = simple{.a = 1111, .b = 222, .c = 333}});
-   bool unknown = false;
+   bool                          unknown = false;
    REQUIRE(p.validate(unknown));
-   REQUIRE( not unknown );
+   REQUIRE(not unknown);
 
-   struct FRACPACK expected_view {
+   struct FRACPACK expected_view
+   {
       uint32_t v_offset = 4;
-      uint8_t  v_type = 0;
-      uint32_t v_size = sizeof( simple );
-      simple   v_value = { .a = 1111, .b = 222, .c = 333 };
+      uint8_t  v_type   = 0;
+      uint32_t v_size   = sizeof(simple);
+      simple   v_value  = {.a = 1111, .b = 222, .c = 333};
    };
 
    expected_view ev;
 
-   REQUIRE(p.size() == sizeof(expected_view) ); //1 + 2 + 4 + 4 + psio::fracpack_size(simple()));
-   REQUIRE( memcmp( &ev, p.data(), sizeof(expected_view) ) == 0 );
-   
+   REQUIRE(p.size() == sizeof(expected_view));  //1 + 2 + 4 + 4 + psio::fracpack_size(simple()));
+   REQUIRE(memcmp(&ev, p.data(), sizeof(expected_view)) == 0);
 
    /*
    auto tv = reinterpret_cast<test_view*>(p.data()-4);
@@ -186,11 +186,15 @@ TEST_CASE("variant")
    std::cout << "tv->c: " << tv->c << "\n";
    */
 
-   psio::view<varstr> tmp2( p.data() );
-   tmp2.v()->visit( [&]( auto v ) {
-          if constexpr (psio::view_is<int32_t, decltype(v)>()) {
+   psio::view<varstr> tmp2(p.data());
+   tmp2.v()->visit(
+       [&](auto v)
+       {
+          if constexpr (psio::view_is<int32_t, decltype(v)>())
+          {
              std::cout << v;
-          } else if constexpr (psio::view_is<double, decltype(v)>())
+          }
+          else if constexpr (psio::view_is<double, decltype(v)>())
              std::cout << v;
           else
           {
@@ -198,26 +202,31 @@ TEST_CASE("variant")
              std::cout << "a.val: " << (uint32_t)v->a() << "\n";
              std::cout << "b.val: " << (uint64_t)v->b() << "\n";
              std::cout << "c.val: " << (uint16_t)v->c() << "\n";
-             REQUIRE( (uint32_t)v->a() == 1111 );
-             REQUIRE( (uint64_t)v->b() == 222 );
-             REQUIRE( (uint16_t)v->c() == 333);
+             REQUIRE((uint32_t)v->a() == 1111);
+             REQUIRE((uint64_t)v->b() == 222);
+             REQUIRE((uint16_t)v->c() == 333);
 
              v->a() = uint64_t(v->a()) + 2;
              std::cout << "hello world!\n";
           }
-   });
+       });
 
    auto u = p.unpack();
-   std::visit( []( auto i ) {
-       if constexpr( not std::is_arithmetic_v<decltype(i)> ) {
-          REQUIRE( i.b == 222 );
-          REQUIRE( i.a == 1113 );
-          REQUIRE( i.c == 333 );
-       } else {
-          REQUIRE( false );
-       }
-   }, u.v);
-
+   std::visit(
+       [](auto i)
+       {
+          if constexpr (not std::is_arithmetic_v<decltype(i)>)
+          {
+             REQUIRE(i.b == 222);
+             REQUIRE(i.a == 1113);
+             REQUIRE(i.c == 333);
+          }
+          else
+          {
+             REQUIRE(false);
+          }
+       },
+       u.v);
 }
 
 TEST_CASE("fracpack-not-final-nest")
@@ -229,32 +238,33 @@ TEST_CASE("fracpack-not-final-nest")
    //REQUIRE( psio::can_memcpy_test<nested_not_final_struct>() == false );
    REQUIRE(psio::can_memcpy<nested_not_final_struct>() == false);
 
-   nested_not_final_struct                 nfs{.a = 123, .nest = {.a = 456, .b = 789, .c = 321}};
+   nested_not_final_struct nfs{.a = 123, .nest = {.a = 456, .b = 789, .c = 321}};
 
-   struct FRACPACK expected_view {
-      uint32_t a = 123;
+   struct FRACPACK expected_view
+   {
+      uint32_t a           = 123;
       uint32_t nest_offset = 4;
-      uint16_t heap = 4+8+2; // 14
-      uint32_t nest_a = 456;
-      uint64_t nest_b = 789;
-      uint16_t nest_c = 321;
+      uint16_t heap        = 4 + 8 + 2;  // 14
+      uint32_t nest_a      = 456;
+      uint64_t nest_b      = 789;
+      uint16_t nest_c      = 321;
    };
-   REQUIRE( psio::fracpack_size( nfs ) == sizeof( expected_view ) );
-   std::cout <<"............ packing.............\n";
+   REQUIRE(psio::fracpack_size(nfs) == sizeof(expected_view));
+   std::cout << "............ packing.............\n";
    psio::shared_view_ptr<nested_not_final_struct> ptr(nfs);
-   auto ev = reinterpret_cast<const expected_view*>(ptr.data());
+   auto ev      = reinterpret_cast<const expected_view*>(ptr.data());
    bool unknown = false;
-   REQUIRE( ptr.validate(unknown) );
-   REQUIRE( not unknown );
+   REQUIRE(ptr.validate(unknown));
+   REQUIRE(not unknown);
 
    REQUIRE((int)ev->a == 123);
    REQUIRE((int)ev->nest_offset == 4);
-   REQUIRE((int)ev->heap == 4+8+2);
+   REQUIRE((int)ev->heap == 4 + 8 + 2);
    REQUIRE((int)ev->nest_a == 456);
    REQUIRE((int)ev->nest_b == 789);
    REQUIRE((int)ev->nest_c == 321);
 
-   std::cout <<"............ testing view .............\n";
+   std::cout << "............ testing view .............\n";
    REQUIRE((int)ptr->a() == 123);
    REQUIRE((int)ptr->nest()->a() == 456);
    REQUIRE((int)ptr->nest()->b() == 789);
@@ -269,7 +279,6 @@ TEST_CASE("fracpack-not-final-nest")
    REQUIRE(u.nest.a == 456);
    REQUIRE(u.nest.b == 789);
    REQUIRE(u.nest.c == 345);
-
 }
 TEST_CASE("fracpack-nest")
 {
@@ -284,7 +293,7 @@ TEST_CASE("fracpack-nest")
 
    bool unknown = false;
    REQUIRE(p.validate(unknown));
-   REQUIRE( not unknown );
+   REQUIRE(not unknown);
    std::cout << "p.size: " << p.size() << "\n";
 
    REQUIRE((uint32_t)p->a() == 42);
@@ -389,15 +398,17 @@ struct struct_with_vector_str final
 };
 PSIO_REFLECT(struct_with_vector_str, test)
 
-struct struct_error {
-   int x;
+struct struct_error
+{
+   int                        x;
    std::optional<std::string> s;
-   int y;
+   int                        y;
 };
-PSIO_REFLECT( struct_error, x, s, y )
+PSIO_REFLECT(struct_error, x, s, y)
 
-TEST_CASE("non_opt_after_opt") {
-   static_assert( psio::has_non_optional_after_optional<struct_error>(), "found error" );
+TEST_CASE("non_opt_after_opt")
+{
+   static_assert(psio::has_non_optional_after_optional<struct_error>(), "found error");
 }
 TEST_CASE("fracpack_vector")
 {
@@ -406,14 +417,14 @@ TEST_CASE("fracpack_vector")
    REQUIRE(emptyp.size() == (2 + 4));
    bool unknown = false;
    REQUIRE(emptyp.validate(unknown));
-   REQUIRE( not unknown );
+   REQUIRE(not unknown);
 
    psio::shared_view_ptr p(struct_with_vector_char{.test = {'1', '2', '3'}});
    REQUIRE(p.size() == (2 + 4 + 4 + 3));
    std::cout << "struct with vector char\n";
    unknown = false;
    REQUIRE(p.validate(unknown));
-   REQUIRE( not unknown );
+   REQUIRE(not unknown);
    std::cout << "size: " << p.size() << "\n";
 
    std::cout << "test->size() = " << p->test()->size() << "\n";
@@ -433,9 +444,9 @@ TEST_CASE("fracpack_vector")
 
    {  /// testing with INT
       psio::shared_view_ptr p(struct_with_vector_int{.test = {1, 2, 3}});
-      bool unknown = false;
+      bool                  unknown = false;
       REQUIRE(p.validate(unknown));
-      REQUIRE( not unknown );
+      REQUIRE(not unknown);
       REQUIRE(p.size() == (2 + 4 + 4 + 3 * 4));
       std::cout << "size: " << p.size() << "\n";
 
@@ -470,19 +481,16 @@ TEST_CASE("fracpack_vector")
 TEST_CASE("fracpack_vector_str")
 {
    psio::shared_view_ptr p(struct_with_vector_str{.test = {"a|", "bc|"}});
-   bool unknown = false;
+   bool                  unknown = false;
    REQUIRE(p.validate(unknown));
-   REQUIRE( not unknown );
+   REQUIRE(not unknown);
    std::cout << "size: " << p.size() << "\n";
-   std::cout << "vecptr       0]  4  == " << *reinterpret_cast<uint32_t*>(p.data() + 0 ) << "\n";
-   std::cout << "vecsize      4]  8  == " << *reinterpret_cast<uint32_t*>(p.data()  + 4) << "\n";
-   std::cout << "veco[0]      8]  8  == " << *reinterpret_cast<uint32_t*>(p.data() + 8 ) << "\n";
-   std::cout << "veco[1]      12] 10 == " << *reinterpret_cast<uint32_t*>(p.data() + 12 )
-             << "\n";
-   std::cout << "str[0].size  16] 2  == " << *reinterpret_cast<uint32_t*>(p.data() + 16 )
-             << "\n";
-   std::cout << "str[1].size  26] 3  == " << *reinterpret_cast<uint32_t*>(p.data() + 22 )
-             << "\n";
+   std::cout << "vecptr       0]  4  == " << *reinterpret_cast<uint32_t*>(p.data() + 0) << "\n";
+   std::cout << "vecsize      4]  8  == " << *reinterpret_cast<uint32_t*>(p.data() + 4) << "\n";
+   std::cout << "veco[0]      8]  8  == " << *reinterpret_cast<uint32_t*>(p.data() + 8) << "\n";
+   std::cout << "veco[1]      12] 10 == " << *reinterpret_cast<uint32_t*>(p.data() + 12) << "\n";
+   std::cout << "str[0].size  16] 2  == " << *reinterpret_cast<uint32_t*>(p.data() + 16) << "\n";
+   std::cout << "str[1].size  26] 3  == " << *reinterpret_cast<uint32_t*>(p.data() + 22) << "\n";
 
    REQUIRE(p->test()->size() == 2);
    REQUIRE(p->test()[0].size() == 2);
@@ -516,7 +524,7 @@ TEST_CASE("nestfinal")
    REQUIRE(psio::can_memcpy<outer>() == true);
 
    psio::shared_view_ptr<outer> p({.in = {.a = 1, .b = 2}, .c = 3});
-   REQUIRE( p.validate() );
+   REQUIRE(p.validate());
    std::cout << p->in()->a() << "\n";
    std::cout << p->in()->b() << "\n";
 
@@ -526,17 +534,17 @@ TEST_CASE("nestfinal")
    REQUIRE(u.c == 3);
 }
 
-TEST_CASE( "frac2" ) {
+TEST_CASE("frac2")
+{
    psio::shared_view_ptr<outer> p({.in = {.a = 1, .b = 2}, .c = 3});
-   REQUIRE( p.validate() );
-   psio::view<outer> v( p.data() );
-   std::cout<<"v.c: " << v.c() <<"\n";
+   REQUIRE(p.validate());
+   psio::view<outer> v(p.data());
+   std::cout << "v.c: " << v.c() << "\n";
    v.in().get().a();
    v.in()->a();
    (*v.in()).a();
-  // std::cout<<"v.in.a: " << v.in().a() <<"\n";
+   // std::cout<<"v.in.a: " << v.in().a() <<"\n";
 }
-
 
 struct vecstruct
 {
@@ -546,25 +554,26 @@ PSIO_REFLECT(vecstruct, vs)
 
 TEST_CASE("vectorstruct")
 {
-   vecstruct                 test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
+   vecstruct test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
 
-   struct FRACPACK expected_view {
-      uint16_t heap = 4;
+   struct FRACPACK expected_view
+   {
+      uint16_t heap   = 4;
       uint32_t offset = 4;
-      uint32_t size   = 3*sizeof(outer);
-      outer    one = {.c=1};
-      outer    two = {.c=2};
-      outer    three = {.c=3};
+      uint32_t size   = 3 * sizeof(outer);
+      outer    one    = {.c = 1};
+      outer    two    = {.c = 2};
+      outer    three  = {.c = 3};
    };
    expected_view ev;
 
-   std::cout <<"----- packsize ----\n";
-   REQUIRE( psio::fracpack_size(test) == sizeof(expected_view) );
+   std::cout << "----- packsize ----\n";
+   REQUIRE(psio::fracpack_size(test) == sizeof(expected_view));
 
-   std::cout <<"----- packing----\n";
+   std::cout << "----- packing----\n";
    psio::shared_view_ptr<vecstruct> p(test);
-   REQUIRE( memcmp( p.data(), &ev, sizeof(expected_view) ) == 0 );
-   REQUIRE( p.validate() );
+   REQUIRE(memcmp(p.data(), &ev, sizeof(expected_view)) == 0);
+   REQUIRE(p.validate());
    REQUIRE(p.size() == 2 + 4 + 4 + 3 * 12);
    REQUIRE((int)p->vs()[0].c() == 1);
    REQUIRE((int)p->vs()[1].c() == 2);
@@ -576,18 +585,19 @@ TEST_CASE("vectorstruct")
    REQUIRE(u.vs[2].c == 3);
 }
 
-TEST_CASE( "frac2vec" ) {
-   vecstruct                 test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
+TEST_CASE("frac2vec")
+{
+   vecstruct                        test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
    psio::shared_view_ptr<vecstruct> p(test);
-   REQUIRE( p.validate() );
-   psio::view<vecstruct> v( p.data() );
+   REQUIRE(p.validate());
+   psio::view<vecstruct> v(p.data());
 
-   REQUIRE( v.vs()->size() == 3 );
-   REQUIRE( v.vs()[0]->c() == 1 );
-   REQUIRE( v.vs()[1]->c() == 2 );
-   REQUIRE( v.vs()[2]->c() == 3 );
+   REQUIRE(v.vs()->size() == 3);
+   REQUIRE(v.vs()[0]->c() == 1);
+   REQUIRE(v.vs()[1]->c() == 2);
+   REQUIRE(v.vs()[2]->c() == 3);
    v.vs()[2]->c() = 4;
-   REQUIRE( v.vs()[2]->c() == 4 );
+   REQUIRE(v.vs()[2]->c() == 4);
 }
 
 struct tree
@@ -600,9 +610,9 @@ PSIO_REFLECT(tree, i, s, children)
 
 TEST_CASE("tree")
 {
-   tree                 t{.i        = 1,
-                          .s        = "one",
-                          .children = {{.i = 2, .s = "two", .children = {{.i = 3, .s = "three"}}}}};
+   tree                        t{.i        = 1,
+                                 .s        = "one",
+                                 .children = {{.i = 2, .s = "two", .children = {{.i = 3, .s = "three"}}}}};
    psio::shared_view_ptr<tree> p(t);
    REQUIRE((uint32_t)p->i() == 1);
    REQUIRE((std::string_view)p->s() == "one");
@@ -698,10 +708,10 @@ TEST_CASE("extend")
    REQUIRE(v2a->e().valid());
    REQUIRE((std::string_view)v2a->e() == "extra");
 
-   psio::shared_view_ptr<ext_v1> v1a(v2a.data(),v2a.size());
-   bool contains_unknown = false;
-   REQUIRE( v1a.validate(contains_unknown) );
-   REQUIRE( contains_unknown );
+   psio::shared_view_ptr<ext_v1> v1a(v2a.data(), v2a.size());
+   bool                          contains_unknown = false;
+   REQUIRE(v1a.validate(contains_unknown));
+   REQUIRE(contains_unknown);
 
    REQUIRE((std::string_view)v1a->c() == "again");
    REQUIRE((std::string_view)v1a->a() == "hello");
@@ -761,16 +771,13 @@ TEST_CASE("blockchain")
    transfer            frtr{.from = 7, .to = 8, .amount = 42, .memo = "test"};
 
    cliofb::transactionT gtrx;
-   gtrx.expire = 1234; 
-   gtrx.tapos = 55; 
-   gtrx.flags = 4;
-   gtrx.actions.push_back(
-       std::unique_ptr<cliofb::actionT>(new cliofb::actionT{ .sender = 88, .contract = 92, .act = 50,
-                                                       .data = std::vector<uint8_t>(44) }) );
-   gtrx.actions.push_back( 
-        std::unique_ptr<cliofb::actionT>(new cliofb::actionT{ .sender = 88, .contract = 92, .act = 50,
-                                                       .data = std::vector<uint8_t>(44) }) );
-
+   gtrx.expire = 1234;
+   gtrx.tapos  = 55;
+   gtrx.flags  = 4;
+   gtrx.actions.push_back(std::unique_ptr<cliofb::actionT>(new cliofb::actionT{
+       .sender = 88, .contract = 92, .act = 50, .data = std::vector<uint8_t>(44)}));
+   gtrx.actions.push_back(std::unique_ptr<cliofb::actionT>(new cliofb::actionT{
+       .sender = 88, .contract = 92, .act = 50, .data = std::vector<uint8_t>(44)}));
 
    transaction ftrx{
        .expires = 123,
@@ -779,14 +786,12 @@ TEST_CASE("blockchain")
        .actions = {
            action(4, 5, 6, transfer{.from = 7, .to = 8, .amount = 42, .memo = "test"}),
            action(14, 15, 16, transfer{.from = 17, .to = 18, .amount = 142, .memo = "test"})}};
-                         
 
    double gt = 1;
    double ft = 1;
 
-
    {
-      auto start = std::chrono::steady_clock::now();
+      auto                                        start = std::chrono::steady_clock::now();
       std::vector<flatbuffers::FlatBufferBuilder> fbb(10000);
       for (uint32_t i = 0; i < 10000; ++i)
       {
@@ -799,7 +804,7 @@ TEST_CASE("blockchain")
    }
 
    {
-      auto start = std::chrono::steady_clock::now();
+      auto                                            start = std::chrono::steady_clock::now();
       std::vector<psio::shared_view_ptr<transaction>> save(10000);
       for (uint32_t i = 0; i < 10000; ++i)
       {
@@ -812,11 +817,11 @@ TEST_CASE("blockchain")
    }
 
    {
-      auto start = std::chrono::steady_clock::now();
+      auto                  start = std::chrono::steady_clock::now();
       std::vector<uint32_t> r(10000);
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         ftrx.expires =psio::fracpack_size(ftrx); //psio::shared_view_ptr<transaction>(ftrx);
+         ftrx.expires = psio::fracpack_size(ftrx);  //psio::shared_view_ptr<transaction>(ftrx);
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -824,11 +829,10 @@ TEST_CASE("blockchain")
       std::cout << "fracpack pack_size trx:   " << ft << " ms  " << 100 * ft / gt << "%\n";
    }
 
-
    {
       flatbuffers::FlatBufferBuilder fbb;
       fbb.Finish(cliofb::transaction::Pack(fbb, &gtrx));
-      std::cout << "fb size: " << fbb.GetSize() <<"\n";
+      std::cout << "fb size: " << fbb.GetSize() << "\n";
 
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
@@ -843,8 +847,8 @@ TEST_CASE("blockchain")
    }
 
    {
-      auto tmp   = psio::shared_view_ptr<transaction>(ftrx);
-      std::cout << "frac trx size: " << tmp.size() <<"\n";
+      auto tmp = psio::shared_view_ptr<transaction>(ftrx);
+      std::cout << "frac trx size: " << tmp.size() << "\n";
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
@@ -857,13 +861,11 @@ TEST_CASE("blockchain")
       std::cout << "fracpack unpack tx: " << ft << " ms  " << 100 * ft / gt << "%\n";
    }
 
-
-
    {
       flatbuffers::FlatBufferBuilder fbb;
       fbb.Finish(cliofb::transaction::Pack(fbb, &gtrx));
 
-      auto     start = std::chrono::steady_clock::now();
+      auto start = std::chrono::steady_clock::now();
       //uint64_t x     = 0;
       for (uint32_t i = 0; i < 10000; ++i)
       {
@@ -877,11 +879,10 @@ TEST_CASE("blockchain")
       std::cout << "google check tx:    " << gt << " ms\n";
    }
 
-
    {
-      auto     tmp   = psio::shared_view_ptr<transaction>(ftrx);
-      auto     start = std::chrono::steady_clock::now();
-     // uint64_t x     = 0;
+      auto tmp   = psio::shared_view_ptr<transaction>(ftrx);
+      auto start = std::chrono::steady_clock::now();
+      // uint64_t x     = 0;
       for (uint32_t i = 0; i < 10000; ++i)
       {
          tmp.validate();
@@ -893,8 +894,6 @@ TEST_CASE("blockchain")
       std::cout << "fracpack check2 tx:  " << ft << " ms  " << 100 * ft / gt << "%\n";
    }
 
-
-
    {
       flatbuffers::FlatBufferBuilder fbb;
       fbb.Finish(cliofb::transaction::Pack(fbb, &gtrx));
@@ -905,10 +904,12 @@ TEST_CASE("blockchain")
       {
          auto t = cliofb::Gettransaction(fbb.GetBufferPointer());
          x += i;
-         if( rand()%10 == 0 ) continue; /// prevent optimizer from killing loop
+         if (rand() % 10 == 0)
+            continue;  /// prevent optimizer from killing loop
          x += t->expire() + t->tapos() + t->flags();
          uint32_t si = t->actions()->size();
-         for( uint32_t i = 0 ; i < si ; ++i ) {
+         for (uint32_t i = 0; i < si; ++i)
+         {
             auto item = t->actions()->Get(i);
             x += item->sender();
             x += item->contract();
@@ -916,8 +917,8 @@ TEST_CASE("blockchain")
             x += item->data()->size();
          }
       }
-      std::cout << x <<"\n";
-   //   REQUIRE(x == 100000 * (7 + 8 + 42 + 4));
+      std::cout << x << "\n";
+      //   REQUIRE(x == 100000 * (7 + 8 + 42 + 4));
       //REQUIRE( std::string_view(t->memo()->c_str()) == std::string_view("test") );
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -926,18 +927,20 @@ TEST_CASE("blockchain")
    }
 
    {
-      auto     tmp   = psio::shared_view_ptr<transaction>(ftrx);
-      psio::view<transaction> tmp2( tmp.data() );
-      auto     start = std::chrono::steady_clock::now();
-      uint64_t x     = 0;
+      auto                    tmp = psio::shared_view_ptr<transaction>(ftrx);
+      psio::view<transaction> tmp2(tmp.data());
+      auto                    start = std::chrono::steady_clock::now();
+      uint64_t                x     = 0;
       for (uint32_t i = 0; i < 100000; ++i)
       {
          x += i;
-         if( rand()%10 == 0 ) continue; /// prevent optimizer from killing loop
+         if (rand() % 10 == 0)
+            continue;  /// prevent optimizer from killing loop
          x += (int64_t)tmp2.expires() + (int64_t)tmp2.tapos() + (int64_t)tmp2.flags();
-         auto acts = tmp2.actions();
-         uint32_t s = acts->size();
-         for( uint32_t i = 0; i < s; ++i ) {
+         auto     acts = tmp2.actions();
+         uint32_t s    = acts->size();
+         for (uint32_t i = 0; i < s; ++i)
+         {
             auto item = acts[i];
             x += (int64_t)item.sender();
             x += (int64_t)item.contract();
@@ -945,8 +948,8 @@ TEST_CASE("blockchain")
             x += item.data()->size();
          }
       }
-      std::cout << x <<"\n";
-   //   REQUIRE(x == 100000 * (7 + 8 + 42 + 4));
+      std::cout << x << "\n";
+      //   REQUIRE(x == 100000 * (7 + 8 + 42 + 4));
       //REQUIRE( std::string_view(tmp->memo()) == std::string_view("test") );
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -955,25 +958,6 @@ TEST_CASE("blockchain")
    }
 
    std::cout << "\n\n=================================\n\n";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
    {
       auto start = std::chrono::steady_clock::now();
@@ -1048,13 +1032,14 @@ TEST_CASE("blockchain")
       std::cout << "google read:     " << gt << " ms\n";
    }
    {
-      auto     tmp   = psio::shared_view_ptr<transfer>(frtr);
-      psio::view<transfer> tmp2( tmp.data() );
-      auto     start = std::chrono::steady_clock::now();
-      uint64_t x     = 0;
+      auto                 tmp = psio::shared_view_ptr<transfer>(frtr);
+      psio::view<transfer> tmp2(tmp.data());
+      auto                 start = std::chrono::steady_clock::now();
+      uint64_t             x     = 0;
       for (uint32_t i = 0; i < 100000; ++i)
       {
-         x += (uint64_t)tmp2.from() + (uint64_t)tmp2.to() + (uint64_t)tmp2.amount() + tmp2.memo()->size();
+         x += (uint64_t)tmp2.from() + (uint64_t)tmp2.to() + (uint64_t)tmp2.amount() +
+              tmp2.memo()->size();
          /*
          x += (uint64_t)tmp->from() + (uint64_t)tmp->to() + (uint64_t)tmp->amount() +
               tmp->memo()->size();
@@ -1072,7 +1057,7 @@ TEST_CASE("blockchain")
       flatbuffers::FlatBufferBuilder fbb;
       fbb.Finish(contract::transfer::Pack(fbb, &trobj));
 
-      auto     start = std::chrono::steady_clock::now();
+      auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
          auto                  t = contract::Gettransfer(fbb.GetBufferPointer());
@@ -1086,8 +1071,8 @@ TEST_CASE("blockchain")
    }
 
    {
-      auto     tmp   = psio::shared_view_ptr<transfer>(frtr);
-      auto     start = std::chrono::steady_clock::now();
+      auto tmp   = psio::shared_view_ptr<transfer>(frtr);
+      auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
          tmp.validate();
@@ -1098,234 +1083,234 @@ TEST_CASE("blockchain")
       ft         = std::chrono::duration<double, std::milli>(delta).count();
       std::cout << "fracpack check2:  " << ft << " ms  " << 100 * ft / gt << "%\n";
    }
-
 }
 
-struct simple_non_memcpy final {
-  int32_t a;
-  int32_t b; 
-  int32_t c;
+struct simple_non_memcpy final
+{
+   int32_t a;
+   int32_t b;
+   int32_t c;
 };
-PSIO_REFLECT( simple_non_memcpy, c, b, a )
+PSIO_REFLECT(simple_non_memcpy, c, b, a)
 
-struct vec_non_memcpy {
+struct vec_non_memcpy
+{
    std::vector<simple_non_memcpy> data;
 };
-PSIO_REFLECT( vec_non_memcpy, data );
+PSIO_REFLECT(vec_non_memcpy, data);
 
-TEST_CASE( "vector_inline" ) {
-   REQUIRE( not psio::can_memcpy<simple_non_memcpy>() ); /// because reflect is opposite
+TEST_CASE("vector_inline")
+{
+   REQUIRE(not psio::can_memcpy<simple_non_memcpy>());  /// because reflect is opposite
 
-   struct FRACPACK testlayout {
-      uint16_t heap = 4;
+   struct FRACPACK testlayout
+   {
+      uint16_t heap        = 4;
       uint32_t data_offset = 4;
-      uint32_t size = 12 * 2;
-      uint32_t v1c = 3;
-      uint32_t v1b = 2;
-      uint32_t v1a = 1;
-      uint32_t v2c = 6;
-      uint32_t v2b = 5;
-      uint32_t v2a = 4;
+      uint32_t size        = 12 * 2;
+      uint32_t v1c         = 3;
+      uint32_t v1b         = 2;
+      uint32_t v1a         = 1;
+      uint32_t v2c         = 6;
+      uint32_t v2b         = 5;
+      uint32_t v2a         = 4;
    };
 
    testlayout t;
-   std::cout<< "testlayout size: " << sizeof(t) <<"\n";
+   std::cout << "testlayout size: " << sizeof(t) << "\n";
 
-   std::cout<<"start\n";
-   psio::shared_view_ptr<vec_non_memcpy> p( {.data={
-                                         { 1, 2, 3 }, { 4, 5, 6 }
-                                    }} );
-   std::cout<<"here\n";
+   std::cout << "start\n";
+   psio::shared_view_ptr<vec_non_memcpy> p({.data = {{1, 2, 3}, {4, 5, 6}}});
+   std::cout << "here\n";
 
-   REQUIRE( sizeof(testlayout) == p.size() );
-   REQUIRE( memcmp( p.data(), &t, sizeof(t) ) == 0 );
-
+   REQUIRE(sizeof(testlayout) == p.size());
+   REQUIRE(memcmp(p.data(), &t, sizeof(t)) == 0);
 }
 
-struct vec_optional {
+struct vec_optional
+{
    std::vector<std::optional<simple_non_memcpy>> data;
 };
-PSIO_REFLECT( vec_optional, data );
+PSIO_REFLECT(vec_optional, data);
 
-TEST_CASE( "vector_optional" ) {
-   struct FRACPACK testlayout {
-      uint16_t heap = 4;
+TEST_CASE("vector_optional")
+{
+   struct FRACPACK testlayout
+   {
+      uint16_t heap        = 4;
       uint32_t data_offset = 4;
-      uint32_t size = 4 * 2;
-      uint32_t v1_offset = 8;
-      uint32_t v2_offset = 1; /// not present
-      uint32_t v1c = 3;
-      uint32_t v1b = 2;
-      uint32_t v1a = 1;
+      uint32_t size        = 4 * 2;
+      uint32_t v1_offset   = 8;
+      uint32_t v2_offset   = 1;  /// not present
+      uint32_t v1c         = 3;
+      uint32_t v1b         = 2;
+      uint32_t v1a         = 1;
    };
-   testlayout t;
-   psio::shared_view_ptr<vec_optional> p({
-                                         .data={
-                                            std::optional<simple_non_memcpy>({ 1, 2, 3 }), 
-                                            std::optional<simple_non_memcpy>()
-                                         }
-                                      });
+   testlayout                          t;
+   psio::shared_view_ptr<vec_optional> p(
+       {.data = {std::optional<simple_non_memcpy>({1, 2, 3}), std::optional<simple_non_memcpy>()}});
 
-   REQUIRE( sizeof(testlayout) == p.size() );
-   REQUIRE( memcmp( p.data(), &t, sizeof(t) ) == 0 );
+   REQUIRE(sizeof(testlayout) == p.size());
+   REQUIRE(memcmp(p.data(), &t, sizeof(t)) == 0);
 }
 
 using std::optional;
-TEST_CASE( "optional_optional" ) {
-   using oo_type = std::optional< std::optional<simple_non_memcpy> >;
+TEST_CASE("optional_optional")
+{
+   using oo_type = std::optional<std::optional<simple_non_memcpy>>;
    oo_type oo;
 
    psio::shared_view_ptr<oo_type> p(oo);
-   REQUIRE( p.size() == 4 );
+   REQUIRE(p.size() == 4);
    uint32_t tomb = 1;
-   REQUIRE( memcmp( &tomb, p.data(), sizeof(tomb) ) == 0 );
+   REQUIRE(memcmp(&tomb, p.data(), sizeof(tomb)) == 0);
 
-   psio::shared_view_ptr<oo_type> p2(oo_type( optional<simple_non_memcpy>( {1,2,3} ) ));
+   psio::shared_view_ptr<oo_type> p2(oo_type(optional<simple_non_memcpy>({1, 2, 3})));
 
-   struct FRACPACK testlayout {
+   struct FRACPACK testlayout
+   {
       uint32_t outer_opt = 4;
       uint32_t inner_opt = 4;
-      uint32_t v1c = 3;
-      uint32_t v1b = 2;
-      uint32_t v1a = 1;
+      uint32_t v1c       = 3;
+      uint32_t v1b       = 2;
+      uint32_t v1a       = 1;
    };
    testlayout t;
 
-   REQUIRE( sizeof(testlayout) == p2.size() );
-   REQUIRE( memcmp( p2.data(), &t, sizeof(t) ) == 0 );
+   REQUIRE(sizeof(testlayout) == p2.size());
+   REQUIRE(memcmp(p2.data(), &t, sizeof(t)) == 0);
 
-   psio::shared_view_ptr<oo_type> p3{oo_type( optional<simple_non_memcpy>() )};
+   psio::shared_view_ptr<oo_type> p3{oo_type(optional<simple_non_memcpy>())};
 
-   struct FRACPACK testlayout3 {
+   struct FRACPACK testlayout3
+   {
       uint32_t outer_opt = 4;
       uint32_t inner_opt = 1;
    };
    testlayout3 t3;
 
-   REQUIRE( sizeof(testlayout3) == p3.size() );
-   REQUIRE( memcmp( p3.data(), &t3, sizeof(t3) ) == 0 );
+   REQUIRE(sizeof(testlayout3) == p3.size());
+   REQUIRE(memcmp(p3.data(), &t3, sizeof(t3)) == 0);
 }
 
-
-struct strv1 {
+struct strv1
+{
    int a;
 };
-PSIO_REFLECT( strv1, a )
-struct strv2 {
-   int a;
+PSIO_REFLECT(strv1, a)
+struct strv2
+{
+   int                              a;
    std::optional<simple_non_memcpy> extra;
 };
-PSIO_REFLECT( strv2, a, extra )
+PSIO_REFLECT(strv2, a, extra)
 
-TEST_CASE( "vector_ext_struct" ) {
-   std::vector<strv2> data{ strv2{.a=1, .extra=simple_non_memcpy{1,2,3}}  };
-   psio::shared_view_ptr<std::vector<strv2> > pn(data);
-   psio::shared_view_ptr<std::vector<strv1> > po(pn.data(), pn.size());
+TEST_CASE("vector_ext_struct")
+{
+   std::vector<strv2> data{strv2{.a = 1, .extra = simple_non_memcpy{1, 2, 3}}};
+   psio::shared_view_ptr<std::vector<strv2>> pn(data);
+   psio::shared_view_ptr<std::vector<strv1>> po(pn.data(), pn.size());
 
    bool unknown = false;
-   REQUIRE( po.validate(unknown) );
-   REQUIRE( unknown );
-  
+   REQUIRE(po.validate(unknown));
+   REQUIRE(unknown);
 }
-   struct test_get_by_name //get_account_by_name
-   {
-      //using return_type = std::optional<psibase::account_num>;
+struct test_get_by_name  //get_account_by_name
+{
+   //using return_type = std::optional<psibase::account_num>;
 
-      std::string name;// = {};
-   };
-   PSIO_REFLECT(test_get_by_name, name)
-
-
+   std::string name;  // = {};
+};
+PSIO_REFLECT(test_get_by_name, name)
 
 struct account_name
 {
-   uint32_t        num  = {};
-   std::string     name = {};
+   uint32_t    num  = {};
+   std::string name = {};
 };
-PSIO_REFLECT(account_name, num, name );
+PSIO_REFLECT(account_name, num, name);
 
 struct startup
 {
-   uint32_t       next_account_num  = 0; 
+   uint32_t                  next_account_num  = 0;
    std::vector<account_name> existing_accounts = {};
 };
-PSIO_REFLECT(startup, next_account_num, existing_accounts) 
+PSIO_REFLECT(startup, next_account_num, existing_accounts)
 using actionv = std::variant<startup, strv2>;
 
-TEST_CASE( "vec_struct_string"  ) {
-  startup su{ .next_account_num = 100,
-            .existing_accounts = {
-               { 1, "one more time" },
-               { 2, "two more times" }
-             }
-          };
-  psio::shared_view_ptr<startup> st{su};
-  REQUIRE( st.validate() );
-  std::cout << "st.size: " << st.size() <<"\n";
+TEST_CASE("vec_struct_string")
+{
+   startup                        su{.next_account_num = 100,
+                                     .existing_accounts = {{1, "one more time"}, {2, "two more times"}}};
+   psio::shared_view_ptr<startup> st{su};
+   REQUIRE(st.validate());
+   std::cout << "st.size: " << st.size() << "\n";
 
-  auto vec = psio::convert_to_frac( actionv(su) );
-  psio::shared_view_ptr<actionv> p{actionv(su)};
-  std::cout << "vec.size: " << vec.size() <<"\n";
-  REQUIRE( p.validate() );
+   auto                           vec = psio::convert_to_frac(actionv(su));
+   psio::shared_view_ptr<actionv> p{actionv(su)};
+   std::cout << "vec.size: " << vec.size() << "\n";
+   REQUIRE(p.validate());
 }
 
-
-TEST_CASE( "opt_empty_string" ) {
-   auto v = psio::convert_to_frac( std::optional<std::string>("") );
-   struct FRACPACK expected_view {
+TEST_CASE("opt_empty_string")
+{
+   auto            v = psio::convert_to_frac(std::optional<std::string>(""));
+   struct FRACPACK expected_view
+   {
       uint32_t size = 0;
    };
-   std::cout <<"v.size: " <<v.size() <<"\n";
-   REQUIRE( v.size() == sizeof(expected_view) );
+   std::cout << "v.size: " << v.size() << "\n";
+   REQUIRE(v.size() == sizeof(expected_view));
 
    expected_view ev;
-   REQUIRE(memcmp( &ev, v.data(), v.size() ) == 0 );
+   REQUIRE(memcmp(&ev, v.data(), v.size()) == 0);
 
    {
-     psio::shared_view_ptr<std::optional<std::string>> p{std::optional<std::string>("")};
-   std::cout <<"v.size: " <<v.size() <<"\n";
-     REQUIRE( p.validate() );
-     auto u = p.unpack();
-     REQUIRE( !!u );
+      psio::shared_view_ptr<std::optional<std::string>> p{std::optional<std::string>("")};
+      std::cout << "v.size: " << v.size() << "\n";
+      REQUIRE(p.validate());
+      auto u = p.unpack();
+      REQUIRE(!!u);
    }
    {
-     psio::shared_view_ptr<std::optional<std::string>> p{std::optional<std::string>()};
-   std::cout <<"v.size: " <<v.size() <<"\n";
-     REQUIRE( p.validate() );
-     auto u = p.unpack();
-     REQUIRE( !u );
+      psio::shared_view_ptr<std::optional<std::string>> p{std::optional<std::string>()};
+      std::cout << "v.size: " << v.size() << "\n";
+      REQUIRE(p.validate());
+      auto u = p.unpack();
+      REQUIRE(!u);
    }
 }
 
-struct null_opt {
-   int a;
+struct null_opt
+{
+   int                a;
    std::optional<int> b;
    std::optional<int> c;
 };
-PSIO_REFLECT( null_opt, a, b, c )
-TEST_CASE( "null_opt" ) {
-
-     psio::shared_view_ptr<null_opt> p{null_opt()};
-     REQUIRE( p.validate() );
-     auto null_opt = p.unpack();
+PSIO_REFLECT(null_opt, a, b, c)
+TEST_CASE("null_opt")
+{
+   psio::shared_view_ptr<null_opt> p{null_opt()};
+   REQUIRE(p.validate());
+   auto null_opt = p.unpack();
 }
-
 
 static const auto None = std::nullopt;
 #define Some(x) x
 
 using Variant = std::variant<uint32_t, std::string>;
 
-struct FRACPACK expected_view {
-   uint16_t outer_heap = 8;
-   uint32_t offset_to_field_inner = 8;
-   uint32_t offset_to_field_option_u8 = 4+6+2;
+struct FRACPACK expected_view
+{
+   uint16_t outer_heap                = 8;
+   uint32_t offset_to_field_inner     = 8;
+   uint32_t offset_to_field_option_u8 = 4 + 6 + 2;
 
-   uint16_t inner_heap = 6;
-   uint16_t inner_u32 = 1234;
-   uint32_t offset_to_inner_option_u32 = 1; /// not there
+   uint16_t inner_heap                 = 6;
+   uint16_t inner_u32                  = 1234;
+   uint32_t offset_to_inner_option_u32 = 1;  /// not there
 
-   uint8_t  u8 = 11;
+   uint8_t u8 = 11;
 };
 struct InnerStruct
 {
@@ -1378,19 +1363,19 @@ struct OuterStruct
    std::optional<std::optional<std::string>> field_o_o_str2;
    std::optional<std::optional<InnerStruct>> field_o_o_inner;
 
- //  auto operator<=>(const OuterStruct& b) const = default;
+   //  auto operator<=>(const OuterStruct& b) const = default;
 };
 PSIO_REFLECT(OuterStruct,
              field_u8,
              field_u16,
              field_u32,
-            field_u64,
+             field_u64,
              field_i8,
              field_i16,
              field_i32,
              field_i64,
              field_str,
-             field_f32, 
+             field_f32,
              field_f64,
              field_inner,
              field_v_inner,
@@ -1406,14 +1391,11 @@ PSIO_REFLECT(OuterStruct,
              field_option_f32,
              field_option_f64,
              field_option_inner,
-        
+
              field_o_o_i8,
-             field_o_o_str
-             ,
-             field_o_o_str2
-             ,
-             field_o_o_inner
-             )
+             field_o_o_str,
+             field_o_o_str2,
+             field_o_o_inner)
 
 OuterStruct tests1_data[] = {
     OuterStruct{
@@ -1586,46 +1568,44 @@ OuterStruct tests1_data[] = {
     },
 };
 
-TEST_CASE( "OuterStruct" ) {
-
-
-
+TEST_CASE("OuterStruct")
 {
-   psio::shared_view_ptr<OuterStruct> p(tests1_data[0]);
-   REQUIRE(p.validate());
-   p.unpack();
-}
+   {
+      psio::shared_view_ptr<OuterStruct> p(tests1_data[0]);
+      REQUIRE(p.validate());
+      p.unpack();
+   }
 
-{
-   expected_view ev;
-   expected_view av;
-   psio::shared_view_ptr<OuterStruct> p(tests1_data[1]);
-   REQUIRE(p.validate());
-   p.unpack();
-}
-{
-   struct FRACPACK expected_view{
-      uint16_t heap_start = 5;           // 0
-      uint8_t  field_u8 = 0xff;          // 2
-      uint32_t oos = 8;                  // 3
-      uint32_t ooin = 4; //+4+4+5;       // 7
-      uint32_t os = 4;                   // 11
-      uint32_t s_size = 5;               // 15
-      char     a = 'a';                  // 19
-      char     sp = ' ';
-      char     s = 's';
-      char     t = 't';
-      char     r = 'r';
-      uint32_t oin = 4; /// this is an optional<Inner> // 24
-      uint16_t inner_heap = 4+2; /// THIS IS INNER     // 28
-      uint16_t inner_u32 = 1234;                       // 30 
-      uint32_t in_i_o_vec_o_u16 = 0;                   // 32
-   //   uint32_t extra_bytes = 9999; ///               // size = 36
-   };
+   {
+      expected_view                      ev;
+      expected_view                      av;
+      psio::shared_view_ptr<OuterStruct> p(tests1_data[1]);
+      REQUIRE(p.validate());
+      p.unpack();
+   }
+   {
+      struct FRACPACK expected_view
+      {
+         uint16_t heap_start       = 5;     // 0
+         uint8_t  field_u8         = 0xff;  // 2
+         uint32_t oos              = 8;     // 3
+         uint32_t ooin             = 4;     //+4+4+5;       // 7
+         uint32_t os               = 4;     // 11
+         uint32_t s_size           = 5;     // 15
+         char     a                = 'a';   // 19
+         char     sp               = ' ';
+         char     s                = 's';
+         char     t                = 't';
+         char     r                = 'r';
+         uint32_t oin              = 4;      /// this is an optional<Inner> // 24
+         uint16_t inner_heap       = 4 + 2;  /// THIS IS INNER     // 28
+         uint16_t inner_u32        = 1234;   // 30
+         uint32_t in_i_o_vec_o_u16 = 0;      // 32
+         //   uint32_t extra_bytes = 9999; ///               // size = 36
+      };
 
-
-   psio::shared_view_ptr<OuterStruct> p(tests1_data[2]);
-   /*
+      psio::shared_view_ptr<OuterStruct> p(tests1_data[2]);
+      /*
    auto s = psio::fracpack_size(tests1_data[2]);
    std::cout << "\n\n     size: " << s <<"   vs " << sizeof(expected_view) <<" \n\n";
    std::cout << "\n\n     packed: " << p.size() <<"\n\n";
@@ -1662,128 +1642,119 @@ TEST_CASE( "OuterStruct" ) {
    std::cout<<" INNER: FIXED SIZE: " << psio::fracpack_fixed_size<InnerStruct>() <<"\n";
    */
 
-
-   auto out = p.unpack();
-   std::cout << "\n\nout.field_o_o_inner: " << !!out.field_o_o_inner <<"\n";
-   std::cout << "*out.field_o_o_inner: " << !!*out.field_o_o_inner <<"\n";
-   std::cout << "out.field_o_o_inner->u32: " << (*out.field_o_o_inner)->inner_u32 <<"\n";
-   std::cout << "out.field_o_o_inner->oveco: " << !!(*out.field_o_o_inner)->inner_o_vec_o_u16<<"\n";
-   std::cout <<"\n\n start validate \n\n";
-   REQUIRE(p.validate());
+      auto out = p.unpack();
+      std::cout << "\n\nout.field_o_o_inner: " << !!out.field_o_o_inner << "\n";
+      std::cout << "*out.field_o_o_inner: " << !!*out.field_o_o_inner << "\n";
+      std::cout << "out.field_o_o_inner->u32: " << (*out.field_o_o_inner)->inner_u32 << "\n";
+      std::cout << "out.field_o_o_inner->oveco: " << !!(*out.field_o_o_inner)->inner_o_vec_o_u16
+                << "\n";
+      std::cout << "\n\n start validate \n\n";
+      REQUIRE(p.validate());
+   }
 }
 
-}
-
-
-
-
-
-
-
-
-
-
-TEST_CASE( "tuple" ) {
-   
+TEST_CASE("tuple")
+{
    using tup_type = std::tuple<uint32_t, uint64_t, uint8_t>;
-   psio::shared_view_ptr<tup_type> p( {1,2,3} );
-   REQUIRE( p.size() == 2+4+8+1 );
-   REQUIRE( p.validate() );
+   psio::shared_view_ptr<tup_type> p({1, 2, 3});
+   REQUIRE(p.size() == 2 + 4 + 8 + 1);
+   REQUIRE(p.validate());
    auto out = p.unpack();
 }
-TEST_CASE( "tuple_string" ) {
-   
+TEST_CASE("tuple_string")
+{
    using tup_type = std::tuple<uint32_t, std::string, uint8_t>;
-   psio::shared_view_ptr<tup_type> p( {1,"hello",3} );
-   REQUIRE( p.size() == 2+4+4+4+5+1 );
-   REQUIRE( p.validate() );
+   psio::shared_view_ptr<tup_type> p({1, "hello", 3});
+   REQUIRE(p.size() == 2 + 4 + 4 + 4 + 5 + 1);
+   REQUIRE(p.validate());
    auto out = p.unpack();
-   REQUIRE( out == tup_type{1,"hello",3} );
+   REQUIRE(out == tup_type{1, "hello", 3});
 }
 
-TEST_CASE( "array" ) {
-   REQUIRE( psio::fracpack_size( std::array<uint64_t,8>() ) == 8*8 );
-   REQUIRE( psio::fracpack_size( std::array<std::string,8>() ) == 8*4 ); /// empty string optimization
+TEST_CASE("array")
+{
+   REQUIRE(psio::fracpack_size(std::array<uint64_t, 8>()) == 8 * 8);
+   REQUIRE(psio::fracpack_size(std::array<std::string, 8>()) ==
+           8 * 4);  /// empty string optimization
 
    /// first element has size + "hello"
-   REQUIRE( psio::fracpack_size( std::array<std::string,8>({"hello"}) ) == 8*4+4+5 ); 
+   REQUIRE(psio::fracpack_size(std::array<std::string, 8>({"hello"})) == 8 * 4 + 4 + 5);
 
-   using type = std::array<std::string,8>;
-   psio::shared_view_ptr<type> p( type{"hello","world"} );
-   REQUIRE( p.validate() );
+   using type = std::array<std::string, 8>;
+   psio::shared_view_ptr<type> p(type{"hello", "world"});
+   REQUIRE(p.validate());
    p.unpack();
 }
 
-uint64_t sum( uint8_t a, uint32_t b, uint64_t c )
+uint64_t sum(uint8_t a, uint32_t b, uint64_t c)
 {
    return a + b + c;
 }
 
-std::string cat( psio::view<std::string> a, psio::const_view<std::string> b ) {
-   return std::string( std::string_view(a) ) + std::string( b );
+std::string cat(psio::view<std::string> a, psio::const_view<std::string> b)
+{
+   return std::string(std::string_view(a)) + std::string(b);
 }
 
-TEST_CASE( "tuple_call" ) {
-
+TEST_CASE("tuple_call")
+{
    {
-   using tup = decltype( psio::args_as_tuple( sum ) );
-   psio::shared_view_ptr<tup> p( tup{1, 2, 3} );
+      using tup = decltype(psio::args_as_tuple(sum));
+      psio::shared_view_ptr<tup> p(tup{1, 2, 3});
 
-   auto result = p->call( sum );
-   REQUIRE( result == 6 );
+      auto result = p->call(sum);
+      REQUIRE(result == 6);
    }
    {
-   using tup = decltype( tuple_remove_view(psio::args_as_tuple(cat)) );
-   psio::shared_view_ptr<tup> p( tup{"hello","world"} );
+      using tup = decltype(tuple_remove_view(psio::args_as_tuple(cat)));
+      psio::shared_view_ptr<tup> p(tup{"hello", "world"});
 
-   //auto result = p->call( cat);
-   //REQUIRE( result == "helloworld" );
+      //auto result = p->call( cat);
+      //REQUIRE( result == "helloworld" );
    }
 }
 
-TEST_CASE( "bugtest" ) 
+TEST_CASE("bugtest")
 {
    auto data = InnerStruct{
-    .inner_u32            = 1234,
-    .var                  = "",
-    .inner_option_u32     = std::optional<uint32_t>(0x1234),
-    .inner_option_str     = None,
-    .inner_option_vec_u16 = std::vector<uint16_t>{},
-    .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+       .inner_u32            = 1234,
+       .var                  = "",
+       .inner_option_u32     = std::optional<uint32_t>(0x1234),
+       .inner_option_str     = None,
+       .inner_option_vec_u16 = std::vector<uint16_t>{},
+       .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
    };
    psio::shared_view_ptr<InnerStruct> p(data);
    REQUIRE(p.validate());
 }
-    
-TEST_CASE( "stdarray" ) {
-   REQUIRE( not psio::may_use_heap<std::array<uint32_t,5>>() );
+
+TEST_CASE("stdarray")
+{
+   REQUIRE(not psio::may_use_heap<std::array<uint32_t, 5>>());
 };
 
-TEST_CASE( "translate" ) {
-  psio::schema apischema;
-  apischema.generate<OuterStruct>();
-  std::cout << "flat schema: " << format_json(apischema) << "\n";
+TEST_CASE("translate")
+{
+   psio::schema apischema;
+   apischema.generate<OuterStruct>();
+   std::cout << "flat schema: " << format_json(apischema) << "\n";
 
-  psio::translator<OuterStruct> tr;
- // std::cout << "flat schema: " << tr.get_protobuf_schema() << "\n";
+   psio::translator<OuterStruct> tr;
+   // std::cout << "flat schema: " << tr.get_protobuf_schema() << "\n";
 
+   std::cout << "================\n" << psio::format_json(tests1_data[0]);
+   std::cout << "================\n" << psio::format_json(tests1_data[1]);
+   std::cout << "================\n" << psio::format_json(tests1_data[2]);
+   auto t1d2_json  = psio::to_json(tests1_data[2]);
+   auto t1d2_frac  = tr.json_to_frac(tr.get_type_num("OuterStruct"), t1d2_json);
+   auto t1d2_json2 = tr.frac_to_json(tr.get_type_num("OuterStruct"), t1d2_frac);
 
-  std::cout << "================\n" 
-            << psio::format_json( tests1_data[0] );
-  std::cout << "================\n" 
-            << psio::format_json( tests1_data[1] );
-  std::cout << "================\n" 
-            << psio::format_json( tests1_data[2] );
-  auto t1d2_json = psio::to_json( tests1_data[2] );
-  auto t1d2_frac = tr.json_to_frac( tr.get_type_num( "OuterStruct" ), t1d2_json );
-  auto t1d2_json2 = tr.frac_to_json( tr.get_type_num( "OuterStruct" ), t1d2_frac );
+   //  std::cout<<t1d2_json<<"\n\n";
+   //  std::cout<<t1d2_json2<<"\n\n";
+   REQUIRE(t1d2_json == t1d2_json2);
 
-//  std::cout<<t1d2_json<<"\n\n";
-//  std::cout<<t1d2_json2<<"\n\n";
-  REQUIRE( t1d2_json == t1d2_json2 );
-
-//  auto t1d2_protobuf = tr.json_to_protobuf( tr.get_type_num( "OuterStruct" ), t1d2_json );
- // auto t1d2_json3 = tr.protobuf_to_json( tr.get_type_num( "OuterStruct" ), t1d2_protobuf );
-//  std::cout<<t1d2_json3<<"\n\n";
-//  REQUIRE( t1d2_json == t1d2_json3 );
+   //  auto t1d2_protobuf = tr.json_to_protobuf( tr.get_type_num( "OuterStruct" ), t1d2_json );
+   // auto t1d2_json3 = tr.protobuf_to_json( tr.get_type_num( "OuterStruct" ), t1d2_protobuf );
+   //  std::cout<<t1d2_json3<<"\n\n";
+   //  REQUIRE( t1d2_json == t1d2_json3 );
 }

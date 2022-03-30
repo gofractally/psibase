@@ -35,6 +35,12 @@ namespace nft_sys
 
       // Mutate
       uint64_t mint(psibase::account_num issuer, sub_id_type sub_id);
+
+      credit( nfitid, user )
+      debit(...)
+
+
+
       void     transfer(psibase::account_num          from,
                         psibase::account_num          to,
                         uint64_t                      nid,
