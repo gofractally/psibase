@@ -39,43 +39,14 @@ uint64_t nft_contract::mint(account_num issuer, sub_id_type sub_id)
    auto nft_idx   = nft_table.get_index<0>();
 
    check(nft_idx.get(new_id) == std::nullopt, "Nft already exists");
-   check(nft::is_valid_key(new_id), "Nft ID invalid");
+   check(nft_row::is_valid_key(new_id), "Nft ID invalid");
 
-   nft_table.put(nft{new_id, issuer, issuer, 0});
+   nft_table.put(nft_row{new_id, issuer, issuer, 0});
 
    return new_id;
 }
 
-void nft_contract::transfer(account_num              from,
-                            account_num              to,
-                            nid                      nft_id,
-                            psio::const_view<string> memo)
-{
-   stubs::require_auth(from);
-
-   check(to != account_sys::null_account, "Target account invalid");
-
-   actor<account_sys> asys{nft_contract::contract, account_sys::contract};
-   check(asys.exists(to), "Target account DNE");
-
-   check(to != from, "Cannot transfer NFT to self");
-
-   check(nft::is_valid_key(nft_id), "NFT invalid");
-
-   auto nft_table = db.open<nft_table_t>();
-   auto nft_idx   = nft_table.get_index<0>();
-   auto item_opt  = nft_idx.get(nft_id);
-   check(item_opt != std::nullopt, "Nft DNE");
-
-   nft item = item_opt.value();
-   check(item.owner == from, "You don't own this NFT");
-
-   // Modify the owner and reinsert into the database
-   item.owner = to;
-   nft_table.put(item);
-}
-
-std::optional<nft> nft_contract::get_nft(nid nft_id)
+std::optional<nft_row> nft_contract::get_nft(nid nft_id)
 {
    auto nft_table = db.open<nft_table_t>();
    auto nft_idx   = nft_table.get_index<0>();

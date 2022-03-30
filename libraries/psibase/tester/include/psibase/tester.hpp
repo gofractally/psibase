@@ -172,6 +172,13 @@ namespace psibase
          }
       }
 
+      template <typename Action>
+      auto trace(Action&& a)
+      {
+         auto trans = make_transaction({a});
+         return push_transaction(trans);
+      }
+
       struct user_context
       {
          test_chain&                t;

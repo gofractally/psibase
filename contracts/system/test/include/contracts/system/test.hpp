@@ -44,6 +44,30 @@ namespace psibase
       return *top_traces[2 * num + 1];
    }
 
+   template <auto F>
+   struct ReturnType;
+
+   template <typename C, typename Ret, typename... Args, Ret (C::*F)(Args...)>
+   struct ReturnType<F>
+   {
+      using type = Ret;
+   };
+
+   template <auto MemberPtr>
+   auto getReturnVal(transaction_trace& t)
+   {
+      const action_trace& at = get_top_action(t, 0);
+
+      using T = typename ReturnType<MemberPtr>::type;
+
+      T                  ret_val;
+      psio::input_stream in(at.raw_retval);
+      psio::fracunpack(ret_val, in);
+      psio::shared_view_ptr<T>{ret_val}.validate();
+
+      return ret_val;
+   }
+
    /* sets up a min functional chain with ec signatures 
     */
    inline void boot_minimal(test_chain& t, bool show = false)

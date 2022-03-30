@@ -140,6 +140,7 @@ namespace psibase
    /**
  *  Builds actions to add to transactions
  */
+
    template <typename T>
    struct transactor : public psio::reflect<T>::template proxy<action_builder_proxy>
    {
@@ -148,6 +149,26 @@ namespace psibase
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
+   };
+
+   using AccountNumber = psibase::account_num;
+   struct Actor
+   {
+      Actor(AccountNumber s = AccountNumber()) : id(s) {}
+
+      template <typename Other>
+      auto at() const
+      {
+         //#ifdef IS_WASM
+         //return actor<Other>(id, Other::contract);
+         //#else
+         return transactor<Other>(id, Other::contract);
+         //#endif
+      }
+
+      operator AccountNumber() { return id; }
+
+      AccountNumber id;
    };
 
 }  // namespace psibase

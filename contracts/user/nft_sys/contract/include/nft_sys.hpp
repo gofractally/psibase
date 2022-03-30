@@ -8,7 +8,7 @@
 namespace nft_sys
 {
    using nid = uint64_t;
-   struct nft
+   struct nft_row
    {
       nid                  nftid;
       psibase::account_num issuer;
@@ -17,12 +17,12 @@ namespace nft_sys
 
       static bool is_valid_key(const nid& id) { return id != 0; }
 
-      friend std::strong_ordering operator<=>(const nft&, const nft&) = default;
+      friend std::strong_ordering operator<=>(const nft_row&, const nft_row&) = default;
    };
-   EOSIO_REFLECT(nft, nftid, issuer, owner, approved_account);
-   PSIO_REFLECT(nft, nftid, issuer, owner, approved_account);
+   EOSIO_REFLECT(nft_row, nftid, issuer, owner, approved_account);
+   PSIO_REFLECT(nft_row, nftid, issuer, owner, approved_account);
 
-   using nft_table_t = psibase::table<nft, &nft::nftid>;
+   using nft_table_t = psibase::table<nft_row, &nft_row::nftid>;
 
    using tables = psibase::contract_tables<nft_table_t>;
    class nft_contract : public psibase::contract
@@ -34,14 +34,10 @@ namespace nft_sys
       using sub_id_type = uint32_t;
 
       // Mutate
-      uint64_t mint(psibase::account_num issuer, sub_id_type sub_id);
-      void     transfer(psibase::account_num          from,
-                        psibase::account_num          to,
-                        uint64_t                      nid,
-                        psio::const_view<std::string> memo);
+      nid mint(psibase::account_num issuer, sub_id_type sub_id);
 
       // Read-only interface
-      std::optional<nft> get_nft(nid nft_id);
+      std::optional<nft_row> get_nft(nid nft_id);
 
      private:
       tables db{contract};
@@ -50,8 +46,7 @@ namespace nft_sys
    // clang-format off
    PSIO_REFLECT_INTERFACE(nft_contract, 
       (mint, 0, issuer, sub_id), 
-      (transfer, 1, actor, to, nid, memo),
-      (get_nft, 2, nft_id)
+      (get_nft, 1, nft_id)
    );
    // clang-format on
 
