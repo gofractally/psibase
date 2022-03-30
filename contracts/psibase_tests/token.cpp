@@ -1,4 +1,5 @@
 #include "token.hpp"
+#include <psibase/dispatch.hpp>
 
 using namespace psibase;
 
@@ -6,21 +7,39 @@ static constexpr bool enable_print = false;
 
 namespace token
 {
-   eosio::asset get_balance(account_num this_contract, account_num acc, eosio::symbol sym)
+
+   uint64_t token::getBalance( AccountNumber owner )
    {
-      auto result = kv_get<eosio::asset>(std::tuple{this_contract, acc, sym.code()});
+      auto result = kv_get<uint64_t>(std::tuple{token::contract, owner});
       if (!result)
-         return {0, sym};
-      check(result->symbol == sym, "symbol precision mismatch");
+         return 0;
+   //   check(result->symbol == sym, "symbol precision mismatch");
       return *result;
    }
 
-   void set_balance(account_num this_contract, account_num acc, eosio::asset amount)
+   void set_balance(account_num acc, uint64_t amount)
    {
-      kv_put(std::tuple{this_contract, acc, amount.symbol.code()}, amount);
+      kv_put(std::tuple{token::contract, acc}, amount);
    }
 
-   // TODO: This does a blind issue; need to track created tokens and limits
+   uint8_t token::transfer( AccountNumber to, uint64_t amount, const_view<String> memo ) {
+      auto fb = getBalance( get_sender() );
+      check( fb >= amount, "insufficient funds" );
+
+      set_balance( get_sender(), fb - amount );
+
+      auto tb = getBalance( to );
+      set_balance( to, tb + amount );
+      return 0;
+   }
+
+   uint8_t token::issue( AccountNumber to, uint64_t amount, const_view<String> memo ) {
+      check(get_sender() == token::contract, "sender must be token account");
+      set_balance( to, amount );
+      return 0;
+   }
+
+   /*
    void exec(account_num this_contract, account_num sender, issue& args)
    {
       check(sender == token::contract, "sender must be token account");
@@ -48,21 +67,8 @@ namespace token
                 get_balance(this_contract, sender, args.amount.symbol).to_string().c_str(),
                 get_balance(this_contract, args.to, args.amount.symbol).to_string().c_str());
    }
+   */
 
-   extern "C" void called(account_num this_contract, account_num sender)
-   {
-      auto act  = get_current_action();
-      auto data = eosio::convert_from_bin<action>(act.raw_data);
-      std::visit(
-          [&](auto& x) {
-             if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
-                exec(this_contract, sender, x);
-             else
-                set_retval(exec(this_contract, sender, x));
-          },
-          data);
-   }
-
-   extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
 }  // namespace token
+
+PSIBASE_DISPATCH( token::token )

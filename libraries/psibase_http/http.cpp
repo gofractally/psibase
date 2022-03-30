@@ -242,15 +242,15 @@ namespace psibase::http
             bc.start();
             signed_transaction trx;
             action             act{
-                .sender   = 0,
+                .sender   = AccountNumber(),
                 .contract = rpc_contract_num,
-                .raw_data = eosio::convert_to_bin(data),
+                .raw_data = psio::convert_to_frac(data),
             };
             transaction_trace   trace;
             transaction_context tc{bc, trx, {}, trace, false};
             action_trace        atrace;
             tc.exec_rpc(act, atrace);
-            auto result = eosio::convert_from_bin<rpc_reply_data>(atrace.raw_retval);
+            auto result = psio::convert_from_frac<rpc_reply_data>(atrace.raw_retval);
             return send(ok(std::move(result.reply), result.content_type.c_str()));
          }
          else if (http_config.static_dir.empty())

@@ -1,3 +1,4 @@
+#include <psibase/dispatch.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
 
@@ -8,20 +9,24 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-namespace transaction_sys
+namespace system_contract
 {
    // TODO: move to another contract
-   void exec(account_num this_contract, account_num sender, set_code& args)
+   uint8_t transaction_sys::setCode(
+            AccountNumber        contract,
+            uint8_t              vm_type,
+            uint8_t              vm_version,
+            std::vector<char>    code )
    {
       // TODO: validate code
-      check(sender == args.contract, "sender must match contract account");
-      auto account = kv_get<account_row>(account_row::kv_map, account_key(args.contract));
+      check( get_sender() == contract, "sender must match contract account");
+      auto account = kv_get<account_row>(account_row::kv_map, account_key(contract));
       check(account.has_value(), "can not set code on a missing account");
-      auto code_hash = sha256(args.code.data(), args.code.size());
-      if (args.vm_type == account->vm_type && args.vm_version == account->vm_version &&
+      auto code_hash = sha256(code.data(), code.size());
+      if (vm_type == account->vm_type && vm_version == account->vm_version &&
           code_hash == account->code_hash)
-         return;
-      if (account->code_hash != eosio::checksum256{})
+         return 0;
+      if (account->code_hash != Checksum256{})
       {
          // TODO: Refund RAM? A different resource?
          auto code_obj = kv_get<code_row>(
@@ -37,8 +42,8 @@ namespace transaction_sys
 
       // TODO: Bill RAM? A different resource?
       account->code_hash  = code_hash;
-      account->vm_type    = args.vm_type;
-      account->vm_version = args.vm_version;
+      account->vm_type    = vm_type;
+      account->vm_version = vm_version;
       kv_put(account->kv_map, account->key(), *account);
 
       auto code_obj = kv_get<code_row>(
@@ -50,26 +55,14 @@ namespace transaction_sys
              .vm_type    = account->vm_type,
              .vm_version = account->vm_version,
          });
-         code_obj->code.assign(args.code.begin(), args.code.end());
+         code_obj->code.assign(code.begin(), code.end());
       }
       ++code_obj->ref_count;
       kv_put(code_obj->kv_map, code_obj->key(), *code_obj);
+
+      return 0;
    }  // set_code
 
-   extern "C" void called(account_num this_contract, account_num sender)
-   {
-      // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
-      auto act  = get_current_action();
-      auto data = eosio::convert_from_bin<action>(act.raw_data);
-      std::visit(
-          [&](auto& x) {
-             if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
-                exec(this_contract, sender, x);
-             else
-                set_retval(exec(this_contract, sender, x));
-          },
-          data);
-   }
 
    // hard coded to account 1, which deploys transaction_sys (or avariant of) and native code
    // knows to call this method
@@ -77,6 +70,8 @@ namespace transaction_sys
    {
       if (enable_print)
          eosio::print("process_transaction\n");
+
+
       // TODO: expiration
       // TODO: check ref_block_num, ref_block_prefix
       // TODO: check max_net_usage_words, max_cpu_usage_ms
@@ -90,6 +85,10 @@ namespace transaction_sys
       {
          auto account = kv_get<account_row>(account_row::kv_map, account_key(act.sender));
          check(!!account, "unknown sender");
+
+         actor<system_contract::auth_fake_sys>  auth( system_contract::transaction_sys::contract, account->auth_contract );
+        // auth->authCheck()( act, trx.claims );
+        /*
          // TODO: assumes same dispatch format (abi) as auth_fake_sys
          // TODO: avoid inner raw_data copy
          // TODO: auth_contract needs a way to opt-in to being an auth contract.
@@ -97,8 +96,9 @@ namespace transaction_sys
          //       sender = 1, which provides transaction.sys's authorization
          //       for a potentially-unknown action.
          psibase::action outer = {
-             .sender   = 1,
+             .sender   = system_contract::transaction_sys::contract,
              .contract = account->auth_contract,
+
              // TODO: auth_contract will have to register action #
              .raw_data = eosio::convert_to_bin(auth_fake_sys::action{auth_fake_sys::auth_check{
                  .action = act,  // act to be authorized
@@ -108,12 +108,13 @@ namespace transaction_sys
          if (enable_print)
             eosio::print("call auth_check\n");
          call(outer);  // TODO: avoid copy (serializing outer)
+         */
          if (enable_print)
             eosio::print("call action\n");
          call(act);  // TODO: avoid copy (serializing)
       }
    }
 
-   extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
-}  // namespace transaction_sys
+}  // namespace system_contract
+
+PSIBASE_DISPATCH( system_contract::transaction_sys )

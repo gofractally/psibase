@@ -1,7 +1,6 @@
 #include <secp256k1_preallocated.h>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/contract_entry.hpp>
-#include <psibase/from_bin.hpp>
 
 using namespace psibase;
 
@@ -23,10 +22,11 @@ extern "C" [[clang::export_name("verify")]] void verify()
 {
    check(context, "verify_ec_sys not fully built");
 
+   /*
    auto act     = get_current_action();
-   auto data    = eosio::convert_from_bin<verify_data>(act.raw_data);
-   auto pub_key = unpack_all<eosio::public_key>(data.claim.raw_data, "extra data in claim");
-   auto sig     = unpack_all<eosio::signature>(data.proof, "extra data in proof");
+   auto data    = psio::convert_from_frac<verify_data>(act.raw_data);
+   auto pub_key = unpack_all<PublicKey>(data.claim.raw_data, "extra data in claim");
+   auto sig     = unpack_all<Signature>(data.proof, "extra data in proof");
    auto hash    = data.transaction_hash.extract_as_byte_array();
 
    auto* k1_pub_key = std::get_if<0>(&pub_key);
@@ -51,6 +51,7 @@ extern "C" [[clang::export_name("verify")]] void verify()
 
    eosio::check(secp256k1_ecdsa_verify(context, &normalized, hash.data(), &parsed_pub_key) == 1,
                 "incorrect signature");
+                */
 }
 
 extern "C" void called(account_num this_contract, account_num sender)

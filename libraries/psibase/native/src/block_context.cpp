@@ -23,7 +23,7 @@ namespace psibase
    }
 
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold
-   void block_context::start(std::optional<eosio::time_point_sec> time)
+   void block_context::start(std::optional<TimePointSec> time)
    {
       eosio::check(!started, "block has already been started");
       auto status = db.kv_get<status_row>(status_row::kv_map, status_key());
@@ -39,13 +39,13 @@ namespace psibase
          current.header.num      = status->head->header.num + 1;
          if (time)
          {
-            eosio::check(time->utc_seconds > status->head->header.time.utc_seconds,
+            eosio::check(time->seconds > status->head->header.time.seconds,
                          "block is in the past");
             current.header.time = *time;
          }
          else
          {
-            current.header.time = status->head->header.time + 1;
+            current.header.time.seconds = status->head->header.time.seconds + 1;
          }
       }
       else

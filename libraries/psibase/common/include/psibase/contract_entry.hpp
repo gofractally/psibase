@@ -5,7 +5,7 @@
 namespace psibase
 {
    // TODO: move to table instead of fixed value
-   constexpr account_num rpc_contract_num = 3;  // RPC requests run on this contract
+   constexpr account_num rpc_contract_num = account_num("rpc");  // RPC requests run on this contract
 
    struct verify_data
    {
@@ -13,7 +13,7 @@ namespace psibase
       psibase::claim     claim;
       std::vector<char>  proof;
    };
-   EOSIO_REFLECT(verify_data, transaction_hash, claim, proof)
+   PSIO_REFLECT(verify_data, transaction_hash, claim, proof)
 
    struct rpc_request_data
    {
@@ -23,7 +23,6 @@ namespace psibase
       std::string       target;
       std::vector<char> body;
    };
-   EOSIO_REFLECT(rpc_request_data, host, root_host, method, target, body)
    PSIO_REFLECT(rpc_request_data, host, root_host, method, target, body)
 
    struct rpc_reply_data
@@ -31,7 +30,6 @@ namespace psibase
       std::string       content_type;
       std::vector<char> reply;
    };
-   EOSIO_REFLECT(rpc_reply_data, content_type, reply)
    PSIO_REFLECT(rpc_reply_data, content_type, reply)
 
 }  // namespace psibase

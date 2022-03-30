@@ -1,3 +1,4 @@
+#include <psio/to_json.hpp>
 #include "contracts/system/rpc_account_sys.hpp"
 
 #include <contracts/system/account_sys.hpp>
@@ -7,7 +8,7 @@
 
 static constexpr bool enable_print = false;
 
-using table_num = uint32_t;
+using table_num = uint16_t;
 
 static constexpr table_num web_content_table = 1;
 
@@ -23,21 +24,23 @@ struct web_content_row
 
    auto key(psibase::account_num this_contract) { return web_content_key(this_contract, path); }
 };
-EOSIO_REFLECT(web_content_row, path, content_type, content)
+PSIO_REFLECT(web_content_row, path, content_type, content)
 
-struct augmented_account_row : psibase::account_row
+struct augmented_account_row //: psibase::account_row
 {
    std::optional<std::string> name;
    std::optional<std::string> auth_contract_name;
 };
-EOSIO_REFLECT(augmented_account_row, base psibase::account_row, name, auth_contract_name)
+PSIO_REFLECT(augmented_account_row, 
+            // base psibase::account_row, 
+             name, auth_contract_name)
 
-namespace psibase
+namespace system_contract 
 {
    rpc_reply_data rpc_account_sys::rpc_sys(rpc_request_data request)
    {
       auto to_json = [](const auto& obj) {
-         auto json = eosio::convert_to_json(obj);
+         auto json = psio::convert_to_json(obj);
          return rpc_reply_data{
              .content_type = "application/json",
              .reply        = {json.begin(), json.end()},
@@ -59,6 +62,7 @@ namespace psibase
          {
             actor<account_sys>                 asys(get_receiver(), account_sys::contract);
             std::vector<augmented_account_row> rows;
+            /*
             auto                               key      = eosio::convert_to_key(account_key(0));
             auto                               key_size = sizeof(account_table);
             while (true)
@@ -75,6 +79,7 @@ namespace psibase
                aug.auth_contract_name = asys.get_account_by_num(aug.auth_contract);
                rows.push_back(std::move(aug));
             }
+            */
             return to_json(rows);
          }
       }
@@ -103,6 +108,6 @@ namespace psibase
       kv_put(row.key(get_receiver()), row);
    }
 
-}  // namespace psibase
+}  // namespace system_contract
 
-PSIBASE_DISPATCH(psibase::rpc_account_sys)
+PSIBASE_DISPATCH(system_contract::rpc_account_sys)

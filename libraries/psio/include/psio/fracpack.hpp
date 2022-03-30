@@ -264,18 +264,18 @@ namespace psio
    constexpr bool may_use_heap()
    {
       if constexpr (is_std_array<T>::value) 
-         return may_use_heap<is_std_array<T>::value_type>();
-      if constexpr (is_std_optional<T>::value)
+         return may_use_heap<typename is_std_array<T>::value_type>();
+      else if constexpr (is_std_optional<T>::value)
          return true;
-      if constexpr (is_std_tuple<T>::value)
+      else if constexpr (is_std_tuple<T>::value)
          return true;
-      if constexpr (is_std_variant<T>::value)
+      else if constexpr (is_std_variant<T>::value)
          return true;
-      if constexpr (is_shared_view_ptr<T>::value)
+      else if constexpr (is_shared_view_ptr<T>::value)
          return may_use_heap<is_shared_view_ptr<T>::value_type>();
-      if constexpr (std::is_arithmetic_v<T>)
+      else if constexpr (std::is_arithmetic_v<T>)
          return false;
-      if constexpr (not std::is_final_v<T>)
+      else if constexpr (not std::is_final_v<T>)
          return true;
       else if constexpr (can_memcpy<T>())
          return false;
@@ -772,24 +772,24 @@ namespace psio
       }
    }
 
-   template <typename V, typename First, typename... Rest>
+   template <uint32_t I, typename V, typename First, typename... Rest>
    bool init_type(uint8_t i, V& v)
    {
-      if (i == 0)
+      if (i == I)
       {
-         v = First();
+         v = V( std::in_place_index_t<I>(), First() );
          return true;
       }
       else if constexpr (sizeof...(Rest) > 0)
       {
-         return init_type<V, Rest...>(i - 1, v);
+         return init_type<I+1,V, Rest...>(i - 1, v);
       }
       return false;
    }
    template <typename First, typename... Rest>
    bool init_variant_by_index(uint8_t index, std::variant<First, Rest...>& v)
    {
-      return init_type<std::variant<First, Rest...>, First, Rest...>(index, v);
+      return init_type<0,std::variant<First, Rest...>, First, Rest...>(index, v);
    }
 
    template <typename T, typename S>
@@ -1643,6 +1643,7 @@ namespace psio
          return pos != nullptr &&
               0 != *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
       }
+      operator T()const { return view<T>(pos); }
       private: 
          friend const_view< shared_view_ptr<T> >;
          char* pos;
@@ -1668,6 +1669,9 @@ namespace psio
          return pos != nullptr &&
               0 != *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
       }
+
+      operator T()const { return view<T>(pos); }
+
       private: 
          const char* pos;
    };
@@ -1711,10 +1715,97 @@ namespace psio
       auto* operator->() { return this; }
       auto& operator*() { return *this; }
 
+      operator std::vector<T>()const {
+         input_stream in(pos, pos+0xfffffff); /// TOOD: maintain real end
+         std::vector<T> tmp;
+         fracunpack<std::vector<T>>(tmp,in);
+         return tmp;
+      }
+
      private:
       friend struct const_view<std::vector<T>>;
       char* pos;
    };
+
+   template <typename T, size_t S>
+   struct view<std::array<T,S>>
+   {
+      view(char* p = nullptr) : pos(p) {}
+
+      uint32_t size() const { return S; }
+
+      auto operator[](uint32_t idx)
+      {
+         if constexpr (may_use_heap<T>())
+         {
+            return get_offset<T>(pos + idx * sizeof(uint32_t));
+         }
+         else
+         {
+            return view<T>(pos + idx * fracpack_fixed_size<T>());
+         }
+      }
+
+      inline char* data()const { return pos; }
+      inline uint32_t data_size()const { return S *  fracpack_fixed_size<T>(); }
+
+      bool valid() const { return pos != nullptr; }
+
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+
+      operator std::array<T,S>()const {
+         input_stream in(pos, pos+0xfffffff); /// TOOD: maintain real end
+         std::array<T,S> tmp;
+         fracunpack<std::array<T,S>>(tmp,in);
+         return tmp;
+      }
+
+     private:
+      friend struct const_view<std::array<T,S>>;
+      char* pos;
+   };
+   template <typename T, size_t S>
+   struct const_view<std::array<T,S>>
+   {
+      const_view(const char* p = nullptr) : pos(p) {}
+      const_view( view<std::array<T,S>> v ) : pos(v.pos) {}
+
+      uint32_t size() const { return S; }
+
+      auto operator[](uint32_t idx)const
+      {
+         if constexpr (may_use_heap<T>())
+         {
+            return get_offset<T>(pos + idx * sizeof(uint32_t));
+         }
+         else
+         {
+            return view<T>(pos + idx * fracpack_fixed_size<T>());
+         }
+      }
+
+      inline const char* data()const { return pos; }
+      inline uint32_t data_size()const { return S *  fracpack_fixed_size<T>(); }
+
+      bool valid() const { return pos != nullptr; }
+
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+
+      operator std::array<T,S>()const {
+         input_stream in(pos, pos+0xfffffff); /// TOOD: maintain real end
+         std::array<T,S> tmp;
+         fracunpack<std::array<T,S>>(tmp,in);
+         return tmp;
+      }
+
+
+     private:
+      const char* pos;
+   };
+
+
 
    /// TODO: specialize this based on whether T is memcpyable and ensure
    /// so that data() and data_size() return types that are proper (e.g. unaligned_type<T>*) and factor
@@ -1754,6 +1845,13 @@ namespace psio
 
       auto* operator->()const  { return this; }
       auto& operator*()const { return *this; }
+
+      operator std::vector<T>()const {
+         input_stream in(pos, pos+0xfffffff); /// TOOD: maintain real end
+         std::vector<T> tmp;
+         fracunpack<std::vector<T>>(tmp,in);
+         return tmp;
+      }
 
      private:
       const char* pos;
@@ -1921,6 +2019,13 @@ namespace psio
       auto* operator->() { return this; }
       auto& operator*() { return *this; }
 
+      operator std::variant<Ts...>() const { 
+         input_stream in(pos, pos+0xfffffff); /// TOOD: maintain real end
+         std::variant<Ts...> tmp;
+         fracunpack<std::variant<Ts...>>(tmp,in);
+         return tmp;
+      }
+
      private:
       friend struct const_view<std::variant<Ts...>>;
       char* pos;
@@ -1957,6 +2062,13 @@ namespace psio
       const char*  data()const{ return pos + 5; }
       auto* operator->()const { return this; }
       auto& operator*()const { return *this; }
+
+      operator std::variant<Ts...>() const { 
+         input_stream in(pos, pos+0xfffffff); /// TOOD: maintain real end
+         std::variant<Ts...> tmp;
+         fracunpack<std::variant<Ts...>>(tmp,in);
+         return tmp;
+      }
 
      private:
       const char* pos;

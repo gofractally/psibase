@@ -5,6 +5,6 @@ endfunction(add)
 add("")
 add("-debug")
 
-add_subdirectory(contract/test)
+#add_subdirectory(contract/test)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

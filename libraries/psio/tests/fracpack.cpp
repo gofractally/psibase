@@ -1755,6 +1755,9 @@ TEST_CASE( "bugtest" )
    REQUIRE(p.validate());
 }
     
+TEST_CASE( "stdarray" ) {
+   REQUIRE( not psio::may_use_heap<std::array<uint32_t,5>>() );
+};
 
 TEST_CASE( "translate" ) {
   psio::schema apischema;

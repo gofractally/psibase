@@ -482,7 +482,7 @@ namespace psio
    template<typename>
    struct is_std_array : std::false_type{};
 
-   template<typename T,std::size_t N>
+   template<typename T,auto N>
    struct is_std_array<std::array<T,N>> : std::true_type{
       using value_type = T;
       constexpr static const std::size_t size = N;

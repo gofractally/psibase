@@ -39,10 +39,10 @@ namespace psibase
  */
    struct action_builder_proxy
    {
-      action_builder_proxy(uint32_t s, uint32_t r) : sender(s), receiver(r) {}
+      action_builder_proxy( AccountNumber s,  AccountNumber r) : sender(s), receiver(r) {}
 
-      uint32_t sender;
-      uint32_t receiver;
+      AccountNumber sender;
+      AccountNumber receiver;
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
@@ -67,7 +67,7 @@ namespace psibase
          //  auto data = arg_var(std::in_place_index_t<idx>(),
          //                      param_tuple(std::forward<Args>(args)...));
 
-         psibase::action act{sender, receiver};
+         psibase::Action act{sender, receiver, Name};
          act.raw_data.resize(5 + param_tuple_size);
          auto rvv        = reinterpret_cast<raw_variant_view*>(act.raw_data.data());
          rvv->action_idx = idx;
@@ -100,10 +100,10 @@ namespace psibase
  */
    struct sync_call_proxy
    {
-      sync_call_proxy(uint32_t s, uint32_t r) : sender(s), receiver(r) {}
+      sync_call_proxy( AccountNumber s,  AccountNumber r) : sender(s), receiver(r) {}
 
-      uint32_t sender;
-      uint32_t receiver;
+      AccountNumber sender;
+      AccountNumber receiver;
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const

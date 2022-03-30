@@ -21,6 +21,12 @@ namespace psibase {
       */
    };
 
+   template<typename R, typename T, typename MemberPtr, typename... Args>
+   void call_method( T& contract, MemberPtr method, Args&&... args ) {
+       psio::shared_view_ptr<R> p((contract.*method)( std::forward<decltype(args)>(args)... ));
+       raw::set_retval( p.data(), p.size() );
+   }
+
    /**
     *  This method is called when a contract receives a call and will
     *  and will call the proper method on Contact assuming Contract has
@@ -50,8 +56,7 @@ namespace psibase {
             if constexpr( std::is_same_v<void, result_type> ) {
                 (contract.*member_func)( std::forward<decltype(args)>(args)... );
             } else {
-                psio::shared_view_ptr<result_type> p((contract.*member_func)( std::forward<decltype(args)>(args)... ));
-                raw::set_retval( p.data(), p.size() );
+                call_method<result_type,Contract,decltype(member_func),decltype(args)...>( contract, member_func, std::forward<decltype(args)>(args)... );
             }
          }); // param_view::call
       }); // reflect::get

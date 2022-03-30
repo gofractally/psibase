@@ -6,10 +6,11 @@
 
 namespace psibase
 {
-   eosio::checksum256 sha256(const char* data, size_t length)
+   Checksum256 sha256(const char* data, size_t length)
    {
-      std::array<unsigned char, 256 / 8> result;
-      SHA256((const unsigned char*)data, length, result.data());
+      //std::array<unsigned char, 256 / 8> result;
+      Checksum256 result;
+      SHA256((const unsigned char*)data, length, (unsigned char*)result.data());
       return result;
    }
 }  // namespace psibase

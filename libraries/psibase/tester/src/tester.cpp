@@ -203,14 +203,15 @@ void psibase::test_chain::start_block(std::string_view time)
    uint64_t value;
    eosio::check(eosio::string_to_utc_microseconds(value, time.data(), time.data() + time.size()),
                 "bad time");
-   start_block(eosio::time_point{eosio::microseconds(value)});
+   start_block(TimePointSec{.seconds = uint32_t(value/1000)});
 }
 
-void psibase::test_chain::start_block(eosio::time_point tp)
+void psibase::test_chain::start_block(TimePointSec tp)
 {
    finish_block();
    auto head_time = get_head_block_info().header.time;
-   auto skip      = (tp - head_time).count() / 1000 - 500;
+  // auto skip      = (tp - head_time).count() / 1000 - 500;
+   auto skip       = tp.seconds - head_time.seconds;
    start_block(skip);
 }
 
@@ -236,10 +237,10 @@ const psibase::block_info& psibase::test_chain::get_head_block_info()
 
 void psibase::test_chain::fill_tapos(transaction& t, uint32_t expire_sec)
 {
-   auto& info      = get_head_block_info();
-   t.expiration    = info.header.time + expire_sec;
-   t.ref_block_num = info.header.num;
-   memcpy(&t.ref_block_prefix, info.id.extract_as_byte_array().data() + 8,
+   auto& info           = get_head_block_info();
+   t.expiration.seconds = info.header.time.seconds + expire_sec;
+   t.ref_block_num      = info.header.num;
+   memcpy(&t.ref_block_prefix, (char*)info.id.data() + 8,
           sizeof(t.ref_block_prefix));
 }
 
@@ -271,7 +272,7 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
    signed_trx.trx = trx;
    for (auto& [pub, priv] : keys)
       signed_trx.trx.claims.push_back({
-          .contract = verify_ec_sys::contract,
+          .contract = system_contract::verify_ec_sys::contract,
           .raw_data = eosio::convert_to_bin(pub),
       });
    // TODO: don't pack twice

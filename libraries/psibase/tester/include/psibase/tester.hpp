@@ -79,7 +79,7 @@ namespace psibase
 
       void start_block(std::string_view time);
 
-      void start_block(eosio::time_point tp);
+      void start_block(TimePointSec tp);
 
       /**
        * Finish the current pending block.  If no block is pending, creates an empty block.

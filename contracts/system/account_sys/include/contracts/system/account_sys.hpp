@@ -4,52 +4,29 @@
 #include <psibase/name.hpp>
 #include <psibase/native_tables.hpp>
 
-namespace psibase
+namespace system_contract 
 {
-   using psibase::account_num;
+   using namespace psibase;
    using std::optional;
    using std::string;
    using std::vector;
-
-   template <typename T>
-   using const_view = psio::const_view<T>;
-
-   struct account_name
-   {
-      account_num      num;
-      string           name;
-   };
-   PSIO_REFLECT(account_name, num, name);
-   EOSIO_REFLECT(account_name, num, name);
+   using psio::const_view;
 
    class account_sys : public psibase::contract
    {
      public:
-      static constexpr account_num contract       = 2;  /// hard coded...?
-      static constexpr uint64_t         contract_flags = psibase::account_row::allow_write_native;
-      static constexpr account_num null_account   = 0;
+      static constexpr AccountNumber contract = AccountNumber("account-sys");
+      static constexpr uint64_t      contract_flags = psibase::account_row::allow_write_native;
+      static constexpr AccountNumber null_account;
 
-      void startup(account_num                 next_account_num,
-                   const_view<vector<account_name>> existing_accounts);
-
-      account_num create_account(const_view<string> name,
-                                      const_view<string> auth_contract,
-                                      bool               allow_sudo);
-
-      optional<account_num> get_account_by_name(const_view<string> name);
-
-      optional<string> get_account_by_num(account_num num);
-      void             assert_account_name(account_num num, const_view<string> name);
-
-      int64_t exists(account_num num);
+      uint8_t startup( const_view<vector<AccountNumber>> existing_accounts);
+      uint8_t create_account( AccountNumber account, AccountNumber auth_contract, bool allow_sudo);
+      uint8_t exists( AccountNumber num);
    };
 
    PSIO_REFLECT_INTERFACE(account_sys,
-                          (startup, 0, next_account_num, existing_accounts),
-                          (create_account, 1, name, auth_contract),
-                          (get_account_by_name, 2, name),
-                          (get_account_by_num, 3, num),
-                          (assert_account_name, 4, num, name),
-                          (exists, 5, num))
+                          (startup, 0, existing_accounts),
+                          (create_account, 1, name, auth_contract, allow_sudo),
+                          (exists, 2, num))
 
-}  // namespace psibase
+}  // namespace system_contract

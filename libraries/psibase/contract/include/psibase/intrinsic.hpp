@@ -1,6 +1,5 @@
 #pragma once
 
-#include <eosio/from_bin.hpp>
 #include <eosio/to_key.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
@@ -137,7 +136,7 @@ namespace psibase
    template <typename T>
    void set_retval(const T& retval)
    {
-      auto data = eosio::convert_to_bin(retval);
+      auto data = psio::convert_to_frac(retval);
       raw::set_retval(data.data(), data.size());
    }
 
@@ -175,7 +174,7 @@ namespace psibase
    auto kv_put(kv_map map, const K& key, const V& value)
        -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
-      kv_put_raw(map, eosio::convert_to_key(key), eosio::convert_to_bin(value));
+      kv_put_raw(map, eosio::convert_to_key(key), psio::convert_to_frac(value));
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
@@ -244,7 +243,7 @@ namespace psibase
       auto v = kv_get_raw(map, eosio::convert_to_key(key));
       if (!v)
          return std::nullopt;
-      return eosio::convert_from_bin<V>(*v);
+      return psio::convert_from_frac<V>(*v);
    }
 
    // Get a key-value pair, if any
@@ -293,7 +292,7 @@ namespace psibase
       auto v = kv_greater_equal_raw(map, eosio::convert_to_key(key), match_key_size);
       if (!v)
          return std::nullopt;
-      return eosio::convert_from_bin<V>(*v);
+      return psio::convert_from_frac<V>(*v);
    }
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
@@ -327,7 +326,7 @@ namespace psibase
       auto v = kv_less_than_raw(map, eosio::convert_to_key(key), match_key_size);
       if (!v)
          return std::nullopt;
-      return eosio::convert_from_bin<V>(*v);
+      return psio::convert_from_frac<V>(*v);
    }
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
@@ -357,7 +356,7 @@ namespace psibase
       auto v = kv_max_raw(map, eosio::convert_to_key(key));
       if (!v)
          return std::nullopt;
-      return eosio::convert_from_bin<V>(*v);
+      return psio::convert_from_frac<V>(*v);
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the

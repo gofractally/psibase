@@ -5,6 +5,7 @@
 #include <contracts/system/auth_ec_sys.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
 #include <contracts/system/rpc_sys.hpp>
+#include <contracts/system/rpc_account_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/contract_entry.hpp>
@@ -13,6 +14,8 @@
 
 namespace psibase
 {
+   using std::vector;
+
    inline std::string show(bool include, transaction_trace t)
    {
       if (include || t.error)
@@ -57,44 +60,45 @@ namespace psibase
                   t.make_transaction(  //
                       {
                           {
-                              .sender   = 9999,  // genesis action... these values are ignored
-                              .contract = 9999,  // to prove that they don't matter
-                              .raw_data = eosio::convert_to_bin(genesis_action_data{
+                              .sender   = {},  // genesis action... these values are ignored
+                              .contract = {},  // to prove that they don't matter
+                              .method   = {},
+                              .raw_data = psio::convert_to_frac(genesis_action_data{
                                   .contracts =  // g.a.d--^ is config file for gen
                                   {
                                       {
-                                          .contract      = transaction_sys::contract,
-                                          .auth_contract = auth_fake_sys::contract,
-                                          .flags         = transaction_sys::contract_flags,
+                                          .contract      = system_contract::transaction_sys::contract,
+                                          .auth_contract = system_contract::auth_fake_sys::contract,
+                                          .flags         = system_contract::transaction_sys::contract_flags,
                                           .code          = read_whole_file("transaction_sys.wasm"),
                                       },
                                       {
-                                          .contract      = account_sys::contract,
-                                          .auth_contract = auth_fake_sys::contract,
-                                          .flags         = account_sys::contract_flags,
+                                          .contract      = system_contract::account_sys::contract,
+                                          .auth_contract = system_contract::auth_fake_sys::contract,
+                                          .flags         = system_contract::account_sys::contract_flags,
                                           .code          = read_whole_file("account_sys.wasm"),
                                       },
                                       {
-                                          .contract      = rpc_contract_num,
-                                          .auth_contract = auth_fake_sys::contract,
+                                          .contract      = system_contract::rpc_account_sys::contract,
+                                          .auth_contract = system_contract::auth_fake_sys::contract,
                                           .flags         = 0,
                                           .code          = read_whole_file("rpc_sys.wasm"),
                                       },
                                       {
-                                          .contract      = auth_fake_sys::contract,
-                                          .auth_contract = auth_fake_sys::contract,
+                                          .contract      = system_contract::auth_fake_sys::contract,
+                                          .auth_contract = system_contract::auth_fake_sys::contract,
                                           .flags         = 0,
                                           .code          = read_whole_file("auth_fake_sys.wasm"),
                                       },
                                       {
-                                          .contract      = auth_ec_sys::contract,
-                                          .auth_contract = auth_fake_sys::contract,
+                                          .contract      = system_contract::auth_ec_sys::contract,
+                                          .auth_contract = system_contract::auth_fake_sys::contract,
                                           .flags         = 0,
                                           .code          = read_whole_file("auth_ec_sys.wasm"),
                                       },
                                       {
-                                          .contract      = verify_ec_sys::contract,
-                                          .auth_contract = auth_fake_sys::contract,
+                                          .contract      = system_contract::verify_ec_sys::contract,
+                                          .auth_contract = system_contract::auth_fake_sys::contract,
                                           .flags         = 0,
                                           .code          = read_whole_file("verify_ec_sys.wasm"),
                                       },
@@ -152,7 +156,7 @@ namespace psibase
       std::cout << "el.existing_accounts.size: " << vi->existing_accounts()->size() <<"\n";
       */
 
-      transactor<account_sys> asys(transaction_sys::contract, account_sys::contract);
+      transactor<system_contract::account_sys> asys{system_contract::transaction_sys::contract, system_contract::account_sys::contract};
 
       REQUIRE(                         //
           psibase::show(               //
@@ -160,94 +164,86 @@ namespace psibase
               t.push_transaction(      //
                   t.make_transaction(  //
                       {
-                          asys.startup(100,
-                                       vector<account_name>{
-                                           {transaction_sys::contract, "transaction.sys"},
-                                           {account_sys::contract, "account.sys"},
-                                           {rpc_contract_num, "rpc.sys"},
-                                           {auth_fake_sys::contract, "auth_fake.sys"},
-                                           {auth_ec_sys::contract, "auth_ec.sys"},
-                                           {verify_ec_sys::contract, "verify_ec.sys"},
+                          asys.startup( vector<AccountNumber>{
+                                           {system_contract::transaction_sys::contract},
+                                           {system_contract::account_sys::contract},
+                                           {system_contract::rpc_contract_num},
+                                           {system_contract::auth_fake_sys::contract},
+                                           {system_contract::auth_ec_sys::contract },
+                                           {system_contract::verify_ec_sys::contract},
                                        })
-                          /*
-                          { // init account_sys contract 
-                              // must be valid, but could be any account num
-                              .sender   = transaction_sys::contract, 
-                              .contract = account_sys::contract,
-                              .raw_data =
-                                  // account_sys::startup( start new accounts at 100, map<num, name> )
-                                  psio::convert_to_frac(account_sys::action{account_sys::startup{
-                                      .next_account_num = 100, 
-                                      .existing_accounts =
-                                          {
-                                              {transaction_sys::contract, "transaction.sys"},
-                                              {account_sys::contract, "account.sys"},
-                                              {auth_fake_sys::contract, "auth_fake.sys"},
-                                              {auth_ec_sys::contract, "auth_ec.sys"},
-                                              {verify_ec_sys::contract, "verify_ec.sys"},
-                                          },
-                                  }}),
-                                  */
                       }))) == "");
    }  // boot_minimal()
 
-   inline account_num add_account(test_chain& t,
-                                  const char* name,
-                                  const char* auth_contract = "auth_fake.sys",
+   inline AccountNumber add_account(test_chain& t,
+                                  AccountNumber acc, 
+                                  AccountNumber auth_contract = AccountNumber("auth-fake-sys"),
                                   bool        show          = false)
    {
-      transactor<account_sys> asys(transaction_sys::contract, account_sys::contract);
+      transactor<system_contract::account_sys> asys(system_contract::transaction_sys::contract, system_contract::account_sys::contract);
       auto                    trace = t.push_transaction(  //
-          t.make_transaction({asys.create_account(name, auth_contract, false)}));
+          t.make_transaction({asys.create_account(acc, auth_contract, false)}));
 
       REQUIRE(psibase::show(show, trace) == "");
       auto& at = get_top_action(trace, 0);
       return psio::convert_from_frac<account_num>(at.raw_retval);
    }  // add_contract()
 
-   inline account_num add_ec_account(test_chain&              t,
-                                     const char*              name,
+   inline AccountNumber add_account(test_chain& t,
+                                  const char* acc, 
+                                  AccountNumber auth_contract = AccountNumber("auth-fake-sys"),
+                                  bool        show          = false) { return add_account( t, AccountNumber(acc), auth_contract, show ); }
+
+   inline AccountNumber add_ec_account(test_chain&              t,
+                                     AccountNumber            name,
                                      const eosio::public_key& public_key,
                                      bool                     show = false)
    {
+      transactor<system_contract::auth_ec_sys> aecsys(system_contract::transaction_sys::contract, system_contract::auth_ec_sys::contract);
+
       auto trace = t.push_transaction(  //
           t.make_transaction(           //
               {{
-                  .sender   = transaction_sys::contract,
-                  .contract = auth_ec_sys::contract,
-                  .raw_data = eosio::convert_to_bin(auth_ec_sys::action{auth_ec_sys::create_account{
-                      .name       = name,
-                      .public_key = public_key,
-                  }}),
+                  aecsys.setKey( name, public_key )
               }}));
       REQUIRE(psibase::show(show, trace) == "");
       auto& at = get_top_action(trace, 0);
-      return eosio::convert_from_bin<account_num>(at.raw_retval);
+      return psio::convert_from_frac<AccountNumber>(at.raw_retval);
    }  // add_ec_account()
+   inline AccountNumber add_ec_account(test_chain&              t,
+                                     const char* name,
+                                     const eosio::public_key& public_key,
+                                     bool                     show = false) {
+      return add_ec_account( t, AccountNumber(name), public_key, show ); 
+   }
 
-   inline account_num add_contract(test_chain& t,
-                                   const char* name,
-                                   const char* filename,
-                                   bool        show = false)
+   inline AccountNumber add_contract(test_chain& t,
+                            AccountNumber acc,
+                            const char* filename,
+                            bool        show = false)
    {
-      auto num = add_account(t, name, "auth_fake.sys", show);
+      add_account(t, acc, AccountNumber("auth-fake-sys"), show);
+      transactor<system_contract::transaction_sys> tsys{acc, system_contract::transaction_sys::contract};
       REQUIRE(                         //
           psibase::show(               //
               show,                    //
               t.push_transaction(      //
                   t.make_transaction(  //
                       {{
-                          .sender   = num,
-                          .contract = transaction_sys::contract,
-                          .raw_data = eosio::convert_to_bin(
-                              transaction_sys::action{transaction_sys::set_code{
-                                  .contract   = num,
-                                  .vm_type    = 0,
-                                  .vm_version = 0,
-                                  .code       = read_whole_file(filename),
-                              }}),
+                          tsys.setCode( 
+                                   acc,
+                                   0,
+                                   0,
+                                   read_whole_file(filename)
+                          )
                       }}))) == "");
-      return num;
+      return acc;
    }  // add_contract()
+   inline AccountNumber add_contract(test_chain& t,
+                            const char* acc,
+                            const char* filename,
+                            bool        show = false) {
+      return add_contract( t, AccountNumber(acc), filename, show ); 
+   }
 
 }  // namespace psibase
