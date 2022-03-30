@@ -2298,6 +2298,7 @@ namespace psio
    {
       uint32_t size;
    };
+
    /**
      *  A shared_ptr<char> array containing the data
      *  
@@ -2410,6 +2411,10 @@ namespace psio
 
      private:
       std::shared_ptr<char> _data;
+   };
+   template <>
+   class shared_view_ptr<void>
+   {
    };
 
    template <typename T, typename R, typename... Args>

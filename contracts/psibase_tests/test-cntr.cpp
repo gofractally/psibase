@@ -18,7 +18,7 @@ extern "C" void __wasm_call_ctors();
 extern "C" void start(account_num this_contract)
 {
    __wasm_call_ctors();
-   printf("This is contract %d\n", this_contract);
+   printf("This is contract %s\n", this_contract.str().c_str());
 }
 
 extern "C" void called(account_num this_contract, account_num sender)
