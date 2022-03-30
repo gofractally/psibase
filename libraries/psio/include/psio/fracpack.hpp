@@ -286,7 +286,9 @@ namespace psio
    template <typename T>
    constexpr bool may_use_heap()
    {
-      if constexpr (is_std_array<T>::value)
+      if constexpr (std::is_same_v<bool, T>)
+         return false;
+      else if constexpr (is_std_array<T>::value)
          return may_use_heap<typename is_std_array<T>::value_type>();
       else if constexpr (is_std_optional<T>::value)
          return true;
@@ -348,7 +350,9 @@ namespace psio
    template <typename T>
    constexpr uint16_t fracpack_fixed_size()
    {
-      if constexpr (is_array<T>())
+      if constexpr (std::is_same_v<bool, T>)
+         return 1;
+      else if constexpr (is_array<T>())
       {
          if constexpr (may_use_heap<typename is_std_array<T>::value_type>())
          {
@@ -599,6 +603,13 @@ namespace psio
       stream.write(v.data(), v.size());
    }
 
+   template <typename S>
+   void fracpack(bool v, S& stream)
+   {
+      char c = v;
+      stream.write(&c, 1);
+   }
+
    /**
      *  Writes v to a stream...without a size prefix
      */
@@ -614,12 +625,7 @@ namespace psio
          if constexpr (not std::is_same_v<size_stream, S>)
             heap = stream.pos + start_heap;
 
-         tuple_foreach(v,
-                       [&](const auto& x)
-                       {
-                          using member_type = std::decay_t<decltype(x)>;
-                          fracpack_member(heap, x, stream);
-                       });
+         tuple_foreach(v, [&](const auto& x) { fracpack_member(heap, x, stream); });
       }
       else if constexpr (is_std_variant<T>::value)
       {
@@ -745,12 +751,8 @@ namespace psio
 
          /// no need to write start_heap, it is always the same because
          /// the structure is "fixed" and cannot be extended in the future
-         reflect<T>::for_each(
-             [&](const meta& ref, auto mptr)
-             {
-                using member_type = decltype(result_of_member(mptr));
-                fracpack_member(heap, v, mptr, stream);
-             });
+         reflect<T>::for_each([&](const meta& ref, auto mptr)
+                              { fracpack_member(heap, v, mptr, stream); });
 
          if constexpr (not std::is_same_v<size_stream, S>)
             stream.pos = heap;
@@ -773,6 +775,14 @@ namespace psio
    {
       if constexpr (not std::is_member_function_pointer_v<P>)
          fracunpack_member(member.*ptr, stream);
+   }
+
+   template <typename S>
+   void fracunpack(bool& v, S& stream)
+   {
+      char c;
+      stream.read(&c, 1);
+      v = c != 0;
    }
 
    template <typename T, typename S>
@@ -1672,6 +1682,59 @@ namespace psio
       using View::not_defined;
    };
 
+   template <>
+   struct view<bool>
+   {
+      using char_ptr = char*;
+      view(char_ptr p = nullptr) : pos(p) {}
+      operator bool() const { return *pos != 0; }
+
+      template <typename V>
+      auto& operator=(V&& v)
+      {
+         *pos = (0 != v);
+         return *this;
+      }
+
+      template <typename S>
+      friend S& operator<<(S& stream, const view& member)
+      {
+         return stream << bool(0 != *member.pos);
+      }
+
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+      auto* operator->() const { return this; }
+      auto& operator*() const { return *this; }
+
+     private:
+      friend struct const_view<bool>;
+      char_ptr pos;
+   };
+
+   template <>
+   struct const_view<bool>
+   {
+      using char_ptr = const char*;
+      const_view(char_ptr p = nullptr) : pos(p) {}
+      const_view(view<bool> v) : pos(v.pos) {}
+      operator bool() const { return *pos != 0; }
+
+      template <typename S>
+      friend S& operator<<(S& stream, const const_view& member)
+      {
+         return stream << bool(0 != *member.pos);
+      }
+
+      auto* operator->() { return this; }
+      auto& operator*() { return *this; }
+      auto* operator->() const { return this; }
+      auto& operator*() const { return *this; }
+
+     private:
+      char_ptr pos;
+   };
+
    template <typename T>
    struct view<T, std::enable_if_t<std::is_arithmetic_v<T>>>
    {
@@ -2298,6 +2361,7 @@ namespace psio
    {
       uint32_t size;
    };
+
    /**
      *  A shared_ptr<char> array containing the data
      *  
@@ -2340,7 +2404,7 @@ namespace psio
       }
 
       shared_view_ptr(){};
-      operator bool() const { return _data != nullptr; }
+      bool operator!() const { return _data == nullptr; }
 
       const auto operator->() const { return view<T>(data()); }
       auto       operator->() { return view<T>(data()); }
@@ -2410,6 +2474,10 @@ namespace psio
 
      private:
       std::shared_ptr<char> _data;
+   };
+   template <>
+   class shared_view_ptr<void>
+   {
    };
 
    template <typename T, typename R, typename... Args>

@@ -22,14 +22,13 @@ namespace system_contract
    };
    PSIO_REFLECT(account_sys_status_row, total_accounts)
 
-   uint8_t account_sys::startup(const_view<vector<AccountNumber>> existing_accounts)
+   void account_sys::startup(const_view<vector<AccountNumber>> existing_accounts)
    {
       check(!kv_get<account_sys_status_row>(account_sys_status_key()), "already started");
       auto s = existing_accounts->size();
 
       kv_put(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
 
-      return 0;
       /*
       eosio::print("existing accounts size: ", s, "\n");
       for (uint32_t i = 0; i < s; ++i)
@@ -41,9 +40,7 @@ namespace system_contract
       */
    }
 
-   uint8_t account_sys::create_account(AccountNumber acc,
-                                       AccountNumber auth_contract,
-                                       bool          allow_sudo)
+   void account_sys::create_account(AccountNumber acc, AccountNumber auth_contract, bool allow_sudo)
    {
       auto status = kv_get<account_sys_status_row>(account_sys_status_key());
       check(status.has_value(), "not started");
@@ -71,11 +68,9 @@ namespace system_contract
       };
       kv_put(status->key(), *status);
       kv_put(account.kv_map, account.key(), account);
-
-      return 0;
    }
 
-   uint8_t account_sys::exists(AccountNumber num)
+   bool account_sys::exists(AccountNumber num)
    {
       return !!kv_get<account_row>(account_row::kv_map, account_key(num));
    }
