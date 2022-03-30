@@ -70,7 +70,7 @@ namespace system_contract
       kv_put(account.kv_map, account.key(), account);
    }
 
-   uint8_t account_sys::exists(AccountNumber num)
+   bool account_sys::exists(AccountNumber num)
    {
       return !!kv_get<account_row>(account_row::kv_map, account_key(num));
    }

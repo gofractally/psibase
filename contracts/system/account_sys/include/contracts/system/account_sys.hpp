@@ -19,9 +19,9 @@ namespace system_contract
       static constexpr uint64_t      contract_flags = psibase::account_row::allow_write_native;
       static constexpr AccountNumber null_account;
 
-      void    startup(const_view<vector<AccountNumber>> existing_accounts);
-      void    create_account(AccountNumber account, AccountNumber auth_contract, bool allow_sudo);
-      uint8_t exists(AccountNumber num);
+      void startup(const_view<vector<AccountNumber>> existing_accounts);
+      void create_account(AccountNumber account, AccountNumber auth_contract, bool allow_sudo);
+      bool exists(AccountNumber num);
    };
 
    PSIO_REFLECT_INTERFACE(account_sys,
