@@ -3,8 +3,8 @@
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/crypto.hpp>
-#include <psibase/native_tables.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/native_tables.hpp>
 
 using namespace psibase;
 
@@ -15,21 +15,28 @@ namespace system_contract
    //using table_num = uint16_t;
    static constexpr table_num auth_table = 1;
 
-   inline auto auth_key(AccountNumber account) { return std::tuple{auth_ec_sys::contract, auth_table, account}; }
+   inline auto auth_key(AccountNumber account)
+   {
+      return std::tuple{auth_ec_sys::contract, auth_table, account};
+   }
    struct auth_row
    {
-      AccountNumber     account;
-      PublicKey         pubkey;
+      AccountNumber account;
+      PublicKey     pubkey;
 
       auto key() { return auth_key(account); }
    };
    PSIO_REFLECT(auth_row, account, pubkey)
 
-   uint8_t auth_ec_sys::setKey( AccountNumber account, PublicKey key ) {
-      if( get_sender() != account ) {
+   uint8_t auth_ec_sys::setKey(AccountNumber account, PublicKey key)
+   {
+      if (get_sender() != account)
+      {
          psibase::actor<account_sys> asys(auth_ec_sys::contract, account_sys::contract);
          asys.create_account(account, auth_ec_sys::contract, false);
-      } else {
+      }
+      else
+      {
          check(get_sender() == account, "wrong sender");
       }
       auth_row row{account, key};
@@ -37,7 +44,8 @@ namespace system_contract
       return 0;
    }
 
-   uint8_t auth_ec_sys::authCheck( const_view<Action> act, const_view<std::vector<Claim>> claims ) {
+   uint8_t auth_ec_sys::authCheck(const_view<Action> act, const_view<std::vector<Claim>> claims)
+   {
       if (enable_print)
          eosio::print("auth_check\n");
 
@@ -53,7 +61,6 @@ namespace system_contract
       */
    }
 
-
 }  // namespace system_contract
 
-PSIBASE_DISPATCH( system_contract::auth_ec_sys )
+PSIBASE_DISPATCH(system_contract::auth_ec_sys)

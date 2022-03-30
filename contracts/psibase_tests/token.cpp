@@ -7,13 +7,12 @@ static constexpr bool enable_print = false;
 
 namespace token
 {
-
-   uint64_t token::getBalance( AccountNumber owner )
+   uint64_t token::getBalance(AccountNumber owner)
    {
       auto result = kv_get<uint64_t>(std::tuple{token::contract, owner});
       if (!result)
          return 0;
-   //   check(result->symbol == sym, "symbol precision mismatch");
+      //   check(result->symbol == sym, "symbol precision mismatch");
       return *result;
    }
 
@@ -22,20 +21,22 @@ namespace token
       kv_put(std::tuple{token::contract, acc}, amount);
    }
 
-   uint8_t token::transfer( AccountNumber to, uint64_t amount, const_view<String> memo ) {
-      auto fb = getBalance( get_sender() );
-      check( fb >= amount, "insufficient funds" );
+   uint8_t token::transfer(AccountNumber to, uint64_t amount, const_view<String> memo)
+   {
+      auto fb = getBalance(get_sender());
+      check(fb >= amount, "insufficient funds");
 
-      set_balance( get_sender(), fb - amount );
+      set_balance(get_sender(), fb - amount);
 
-      auto tb = getBalance( to );
-      set_balance( to, tb + amount );
+      auto tb = getBalance(to);
+      set_balance(to, tb + amount);
       return 0;
    }
 
-   uint8_t token::issue( AccountNumber to, uint64_t amount, const_view<String> memo ) {
+   uint8_t token::issue(AccountNumber to, uint64_t amount, const_view<String> memo)
+   {
       check(get_sender() == token::contract, "sender must be token account");
-      set_balance( to, amount );
+      set_balance(to, amount);
       return 0;
    }
 
@@ -71,4 +72,4 @@ namespace token
 
 }  // namespace token
 
-PSIBASE_DISPATCH( token::token )
+PSIBASE_DISPATCH(token::token)

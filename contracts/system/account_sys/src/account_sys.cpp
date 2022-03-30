@@ -6,7 +6,7 @@
 
 static constexpr bool enable_print = false;
 
-namespace system_contract 
+namespace system_contract
 {
    static constexpr table_num account_sys_status_table = 1;
 
@@ -16,18 +16,18 @@ namespace system_contract
    }
    struct account_sys_status_row
    {
-      uint32_t  total_accounts = 0;
+      uint32_t total_accounts = 0;
 
       static auto key() { return account_sys_status_key(); }
    };
-   PSIO_REFLECT(account_sys_status_row, total_accounts )
+   PSIO_REFLECT(account_sys_status_row, total_accounts)
 
-   uint8_t account_sys::startup( const_view<vector<AccountNumber>> existing_accounts)
+   uint8_t account_sys::startup(const_view<vector<AccountNumber>> existing_accounts)
    {
       check(!kv_get<account_sys_status_row>(account_sys_status_key()), "already started");
       auto s = existing_accounts->size();
 
-      kv_put(account_sys_status_key(), account_sys_status_row{ .total_accounts = s });
+      kv_put(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
 
       return 0;
       /*
@@ -41,9 +41,9 @@ namespace system_contract
       */
    }
 
-   uint8_t account_sys::create_account( AccountNumber acc,
-                                     AccountNumber auth_contract,
-                                     bool               allow_sudo)
+   uint8_t account_sys::create_account(AccountNumber acc,
+                                       AccountNumber auth_contract,
+                                       bool          allow_sudo)
    {
       auto status = kv_get<account_sys_status_row>(account_sys_status_key());
       check(status.has_value(), "not started");
@@ -53,8 +53,8 @@ namespace system_contract
       write_console("auth con: ");
       write_console(auth_contract.str());
 
-      check( !exists(acc), "account already exists" );
-      check( exists(auth_contract), "unknown auth contract" );
+      check(!exists(acc), "account already exists");
+      check(exists(auth_contract), "unknown auth contract");
 
       uint32_t flags = 0;
 

@@ -25,7 +25,7 @@ TEST_CASE("ec")
    // use fake auth
    auto test_contract = add_contract(t, "test-cntr", "test-cntr.wasm");
    auto alice         = add_account(t, AccountNumber("alice"));
-   auto bob           = add_account(t, AccountNumber("bob"), AccountNumber("auth-ec-sys") );
+   auto bob           = add_account(t, AccountNumber("bob"), AccountNumber("auth-ec-sys"));
 
    // use "real" auth
    auto sue = add_ec_account(t, "sue", pub_key1);

@@ -8,10 +8,11 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-namespace system_contract 
+namespace system_contract
 {
-   uint8_t auth_fake_sys::authCheck( const_view<Action> act, const_view<std::vector<Claim>> claims ) {
+   uint8_t auth_fake_sys::authCheck(const_view<Action> act, const_view<std::vector<Claim>> claims)
+   {
       return 0;
    }
 }  // namespace system_contract
-PSIBASE_DISPATCH( system_contract::auth_fake_sys )
+PSIBASE_DISPATCH(system_contract::auth_fake_sys)

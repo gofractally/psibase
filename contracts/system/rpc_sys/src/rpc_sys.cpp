@@ -1,6 +1,6 @@
+#include <contracts/system/rpc_sys.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/to_json.hpp>
-#include <contracts/system/rpc_sys.hpp>
 
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
@@ -69,7 +69,8 @@ namespace psibase
          contract_name = "rpc.roothost.sys";
 
       // TODO: remove lookup after account number type is changed
-      psibase::actor<system_contract::account_sys> asys(act.contract, system_contract::account_sys::contract);
+      psibase::actor<system_contract::account_sys> asys(act.contract,
+                                                        system_contract::account_sys::contract);
 
       /*
       auto                        account_num = asys.get_account_by_name(contract_name).unpack();

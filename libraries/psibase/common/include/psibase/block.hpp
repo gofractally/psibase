@@ -1,12 +1,12 @@
 #pragma once
 
+#include <compare>
 #include <eosio/crypto.hpp>
 #include <eosio/fixed_bytes.hpp>
 #include <eosio/time.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/name.hpp>
 #include <psio/fracpack.hpp>
-#include <compare>
 
 // TODO
 namespace eosio
@@ -16,29 +16,48 @@ namespace eosio
 
 namespace psibase
 {
-   using String      = std::string;
+   using String = std::string;
 
    // TODO: Rename to contract_num?
 
-   struct TimePointSec final {
+   struct TimePointSec final
+   {
       uint32_t seconds = 0;
       //auto operator <=> (const TimePointSec&)const = default;
-      friend bool operator == ( const TimePointSec& a, const TimePointSec& b ) { return a.seconds == b.seconds; }
-      friend bool operator < ( const TimePointSec& a, const TimePointSec& b ) { return a.seconds < b.seconds; }
-      friend bool operator != ( const TimePointSec& a, const TimePointSec& b ) { return a.seconds != b.seconds; }
+      friend bool operator==(const TimePointSec& a, const TimePointSec& b)
+      {
+         return a.seconds == b.seconds;
+      }
+      friend bool operator<(const TimePointSec& a, const TimePointSec& b)
+      {
+         return a.seconds < b.seconds;
+      }
+      friend bool operator!=(const TimePointSec& a, const TimePointSec& b)
+      {
+         return a.seconds != b.seconds;
+      }
    };
-   PSIO_REFLECT( TimePointSec, seconds );
+   PSIO_REFLECT(TimePointSec, seconds);
 
    struct AccountNumber final
    {
       uint64_t value = 0;
-      constexpr AccountNumber():value(0){}
-      constexpr explicit AccountNumber( uint64_t v ):value(v){}
-      constexpr explicit AccountNumber( std::string_view s ):value( name_to_number(s) ){}
-      std::string str()const { return number_to_name(value); }
-      friend bool operator == ( const AccountNumber& a, const AccountNumber& b ) { return a.value == b.value; }
-      friend bool operator < ( const AccountNumber& a, const AccountNumber& b ) { return a.value < b.value; }
-      friend bool operator != ( const AccountNumber& a, const AccountNumber& b ) { return a.value != b.value; }
+      constexpr AccountNumber() : value(0) {}
+      constexpr explicit AccountNumber(uint64_t v) : value(v) {}
+      constexpr explicit AccountNumber(std::string_view s) : value(name_to_number(s)) {}
+      std::string str() const { return number_to_name(value); }
+      friend bool operator==(const AccountNumber& a, const AccountNumber& b)
+      {
+         return a.value == b.value;
+      }
+      friend bool operator<(const AccountNumber& a, const AccountNumber& b)
+      {
+         return a.value < b.value;
+      }
+      friend bool operator!=(const AccountNumber& a, const AccountNumber& b)
+      {
+         return a.value != b.value;
+      }
       //auto operator <=> (const AccountNumber&)const = default;
    };
    PSIO_REFLECT(AccountNumber, value)
@@ -46,7 +65,7 @@ namespace psibase
    template <typename S>
    void to_key(const AccountNumber& k, S& s)
    {
-      s.write(&k.value,sizeof(k.value));
+      s.write(&k.value, sizeof(k.value));
    }
 
    struct MethodNumber final
@@ -77,10 +96,10 @@ namespace psibase
    {
       AccountNumber     contract;
       AccountNumber     auth_contract;
-      uint64_t          flags         = 0;
-      uint8_t           vm_type       = 0;
-      uint8_t           vm_version    = 0;
-      std::vector<char> code          = {};
+      uint64_t          flags      = 0;
+      uint8_t           vm_type    = 0;
+      uint8_t           vm_version = 0;
+      std::vector<char> code       = {};
    };
    PSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
    EOSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
@@ -98,8 +117,8 @@ namespace psibase
 
    struct Claim
    {
-      AccountNumber       contract;
-      std::vector<char>   raw_data;
+      AccountNumber     contract;
+      std::vector<char> raw_data;
    };
    EOSIO_REFLECT(Claim, contract, raw_data)
    PSIO_REFLECT(Claim, contract, raw_data)
@@ -109,14 +128,14 @@ namespace psibase
    {
       static constexpr uint32_t do_not_broadcast = 1u << 0;
 
-      TimePointSec          expiration;
-      uint16_t              ref_block_num       = 0;
-      uint32_t              ref_block_prefix    = 0;
-      uint16_t              max_net_usage_words = 0;  // 8-byte words
-      uint16_t              max_cpu_usage_ms    = 0;
-      uint32_t              flags               = 0;
-      std::vector<Action>   actions;
-      std::vector<Claim>    claims;  // TODO: Is there standard terminology that we could use?
+      TimePointSec        expiration;
+      uint16_t            ref_block_num       = 0;
+      uint32_t            ref_block_prefix    = 0;
+      uint16_t            max_net_usage_words = 0;  // 8-byte words
+      uint16_t            max_cpu_usage_ms    = 0;
+      uint32_t            flags               = 0;
+      std::vector<Action> actions;
+      std::vector<Claim>  claims;  // TODO: Is there standard terminology that we could use?
    };
    EOSIO_REFLECT(transaction,
                  expiration,
@@ -159,27 +178,26 @@ namespace psibase
    // TODO: Consider placing consensus alg in a contract; might affect how header is laid out.
    struct BlockHeader
    {
-      Checksum256           previous;
-      block_num             num = 0;  // TODO: pack into previous instead?
-      TimePointSec          time;
+      Checksum256  previous;
+      block_num    num = 0;  // TODO: pack into previous instead?
+      TimePointSec time;
    };
    EOSIO_REFLECT(BlockHeader, previous, num, time)
    PSIO_REFLECT(BlockHeader, /*previous,*/ num, time)
 
    struct Block
    {
-      BlockHeader header;
+      BlockHeader                     header;
       std::vector<signed_transaction> transactions;  // TODO: move inside receipts
    };
    EOSIO_REFLECT(Block, header, transactions)
    PSIO_REFLECT(Block, header, transactions)
 
-
    /// TODO: you have signed block headers, not signed blocks
    struct signed_block
    {
-      Block   block;
-      Claim   signature;
+      Block block;
+      Claim signature;
    };
    EOSIO_REFLECT(signed_block, block, signature)
    PSIO_REFLECT(signed_block, block /*, signature*/)
@@ -189,19 +207,19 @@ namespace psibase
       BlockHeader header;
       Checksum256 id;
 
-      BlockInfo()                  = default;
+      BlockInfo()                 = default;
       BlockInfo(const BlockInfo&) = default;
 
       // TODO: switch to fracpack for sha
       // TODO: don't repack to compute sha
-      BlockInfo(const Block& b) : header{b.header}, id{sha256( b )} {}
+      BlockInfo(const Block& b) : header{b.header}, id{sha256(b)} {}
    };
    EOSIO_REFLECT(BlockInfo, header, id)
    PSIO_REFLECT(BlockInfo, header, id)
 
-   // TODO: remove dependency on these 
-   using block = Block;
+   // TODO: remove dependency on these
+   using block      = Block;
    using block_info = BlockInfo;
-   using claim = Claim;
+   using claim      = Claim;
 
 }  // namespace psibase

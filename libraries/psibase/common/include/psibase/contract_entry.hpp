@@ -5,7 +5,8 @@
 namespace psibase
 {
    // TODO: move to table instead of fixed value
-   constexpr account_num rpc_contract_num = account_num("rpc");  // RPC requests run on this contract
+   constexpr account_num rpc_contract_num =
+       account_num("rpc");  // RPC requests run on this contract
 
    struct verify_data
    {

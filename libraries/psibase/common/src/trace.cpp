@@ -55,7 +55,7 @@ namespace psibase
    void pretty_trace(std::string& dest, const action_trace& atrace, const std::string& indent)
    {
       dest += indent + "action:\n";
-      dest += indent + "    " + atrace.act.sender.str() + "->"+ atrace.act.contract.str(); 
+      dest += indent + "    " + atrace.act.sender.str() + "->" + atrace.act.contract.str();
       dest += indent + "    (" + eosio::convert_to_json(atrace.act.raw_data) + ")\n";
       for (auto& inner : atrace.inner_traces)
          std::visit([&](auto& inner) { pretty_trace(dest, inner, indent + "    "); }, inner.inner);

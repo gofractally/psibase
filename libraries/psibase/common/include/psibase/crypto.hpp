@@ -7,9 +7,9 @@
 
 namespace psibase
 {
-   using Checksum160 = std::array<uint32_t,5>;
-   using Checksum256 = std::array<uint64_t,4>;
-   using Checksum512 = std::array<uint64_t,8>;
+   using Checksum160 = std::array<uint32_t, 5>;
+   using Checksum256 = std::array<uint64_t, 4>;
+   using Checksum512 = std::array<uint64_t, 8>;
 
    Checksum256 sha256(const char* data, size_t length);
 
@@ -22,7 +22,7 @@ namespace psibase
    template <typename T>
    Checksum256 sha256(const T& obj)
    {
-      auto bin = psio::convert_to_frac(obj); //eosio::convert_to_bin(obj);
+      auto bin = psio::convert_to_frac(obj);  //eosio::convert_to_bin(obj);
       return sha256(bin.data(), bin.size());
    }
 }  // namespace psibase

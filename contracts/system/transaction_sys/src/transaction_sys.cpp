@@ -1,6 +1,6 @@
-#include <psibase/dispatch.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
+#include <psibase/dispatch.hpp>
 
 #include <psibase/crypto.hpp>
 #include <psibase/native_tables.hpp>
@@ -12,14 +12,13 @@ static constexpr bool enable_print = false;
 namespace system_contract
 {
    // TODO: move to another contract
-   uint8_t transaction_sys::setCode(
-            AccountNumber        contract,
-            uint8_t              vm_type,
-            uint8_t              vm_version,
-            std::vector<char>    code )
+   uint8_t transaction_sys::setCode(AccountNumber     contract,
+                                    uint8_t           vm_type,
+                                    uint8_t           vm_version,
+                                    std::vector<char> code)
    {
       // TODO: validate code
-      check( get_sender() == contract, "sender must match contract account");
+      check(get_sender() == contract, "sender must match contract account");
       auto account = kv_get<account_row>(account_row::kv_map, account_key(contract));
       check(account.has_value(), "can not set code on a missing account");
       auto code_hash = sha256(code.data(), code.size());
@@ -63,14 +62,12 @@ namespace system_contract
       return 0;
    }  // set_code
 
-
    // hard coded to account 1, which deploys transaction_sys (or avariant of) and native code
    // knows to call this method
    extern "C" [[clang::export_name("process_transaction")]] void process_transaction()
    {
       if (enable_print)
          eosio::print("process_transaction\n");
-
 
       // TODO: expiration
       // TODO: check ref_block_num, ref_block_prefix
@@ -86,9 +83,10 @@ namespace system_contract
          auto account = kv_get<account_row>(account_row::kv_map, account_key(act.sender));
          check(!!account, "unknown sender");
 
-         actor<system_contract::auth_fake_sys>  auth( system_contract::transaction_sys::contract, account->auth_contract );
-        // auth->authCheck()( act, trx.claims );
-        /*
+         actor<system_contract::auth_fake_sys> auth(system_contract::transaction_sys::contract,
+                                                    account->auth_contract);
+         // auth->authCheck()( act, trx.claims );
+         /*
          // TODO: assumes same dispatch format (abi) as auth_fake_sys
          // TODO: avoid inner raw_data copy
          // TODO: auth_contract needs a way to opt-in to being an auth contract.
@@ -117,4 +115,4 @@ namespace system_contract
 
 }  // namespace system_contract
 
-PSIBASE_DISPATCH( system_contract::transaction_sys )
+PSIBASE_DISPATCH(system_contract::transaction_sys)

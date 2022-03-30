@@ -39,8 +39,7 @@ namespace psibase
          current.header.num      = status->head->header.num + 1;
          if (time)
          {
-            eosio::check(time->seconds > status->head->header.time.seconds,
-                         "block is in the past");
+            eosio::check(time->seconds > status->head->header.time.seconds, "block is in the past");
             current.header.time = *time;
          }
          else

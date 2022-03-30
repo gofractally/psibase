@@ -46,8 +46,7 @@ namespace psibase
 
       auto account = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
       eosio::check(account.has_value(), "set_code: unknown contract account");
-      eosio::check(account->code_hash == Checksum256{},
-                   "native set_code can't replace code");
+      eosio::check(account->code_hash == Checksum256{}, "native set_code can't replace code");
       account->code_hash  = code_hash;
       account->vm_type    = vm_type;
       account->vm_version = vm_version;

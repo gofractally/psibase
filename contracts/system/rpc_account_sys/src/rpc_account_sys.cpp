@@ -1,5 +1,5 @@
-#include <psio/to_json.hpp>
 #include "contracts/system/rpc_account_sys.hpp"
+#include <psio/to_json.hpp>
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/rpc_sys.hpp>
@@ -26,16 +26,17 @@ struct web_content_row
 };
 PSIO_REFLECT(web_content_row, path, content_type, content)
 
-struct augmented_account_row //: psibase::account_row
+struct augmented_account_row  //: psibase::account_row
 {
    std::optional<std::string> name;
    std::optional<std::string> auth_contract_name;
 };
-PSIO_REFLECT(augmented_account_row, 
-            // base psibase::account_row, 
-             name, auth_contract_name)
+PSIO_REFLECT(augmented_account_row,
+             // base psibase::account_row,
+             name,
+             auth_contract_name)
 
-namespace system_contract 
+namespace system_contract
 {
    rpc_reply_data rpc_account_sys::rpc_sys(rpc_request_data request)
    {

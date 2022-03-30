@@ -106,7 +106,7 @@ namespace psibase
          auto s = kv_get_raw(map, eosio::convert_to_key(key));
          if (!s)
             return std::nullopt;
-         return psio::convert_from_frac<V>(psio::input_stream( s->pos, s->end ));
+         return psio::convert_from_frac<V>(psio::input_stream(s->pos, s->end));
       }
 
       template <typename V, typename K>
