@@ -35,6 +35,7 @@ change based on the prior element.
 */
 #pragma once
 #include <string>
+#include <limits>
 
 namespace psio
 {
