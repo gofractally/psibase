@@ -16,6 +16,20 @@ namespace psibase
       R get_return_type(R (C::*f)(Args...) const);
    }  // namespace internal_use_do_not_use
 
+   template <auto MemberPtr>
+   auto getReturnVal(const psibase::action_trace& actionTrace)
+   {
+      //using T = typename ReturnType<MemberPtr>::type;
+      using T = decltype(internal_use_do_not_use::get_return_type(MemberPtr));
+
+      T                  ret_val;
+      psio::input_stream in(actionTrace.raw_retval);
+      psio::fracunpack(ret_val, in);
+      psio::shared_view_ptr<T>{ret_val}.validate();
+
+      return ret_val;
+   }
+
    std::vector<char> read_whole_file(std::string_view filename);
 
    int32_t execute(std::string_view command);
@@ -175,8 +189,14 @@ namespace psibase
       template <typename Action>
       auto trace(Action&& a)
       {
-         auto trans = make_transaction({a});
-         return push_transaction(trans);
+         return push_transaction(make_transaction({a}));
+      }
+
+      template <typename Action>
+      auto act(Action&& a)
+      {
+         transaction_trace trace = push_transaction(make_transaction({a}));
+         eosio::check(!trace.error.has_value(), *trace.error);
       }
 
       struct user_context

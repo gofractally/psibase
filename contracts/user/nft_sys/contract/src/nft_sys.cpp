@@ -52,7 +52,20 @@ std::optional<nft_row> nft_contract::getNft(nid nft_id)
    auto nft_idx   = nft_table.get_index<0>();
    return nft_idx.get(nft_id);
 
-   //printf("Contract 2: NFT ID is %" PRId64 "\n", (*nft).nftid);
+   //printf("Contract 2: NFT ID is %" PRId64 "\n", (*nft).id);
+}
+
+std::optional<nft_row> nft_contract::getNft2(psibase::account_num issuer, sub_id_type sub_id)
+{
+   return getNft(generate(issuer, sub_id));
+}
+
+int64_t nft_contract::isAutodebit(psibase::account_num user)
+{
+   auto ad_table_idx = db.open<ad_table_t>().get_index<0>();
+   auto ad           = ad_table_idx.get(user);
+   bool ret          = (!ad.has_value()) || (ad.has_value() && ad->autodebit);
+   return ret ? 1 : 0;
 }
 
 PSIBASE_DISPATCH(nft_sys::nft_contract)
