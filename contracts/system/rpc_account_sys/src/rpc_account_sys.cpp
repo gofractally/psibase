@@ -10,6 +10,7 @@
 static constexpr bool enable_print = false;
 
 using table_num = uint16_t;
+using namespace psibase;
 
 static constexpr table_num web_content_table = 1;
 

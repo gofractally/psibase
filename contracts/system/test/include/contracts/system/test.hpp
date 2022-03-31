@@ -118,7 +118,7 @@ namespace psibase
                       {asys.startup(std::vector<AccountNumber>{
                           {system_contract::transaction_sys::contract},
                           {system_contract::account_sys::contract},
-                          {system_contract::rpc_contract_num},
+                          {rpc_contract_num},
                           {system_contract::auth_fake_sys::contract},
                           {system_contract::auth_ec_sys::contract},
                           {system_contract::verify_ec_sys::contract},
