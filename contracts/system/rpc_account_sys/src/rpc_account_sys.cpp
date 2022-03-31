@@ -1,8 +1,9 @@
-#include <psio/to_json.hpp>
 #include "contracts/system/rpc_account_sys.hpp"
+#include <psio/to_json.hpp>
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/rpc_sys.hpp>
+#include <eosio/from_json.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
 
@@ -26,16 +27,27 @@ struct web_content_row
 };
 PSIO_REFLECT(web_content_row, path, content_type, content)
 
-struct augmented_account_row //: psibase::account_row
+struct augmented_account_row  //: psibase::account_row
 {
    std::optional<std::string> name;
    std::optional<std::string> auth_contract_name;
 };
-PSIO_REFLECT(augmented_account_row, 
-            // base psibase::account_row, 
-             name, auth_contract_name)
+PSIO_REFLECT(augmented_account_row,
+             // base psibase::account_row,
+             name,
+             auth_contract_name)
 
-namespace system_contract 
+// TODO: automate defining the struct in reflection macro?
+struct CreateAccount
+{
+   std::string name         = {};
+   std::string authContract = {};
+   bool        allowSudo    = false;
+};
+EOSIO_REFLECT(CreateAccount, name, authContract, allowSudo)
+PSIO_REFLECT(CreateAccount, name, authContract, allowSudo)
+
+namespace system_contract
 {
    rpc_reply_data rpc_account_sys::rpc_sys(rpc_request_data request)
    {
@@ -81,6 +93,24 @@ namespace system_contract
             }
             */
             return to_json(rows);
+         }
+      }
+
+      if (request.method == "POST")
+      {
+         // TODO: move to an ABI wasm?
+         if (request.target == "/pack/create_account")
+         {
+            request.body.push_back(0);
+            eosio::json_token_stream jstream{request.body.data()};
+            CreateAccount            args;
+            eosio::from_json(args, jstream);
+            action act{
+                .sender   = get_receiver(),
+                .contract = get_receiver(),
+                .raw_data = psio::convert_to_frac(args),
+            };
+            return to_json(act);
          }
       }
 

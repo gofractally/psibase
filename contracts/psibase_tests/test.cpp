@@ -2,14 +2,12 @@
 #include <contracts/system/test.hpp>
 
 #include "test-cntr.hpp"
-#include "token.hpp"
 
 using namespace eosio;
 using namespace psibase;
 
 TEST_CASE("recursion")
 {
-   /*
    test_chain t;
    t.start_block();
    boot_minimal(t);
@@ -19,71 +17,17 @@ TEST_CASE("recursion")
             t.push_transaction(      //
                 t.make_transaction(  //
                     {{
-                        .sender   = AccountNumber(test_contract),
-                        .contract = AccountNumber(test_contract),
-                        .raw_data = eosio::convert_to_bin(test_cntr::payload{
+                        .sender   = AccountNumber("test-cntr"),
+                        .contract = AccountNumber("test-cntr"),
+                        .raw_data = psio::convert_to_frac(test_cntr::payload{
                             .number = 3,
                             .memo   = "Counting down",
                         }),
                     }}))) == "");
-                    */
 }  // recursion
-
-TEST_CASE("transfer")
-{
-   /*
-   test_chain t;
-   t.start_block();
-   boot_minimal(t);
-   check(token::contract == add_contract(t, "token.sys", "token.wasm"),
-         "token contract num changed");
-   auto alice = add_account(t, "alice");
-   auto bob   = add_account(t, "bob");
-
-   REQUIRE(                          //
-       show(false,                   //
-            t.push_transaction(      //
-                t.make_transaction(  //
-                    {{
-                         .sender   = token::contract,
-                         .contract = token::contract,
-                         .raw_data = eosio::convert_to_bin(token::action{token::issue{
-                             .to     = alice,
-                             .amount = s2a("1.0000 TOK"),
-                             .memo   = "issuing",
-                         }}),
-                     },
-                     {
-                         .sender   = alice,
-                         .contract = token::contract,
-                         .raw_data = eosio::convert_to_bin(token::action{token::transfer{
-                             .to     = bob,
-                             .amount = s2a("0.1000 TOK"),
-                             .memo   = "alice->bob",
-                         }}),
-                     }}))) == "");
-
-   for (int i = 0; i < 100; ++i)
-      REQUIRE(                          //
-          show(false,                   //
-               t.push_transaction(      //
-                   t.make_transaction(  //
-                       {{
-                           .sender   = alice,
-                           .contract = token::contract,
-                           .raw_data = eosio::convert_to_bin(token::action{token::transfer{
-                               .to     = bob,
-                               .amount = s2a("0.0001 TOK"),
-                               .memo   = "alice->bob",
-                           }}),
-                       }}))) == "");
-
-                       */
-}  // transfer
 
 TEST_CASE("kv")
 {
-   /*
    test_chain t;
    t.start_block();
    boot_minimal(t);
@@ -96,7 +40,6 @@ TEST_CASE("kv")
                         .sender   = test_kv_contract,
                         .contract = test_kv_contract,
                     }}))) == "");
-                    */
 }  // kv
 
 TEST_CASE("table")

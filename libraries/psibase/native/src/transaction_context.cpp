@@ -61,10 +61,11 @@ namespace psibase
       atrace.act   = act;
       try
       {
-         auto& db   = self.block_context.db;
+         auto& db = self.block_context.db;
          //auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
-                                                     //"extra data in genesis payload");
-         auto  data = psio::convert_from_frac<genesis_action_data>({act.raw_data.data(), act.raw_data.size()});
+         //"extra data in genesis payload");
+         auto data = psio::convert_from_frac<genesis_action_data>(
+             {act.raw_data.data(), act.raw_data.size()});
          for (auto& contract : data.contracts)
          {
             eosio::check(contract.contract.value, "account 0 is reserved");
@@ -92,7 +93,7 @@ namespace psibase
    {
       /// TODO: move this to a common header
       static constexpr AccountNumber trxsys = AccountNumber("transact-sys");
-      action act{
+      action                         act{
           .sender   = AccountNumber(),
           .contract = trxsys,
           .raw_data = psio::convert_to_frac(self.trx.trx),
@@ -111,8 +112,6 @@ namespace psibase
    // TODO: time limit
    static void exec_verify_proofs(transaction_context& self)
    {
-      return;
-      /*
       eosio::check(self.trx.proofs.size() == self.trx.trx.claims.size(),
                    "proofs and claims must have same size");
       // TODO: don't pack trx twice
@@ -138,7 +137,6 @@ namespace psibase
          auto&          ec = self.get_execution_context(claim.contract);
          ec.exec_verify(ac);
       }
-      */
    }
 
    void transaction_context::exec_called_action(uint64_t      caller_flags,

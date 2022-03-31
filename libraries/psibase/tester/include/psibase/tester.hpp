@@ -34,7 +34,7 @@ namespace psibase
    /**
     * Sign a digest
     */
-   eosio::signature sign(const eosio::private_key& key, const eosio::checksum256& digest);
+   Signature sign(const PrivateKey& key, const Checksum256& digest);
 
    /**
     * Manages a chain.
@@ -48,8 +48,8 @@ namespace psibase
       std::optional<block_info> head_block_info;
 
      public:
-      static const eosio::public_key  default_pub_key;
-      static const eosio::private_key default_priv_key;
+      static const PublicKey  default_pub_key;
+      static const PrivateKey default_priv_key;
 
       test_chain(const char* snapshot = nullptr, uint64_t state_size = 1024 * 1024 * 1024);
       test_chain(const test_chain&) = delete;
@@ -107,8 +107,8 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] transaction_trace push_transaction(
-          const transaction&                                                   trx,
-          const std::vector<std::pair<eosio::public_key, eosio::private_key>>& keys = {
+          const transaction&                                   trx,
+          const std::vector<std::pair<PublicKey, PrivateKey>>& keys = {
               {default_pub_key, default_priv_key}});
 
       /**
@@ -116,10 +116,9 @@ namespace psibase
        *
        * Validates the transaction status according to @ref eosio::expect.
        */
-      transaction_trace transact(
-          std::vector<action>&&                                                actions,
-          const std::vector<std::pair<eosio::public_key, eosio::private_key>>& keys,
-          const char* expected_except = nullptr);
+      transaction_trace transact(std::vector<action>&&                                actions,
+                                 const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
+                                 const char* expected_except = nullptr);
       transaction_trace transact(std::vector<action>&& actions,
                                  const char*           expected_except = nullptr);
 

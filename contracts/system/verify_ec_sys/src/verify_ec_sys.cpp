@@ -1,6 +1,7 @@
 #include <secp256k1_preallocated.h>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/contract_entry.hpp>
+#include <psibase/from_bin.hpp>
 
 using namespace psibase;
 
@@ -22,12 +23,10 @@ extern "C" [[clang::export_name("verify")]] void verify()
 {
    check(context, "verify_ec_sys not fully built");
 
-   /*
    auto act     = get_current_action();
    auto data    = psio::convert_from_frac<verify_data>(act.raw_data);
-   auto pub_key = unpack_all<PublicKey>(data.claim.raw_data, "extra data in claim");
-   auto sig     = unpack_all<Signature>(data.proof, "extra data in proof");
-   auto hash    = data.transaction_hash.extract_as_byte_array();
+   auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.raw_data);  // TODO: verify no extra
+   auto sig     = psio::convert_from_frac<Signature>(data.proof);           // TODO: verify no extra
 
    auto* k1_pub_key = std::get_if<0>(&pub_key);
    auto* k1_sig     = std::get_if<0>(&sig);
@@ -38,20 +37,19 @@ extern "C" [[clang::export_name("verify")]] void verify()
                                           k1_pub_key->size()) == 1,
                 "pubkey parse failed");
 
-   // TODO: first byte of eosio::signature (recovery param) is ignored; change
-   //       the format to not include it?
    secp256k1_ecdsa_signature parsed_sig;
-   eosio::check(
-       secp256k1_ecdsa_signature_parse_compact(context, &parsed_sig, k1_sig->data() + 1) == 1,
-       "signature parse failed");
+   eosio::check(secp256k1_ecdsa_signature_parse_compact(context, &parsed_sig, k1_sig->data()) == 1,
+                "signature parse failed");
 
    // secp256k1_ecdsa_verify requires normalized, but we don't
    secp256k1_ecdsa_signature normalized;
    secp256k1_ecdsa_signature_normalize(context, &normalized, &parsed_sig);
 
-   eosio::check(secp256k1_ecdsa_verify(context, &normalized, hash.data(), &parsed_pub_key) == 1,
-                "incorrect signature");
-                */
+   eosio::check(
+       secp256k1_ecdsa_verify(context, &normalized,
+                              reinterpret_cast<const unsigned char*>(data.transaction_hash.data()),
+                              &parsed_pub_key) == 1,
+       "incorrect signature");
 }
 
 extern "C" void called(account_num this_contract, account_num sender)

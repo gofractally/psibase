@@ -1,4 +1,3 @@
-#include <psio/to_json.hpp>
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/auth_ec_sys.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
@@ -9,6 +8,7 @@
 #include <psibase/contract_entry.hpp>
 #include <psibase/http.hpp>
 #include <psibase/transaction_context.hpp>
+#include <psio/to_json.hpp>
 
 #include <eosio/finally.hpp>
 #include <iostream>
@@ -112,13 +112,13 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("verify_ec_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber( "roothost-rpc" ),
+                        .contract      = AccountNumber("roothost-rpc"),
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
                         .code          = read_whole_file("rpc_roothost_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber( "account-rpc" ),
+                        .contract      = AccountNumber("account-rpc"),
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
                         .code          = read_whole_file("rpc_account_sys.wasm"),
@@ -126,21 +126,19 @@ void bootstrap_chain(system_context& system)
                 },
         });
 
-   AccountNumber roothost_rpc("roothost-rpc");
-   AccountNumber account_rpc("account-rpc");
-   transactor<system_contract::account_sys> asys(system_contract::account_sys::contract, system_contract::account_sys::contract);
-   push_action(bc, asys.startup( std::vector<AccountNumber>{
-                                    system_contract::transaction_sys::contract,
-                                    system_contract::account_sys::contract,
-                                    AccountNumber("rpc"), /// TODO: where do I get this constant?
-                                    system_contract::auth_fake_sys::contract,
-                                    system_contract::auth_ec_sys::contract,
-                                    system_contract::verify_ec_sys::contract,
-                                    roothost_rpc,
-                                    account_rpc
-                                    //{20, "rpc.roothost.sys"},
-                                    //{21, "rpc.account.sys"},
-                                }));
+   AccountNumber                            roothost_rpc("roothost-rpc");
+   AccountNumber                            account_rpc("account-rpc");
+   transactor<system_contract::account_sys> asys(system_contract::account_sys::contract,
+                                                 system_contract::account_sys::contract);
+   push_action(
+       bc, asys.startup(std::vector<AccountNumber>{
+               system_contract::transaction_sys::contract, system_contract::account_sys::contract,
+               AccountNumber("rpc"),  /// TODO: where do I get this constant?
+               system_contract::auth_fake_sys::contract, system_contract::auth_ec_sys::contract,
+               system_contract::verify_ec_sys::contract, roothost_rpc, account_rpc
+               //{20, "rpc.roothost.sys"},
+               //{21, "rpc.account.sys"},
+           }));
 
    reg_rpc(bc, roothost_rpc, roothost_rpc);
    upload(bc, roothost_rpc, "/", "text/html", "../contracts/user/rpc_roothost_sys/ui/index.html");
@@ -149,10 +147,13 @@ void bootstrap_chain(system_context& system)
 
    reg_rpc(bc, system_contract::account_sys::contract, account_rpc);
    upload(bc, account_rpc, "/", "text/html", "../contracts/system/rpc_account_sys/ui/index.html");
-   upload(bc, account_rpc, "/ui/index.js", "text/html", "../contracts/system/rpc_account_sys/ui/index.js");
+   upload(bc, account_rpc, "/ui/index.js", "text/html",
+          "../contracts/system/rpc_account_sys/ui/index.js");
 
-   push_action(bc, asys.create_account(AccountNumber("alice"), system_contract::transaction_sys::contract, false));
-   push_action(bc, asys.create_account(AccountNumber("bob"), system_contract::transaction_sys::contract, false));
+   push_action(bc, asys.create_account(AccountNumber("alice"),
+                                       system_contract::transaction_sys::contract, false));
+   push_action(bc, asys.create_account(AccountNumber("bob"),
+                                       system_contract::transaction_sys::contract, false));
 
    bc.commit();
 }

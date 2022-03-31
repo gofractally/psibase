@@ -22,33 +22,28 @@ namespace system_contract
    };
    PSIO_REFLECT(account_sys_status_row, total_accounts)
 
+   // TODO: remove existing_accounts arg
+   // TODO: scan native table to get total_accounts
    void account_sys::startup(const_view<vector<AccountNumber>> existing_accounts)
    {
       check(!kv_get<account_sys_status_row>(account_sys_status_key()), "already started");
       auto s = existing_accounts->size();
 
       kv_put(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
-
-      /*
-      eosio::print("existing accounts size: ", s, "\n");
-      for (uint32_t i = 0; i < s; ++i)
-      {
-         auto r = existing_accounts[i];
-     //    eosio::print((uint32_t)r->num(), " ", std::string_view(r->name()), "\n");
-         register_acc(r->num() );
-      }
-      */
    }
 
    void account_sys::create_account(AccountNumber acc, AccountNumber auth_contract, bool allow_sudo)
    {
       auto status = kv_get<account_sys_status_row>(account_sys_status_key());
       check(status.has_value(), "not started");
-      write_console("new acc: ");
-      write_console(acc.str());
 
-      write_console("auth con: ");
-      write_console(auth_contract.str());
+      if (enable_print)
+      {
+         write_console("new acc: ");
+         write_console(acc.str());
+         write_console("auth con: ");
+         write_console(auth_contract.str());
+      }
 
       check(!exists(acc), "account already exists");
       check(exists(auth_contract), "unknown auth contract");

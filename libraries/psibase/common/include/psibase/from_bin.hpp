@@ -1,11 +1,12 @@
 #pragma once
 
-#include <eosio/from_bin.hpp>
+#include <eosio/check.hpp>
+#include <psio/from_bin.hpp>
 
 namespace psibase
 {
    template <typename T>
-   T unpack_all(eosio::input_stream s, std::string_view error)
+   T unpack_all(psio::input_stream s, std::string_view error)
    {
       T result{};
       from_bin(result, s);

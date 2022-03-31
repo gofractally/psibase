@@ -5,13 +5,14 @@
 namespace psibase
 {
    // TODO: move to table instead of fixed value
-   constexpr account_num rpc_contract_num = account_num("rpc");  // RPC requests run on this contract
+   constexpr account_num rpc_contract_num =
+       account_num("rpc");  // RPC requests run on this contract
 
    struct verify_data
    {
-      eosio::checksum256 transaction_hash;
-      psibase::claim     claim;
-      std::vector<char>  proof;
+      Checksum256       transaction_hash;
+      psibase::claim    claim;
+      std::vector<char> proof;
    };
    PSIO_REFLECT(verify_data, transaction_hash, claim, proof)
 

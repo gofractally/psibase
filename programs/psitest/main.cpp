@@ -4,6 +4,7 @@
 #include <eosio/fixed_bytes.hpp>
 #include <eosio/to_bin.hpp>
 #include <psibase/block_context.hpp>
+#include <psio/to_json.hpp>
 
 #include <stdio.h>
 #include <chrono>
@@ -640,7 +641,7 @@ struct callbacks
       auto us = std::chrono::duration_cast<std::chrono::microseconds>(
           std::chrono::steady_clock::now() - start_time);
       std::cout << "psibase transaction took " << us.count() << " us\n";
-      // std::cout << eosio::format_json(trace) << "\n";
+      // std::cout << psio::format_json(trace) << "\n";
       set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(trace));
    }
 
