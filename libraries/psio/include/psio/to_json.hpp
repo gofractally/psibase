@@ -306,6 +306,12 @@ template <typename S> void to_json(float value, S& stream)     { return fp_to_js
       stream.write('"');
    }
 
+   template <typename S>
+   void to_json(const std::vector<char>& obj, S& stream)
+   {
+      to_json_hex(obj.data(), obj.size(), stream);
+   }
+
    template <typename T>
    std::string convert_to_json(const T& t)
    {

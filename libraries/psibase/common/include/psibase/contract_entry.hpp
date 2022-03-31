@@ -10,9 +10,9 @@ namespace psibase
 
    struct verify_data
    {
-      eosio::checksum256 transaction_hash;
-      psibase::claim     claim;
-      std::vector<char>  proof;
+      Checksum256       transaction_hash;
+      psibase::claim    claim;
+      std::vector<char> proof;
    };
    PSIO_REFLECT(verify_data, transaction_hash, claim, proof)
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <eosio/reflection.hpp>
+#include <psio/fracpack.hpp>
 #include <string>
 
 namespace test_cntr
@@ -11,5 +11,5 @@ namespace test_cntr
       int         number;
       std::string memo;
    };
-   EOSIO_REFLECT(payload, number, memo)
+   PSIO_REFLECT(payload, number, memo)
 }  // namespace test_cntr

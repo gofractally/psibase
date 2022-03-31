@@ -68,7 +68,7 @@ namespace psibase
 
    struct backend_entry
    {
-      eosio::checksum256         hash;
+      Checksum256                hash;
       std::unique_ptr<backend_t> backend;
    };
 
@@ -97,7 +97,7 @@ namespace psibase
             ind.pop_front();
       }
 
-      std::unique_ptr<backend_t> get(const eosio::checksum256& hash)
+      std::unique_ptr<backend_t> get(const Checksum256& hash)
       {
          std::unique_ptr<backend_t>  result;
          std::lock_guard<std::mutex> lock{mutex};
@@ -256,8 +256,8 @@ namespace psibase
       {
          // Only the code table currently lives in native_constrained
          // TODO: use a view here instead of unpacking to a rich object
+         // TODO: verify fracpack; no unknown
          auto code = psio::convert_from_frac<code_row>(psio::input_stream(value.pos, value.end));
-         eosio::check(!value.remaining(), "extra data after code_row");
          auto code_hash = sha256(code.code.data(), code.code.size());
          eosio::check(code.code_hash == code_hash, "code_row has incorrect code_hash");
          auto expected_key = eosio::convert_to_key(code.key());

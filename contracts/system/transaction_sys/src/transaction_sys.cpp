@@ -83,10 +83,10 @@ namespace system_contract
          auto account = kv_get<account_row>(account_row::kv_map, account_key(act.sender));
          check(!!account, "unknown sender");
 
-         actor<system_contract::auth_fake_sys> auth(system_contract::transaction_sys::contract,
-                                                    account->auth_contract);
+         // actor<system_contract::auth_fake_sys> auth(system_contract::transaction_sys::contract,
+         //                                            account->auth_contract);
          // auth->authCheck()( act, trx.claims );
-         /*
+
          // TODO: assumes same dispatch format (abi) as auth_fake_sys
          // TODO: avoid inner raw_data copy
          // TODO: auth_contract needs a way to opt-in to being an auth contract.
@@ -96,9 +96,8 @@ namespace system_contract
          psibase::action outer = {
              .sender   = system_contract::transaction_sys::contract,
              .contract = account->auth_contract,
-
              // TODO: auth_contract will have to register action #
-             .raw_data = eosio::convert_to_bin(auth_fake_sys::action{auth_fake_sys::auth_check{
+             .raw_data = psio::convert_to_frac(auth_fake_sys::action{auth_fake_sys::auth_check{
                  .action = act,  // act to be authorized
                  .claims = trx.claims,
              }}),
@@ -106,7 +105,6 @@ namespace system_contract
          if (enable_print)
             eosio::print("call auth_check\n");
          call(outer);  // TODO: avoid copy (serializing outer)
-         */
          if (enable_print)
             eosio::print("call action\n");
          call(act);  // TODO: avoid copy (serializing)

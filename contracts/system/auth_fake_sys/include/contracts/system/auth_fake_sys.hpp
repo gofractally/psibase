@@ -1,23 +1,32 @@
 #pragma once
 
-#include <psibase/actor.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
+#include <psio/from_bin.hpp>
+#include <psio/to_bin.hpp>
 
-namespace system_contract
+namespace system_contract::auth_fake_sys
 {
-   using namespace psibase;
-   using psio::const_view;
+   static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-fake-sys");
 
-   class auth_fake_sys : public psibase::contract
+   struct auth_check
    {
-     public:
-      static constexpr psibase::AccountNumber contract = AccountNumber("auth-fake-sys");
-
-      // sets the key, and if not exist, creates account
-      uint8_t authCheck(const_view<Action> act, const_view<std::vector<Claim>> claims);
+      psibase::action             action;
+      std::vector<psibase::claim> claims;
    };
+   PSIO_REFLECT(auth_check, action, claims)
 
-   PSIO_REFLECT_INTERFACE(auth_fake_sys, (authCheck, 0, action, claims))
+   using action = std::variant<auth_check>;
 
-}  // namespace system_contract
+   template <typename T, typename R = typename T::return_type>
+   R call(psibase::account_num sender, T args)
+   {
+      auto result = psibase::call(psibase::action{
+          .sender   = sender,
+          .contract = contract,
+          .raw_data = psio::convert_to_frac(action{std::move(args)}),
+      });
+      if constexpr (!std::is_same_v<R, void>)
+         return psio::convert_from_frac<R>(result);
+   }
+}  // namespace system_contract::auth_fake_sys

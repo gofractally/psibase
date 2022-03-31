@@ -2,17 +2,10 @@
 
 #include <compare>
 #include <eosio/crypto.hpp>
-#include <eosio/fixed_bytes.hpp>
 #include <eosio/time.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/name.hpp>
 #include <psio/fracpack.hpp>
-
-// TODO
-namespace eosio
-{
-   PSIO_REFLECT(time_point_sec, utc_seconds)
-}
 
 namespace psibase
 {

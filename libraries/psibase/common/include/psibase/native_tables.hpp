@@ -53,7 +53,7 @@ namespace psibase
    //   EOSIO_REFLECT(account_row, num, auth_contract, flags, code_hash, vm_type, vm_version)
    PSIO_REFLECT(account_row, num, auth_contract, flags, code_hash, vm_type, vm_version)
 
-   inline auto code_key(const eosio::checksum256& code_hash, uint8_t vm_type, uint8_t vm_version)
+   inline auto code_key(const Checksum256& code_hash, uint8_t vm_type, uint8_t vm_version)
    {
       // TODO: leave space for secondary index?
       return std::tuple{code_table, code_hash, vm_type, vm_version};

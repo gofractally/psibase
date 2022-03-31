@@ -1,10 +1,10 @@
 #pragma once
-#include <psio/bytes.hpp>
-#include <psio/stream.hpp>
 #include <deque>
 #include <list>
 #include <map>
 #include <optional>
+#include <psio/bytes.hpp>
+#include <psio/stream.hpp>
 #include <set>
 #include <string_view>
 #include <tuple>
@@ -13,7 +13,6 @@
 
 namespace psio
 {
-
    template <typename T, typename S>
    void from_bin(T& obj, S& stream);
 
@@ -336,6 +335,14 @@ namespace psio
 
    template <typename T>
    T from_bin(const std::vector<char>& bin)
+   {
+      T obj;
+      from_bin_vec(obj, bin);
+      return obj;
+   }
+
+   template <typename T>
+   T from_bin(std::vector<char>& bin)
    {
       T obj;
       from_bin_vec(obj, bin);

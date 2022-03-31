@@ -112,8 +112,6 @@ namespace psibase
    // TODO: time limit
    static void exec_verify_proofs(transaction_context& self)
    {
-      return;
-      /*
       eosio::check(self.trx.proofs.size() == self.trx.trx.claims.size(),
                    "proofs and claims must have same size");
       // TODO: don't pack trx twice
@@ -139,7 +137,6 @@ namespace psibase
          auto&          ec = self.get_execution_context(claim.contract);
          ec.exec_verify(ac);
       }
-      */
    }
 
    void transaction_context::exec_called_action(uint64_t      caller_flags,
