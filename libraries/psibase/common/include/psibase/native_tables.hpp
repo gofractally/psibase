@@ -6,13 +6,17 @@
 namespace psibase
 {
    // TODO: replace with a name type?
+   // TODO: rename to make it clear it's only for native tables
    using table_num = uint16_t;
 
    static constexpr table_num status_table  = 1;
    static constexpr table_num account_table = 2;
    static constexpr table_num code_table    = 3;
 
-   inline auto status_key() { return std::tuple{status_table}; }
+   inline auto status_key()
+   {
+      return std::tuple{status_table};
+   }
    struct status_row
    {
       Checksum256              chain_id;
@@ -23,7 +27,6 @@ namespace psibase
       static auto           key() { return status_key(); }
    };
    PSIO_REFLECT(status_row, chain_id, head, num_execution_memories)
-   //   EOSIO_REFLECT(status_row, chain_id, head, num_execution_memories)
 
    // TODO: Rename account to contract?
    inline auto account_key(AccountNumber num)
@@ -50,7 +53,6 @@ namespace psibase
       static constexpr auto kv_map = psibase::kv_map::native_unconstrained;
       auto                  key() const { return account_key(num); }
    };
-   //   EOSIO_REFLECT(account_row, num, auth_contract, flags, code_hash, vm_type, vm_version)
    PSIO_REFLECT(account_row, num, auth_contract, flags, code_hash, vm_type, vm_version)
 
    inline auto code_key(const Checksum256& code_hash, uint8_t vm_type, uint8_t vm_version)

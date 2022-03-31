@@ -5,17 +5,14 @@
 
 namespace system_contract
 {
-   using namespace psibase;
-   using psio::const_view;
-
    struct rpc_account_sys : public psibase::contract
    {
-      static constexpr AccountNumber contract = AccountNumber("rpc-sys");
+      static constexpr auto contract = psibase::AccountNumber("rpc-sys");
 
-      rpc_reply_data rpc_sys(rpc_request_data request);
-      void           upload_rpc_sys(const_view<std::string>       path,
-                                    const_view<std::string>       content_type,
-                                    const_view<std::vector<char>> content);
+      psibase::rpc_reply_data rpc_sys(psibase::rpc_request_data request);
+      void                    upload_rpc_sys(psio::const_view<std::string>       path,
+                                             psio::const_view<std::string>       content_type,
+                                             psio::const_view<std::vector<char>> content);
    };
    PSIO_REFLECT_INTERFACE(rpc_account_sys,
                           (rpc_sys, 0, request),

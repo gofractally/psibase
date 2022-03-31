@@ -36,6 +36,7 @@ change based on the prior element.
 #pragma once
 #include <consthash/cityhash64.hxx>
 #include <string>
+#include <limits>
 
 namespace psio
 {

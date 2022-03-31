@@ -22,7 +22,8 @@ namespace system_contract::auth_fake_sys
       auto act  = get_current_action();
       auto data = psio::convert_from_frac<action>(act.raw_data);
       std::visit(
-          [&](auto& x) {
+          [&](auto& x)
+          {
              if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
                 exec(this_contract, sender, x);
              else
@@ -32,5 +33,8 @@ namespace system_contract::auth_fake_sys
    }
 
    extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
+   extern "C" void start(account_num this_contract)
+   {
+      __wasm_call_ctors();
+   }
 }  // namespace system_contract::auth_fake_sys

@@ -4,9 +4,9 @@
 
 namespace psibase
 {
-   using Checksum160 = std::array<uint32_t, 5>;
-   using Checksum256 = std::array<uint64_t, 4>;
-   using Checksum512 = std::array<uint64_t, 8>;
+   using Checksum160 = std::array<uint32_t, 5>;  // TODO: need uint8_t to signal json to use hex
+   using Checksum256 = std::array<uint64_t, 4>;  // TODO: need uint8_t to signal json to use hex
+   using Checksum512 = std::array<uint64_t, 8>;  // TODO: need uint8_t to signal json to use hex
 
    Checksum256 sha256(const char* data, size_t length);
 

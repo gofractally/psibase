@@ -14,7 +14,10 @@ namespace system_contract::auth_ec_sys
    using table_num                       = uint32_t;
    static constexpr table_num auth_table = 1;
 
-   inline auto auth_key(account_num account) { return std::tuple{contract, auth_table, account}; }
+   inline auto auth_key(account_num account)
+   {
+      return std::tuple{contract, auth_table, account};
+   }
    struct auth_row
    {
       account_num account;
@@ -74,5 +77,8 @@ namespace system_contract::auth_ec_sys
    }
 
    extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
+   extern "C" void start(account_num this_contract)
+   {
+      __wasm_call_ctors();
+   }
 }  // namespace system_contract::auth_ec_sys

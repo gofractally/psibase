@@ -3,7 +3,6 @@
 
 namespace psibase
 {
-
    struct AccountNumber final
    {
       uint64_t value = 0;
@@ -26,6 +25,15 @@ namespace psibase
       //auto operator <=> (const AccountNumber&)const = default;
    };
    PSIO_REFLECT(AccountNumber, value)
+
+   // TODO: remove
+   using account_num = AccountNumber;
+
+   template <typename S>
+   void to_key(const AccountNumber& k, S& s)
+   {
+      s.write(&k.value, sizeof(k.value));
+   }
 
 }  // namespace psibase
 inline constexpr psibase::AccountNumber operator""_a(const char* s, unsigned long)

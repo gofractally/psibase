@@ -6,6 +6,9 @@
 
 static constexpr bool enable_print = false;
 
+using namespace psibase;
+using namespace psio;
+
 namespace system_contract
 {
    static constexpr table_num account_sys_status_table = 1;
@@ -24,7 +27,7 @@ namespace system_contract
 
    // TODO: remove existing_accounts arg
    // TODO: scan native table to get total_accounts
-   void account_sys::startup(const_view<vector<AccountNumber>> existing_accounts)
+   void account_sys::startup(const_view<std::vector<AccountNumber>> existing_accounts)
    {
       check(!kv_get<account_sys_status_row>(account_sys_status_key()), "already started");
       auto s = existing_accounts->size();
