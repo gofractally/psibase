@@ -17,6 +17,12 @@ namespace nft_sys
 
       static bool is_valid_key(const nid& id) { return id != 0; }
 
+      struct DiskUsage
+      {
+         static constexpr int64_t firstEmplace      = 100;
+         static constexpr int64_t subsequentEmplace = 100;
+      };
+
       friend std::strong_ordering operator<=>(const nft_row&, const nft_row&) = default;
    };
    EOSIO_REFLECT(nft_row, nftid, issuer, owner, approved_account);
