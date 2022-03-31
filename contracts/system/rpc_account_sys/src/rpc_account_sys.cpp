@@ -51,7 +51,8 @@ namespace system_contract
 {
    rpc_reply_data rpc_account_sys::rpc_sys(rpc_request_data request)
    {
-      auto to_json = [](const auto& obj) {
+      auto to_json = [](const auto& obj)
+      {
          auto json = psio::convert_to_json(obj);
          return rpc_reply_data{
              .content_type = "application/json",
@@ -114,7 +115,7 @@ namespace system_contract
          }
       }
 
-      abort_message("not found");
+      abort_message_str("not found");
    }  // rpc_account_sys::rpc_sys
 
    void rpc_account_sys::upload_rpc_sys(psio::const_view<std::string>       path,

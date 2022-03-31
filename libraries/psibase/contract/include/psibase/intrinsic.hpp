@@ -24,8 +24,11 @@ namespace psibase
       [[clang::import_name("write_console")]] void write_console(const char* message, uint32_t len);
 
       // Abort with message. Message should be UTF8.
+
+#ifndef PSIBASE_ABORT_MESSAGE
       [[clang::import_name("abort_message"), noreturn]] void abort_message(const char* message,
                                                                            uint32_t    len);
+#endif
 
       // Store the currently-executing action into result and return the result size.
       //
@@ -99,7 +102,7 @@ namespace psibase
    std::vector<char> get_key();
 
    // Abort with message. Message should be UTF8.
-   [[noreturn]] inline void abort_message(std::string_view msg)
+   [[noreturn]] inline void abort_message_str(std::string_view msg)
    {
       raw::abort_message(msg.data(), msg.size());
    }
@@ -108,7 +111,7 @@ namespace psibase
    inline void check(bool cond, std::string_view message)
    {
       if (!cond)
-         abort_message(message);
+         abort_message_str(message);
    }
 
    // Get the currently-executing action.

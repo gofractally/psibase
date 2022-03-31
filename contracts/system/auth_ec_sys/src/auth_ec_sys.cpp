@@ -34,7 +34,7 @@ namespace system_contract::auth_ec_sys
       for (auto& claim : args.claims)
          if (claim.contract == verify_ec_sys::contract && claim.raw_data == expected)
             return;
-      abort_message("no matching claim found");
+      abort_message_str("no matching claim found");
    }
 
    void exec(account_num this_contract, account_num sender, set_key& args)
@@ -63,7 +63,8 @@ namespace system_contract::auth_ec_sys
       auto act  = get_current_action();
       auto data = psio::convert_from_frac<action>(act.raw_data);
       std::visit(
-          [&](auto& x) {
+          [&](auto& x)
+          {
              if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
                 exec(this_contract, sender, x);
              else

@@ -69,7 +69,8 @@ void test(account_num this_contract)
       if (!item.keep)
          kv_remove_raw(kv_map::contract, item.get_key(this_contract));
 
-   auto run = [&](auto match_key_size, auto expected, const auto& key, auto f) {
+   auto run = [&](auto match_key_size, auto expected, const auto& key, auto f)
+   {
       if (expected == skip)
       {
          if (enable_print)
@@ -91,7 +92,7 @@ void test(account_num this_contract)
       {
          if (enable_print)
             printf("0x%02x\n", val);
-         abort_message("mismatched result");
+         abort_message_str("mismatched result");
       }
       bool found = false;
       for (auto& item : items)

@@ -89,14 +89,14 @@ namespace psio
                             cumulative_frequency[model_width]};
                   if (p.count == 0)
                   {
-                     c = char_to_symbol['\0'];
+                     c = char_to_symbol[0];
                      update(c);
                      return prob{0, 1, 1};
                   }
                   update(c);
                   return p;
                }
-            c = char_to_symbol['\0'];
+            c = char_to_symbol[0];
             return prob{0, 1, 1};
          }
          constexpr code_value getCount() { return model_cf[m_last_byte][model_width]; }
@@ -203,7 +203,7 @@ namespace psio
 
         private:
          constexpr inline void update(int c) { m_last_byte = c; }
-         uint8_t               m_last_byte = char_to_symbol['\0'];
+         uint8_t               m_last_byte = char_to_symbol[0];
       };
 
       inline constexpr uint64_t method_to_number(std::string_view m_input)
@@ -216,7 +216,7 @@ namespace psio
          if (*m_in_itr <= '9')
             return 0;
          for (auto i : m_input)
-            if (not func_model::char_to_symbol[i])
+            if (not func_model::char_to_symbol[uint8_t(i)])
                return 0;
 
          typedef typename func_model::code_value code_value;
@@ -247,7 +247,7 @@ namespace psio
          {
             if (m_in_itr == m_input.end())
                return 0;
-            int c = m_model.char_to_symbol[*m_in_itr];
+            int c = m_model.char_to_symbol[uint8_t(*m_in_itr)];
             ++m_in_itr;
             return c;
          };
@@ -267,7 +267,7 @@ namespace psio
          };
 
          int c = 1;
-         for (; c != '\0' and m_bit < 64;)
+         for (; c != 0 and m_bit < 64;)
          {
             c = getByte();
 
@@ -325,7 +325,7 @@ namespace psio
          if (m_Mask != 0x80 and m_bit < 64)
             m_output |= (uint64_t(m_NextByte) << m_bit);
 
-         if (m_in_itr != m_input.end() || c != '\0')
+         if (m_in_itr != m_input.end() || c != 0)
             return 0;
 
          return m_output;
@@ -380,10 +380,10 @@ namespace psio
             code_value scaled_value = ((value - low + 1) * m_model.getCount() - 1) / range;
             int        c;
             prob       p = m_model.getChar(scaled_value, c);
-            if (c == '\0')
+            if (c == 0)
                break;
 
-            out += m_model.symbol_to_char[char(c)];
+            out += m_model.symbol_to_char[uint8_t(c)];
 
             if (p.count == 0)
                return "RUNTIME LOGIC ERROR";

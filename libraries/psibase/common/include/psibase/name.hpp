@@ -299,9 +299,13 @@ namespace psibase
          if (b)
             m_NextByte |= m_Mask;
          m_Mask >>= 1;
-         if (!m_Mask and m_bit < 64)
+         if (!m_Mask)
          {
-            m_output |= (uint64_t(m_NextByte) << m_bit);
+            if (m_bit < 64)
+            {
+               m_output |= (uint64_t(m_NextByte) << m_bit);
+            }
+
             m_bit += 8;
 
             m_Mask     = 0x80;
@@ -388,8 +392,13 @@ namespace psibase
       else
          put_bit_plus_pending(1);
 
-      if (m_Mask != 0x80 and m_bit < 64)
-         m_output |= (uint64_t(m_NextByte) << m_bit);
+      if (m_Mask != 0x80)
+      {
+         if (m_bit < 64)
+            m_output |= (uint64_t(m_NextByte) << m_bit);
+         else
+            m_output = 0;
+      }
 
       if (m_in_itr != m_input.end() || c != '\0')
          return 0;
@@ -498,12 +507,5 @@ namespace psibase
 
    PSIO_REFLECT(account_id_type, value);
 
-   inline namespace literals
-   {
-      inline constexpr account_id_type operator""_a(const char* s, size_t size)
-      {
-         return account_id_type(name_to_number(std::string_view(s, size)));
-      }
-   }  // namespace literals
 }  // namespace psibase
 

@@ -3,15 +3,13 @@
 #include <compare>
 #include <eosio/crypto.hpp>
 #include <eosio/time.hpp>
+#include <psibase/AccountNumber.hpp>
 #include <psibase/crypto.hpp>
-#include <psibase/name.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
 {
    using String = std::string;
-
-   // TODO: Rename to contract_num?
 
    struct TimePointSec final
    {
@@ -31,29 +29,6 @@ namespace psibase
       }
    };
    PSIO_REFLECT(TimePointSec, seconds);
-
-   struct AccountNumber final
-   {
-      uint64_t value = 0;
-      constexpr AccountNumber() : value(0) {}
-      constexpr explicit AccountNumber(uint64_t v) : value(v) {}
-      constexpr explicit AccountNumber(std::string_view s) : value(name_to_number(s)) {}
-      std::string str() const { return number_to_name(value); }
-      friend bool operator==(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value == b.value;
-      }
-      friend bool operator<(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value < b.value;
-      }
-      friend bool operator!=(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value != b.value;
-      }
-      //auto operator <=> (const AccountNumber&)const = default;
-   };
-   PSIO_REFLECT(AccountNumber, value)
 
    template <typename S>
    void to_key(const AccountNumber& k, S& s)

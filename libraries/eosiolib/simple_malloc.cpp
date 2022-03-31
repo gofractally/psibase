@@ -16,6 +16,15 @@ extern "C"
 
 extern "C" char __heap_base;
 
+namespace psibase
+{
+   namespace raw
+   {
+      [[clang::import_name("abort_message"), noreturn]] void abort_message(const char* message,
+                                                                           uint32_t    len);
+   }
+}  // namespace psibase
+
 namespace eosio
 {
    struct dsmalloc
@@ -35,19 +44,17 @@ namespace eosio
 
       void* operator()(size_t sz, size_t align_amt = 16)
       {
-         [[clang::import_name("abort_message"), noreturn]] void malloc_abort_message(
-             const char* message, uint32_t len);
          if (sz == 0)
             return NULL;
 
          size_t ret = align(next_addr, align_amt);
-         next_addr = ret + sz;
+         next_addr  = ret + sz;
 
          if (next_addr > next_page)
          {
             size_t new_next_page = align(next_addr, wasm_page_size);
             if (GROW_MEMORY((new_next_page - next_page) >> 16) == -1)
-               malloc_abort_message("failed to allocate pages", 24);
+               psibase::raw::abort_message("failed to allocate pages", 24);
             next_page = new_next_page;
          }
 
@@ -104,8 +111,7 @@ extern "C"
    void free(void* ptr) {}
 
    // Define these to satisfy musl references.
-   void *__libc_malloc(size_t) __attribute__((alias("malloc")));
-   void __libc_free(void *) __attribute__((alias("free")));
-   void *__libc_calloc(size_t nmemb, size_t size) __attribute__((alias("calloc")));
-
+   void* __libc_malloc(size_t) __attribute__((alias("malloc")));
+   void  __libc_free(void*) __attribute__((alias("free")));
+   void* __libc_calloc(size_t nmemb, size_t size) __attribute__((alias("calloc")));
 }

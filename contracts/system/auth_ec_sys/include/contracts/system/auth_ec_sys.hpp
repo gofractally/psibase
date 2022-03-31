@@ -41,6 +41,7 @@ namespace system_contract::auth_ec_sys
 
    using action = std::variant<auth_check, set_key, create_account>;
 
+#ifdef __wasm__
    template <typename T, typename R = typename T::return_type>
    R call(psibase::account_num sender, T args)
    {
@@ -52,4 +53,5 @@ namespace system_contract::auth_ec_sys
       if constexpr (!std::is_same_v<R, void>)
          return psio::convert_from_frac<R>(result);
    }
+#endif
 }  // namespace system_contract::auth_ec_sys
