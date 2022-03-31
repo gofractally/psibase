@@ -61,15 +61,16 @@ void bootstrap_chain(system_context& system)
 
    auto reg_rpc = [&](auto& bc, account_num contract, account_num rpc_contract)
    {
-      push_action(bc, transactor<rpc_sys>(contract, rpc_contract_num)
-                          .register_contract(contract, rpc_contract));
+      push_action(
+          bc,
+          transactor<rpc_sys>(contract, rpcContractNum).register_contract(contract, rpc_contract));
    };
 
-   auto upload = [&](auto& bc, account_num contract, const char* path, const char* content_type,
+   auto upload = [&](auto& bc, account_num contract, const char* path, const char* contentType,
                      const char* filename)
    {
       transactor<system_contract::rpc_account_sys> rasys(contract, contract);
-      push_action(bc, rasys.upload_rpc_sys(path, content_type, read_whole_file(filename)));
+      push_action(bc, rasys.upload_rpc_sys(path, contentType, read_whole_file(filename)));
    };
 
    block_context bc{system, true, true};
@@ -92,7 +93,7 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("account_sys.wasm"),
                     },
                     {
-                        .contract      = rpc_contract_num,
+                        .contract      = rpcContractNum,
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
                         .code          = read_whole_file("rpc_sys.wasm"),
@@ -116,7 +117,7 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("verify_ec_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber("roothost-rpc"),
+                        .contract      = AccountNumber("roothost-sys"),
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
                         .code          = read_whole_file("rpc_roothost_sys.wasm"),
@@ -130,7 +131,7 @@ void bootstrap_chain(system_context& system)
                 },
         });
 
-   AccountNumber                            roothost_rpc("roothost-rpc");
+   AccountNumber                            roothost_rpc("roothost-sys");
    AccountNumber                            account_rpc("account-rpc");
    transactor<system_contract::account_sys> asys(system_contract::account_sys::contract,
                                                  system_contract::account_sys::contract);

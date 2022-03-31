@@ -1,11 +1,11 @@
 #include "contracts/system/rpc_account_sys.hpp"
-#include <psio/to_json.hpp>
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/rpc_sys.hpp>
-#include <eosio/from_json.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
+#include <psio/from_json.hpp>
+#include <psio/to_json.hpp>
 
 static constexpr bool enable_print = false;
 
@@ -14,31 +14,22 @@ using namespace psibase;
 
 static constexpr table_num web_content_table = 1;
 
-inline auto web_content_key(psibase::account_num this_contract, std::string_view path)
+inline auto webContentKey(AccountNumber thisContract, std::string_view path)
 {
-   return std::tuple{this_contract, web_content_table, path};
+   return std::tuple{thisContract, web_content_table, path};
 }
-struct web_content_row
+struct WebContentRow
 {
-   std::string       path         = {};
-   std::string       content_type = {};
-   std::vector<char> content      = {};
+   std::string       path        = {};
+   std::string       contentType = {};
+   std::vector<char> content     = {};
 
-   auto key(psibase::account_num this_contract) { return web_content_key(this_contract, path); }
+   auto key(AccountNumber thisContract) { return webContentKey(thisContract, path); }
 };
-PSIO_REFLECT(web_content_row, path, content_type, content)
-
-struct augmented_account_row  //: psibase::account_row
-{
-   std::optional<std::string> name;
-   std::optional<std::string> auth_contract_name;
-};
-PSIO_REFLECT(augmented_account_row,
-             // base psibase::account_row,
-             name,
-             auth_contract_name)
+PSIO_REFLECT(WebContentRow, path, contentType, content)
 
 // TODO: automate defining the struct in reflection macro?
+// TODO: out of date
 struct CreateAccount
 {
    std::string name         = {};
@@ -56,44 +47,37 @@ namespace system_contract
       {
          auto json = psio::convert_to_json(obj);
          return rpc_reply_data{
-             .content_type = "application/json",
-             .reply        = {json.begin(), json.end()},
+             .contentType = "application/json",
+             .reply       = {json.begin(), json.end()},
          };
       };
 
       if (request.method == "GET")
       {
-         auto content = kv_get<web_content_row>(web_content_key(get_receiver(), request.target));
+         auto content = kv_get<WebContentRow>(webContentKey(get_receiver(), request.target));
          if (!!content)
          {
             return {
-                .content_type = content->content_type,
-                .reply        = content->content,
+                .contentType = content->contentType,
+                .reply       = content->content,
             };
          }
 
          if (request.target == "/accounts")
          {
-            actor<account_sys>                 asys(get_receiver(), account_sys::contract);
-            std::vector<augmented_account_row> rows;
-            /*
-            auto                               key      = eosio::convert_to_key(account_key(0));
-            auto                               key_size = sizeof(account_table);
+            std::vector<account_row> rows;
+            auto                     key     = eosio::convert_to_key(account_key({}));
+            auto                     keySize = sizeof(account_table);
             while (true)
             {
-               auto raw = kv_greater_equal_raw(account_row::kv_map, key, key_size);
+               auto raw = kv_greater_equal_raw(account_row::kv_map, key, keySize);
                if (!raw)
                   break;
-               auto acc = eosio::convert_from_bin<account_row>(*raw);
+               auto acc = psio::convert_from_frac<account_row>(*raw);
                key      = get_key();
                key.push_back(0);
-               augmented_account_row aug;
-               (account_row&)aug      = acc;
-               aug.name               = asys.get_account_by_num(aug.num);
-               aug.auth_contract_name = asys.get_account_by_num(aug.auth_contract);
-               rows.push_back(std::move(aug));
+               rows.push_back(std::move(acc));
             }
-            */
             return to_json(rows);
          }
       }
@@ -120,7 +104,7 @@ namespace system_contract
    }  // rpc_account_sys::rpc_sys
 
    void rpc_account_sys::upload_rpc_sys(psio::const_view<std::string>       path,
-                                        psio::const_view<std::string>       content_type,
+                                        psio::const_view<std::string>       contentType,
                                         psio::const_view<std::vector<char>> content)
    {
       check(get_sender() == get_receiver(), "wrong sender");
@@ -132,10 +116,10 @@ namespace system_contract
          c[i] = content[i];
 
       // TODO: avoid copies before pack
-      web_content_row row{
-          .path         = path,
-          .content_type = content_type,
-          .content      = std::move(c),
+      WebContentRow row{
+          .path        = path,
+          .contentType = contentType,
+          .content     = std::move(c),
       };
       kv_put(row.key(get_receiver()), row);
    }

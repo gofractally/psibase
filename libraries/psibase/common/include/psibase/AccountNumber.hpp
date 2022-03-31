@@ -1,5 +1,6 @@
 #pragma once
 #include <psibase/name.hpp>
+#include <psio/to_json.hpp>
 
 namespace psibase
 {
@@ -30,12 +31,20 @@ namespace psibase
    using account_num = AccountNumber;
 
    template <typename S>
+   void to_json(const AccountNumber& n, S& s)
+   {
+      to_json(n.str(), s);
+   }
+
+   template <typename S>
    void to_key(const AccountNumber& k, S& s)
    {
       s.write(&k.value, sizeof(k.value));
    }
 
 }  // namespace psibase
+
+// TODO: move to psibase::literals (inline namespace)
 inline constexpr psibase::AccountNumber operator""_a(const char* s, unsigned long)
 {
    auto num = psibase::AccountNumber(s);

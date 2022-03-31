@@ -4,14 +4,12 @@
 
 namespace psibase
 {
-   // TODO: move to table instead of fixed value
-   constexpr account_num rpc_contract_num =
-       account_num("rpc");  // RPC requests run on this contract
+   static constexpr auto rpcContractNum = AccountNumber("rpc-sys");
 
    struct verify_data
    {
       Checksum256       transaction_hash;
-      psibase::claim    claim;
+      Claim             claim;
       std::vector<char> proof;
    };
    PSIO_REFLECT(verify_data, transaction_hash, claim, proof)
@@ -28,9 +26,9 @@ namespace psibase
 
    struct rpc_reply_data
    {
-      std::string       content_type;
+      std::string       contentType;
       std::vector<char> reply;
    };
-   PSIO_REFLECT(rpc_reply_data, content_type, reply)
+   PSIO_REFLECT(rpc_reply_data, contentType, reply)
 
 }  // namespace psibase

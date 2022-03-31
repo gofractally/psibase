@@ -40,7 +40,7 @@ namespace psibase
       static constexpr uint64_t allow_write_native = uint64_t(1) << 1;
       static constexpr uint64_t is_subjective      = uint64_t(1) << 2;
 
-      AccountNumber num;
+      AccountNumber num;            // TODO: rename
       AccountNumber auth_contract;  // TODO: move out of native
       uint64_t      flags = 0;      // allow_sudo | allow_write_native | is_subjective
 
