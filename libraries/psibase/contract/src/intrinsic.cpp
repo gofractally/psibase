@@ -24,10 +24,17 @@ namespace psibase
 
    std::vector<char> get_key() { return get_key(raw::get_key(nullptr, 0)); }
 
-   action get_current_action()
+   Action get_current_action()
    {
       auto data = get_result(raw::get_current_action());
       return psio::convert_from_frac<action>(data);
+   }
+
+   psio::shared_view_ptr<Action> get_current_action_view()
+   {
+      psio::shared_view_ptr<Action> ptr(psio::size_tag{raw::get_current_action()});
+      raw::get_result(ptr.data(), ptr.size());
+      return ptr;
    }
 
    std::vector<char> call(const char* action, uint32_t len)
