@@ -219,7 +219,7 @@ namespace psio
             uint64_t output = 0;
             for (uint32_t i = 1; i < 17; ++i)
             {
-               uint64_t sym = uint8_t((func_model::char_to_symbol[m_input[i]]) - 1);
+               uint64_t sym = uint8_t((func_model::char_to_symbol[uint8_t(m_input[i])]) - 1);
                sym <<= 4 * (i - 1);
                output |= sym;
             }
@@ -228,7 +228,7 @@ namespace psio
 
          func_model                       m_model;
          std::string_view::const_iterator m_in_itr(m_input.begin());
-         for (auto i : m_input)
+         for (uint8_t i : m_input)
             if (not func_model::char_to_symbol[i])
                return 0;
 
@@ -272,7 +272,7 @@ namespace psio
          {
             if (m_in_itr == m_input.end())
                return 0;
-            int c = m_model.char_to_symbol[*m_in_itr];
+            int c = m_model.char_to_symbol[uint8_t(*m_in_itr)];
             ++m_in_itr;
             return c;
          };
@@ -429,7 +429,7 @@ namespace psio
             if (c == '\0')
                break;
 
-            out += m_model.symbol_to_char[char(c)];
+            out += m_model.symbol_to_char[uint8_t(c)];
 
             if (p.count == 0)
                return "RUNTIME LOGIC ERROR";

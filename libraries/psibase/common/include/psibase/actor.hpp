@@ -50,33 +50,11 @@ namespace psibase
          using member_class = decltype(psio::class_of_member(MemberPtr));
          using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
 
-         param_tuple tup(std::forward<Args>(args)...);
-
-         struct FRACPACK raw_variant_view
-         {
-            uint8_t  action_idx = idx;
-            uint32_t size;
-            char     data[];
-         };
-
-         auto param_tuple_size = psio::fracpack_size(tup);
-
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
                        "insufficient arguments passed to method");
 
-         //  auto data = arg_var(std::in_place_index_t<idx>(),
-         //                      param_tuple(std::forward<Args>(args)...));
-
-         psibase::Action act{sender, receiver, MethodNumber(Name)};
-         act.raw_data.resize(5 + param_tuple_size);
-         auto rvv        = reinterpret_cast<raw_variant_view*>(act.raw_data.data());
-         rvv->action_idx = idx;
-         rvv->size       = param_tuple_size;
-
-         psio::fast_buf_stream stream(rvv->data, param_tuple_size);
-         psio::fracpack(tup, stream);
-
-         return act;
+         return psibase::Action{sender, receiver, MethodNumber(Name),
+                                psio::convert_to_frac(param_tuple(std::forward<Args>(args)...))};
       }
    };
 
