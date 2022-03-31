@@ -1,7 +1,7 @@
 enable_testing()
 
 add_library( psio src/fpconv.c )
-target_link_libraries( psio INTERFACE rapidjson simdjson )
+target_link_libraries( psio INTERFACE rapidjson simdjson consthash )
 target_include_directories( psio PUBLIC include ${Boost_INCLUDE_DIRS} )
 add_compile_options( -Wall -Wstrict-aliasing )
 
@@ -55,4 +55,5 @@ target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/protobuf/schema.hpp
 )
 
+add_subdirectory( consthash )
 add_subdirectory(tests)

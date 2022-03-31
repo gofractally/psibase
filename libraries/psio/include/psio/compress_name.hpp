@@ -34,13 +34,13 @@ change based on the prior element.
 
 */
 #pragma once
+#include <consthash/cityhash64.hxx>
 #include <string>
 
 namespace psio
 {
    namespace detail
    {
-
       struct func_model
       {
          typedef uint32_t           code_value;
@@ -211,12 +211,25 @@ namespace psio
          if (m_input.size() == 0)
             return 0;
 
+         if (m_input[0] == '#')
+         {
+            if (m_input.size() != 17)
+               return -1;
+
+            uint64_t output = 0;
+            for (uint32_t i = 1; i < 17; ++i)
+            {
+               uint64_t sym = uint8_t((func_model::char_to_symbol[m_input[i]]) - 1);
+               sym <<= 4 * (i - 1);
+               output |= sym;
+            }
+            return output;
+         }
+
          func_model                       m_model;
          std::string_view::const_iterator m_in_itr(m_input.begin());
-         if (*m_in_itr <= '9')
-            return 0;
          for (auto i : m_input)
-            if (not func_model::char_to_symbol[uint8_t(i)])
+            if (not func_model::char_to_symbol[i])
                return 0;
 
          typedef typename func_model::code_value code_value;
@@ -227,19 +240,31 @@ namespace psio
          uint8_t       m_NextByte = 0;
          unsigned char m_Mask     = 0x80;
          uint64_t      m_output   = 0;
+         uint64_t      m_seed     = 0xbadd00d00b00b569;
+         int           m_bitc     = 0;
 
          auto put_bit = [&](bool b)
          {
-            if (b)
-               m_NextByte |= m_Mask;
-            m_Mask >>= 1;
-            if (!m_Mask and m_bit < 64)
+            if (b and m_bitc == 63)
             {
-               m_output |= (uint64_t(m_NextByte) << m_bit);
-               m_bit += 8;
+               m_seed   = m_output;
+               m_output = 0;
+               m_bit    = 64;
+            }
+            else
+            {
+               ++m_bitc;
+               if (b)
+                  m_NextByte |= m_Mask;
+               m_Mask >>= 1;
+               if (!m_Mask and m_bit < 64)
+               {
+                  m_output |= (uint64_t(m_NextByte) << m_bit);
+                  m_bit += 8;
 
-               m_Mask     = 0x80;
-               m_NextByte = 0;
+                  m_Mask     = 0x80;
+                  m_NextByte = 0;
+               }
             }
          };
 
@@ -247,7 +272,7 @@ namespace psio
          {
             if (m_in_itr == m_input.end())
                return 0;
-            int c = m_model.char_to_symbol[uint8_t(*m_in_itr)];
+            int c = m_model.char_to_symbol[*m_in_itr];
             ++m_in_itr;
             return c;
          };
@@ -267,7 +292,7 @@ namespace psio
          };
 
          int c = 1;
-         for (; c != 0 and m_bit < 64;)
+         for (; c != '\0' and m_bit < 64;)
          {
             c = getByte();
 
@@ -325,8 +350,16 @@ namespace psio
          if (m_Mask != 0x80 and m_bit < 64)
             m_output |= (uint64_t(m_NextByte) << m_bit);
 
-         if (m_in_itr != m_input.end() || c != 0)
-            return 0;
+         if (m_in_itr != m_input.end() || c != '\0')
+            m_output = 0;
+
+         if (not m_output)
+         {
+            m_output = consthash::city64_seed(m_input.data(), m_input.size(),
+                                              m_seed);  // psio::murmur64(m_input.data(),
+                                                        // m_input.size(), m_seed);
+            m_output |= (uint64_t(0x01) << (64 - 8));
+         }
 
          return m_output;
       }  // name_to_number
@@ -335,6 +368,19 @@ namespace psio
       {
          if (not input)
             return std::string();
+         if (input & (uint64_t(0x01) << (64 - 8)))
+         {
+            std::string str = "#";
+            /// then it is a hash
+            uint64_t r = input;
+            for (uint32_t i = 0; i < 16; ++i)
+            {
+               str += func_model::symbol_to_char[uint8_t((r & 0x0f)) + 1];
+               r >>= 4;
+            }
+            return str;
+         }
+
          typedef typename func_model::code_value code_value;
          typedef typename func_model::prob       prob;
 
@@ -380,10 +426,10 @@ namespace psio
             code_value scaled_value = ((value - low + 1) * m_model.getCount() - 1) / range;
             int        c;
             prob       p = m_model.getChar(scaled_value, c);
-            if (c == 0)
+            if (c == '\0')
                break;
 
-            out += m_model.symbol_to_char[uint8_t(c)];
+            out += m_model.symbol_to_char[char(c)];
 
             if (p.count == 0)
                return "RUNTIME LOGIC ERROR";

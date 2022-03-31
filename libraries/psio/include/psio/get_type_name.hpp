@@ -8,8 +8,8 @@
 #include <variant>
 #include <vector>
 
+#include <consthash/cityhash64.hxx>
 #include <psio/compress_name.hpp>
-#include <psio/murmur.hpp>
 
 namespace psio
 {
@@ -229,7 +229,7 @@ namespace psio
       {
          return n;
       }
-      return murmur64(str.data(), str.size());
+      return consthash::city64(str.data(), str.size());
    }
 
    template <typename T>

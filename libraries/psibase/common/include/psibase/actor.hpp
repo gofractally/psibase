@@ -67,7 +67,7 @@ namespace psibase
          //  auto data = arg_var(std::in_place_index_t<idx>(),
          //                      param_tuple(std::forward<Args>(args)...));
 
-         psibase::Action act{sender, receiver, Name};
+         psibase::Action act{sender, receiver, MethodNumber(Name)};
          act.raw_data.resize(5 + param_tuple_size);
          auto rvv        = reinterpret_cast<raw_variant_view*>(act.raw_data.data());
          rvv->action_idx = idx;

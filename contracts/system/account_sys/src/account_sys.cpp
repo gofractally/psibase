@@ -32,7 +32,7 @@ namespace system_contract
       kv_put(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
    }
 
-   void account_sys::create_account(AccountNumber acc, AccountNumber auth_contract, bool allow_sudo)
+   void account_sys::newAccount(AccountNumber acc, AccountNumber auth_contract, bool allow_sudo)
    {
       auto status = kv_get<account_sys_status_row>(account_sys_status_key());
       check(status.has_value(), "not started");

@@ -4,6 +4,7 @@
 #include <eosio/crypto.hpp>
 #include <eosio/time.hpp>
 #include <psibase/AccountNumber.hpp>
+#include <psibase/MethodNumber.hpp>
 #include <psibase/crypto.hpp>
 #include <psio/fracpack.hpp>
 
@@ -36,15 +37,7 @@ namespace psibase
       s.write(&k.value, sizeof(k.value));
    }
 
-   struct MethodNumber final
-   {
-      uint64_t value = 0;
-   };
-
-   PSIO_REFLECT(MethodNumber, value)
-
    using account_num = AccountNumber;
-   using method_num  = MethodNumber;
 
    using BlockNum  = uint32_t;
    using block_num = BlockNum;

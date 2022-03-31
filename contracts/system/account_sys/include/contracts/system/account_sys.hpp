@@ -20,13 +20,13 @@ namespace system_contract
       static constexpr AccountNumber null_account;
 
       void startup(const_view<vector<AccountNumber>> existing_accounts);
-      void create_account(AccountNumber account, AccountNumber auth_contract, bool allow_sudo);
+      void newAccount(AccountNumber account, AccountNumber auth_contract, bool allow_sudo);
       bool exists(AccountNumber num);
    };
 
    PSIO_REFLECT_INTERFACE(account_sys,
                           (startup, 0, existing_accounts),
-                          (create_account, 1, name, auth_contract, allow_sudo),
+                          (newAccount, 1, name, auth_contract, allow_sudo),
                           (exists, 2, num))
 
 }  // namespace system_contract

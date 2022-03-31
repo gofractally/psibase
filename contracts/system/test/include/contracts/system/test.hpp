@@ -134,7 +134,7 @@ namespace psibase
                                                     system_contract::account_sys::contract);
 
       auto trace = t.push_transaction(  //
-          t.make_transaction({asys.create_account(acc, auth_contract, false)}));
+          t.make_transaction({asys.newAccount(acc, auth_contract, false)}));
       REQUIRE(psibase::show(true, trace) == "");
       return acc;
    }  // add_account()

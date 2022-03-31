@@ -51,7 +51,7 @@ namespace system_contract::auth_ec_sys
       // TODO: support entire set of flags
 
       psibase::actor<account_sys> asys(this_contract, account_sys::contract);
-      asys.create_account(args.name, this_contract, args.allow_sudo);
+      asys.newAccount(args.name, this_contract, args.allow_sudo);
       auth_row row{AccountNumber{args.name}, args.public_key};
       kv_put(row.key(), row);
       return args.name;

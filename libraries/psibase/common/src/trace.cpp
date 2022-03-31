@@ -10,7 +10,8 @@ namespace psibase
          t.act.raw_data.resize(max);
       for (auto& inner : t.inner_traces)
          std::visit(
-             [max](auto& obj) {
+             [max](auto& obj)
+             {
                 if constexpr (std::is_same_v<eosio::remove_cvref_t<decltype(obj)>, action_trace>)
                    trim_raw_data(obj, max);
              },
@@ -57,7 +58,8 @@ namespace psibase
    void pretty_trace(std::string& dest, const action_trace& atrace, const std::string& indent)
    {
       dest += indent + "action:\n";
-      dest += indent + "    " + atrace.act.sender.str() + " -> " + atrace.act.contract.str() + "\n";
+      dest += indent + "    " + atrace.act.sender.str() + " -> " + atrace.act.contract.str() +
+              "::" + atrace.act.method.str() + "\n";
       dest += indent + "    " + psio::convert_to_json(atrace.act.raw_data) + "\n";
       for (auto& inner : atrace.inner_traces)
          std::visit([&](auto& inner) { pretty_trace(dest, inner, indent + "    "); }, inner.inner);

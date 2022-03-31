@@ -9,15 +9,7 @@ namespace psibase
       uint64_t value = 0;
       constexpr AccountNumber() : value(0) {}
       constexpr explicit AccountNumber(uint64_t v) : value(v) {}
-      constexpr explicit AccountNumber(std::string_view s) : value(name_to_number(s))
-      {
-         if (not value)
-         {
-            char failed_to_compress_name = 1;
-            // intentionally invoke undefined behavior to report constexpr error
-            failed_to_compress_name <<= value - 1;
-         }
-      }
+      constexpr explicit AccountNumber(std::string_view s) : value(name_to_number(s)) {}
       std::string str() const { return number_to_name(value); }
       friend bool operator==(const AccountNumber& a, const AccountNumber& b)
       {
@@ -38,5 +30,10 @@ namespace psibase
 }  // namespace psibase
 inline constexpr psibase::AccountNumber operator""_a(const char* s, unsigned long)
 {
-   return psibase::AccountNumber(s);
+   auto num = psibase::AccountNumber(s);
+   if (not num.value)
+   {
+      std::abort();  // failed_to_compress_name
+   }
+   return num;
 }
