@@ -8,19 +8,18 @@
 
 namespace system_contract
 {
-   using psibase::AccountNumber;
-
    class transaction_sys : public psibase::contract
    {
      public:
-      static constexpr AccountNumber contract = AccountNumber("transact-sys");
-      static constexpr uint64_t      contract_flags =
+      static constexpr auto     contract = psibase::AccountNumber("transact-sys");
+      static constexpr uint64_t contract_flags =
           psibase::account_row::allow_sudo | psibase::account_row::allow_write_native;
 
-      uint8_t setCode(AccountNumber     contract,
-                      uint8_t           vm_type,
-                      uint8_t           vm_version,
-                      std::vector<char> code);
+      // TODO: move to another contract
+      uint8_t setCode(psibase::AccountNumber contract,
+                      uint8_t                vm_type,
+                      uint8_t                vm_version,
+                      std::vector<char>      code);
    };
 
    PSIO_REFLECT_INTERFACE(transaction_sys, (setCode, 0, contact, vm_type, vm_version, code))

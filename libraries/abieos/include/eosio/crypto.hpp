@@ -53,7 +53,7 @@ namespace eosio
        * expected result of the test of user presence for a valid signature
        * @see https://w3c.github.io/webauthn/#test-of-user-presence
        */
-      uint8_t user_presence;
+      user_presence_t user_presence;
 
       /**
        * the Relying Party Identifier for WebAuthN

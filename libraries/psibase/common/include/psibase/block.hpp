@@ -11,6 +11,7 @@ namespace psibase
 {
    using String = std::string;
 
+   // TODO: Move
    struct TimePointSec final
    {
       uint32_t seconds = 0;
@@ -30,12 +31,14 @@ namespace psibase
    };
    PSIO_REFLECT(TimePointSec, seconds);
 
+   // TODO: Move
    template <typename S>
    void to_key(const AccountNumber& k, S& s)
    {
       s.write(&k.value, sizeof(k.value));
    }
 
+   // TODO: Move
    struct MethodNumber final
    {
       uint64_t value = 0;
@@ -148,7 +151,7 @@ namespace psibase
    {
       Checksum256  previous;
       block_num    num = 0;  // TODO: pack into previous instead?
-      TimePointSec time;
+      TimePointSec time;     // TODO: switch to microseconds
    };
    EOSIO_REFLECT(BlockHeader, previous, num, time)
    PSIO_REFLECT(BlockHeader, /*previous,*/ num, time)
@@ -165,10 +168,10 @@ namespace psibase
    struct signed_block
    {
       Block block;
-      Claim signature;
+      Claim signature;  // TODO: switch to proofs?
    };
    EOSIO_REFLECT(signed_block, block, signature)
-   PSIO_REFLECT(signed_block, block /*, signature*/)
+   PSIO_REFLECT(signed_block, block, signature)
 
    struct BlockInfo
    {

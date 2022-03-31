@@ -147,11 +147,10 @@ void test_compare()
    test_key(public_key(), public_key());
    test_key(public_key(std::in_place_index<0>, eosio::ecc_public_key{1}),
             public_key(std::in_place_index<1>));
-   test_key(
-       public_key(eosio::webauthn_public_key{
-           {}, (uint8_t)eosio::webauthn_public_key::user_presence_t::USER_PRESENCE_NONE, "b"}),
-       public_key(eosio::webauthn_public_key{
-           {}, (uint8_t)eosio::webauthn_public_key::user_presence_t::USER_PRESENCE_PRESENT, "a"}));
+   test_key(public_key(eosio::webauthn_public_key{
+                {}, eosio::webauthn_public_key::user_presence_t::USER_PRESENCE_NONE, "b"}),
+            public_key(eosio::webauthn_public_key{
+                {}, eosio::webauthn_public_key::user_presence_t::USER_PRESENCE_PRESENT, "a"}));
 
    using namespace std::literals;
    test_key(""s, ""s);

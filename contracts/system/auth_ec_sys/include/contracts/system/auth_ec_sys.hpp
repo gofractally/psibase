@@ -4,12 +4,6 @@
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
 
-// TODO
-namespace eosio
-{
-   PSIO_REFLECT(webauthn_public_key, key, user_presence, rpid)
-}
-
 namespace system_contract::auth_ec_sys
 {
    static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-ec-sys");
