@@ -36,8 +36,8 @@ uint64_t nft_contract::mint(account_num issuer, sub_id_type sub_id)
    uint64_t new_id = generate(issuer, sub_id);
 
    auto nft_table = db.open<nft_table_t>();
-   auto nft_idx   = nft_table.get_index<0>();
 
+   auto nft_idx = nft_table.get_index<0>();
    check(nft_idx.get(new_id) == std::nullopt, "Nft already exists");
    check(nft_row::is_valid_key(new_id), "Nft ID invalid");
 
@@ -46,7 +46,7 @@ uint64_t nft_contract::mint(account_num issuer, sub_id_type sub_id)
    return new_id;
 }
 
-std::optional<nft_row> nft_contract::get_nft(nid nft_id)
+std::optional<nft_row> nft_contract::getNft(nid nft_id)
 {
    auto nft_table = db.open<nft_table_t>();
    auto nft_idx   = nft_table.get_index<0>();

@@ -63,7 +63,7 @@ namespace
    }
 }  // namespace
 
-SCENARIO("Minting nfts")
+SCENARIO("Minting & burning nfts")
 {
    GIVEN("An empty chain with registered users Alice and Bob")
    {
@@ -77,10 +77,10 @@ SCENARIO("Minting nfts")
       Actor bob{add_account(t, "bob")};
 
       uint32_t sub_id = 0;
+      THEN("Alice cannot burn an NFT") {}
       THEN("Alice can mint an NFT")
       {
          transaction_trace trace = t.trace(alice.at<nft_contract>().mint(alice, sub_id));
-         INFO("Delete me - everything worked");
          REQUIRE(show(false, trace) == "");
 
          AND_THEN("The NFT exists")
@@ -95,8 +95,8 @@ SCENARIO("Minting nfts")
                                 .approved_account = 0};
 
             auto nft_id = getReturnVal<&nft_contract::mint>(trace);
-            trace       = t.trace(alice.at<nft_contract>().get_nft(nft_id));
-            auto nft    = getReturnVal<&nft_contract::get_nft>(trace);
+            trace       = t.trace(alice.at<nft_contract>().getNft(nft_id));
+            auto nft    = getReturnVal<&nft_contract::getNft>(trace);
             REQUIRE(nft != std::nullopt);
             REQUIRE(*nft == expectedNft);
          }
@@ -120,6 +120,8 @@ SCENARIO("Minting nfts")
             CHECK(failedWith(t.trace(alice.at<nft_contract>().mint(alice, sub_id)),
                              "Nft already exists"));
          }
+         THEN("Alice can burn the NFT") {}
+         THEN("Bob cannot burn the NFT") {}
          THEN("Bob can mint an NFT using the same sub_id")
          {
             CHECK(succeeded(t.trace(bob.at<nft_contract>().mint(bob, sub_id))));
@@ -131,12 +133,12 @@ SCENARIO("Minting nfts")
          AND_WHEN("Alice mints a second NFT using a different sub_id")
          {
             //auto nftId = t.act(alice.at<nft_contract>().mint(alice, sub_id + 1));
-            //auto nft1  = t.act(alice.at<nft_contract>().get_nft(nftId));
+            //auto nft1  = t.act(alice.at<nft_contract>().getNft(nftId));
             t.finish_block();
 
             THEN("The ID is one more than the first")
             {
-               //nft_row nft2        = *(t.act(alice.at<nft_contract>().get_nft(nftId)));
+               //nft_row nft2        = *(t.act(alice.at<nft_contract>().getNft(nftId)));
                //nft_row expectedNft = *nft1;
                //expectedNft.nftid++;
                //REQUIRE(nft2 == expectedNft);
@@ -154,4 +156,55 @@ SCENARIO("Minting nfts")
          }
       }
    }
+}
+
+// To do - Add test cases for disk space consumption
+//       - Add test cases for checking that events were emitted properly
+SCENARIO("Transferring NFTs")
+{
+   GIVEN("A chain with registered users Alice, Bob, and Charlie")
+   {
+      THEN("Bob is configured to use auto-debit by default") {}
+      THEN("Bob is able to opt out of auto-debit") {}
+      THEN("Alice is unable to credit, uncredit, or debit any NFT with anyone") {}
+      AND_GIVEN("Alice has minted an NFT")
+      {
+         THEN("No one can debit or uncredit the NFT") {}
+         THEN("Bob may not credit the NFT to Bob") {}
+         THEN("Alice may not credit the NFT to herself") {}
+         THEN("Alice may credit the NFT to Bob") {}
+         WHEN("Alice credits the NFT to Bob")
+         {
+            THEN("Bob immediately owns the NFT") {}
+            THEN("Alice has no chance to uncredit the NFT") {}
+         }
+         WHEN("Bob opts out of auto-debit")
+         {
+            AND_WHEN("Alice credits the NFT to Bob")
+            {
+               THEN("The NFT is not yet owned by Bob") {}
+               THEN("Alice and Charlie may not debit the NFT") {}
+               THEN("Bob may debit the NFT") {}
+               THEN("Bob and Charlie may not uncredit the NFT") {}
+               THEN("Alice may uncredit the NFT") {}
+               AND_WHEN("Bob debits the NFT")
+               {
+                  THEN("Bob owns the NFT") {}
+                  THEN("Alice and Charlie may not uncredit or debit the NFT") {}
+                  THEN("Bob may not debit the NFT again") {}
+               }
+               AND_WHEN("Alice uncredits the NFT")
+               {
+                  THEN("No one can debit or uncredit the NFT") {}
+                  THEN("Alice may credit the NFT again") {}
+               }
+            }
+         }
+      }
+   }
+}
+
+SCENARIO("Approving NFTs")
+{
+   // Approving NFTs allows someone to credit the NFT on your behalf.
 }
