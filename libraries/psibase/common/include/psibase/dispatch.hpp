@@ -35,21 +35,22 @@ namespace psibase
    {
       Contract contract;
       contract.psibase::contract::dispatch_set_sender_receiver(sender, receiver);
-      action act = get_current_action();  /// action view...
+      auto act = get_current_action_view();  /// action view...
 
       bool called = psio::reflect<Contract>::get_by_name(
-          act.method.value,
+          act->method()->value(),
           [&](auto member_func)
           {
              using result_type = decltype(psio::result_of(member_func));
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
 
-             psibase::check(psio::fracvalidate<param_tuple>(
-                                act.raw_data.data(), act.raw_data.data() + act.raw_data.size())
-                                .valid,
-                            "invalid argument encoding");
-             psio::const_view<param_tuple> param_view(act.raw_data.data());
+             auto param_data = act->raw_data()->data();
+             psibase::check(
+                 psio::fracvalidate<param_tuple>(param_data, param_data + act->raw_data()->size())
+                     .valid,
+                 "invalid argument encoding");
+             psio::const_view<param_tuple> param_view(param_data);
 
              param_view->call(
                  [&](auto... args)

@@ -124,7 +124,8 @@ namespace psibase
    // Note: The above only applies if the contract uses the call() intrinsic.
    //       The call() function and the action wrappers use the call() intrinsic.
    //       Calling a contract function directly does NOT use the call() intrinsic.
-   action get_current_action();
+   Action                        get_current_action();
+   psio::shared_view_ptr<Action> get_current_action_view();
 
    // Call a contract and return its result
    std::vector<char> call(const char* action, uint32_t len);
