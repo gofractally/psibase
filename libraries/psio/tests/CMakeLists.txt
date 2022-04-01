@@ -3,6 +3,7 @@ add_compile_options( -Wall -Wstrict-aliasing -fstrict-aliasing )
 if(DEFINED IS_NATIVE)
     find_package(Threads REQUIRED)
     add_executable(psio-tests
+        graphql.cpp
         fracpack.cpp
         psio_tests.cpp
         reflect.cpp
@@ -15,6 +16,7 @@ endif()
 
 if(DEFINED IS_WASM)
     add_executable(psio-tests
+        graphql.cpp
         fracpack.cpp
         psio_tests.cpp
         reflect.cpp

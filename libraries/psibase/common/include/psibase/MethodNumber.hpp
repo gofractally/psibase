@@ -1,5 +1,6 @@
 #pragma once
 #include <psio/reflect.hpp>
+#include <psio/to_json.hpp>
 
 namespace psibase
 {
@@ -27,6 +28,18 @@ namespace psibase
       //auto operator <=> (const MethodNumber&)const = default;
    };
    PSIO_REFLECT(MethodNumber, value)
+
+   template <typename S>
+   void to_json(const MethodNumber& n, S& s)
+   {
+      to_json(n.str(), s);
+   }
+
+   template <typename S>
+   void to_key(const MethodNumber& k, S& s)
+   {
+      s.write(&k.value, sizeof(k.value));
+   }
 
 }  // namespace psibase
 inline constexpr psibase::MethodNumber operator""_m(const char* s, unsigned long)

@@ -159,9 +159,12 @@ namespace psio
       return true;                                            \
    }
 
-#define PSIO_REFLECT_MEMBER_BY_NAME_PB_INTERNAL(r, OP, member) \
-   case psio::hash_name(PSIO_REFLECT_FILTER_NAME_STR member):  \
-      (void)lambda(&OP::PSIO_REFLECT_FILTER_NAME member);      \
+#define PSIO_REFLECT_MEMBER_BY_NAME_PB_INTERNAL(r, OP, member)                         \
+   case psio::hash_name(PSIO_REFLECT_FILTER_NAME_STR member):                          \
+      (void)lambda(psio::meta{.name        = PSIO_REFLECT_FILTER_NAME_STR      member, \
+                              .param_names = PSIO_REFLECT_FILTER_PARAMS member,        \
+                              .number      = PSIO_REFLECT_FILTER_IDX         member},               \
+                   &OP::PSIO_REFLECT_FILTER_NAME member);                              \
       return true;
 
 #define PSIO_REFLECT_MEMBER_BY_IDX_PB_INTERNAL(r, OP, member) \
@@ -232,9 +235,9 @@ namespace psio
 #define PSIO_REFLECT_MEMBER_BY_IDX_HELPER(QUERY_CLASS, MEMBER_IDXS) \
    BOOST_PP_SEQ_FOR_EACH_I(PSIO_REFLECT_MEMBER_BY_IDX_I_INTERNAL, QUERY_CLASS, MEMBER_IDXS)
 
-#define PSIO_REFLECT_MEMBER_BY_NAME_I_INTERNAL(r, OP, I, member) \
-   case psio::hash_name(BOOST_PP_STRINGIZE(member)):             \
-      (void)lambda(&OP::member);                                 \
+#define PSIO_REFLECT_MEMBER_BY_NAME_I_INTERNAL(r, OP, I, member)                                  \
+   case psio::hash_name(BOOST_PP_STRINGIZE(member)):                                              \
+      (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(member), .number = I + 1}, &OP::member); \
       return true;
 
 #define PSIO_REFLECT_MEMBER_BY_NAME_HELPER(QUERY_CLASS, MEMBER_NAMES) \
@@ -498,6 +501,31 @@ namespace psio
       using value_type = T;
    };
 
+   template <typename T>
+   using is_std_optional_v = typename is_std_optional<T>::value;
+
+   template <typename>
+   struct is_std_unique_ptr : std::false_type
+   {
+   };
+
+   template <typename T>
+   struct is_std_unique_ptr<std::unique_ptr<T>> : std::true_type
+   {
+      using value_type = T;
+   };
+
+   template <typename>
+   struct is_std_reference_wrapper : std::false_type
+   {
+   };
+
+   template <typename T>
+   struct is_std_reference_wrapper<std::reference_wrapper<T>> : std::true_type
+   {
+      using value_type = T;
+   };
+
    template <typename>
    struct is_std_array : std::false_type
    {
@@ -509,6 +537,22 @@ namespace psio
       using value_type                        = T;
       constexpr static const std::size_t size = N;
    };
+
+   template <typename T>
+   inline constexpr bool is_optional()
+   {
+      return is_std_optional<T>::value;
+   }
+   template <typename T>
+   inline constexpr bool is_unique_ptr()
+   {
+      return is_std_unique_ptr<T>::value;
+   }
+   template <typename T>
+   inline constexpr bool is_reference_wrapper()
+   {
+      return is_std_reference_wrapper<T>::value;
+   }
 
    template <typename T>
    constexpr bool is_array()
@@ -571,6 +615,14 @@ namespace psio
          return n;
       }
    };
+   template <typename T>
+   struct remove_cvref
+   {
+      typedef std::remove_cv_t<std::remove_reference_t<T>> type;
+   };
+
+   template <typename T>
+   using remove_cvref_t = typename remove_cvref<T>::type;
 
 }  // namespace psio
 

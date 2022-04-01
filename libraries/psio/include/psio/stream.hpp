@@ -27,10 +27,10 @@ namespace psio
       invalid_name_char,
       invalid_name_char13,
       name_too_long,
-      json_writer_error, 
+      json_writer_error,
       invalid_frac_encoding,
-      empty_vec_used_offset// !!!
-   };                     // stream_error
+      empty_vec_used_offset  // !!!
+   };                        // stream_error
 }  // namespace psio
 
 namespace std
@@ -219,11 +219,6 @@ namespace psio
       size_t consumed() const { return pos - begin; }
    };
 
-
-
-
-
-
    /**
     * Does not bounds checking, assuming packsize was done first.
     */
@@ -235,10 +230,7 @@ namespace psio
 
       fast_buf_stream(char* pos, size_t size) : begin(pos), pos{pos}, end{pos + size} {}
 
-      void write(char ch)
-      {
-         *pos++ = ch;
-      }
+      void write(char ch) { *pos++ = ch; }
 
       void write(const void* src, size_t size)
       {
@@ -260,24 +252,12 @@ namespace psio
 
       void write(const std::string& v) { write(v.c_str(), v.size()); }
 
-      void skip(int32_t s)
-      {
-         pos += s;
-      }
+      void skip(int32_t s) { pos += s; }
       auto get_pos() const { return pos; }
 
       size_t remaining() { return end - pos; }
       size_t consumed() const { return pos - begin; }
    };
-
-
-
-
-
-
-
-
-
 
    struct size_stream
    {
@@ -287,9 +267,7 @@ namespace psio
       void   write(char ch) { ++size; }
       size_t consumed() const { return size; }
 
-      void write(const void* src, size_t size) { 
-         this->size += size; 
-      }
+      void write(const void* src, size_t size) { this->size += size; }
 
       template <int size>
       void write(const char (&src)[size])
@@ -305,9 +283,7 @@ namespace psio
 
       void write(const std::string& v) { write(v.c_str(), v.size()); }
 
-      void skip(int32_t s) { 
-         size += s; 
-      }
+      void skip(int32_t s) { size += s; }
    };
 
    template <typename S>
@@ -441,16 +417,19 @@ namespace psio
       const char* end;
       size_t      total_read = 0;
       size_t      size;
-      void add_total_read( uint32_t v ) {
+      void        add_total_read(uint32_t v)
+      {
          total_read += v;
-         if(  size < get_total_read() ) {
+         if (size < get_total_read())
+         {
             throw_error(stream_error::doubleread);
          }
       }
-      size_t get_total_read()const { return total_read + (pos-begin); }
+      size_t get_total_read() const { return total_read + (pos - begin); }
 
       check_input_stream() : pos{nullptr}, end{nullptr} {}
-      check_input_stream(const char* pos, size_t size) : begin(pos), pos{pos}, end{pos + size},size(size)
+      check_input_stream(const char* pos, size_t size)
+          : begin(pos), pos{pos}, end{pos + size}, size(size)
       {
          if (size < 0)
             throw_error(stream_error::overrun);
@@ -518,4 +497,9 @@ namespace psio
       }
    };
 
+   template <typename S>
+   void write_str(std::string_view str, S& stream)
+   {
+      stream.write(str.data(), str.size());
+   }
 }  // namespace psio
