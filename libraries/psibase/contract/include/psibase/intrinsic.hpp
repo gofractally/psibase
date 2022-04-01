@@ -5,6 +5,12 @@
 #include <psibase/db.hpp>
 #include <psio/fracpack.hpp>
 
+#if defined(COMPILING_CONTRACT) || defined(COMPILING_TESTS)
+#define PSIBASE_INTRINSIC(x) [[clang::import_name(#x)]]
+#else
+#define PSIBASE_INTRINSIC(x)
+#endif
+
 namespace psibase
 {
    // These use mangled names instead of extern "C" to prevent collisions
@@ -13,21 +19,20 @@ namespace psibase
    {
       // Intrinsics which return data do it by storing it in a result buffer.
       // get_result copies min(dest_size, result_size) bytes into dest and returns result_size.
-      [[clang::import_name("get_result")]] uint32_t get_result(const char* dest,
-                                                               uint32_t    dest_size);
+      PSIBASE_INTRINSIC(get_result) uint32_t get_result(const char* dest, uint32_t dest_size);
 
       // Intrinsics which return keys do it by storing it in a key buffer.
       // get_key copies min(dest_size, key_size) bytes into dest and returns key_size.
-      [[clang::import_name("get_key")]] uint32_t get_key(const char* dest, uint32_t dest_size);
+      PSIBASE_INTRINSIC(get_key) uint32_t get_key(const char* dest, uint32_t dest_size);
 
       // Write message to console. Message should be UTF8.
-      [[clang::import_name("write_console")]] void write_console(const char* message, uint32_t len);
+      PSIBASE_INTRINSIC(write_console) void write_console(const char* message, uint32_t len);
 
       // Abort with message. Message should be UTF8.
 
 #ifndef PSIBASE_ABORT_MESSAGE
-      [[clang::import_name("abort_message"), noreturn]] void abort_message(const char* message,
-                                                                           uint32_t    len);
+      PSIBASE_INTRINSIC(abort_message)
+      [[noreturn]] void abort_message(const char* message, uint32_t len);
 #endif
 
       // Store the currently-executing action into result and return the result size.
@@ -40,56 +45,50 @@ namespace psibase
       // Note: The above only applies if the contract uses the call() intrinsic.
       //       The call() function and the action wrappers use the call() intrinsic.
       //       Calling a contract function directly does NOT use the call() intrinsic.
-      [[clang::import_name("get_current_action")]] uint32_t get_current_action();
+      PSIBASE_INTRINSIC(get_current_action) uint32_t get_current_action();
 
       // Call a contract, store the return value into result, and return the result size.
-      [[clang::import_name("call")]] uint32_t call(const char* action, uint32_t len);
+      PSIBASE_INTRINSIC(call) uint32_t call(const char* action, uint32_t len);
 
       // Set the return value of the currently-executing action
-      [[clang::import_name("set_retval")]] void set_retval(const char* retval, uint32_t len);
+      PSIBASE_INTRINSIC(set_retval) void set_retval(const char* retval, uint32_t len);
 
       // Set a key-value pair. If key already exists, then replace the existing value.
-      [[clang::import_name("kv_put")]] void kv_put(kv_map      map,
-                                                   const char* key,
-                                                   uint32_t    key_len,
-                                                   const char* value,
-                                                   uint32_t    value_len);
+      PSIBASE_INTRINSIC(kv_put)
+      void kv_put(kv_map      map,
+                  const char* key,
+                  uint32_t    key_len,
+                  const char* value,
+                  uint32_t    value_len);
 
       // Remove a key-value pair if it exists
-      [[clang::import_name("kv_remove")]] void kv_remove(kv_map      map,
-                                                         const char* key,
-                                                         uint32_t    key_len);
+      PSIBASE_INTRINSIC(kv_remove) void kv_remove(kv_map map, const char* key, uint32_t key_len);
 
       // Get a key-value pair, if any. If key exists, then sets result to value and
       // returns size. If key does not exist, returns -1 and clears result.
-      [[clang::import_name("kv_get")]] uint32_t kv_get(kv_map      map,
-                                                       const char* key,
-                                                       uint32_t    key_len);
+      PSIBASE_INTRINSIC(kv_get) uint32_t kv_get(kv_map map, const char* key, uint32_t key_len);
 
       // Get the first key-value pair which is greater than or equal to the provided
       // key. If one is found, and the first match_key_size bytes of the found key
       // matches the provided key, then sets result to value and returns size. Also
       // sets key (use get_key). Otherwise returns -1 and clears result.
-      [[clang::import_name("kv_greater_equal")]] uint32_t kv_greater_equal(kv_map      map,
-                                                                           const char* key,
-                                                                           uint32_t    key_len,
-                                                                           uint32_t match_key_size);
+      PSIBASE_INTRINSIC(kv_greater_equal)
+      uint32_t kv_greater_equal(kv_map      map,
+                                const char* key,
+                                uint32_t    key_len,
+                                uint32_t    match_key_size);
 
       // Get the key-value pair immediately-before provided key. If one is found,
       // and the first match_key_size bytes of the found key matches the provided
       // key, then sets result to value and returns size. Also sets key (use get_key).
       // Otherwise returns -1 and clears result.
-      [[clang::import_name("kv_less_than")]] uint32_t kv_less_than(kv_map      map,
-                                                                   const char* key,
-                                                                   uint32_t    key_len,
-                                                                   uint32_t    match_key_size);
+      PSIBASE_INTRINSIC(kv_less_than)
+      uint32_t kv_less_than(kv_map map, const char* key, uint32_t key_len, uint32_t match_key_size);
 
       // Get the maximum key-value pair which has key as a prefix. If one is found,
       // then sets result to value and returns size. Also sets key (use get_key).
       // Otherwise returns -1 and clears result.
-      [[clang::import_name("kv_max")]] uint32_t kv_max(kv_map      map,
-                                                       const char* key,
-                                                       uint32_t    key_len);
+      PSIBASE_INTRINSIC(kv_max) uint32_t kv_max(kv_map map, const char* key, uint32_t key_len);
    }  // namespace raw
 
    // Get result when size is known. Caution: this does not verify size.
@@ -165,7 +164,10 @@ namespace psibase
    }
 
    // Set the return value of the currently-executing action
-   inline void set_retval_bytes(eosio::input_stream s) { raw::set_retval(s.pos, s.remaining()); }
+   inline void set_retval_bytes(eosio::input_stream s)
+   {
+      raw::set_retval(s.pos, s.remaining());
+   }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    inline void kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
