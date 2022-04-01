@@ -19,15 +19,8 @@ namespace psibase
    template <auto MemberPtr>
    auto getReturnVal(const psibase::action_trace& actionTrace)
    {
-      //using T = typename ReturnType<MemberPtr>::type;
       using T = decltype(internal_use_do_not_use::get_return_type(MemberPtr));
-
-      T                  ret_val;
-      psio::input_stream in(actionTrace.raw_retval);
-      psio::fracunpack(ret_val, in);
-      psio::shared_view_ptr<T>{ret_val}.validate();
-
-      return ret_val;
+      return psio::convert_from_frac<T>(actionTrace.raw_retval);
    }
 
    std::vector<char> read_whole_file(std::string_view filename);
