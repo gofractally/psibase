@@ -2,29 +2,33 @@
 
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
+#include <psio/from_bin.hpp>
+#include <psio/to_bin.hpp>
 
-namespace auth_fake_sys
+namespace system_contract::auth_fake_sys
 {
-   static constexpr psibase::account_num contract = 4;
+   static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-fake-sys");
 
    struct auth_check
    {
       psibase::action             action;
       std::vector<psibase::claim> claims;
    };
-   EOSIO_REFLECT(auth_check, action, claims)
+   PSIO_REFLECT(auth_check, action, claims)
 
    using action = std::variant<auth_check>;
 
+#ifdef __wasm__
    template <typename T, typename R = typename T::return_type>
    R call(psibase::account_num sender, T args)
    {
       auto result = psibase::call(psibase::action{
           .sender   = sender,
           .contract = contract,
-          .raw_data = eosio::convert_to_bin(action{std::move(args)}),
+          .raw_data = psio::convert_to_frac(action{std::move(args)}),
       });
       if constexpr (!std::is_same_v<R, void>)
-         return eosio::convert_from_bin<R>(result);
+         return psio::convert_from_frac<R>(result);
    }
-}  // namespace auth_fake_sys
+#endif
+}  // namespace system_contract::auth_fake_sys

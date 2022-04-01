@@ -9,8 +9,8 @@ namespace name_sys
 {
    struct display_name_row
    {
-      psibase::account_num acc;
-      std::string          display_name;
+      psibase::AccountNumber acc;
+      std::string            display_name;
 
       friend std::strong_ordering operator<=>(const display_name_row&,
                                               const display_name_row&) = default;
@@ -24,11 +24,10 @@ namespace name_sys
    class name_contract : public psibase::contract
    {
      public:
-      static constexpr psibase::account_num contract     = 102;
-      static constexpr std::string_view     account_name = "name_sys";
+      static constexpr psibase::AccountNumber contract = "name-sys"_a;
 
       // Mutate
-      void create(psibase::account_num account, psibase::account_num ram_payer);
+      void create(psibase::AccountNumber account, psibase::AccountNumber ram_payer);
 
       // Read-only interface
 

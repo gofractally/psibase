@@ -4,6 +4,7 @@
 
 #include <psibase/blob.hpp>
 #include <psibase/native_tables.hpp>
+#include <psio/fracpack.hpp>
 
 #include <boost/filesystem/path.hpp>
 #include <eosio/from_bin.hpp>
@@ -96,7 +97,7 @@ namespace psibase
       auto kv_put(kv_map map, const K& key, const V& value)
           -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
       {
-         kv_put_raw(map, eosio::convert_to_key(key), eosio::convert_to_bin(value));
+         kv_put_raw(map, eosio::convert_to_key(key), psio::convert_to_frac(value));
       }
 
       template <typename V, typename K>
@@ -105,7 +106,7 @@ namespace psibase
          auto s = kv_get_raw(map, eosio::convert_to_key(key));
          if (!s)
             return std::nullopt;
-         return eosio::from_bin<V>(*s);
+         return psio::convert_from_frac<V>(psio::input_stream(s->pos, s->end));
       }
 
       template <typename V, typename K>

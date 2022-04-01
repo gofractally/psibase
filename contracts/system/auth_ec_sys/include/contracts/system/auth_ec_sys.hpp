@@ -4,46 +4,48 @@
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
 
-namespace auth_ec_sys
+namespace system_contract::auth_ec_sys
 {
-   static constexpr psibase::account_num contract = 5;
+   static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-ec-sys");
 
    struct auth_check
    {
       psibase::action             action;
       std::vector<psibase::claim> claims;
    };
-   EOSIO_REFLECT(auth_check, action, claims)
+   PSIO_REFLECT(auth_check, action, claims)
 
    struct set_key
    {
       psibase::account_num account;
-      eosio::public_key    key;
+      psibase::PublicKey   key;
    };
-   EOSIO_REFLECT(set_key, account, key)
+   PSIO_REFLECT(set_key, account, key)
 
    // TODO: remove. This is just a temporary approach for creating an account with a key.
    struct create_account
    {
       using return_type = psibase::account_num;
 
-      std::string       name       = {};
-      eosio::public_key public_key = {};
-      bool              allow_sudo = {};
+      psibase::AccountNumber name       = {};
+      psibase::PublicKey     public_key = {};
+      bool                   allow_sudo = {};
    };
-   EOSIO_REFLECT(create_account, name, public_key, allow_sudo)
+   PSIO_REFLECT(create_account, name, public_key, allow_sudo)
 
    using action = std::variant<auth_check, set_key, create_account>;
 
+#ifdef __wasm__
    template <typename T, typename R = typename T::return_type>
    R call(psibase::account_num sender, T args)
    {
       auto result = psibase::call(psibase::action{
           .sender   = sender,
           .contract = contract,
-          .raw_data = eosio::convert_to_bin(action{std::move(args)}),
+          .raw_data = psio::convert_to_frac(action{std::move(args)}),
       });
       if constexpr (!std::is_same_v<R, void>)
-         return eosio::convert_from_bin<R>(result);
+         return psio::convert_from_frac<R>(result);
    }
-}  // namespace auth_ec_sys
+#endif
+}  // namespace system_contract::auth_ec_sys

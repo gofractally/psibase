@@ -61,12 +61,14 @@ namespace psibase
       atrace.act   = act;
       try
       {
-         auto& db   = self.block_context.db;
-         auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
-                                                     "extra data in genesis payload");
+         auto& db = self.block_context.db;
+         //auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
+         //"extra data in genesis payload");
+         auto data = psio::convert_from_frac<genesis_action_data>(
+             {act.raw_data.data(), act.raw_data.size()});
          for (auto& contract : data.contracts)
          {
-            eosio::check(contract.contract, "account 0 is reserved");
+            eosio::check(contract.contract.value, "account 0 is reserved");
             eosio::check(
                 !db.kv_get<account_row>(account_row::kv_map, account_key(contract.contract)),
                 "account already created");
@@ -89,15 +91,17 @@ namespace psibase
 
    static void exec_process_transaction(transaction_context& self)
    {
-      action act{
-          .sender   = 0,
-          .contract = 1,
+      /// TODO: move this to a common header
+      static constexpr AccountNumber trxsys = AccountNumber("transact-sys");
+      action                         act{
+          .sender   = AccountNumber(),
+          .contract = trxsys,
           .raw_data = psio::convert_to_frac(self.trx.trx),
       };
       auto& atrace      = self.transaction_trace.action_traces.emplace_back();
       atrace.act        = act;  // TODO: avoid copy and redundancy between act and atrace.act
       action_context ac = {self, act, self.transaction_trace.action_traces.back()};
-      auto&          ec = self.get_execution_context(1);
+      auto&          ec = self.get_execution_context(trxsys);
       ec.exec_process_transaction(ac);
    }
 
@@ -123,9 +127,9 @@ namespace psibase
              .proof            = proof,
          };
          action act{
-             .sender   = 0,
+             .sender   = {},
              .contract = claim.contract,
-             .raw_data = eosio::convert_to_bin(data),
+             .raw_data = psio::convert_to_frac(data),
          };
          auto& atrace      = self.transaction_trace.action_traces.emplace_back();
          atrace.act        = act;

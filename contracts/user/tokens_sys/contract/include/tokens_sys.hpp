@@ -56,31 +56,30 @@ namespace tokens_sys
    class tokens_contract : public psibase::contract
    {
      public:
-      static constexpr psibase::account_num contract     = 104;
-      static constexpr std::string_view     account_name = "tokens_sys";
+      static constexpr psibase::AccountNumber contract = "tokens-sys"_a;
 
       // This action allows the storage_payer account to create an account owner with zero token balance at the expense of ram_payer for specified token ID
-      void open(psibase::account_num account, tid token_id, psibase::account_num storage_payer);
-      void close(psibase::account_num account, tid token_id);
+      void open(psibase::AccountNumber account, tid token_id, psibase::AccountNumber storage_payer);
+      void close(psibase::AccountNumber account, tid token_id);
 
       // Transfers directly from uid to uid (no notification)
-      void credit(psibase::account_num from,
-                  psibase::account_num to,
-                  int64_t              amount,
-                  tid                  token_id,
-                  const std::string&   memo);
-      void debit(psibase::account_num actor_uid,
-                 psibase::account_num from_uid,
-                 psibase::account_num to_uid,
-                 int64_t&             amount,
-                 tid                  token_id,
-                 const std::string&   memo);
-      void approve(psibase::account_num owner,
-                   psibase::account_num spender,
-                   int64_t              amount,
-                   tid                  token_id);
+      void credit(psibase::AccountNumber from,
+                  psibase::AccountNumber to,
+                  int64_t                amount,
+                  tid                    token_id,
+                  const std::string&     memo);
+      void debit(psibase::AccountNumber actor_uid,
+                 psibase::AccountNumber from_uid,
+                 psibase::AccountNumber to_uid,
+                 int64_t&               amount,
+                 tid                    token_id,
+                 const std::string&     memo);
+      void approve(psibase::AccountNumber owner,
+                   psibase::AccountNumber spender,
+                   int64_t                amount,
+                   tid                    token_id);
 
-      void create(psibase::account_num issuer, uint8_t precision, int64_t max_supply);
+      void create(psibase::AccountNumber issuer, uint8_t precision, int64_t max_supply);
 
      private:
       tables db{contract};

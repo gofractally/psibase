@@ -20,12 +20,12 @@ namespace nft_sys
 
    }  // namespace errors
 
-   using nid = uint64_t;
+   using nid = uint64_t;  //TODO: change to 32 bit
 
    struct AdRow
    {
-      psibase::account_num user;
-      bool                 autodebit;
+      psibase::AccountNumber user;
+      bool                   autodebit;
    };
    EOSIO_REFLECT(AdRow, user, autodebit);
    PSIO_REFLECT(AdRow, user, autodebit);
@@ -33,10 +33,10 @@ namespace nft_sys
    using ad_table_t = psibase::table<AdRow, &AdRow::user>;
    struct nft_row
    {
-      nid                  id;
-      psibase::account_num issuer;
-      psibase::account_num owner;
-      psibase::account_num approved_account;
+      nid                    id;
+      psibase::AccountNumber issuer;
+      psibase::AccountNumber owner;
+      psibase::AccountNumber approved_account;
 
       static bool is_valid_key(const nid& id) { return id != 0; }
 
@@ -58,33 +58,31 @@ namespace nft_sys
    class nft_contract : public psibase::contract
    {
      public:
-      static constexpr psibase::account_num contract     = 100;
-      static constexpr std::string_view     account_name = "nft_sys";
+      static constexpr psibase::AccountNumber contract = "nft-sys"_a;
 
       using sub_id_type = uint32_t;
 
       // Create a new NFT in issuer's scope, with sub_id 0
-      nid  mint(psibase::account_num issuer, sub_id_type sub_id);
-      void burn(psibase::account_num owner, nid nftId){};
+      nid  mint(psibase::AccountNumber issuer, sub_id_type sub_id);
+      void burn(psibase::AccountNumber owner, nid nftId){};
 
-      void autodebit(psibase::account_num account, bool autoDebit) {}
+      void autodebit(psibase::AccountNumber account, bool autoDebit) {}
 
-      void credit(psibase::account_num sender,
-                  psibase::account_num receiver,
-                  nid                  nftId,
-                  std::string          memo)
+      void credit(psibase::AccountNumber sender,
+                  psibase::AccountNumber receiver,
+                  nid                    nftId,
+                  std::string            memo)
       {
       }
-      void uncredit(psibase::account_num sender, psibase::account_num receiver, nid nftId) {}
-      void debit(psibase::account_num sender, psibase::account_num receiver, nid nftId) {}
+      void uncredit(psibase::AccountNumber sender, psibase::AccountNumber receiver, nid nftId) {}
+      void debit(psibase::AccountNumber sender, psibase::AccountNumber receiver, nid nftId) {}
 
-      void approve(nid nftId, psibase::account_num account) {}
-      void unapprove(nid nftId, psibase::account_num account) {}
+      void approve(nid nftId, psibase::AccountNumber account) {}
+      void unapprove(nid nftId, psibase::AccountNumber account) {}
 
       // Read-only interface
       std::optional<nft_row> getNft(nid nft_id);
-      std::optional<nft_row> getNft2(psibase::account_num issuer, sub_id_type sub_id);
-      int64_t                isAutodebit(psibase::account_num user);
+      int64_t                isAutodebit(psibase::AccountNumber user);
 
      private:
       tables db{contract};
@@ -105,8 +103,7 @@ namespace nft_sys
       (unapprove, 7, nftId, account),
       
       (getNft, 8, nft_id),
-      (getNft2, 9, issuer, sub_id),
-      (isAutodebit, 10, user)
+      (isAutodebit, 9, user)
    );
    // clang-format on
 

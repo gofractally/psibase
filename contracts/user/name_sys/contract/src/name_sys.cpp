@@ -5,7 +5,7 @@
 using namespace name_sys;
 using namespace psibase;
 
-void name_contract::create(psibase::account_num account, psibase::account_num ram_payer)
+void name_contract::create(psibase::AccountNumber account, psibase::AccountNumber ram_payer)
 {
    // NOP
 }

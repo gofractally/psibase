@@ -2,7 +2,10 @@
 
 #include <psibase/intrinsic.hpp>
 
-namespace verify_ec_sys
+namespace system_contract
 {
-   static constexpr psibase::account_num contract = 6;
-}  // namespace verify_ec_sys
+   namespace verify_ec_sys
+   {
+      static constexpr psibase::AccountNumber contract = "verifyec-sys"_a;
+   }  // namespace verify_ec_sys
+}  // namespace system_contract

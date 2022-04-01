@@ -1,11 +1,11 @@
 #pragma once
 
 #include <psio/fpconv.h>
-#include <psio/reflect.hpp>
-#include <psio/stream.hpp>
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <psio/reflect.hpp>
+#include <psio/stream.hpp>
 #include <variant>
 
 #include <rapidjson/encodings.h>
@@ -304,6 +304,18 @@ template <typename S> void to_json(float value, S& stream)     { return fp_to_js
          stream.write(hex_digits[byte & 15]);
       }
       stream.write('"');
+   }
+
+   template <typename S>
+   void to_json(const std::vector<char>& obj, S& stream)
+   {
+      to_json_hex(obj.data(), obj.size(), stream);
+   }
+
+   template <size_t N, typename S>
+   void to_json(const std::array<uint8_t, N>& obj, S& stream)
+   {
+      to_json_hex(reinterpret_cast<const char*>(obj.data()), obj.size(), stream);
    }
 
    template <typename T>

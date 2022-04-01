@@ -5,7 +5,7 @@
 using namespace symbol_sys;
 using namespace psibase;
 
-void symbol_contract::create(psibase::account_num owner, int64_t max_supply)
+void symbol_contract::create(psibase::AccountNumber owner, int64_t max_supply)
 {
    // NOP
 }

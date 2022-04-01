@@ -72,7 +72,8 @@ namespace psibase::http
    beast::string_view mime_type(beast::string_view path)
    {
       using beast::iequals;
-      const auto ext = [&path] {
+      const auto ext = [&path]
+      {
          const auto pos = path.rfind(".");
          if (pos == beast::string_view::npos)
             return beast::string_view{};
@@ -160,7 +161,8 @@ namespace psibase::http
                        Send&&                                                 send)
    {
       // Returns a bad request response
-      const auto bad_request = [&http_config, &req](beast::string_view why) {
+      const auto bad_request = [&http_config, &req](beast::string_view why)
+      {
          bhttp::response<bhttp::string_body> res{bhttp::status::bad_request, req.version()};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
@@ -173,7 +175,8 @@ namespace psibase::http
       };
 
       // Returns a not found response
-      const auto not_found = [&http_config, &req](beast::string_view target) {
+      const auto not_found = [&http_config, &req](beast::string_view target)
+      {
          bhttp::response<bhttp::string_body> res{bhttp::status::not_found, req.version()};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
@@ -187,7 +190,8 @@ namespace psibase::http
 
       // Returns an error response
       const auto error = [&http_config, &req](bhttp::status status, beast::string_view why,
-                                              const char* content_type = "text/html") {
+                                              const char* content_type = "text/html")
+      {
          bhttp::response<bhttp::string_body> res{status, req.version()};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, content_type);
@@ -199,7 +203,8 @@ namespace psibase::http
          return res;
       };
 
-      const auto ok = [&http_config, &req](std::vector<char> reply, const char* content_type) {
+      const auto ok = [&http_config, &req](std::vector<char> reply, const char* content_type)
+      {
          bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req.version()};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, content_type);
@@ -242,16 +247,16 @@ namespace psibase::http
             bc.start();
             signed_transaction trx;
             action             act{
-                .sender   = 0,
-                .contract = rpc_contract_num,
-                .raw_data = eosio::convert_to_bin(data),
+                            .sender   = AccountNumber(),
+                            .contract = rpcContractNum,
+                            .raw_data = psio::convert_to_frac(data),
             };
             transaction_trace   trace;
             transaction_context tc{bc, trx, {}, trace, false};
             action_trace        atrace;
             tc.exec_rpc(act, atrace);
-            auto result = eosio::convert_from_bin<rpc_reply_data>(atrace.raw_retval);
-            return send(ok(std::move(result.reply), result.content_type.c_str()));
+            auto result = psio::convert_from_frac<rpc_reply_data>(atrace.raw_retval);
+            return send(ok(std::move(result.reply), result.contentType.c_str()));
          }
          else if (http_config.static_dir.empty())
          {
@@ -458,23 +463,25 @@ namespace psibase::http
       void start_socket_timer()
       {
          _timer->expires_after(http_config->idle_timeout_ms);
-         _timer->async_wait([this](beast::error_code ec) {
-            if (ec)
-            {
-               return;
-            }
-            auto session_duration = steady_clock::now() - last_activity_timepoint;
-            if (session_duration <= http_config->idle_timeout_ms)
-            {
-               start_socket_timer();
-            }
-            else
-            {
-               ec = beast::error::timeout;
-               fail(ec, "timeout");
-               return do_close();
-            }
-         });
+         _timer->async_wait(
+             [this](beast::error_code ec)
+             {
+                if (ec)
+                {
+                   return;
+                }
+                auto session_duration = steady_clock::now() - last_activity_timepoint;
+                if (session_duration <= http_config->idle_timeout_ms)
+                {
+                   start_socket_timer();
+                }
+                else
+                {
+                   ec = beast::error::timeout;
+                   fail(ec, "timeout");
+                   return do_close();
+                }
+             });
       }
 
       void do_read()
@@ -649,7 +656,8 @@ namespace psibase::http
       {
          beast::error_code ec;
 
-         auto check_ec = [&](const char* what) {
+         auto check_ec = [&](const char* what)
+         {
             if (!ec)
                return;
             // TODO: elog("${w}: ${m}", ("w", what)("m", ec.message()));
@@ -689,42 +697,44 @@ namespace psibase::http
          // The new connection gets its own strand
          acceptor.async_accept(
              net::make_strand(ioc),
-             beast::bind_front_handler([&acceptor, self = shared_from_this(), this](
-                                           beast::error_code ec, auto socket) mutable {
-                if (ec)
-                {
-                   fail(ec, "accept");
-                }
-                else
-                {
-                   // Create the http session and run it
-                   if constexpr (std::is_same_v<Acceptor, tcp::acceptor>)
-                   {
-                      boost::system::error_code ec;
-                      // TODO:
-                      // dlog("Accepting connection from ${ra}:${rp} to ${la}:${lp}",
-                      //      ("ra", socket.remote_endpoint(ec).address().to_string())(
-                      //          "rp", socket.remote_endpoint(ec).port())(
-                      //          "la", socket.local_endpoint(ec).address().to_string())(
-                      //          "lp", socket.local_endpoint(ec).port()));
-                      std::make_shared<tcp_http_session>(http_config, shared_state,
-                                                         std::move(socket))
-                          ->run();
-                   }
-                   else if constexpr (std::is_same_v<Acceptor, unixs::acceptor>)
-                   {
-                      boost::system::error_code ec;
-                      auto                      rep = socket.remote_endpoint(ec);
-                      // TODO: dlog("Accepting connection from ${r}", ("r", rep.path()));
-                      std::make_shared<unix_http_session>(http_config, shared_state,
-                                                          std::move(socket))
-                          ->run();
-                   }
-                }
+             beast::bind_front_handler(
+                 [&acceptor, self = shared_from_this(), this](beast::error_code ec,
+                                                              auto              socket) mutable
+                 {
+                    if (ec)
+                    {
+                       fail(ec, "accept");
+                    }
+                    else
+                    {
+                       // Create the http session and run it
+                       if constexpr (std::is_same_v<Acceptor, tcp::acceptor>)
+                       {
+                          boost::system::error_code ec;
+                          // TODO:
+                          // dlog("Accepting connection from ${ra}:${rp} to ${la}:${lp}",
+                          //      ("ra", socket.remote_endpoint(ec).address().to_string())(
+                          //          "rp", socket.remote_endpoint(ec).port())(
+                          //          "la", socket.local_endpoint(ec).address().to_string())(
+                          //          "lp", socket.local_endpoint(ec).port()));
+                          std::make_shared<tcp_http_session>(http_config, shared_state,
+                                                             std::move(socket))
+                              ->run();
+                       }
+                       else if constexpr (std::is_same_v<Acceptor, unixs::acceptor>)
+                       {
+                          boost::system::error_code ec;
+                          auto                      rep = socket.remote_endpoint(ec);
+                          // TODO: dlog("Accepting connection from ${r}", ("r", rep.path()));
+                          std::make_shared<unix_http_session>(http_config, shared_state,
+                                                              std::move(socket))
+                              ->run();
+                       }
+                    }
 
-                // Accept another connection
-                do_accept(acceptor);
-             }));
+                    // Accept another connection
+                    do_accept(acceptor);
+                 }));
       }
    };  // listener
 

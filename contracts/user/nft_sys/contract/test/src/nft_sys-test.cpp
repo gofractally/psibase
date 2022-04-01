@@ -82,8 +82,7 @@ namespace
    {
       t.start_block();
       boot_minimal(t);
-      auto cnum = add_contract(t, "nft.sys", "nft_sys.wasm");
-      eosio::check(cnum == nft_contract::contract, "contract number changed");
+      auto cnum = add_contract(t, nft_contract::contract, "nft_sys.wasm");
    }
 
    auto debugCounter = [i = 0]() mutable { std::cout << "\nTEST " << ++i << "\n\n"; };

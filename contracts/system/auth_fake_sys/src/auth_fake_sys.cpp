@@ -7,7 +7,7 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-namespace auth_fake_sys
+namespace system_contract::auth_fake_sys
 {
    void exec(account_num this_contract, account_num sender, auth_check& act)
    {
@@ -20,9 +20,10 @@ namespace auth_fake_sys
    {
       // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
       auto act  = get_current_action();
-      auto data = eosio::convert_from_bin<action>(act.raw_data);
+      auto data = psio::convert_from_frac<action>(act.raw_data);
       std::visit(
-          [&](auto& x) {
+          [&](auto& x)
+          {
              if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
                 exec(this_contract, sender, x);
              else
@@ -32,5 +33,8 @@ namespace auth_fake_sys
    }
 
    extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
-}  // namespace auth_fake_sys
+   extern "C" void start(account_num this_contract)
+   {
+      __wasm_call_ctors();
+   }
+}  // namespace system_contract::auth_fake_sys

@@ -11,8 +11,12 @@ namespace psibase
    };
    PSIO_REFLECT_INTERFACE(rpc_interface, (rpc_sys, 0, request))
 
+   // TODO: rename to proxy_sys? proxy_sy?
    struct rpc_sys : psibase::contract
    {
+      // TODO: allow contract to register multiple contracts to handle
+      //    * sub.dom.ains.contract
+      //    * contract/foo/bar/...
       void register_contract(account_num contract, account_num rpc_contract);
    };
    PSIO_REFLECT_INTERFACE(rpc_sys, (register_contract, 0, contract, rpc_contract))

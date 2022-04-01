@@ -7,7 +7,6 @@ endfunction()
 
 function(add suffix)
     contract(test-cntr "${suffix}" test-cntr.cpp)
-    contract(token "${suffix}" token.cpp)
     contract(test_kv "${suffix}" test_kv.cpp)
     contract(test_table "${suffix}" test_table.cpp)
 

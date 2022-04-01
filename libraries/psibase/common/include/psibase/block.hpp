@@ -1,43 +1,58 @@
 #pragma once
 
 #include <eosio/crypto.hpp>
-#include <eosio/fixed_bytes.hpp>
 #include <eosio/time.hpp>
+#include <psibase/AccountNumber.hpp>
+#include <psibase/MethodNumber.hpp>
 #include <psibase/crypto.hpp>
 #include <psio/fracpack.hpp>
 
-// TODO
-namespace eosio
-{
-   PSIO_REFLECT(time_point_sec, utc_seconds)
-}
-
 namespace psibase
 {
-   // TODO: Rename to contract_num?
-   using account_num = uint64_t;
-   using method_num  = uint64_t;
+   using String = std::string;
 
-   using block_num = uint32_t;
-
-   struct action
+   // TODO: Move
+   struct TimePointSec final
    {
-      account_num       sender   = 0;
-      account_num       contract = 0;
-      method_num        method   = 0;
+      uint32_t seconds = 0;
+      //auto operator <=> (const TimePointSec&)const = default;
+      friend bool operator==(const TimePointSec& a, const TimePointSec& b)
+      {
+         return a.seconds == b.seconds;
+      }
+      friend bool operator<(const TimePointSec& a, const TimePointSec& b)
+      {
+         return a.seconds < b.seconds;
+      }
+      friend bool operator!=(const TimePointSec& a, const TimePointSec& b)
+      {
+         return a.seconds != b.seconds;
+      }
+   };
+   PSIO_REFLECT(TimePointSec, seconds);
+
+   using BlockNum  = uint32_t;
+   using block_num = BlockNum;
+
+   struct Action
+   {
+      AccountNumber     sender;
+      AccountNumber     contract;
+      MethodNumber      method;
       std::vector<char> raw_data;
    };
-   PSIO_REFLECT(action, sender, contract, method, raw_data)
+   using action = Action;
+   PSIO_REFLECT(Action, sender, contract, method, raw_data)
    EOSIO_REFLECT(action, sender, contract, method, raw_data)
 
    struct genesis_contract
    {
-      account_num       contract      = 0;
-      account_num       auth_contract = 0;
-      uint64_t          flags         = 0;
-      uint8_t           vm_type       = 0;
-      uint8_t           vm_version    = 0;
-      std::vector<char> code          = {};
+      AccountNumber     contract;
+      AccountNumber     auth_contract;
+      uint64_t          flags      = 0;
+      uint8_t           vm_type    = 0;
+      uint8_t           vm_version = 0;
+      std::vector<char> code       = {};
    };
    PSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
    EOSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
@@ -53,27 +68,27 @@ namespace psibase
    EOSIO_REFLECT(genesis_action_data, memo, contracts)
    PSIO_REFLECT(genesis_action_data, memo, contracts)
 
-   struct claim
+   struct Claim
    {
-      account_num       contract;
+      AccountNumber     contract;
       std::vector<char> raw_data;
    };
-   EOSIO_REFLECT(claim, contract, raw_data)
-   PSIO_REFLECT(claim, contract, raw_data)
+   EOSIO_REFLECT(Claim, contract, raw_data)
+   PSIO_REFLECT(Claim, contract, raw_data)
 
    // TODO: separate native-defined fields from contract-defined fields
    struct transaction
    {
       static constexpr uint32_t do_not_broadcast = 1u << 0;
 
-      eosio::time_point_sec expiration;
-      uint16_t              ref_block_num       = 0;
-      uint32_t              ref_block_prefix    = 0;
-      uint16_t              max_net_usage_words = 0;  // 8-byte words
-      uint16_t              max_cpu_usage_ms    = 0;
-      uint32_t              flags               = 0;
-      std::vector<action>   actions;
-      std::vector<claim>    claims;  // TODO: Is there standard terminology that we could use?
+      TimePointSec        expiration;
+      uint16_t            ref_block_num       = 0;
+      uint32_t            ref_block_prefix    = 0;
+      uint16_t            max_net_usage_words = 0;  // 8-byte words
+      uint16_t            max_cpu_usage_ms    = 0;
+      uint32_t            flags               = 0;
+      std::vector<Action> actions;
+      std::vector<Claim>  claims;  // TODO: Is there standard terminology that we could use?
    };
    EOSIO_REFLECT(transaction,
                  expiration,
@@ -114,45 +129,50 @@ namespace psibase
    // TODO: Protocol Activation? Main reason to put here is to support light-client validation.
    // TODO: Are we going to attempt to support light-client validation? Didn't seem to work out easy last time.
    // TODO: Consider placing consensus alg in a contract; might affect how header is laid out.
-   struct block_header
+   struct BlockHeader
    {
-      eosio::checksum256    previous;
-      block_num             num = 0;  // TODO: pack into previous instead?
-      eosio::time_point_sec time;
+      Checksum256  previous;
+      block_num    num = 0;  // TODO: pack into previous instead?
+      TimePointSec time;     // TODO: switch to microseconds
    };
-   EOSIO_REFLECT(block_header, previous, num, time)
-   PSIO_REFLECT(block_header, /*previous,*/ num, time)
+   EOSIO_REFLECT(BlockHeader, previous, num, time)
+   PSIO_REFLECT(BlockHeader, /*previous,*/ num, time)
 
-   struct block
+   struct Block
    {
-      block_header                    header;
+      BlockHeader                     header;
       std::vector<signed_transaction> transactions;  // TODO: move inside receipts
    };
-   EOSIO_REFLECT(block, header, transactions)
-   PSIO_REFLECT(block, header, transactions)
+   EOSIO_REFLECT(Block, header, transactions)
+   PSIO_REFLECT(Block, header, transactions)
 
    /// TODO: you have signed block headers, not signed blocks
    struct signed_block
    {
-      psibase::block   block;
-      eosio::signature signature;
+      Block block;
+      Claim signature;  // TODO: switch to proofs?
    };
    EOSIO_REFLECT(signed_block, block, signature)
-   PSIO_REFLECT(signed_block, block /*, signature*/)
+   PSIO_REFLECT(signed_block, block, signature)
 
-   struct block_info
+   struct BlockInfo
    {
-      block_header       header;
-      eosio::checksum256 id;
+      BlockHeader header;
+      Checksum256 id;
 
-      block_info()                  = default;
-      block_info(const block_info&) = default;
+      BlockInfo()                 = default;
+      BlockInfo(const BlockInfo&) = default;
 
       // TODO: switch to fracpack for sha
       // TODO: don't repack to compute sha
-      block_info(const block& b) : header{b.header}, id{sha256(b)} {}
+      BlockInfo(const Block& b) : header{b.header}, id{sha256(b)} {}
    };
-   EOSIO_REFLECT(block_info, header, id)
-   PSIO_REFLECT(block_info, header /*, id*/)
+   EOSIO_REFLECT(BlockInfo, header, id)
+   PSIO_REFLECT(BlockInfo, header, id)
+
+   // TODO: remove dependency on these
+   using block      = Block;
+   using block_info = BlockInfo;
+   using claim      = Claim;
 
 }  // namespace psibase

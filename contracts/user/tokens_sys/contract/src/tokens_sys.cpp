@@ -5,9 +5,9 @@
 using namespace tokens_sys;
 using namespace psibase;
 
-void tokens_contract::open(psibase::account_num account,
-                           tid                  token_id,
-                           psibase::account_num storage_payer)
+void tokens_contract::open(psibase::AccountNumber account,
+                           tid                    token_id,
+                           psibase::AccountNumber storage_payer)
 {
    // NOP
 }

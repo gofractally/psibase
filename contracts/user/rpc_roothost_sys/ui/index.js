@@ -1,6 +1,6 @@
 'use strict';
 
-let contracts = ['account.sys'];
+let contracts = ['account-sys'];
 
 for (let contract of contracts) {
     let ul = document.getElementById('contracts');

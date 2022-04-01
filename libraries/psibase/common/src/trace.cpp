@@ -1,5 +1,7 @@
 #include <psibase/trace.hpp>
 
+#include <psio/to_json.hpp>
+
 namespace psibase
 {
    void trim_raw_data(action_trace& t, size_t max)
@@ -8,7 +10,8 @@ namespace psibase
          t.act.raw_data.resize(max);
       for (auto& inner : t.inner_traces)
          std::visit(
-             [max](auto& obj) {
+             [max](auto& obj)
+             {
                 if constexpr (std::is_same_v<eosio::remove_cvref_t<decltype(obj)>, action_trace>)
                    trim_raw_data(obj, max);
              },
@@ -55,13 +58,13 @@ namespace psibase
    void pretty_trace(std::string& dest, const action_trace& atrace, const std::string& indent)
    {
       dest += indent + "action:\n";
-      dest += indent + "    sender:     " + std::to_string(atrace.act.sender) + "\n";
-      dest += indent + "    contract:   " + std::to_string(atrace.act.contract) + "\n";
-      dest += indent + "    raw_data:   " + eosio::convert_to_json(atrace.act.raw_data) + "\n";
+      dest += indent + "    " + atrace.act.sender.str() + " => " + atrace.act.contract.str() +
+              "::" + atrace.act.method.str() + "\n";
+      dest += indent + "    " + psio::convert_to_json(atrace.act.raw_data) + "\n";
       for (auto& inner : atrace.inner_traces)
          std::visit([&](auto& inner) { pretty_trace(dest, inner, indent + "    "); }, inner.inner);
       if (!atrace.raw_retval.empty())
-         dest += indent + "    raw_retval: " + eosio::convert_to_json(atrace.raw_retval) + "\n";
+         dest += indent + "    raw_retval: " + psio::convert_to_json(atrace.raw_retval) + "\n";
    }
 
    void pretty_trace(std::string& dest, const transaction_trace& ttrace, const std::string& indent)

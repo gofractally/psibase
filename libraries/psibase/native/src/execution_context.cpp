@@ -46,8 +46,7 @@ namespace psibase
 
       auto account = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
       eosio::check(account.has_value(), "set_code: unknown contract account");
-      eosio::check(account->code_hash == eosio::checksum256{},
-                   "native set_code can't replace code");
+      eosio::check(account->code_hash == Checksum256{}, "native set_code can't replace code");
       account->code_hash  = code_hash;
       account->vm_type    = vm_type;
       account->vm_version = vm_version;
@@ -69,7 +68,7 @@ namespace psibase
 
    struct backend_entry
    {
-      eosio::checksum256         hash;
+      Checksum256                hash;
       std::unique_ptr<backend_t> backend;
    };
 
@@ -98,7 +97,7 @@ namespace psibase
             ind.pop_front();
       }
 
-      std::unique_ptr<backend_t> get(const eosio::checksum256& hash)
+      std::unique_ptr<backend_t> get(const Checksum256& hash)
       {
          std::unique_ptr<backend_t>  result;
          std::lock_guard<std::mutex> lock{mutex};
@@ -151,7 +150,7 @@ namespace psibase
       {
          auto ca = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
          eosio::check(ca.has_value(), "unknown contract account");
-         eosio::check(ca->code_hash != eosio::checksum256{}, "account has no code");
+         eosio::check(ca->code_hash != Checksum256{}, "account has no code");
          contract_account = std::move(*ca);
          auto code        = db.kv_get<code_row>(
              code_row::kv_map, code_key(contract_account.code_hash, contract_account.vm_type,
@@ -180,7 +179,7 @@ namespace psibase
             // auto start_time = std::chrono::steady_clock::now();
             backend->set_wasm_allocator(&wa);
             backend->initialize(this);
-            (*backend)(*this, "env", "start", (uint64_t)current_act_context->action.contract);
+            (*backend)(*this, "env", "start", current_act_context->action.contract.value);
             initialized = true;
             // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
             //     std::chrono::steady_clock::now() - start_time);
@@ -236,9 +235,9 @@ namespace psibase
 
          if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
          {
-            uint64_t prefix = contract_account.num;
+            uint64_t prefix = contract_account.num.value;
             // TODO DAN: remove this later...
-            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
+            //std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             eosio::check(
                 key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
                 "key prefix must match contract during write");
@@ -256,8 +255,9 @@ namespace psibase
       void verify_write_constrained(eosio::input_stream key, eosio::input_stream value)
       {
          // Only the code table currently lives in native_constrained
-         auto code = eosio::from_bin<code_row>(value);
-         eosio::check(!value.remaining(), "extra data after code_row");
+         // TODO: use a view here instead of unpacking to a rich object
+         // TODO: verify fracpack; no unknown
+         auto code = psio::convert_from_frac<code_row>(psio::input_stream(value.pos, value.end));
          auto code_hash = sha256(code.code.data(), code.code.size());
          eosio::check(code.code_hash == code_hash, "code_row has incorrect code_hash");
          auto expected_key = eosio::convert_to_key(code.key());
@@ -468,8 +468,8 @@ namespace psibase
                       "subjective contracts may not call non-subjective ones");
 
       impl->exec(act_context, [&] {  //
-         (*impl->backend)(*impl, "env", "called", (uint64_t)act_context.action.contract,
-                          (uint64_t)act_context.action.sender);
+         (*impl->backend)(*impl, "env", "called", act_context.action.contract.value,
+                          act_context.action.sender.value);
       });
    }
 

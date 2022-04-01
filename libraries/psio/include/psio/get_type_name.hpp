@@ -8,7 +8,8 @@
 #include <variant>
 #include <vector>
 
-#include <psio/murmur.hpp>
+#include <consthash/cityhash64.hxx>
+#include <psio/compress_name.hpp>
 
 namespace psio
 {
@@ -23,8 +24,8 @@ namespace psio
    constexpr const char* get_type_name(const std::optional<T>*);
    template <typename T>
    constexpr const char* get_type_name(const std::vector<T>*);
-   template <typename T,size_t S>
-   constexpr const char* get_type_name(const std::array<T,S>*);
+   template <typename T, size_t S>
+   constexpr const char* get_type_name(const std::array<T, S>*);
    template <typename... T>
    constexpr const char* get_type_name(const std::tuple<T...>*);
    template <typename... T>
@@ -82,7 +83,7 @@ namespace psio
    template <typename T>
    constexpr auto vector_type_name = append_type_name<T>("[]");
 
-   template <typename T,size_t S>
+   template <typename T, size_t S>
    constexpr auto array_type_name = append_type_name<T>("[#]");
 
    template <typename T>
@@ -93,12 +94,11 @@ namespace psio
    {
       return vector_type_name<T>.data();
    }
-   template <typename T,size_t S>
-   constexpr const char* get_type_name(const std::array<T,S>*)
+   template <typename T, size_t S>
+   constexpr const char* get_type_name(const std::array<T, S>*)
    {
-      return "array";//array_type_name<T,S>.data();
+      return "array";  //array_type_name<T,S>.data();
    }
-
 
    template <typename T>
    constexpr const char* get_type_name(const std::optional<T>*)
@@ -155,7 +155,6 @@ namespace psio
    {
       return get_tuple_type_name<T...>().data();
    }
-
 
    template <typename T>
    constexpr const char* get_type_name()
@@ -214,12 +213,23 @@ namespace psio
       return true;
    }
 
+   /*
    inline constexpr uint64_t hash_name(std::string_view str)
    {
       uint64_t r = 0;
       if (not string_to_name_strict(r, str))
          return murmur64(str.data(), str.size());
       return r;
+   }
+   */
+   inline constexpr uint64_t hash_name(std::string_view str)
+   {
+      uint64_t n = detail::method_to_number(str);
+      if (n)
+      {
+         return n;
+      }
+      return consthash::city64(str.data(), str.size());
    }
 
    template <typename T>
