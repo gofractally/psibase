@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 #include <iostream>
 #include <psio/graphql.hpp>
+#include <psio/graphql_connection.hpp>
 
 struct InputArg
 {
@@ -9,15 +10,54 @@ struct InputArg
    std::string two;
 };
 PSIO_REFLECT_INTERFACE(InputArg, (one, 0), (two, 1))
+
+struct Account
+{
+   std::string firstName;
+   std::string lastName;
+};
+PSIO_REFLECT(Account, firstName, lastName)
+using ChainAccountConnection = psio::Connection<Account>;
+using AccountEdge            = psio::Edge<Account>;
+PSIO_REFLECT_GQL_EDGE(AccountEdge)
+PSIO_REFLECT_GQL_CONNECTION(ChainAccountConnection)
+
 struct Root
 {
    std::string world;
    int         hello;
    int64_t     sum(int a, int b) const { return a + b; }
    std::string cat(InputArg arg) const { return arg.one + arg.two; }
+
+   ChainAccountConnection getAccounts(std::optional<int>         first,
+                                      std::optional<std::string> before,
+                                      std::optional<int>         last,
+                                      std::optional<std::string> after) const
+   {
+      return psio::make_connection<ChainAccountConnection, std::string>(
+          {}, {}, {}, {}, first, last, before, after, accounts, [](auto e) { return e.firstName; },
+          [](auto e) { return e; },
+          [](const auto& container, auto key)
+          {
+             return std::lower_bound(container.begin(), container.end(), Account{key},
+                                     [](auto a, auto b) { return a.firstName < b.firstName; });
+          },
+          [](const auto& container, auto key)
+          {
+             return std::upper_bound(container.begin(), container.end(), Account{key},
+                                     [](auto a, auto b) { return a.firstName < b.firstName; });
+          });
+   }
+
+   std::vector<Account> accounts;
 };
 
-PSIO_REFLECT_INTERFACE(Root, (world, 0), (hello, 1), (sum, 2, a, b), (cat, 3, arg))
+PSIO_REFLECT_INTERFACE(Root,
+                       (world, 0),
+                       (hello, 1),
+                       (sum, 2, a, b),
+                       (cat, 3, arg),
+                       (getAccounts, 4, first, before, last, after))
 
 TEST_CASE("graphql")
 {
@@ -29,4 +69,19 @@ TEST_CASE("graphql")
    std::cout << "\n";
    std::cout << psio::gql_query(
        r, "{ hello, world, cat( arg: { two: \"hello\", one: \"world\"} )  }", "");
+
+   r.accounts = std::vector<Account>{{"dan", "larimer"}, {"anna", "taylor"}, {"pam", "larimer"}};
+   std::sort(r.accounts.begin(), r.accounts.end(),
+             [](auto a, auto b) { return a.firstName < b.firstName; });
+
+   std::cout << "\n";
+   std::cout << psio::gql_query(
+       r, "{ accounts:getAccounts( first: 2 ) { edges { node {firstName, lastName } } }  }", "");
+
+   std::cout << "\n";
+   std::cout << psio::gql_query(
+       r,
+       "{ accounts:getAccounts( last: 2 ) { pageInfo { hasPreviousPage, hasNextPage }, "
+       "edges { node {firstName, lastName } } }  }",
+       "");
 }
