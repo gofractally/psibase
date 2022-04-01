@@ -26,6 +26,7 @@ namespace psibase
       //auto operator <=> (const AccountNumber&)const = default;
    };
    PSIO_REFLECT(AccountNumber, value)
+   EOSIO_REFLECT(AccountNumber, value) //Todo - remove when kv table uses PSIO
 
    // TODO: remove
    using account_num = AccountNumber;

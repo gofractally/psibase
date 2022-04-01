@@ -1,6 +1,5 @@
 #pragma once
 
-#include <compare>
 #include <eosio/crypto.hpp>
 #include <eosio/time.hpp>
 #include <psibase/AccountNumber.hpp>

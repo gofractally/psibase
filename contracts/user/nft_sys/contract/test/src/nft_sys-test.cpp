@@ -34,10 +34,7 @@ TEST_CASE("Mint nft")
       return trace;
    };
 
-   auto cnum = add_contract(t, "nft.sys", "nft_sys.wasm");
-   check(nft_contract::contract == cnum, "nft contract num changed from " +
-                                             std::to_string(nft_contract::contract) + " to " +
-                                             std::to_string(cnum));
+   auto cnum  = add_contract(t, nft_contract::contract, "nft_sys.wasm");
    auto alice = add_account(t, "alice");
    std::cout << "Alice account number is " << alice << "\n";
 

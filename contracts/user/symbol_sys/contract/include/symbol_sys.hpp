@@ -25,15 +25,14 @@ namespace symbol_sys
    class symbol_contract : public psibase::contract
    {
      public:
-      static constexpr psibase::account_num contract     = 103;
-      static constexpr std::string_view     account_name = "symbol_sys";
+      static constexpr psibase::AccountNumber contract = "symbol-sys"_a;
 
       // Mutate
-      void create(psibase::account_num owner, int64_t max_supply);
-      void purchase(psibase::account_num buyer, std::string newsymbol, int64_t amount);
-      void buysymbol(psibase::account_num buyer, std::string symbol);
+      void create(psibase::AccountNumber owner, int64_t max_supply);
+      void purchase(psibase::AccountNumber buyer, std::string newsymbol, int64_t amount);
+      void buysymbol(psibase::AccountNumber buyer, std::string symbol);
       void sellsymbol(std::string symbol, int64_t price);
-      void withdraw(psibase::account_num owner, int64_t amount);
+      void withdraw(psibase::AccountNumber owner, int64_t amount);
       void setsalefee(uint32_t fee);
       void setsym(uint32_t symlen,
                   int64_t  price,
@@ -41,7 +40,7 @@ namespace symbol_sys
                   uint32_t increase_thresold,
                   uint32_t decrease_threshold,
                   uint32_t window);
-      void setowner(psibase::account_num owner, std::string sym, std::string memo);
+      void setowner(psibase::AccountNumber owner, std::string sym, std::string memo);
 
      private:
       tables db{contract};

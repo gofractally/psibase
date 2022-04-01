@@ -11,7 +11,7 @@ namespace system_contract
      public:
       static constexpr auto     contract       = psibase::AccountNumber("account-sys");
       static constexpr uint64_t contract_flags = psibase::account_row::allow_write_native;
-      static constexpr psibase::AccountNumber null_account;
+      static constexpr psibase::AccountNumber null_account = psibase::AccountNumber(0);
 
       void startup(psio::const_view<std::vector<psibase::AccountNumber>> existing_accounts);
       void newAccount(psibase::AccountNumber account,
