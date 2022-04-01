@@ -129,7 +129,7 @@ SCENARIO("Minting & burning nfts")
          t.trace(alice.at<nft_contract>().mint(alice, sub_id));
          auto trace = t.trace(alice.at<nft_contract>().getNft2(alice, sub_id));
          auto nft1  = *getReturnVal<&nft_contract::getNft2>(get_top_action(trace, 0));
-         t.finish_block();
+         t.start_block();
 
          THEN("Alice consumes storage space as expected")
          {
@@ -162,13 +162,11 @@ SCENARIO("Minting & burning nfts")
             // Mint second NFT
             auto secondId = sub_id + 1;
             t.trace(alice.at<nft_contract>().mint(alice, secondId));
-            t.finish_block();
+            t.start_block();
 
             THEN("The ID is one more than the first")
             {
                trace = t.trace(alice.at<nft_contract>().getNft2(alice, secondId));
-               REQUIRE(succeeded(trace));
-               REQUIRE(false);
 
                auto nft2 = *getReturnVal<&nft_contract::getNft2>(get_top_action(trace, 0));
 
@@ -180,7 +178,7 @@ SCENARIO("Minting & burning nfts")
          AND_WHEN("Bob mints an NFT")
          {
             auto trace = t.trace(bob.at<nft_contract>().mint(bob, sub_id));
-            t.finish_block();
+            t.start_block();
 
             THEN("Bob's pays for an expected amount of storage space")
             {
