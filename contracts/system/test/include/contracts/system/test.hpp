@@ -101,7 +101,7 @@ namespace psibase
                    "Failed to install genesis contracts");
    }
 
-   void validateFracpack(test_chain& t, bool show = false)
+   inline void validateFracpack(test_chain& t, bool show = false)
    {
       struct FRACPACK expected_layout
       {
@@ -152,7 +152,7 @@ namespace psibase
       */
    }
 
-   void createSysContractAccounts(test_chain& t, bool show = false)
+   inline void createSysContractAccounts(test_chain& t, bool show = false)
    {
       transactor<account_sys> asys(transaction_sys::contract, account_sys::contract);
 
