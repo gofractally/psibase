@@ -39,7 +39,7 @@ namespace psibase
 
       bool called = psio::reflect<Contract>::get_by_name(
           act->method()->value(),
-          [&](auto member_func)
+          [&](auto meta, auto member_func)
           {
              using result_type = decltype(psio::result_of(member_func));
              using param_tuple =
