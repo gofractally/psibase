@@ -7,6 +7,7 @@
 #include <psio/to_json.hpp>
 
 #include <stdio.h>
+#include <bitset>
 #include <chrono>
 #include <optional>
 
@@ -17,6 +18,12 @@ using eosio::vm::span;
 
 struct callbacks;
 using rhf_t = eosio::vm::registered_host_functions<callbacks>;
+
+using cl_flags_t = std::bitset<16>;
+enum cl_flags
+{
+   timing
+};
 
 void backtrace();
 
@@ -90,6 +97,7 @@ struct state
    eosio::vm::wasm_allocator&               wa;
    backend_t&                               backend;
    std::vector<std::string>                 args;
+   cl_flags_t                               additional_args;
    std::vector<file>                        files;
    std::vector<std::unique_ptr<test_chain>> chains;
    std::optional<uint32_t>                  selected_chain_index;
@@ -640,8 +648,13 @@ struct callbacks
 
       auto us = std::chrono::duration_cast<std::chrono::microseconds>(
           std::chrono::steady_clock::now() - start_time);
-      std::cout << "psibase transaction took " << us.count() << " us\n";
-      // std::cout << psio::format_json(trace) << "\n";
+
+      if (state.additional_args[cl_flags::timing])
+      {
+         std::cout << "psibase transaction took " << us.count() << " us\n";
+      }
+
+      // std::cout << eosio::format_json(trace) << "\n";
       set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(trace));
    }
 
@@ -731,7 +744,8 @@ void fill_substitutions(::state& state, const std::map<std::string, std::string>
 
 static void run(const char*                               wasm,
                 const std::vector<std::string>&           args,
-                const std::map<std::string, std::string>& substitutions)
+                const std::map<std::string, std::string>& substitutions,
+                const cl_flags_t&                         additional_args)
 {
    eosio::vm::wasm_allocator wa;
    auto                      code = eosio::vm::read_wasm(wasm);
@@ -739,7 +753,7 @@ static void run(const char*                               wasm,
    auto dwarf_info = dwarf::get_info_from_wasm({(const char*)code.data(), code.size()});
    auto reg        = debug_eos_vm::enable_debug(code, backend, dwarf_info, "_start");
 
-   ::state state{wasm, dwarf_info, wa, backend, args};
+   ::state state{wasm, dwarf_info, wa, backend, args, additional_args};
    fill_substitutions(state, substitutions);
    callbacks cb{state};
    state.files.emplace_back(stdin, false);
@@ -771,6 +785,10 @@ OPTIONS:
             place and enable debugging support. This bypasses size limits and
             other constraints on debug.wasm. eosiolib still enforces
             constraints on contract.wasm. (repeatable)
+
+      --timing 
+
+            Show how long transactions take in us.
 )";
 
 int main(int argc, char* argv[])
@@ -778,7 +796,9 @@ int main(int argc, char* argv[])
    bool                               show_usage = false;
    bool                               error      = false;
    std::map<std::string, std::string> substitutions;
-   int                                next_arg = 1;
+   cl_flags_t                         additional_args;
+
+   int next_arg = 1;
    while (next_arg < argc && argv[next_arg][0] == '-')
    {
       if (!strcmp(argv[next_arg], "-h") || !strcmp(argv[next_arg], "--help"))
@@ -786,6 +806,10 @@ int main(int argc, char* argv[])
       else if (!strcmp(argv[next_arg], "-v") || !strcmp(argv[next_arg], "--verbose"))
       {
          // TODO
+      }
+      else if (!strcmp(argv[next_arg], "--timing"))
+      {
+         additional_args[cl_flags::timing] = true;
       }
       else if (!strcmp(argv[next_arg], "-s") || !strcmp(argv[next_arg], "--subst"))
       {
@@ -821,7 +845,7 @@ int main(int argc, char* argv[])
       std::vector<std::string> args{argv + next_arg, argv + argc};
       psibase::execution_context::register_host_functions();
       register_callbacks();
-      run(argv[next_arg], args, substitutions);
+      run(argv[next_arg], args, substitutions, additional_args);
       return 0;
    }
    catch (::assert_exception& e)
