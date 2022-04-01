@@ -616,11 +616,16 @@ struct callbacks
    // TODO: drop this and add general kv access
    void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
-      auto&               chain = assert_chain(chain_index);
+      test_chain& chain  = assert_chain(chain_index);
+      auto        status = chain.block->db.kv_get<psibase::status_row>(psibase::status_row::kv_map,
+                                                                psibase::status_key());
+
       psibase::block_info bi;
-      // auto*                obj = chain.db->db.find<psibase::status_object>();
-      // if (obj && obj->head)
-      //    bi = *obj->head;
+      if (status && status->head)
+      {
+         bi = *(status->head);
+      }
+
       set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(bi));
    }
 
