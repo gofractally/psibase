@@ -5,9 +5,9 @@
 #include <psibase/table.hpp>
 #include <string_view>
 
-namespace nft_sys
+namespace UserContract
 {
-   namespace errors
+   namespace Errors
    {
       std::string_view nftDNE                 = "NFT does not exist";
       std::string_view debitRequiresCredit    = "NFT can only be debited after being credited";
@@ -18,9 +18,9 @@ namespace nft_sys
       // Todo: Move to somewhere common
       std::string_view missingRequiredAuth = "Missing required authority";
 
-   }  // namespace errors
+   }  // namespace Errors
 
-   using nid = uint64_t;  //TODO: change to 32 bit
+   using NID = uint64_t;  //TODO: change to 32 bit
 
    struct AdRow
    {
@@ -30,15 +30,15 @@ namespace nft_sys
    EOSIO_REFLECT(AdRow, user, autodebit);
    PSIO_REFLECT(AdRow, user, autodebit);
 
-   using ad_table_t = psibase::table<AdRow, &AdRow::user>;
-   struct nft_row
+   using AdTable_t = psibase::table<AdRow, &AdRow::user>;
+   struct NftRow
    {
-      nid                    id;
+      NID                    id;
       psibase::AccountNumber issuer;
       psibase::AccountNumber owner;
-      psibase::AccountNumber approved_account;
+      psibase::AccountNumber approvedAccount;
 
-      static bool is_valid_key(const nid& id) { return id != 0; }
+      static bool isValidKey(const NID& id) { return id != 0; }
 
       struct DiskUsage
       {
@@ -47,15 +47,15 @@ namespace nft_sys
          static constexpr int64_t update            = 100;
       };
 
-      friend std::strong_ordering operator<=>(const nft_row&, const nft_row&) = default;
+      friend std::strong_ordering operator<=>(const NftRow&, const NftRow&) = default;
    };
-   EOSIO_REFLECT(nft_row, id, issuer, owner, approved_account);
-   PSIO_REFLECT(nft_row, id, issuer, owner, approved_account);
+   EOSIO_REFLECT(NftRow, id, issuer, owner, approvedAccount);
+   PSIO_REFLECT(NftRow, id, issuer, owner, approvedAccount);
 
-   using nft_table_t = psibase::table<nft_row, &nft_row::id>;
+   using nft_table_t = psibase::table<NftRow, &NftRow::id>;
 
-   using tables = psibase::contract_tables<nft_table_t, ad_table_t>;
-   class nft_contract : public psibase::contract
+   using tables = psibase::contract_tables<nft_table_t, AdTable_t>;
+   class NftSys : public psibase::contract
    {
      public:
       static constexpr psibase::AccountNumber contract = "nft-sys"_a;
@@ -63,33 +63,33 @@ namespace nft_sys
       using sub_id_type = uint32_t;
 
       // Create a new NFT in issuer's scope, with sub_id 0
-      nid  mint(psibase::AccountNumber issuer);
-      void burn(psibase::AccountNumber owner, nid nftId){};
+      NID  mint(psibase::AccountNumber issuer);
+      void burn(psibase::AccountNumber owner, NID nftId){};
 
-      void autodebit(psibase::AccountNumber account, bool autoDebit) {}
+      void autodebit(psibase::AccountNumber account, bool autoDebit);
 
       void credit(psibase::AccountNumber sender,
                   psibase::AccountNumber receiver,
-                  nid                    nftId,
+                  NID                    nftId,
                   std::string            memo)
       {
       }
-      void uncredit(psibase::AccountNumber sender, psibase::AccountNumber receiver, nid nftId) {}
-      void debit(psibase::AccountNumber sender, psibase::AccountNumber receiver, nid nftId) {}
+      void uncredit(psibase::AccountNumber sender, psibase::AccountNumber receiver, NID nftId) {}
+      void debit(psibase::AccountNumber sender, psibase::AccountNumber receiver, NID nftId) {}
 
-      void approve(nid nftId, psibase::AccountNumber account) {}
-      void unapprove(nid nftId, psibase::AccountNumber account) {}
+      void approve(NID nftId, psibase::AccountNumber account) {}
+      void unapprove(NID nftId, psibase::AccountNumber account) {}
 
       // Read-only interface
-      std::optional<nft_row> getNft(nid nftId);
-      int64_t                isAutodebit(psibase::AccountNumber user);
+      std::optional<NftRow> getNft(NID nftId);
+      int64_t               isAutodebit(psibase::AccountNumber user);
 
      private:
       tables db{contract};
    };
 
    // clang-format off
-   PSIO_REFLECT_INTERFACE(nft_contract, 
+   PSIO_REFLECT_INTERFACE(NftSys, 
       (mint, 0, issuer), 
       (burn, 1, owner, nftId),
 
@@ -107,4 +107,4 @@ namespace nft_sys
    );
    // clang-format on
 
-}  // namespace nft_sys
+}  // namespace UserContract

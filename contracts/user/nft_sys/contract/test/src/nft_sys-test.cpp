@@ -8,13 +8,13 @@
 #include "nft_sys.hpp"
 
 using namespace eosio;
-using namespace nft_sys;
+using namespace UserContract;
 using namespace psibase;
-using nft_sys::nft_row;
 using std::optional;
 using std::pair;
 using std::string;
 using std::vector;
+using UserContract::NftRow;
 
 namespace
 {
@@ -46,8 +46,8 @@ namespace
       return ret;
    }
 
-   void check_disk_consumption(const transaction_trace&                  trace,
-                               const vector<pair<account_num, int64_t>>& consumption)
+   void checkDiskConsumption(const transaction_trace&                  trace,
+                             const vector<pair<account_num, int64_t>>& consumption)
    {
       const vector<action_trace>& actions = trace.action_traces;
       INFO("This check expects only single action traces");
@@ -77,11 +77,11 @@ namespace
       }
    }
 
-   void configure_test_chain(test_chain& t)
+   void configureTestChain(test_chain& t)
    {
       t.start_block();
       boot_minimal(t);
-      auto cnum = add_contract(t, nft_contract::contract, "nft_sys.wasm");
+      auto cnum = add_contract(t, NftSys::contract, "nft_sys.wasm");
    }
 
    auto debugCounter = [i = 0]() mutable { std::cout << "\nTEST " << ++i << "\n\n"; };
@@ -93,82 +93,81 @@ SCENARIO("Minting & burning nfts")
    GIVEN("An empty chain with registered users Alice and Bob")
    {
       test_chain t;
-      configure_test_chain(t);
+      configureTestChain(t);
 
       Actor alice{add_account(t, "alice")};
       Actor bob{add_account(t, "bob")};
 
       THEN("Alice can mint an NFT")
       {
-         auto trace = t.trace(alice.at<nft_contract>().mint(alice));
+         auto trace = t.trace(alice.at<NftSys>().mint(alice));
          CHECK(succeeded(trace));
 
          AND_THEN("The NFT exists")
          {
-            nft_row expectedNft{
-                .id               = 1,         // First minted NFT (skipping 0)
-                .issuer           = alice.id,  //
-                .owner            = alice.id,  //
-                .approved_account = system_contract::account_sys::null_account  //
+            NftRow expectedNft{
+                .id              = 1,         // First minted NFT (skipping 0)
+                .issuer          = alice.id,  //
+                .owner           = alice.id,  //
+                .approvedAccount = system_contract::account_sys::null_account  //
             };
 
-            auto nft_id = getReturnVal<&nft_contract::mint>(get_top_action(trace, 0));
-            auto trace  = t.trace(alice.at<nft_contract>().getNft(nft_id));
-            auto nft    = getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0));
+            auto nftId = getReturnVal<&NftSys::mint>(get_top_action(trace, 0));
+            auto trace = t.trace(alice.at<NftSys>().getNft(nftId));
+            auto nft   = getReturnVal<&NftSys::getNft>(get_top_action(trace, 0));
             CHECK((nft != std::nullopt && *nft == expectedNft));
          }
       }
       THEN("Alice cannot force Bob to pay the storage cost for her minting an NFT")
       {
-         CHECK(
-             failedWith(t.trace(alice.at<nft_contract>().mint(bob)), "Missing required authority"));
+         CHECK(failedWith(t.trace(alice.at<NftSys>().mint(bob)), "Missing required authority"));
       }
       WHEN("Alice mints an NFT")
       {
-         auto trace  = t.trace(alice.at<nft_contract>().mint(alice));
-         auto nft_id = getReturnVal<&nft_contract::mint>(get_top_action(trace, 0));
-         trace       = t.trace(alice.at<nft_contract>().getNft(nft_id));
-         auto nft1   = *getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0));
+         auto trace = t.trace(alice.at<NftSys>().mint(alice));
+         auto nftId = getReturnVal<&NftSys::mint>(get_top_action(trace, 0));
+         trace      = t.trace(alice.at<NftSys>().getNft(nftId));
+         auto nft1  = *getReturnVal<&NftSys::getNft>(get_top_action(trace, 0));
          t.start_block();
 
          THEN("Alice consumes storage space as expected")
          {
-            check_disk_consumption(trace, {{alice.id, nft_row::DiskUsage::firstEmplace}});
+            checkDiskConsumption(trace, {{alice.id, NftRow::DiskUsage::firstEmplace}});
          }
          THEN("Alice can burn the NFT")
          {
-            CHECK(succeeded(t.trace(alice.at<nft_contract>().burn(alice, nft1.id))));
+            CHECK(succeeded(t.trace(alice.at<NftSys>().burn(alice, nft1.id))));
          }
          THEN("Bob cannot burn the NFT")
          {
-            CHECK(failedWith(t.trace(bob.at<nft_contract>().burn(alice, nft1.id)),
-                             nft_sys::errors::missingRequiredAuth));
+            CHECK(failedWith(t.trace(bob.at<NftSys>().burn(alice, nft1.id)),
+                             UserContract::Errors::missingRequiredAuth));
          }
          AND_WHEN("Alice mints a second NFT")
          {
             // Mint second NFT
-            trace = t.trace(alice.at<nft_contract>().mint(alice));
+            trace = t.trace(alice.at<NftSys>().mint(alice));
             t.start_block();
 
             THEN("The ID is one more than the first")
             {
-               auto nftId2 = getReturnVal<&nft_contract::mint>(get_top_action(trace, 0));
-               trace       = t.trace(alice.at<nft_contract>().getNft(nftId2));
-               auto nft2   = *getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0));
+               auto nftId2 = getReturnVal<&NftSys::mint>(get_top_action(trace, 0));
+               trace       = t.trace(alice.at<NftSys>().getNft(nftId2));
+               auto nft2   = *getReturnVal<&NftSys::getNft>(get_top_action(trace, 0));
 
-               nft_row expectedNft = nft1;
+               NftRow expectedNft = nft1;
                expectedNft.id++;
                REQUIRE(nft2 == expectedNft);
             }
          }
          AND_WHEN("Bob mints an NFT")
          {
-            auto trace = t.trace(bob.at<nft_contract>().mint(bob));
+            auto trace = t.trace(bob.at<NftSys>().mint(bob));
             t.start_block();
 
             THEN("Bob's pays for an expected amount of storage space")
             {
-               check_disk_consumption(trace, {{bob.id, nft_row::DiskUsage::subsequentEmplace}});
+               checkDiskConsumption(trace, {{bob.id, NftRow::DiskUsage::subsequentEmplace}});
             }
          }
       }
@@ -181,7 +180,7 @@ SCENARIO("Transferring NFTs")
    GIVEN("A chain with registered users Alice, Bob, and Charlie")
    {
       test_chain t;
-      configure_test_chain(t);
+      configureTestChain(t);
 
       Actor alice{add_account(t, "alice")};
       Actor bob{add_account(t, "bob")};
@@ -189,186 +188,179 @@ SCENARIO("Transferring NFTs")
 
       THEN("Bob is configured to use auto-debit by default")
       {
-         auto trace       = t.trace(bob.at<nft_contract>().isAutodebit(bob));
-         bool isAutodebit = getReturnVal<&nft_contract::isAutodebit>(get_top_action(trace, 0));
+         auto trace       = t.trace(bob.at<NftSys>().isAutodebit(bob));
+         bool isAutodebit = getReturnVal<&NftSys::isAutodebit>(get_top_action(trace, 0));
          CHECK(succeeded(trace));
          CHECK(isAutodebit);
       }
       THEN("Bob is able to opt out of auto-debit")
       {
-         auto trace = t.trace(bob.at<nft_contract>().autodebit(bob, false));
+         auto trace = t.trace(bob.at<NftSys>().autodebit(bob, false));
          CHECK(succeeded(trace));
 
-         trace            = t.trace(bob.at<nft_contract>().isAutodebit(bob));
-         bool isAutodebit = getReturnVal<&nft_contract::isAutodebit>(get_top_action(trace, 0));
+         trace            = t.trace(bob.at<NftSys>().isAutodebit(bob));
+         bool isAutodebit = getReturnVal<&NftSys::isAutodebit>(get_top_action(trace, 0));
          CHECK(!isAutodebit);
       }
 
       THEN("Alice is unable to credit, uncredit, or debit a non-existent NFT")
       {
-         CHECK(failedWith(t.trace(alice.at<nft_contract>().credit(alice, bob, 1, "memo")),
-                          nft_sys::errors::nftDNE));
-         CHECK(failedWith(t.trace(alice.at<nft_contract>().uncredit(alice, bob, 1)),
-                          nft_sys::errors::nftDNE));
-         CHECK(failedWith(t.trace(alice.at<nft_contract>().debit(bob, alice, 1)),
-                          nft_sys::errors::nftDNE));
-         CHECK(failedWith(t.trace(alice.at<nft_contract>().debit(alice, bob, 1)),
-                          nft_sys::errors::nftDNE));
+         CHECK(failedWith(t.trace(alice.at<NftSys>().credit(alice, bob, 1, "memo")),
+                          UserContract::Errors::nftDNE));
+         CHECK(failedWith(t.trace(alice.at<NftSys>().uncredit(alice, bob, 1)),
+                          UserContract::Errors::nftDNE));
+         CHECK(failedWith(t.trace(alice.at<NftSys>().debit(bob, alice, 1)),
+                          UserContract::Errors::nftDNE));
+         CHECK(failedWith(t.trace(alice.at<NftSys>().debit(alice, bob, 1)),
+                          UserContract::Errors::nftDNE));
       }
       AND_GIVEN("Alice has minted an NFT")
       {
-         auto trace = t.trace(alice.at<nft_contract>().mint(alice));
+         auto trace = t.trace(alice.at<NftSys>().mint(alice));
 
-         auto nftId = getReturnVal<&nft_contract::mint>(get_top_action(trace, 0));
+         auto nftId = getReturnVal<&NftSys::mint>(get_top_action(trace, 0));
 
-         trace    = t.trace(alice.at<nft_contract>().getNft(nftId));
-         auto nft = *getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0));
+         trace    = t.trace(alice.at<NftSys>().getNft(nftId));
+         auto nft = *getReturnVal<&NftSys::getNft>(get_top_action(trace, 0));
 
          THEN("No one can debit or uncredit the NFT")
          {
-            CHECK(failedWith(t.trace(bob.at<nft_contract>().debit(alice, bob, nft.id)),
-                             nft_sys::errors::debitRequiresCredit));
-            CHECK(failedWith(t.trace(bob.at<nft_contract>().uncredit(alice, bob, nft.id)),
-                             nft_sys::errors::uncreditRequiresCredit));
-            CHECK(failedWith(t.trace(alice.at<nft_contract>().uncredit(alice, bob, nft.id)),
-                             nft_sys::errors::uncreditRequiresCredit));
+            CHECK(failedWith(t.trace(bob.at<NftSys>().debit(alice, bob, nft.id)),
+                             UserContract::Errors::debitRequiresCredit));
+            CHECK(failedWith(t.trace(bob.at<NftSys>().uncredit(alice, bob, nft.id)),
+                             UserContract::Errors::uncreditRequiresCredit));
+            CHECK(failedWith(t.trace(alice.at<NftSys>().uncredit(alice, bob, nft.id)),
+                             UserContract::Errors::uncreditRequiresCredit));
          }
 
          THEN("Bob may not credit the NFT to Bob")
          {
-            CHECK(failedWith(t.trace(bob.at<nft_contract>().credit(alice, bob, nft.id, "memo")),
-                             nft_sys::errors::missingRequiredAuth));
+            CHECK(failedWith(t.trace(bob.at<NftSys>().credit(alice, bob, nft.id, "memo")),
+                             UserContract::Errors::missingRequiredAuth));
          }
          THEN("Alice may not credit the NFT to herself")
          {
-            CHECK(failedWith(t.trace(alice.at<nft_contract>().credit(alice, alice, nft.id, "memo")),
-                             nft_sys::errors::creditorIsDebitor));
+            CHECK(failedWith(t.trace(alice.at<NftSys>().credit(alice, alice, nft.id, "memo")),
+                             UserContract::Errors::creditorIsDebitor));
          }
          THEN("Alice may credit the NFT to Bob")
          {
-            CHECK(succeeded(t.trace(alice.at<nft_contract>().credit(alice, bob, nft.id, "memo"))));
+            CHECK(succeeded(t.trace(alice.at<NftSys>().credit(alice, bob, nft.id, "memo"))));
          }
          WHEN("Alice credits the NFT to Bob")
          {
-            auto creditTrace = t.trace(alice.at<nft_contract>().credit(alice, bob, nft.id, "memo"));
+            auto creditTrace = t.trace(alice.at<NftSys>().credit(alice, bob, nft.id, "memo"));
 
             THEN("Bob immediately owns the NFT")
             {
-               auto trace = t.trace(bob.at<nft_contract>().getNft(nft.id));
-               nft        = *getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0));
+               auto trace = t.trace(bob.at<NftSys>().getNft(nft.id));
+               nft        = *getReturnVal<&NftSys::getNft>(get_top_action(trace, 0));
             }
             THEN("The payer for storage costs of the NFT are updated accordingly")
             {
-               check_disk_consumption(creditTrace, {{alice.id, -1 * nft_row::DiskUsage::update},
-                                                    {bob.id, nft_row::DiskUsage::update}});
+               checkDiskConsumption(creditTrace, {{alice.id, -1 * NftRow::DiskUsage::update},
+                                                  {bob.id, NftRow::DiskUsage::update}});
             }
             THEN("Alice has no chance to uncredit the NFT")
             {
-               CHECK(failedWith(t.trace(alice.at<nft_contract>().uncredit(alice, bob, nft.id)),
-                                nft_sys::errors::uncreditRequiresCredit));
+               CHECK(failedWith(t.trace(alice.at<NftSys>().uncredit(alice, bob, nft.id)),
+                                UserContract::Errors::uncreditRequiresCredit));
             }
          }
          WHEN("Bob opts out of auto-debit")
          {
-            t.act(bob.at<nft_contract>().autodebit(bob, false));
+            t.act(bob.at<NftSys>().autodebit(bob, false));
 
             AND_WHEN("Alice credits the NFT to Bob")
             {
-               auto creditTrace =
-                   t.trace(alice.at<nft_contract>().credit(alice, bob, nft.id, "memo"));
+               auto creditTrace = t.trace(alice.at<NftSys>().credit(alice, bob, nft.id, "memo"));
 
                THEN("The NFT is not yet owned by Bob")
                {
-                  auto trace = t.trace(bob.at<nft_contract>().getNft(nft.id));
-                  auto owner =
-                      (*getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0))).owner;
+                  auto trace = t.trace(bob.at<NftSys>().getNft(nft.id));
+                  auto owner = (*getReturnVal<&NftSys::getNft>(get_top_action(trace, 0))).owner;
                   CHECK(bob.id != owner);
                }
                THEN("The payer for storage costs of the NFT do not change")
                {
-                  check_disk_consumption(creditTrace, {{}});
+                  checkDiskConsumption(creditTrace, {{}});
                }
                THEN("Alice and Charlie may not debit the NFT")
                {
-                  CHECK(failedWith(t.trace(alice.at<nft_contract>().debit(alice, bob, nft.id)),
-                                   nft_sys::errors::creditorIsDebitor));
-                  CHECK(failedWith(t.trace(alice.at<nft_contract>().debit(alice, bob, nft.id)),
-                                   nft_sys::errors::missingRequiredAuth));
+                  CHECK(failedWith(t.trace(alice.at<NftSys>().debit(alice, bob, nft.id)),
+                                   UserContract::Errors::creditorIsDebitor));
+                  CHECK(failedWith(t.trace(alice.at<NftSys>().debit(alice, bob, nft.id)),
+                                   UserContract::Errors::missingRequiredAuth));
                }
                THEN("Bob and Charlie may not uncredit the NFT")
                {
-                  CHECK(failedWith(t.trace(bob.at<nft_contract>().uncredit(alice, bob, nft.id)),
-                                   nft_sys::errors::creditorAction));
-                  CHECK(failedWith(t.trace(charlie.at<nft_contract>().uncredit(alice, bob, nft.id)),
-                                   nft_sys::errors::creditorAction));
+                  CHECK(failedWith(t.trace(bob.at<NftSys>().uncredit(alice, bob, nft.id)),
+                                   UserContract::Errors::creditorAction));
+                  CHECK(failedWith(t.trace(charlie.at<NftSys>().uncredit(alice, bob, nft.id)),
+                                   UserContract::Errors::creditorAction));
                }
                THEN("Bob may debit the NFT")
                {
-                  auto debitTrace = t.trace(bob.at<nft_contract>().debit(alice, bob, nft.id));
+                  auto debitTrace = t.trace(bob.at<NftSys>().debit(alice, bob, nft.id));
                   CHECK(succeeded(debitTrace));
                   AND_THEN("The payer for storage costs of the NFT are updated accordingly")
                   {
-                     check_disk_consumption(debitTrace,
-                                            {{alice.id, -1 * nft_row::DiskUsage::update},
-                                             {bob.id, nft_row::DiskUsage::update}});
+                     checkDiskConsumption(debitTrace, {{alice.id, -1 * NftRow::DiskUsage::update},
+                                                       {bob.id, NftRow::DiskUsage::update}});
                   }
                }
                THEN("Alice may uncredit the NFT")
                {
-                  auto uncreditTrace =
-                      t.trace(alice.at<nft_contract>().uncredit(alice, bob, nft.id));
+                  auto uncreditTrace = t.trace(alice.at<NftSys>().uncredit(alice, bob, nft.id));
                   CHECK(succeeded(uncreditTrace));
 
                   AND_THEN("The payer for storage costs of the NFT do not change")
                   {
-                     check_disk_consumption(uncreditTrace, {{}});
+                     checkDiskConsumption(uncreditTrace, {{}});
                   }
                }
                AND_WHEN("Bob debits the NFT")
                {
-                  t.act(bob.at<nft_contract>().debit(alice, bob, nft.id));
+                  t.act(bob.at<NftSys>().debit(alice, bob, nft.id));
 
                   THEN("Bob owns the NFT")
                   {
-                     auto trace = t.trace(bob.at<nft_contract>().getNft(nft.id));
-                     auto owner =
-                         (*getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0))).owner;
+                     auto trace = t.trace(bob.at<NftSys>().getNft(nft.id));
+                     auto owner = (*getReturnVal<&NftSys::getNft>(get_top_action(trace, 0))).owner;
                      CHECK(bob.id == owner);
                   }
                   THEN("Alice and Charlie may not uncredit or debit the NFT")
                   {
-                     CHECK(
-                         failedWith(t.trace(alice.at<nft_contract>().uncredit(alice, bob, nft.id)),
-                                    nft_sys::errors::uncreditRequiresCredit));
-                     CHECK(failedWith(t.trace(alice.at<nft_contract>().debit(alice, bob, nft.id)),
-                                      nft_sys::errors::debitRequiresCredit));
-                     CHECK(failedWith(
-                         t.trace(charlie.at<nft_contract>().uncredit(alice, bob, nft.id)),
-                         nft_sys::errors::uncreditRequiresCredit));
-                     CHECK(failedWith(t.trace(charlie.at<nft_contract>().debit(alice, bob, nft.id)),
-                                      nft_sys::errors::debitRequiresCredit));
+                     CHECK(failedWith(t.trace(alice.at<NftSys>().uncredit(alice, bob, nft.id)),
+                                      UserContract::Errors::uncreditRequiresCredit));
+                     CHECK(failedWith(t.trace(alice.at<NftSys>().debit(alice, bob, nft.id)),
+                                      UserContract::Errors::debitRequiresCredit));
+                     CHECK(failedWith(t.trace(charlie.at<NftSys>().uncredit(alice, bob, nft.id)),
+                                      UserContract::Errors::uncreditRequiresCredit));
+                     CHECK(failedWith(t.trace(charlie.at<NftSys>().debit(alice, bob, nft.id)),
+                                      UserContract::Errors::debitRequiresCredit));
                   }
                   THEN("Bob may not debit the NFT again")
                   {
-                     CHECK(failedWith(t.trace(bob.at<nft_contract>().debit(alice, bob, nft.id)),
-                                      nft_sys::errors::debitRequiresCredit));
+                     CHECK(failedWith(t.trace(bob.at<NftSys>().debit(alice, bob, nft.id)),
+                                      UserContract::Errors::debitRequiresCredit));
                   }
                }
                AND_WHEN("Alice uncredits the NFT")
                {
-                  t.act(alice.at<nft_contract>().uncredit(alice, bob, nft.id));
+                  t.act(alice.at<NftSys>().uncredit(alice, bob, nft.id));
 
                   THEN("No one can debit or uncredit the NFT")
                   {
                      auto checkUncredit = [&](auto actor) {
                         CHECK(failedWith(
-                            t.trace(actor.template at<nft_contract>().uncredit(alice, bob, nft.id)),
-                            nft_sys::errors::uncreditRequiresCredit));
+                            t.trace(actor.template at<NftSys>().uncredit(alice, bob, nft.id)),
+                            UserContract::Errors::uncreditRequiresCredit));
                      };
                      auto checkDebit = [&](auto actor) {
                         CHECK(failedWith(
-                            t.trace(actor.template at<nft_contract>().debit(alice, bob, nft.id)),
-                            nft_sys::errors::debitRequiresCredit));
+                            t.trace(actor.template at<NftSys>().debit(alice, bob, nft.id)),
+                            UserContract::Errors::debitRequiresCredit));
                      };
 
                      checkUncredit(alice);
@@ -381,8 +373,8 @@ SCENARIO("Transferring NFTs")
                   }
                   THEN("Alice may credit the NFT again")
                   {
-                     CHECK(succeeded(
-                         t.trace(alice.at<nft_contract>().credit(alice, bob, nft.id, "memo"))));
+                     CHECK(
+                         succeeded(t.trace(alice.at<NftSys>().credit(alice, bob, nft.id, "memo"))));
                   }
                }
             }

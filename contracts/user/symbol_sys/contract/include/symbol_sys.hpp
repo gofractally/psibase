@@ -11,8 +11,8 @@ namespace symbol_sys
 {
    struct symbol_row
    {
-      nft_sys::nid nft_id;
-      std::string  symbol_name;
+      UserContract::NID nft_id;
+      std::string       symbol_name;
 
       friend std::strong_ordering operator<=>(const symbol_row&, const symbol_row&) = default;
    };

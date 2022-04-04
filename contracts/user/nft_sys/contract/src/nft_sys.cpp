@@ -10,7 +10,7 @@
 #include <psio/reflect.hpp>
 
 using namespace psibase;
-using namespace nft_sys;
+using namespace UserContract;
 using psio::const_view;
 using std::string;
 using system_contract::account_sys;
@@ -21,7 +21,7 @@ namespace stubs
    bool require_auth(AccountNumber acc) { return true; }
 }  // namespace stubs
 
-uint64_t nft_contract::mint(AccountNumber issuer)
+uint64_t NftSys::mint(AccountNumber issuer)
 {
    AccountNumber ram_payer = issuer;
    stubs::require_auth(ram_payer);
@@ -32,19 +32,19 @@ uint64_t nft_contract::mint(AccountNumber issuer)
    // Todo - replace with auto incrementing when available
    auto new_id = (nft_idx.begin() == nft_idx.end()) ? 1 : (*(--nft_idx.end())).id + 1;
 
-   check(nft_row::is_valid_key(new_id), "Nft ID invalid");
+   check(NftRow::isValidKey(new_id), "Nft ID invalid");
 
-   nft_table.put(nft_row{
-       .id               = new_id,           //
-       .issuer           = issuer,           //
-       .owner            = issuer,           //
-       .approved_account = AccountNumber(0)  //
+   nft_table.put(NftRow{
+       .id              = new_id,           //
+       .issuer          = issuer,           //
+       .owner           = issuer,           //
+       .approvedAccount = AccountNumber(0)  //
    });
 
    return new_id;
 }
 
-std::optional<nft_row> nft_contract::getNft(nid nftId)
+std::optional<NftRow> NftSys::getNft(NID nftId)
 {
    auto nft_table = db.open<nft_table_t>();
    auto nft_idx   = nft_table.get_index<0>();
@@ -53,12 +53,14 @@ std::optional<nft_row> nft_contract::getNft(nid nftId)
    //printf("Contract 2: NFT ID is %" PRId64 "\n", (*nft).id);
 }
 
-int64_t nft_contract::isAutodebit(psibase::AccountNumber user)
+int64_t NftSys::isAutodebit(psibase::AccountNumber user)
 {
-   auto ad_table_idx = db.open<ad_table_t>().get_index<0>();
+   auto ad_table_idx = db.open<AdTable_t>().get_index<0>();
    auto ad           = ad_table_idx.get(user);
    bool ret          = (!ad.has_value()) || (ad.has_value() && ad->autodebit);
    return ret ? 1 : 0;
 }
 
-PSIBASE_DISPATCH(nft_sys::nft_contract)
+void NftSys::autodebit(psibase::AccountNumber account, bool autoDebit) {}
+
+PSIBASE_DISPATCH(UserContract::NftSys)
