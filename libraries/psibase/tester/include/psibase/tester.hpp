@@ -19,7 +19,7 @@ namespace psibase
    template <auto MemberPtr>
    auto getReturnVal(const psibase::action_trace& actionTrace)
    {
-      using T = decltype(internal_use_do_not_use::get_return_type(MemberPtr));
+      using T = decltype(psio::result_of(MemberPtr));
       return psio::convert_from_frac<T>(actionTrace.raw_retval);
    }
 

@@ -63,7 +63,7 @@ namespace nft_sys
       using sub_id_type = uint32_t;
 
       // Create a new NFT in issuer's scope, with sub_id 0
-      nid  mint(psibase::AccountNumber issuer, sub_id_type sub_id);
+      nid  mint(psibase::AccountNumber issuer);
       void burn(psibase::AccountNumber owner, nid nftId){};
 
       void autodebit(psibase::AccountNumber account, bool autoDebit) {}
@@ -81,7 +81,7 @@ namespace nft_sys
       void unapprove(nid nftId, psibase::AccountNumber account) {}
 
       // Read-only interface
-      std::optional<nft_row> getNft(nid nft_id);
+      std::optional<nft_row> getNft(nid nftId);
       int64_t                isAutodebit(psibase::AccountNumber user);
 
      private:
@@ -90,7 +90,7 @@ namespace nft_sys
 
    // clang-format off
    PSIO_REFLECT_INTERFACE(nft_contract, 
-      (mint, 0, issuer, sub_id), 
+      (mint, 0, issuer), 
       (burn, 1, owner, nftId),
 
       (autodebit, 2, account, autoDebit),
@@ -102,7 +102,7 @@ namespace nft_sys
       (approve, 6, nftId, account),
       (unapprove, 7, nftId, account),
       
-      (getNft, 8, nft_id),
+      (getNft, 8, nftId),
       (isAutodebit, 9, user)
    );
    // clang-format on

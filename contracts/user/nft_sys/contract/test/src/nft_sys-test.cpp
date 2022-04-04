@@ -3,6 +3,8 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/test.hpp>
+#include <string>
+
 #include "nft_sys.hpp"
 
 using namespace eosio;
@@ -11,6 +13,7 @@ using namespace psibase;
 using nft_sys::nft_row;
 using std::optional;
 using std::pair;
+using std::string;
 using std::vector;
 
 namespace
@@ -74,10 +77,6 @@ namespace
       }
    }
 
-   auto generate = [](uint32_t a, uint32_t b) {
-      return (static_cast<uint64_t>(a) << 32 | static_cast<uint64_t>(b));
-   };
-
    void configure_test_chain(test_chain& t)
    {
       t.start_block();
@@ -99,18 +98,19 @@ SCENARIO("Minting & burning nfts")
       Actor alice{add_account(t, "alice")};
       Actor bob{add_account(t, "bob")};
 
-      uint32_t sub_id = 0;
       THEN("Alice can mint an NFT")
       {
-         auto trace = t.trace(alice.at<nft_contract>().mint(alice, sub_id));
+         auto trace = t.trace(alice.at<nft_contract>().mint(alice));
          CHECK(succeeded(trace));
 
          AND_THEN("The NFT exists")
          {
-            nft_row expectedNft{.id               = generate(alice.id, sub_id),
-                                .issuer           = alice.id,
-                                .owner            = alice.id,
-                                .approved_account = 0};
+            nft_row expectedNft{
+                .id               = 1,         // First minted NFT (skipping 0)
+                .issuer           = alice.id,  //
+                .owner            = alice.id,  //
+                .approved_account = system_contract::account_sys::null_account  //
+            };
 
             auto nft_id = getReturnVal<&nft_contract::mint>(get_top_action(trace, 0));
             auto trace  = t.trace(alice.at<nft_contract>().getNft(nft_id));
@@ -120,24 +120,20 @@ SCENARIO("Minting & burning nfts")
       }
       THEN("Alice cannot force Bob to pay the storage cost for her minting an NFT")
       {
-         CHECK(failedWith(t.trace(alice.at<nft_contract>().mint(bob, sub_id)),
-                          "Missing required authority"));
+         CHECK(
+             failedWith(t.trace(alice.at<nft_contract>().mint(bob)), "Missing required authority"));
       }
       WHEN("Alice mints an NFT")
       {
-         t.trace(alice.at<nft_contract>().mint(alice, sub_id));
-         auto trace = t.trace(alice.at<nft_contract>().getNft2(alice, sub_id));
-         auto nft1  = *getReturnVal<&nft_contract::getNft2>(get_top_action(trace, 0));
+         auto trace  = t.trace(alice.at<nft_contract>().mint(alice));
+         auto nft_id = getReturnVal<&nft_contract::mint>(get_top_action(trace, 0));
+         trace       = t.trace(alice.at<nft_contract>().getNft(nft_id));
+         auto nft1   = *getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0));
          t.start_block();
 
          THEN("Alice consumes storage space as expected")
          {
             check_disk_consumption(trace, {{alice.id, nft_row::DiskUsage::firstEmplace}});
-         }
-         THEN("Alice cannot mint another using the same sub_id")
-         {
-            CHECK(failedWith(t.trace(alice.at<nft_contract>().mint(alice, sub_id)),
-                             "Nft already exists"));
          }
          THEN("Alice can burn the NFT")
          {
@@ -148,26 +144,17 @@ SCENARIO("Minting & burning nfts")
             CHECK(failedWith(t.trace(bob.at<nft_contract>().burn(alice, nft1.id)),
                              nft_sys::errors::missingRequiredAuth));
          }
-         THEN("Bob can mint an NFT using the same sub_id")
-         {
-            CHECK(succeeded(t.trace(bob.at<nft_contract>().mint(bob, sub_id))));
-         }
-         THEN("Alice can mint a second NFT using a different sub_id")
-         {
-            CHECK(succeeded(t.trace(alice.at<nft_contract>().mint(alice, sub_id + 1))));
-         }
-         AND_WHEN("Alice mints a second NFT using a different sub_id")
+         AND_WHEN("Alice mints a second NFT")
          {
             // Mint second NFT
-            auto secondId = sub_id + 1;
-            t.trace(alice.at<nft_contract>().mint(alice, secondId));
+            trace = t.trace(alice.at<nft_contract>().mint(alice));
             t.start_block();
 
             THEN("The ID is one more than the first")
             {
-               trace = t.trace(alice.at<nft_contract>().getNft2(alice, secondId));
-
-               auto nft2 = *getReturnVal<&nft_contract::getNft2>(get_top_action(trace, 0));
+               auto nftId2 = getReturnVal<&nft_contract::mint>(get_top_action(trace, 0));
+               trace       = t.trace(alice.at<nft_contract>().getNft(nftId2));
+               auto nft2   = *getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0));
 
                nft_row expectedNft = nft1;
                expectedNft.id++;
@@ -176,7 +163,7 @@ SCENARIO("Minting & burning nfts")
          }
          AND_WHEN("Bob mints an NFT")
          {
-            auto trace = t.trace(bob.at<nft_contract>().mint(bob, sub_id));
+            auto trace = t.trace(bob.at<nft_contract>().mint(bob));
             t.start_block();
 
             THEN("Bob's pays for an expected amount of storage space")
@@ -194,10 +181,7 @@ SCENARIO("Transferring NFTs")
    GIVEN("A chain with registered users Alice, Bob, and Charlie")
    {
       test_chain t;
-      t.start_block();
-      boot_minimal(t);
-      auto cnum = add_contract(t, "nft.sys", "nft_sys.wasm");
-      REQUIRE(cnum == nft_contract::contract);
+      configure_test_chain(t);
 
       Actor alice{add_account(t, "alice")};
       Actor bob{add_account(t, "bob")};
@@ -233,9 +217,12 @@ SCENARIO("Transferring NFTs")
       }
       AND_GIVEN("Alice has minted an NFT")
       {
-         t.act(alice.at<nft_contract>().mint(alice, 0));
-         auto trace = t.trace(alice.at<nft_contract>().getNft2(alice, 0));
-         auto nft   = *getReturnVal<&nft_contract::getNft2>(get_top_action(trace, 0));
+         auto trace = t.trace(alice.at<nft_contract>().mint(alice));
+
+         auto nftId = getReturnVal<&nft_contract::mint>(get_top_action(trace, 0));
+
+         trace    = t.trace(alice.at<nft_contract>().getNft(nftId));
+         auto nft = *getReturnVal<&nft_contract::getNft>(get_top_action(trace, 0));
 
          THEN("No one can debit or uncredit the NFT")
          {

@@ -15,23 +15,14 @@ using psio::const_view;
 using std::string;
 using system_contract::account_sys;
 
-namespace
-{
-   uint64_t generate(uint32_t a, uint32_t b)
-   {
-      return (static_cast<uint64_t>(a) << 32 | static_cast<uint64_t>(b));
-   }
-}  // namespace
-
 namespace stubs
 {
    // Replace with auth calls when available
    bool require_auth(AccountNumber acc) { return true; }
 }  // namespace stubs
 
-uint64_t nft_contract::mint(AccountNumber issuer, sub_id_type sub_id)
+uint64_t nft_contract::mint(AccountNumber issuer)
 {
-   //TODO - delete sub_id
    AccountNumber ram_payer = issuer;
    stubs::require_auth(ram_payer);
 
@@ -53,11 +44,11 @@ uint64_t nft_contract::mint(AccountNumber issuer, sub_id_type sub_id)
    return new_id;
 }
 
-std::optional<nft_row> nft_contract::getNft(nid nft_id)
+std::optional<nft_row> nft_contract::getNft(nid nftId)
 {
    auto nft_table = db.open<nft_table_t>();
    auto nft_idx   = nft_table.get_index<0>();
-   return nft_idx.get(nft_id);
+   return nft_idx.get(nftId);
 
    //printf("Contract 2: NFT ID is %" PRId64 "\n", (*nft).id);
 }
