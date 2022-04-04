@@ -97,6 +97,8 @@ namespace system_contract
              .sender   = system_contract::transaction_sys::contract,
              .contract = account->auth_contract,
              // TODO: auth_contract will have to register action #
+             // TODO: rename to checkauth_sys or sys_checkauth
+             // TODO: checkauth return bool
              .raw_data = psio::convert_to_frac(auth_fake_sys::action{auth_fake_sys::auth_check{
                  .action = act,  // act to be authorized
                  .claims = trx.claims,
