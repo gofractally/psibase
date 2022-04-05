@@ -319,6 +319,8 @@ namespace psibase::http
                                 session->queue_(error(bhttp::status::internal_server_error,
                                                       std::get<std::string>(result)));
                              }
+                             if (session->queue_.can_read())
+                                session->do_read();
                           }
                           catch (...)
                           {
@@ -555,6 +557,7 @@ namespace psibase::http
              });
       }
 
+     public:
       void do_read()
       {
          // Construct a new parser for each message
@@ -570,6 +573,7 @@ namespace psibase::http
                                                      derived_session().shared_from_this()));
       }
 
+     private:
       void on_read(beast::error_code ec, std::size_t bytes_transferred)
       {
          boost::ignore_unused(bytes_transferred);
