@@ -185,57 +185,62 @@ namespace psibase::http
                        bhttp::request<Body, bhttp::basic_fields<Allocator>>&& req,
                        Send&&                                                 send)
    {
+      unsigned req_version    = req.version();
+      bool     req_keep_alive = req.keep_alive();
+
       // Returns a bad request response
-      const auto bad_request = [&server, &req](beast::string_view why)
+      const auto bad_request = [&server, req_version, req_keep_alive](beast::string_view why)
       {
-         bhttp::response<bhttp::string_body> res{bhttp::status::bad_request, req.version()};
+         bhttp::response<bhttp::string_body> res{bhttp::status::bad_request, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          if (!server.http_config->allow_origin.empty())
             res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
-         res.keep_alive(req.keep_alive());
+         res.keep_alive(req_keep_alive);
          res.body() = why.to_string();
          res.prepare_payload();
          return res;
       };
 
       // Returns a not found response
-      const auto not_found = [&server, &req](beast::string_view target)
+      const auto not_found = [&server, req_version, req_keep_alive](beast::string_view target)
       {
-         bhttp::response<bhttp::string_body> res{bhttp::status::not_found, req.version()};
+         bhttp::response<bhttp::string_body> res{bhttp::status::not_found, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          if (!server.http_config->allow_origin.empty())
             res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
-         res.keep_alive(req.keep_alive());
+         res.keep_alive(req_keep_alive);
          res.body() = "The resource '" + target.to_string() + "' was not found.";
          res.prepare_payload();
          return res;
       };
 
       // Returns an error response
-      const auto error = [&server, &req](bhttp::status status, beast::string_view why,
-                                         const char* content_type = "text/html")
+      const auto error =
+          [&server, req_version, req_keep_alive](bhttp::status status, beast::string_view why,
+                                                 const char* content_type = "text/html")
       {
-         bhttp::response<bhttp::string_body> res{status, req.version()};
+         bhttp::response<bhttp::string_body> res{status, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, content_type);
          if (!server.http_config->allow_origin.empty())
             res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
-         res.keep_alive(req.keep_alive());
+         res.keep_alive(req_keep_alive);
          res.body() = why.to_string();
          res.prepare_payload();
          return res;
       };
 
-      const auto ok = [&server, &req](std::vector<char> reply, const char* content_type)
+      const auto ok =
+          [&server, req_version, req_keep_alive](std::vector<char> reply, const char* content_type)
       {
-         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req.version()};
+         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, content_type);
          if (!server.http_config->allow_origin.empty())
             res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
-         res.keep_alive(req.keep_alive());
+         res.keep_alive(req_keep_alive);
          res.body() = std::move(reply);
          res.prepare_payload();
          return res;
