@@ -268,7 +268,7 @@ namespace psibase::http
             data.host      = {host.begin(), host.size()};
             data.root_host = server.http_config->host;
             data.target    = req.target().to_string();
-            data.body      = req.body();
+            data.body      = std::move(req.body());
 
             // TODO: time limit
             auto           system = server.shared_state->get_system_context();
@@ -287,6 +287,47 @@ namespace psibase::http
             tc.exec_rpc(act, atrace);
             auto result = psio::convert_from_frac<rpc_reply_data>(atrace.raw_retval);
             return send(ok(std::move(result.reply), result.contentType.c_str()));
+         }
+         else if (req.target() == "/push_transaction" && req.method() == bhttp::verb::post &&
+                  server.http_config->push_transaction_async)
+         {
+            server.http_config->push_transaction_async(
+                std::move(req.body()),
+                [error, ok, session = send.self.derived_session().shared_from_this(),
+                 server = send.self.server.shared_from_this()](push_transaction_result result)
+                {
+                   // inside foreign thread; the server capture above keeps ioc alive.
+                   net::post(
+                       session->stream.socket().get_executor(),
+                       [error, ok, session = std::move(session), result = std::move(result)]
+                       {
+                          // inside http thread pool. If we reached here, then the server
+                          // and ioc are still alive. This lambda doesn't capture server since
+                          // that would leak memory (circular) if the ioc threads were shut down.
+                          try
+                          {
+                             session->queue_.pause_read = false;
+                             if (auto* trace = std::get_if<transaction_trace>(&result))
+                             {
+                                std::vector<char>   data;
+                                psio::vector_stream stream{data};
+                                psio::to_json(*trace, stream);
+                                session->queue_(ok(std::move(data), "application/json"));
+                             }
+                             else
+                             {
+                                session->queue_(error(bhttp::status::internal_server_error,
+                                                      std::get<std::string>(result)));
+                             }
+                          }
+                          catch (...)
+                          {
+                             session->do_close();
+                          }
+                       });
+                });
+            send.pause_read = true;
+            return;
          }
          else if (server.http_config->static_dir.empty())
          {
@@ -463,9 +504,7 @@ namespace psibase::http
          }
       };
 
-      server_impl&                       server;
       beast::flat_buffer                 buffer;
-      queue                              queue_;
       std::unique_ptr<net::steady_timer> _timer;
       steady_clock::time_point           last_activity_timepoint;
 
@@ -474,6 +513,9 @@ namespace psibase::http
       boost::optional<bhttp::request_parser<bhttp::vector_body<char>>> parser;
 
      public:
+      server_impl& server;
+      queue        queue_;
+
       http_session(server_impl& server) : server(server), queue_(*this) {}
 
       // Start the session
@@ -575,6 +617,7 @@ namespace psibase::http
          }
       }
 
+     public:
       void do_close()
       {
          // Send a TCP shutdown
