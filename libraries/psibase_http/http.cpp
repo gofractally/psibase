@@ -395,10 +395,12 @@ namespace psibase::http
             virtual void operator()() = 0;
          };
 
-         http_session&                      self;
          std::vector<std::unique_ptr<work>> items;
 
         public:
+         http_session& self;
+         bool          pause_read = false;
+
          explicit queue(http_session& self) : self(self)
          {
             static_assert(limit > 0, "queue limit must be positive");
@@ -407,6 +409,8 @@ namespace psibase::http
 
          // Returns `true` if we have reached the queue limit
          bool is_full() const { return items.size() >= limit; }
+
+         bool can_read() const { return !is_full() && !pause_read; }
 
          // Called when a message finishes sending
          // Returns `true` if the caller should initiate a read
@@ -417,7 +421,7 @@ namespace psibase::http
             items.erase(items.begin());
             if (!items.empty())
                (*items.front())();
-            return was_full;
+            return was_full && !pause_read;
          }
 
          // Called by the HTTP handler to send a response.
@@ -511,7 +515,6 @@ namespace psibase::http
 
          // Apply a reasonable limit to the allowed size
          // of the body in bytes to prevent abuse.
-         // todo: make configurable
          parser->body_limit(server.http_config->max_request_size);
          last_activity_timepoint = steady_clock::now();
          // Read a request using the parser-oriented interface
@@ -538,7 +541,7 @@ namespace psibase::http
          handle_request(server, parser->release(), queue_);
 
          // If we aren't at the queue limit, try to pipeline another request
-         if (!queue_.is_full())
+         if (queue_.can_read())
             do_read();
       }
 
@@ -549,7 +552,7 @@ namespace psibase::http
          if (ec)
          {
             fail(ec, "write");
-            do_close();
+            return do_close();
          }
 
          if (close)
