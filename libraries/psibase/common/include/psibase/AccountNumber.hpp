@@ -1,5 +1,6 @@
 #pragma once
 #include <psibase/name.hpp>
+#include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
 
 namespace psibase
@@ -35,6 +36,12 @@ namespace psibase
    void to_json(const AccountNumber& n, S& s)
    {
       to_json(n.str(), s);
+   }
+
+   template <typename S>
+   void from_json(AccountNumber& result, S& stream)
+   {
+      result = AccountNumber{stream.get_string()};
    }
 
    template <typename S>
