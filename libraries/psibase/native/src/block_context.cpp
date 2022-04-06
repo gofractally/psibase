@@ -105,22 +105,12 @@ namespace psibase
       }
    }
 
+   // TODO: limit charged CPU & NET which can go into a block
+   // TODO: duplicate detection
    void block_context::exec(const signed_transaction& trx,
                             transaction_trace&        trace,
                             bool                      enable_undo,
                             bool                      commit)
-   {
-      // TODO: recover keys
-      exec(trx, {}, trace, enable_undo, commit);
-   }
-
-   // TODO: limit charged CPU & NET which can go into a block
-   // TODO: duplicate detection
-   void block_context::exec(const signed_transaction&             trx,
-                            const std::vector<eosio::public_key>& recovered_keys,
-                            transaction_trace&                    trace,
-                            bool                                  enable_undo,
-                            bool                                  commit)
    {
       try
       {
@@ -133,7 +123,7 @@ namespace psibase
          active = enable_undo;
 
          trace.trx = trx;
-         transaction_context t{*this, trx, recovered_keys, trace, enable_undo};
+         transaction_context t{*this, trx, trace, enable_undo};
          t.exec_transaction();
 
          if (commit)

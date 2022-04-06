@@ -7,15 +7,11 @@
 
 namespace psibase
 {
-   transaction_context::transaction_context(psibase::block_context&               block_context,
-                                            const signed_transaction&             trx,
-                                            const std::vector<eosio::public_key>& recovered_keys,
-                                            psibase::transaction_trace&           transaction_trace,
-                                            bool                                  enable_undo)
-       : block_context{block_context},
-         trx{trx},
-         recovered_keys{recovered_keys},
-         transaction_trace{transaction_trace}
+   transaction_context::transaction_context(psibase::block_context&     block_context,
+                                            const signed_transaction&   trx,
+                                            psibase::transaction_trace& transaction_trace,
+                                            bool                        enable_undo)
+       : block_context{block_context}, trx{trx}, transaction_trace{transaction_trace}
    {
       if (enable_undo)
          session = block_context.db.start_write();
@@ -94,9 +90,9 @@ namespace psibase
       /// TODO: move this to a common header
       static constexpr AccountNumber trxsys = AccountNumber("transact-sys");
       action                         act{
-          .sender   = AccountNumber(),
-          .contract = trxsys,
-          .raw_data = psio::convert_to_frac(self.trx.trx),
+                                  .sender   = AccountNumber(),
+                                  .contract = trxsys,
+                                  .raw_data = psio::convert_to_frac(self.trx.trx),
       };
       auto& atrace      = self.transaction_trace.action_traces.emplace_back();
       atrace.act        = act;  // TODO: avoid copy and redundancy between act and atrace.act
