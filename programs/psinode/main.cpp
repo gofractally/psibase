@@ -145,12 +145,14 @@ void bootstrap_chain(system_context& system)
 
    reg_rpc(bc, roothost_rpc, roothost_rpc);
    upload(bc, roothost_rpc, "/", "text/html", "../contracts/user/rpc_roothost_sys/ui/index.html");
+   upload(bc, roothost_rpc, "/roothost/rpc.mjs", "text/javascript",
+          "../contracts/user/rpc_roothost_sys/roothost/rpc.mjs");
    upload(bc, roothost_rpc, "/ui/index.js", "text/javascript",
           "../contracts/user/rpc_roothost_sys/ui/index.js");
 
    reg_rpc(bc, system_contract::account_sys::contract, account_rpc);
    upload(bc, account_rpc, "/", "text/html", "../contracts/system/rpc_account_sys/ui/index.html");
-   upload(bc, account_rpc, "/ui/index.js", "text/html",
+   upload(bc, account_rpc, "/ui/index.js", "text/javascript",
           "../contracts/system/rpc_account_sys/ui/index.js");
 
    bc.commit();
