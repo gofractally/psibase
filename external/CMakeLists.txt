@@ -27,7 +27,7 @@ if(IS_NATIVE)
     if(NOT CLIO_ONLY)
         add_library(eos-vm INTERFACE)
         target_include_directories(eos-vm INTERFACE
-            ${ROOT_SOURCE_DIR}/external/eos/libraries/eos-vm/include
+            ${ROOT_SOURCE_DIR}/external/eos-vm/include
         )
 
         set(MDBX_OUTPUT_DIR ${ROOT_BINARY_DIR}/mdbx)
