@@ -67,6 +67,22 @@ namespace psibase
          }
       }
 
+      if (request.method == "POST")
+      {
+         // TODO: move to an ABI wasm?
+         if (request.target == "/roothost/pack/signed_transaction")
+         {
+            request.body.push_back(0);
+            eosio::json_token_stream jstream{request.body.data()};
+            signed_transaction       trx;
+            eosio::from_json(trx, jstream);
+            return rpc_reply_data{
+                .contentType = "application/octet-stream",
+                .reply       = psio::convert_to_frac(trx),
+            };
+         }
+      }
+
       abort_message_str("not found");
    }  // rpc_roothost_sys::rpc_sys
 

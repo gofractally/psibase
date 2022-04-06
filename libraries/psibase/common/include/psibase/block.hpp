@@ -30,6 +30,7 @@ namespace psibase
       }
    };
    PSIO_REFLECT(TimePointSec, seconds);
+   EOSIO_REFLECT(TimePointSec, seconds);
 
    using BlockNum  = uint32_t;
    using block_num = BlockNum;

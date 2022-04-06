@@ -1,4 +1,5 @@
 #pragma once
+#include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
 #include <psio/to_json.hpp>
 
@@ -36,12 +37,20 @@ namespace psibase
    }
 
    template <typename S>
+   void from_json(MethodNumber& result, S& stream)
+   {
+      result = MethodNumber{stream.get_string()};
+   }
+
+   template <typename S>
    void to_key(const MethodNumber& k, S& s)
    {
       s.write(&k.value, sizeof(k.value));
    }
 
 }  // namespace psibase
+
+// TODO: move to psibase::literals (inline namespace)
 inline constexpr psibase::MethodNumber operator""_m(const char* s, unsigned long)
 {
    auto num = psibase::MethodNumber(s);

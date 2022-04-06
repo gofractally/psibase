@@ -32,12 +32,12 @@ PSIO_REFLECT(WebContentRow, path, contentType, content)
 // TODO: out of date
 struct CreateAccount
 {
-   std::string name         = {};
-   std::string authContract = {};
-   bool        allowSudo    = false;
+   psibase::AccountNumber account      = {};
+   psibase::AccountNumber authContract = {};
+   bool                   allowSudo    = false;
 };
-EOSIO_REFLECT(CreateAccount, name, authContract, allowSudo)
-PSIO_REFLECT(CreateAccount, name, authContract, allowSudo)
+EOSIO_REFLECT(CreateAccount, account, authContract, allowSudo)
+PSIO_REFLECT(CreateAccount, account, authContract, allowSudo)
 
 namespace system_contract
 {
@@ -91,9 +91,12 @@ namespace system_contract
             eosio::json_token_stream jstream{request.body.data()};
             CreateAccount            args;
             eosio::from_json(args, jstream);
+            check(args.account.value, "Invalid or missing name");
+            check(args.authContract.value, "Invalid or missing authContract");
             action act{
-                .sender   = get_receiver(),
-                .contract = get_receiver(),
+                .sender   = account_sys::contract,
+                .contract = account_sys::contract,
+                .method   = "newAccount"_m,
                 .raw_data = psio::convert_to_frac(args),
             };
             return to_json(act);

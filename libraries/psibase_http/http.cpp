@@ -253,9 +253,11 @@ namespace psibase::http
          if (colon != host.npos)
             host.remove_suffix(host.size() - colon);
 
+         // TODO: simplify rule for separating native vs contract
          if (req.target() == "/" || req.target().starts_with("/rpc") ||
              req.target().starts_with("/roothost") || req.target().starts_with("/ui") ||
-             host != server.http_config->host && host.ends_with(server.http_config->host))
+             host != server.http_config->host && host.ends_with(server.http_config->host) &&
+                 !req.target().starts_with("/native"))
          {
             rpc_request_data data;
             if (req.method() == bhttp::verb::get)
@@ -288,7 +290,7 @@ namespace psibase::http
             auto result = psio::convert_from_frac<rpc_reply_data>(atrace.raw_retval);
             return send(ok(std::move(result.reply), result.contentType.c_str()));
          }
-         else if (req.target() == "/push_transaction" && req.method() == bhttp::verb::post &&
+         else if (req.target() == "/native/push_transaction" && req.method() == bhttp::verb::post &&
                   server.http_config->push_transaction_async)
          {
             server.http_config->push_transaction_async(

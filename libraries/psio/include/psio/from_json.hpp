@@ -1,10 +1,11 @@
 #pragma once
 
 #include <rapidjson/reader.h>
-#include <psio/reflect.hpp>
 #include <cstdlib>
 #include <functional>
 #include <optional>
+#include <psio/error.hpp>
+#include <psio/reflect.hpp>
 #include <tuple>
 #include <variant>
 #include <vector>
