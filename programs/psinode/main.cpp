@@ -12,6 +12,7 @@
 
 #include <eosio/finally.hpp>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 using namespace psibase;
@@ -163,6 +164,76 @@ void bootstrap_chain(system_context& system)
    bc.commit();
 }
 
+struct transaction_queue
+{
+   struct entry
+   {
+      std::vector<char>               packed_signed_trx;
+      http::push_transaction_callback callback;
+   };
+
+   std::mutex         mutex;
+   std::vector<entry> entries;
+};
+
+#define RETHROW_BAD_ALLOC  \
+   catch (std::bad_alloc&) \
+   {                       \
+      throw;               \
+   }
+
+#define CATCH_IGNORE \
+   catch (...) {}
+
+void push_transaction(block_context& bc, transaction_queue::entry& entry)
+{
+   try
+   {
+      // TODO: verify no extra data
+      // TODO: view
+      auto              trx = psio::convert_from_frac<signed_transaction>(entry.packed_signed_trx);
+      transaction_trace trace;
+
+      try
+      {
+         bc.push_transaction(trx, trace);
+      }
+      RETHROW_BAD_ALLOC
+      catch (...)
+      {
+         // Don't give a false positive
+         if (!trace.error)
+            throw;
+      }
+
+      try
+      {
+         entry.callback(std::move(trace));
+      }
+      RETHROW_BAD_ALLOC
+      CATCH_IGNORE
+   }
+   RETHROW_BAD_ALLOC
+   catch (std::exception& e)
+   {
+      try
+      {
+         entry.callback(e.what());
+      }
+      RETHROW_BAD_ALLOC
+      CATCH_IGNORE
+   }
+   catch (...)
+   {
+      try
+      {
+         entry.callback("unknown error");
+      }
+      RETHROW_BAD_ALLOC
+      CATCH_IGNORE
+   }
+}  // push_transaction
+
 void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 {
    execution_context::register_host_functions();
@@ -171,6 +242,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
    auto shared_state =
        std::make_shared<psibase::shared_state>(shared_database{db_path}, wasm_cache{128});
    auto system = shared_state->get_system_context();
+   auto queue  = std::make_shared<transaction_queue>();
 
    if (host)
    {
@@ -186,7 +258,17 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
           .unix_path        = "",
           .host             = host,
       });
-      auto server      = http::server::create(http_config, shared_state);
+
+      // TODO: speculative execution on non-producers
+      if (produce)
+         http_config->push_transaction_async =
+             [queue](std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
+         {
+            std::scoped_lock lock{queue->mutex};
+            queue->entries.push_back({std::move(packed_signed_trx), std::move(callback)});
+         };
+
+      auto server = http::server::create(http_config, shared_state);
    }
 
    if (bootstrap)
@@ -198,8 +280,19 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
       std::this_thread::sleep_for(std::chrono::milliseconds{1000});
       if (produce)
       {
+         std::vector<transaction_queue::entry> entries;
+         {
+            std::scoped_lock lock{queue->mutex};
+            std::swap(entries, queue->entries);
+         }
+
          block_context bc{*system, true, true};
          bc.start();
+
+         // TODO: block limits
+         for (auto& entry : entries)
+            push_transaction(bc, entry);
+
          bc.commit();
          std::cout << psio::convert_to_json((BlockHeader&)bc.current) << "\n";
       }
