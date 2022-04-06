@@ -282,7 +282,7 @@ namespace psibase::http
                             .raw_data = psio::convert_to_frac(data),
             };
             transaction_trace   trace;
-            transaction_context tc{bc, trx, {}, trace, false};
+            transaction_context tc{bc, trx, trace, false};
             action_trace        atrace;
             tc.exec_rpc(act, atrace);
             auto result = psio::convert_from_frac<rpc_reply_data>(atrace.raw_retval);

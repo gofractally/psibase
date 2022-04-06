@@ -50,12 +50,6 @@ namespace psibase
                 transaction_trace&        trace,
                 bool                      enable_undo,
                 bool                      commit);
-
-      void exec(const signed_transaction&             trx,
-                const std::vector<eosio::public_key>& recovered_keys,
-                transaction_trace&                    trace,
-                bool                                  enable_undo,
-                bool                                  commit);
    };  // block_context
 
 }  // namespace psibase
