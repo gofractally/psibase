@@ -5,33 +5,11 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/crypto.hpp>
-#include <psio/fracpack.hpp>
+#include <psibase/time.hpp>
 
 namespace psibase
 {
-   using String = std::string;
-
-   // TODO: Move
-   struct TimePointSec final
-   {
-      uint32_t seconds = 0;
-      //auto operator <=> (const TimePointSec&)const = default;
-      friend bool operator==(const TimePointSec& a, const TimePointSec& b)
-      {
-         return a.seconds == b.seconds;
-      }
-      friend bool operator<(const TimePointSec& a, const TimePointSec& b)
-      {
-         return a.seconds < b.seconds;
-      }
-      friend bool operator!=(const TimePointSec& a, const TimePointSec& b)
-      {
-         return a.seconds != b.seconds;
-      }
-   };
-   PSIO_REFLECT(TimePointSec, seconds);
-   EOSIO_REFLECT(TimePointSec, seconds);
-
+   using String    = std::string;
    using BlockNum  = uint32_t;
    using block_num = BlockNum;
 

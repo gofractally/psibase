@@ -44,6 +44,10 @@ async function createAccount() {
         const signedTrx = {
             // TODO: TAPOS
             // TODO: Sign
+            trx: {
+                expiration: new Date(Date.now() + 10_000),
+                actions: [action],
+            },
         };
         const trxResponse = await fetch('/roothost/pack/signed_transaction', {
             method: 'POST',

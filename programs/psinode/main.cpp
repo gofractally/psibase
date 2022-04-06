@@ -141,10 +141,7 @@ void bootstrap_chain(system_context& system)
                system_contract::transaction_sys::contract, system_contract::account_sys::contract,
                AccountNumber("rpc"),  /// TODO: where do I get this constant?
                system_contract::auth_fake_sys::contract, system_contract::auth_ec_sys::contract,
-               system_contract::verify_ec_sys::contract, roothost_rpc, account_rpc
-               //{20, "rpc.roothost.sys"},
-               //{21, "rpc.account.sys"},
-           }));
+               system_contract::verify_ec_sys::contract, roothost_rpc, account_rpc}));
 
    reg_rpc(bc, roothost_rpc, roothost_rpc);
    upload(bc, roothost_rpc, "/", "text/html", "../contracts/user/rpc_roothost_sys/ui/index.html");
@@ -155,11 +152,6 @@ void bootstrap_chain(system_context& system)
    upload(bc, account_rpc, "/", "text/html", "../contracts/system/rpc_account_sys/ui/index.html");
    upload(bc, account_rpc, "/ui/index.js", "text/html",
           "../contracts/system/rpc_account_sys/ui/index.js");
-
-   push_action(bc, asys.newAccount(AccountNumber("alice"),
-                                   system_contract::transaction_sys::contract, false));
-   push_action(bc, asys.newAccount(AccountNumber("bob"), system_contract::transaction_sys::contract,
-                                   false));
 
    bc.commit();
 }

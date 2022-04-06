@@ -31,7 +31,7 @@ TEST_CASE("kv")
    test_chain t;
    t.start_block();
    boot_minimal(t);
-   auto test_kv_contract = add_contract(t, "test_kv", "test_kv.wasm");
+   auto test_kv_contract = add_contract(t, "test-kv", "test_kv.wasm");
    REQUIRE(                          //
        show(false,                   //
             t.push_transaction(      //
