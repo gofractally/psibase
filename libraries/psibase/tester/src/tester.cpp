@@ -34,8 +34,7 @@ namespace
                                Alloc_fn    alloc_fn)
    {
       return tester_read_whole_file(filename_begin, filename_size, &alloc_fn,
-                                    [](void* cb_alloc_data, size_t size) -> void*
-                                    {  //
+                                    [](void* cb_alloc_data, size_t size) -> void* {  //
                                        return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
                                     });
    }
@@ -44,8 +43,7 @@ namespace
    inline void get_head_block_info(uint32_t chain, Alloc_fn alloc_fn)
    {
       tester_get_head_block_info(chain, &alloc_fn,
-                                 [](void* cb_alloc_data, size_t size) -> void*
-                                 {  //
+                                 [](void* cb_alloc_data, size_t size) -> void* {  //
                                     return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
                                  });
    }
@@ -57,8 +55,7 @@ namespace
                                 Alloc_fn    alloc_fn)
    {
       tester_push_transaction(chain, args_begin, args_size, &alloc_fn,
-                              [](void* cb_alloc_data, size_t size) -> void*
-                              {  //
+                              [](void* cb_alloc_data, size_t size) -> void* {  //
                                  return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
                               });
    }
@@ -67,22 +64,90 @@ namespace
    inline bool exec_deferred(uint32_t chain, Alloc_fn alloc_fn)
    {
       return tester_exec_deferred(chain, &alloc_fn,
-                                  [](void* cb_alloc_data, size_t size) -> void*
-                                  {  //
+                                  [](void* cb_alloc_data, size_t size) -> void* {  //
                                      return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
                                   });
    }
 }  // namespace
 
+psibase::TraceResult::TraceResult(transaction_trace&& t) : trace(t) {}
+
+bool psibase::TraceResult::succeeded()
+{
+   bool hasErrObj = (trace.error != std::nullopt);
+   bool failed    = hasErrObj && (*trace.error) != "";
+   if (failed)
+   {
+      UNSCOPED_INFO("transaction failed with exception: " << *trace.error << "\n");
+   }
+
+   return !failed;
+}
+
+bool psibase::TraceResult::failed(std::string_view expected)
+{
+   bool failed = (trace.error != std::nullopt);
+   if (!failed)
+   {
+      UNSCOPED_INFO("transaction succeeded, but was expected to fail");
+      return false;
+   }
+
+   bool hasException = (failed && trace.error.has_value());
+   if (hasException)
+   {
+      if (trace.error->find(expected.data()) != std::string::npos)
+      {
+         return true;
+      }
+      else
+      {
+         UNSCOPED_INFO("transaction was expected to fail exception: \""
+                       << expected << "\", but it failed exception: \"" << *trace.error << "\"\n");
+      }
+   }
+
+   return false;
+}
+
+bool psibase::TraceResult::diskConsumed(
+    const std::vector<std::pair<AccountNumber, int64_t>>& consumption)
+{
+   //const vector<action_trace>& actions = trace.action_traces;
+   //const auto& ram_deltas = actions.at(0).account_ram_deltas;
+
+   {
+       //INFO("Check for equality in the total number of RAM changes");
+       //CHECK(ram_deltas.size() == consumption.size());
+   }
+
+   {
+      //INFO("Check that each actual RAM delta was in the set of expected deltas");
+      // for (const auto& delta : ram_deltas)
+      // {
+      //    bool foundMatch =
+      //        std::any_of(consumption.begin(), consumption.end(), [&](const auto& cPair) {
+      //           return cPair.first == delta.account && cPair.second == delta.delta;
+      //        });
+      //    if (!foundMatch)
+      //    {
+      //       INFO("Real RAM Delta: [" << delta.account.to_string() << "]["
+      //                                << std::to_string(delta.delta) << "]");
+      //       CHECK(false);
+      //    }
+      // }
+   }
+
+   return true;
+}
+
 std::vector<char> psibase::read_whole_file(std::string_view filename)
 {
    std::vector<char> result;
-   if (!::read_whole_file(filename.data(), filename.size(),
-                          [&](size_t size)
-                          {
-                             result.resize(size);
-                             return result.data();
-                          }))
+   if (!::read_whole_file(filename.data(), filename.size(), [&](size_t size) {
+          result.resize(size);
+          return result.data();
+       }))
       eosio::check(false, "read " + std::string(filename) + " failed");
    return result;
 }
@@ -135,8 +200,7 @@ void psibase::internal_use_do_not_use::hex(const uint8_t* begin,
                                            std::ostream&  os)
 {
    std::ostreambuf_iterator<char> dest(os.rdbuf());
-   auto                           nibble = [&dest](uint8_t i)
-   {
+   auto                           nibble = [&dest](uint8_t i) {
       if (i <= 9)
          *dest++ = '0' + i;
       else
@@ -231,12 +295,10 @@ const psibase::block_info& psibase::test_chain::get_head_block_info()
    if (!head_block_info)
    {
       std::vector<char> bin;
-      ::get_head_block_info(id,
-                            [&](size_t size)
-                            {
-                               bin.resize(size);
-                               return bin.data();
-                            });
+      ::get_head_block_info(id, [&](size_t size) {
+         bin.resize(size);
+         return bin.data();
+      });
       head_block_info = psio::convert_from_frac<block_info>(bin);
    }
    return *head_block_info;
@@ -263,12 +325,10 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
 {
    std::vector<char> packed_trx = psio::convert_to_frac(signed_trx);
    std::vector<char> bin;
-   ::push_transaction(id, packed_trx.data(), packed_trx.size(),
-                      [&](size_t size)
-                      {
-                         bin.resize(size);
-                         return bin.data();
-                      });
+   ::push_transaction(id, packed_trx.data(), packed_trx.size(), [&](size_t size) {
+      bin.resize(size);
+      return bin.data();
+   });
    return psio::convert_from_frac<transaction_trace>(bin);
 }
 

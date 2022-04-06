@@ -63,26 +63,21 @@ namespace UserContract
       using sub_id_type = uint32_t;
 
       // Create a new NFT in issuer's scope, with sub_id 0
-      NID  mint(psibase::AccountNumber issuer);
-      void burn(psibase::AccountNumber owner, NID nftId){};
+      NID  mint();
+      void burn(NID nftId){};
 
-      void autodebit(psibase::AccountNumber account, bool autoDebit);
+      void autodebit(bool autoDebit);
 
-      void credit(psibase::AccountNumber sender,
-                  psibase::AccountNumber receiver,
-                  NID                    nftId,
-                  std::string            memo)
-      {
-      }
-      void uncredit(psibase::AccountNumber sender, psibase::AccountNumber receiver, NID nftId) {}
-      void debit(psibase::AccountNumber sender, psibase::AccountNumber receiver, NID nftId) {}
+      void credit(psibase::AccountNumber receiver, NID nftId, std::string memo) {}
+      void uncredit(psibase::AccountNumber receiver, NID nftId) {}
+      void debit(psibase::AccountNumber sender, NID nftId) {}
 
       void approve(NID nftId, psibase::AccountNumber account) {}
       void unapprove(NID nftId, psibase::AccountNumber account) {}
 
       // Read-only interface
       std::optional<NftRow> getNft(NID nftId);
-      int64_t               isAutodebit(psibase::AccountNumber user);
+      int64_t               isAutodebit();
 
      private:
       tables db{contract};
@@ -90,20 +85,20 @@ namespace UserContract
 
    // clang-format off
    PSIO_REFLECT_INTERFACE(NftSys, 
-      (mint, 0, issuer), 
-      (burn, 1, owner, nftId),
+      (mint, 0), 
+      (burn, 1, nftId),
 
-      (autodebit, 2, account, autoDebit),
+      (autodebit, 2, autoDebit),
 
-      (credit, 3, sender, receiver, nftId, memo),
-      (uncredit, 4, sender, receiver, nftId),
-      (debit, 5, sender, receiver, nftId),
+      (credit, 3, receiver, nftId, memo),
+      (uncredit, 4, receiver, nftId),
+      (debit, 5, sender, nftId),
       
       (approve, 6, nftId, account),
       (unapprove, 7, nftId, account),
       
       (getNft, 8, nftId),
-      (isAutodebit, 9, user)
+      (isAutodebit, 9)
    );
    // clang-format on
 

@@ -21,11 +21,11 @@ namespace stubs
    bool require_auth(AccountNumber acc) { return true; }
 }  // namespace stubs
 
-uint64_t NftSys::mint(AccountNumber issuer)
+NID NftSys::mint()
 {
-   AccountNumber ram_payer = issuer;
-   stubs::require_auth(ram_payer);
-
+   auto issuer = get_sender();
+   auto output = issuer.str() + "\n";
+   printf(output.c_str());
    auto nft_table = db.open<nft_table_t>();
    auto nft_idx   = nft_table.get_index<0>();
 
@@ -53,14 +53,14 @@ std::optional<NftRow> NftSys::getNft(NID nftId)
    //printf("Contract 2: NFT ID is %" PRId64 "\n", (*nft).id);
 }
 
-int64_t NftSys::isAutodebit(psibase::AccountNumber user)
+int64_t NftSys::isAutodebit()
 {
    auto ad_table_idx = db.open<AdTable_t>().get_index<0>();
-   auto ad           = ad_table_idx.get(user);
+   auto ad           = ad_table_idx.get(get_sender());
    bool ret          = (!ad.has_value()) || (ad.has_value() && ad->autodebit);
    return ret ? 1 : 0;
 }
 
-void NftSys::autodebit(psibase::AccountNumber account, bool autoDebit) {}
+void NftSys::autodebit(bool autoDebit) {}
 
 PSIBASE_DISPATCH(UserContract::NftSys)

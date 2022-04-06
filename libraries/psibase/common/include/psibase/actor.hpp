@@ -58,7 +58,7 @@ namespace psibase
       }
    };
 
-#ifdef __wasm__
+   //#ifdef __wasm__
    template <typename T>
    psio::shared_view_ptr<T> fraccall(const action& a)
    {
@@ -144,7 +144,7 @@ namespace psibase
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
    };
-#endif  // __wasm__
+   //#endif  // __wasm__
 
    /**
  *  Builds actions to add to transactions
@@ -166,26 +166,6 @@ namespace psibase
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
-   };
-
-   using AccountNumber = psibase::account_num;
-   struct Actor
-   {
-      Actor(AccountNumber s = AccountNumber()) : id(s) {}
-
-      template <typename Other>
-      auto at() const
-      {
-         //#ifdef IS_WASM
-         //return actor<Other>(id, Other::contract);
-         //#else
-         return transactor<Other>(id, Other::contract);
-         //#endif
-      }
-
-      operator AccountNumber() { return id; }
-
-      AccountNumber id;
    };
 
 }  // namespace psibase
