@@ -1,8 +1,6 @@
-import { postJsonGetJson, pushedSignedTransaction } from '/common/rpc.mjs';
+import { postTextGetJson } from '/common/rpc.mjs';
 import { siblingUrl } from '/common/rootdomain.mjs';
-
-// TODO: mirror this
-import htm from "https://unpkg.com/htm@3.1.0?module";
+import htm from 'https://unpkg.com/htm@3.1.0?module';
 const html = htm.bind(React.createElement);
 
 const App = () => {
@@ -18,3 +16,7 @@ const App = () => {
 const container = document.getElementById('root');
 const root = ReactDOM.createRoot(container);
 root.render(html`<${App} />`);
+
+console.log(JSON.stringify(await postTextGetJson('/graphql', `{
+    foo,
+}`), null, 4));

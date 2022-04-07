@@ -21,6 +21,16 @@ export async function throwIfError(response) {
     return response;
 }
 
+export async function postText(url, text) {
+    return await throwIfError(await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'text'
+        },
+        body: text,
+    }));
+}
+
 export async function postJson(url, json) {
     return await throwIfError(await fetch(url, {
         method: 'POST',
@@ -39,6 +49,10 @@ export async function postArrayBuffer(url, arrayBuffer) {
         },
         body: arrayBuffer,
     }));
+}
+
+export async function postTextGetJson(url, json) {
+    return await (await postText(url, json)).json();
 }
 
 export async function postJsonGetJson(url, json) {

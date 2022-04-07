@@ -2,6 +2,7 @@
 
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/dispatch.hpp>
+#include <psio/graphql_connection.hpp>
 
 using table_num = uint16_t;
 using namespace psibase;
@@ -22,6 +23,12 @@ struct WebContentRow
 };
 PSIO_REFLECT(WebContentRow, path, contentType, content)
 
+struct QueryRoot
+{
+   std::string foo() const { return "bar"; }
+};
+PSIO_REFLECT_INTERFACE(QueryRoot, (foo, 0))
+
 namespace system_contract
 {
    rpc_reply_data blocklog_sys::serveSys(rpc_request_data request)
@@ -34,6 +41,19 @@ namespace system_contract
             return {
                 .contentType = content->contentType,
                 .reply       = content->content,
+            };
+         }
+      }
+
+      if (request.method == "POST")
+      {
+         if (request.target == "/graphql")
+         {
+            auto result =
+                psio::gql_query(QueryRoot(), {request.body.data(), request.body.size()}, {});
+            return rpc_reply_data{
+                .contentType = "application/json",
+                .reply       = {result.data(), result.data() + result.size()},  // TODO: avoid copy
             };
          }
       }
