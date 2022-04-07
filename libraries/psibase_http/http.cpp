@@ -280,7 +280,7 @@ namespace psibase::http
             signed_transaction trx;
             action             act{
                             .sender   = AccountNumber(),
-                            .contract = rpcContractNum,
+                            .contract = proxyContractNum,
                             .raw_data = psio::convert_to_frac(data),
             };
             transaction_trace   trace;

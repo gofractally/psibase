@@ -4,7 +4,7 @@
 
 namespace psibase
 {
-   static constexpr auto rpcContractNum = AccountNumber("rpc-sys");
+   static constexpr auto proxyContractNum = AccountNumber("proxy-sys");
 
    struct verify_data
    {

@@ -1,8 +1,8 @@
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/auth_ec_sys.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
+#include <contracts/system/proxy_sys.hpp>
 #include <contracts/system/rpc_account_sys.hpp>
-#include <contracts/system/rpc_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/contract_entry.hpp>
@@ -64,14 +64,14 @@ void bootstrap_chain(system_context& system)
    {
       push_action(
           bc,
-          transactor<rpc_sys>(contract, rpcContractNum).register_contract(contract, rpc_contract));
+          transactor<proxy_sys>(contract, proxyContractNum).registerServer(contract, rpc_contract));
    };
 
    auto upload = [&](auto& bc, account_num contract, const char* path, const char* contentType,
                      const char* filename)
    {
       transactor<system_contract::rpc_account_sys> rasys(contract, contract);
-      push_action(bc, rasys.upload_rpc_sys(path, contentType, read_whole_file(filename)));
+      push_action(bc, rasys.uploadSys(path, contentType, read_whole_file(filename)));
    };
 
    block_context bc{system, true, true};
@@ -94,10 +94,10 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("account_sys.wasm"),
                     },
                     {
-                        .contract      = rpcContractNum,
+                        .contract      = proxyContractNum,
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
-                        .code          = read_whole_file("rpc_sys.wasm"),
+                        .code          = read_whole_file("proxy_sys.wasm"),
                     },
                     {
                         .contract      = system_contract::auth_fake_sys::contract,
@@ -136,12 +136,16 @@ void bootstrap_chain(system_context& system)
    AccountNumber                            account_rpc("account-rpc");
    transactor<system_contract::account_sys> asys(system_contract::account_sys::contract,
                                                  system_contract::account_sys::contract);
-   push_action(
-       bc, asys.startup(std::vector<AccountNumber>{
-               system_contract::transaction_sys::contract, system_contract::account_sys::contract,
-               AccountNumber("rpc"),  /// TODO: where do I get this constant?
-               system_contract::auth_fake_sys::contract, system_contract::auth_ec_sys::contract,
-               system_contract::verify_ec_sys::contract, roothost_rpc, account_rpc}));
+   push_action(bc, asys.startup(std::vector<AccountNumber>{
+                       system_contract::transaction_sys::contract,
+                       system_contract::account_sys::contract,
+                       proxyContractNum,
+                       system_contract::auth_fake_sys::contract,
+                       system_contract::auth_ec_sys::contract,
+                       system_contract::verify_ec_sys::contract,
+                       AccountNumber("roothost-sys"),
+                       AccountNumber("account-rpc"),
+                   }));
 
    reg_rpc(bc, roothost_rpc, roothost_rpc);
    upload(bc, roothost_rpc, "/", "text/html", "../contracts/user/rpc_roothost_sys/ui/index.html");

@@ -1,7 +1,7 @@
 #include "contracts/system/rpc_roothost_sys.hpp"
 
 #include <contracts/system/account_sys.hpp>
-#include <contracts/system/rpc_sys.hpp>
+#include <contracts/system/proxy_sys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
 
@@ -28,7 +28,7 @@ PSIO_REFLECT(WebContentRow, path, contentType, content)
 
 namespace psibase
 {
-   rpc_reply_data rpc_roothost_sys::rpc_sys(rpc_request_data request)
+   rpc_reply_data rpc_roothost_sys::serveSys(rpc_request_data request)
    {
       auto to_json = [](const auto& obj)
       {
@@ -84,11 +84,11 @@ namespace psibase
       }
 
       abort_message_str("not found");
-   }  // rpc_roothost_sys::rpc_sys
+   }  // rpc_roothost_sys::serveSys
 
-   void rpc_roothost_sys::upload_rpc_sys(psio::const_view<std::string>       path,
-                                         psio::const_view<std::string>       contentType,
-                                         psio::const_view<std::vector<char>> content)
+   void rpc_roothost_sys::uploadSys(psio::const_view<std::string>       path,
+                                    psio::const_view<std::string>       contentType,
+                                    psio::const_view<std::vector<char>> content)
    {
       check(get_sender() == get_receiver(), "wrong sender");
 

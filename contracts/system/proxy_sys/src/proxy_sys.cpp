@@ -1,4 +1,4 @@
-#include <contracts/system/rpc_sys.hpp>
+#include <contracts/system/proxy_sys.hpp>
 #include <psio/fracpack.hpp>
 
 #include <psibase/dispatch.hpp>
@@ -29,7 +29,7 @@ namespace psibase
    };
    PSIO_REFLECT(RegisteredContractRow, contract, rpcContract)
 
-   void rpc_sys::register_contract(AccountNumber contract, AccountNumber rpcContract)
+   void proxy_sys::registerServer(AccountNumber contract, AccountNumber rpcContract)
    {
       check(contract == get_sender(), "wrong sender");
       RegisteredContractRow row{
@@ -40,11 +40,11 @@ namespace psibase
    }
 }  // namespace psibase
 
-PSIBASE_DISPATCH(psibase::rpc_sys)
+PSIBASE_DISPATCH(psibase::proxy_sys)
 
 namespace psibase
 {
-   extern "C" [[clang::export_name("rpc")]] void rpc()
+   extern "C" [[clang::export_name("serve")]] void serve()
    {
       auto act = get_current_action();
       // TODO: use a view
@@ -67,8 +67,8 @@ namespace psibase
          abort_message_str("contract not registered: " + contract.str());
 
       // TODO: avoid repacking (both directions)
-      psibase::actor<rpc_interface> iface(act.contract, reg->rpcContract);
-      set_retval(iface.rpc_sys(req).unpack());
-   }  // rpc()
+      psibase::actor<ServerInterface> iface(act.contract, reg->rpcContract);
+      set_retval(iface.serveSys(req).unpack());
+   }  // serve()
 
 }  // namespace psibase

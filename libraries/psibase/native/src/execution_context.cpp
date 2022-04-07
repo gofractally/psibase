@@ -500,7 +500,7 @@ namespace psibase
    void execution_context::exec_rpc(action_context& act_context)
    {
       impl->exec(act_context, [&] {  //
-         (*impl->backend)(*impl, "env", "rpc");
+         (*impl->backend)(*impl, "env", "serve");
       });
    }
 }  // namespace psibase
