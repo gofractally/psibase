@@ -28,4 +28,8 @@ pub enum KvMap {
     /// Individual nodes may modify this map, expire data from this
     /// map, or wipe it entirely at will.
     WriteOnly,
+
+    /// This contains the block log. Transactions don't have access to
+    /// it, but RPC does.
+    BlockLog,
 }

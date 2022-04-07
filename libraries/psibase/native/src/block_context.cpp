@@ -84,6 +84,11 @@ namespace psibase
          status->chain_id = status->head->id;
       db.kv_put(status_row::kv_map, status->key(), *status);
 
+      // TODO: store block IDs somewhere?
+      // TODO: store block proofs somewhere
+      // TODO: avoid repacking
+      db.kv_put(kv_map::block_log, current.header.num, current);
+
       session.commit();
    }
 

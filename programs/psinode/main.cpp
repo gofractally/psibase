@@ -273,6 +273,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
       bootstrap_chain(*system);
 
    // TODO: temporary loop
+   // TODO: replay
    while (true)
    {
       std::this_thread::sleep_for(std::chrono::milliseconds{1000});
@@ -292,7 +293,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
             push_transaction(bc, entry);
 
          bc.commit();
-         std::cout << psio::convert_to_json((BlockHeader&)bc.current) << "\n";
+         std::cout << psio::convert_to_json(bc.current.header) << "\n";
       }
    }
 }
