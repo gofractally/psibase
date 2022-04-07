@@ -65,6 +65,19 @@ namespace psibase
                 .reply       = {js.begin(), js.end()},
             };
          }
+         if (request.target == "/common/rootdomain.mjs")
+         {
+            auto js = "export const rootdomain = '" + request.root_host + "';\n";
+            js +=
+                "export function siblingUrl(contract, path) {\n"
+                "    return location.protocol + '//' + (contract ? contract + '.' : '') +\n"
+                "           rootdomain + ':' + location.port + '/' + (path || '');\n"
+                "}\n";
+            return rpc_reply_data{
+                .contentType = "text/javascript",
+                .reply       = {js.begin(), js.end()},
+            };
+         }
       }
 
       if (request.method == "POST")
