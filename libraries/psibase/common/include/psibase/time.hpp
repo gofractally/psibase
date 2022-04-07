@@ -19,20 +19,8 @@ namespace psibase
 
    struct TimePointSec final
    {
-      uint32_t seconds = 0;
-      //auto operator <=> (const TimePointSec&)const = default;
-      friend bool operator==(const TimePointSec& a, const TimePointSec& b)
-      {
-         return a.seconds == b.seconds;
-      }
-      friend bool operator<(const TimePointSec& a, const TimePointSec& b)
-      {
-         return a.seconds < b.seconds;
-      }
-      friend bool operator!=(const TimePointSec& a, const TimePointSec& b)
-      {
-         return a.seconds != b.seconds;
-      }
+      uint32_t seconds                                = 0;
+      auto     operator<=>(const TimePointSec&) const = default;
    };
    PSIO_REFLECT(TimePointSec, seconds);
    EOSIO_REFLECT(TimePointSec, seconds);

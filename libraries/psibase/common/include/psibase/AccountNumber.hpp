@@ -12,19 +12,7 @@ namespace psibase
       constexpr explicit AccountNumber(uint64_t v) : value(v) {}
       constexpr explicit AccountNumber(std::string_view s) : value(name_to_number(s)) {}
       std::string str() const { return number_to_name(value); }
-      friend bool operator==(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value == b.value;
-      }
-      friend bool operator<(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value < b.value;
-      }
-      friend bool operator!=(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value != b.value;
-      }
-      //auto operator <=> (const AccountNumber&)const = default;
+      auto        operator<=>(const AccountNumber&) const = default;
    };
    PSIO_REFLECT(AccountNumber, value)
    EOSIO_REFLECT(AccountNumber, value) //Todo - remove when kv table uses PSIO
