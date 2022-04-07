@@ -41,13 +41,6 @@ namespace psibase
       return *top_traces[2 * num + 1];
    }
 
-   template <auto MemberPtr>
-   auto getReturnVal(const psibase::action_trace& actionTrace)
-   {
-      using T = decltype(psio::result_of(MemberPtr));
-      return psio::convert_from_frac<T>(actionTrace.raw_retval);
-   }
-
    std::vector<char> read_whole_file(std::string_view filename);
 
    int32_t execute(std::string_view command);
@@ -182,36 +175,6 @@ namespace psibase
       transaction_trace transact(std::vector<action>&& actions,
                                  const char*           expected_except = nullptr);
 
-      /**
-       * Pushes a transaction with action onto the chain and converts its return value.
-       * If no block is currently pending, starts one.
-       */
-      template <typename Action, typename... Args>
-      auto action_with_return(const Action& action, Args&&... args)
-      {
-         using Ret  = decltype(internal_use_do_not_use::get_return_type(Action::get_mem_ptr()));
-         auto trace = transact({action.to_action(std::forward<Args>(args)...)});
-         return convert_from_bin<Ret>(trace.action_traces[0].return_value);
-      }
-
-      template <typename Action, typename... Args>
-      auto act(const std::optional<std::vector<std::vector<char>>>& cfd,
-               const Action&                                        action,
-               Args&&... args)
-      {
-         using Ret  = decltype(internal_use_do_not_use::get_return_type(Action::get_mem_ptr()));
-         auto trace = this->trace(cfd, action, std::forward<Args>(args)...);
-         expect(trace);
-         if constexpr (!std::is_same_v<Ret, void>)
-         {
-            return convert_from_bin<Ret>(trace.action_traces[0].return_value);
-         }
-         else
-         {
-            return trace;
-         }
-      }
-
       template <typename Action, typename... Args>
       auto trace(const std::optional<std::vector<std::vector<char>>>& cfd,
                  const Action&                                        action,
@@ -235,13 +198,6 @@ namespace psibase
       auto trace(Action&& a)
       {
          return push_transaction(make_transaction({a}));
-      }
-
-      template <typename Action>
-      auto act(Action&& a)
-      {
-         transaction_trace trace = push_transaction(make_transaction({a}));
-         eosio::check(!trace.error.has_value(), *trace.error);
       }
 
       /**
