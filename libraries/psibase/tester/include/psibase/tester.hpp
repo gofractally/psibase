@@ -17,6 +17,15 @@ namespace psibase
       R get_return_type(R (C::*f)(Args...) const);
    }  // namespace internal_use_do_not_use
 
+   inline std::string show(bool include, transaction_trace t)
+   {
+      if (include || t.error)
+         std::cout << pretty_trace(trim_raw_data(t)) << "\n";
+      if (t.error)
+         return *t.error;
+      return {};
+   }
+
    inline const action_trace& get_top_action(transaction_trace& t, size_t num)
    {
       // TODO: redesign transaction_trace to make this easier

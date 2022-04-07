@@ -60,6 +60,7 @@ function(add suffix)
         add_library(nctestlib${suffix})
         target_sources(nctestlib${suffix} PRIVATE
             tester/src/tester.cpp
+            tester/src/DefaultTestChain.cpp
             contract/src/intrinsic.cpp
             ../eosiolib/tester/tester_intrinsics.cpp
             ../eosiolib/tester/wasi_polyfill/__wasi_args_get.cpp
@@ -95,6 +96,13 @@ function(add suffix)
             ../eosiolib/core/include
             ../eosiolib/contracts/include
             tester/include
+            ../../contracts/system/account_sys/include
+            ../../contracts/system/auth_ec_sys/include
+            ../../contracts/system/auth_fake_sys/include
+            ../../contracts/system/rpc_account_sys/include
+            ../../contracts/system/rpc_sys/include
+            ../../contracts/system/transaction_sys/include
+            ../../contracts/system/verify_ec_sys/include
         )
         target_include_directories(nctestlib${suffix} PRIVATE
             ../../contracts/system/verify_ec_sys/include
