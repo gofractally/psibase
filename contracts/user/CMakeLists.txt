@@ -50,6 +50,7 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
+    add_subdirectory(blocklog_sys)
     add_subdirectory(common_sys)
     add_subdirectory(exchange_sys)
     add_subdirectory(mincon)
