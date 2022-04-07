@@ -1,4 +1,4 @@
-import { postJsonGetJson, pushedSignedTransaction } from '/roothost/rpc.mjs';
+import { postJsonGetJson, pushedSignedTransaction } from '/common/rpc.mjs';
 
 const table = document.getElementById('accounts');
 const tbody = table.getElementsByTagName('tbody')[0];

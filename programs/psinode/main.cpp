@@ -118,10 +118,10 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("verify_ec_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber("roothost-sys"),
+                        .contract      = AccountNumber("common-sys"),
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
-                        .code          = read_whole_file("rpc_roothost_sys.wasm"),
+                        .code          = read_whole_file("common_sys.wasm"),
                     },
                     {
                         .contract      = AccountNumber("account-rpc"),
@@ -132,7 +132,7 @@ void bootstrap_chain(system_context& system)
                 },
         });
 
-   AccountNumber                            roothost_rpc("roothost-sys");
+   AccountNumber                            common_sys("common-sys");
    AccountNumber                            account_rpc("account-rpc");
    transactor<system_contract::account_sys> asys(system_contract::account_sys::contract,
                                                  system_contract::account_sys::contract);
@@ -143,16 +143,16 @@ void bootstrap_chain(system_context& system)
                        system_contract::auth_fake_sys::contract,
                        system_contract::auth_ec_sys::contract,
                        system_contract::verify_ec_sys::contract,
-                       AccountNumber("roothost-sys"),
+                       AccountNumber("common-sys"),
                        AccountNumber("account-rpc"),
                    }));
 
-   reg_rpc(bc, roothost_rpc, roothost_rpc);
-   upload(bc, roothost_rpc, "/", "text/html", "../contracts/user/rpc_roothost_sys/ui/index.html");
-   upload(bc, roothost_rpc, "/roothost/rpc.mjs", "text/javascript",
-          "../contracts/user/rpc_roothost_sys/roothost/rpc.mjs");
-   upload(bc, roothost_rpc, "/ui/index.js", "text/javascript",
-          "../contracts/user/rpc_roothost_sys/ui/index.js");
+   reg_rpc(bc, common_sys, common_sys);
+   upload(bc, common_sys, "/", "text/html", "../contracts/user/common_sys/ui/index.html");
+   upload(bc, common_sys, "/common/rpc.mjs", "text/javascript",
+          "../contracts/user/common_sys/common/rpc.mjs");
+   upload(bc, common_sys, "/ui/index.js", "text/javascript",
+          "../contracts/user/common_sys/ui/index.js");
 
    reg_rpc(bc, system_contract::account_sys::contract, account_rpc);
    upload(bc, account_rpc, "/", "text/html", "../contracts/system/rpc_account_sys/ui/index.html");

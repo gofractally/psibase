@@ -255,7 +255,7 @@ namespace psibase::http
 
          // TODO: simplify rule for separating native vs contract
          if (req.target() == "/" || req.target().starts_with("/rpc") ||
-             req.target().starts_with("/roothost") || req.target().starts_with("/ui") ||
+             req.target().starts_with("/common") || req.target().starts_with("/ui") ||
              host != server.http_config->host && host.ends_with(server.http_config->host) &&
                  !req.target().starts_with("/native"))
          {

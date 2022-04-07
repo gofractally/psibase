@@ -7,7 +7,7 @@ for (let contract of contracts) {
     let li = document.createElement('li');
     let a = document.createElement('a');
     a.appendChild(document.createTextNode(contract));
-    a.href = roothostUrl(contract);
+    a.href = siblingUrl(contract);
     li.appendChild(a);
     ul.appendChild(li);
 }

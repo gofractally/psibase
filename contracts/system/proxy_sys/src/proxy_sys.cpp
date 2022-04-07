@@ -38,12 +38,7 @@ namespace psibase
       };
       kv_put(row.key(get_receiver()), row);
    }
-}  // namespace psibase
 
-PSIBASE_DISPATCH(psibase::proxy_sys)
-
-namespace psibase
-{
    extern "C" [[clang::export_name("serve")]] void serve()
    {
       auto act = get_current_action();
@@ -53,13 +48,17 @@ namespace psibase
       std::string contractName;
 
       // Path reserved across all subdomains
-      if (req.target.starts_with("/roothost"))
-         contractName = "roothost-sys";
+      if (req.target.starts_with("/common"))
+         contractName = "common-sys";
+
+      // subdomain
       else if (req.host.size() > req.root_host.size() + 1 && req.host.ends_with(req.root_host) &&
                req.host[req.host.size() - req.root_host.size() - 1] == '.')
          contractName.assign(req.host.begin(), req.host.end() - req.root_host.size() - 1);
+
+      // root domain
       else
-         contractName = "roothost-sys";
+         contractName = "common-sys";
 
       auto contract = AccountNumber(contractName);
       auto reg      = kv_get<RegisteredContractRow>(registeredContractKey(act.contract, contract));
@@ -72,3 +71,5 @@ namespace psibase
    }  // serve()
 
 }  // namespace psibase
+
+PSIBASE_DISPATCH(psibase::proxy_sys)
