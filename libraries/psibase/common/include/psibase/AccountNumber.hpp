@@ -1,4 +1,5 @@
 #pragma once
+#include <compare>
 #include <psibase/name.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
@@ -15,7 +16,7 @@ namespace psibase
       auto        operator<=>(const AccountNumber&) const = default;
    };
    PSIO_REFLECT(AccountNumber, value)
-   EOSIO_REFLECT(AccountNumber, value) //Todo - remove when kv table uses PSIO
+   EOSIO_REFLECT(AccountNumber, value)  //Todo - remove when kv table uses PSIO
 
    // TODO: remove
    using account_num = AccountNumber;

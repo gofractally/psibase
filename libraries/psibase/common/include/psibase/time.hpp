@@ -1,4 +1,5 @@
 #pragma once
+#include <compare>
 
 #include <eosio/check.hpp>
 #include <eosio/reflection.hpp>
