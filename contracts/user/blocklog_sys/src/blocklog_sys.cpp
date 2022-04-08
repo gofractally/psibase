@@ -27,7 +27,7 @@ struct QueryRoot
 {
    std::string foo() const { return "bar"; }
 };
-PSIO_REFLECT_INTERFACE(QueryRoot, (foo, 0))
+PSIO_REFLECT(QueryRoot, method(foo))
 
 namespace system_contract
 {

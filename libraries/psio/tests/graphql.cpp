@@ -9,7 +9,7 @@ struct InputArg
    std::string one;
    std::string two;
 };
-PSIO_REFLECT_INTERFACE(InputArg, (one, 0), (two, 1))
+PSIO_REFLECT(InputArg, method(one), method(two))
 
 struct Account
 {
@@ -52,12 +52,12 @@ struct Root
    std::vector<Account> accounts;
 };
 
-PSIO_REFLECT_INTERFACE(Root,
-                       (world, 0),
-                       (hello, 1),
-                       (sum, 2, a, b),
-                       (cat, 3, arg),
-                       (getAccounts, 4, first, before, last, after))
+PSIO_REFLECT(Root,
+             method(world),
+             method(hello),
+             method(sum, a, b),
+             method(cat, arg),
+             method(getAccounts, first, before, last, after))
 
 TEST_CASE("graphql")
 {

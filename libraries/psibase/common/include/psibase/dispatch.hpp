@@ -28,7 +28,7 @@ namespace psibase
    /**
     *  This method is called when a contract receives a call and will
     *  and will call the proper method on Contact assuming Contract has
-    *  used the PSIO_REFLECT_INTERFACE macro.
+    *  used the PSIO_REFLECT macro.
     */
    template <typename Contract>
    void dispatch(account_num sender, account_num receiver)

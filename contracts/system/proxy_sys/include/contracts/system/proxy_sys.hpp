@@ -10,7 +10,7 @@ namespace psibase
    {
       rpc_reply_data serveSys(rpc_request_data request);
    };
-   PSIO_REFLECT_INTERFACE(ServerInterface, (serveSys, 0, request))
+   PSIO_REFLECT(ServerInterface, method(serveSys, request))
 
    // Contracts which support uploading files implement this
    struct ServerUploadInterface : psibase::contract
@@ -19,7 +19,7 @@ namespace psibase
                      psio::const_view<std::string>       contentType,
                      psio::const_view<std::vector<char>> content);
    };
-   PSIO_REFLECT_INTERFACE(ServerUploadInterface, (uploadSys, 0, path, contentType, content))
+   PSIO_REFLECT(ServerUploadInterface, method(uploadSys, path, contentType, content))
 
    struct proxy_sys : psibase::contract
    {
@@ -28,5 +28,5 @@ namespace psibase
       //    * contract/foo/bar/...
       void registerServer(account_num contract, account_num rpc_contract);
    };
-   PSIO_REFLECT_INTERFACE(proxy_sys, (registerServer, 0, contract, rpc_contract))
+   PSIO_REFLECT(proxy_sys, method(registerServer, contract, rpc_contract))
 }  // namespace psibase

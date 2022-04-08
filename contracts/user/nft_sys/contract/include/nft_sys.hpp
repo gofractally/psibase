@@ -47,12 +47,9 @@ namespace nft_sys
       tables db{contract};
    };
 
-   // clang-format off
-   PSIO_REFLECT_INTERFACE(nft_contract, 
-      (mint, 0, issuer, sub_id), 
-      (transfer, 1, actor, to, nid, memo),
-      (get_nft, 2, nft_id)
-   );
-   // clang-format on
+   PSIO_REFLECT(nft_contract,
+                method(mint, issuer, sub_id),
+                method(transfer, actor, to, nid, memo),
+                method(get_nft, nft_id));
 
 }  // namespace nft_sys

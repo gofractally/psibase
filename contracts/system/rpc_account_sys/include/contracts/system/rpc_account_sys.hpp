@@ -12,7 +12,7 @@ namespace system_contract
                                         psio::const_view<std::string>       contentType,
                                         psio::const_view<std::vector<char>> content);
    };
-   PSIO_REFLECT_INTERFACE(rpc_account_sys,
-                          (serveSys, 0, request),
-                          (uploadSys, 1, path, contentType, content))
+   PSIO_REFLECT(rpc_account_sys,
+                method(serveSys, request),
+                method(uploadSys, path, contentType, content))
 }  // namespace system_contract

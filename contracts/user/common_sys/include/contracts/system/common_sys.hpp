@@ -14,7 +14,7 @@ namespace psibase
                                psio::const_view<std::string>       contentType,
                                psio::const_view<std::vector<char>> content);
    };
-   PSIO_REFLECT_INTERFACE(common_sys,
-                          (serveSys, 0, request),
-                          (uploadSys, 1, path, contentType, content))
+   PSIO_REFLECT(common_sys,
+                method(serveSys, request),
+                method(uploadSys, path, contentType, content))
 }  // namespace psibase

@@ -22,5 +22,5 @@ namespace system_contract
                       std::vector<char>      code);
    };
 
-   PSIO_REFLECT_INTERFACE(transaction_sys, (setCode, 0, contact, vm_type, vm_version, code))
+   PSIO_REFLECT(transaction_sys, method(setCode, contact, vm_type, vm_version, code))
 }  // namespace system_contract

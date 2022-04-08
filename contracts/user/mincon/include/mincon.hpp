@@ -11,5 +11,5 @@ namespace company
       void                                      hello() { psibase::write_console("hello world"); }
    };
 
-   PSIO_REFLECT_INTERFACE(min_contract, (hello, 0))
+   PSIO_REFLECT(min_contract, method(hello))
 }  // namespace company

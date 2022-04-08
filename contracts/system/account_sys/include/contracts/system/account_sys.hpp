@@ -20,9 +20,9 @@ namespace system_contract
       bool exists(psibase::AccountNumber num);
    };
 
-   PSIO_REFLECT_INTERFACE(account_sys,
-                          (startup, 0, existing_accounts),
-                          (newAccount, 1, name, auth_contract, allow_sudo),
-                          (exists, 2, num))
+   PSIO_REFLECT(account_sys,
+                method(startup, existing_accounts),
+                method(newAccount, name, auth_contract, allow_sudo),
+                method(exists, num))
 
 }  // namespace system_contract
