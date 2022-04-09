@@ -163,7 +163,12 @@ namespace psibase::http
       {
       }
 
-      virtual ~server_impl() { stop(); }
+      virtual ~server_impl()
+      {
+         // TODO: BUG: refcount fell to 0, but threads haven't stopped
+         //            yet. A thread may try to bump it back up.
+         stop();
+      }
 
       bool start();
 
