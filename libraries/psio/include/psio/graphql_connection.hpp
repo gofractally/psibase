@@ -27,7 +27,7 @@ namespace psio
    template <typename Node>
    struct Connection
    {
-      using node_type = Node;
+      using NodeType = Node;
       std::vector<Edge<Node>> edges;
       PageInfo                pageInfo;
    };
@@ -38,31 +38,37 @@ namespace psio
    template <typename Connection,
              typename Key,
              typename T,
-             typename To_key,
-             typename To_node,
+             typename Iter,
+             typename Incr_Iter,
+             typename Decr_Iter,
+             typename Iter_to_key,
+             typename Iter_to_node,
              typename Lower_bound,
              typename Upper_bound>
-   Connection make_connection(const std::optional<Key>&         gt,
-                              const std::optional<Key>&         ge,
-                              const std::optional<Key>&         lt,
-                              const std::optional<Key>&         le,
-                              std::optional<uint32_t>           first,
-                              std::optional<uint32_t>           last,
-                              const std::optional<std::string>& before,
-                              const std::optional<std::string>& after,
-                              const T&                          container,
-                              To_key&&                          to_key,
-                              To_node&&                         to_node,
-                              Lower_bound&&                     lower_bound,
-                              Upper_bound&&                     upper_bound)
+   Connection makeConnection(const std::optional<Key>&         gt,
+                             const std::optional<Key>&         ge,
+                             const std::optional<Key>&         lt,
+                             const std::optional<Key>&         le,
+                             std::optional<uint32_t>           first,
+                             std::optional<uint32_t>           last,
+                             const std::optional<std::string>& before,
+                             const std::optional<std::string>& after,
+                             const Iter&                       containerBegin,
+                             const Iter&                       containerEnd,
+                             Incr_Iter                         incrIter,
+                             Decr_Iter                         decrIter,
+                             Iter_to_key                       iterToKey,
+                             Iter_to_node                      iterToNode,
+                             Lower_bound                       lowerBound,
+                             Upper_bound                       upperBound)
    {
       auto compare_it = [&](const auto& a, const auto& b)
       {
-         if (a == container.end())
+         if (a == containerEnd)
             return false;
-         if (b == container.end())
+         if (b == containerEnd)
             return true;
-         return to_key(*a) < to_key(*b);
+         return iterToKey(a) < iterToKey(b);
       };
       auto key_from_hex = [&](const std::optional<std::string>& s) -> std::optional<Key>
       {
@@ -76,39 +82,39 @@ namespace psio
          return {};
       };
 
-      auto rangeBegin = container.begin();
-      auto rangeEnd   = container.end();
+      auto rangeBegin = containerBegin;
+      auto rangeEnd   = containerEnd;
       if (ge)
-         rangeBegin = std::max(rangeBegin, lower_bound(container, *ge), compare_it);
+         rangeBegin = std::max(rangeBegin, lowerBound(*ge), compare_it);
       if (gt)
-         rangeBegin = std::max(rangeBegin, upper_bound(container, *gt), compare_it);
+         rangeBegin = std::max(rangeBegin, upperBound(*gt), compare_it);
       if (le)
-         rangeEnd = std::min(rangeEnd, upper_bound(container, *le), compare_it);
+         rangeEnd = std::min(rangeEnd, upperBound(*le), compare_it);
       if (lt)
-         rangeEnd = std::min(rangeEnd, lower_bound(container, *lt), compare_it);
+         rangeEnd = std::min(rangeEnd, lowerBound(*lt), compare_it);
       rangeEnd = std::max(rangeBegin, rangeEnd, compare_it);
 
       auto it  = rangeBegin;
       auto end = rangeEnd;
       if (auto key = key_from_hex(after))
-         it = std::clamp(upper_bound(container, *key), rangeBegin, rangeEnd, compare_it);
+         it = std::clamp(upperBound(*key), rangeBegin, rangeEnd, compare_it);
       if (auto key = key_from_hex(before))
-         end = std::clamp(lower_bound(container, *key), rangeBegin, rangeEnd, compare_it);
+         end = std::clamp(lowerBound(*key), rangeBegin, rangeEnd, compare_it);
       end = std::max(it, end, compare_it);
 
       Connection result;
       auto       add_edge = [&](const auto& it)
       {
-         auto bin    = to_bin(to_key(*it));
+         auto bin    = to_bin(iterToKey(it));
          auto cursor = to_hex(bin);
          result.edges.push_back(
-             Edge<typename Connection::node_type>{to_node(*it), std::move(cursor)});
+             Edge<typename Connection::NodeType>{iterToNode(it), std::move(cursor)});
       };
 
       if (last && !first)
       {
          result.pageInfo.hasNextPage = end != rangeEnd;
-         for (; it != end && (*last)-- > 0; --end)
+         for (; it != end && (*last)-- > 0; decrIter(end))
             add_edge(std::prev(end));
          result.pageInfo.hasPreviousPage = end != rangeBegin;
          std::reverse(result.edges.begin(), result.edges.end());
@@ -116,7 +122,7 @@ namespace psio
       else
       {
          result.pageInfo.hasPreviousPage = it != rangeBegin;
-         for (; it != end && (!first || (*first)-- > 0); ++it)
+         for (; it != end && (!first || (*first)-- > 0); incrIter(it))
             add_edge(it);
          result.pageInfo.hasNextPage = it != rangeEnd;
          if (last && *last < result.edges.size())
