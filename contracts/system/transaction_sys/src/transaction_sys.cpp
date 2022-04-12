@@ -9,8 +9,22 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
+static const auto& getStatus()
+{
+   static const auto status = kv_get<status_row>(status_row::kv_map, status_key());
+   return status;
+}
+
 namespace system_contract
 {
+   psibase::BlockNum transaction_sys::headBlockNum()
+   {
+      auto& stat = getStatus();
+      if (stat && stat->head)
+         return stat->head->header.num;
+      return 2;
+   }
+
    // TODO: move to another contract
    uint8_t transaction_sys::setCode(AccountNumber     contract,
                                     uint8_t           vm_type,

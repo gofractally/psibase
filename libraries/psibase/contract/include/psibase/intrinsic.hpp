@@ -1,6 +1,7 @@
 #pragma once
 
 #include <eosio/to_key.hpp>
+#include <psibase/AccountNumber.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 #include <psio/fracpack.hpp>
@@ -201,24 +202,24 @@ namespace psibase
    // Add a sequentially-numbered record. Returns the id.
    inline uint64_t kv_put_sequential_raw(kv_map map, eosio::input_stream value)
    {
-      return raw::kv_put_sequential_raw(map, value.pos, value.remaining());
+      return raw::kv_put_sequential(map, value.pos, value.remaining());
    }
 
    // Add a sequentially-numbered record. Returns the id.
    template <typename Type, typename V>
-   auto kv_put_sequential(kv_map     map,
-                          BlockNum   blockNum,
-                          AccountNum contract,
-                          Type       type,
-                          const V&   value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+   auto kv_put_sequential(kv_map        map,
+                          BlockNum      blockNum,
+                          AccountNumber contract,
+                          Type          type,
+                          const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
-      std::vector<char> packed(fracpack_size(blockNum) + fracpack_size(contract) +
-                               fracpack_size(type) + fracpack_size(value));
-      fast_buf_stream   stream(packed.data(), packed.size());
-      fracpack(blockNum, stream);
-      fracpack(contract, stream);
-      fracpack(type, stream);
-      fracpack(value, stream);
+      std::vector<char>     packed(psio::fracpack_size(blockNum) + psio::fracpack_size(contract) +
+                                   psio::fracpack_size(type) + psio::fracpack_size(value));
+      psio::fast_buf_stream stream(packed.data(), packed.size());
+      psio::fracpack(blockNum, stream);
+      psio::fracpack(contract, stream);
+      psio::fracpack(type, stream);
+      psio::fracpack(value, stream);
       return kv_put_sequential_raw(map, packed);
    }
 
@@ -330,36 +331,36 @@ namespace psibase
    // * If type is non-null, then it receives the record type. It is left untouched if either the record
    //   is not available or if matchContract is not null but doesn't match.
    template <typename V, typename Type>
-   inline std::optional<V> kv_get_sequential(kv_map            map,
-                                             uint64_t          id,
-                                             const AccountNum* matchContract = nullptr,
-                                             const Type*       matchType     = nullptr,
-                                             BlockNum*         blockNum      = nullptr,
-                                             AccountNum*       contract      = nullptr,
-                                             Type*             type          = nullptr)
+   inline std::optional<V> kv_get_sequential(kv_map               map,
+                                             uint64_t             id,
+                                             const AccountNumber* matchContract = nullptr,
+                                             const Type*          matchType     = nullptr,
+                                             BlockNum*            blockNum      = nullptr,
+                                             AccountNumber*       contract      = nullptr,
+                                             Type*                type          = nullptr)
    {
       std::optional<V> result;
       auto             v = kv_get_sequential_raw(map, id);
       if (!v)
          return result;
-      input_stream stream(v.data(), v.size());
+      psio::input_stream stream(v->data(), v->size());
 
-      BlockNum   bn;
-      AccountNum c;
+      BlockNum      bn;
+      AccountNumber c;
       fracunpack(bn, stream);
       fracunpack(c, stream);
       if (blockNum)
          *blockNum = bn;
       if (contract)
          *contract = c;
-      if (matchContract.value && matchContract != c)
+      if (matchContract && *matchContract != c)
          return result;
 
       Type t;
       fracunpack(t, stream);
       if (type)
          *type = t;
-      if (matchType.value && matchType != t)
+      if (matchType && *matchType != t)
          return result;
 
       result.emplace();
