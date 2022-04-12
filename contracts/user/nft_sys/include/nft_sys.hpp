@@ -115,18 +115,18 @@ namespace UserContract
    };
 
    // clang-format off
-   PSIO_REFLECT_INTERFACE(NftSys, 
-      (mint, 0), 
-      (burn, 1, nftId),
+   PSIO_REFLECT(NftSys, 
+      method(mint), 
+      method(burn, nftId),
 
-      (autodebit, 2, autodebit),
+      method(autodebit, autodebit),
 
-      (credit, 3, receiver, nftId, memo),
-      (uncredit, 4, nftId),
-      (debit, 5, nftId),
+      method(credit, receiver, nftId, memo),
+      method(uncredit, nftId),
+      method(debit, nftId),
       
-      (getNft, 6, nftId),
-      (isAutodebit, 7)
+      method(getNft, nftId),
+      method(isAutodebit)
    );
    // clang-format on
 
