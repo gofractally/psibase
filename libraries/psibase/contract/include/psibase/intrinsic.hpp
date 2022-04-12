@@ -1,6 +1,7 @@
 #pragma once
 
 #include <eosio/to_key.hpp>
+#include <psibase/AccountNumber.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 #include <psio/fracpack.hpp>
@@ -61,12 +62,20 @@ namespace psibase
                   const char* value,
                   uint32_t    value_len);
 
+      // Add a sequentially-numbered record. Returns the id.
+      PSIBASE_INTRINSIC(kv_put_sequential)
+      uint64_t kv_put_sequential(kv_map map, const char* value, uint32_t value_len);
+
       // Remove a key-value pair if it exists
       PSIBASE_INTRINSIC(kv_remove) void kv_remove(kv_map map, const char* key, uint32_t key_len);
 
       // Get a key-value pair, if any. If key exists, then sets result to value and
       // returns size. If key does not exist, returns -1 and clears result.
       PSIBASE_INTRINSIC(kv_get) uint32_t kv_get(kv_map map, const char* key, uint32_t key_len);
+
+      // Get a sequentially-numbered record. If id is available, then sets result to value and
+      // returns size. If id does not exist, returns -1 and clears result.
+      PSIBASE_INTRINSIC(kv_get_sequential) uint32_t kv_get_sequential(kv_map map, uint64_t id);
 
       // Get the first key-value pair which is greater than or equal to the provided
       // key. If one is found, and the first match_key_size bytes of the found key
@@ -190,6 +199,30 @@ namespace psibase
       kv_put(kv_map::contract, key, value);
    }
 
+   // Add a sequentially-numbered record. Returns the id.
+   inline uint64_t kv_put_sequential_raw(kv_map map, eosio::input_stream value)
+   {
+      return raw::kv_put_sequential(map, value.pos, value.remaining());
+   }
+
+   // Add a sequentially-numbered record. Returns the id.
+   template <typename Type, typename V>
+   auto kv_put_sequential(kv_map        map,
+                          BlockNum      blockNum,
+                          AccountNumber contract,
+                          Type          type,
+                          const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+   {
+      std::vector<char>     packed(psio::fracpack_size(blockNum) + psio::fracpack_size(contract) +
+                                   psio::fracpack_size(type) + psio::fracpack_size(value));
+      psio::fast_buf_stream stream(packed.data(), packed.size());
+      psio::fracpack(blockNum, stream);
+      psio::fracpack(contract, stream);
+      psio::fracpack(type, stream);
+      psio::fracpack(value, stream);
+      return kv_put_sequential_raw(map, packed);
+   }
+
    // Remove a key-value pair if it exists
    inline void kv_remove_raw(kv_map map, eosio::input_stream key)
    {
@@ -249,6 +282,7 @@ namespace psibase
       auto v = kv_get_raw(map, eosio::convert_to_key(key));
       if (!v)
          return std::nullopt;
+      // TODO: validate (allow opt-in or opt-out)
       return psio::convert_from_frac<V>(*v);
    }
 
@@ -276,6 +310,65 @@ namespace psibase
       return kv_get_or_default<V>(kv_map::contract, key);
    }
 
+   // Get a sequentially-numbered record, if available
+   inline std::optional<std::vector<char>> kv_get_sequential_raw(kv_map map, uint64_t id)
+   {
+      auto size = raw::kv_get_sequential(map, id);
+      if (size == -1)
+         return std::nullopt;
+      return get_result(size);
+   }
+
+   // Get a sequentially-numbered record, if available.
+   // * If matchContract is non-null, and the record wasn't written by matchContract, then return nullopt.
+   //   This prevents a spurious abort from mismatched serialization.
+   // * If matchType is non-null, and the record type doesn't match, then return nullopt.
+   //   This prevents a spurious abort from mismatched serialization.
+   // * If blockNum is non-null, then it receives the block number the record was written in. It is
+   //   left untouched if the record is not available.
+   // * If contract is non-null, then it receives the contract that wrote the record. It is
+   //   left untouched if the record is not available.
+   // * If type is non-null, then it receives the record type. It is left untouched if either the record
+   //   is not available or if matchContract is not null but doesn't match.
+   template <typename V, typename Type>
+   inline std::optional<V> kv_get_sequential(kv_map               map,
+                                             uint64_t             id,
+                                             const AccountNumber* matchContract = nullptr,
+                                             const Type*          matchType     = nullptr,
+                                             BlockNum*            blockNum      = nullptr,
+                                             AccountNumber*       contract      = nullptr,
+                                             Type*                type          = nullptr)
+   {
+      std::optional<V> result;
+      auto             v = kv_get_sequential_raw(map, id);
+      if (!v)
+         return result;
+      psio::input_stream stream(v->data(), v->size());
+
+      BlockNum      bn;
+      AccountNumber c;
+      fracunpack(bn, stream);
+      fracunpack(c, stream);
+      if (blockNum)
+         *blockNum = bn;
+      if (contract)
+         *contract = c;
+      if (matchContract && *matchContract != c)
+         return result;
+
+      Type t;
+      fracunpack(t, stream);
+      if (type)
+         *type = t;
+      if (matchType && *matchType != t)
+         return result;
+
+      result.emplace();
+      // TODO: validate (allow opt-in or opt-out)
+      fracunpack(*result, stream);
+      return result;
+   }
+
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
    // returns the value. Also sets key (use get_key). Otherwise returns nullopt.
@@ -298,6 +391,7 @@ namespace psibase
       auto v = kv_greater_equal_raw(map, eosio::convert_to_key(key), match_key_size);
       if (!v)
          return std::nullopt;
+      // TODO: validate (allow opt-in or opt-out)
       return psio::convert_from_frac<V>(*v);
    }
 
@@ -332,6 +426,7 @@ namespace psibase
       auto v = kv_less_than_raw(map, eosio::convert_to_key(key), match_key_size);
       if (!v)
          return std::nullopt;
+      // TODO: validate (allow opt-in or opt-out)
       return psio::convert_from_frac<V>(*v);
    }
 
@@ -362,6 +457,7 @@ namespace psibase
       auto v = kv_max_raw(map, eosio::convert_to_key(key));
       if (!v)
          return std::nullopt;
+      // TODO: validate (allow opt-in or opt-out)
       return psio::convert_from_frac<V>(*v);
    }
 

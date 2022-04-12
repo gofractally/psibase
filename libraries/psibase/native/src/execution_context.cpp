@@ -463,7 +463,7 @@ namespace psibase
       uint32_t kv_get_sequential(uint32_t map, uint64_t indexNumber)
       {
          auto m = get_map_read_sequential(map);
-         return set_result(db.kv_get_raw(get_map_read(map), eosio::convert_to_key(indexNumber)));
+         return set_result(db.kv_get_raw(m, eosio::convert_to_key(indexNumber)));
       }
 
       // TODO: don't let timer abort db operation
