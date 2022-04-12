@@ -70,15 +70,15 @@ namespace
    }
 }  // namespace
 
-psibase::TraceResult::TraceResult(transaction_trace&& t) : trace(t) {}
+psibase::TraceResult::TraceResult(transaction_trace&& t) : _t(t) {}
 
 bool psibase::TraceResult::succeeded()
 {
-   bool hasErrObj = (trace.error != std::nullopt);
-   bool failed    = hasErrObj && (*trace.error) != "";
+   bool hasErrObj = (_t.error != std::nullopt);
+   bool failed    = hasErrObj && (*_t.error) != "";
    if (failed)
    {
-      UNSCOPED_INFO("transaction failed with exception: " << *trace.error << "\n");
+      UNSCOPED_INFO("transaction failed: " << *_t.error << "\n");
    }
 
    return !failed;
@@ -86,24 +86,24 @@ bool psibase::TraceResult::succeeded()
 
 bool psibase::TraceResult::failed(std::string_view expected)
 {
-   bool failed = (trace.error != std::nullopt);
+   bool failed = (_t.error != std::nullopt);
    if (!failed)
    {
       UNSCOPED_INFO("transaction succeeded, but was expected to fail");
       return false;
    }
 
-   bool hasException = (failed && trace.error.has_value());
+   bool hasException = (failed && _t.error.has_value());
    if (hasException)
    {
-      if (trace.error->find(expected.data()) != std::string::npos)
+      if (_t.error->find(expected.data()) != std::string::npos)
       {
          return true;
       }
       else
       {
-         UNSCOPED_INFO("transaction was expected to fail exception: \""
-                       << expected << "\", but it failed exception: \"" << *trace.error << "\"\n");
+         UNSCOPED_INFO("transaction was expected to fail with: \""
+                       << expected << "\", but it failed with: \"" << *_t.error << "\"\n");
       }
    }
 

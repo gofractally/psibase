@@ -17,6 +17,10 @@ namespace psibase
       R get_return_type(R (C::*f)(Args...) const);
    }  // namespace internal_use_do_not_use
 
+   auto debugCounter = [i = 0](const std::string& prefix = "") mutable {
+      std::cout << "\n" << prefix << " DebugCounter " << ++i << "\n\n";
+   };
+
    inline std::string show(bool include, transaction_trace t)
    {
       if (include || t.error)
@@ -70,31 +74,56 @@ namespace psibase
     */
    Signature sign(const PrivateKey& key, const Checksum256& digest);
 
-   struct TraceResult
+   class TraceResult
    {
+     public:
       TraceResult(transaction_trace&& t);
       bool succeeded();
       bool failed(std::string_view expected);
       bool diskConsumed(const std::vector<std::pair<AccountNumber, int64_t>>& consumption);
 
-      transaction_trace trace;
+      const transaction_trace& trace() { return _t; }
+
+     protected:
+      transaction_trace _t;
    };
 
    template <typename ReturnType>
-   struct Result : TraceResult
+   class Result : public TraceResult
    {
-      Result(transaction_trace&& t) : TraceResult(std::forward<transaction_trace>(t))
+     public:
+      Result(transaction_trace&& t)
+          : TraceResult(std::forward<transaction_trace>(t)), _return(std::nullopt)
       {
          auto actionTrace = get_top_action(t, 0);
-         returnVal        = psio::convert_from_frac<ReturnType>(actionTrace.raw_retval);
+         if (actionTrace.raw_retval.size() != 0)
+         {
+            _return = psio::convert_from_frac<ReturnType>(actionTrace.raw_retval);
+         }
       }
 
-      ReturnType returnVal;
+      ReturnType returnVal()
+      {
+         if (_return.has_value())
+         {
+            return (*_return);
+         }
+         else
+         {
+            show(true, _t);
+            eosio::check(false, "Action aborted, no return value");
+            return ReturnType();  // Silence compiler warning
+         }
+      }
+
+     private:
+      std::optional<ReturnType> _return;
    };
 
    template <>
-   struct Result<void> : TraceResult
+   class Result<void> : public TraceResult
    {
+     public:
       Result(transaction_trace&& t) : TraceResult(std::forward<transaction_trace>(t)) {}
    };
 
@@ -231,7 +260,7 @@ namespace psibase
             auto act = action_builder_proxy(sender, receiver)
                            .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
 
-            return Result<result_type>{chain.trace(act)};
+            return Result<result_type>(chain.trace(act));
          }
       };
 
