@@ -1,9 +1,6 @@
 [submodule "external/rapidjson"]
 	path = external/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
-[submodule "external/eos"]
-	path = external/eos
-	url = https://github.com/eosnetworkfoundation/mandel.git
 [submodule "external/fmt"]
 	path = external/fmt
 	url = https://github.com/fmtlib/fmt.git
@@ -16,3 +13,6 @@
 [submodule "external/secp256k1"]
 	path = external/secp256k1
 	url = https://github.com/bitcoin-core/secp256k1.git
+[submodule "eos-vm"]
+	path = external/eos-vm
+	url = git@github.com:eosnetworkfoundation/mandel-eos-vm.git

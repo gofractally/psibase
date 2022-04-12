@@ -1,8 +1,8 @@
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/auth_ec_sys.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
+#include <contracts/system/proxy_sys.hpp>
 #include <contracts/system/rpc_account_sys.hpp>
-#include <contracts/system/rpc_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/contract_entry.hpp>
@@ -64,14 +64,14 @@ void bootstrap_chain(system_context& system)
    {
       push_action(
           bc,
-          transactor<rpc_sys>(contract, rpcContractNum).register_contract(contract, rpc_contract));
+          transactor<proxy_sys>(contract, proxyContractNum).registerServer(contract, rpc_contract));
    };
 
    auto upload = [&](auto& bc, account_num contract, const char* path, const char* contentType,
                      const char* filename)
    {
       transactor<system_contract::rpc_account_sys> rasys(contract, contract);
-      push_action(bc, rasys.upload_rpc_sys(path, contentType, read_whole_file(filename)));
+      push_action(bc, rasys.uploadSys(path, contentType, read_whole_file(filename)));
    };
 
    block_context bc{system, true, true};
@@ -94,10 +94,10 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("account_sys.wasm"),
                     },
                     {
-                        .contract      = rpcContractNum,
+                        .contract      = proxyContractNum,
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
-                        .code          = read_whole_file("rpc_sys.wasm"),
+                        .code          = read_whole_file("proxy_sys.wasm"),
                     },
                     {
                         .contract      = system_contract::auth_fake_sys::contract,
@@ -118,48 +118,57 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("verify_ec_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber("roothost-sys"),
+                        .contract      = AccountNumber("common-sys"),
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
-                        .code          = read_whole_file("rpc_roothost_sys.wasm"),
+                        .code          = read_whole_file("common_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber("account-rpc"),
+                        .contract      = AccountNumber("account-rpc"),  // TODO: need -sys suffix
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
                         .code          = read_whole_file("rpc_account_sys.wasm"),
                     },
+                    {
+                        .contract      = AccountNumber("blocklog-sys"),
+                        .auth_contract = system_contract::auth_fake_sys::contract,
+                        .flags         = 0,
+                        .code          = read_whole_file("blocklog_sys.wasm"),
+                    },
                 },
         });
 
-   AccountNumber                            roothost_rpc("roothost-sys");
+   AccountNumber                            common_sys("common-sys");
    AccountNumber                            account_rpc("account-rpc");
    transactor<system_contract::account_sys> asys(system_contract::account_sys::contract,
                                                  system_contract::account_sys::contract);
-   push_action(
-       bc, asys.startup(std::vector<AccountNumber>{
-               system_contract::transaction_sys::contract, system_contract::account_sys::contract,
-               AccountNumber("rpc"),  /// TODO: where do I get this constant?
-               system_contract::auth_fake_sys::contract, system_contract::auth_ec_sys::contract,
-               system_contract::verify_ec_sys::contract, roothost_rpc, account_rpc
-               //{20, "rpc.roothost.sys"},
-               //{21, "rpc.account.sys"},
-           }));
+   push_action(bc, asys.startup(std::vector<AccountNumber>{
+                       system_contract::transaction_sys::contract,
+                       system_contract::account_sys::contract,
+                       proxyContractNum,
+                       system_contract::auth_fake_sys::contract,
+                       system_contract::auth_ec_sys::contract,
+                       system_contract::verify_ec_sys::contract,
+                       AccountNumber("common-sys"),
+                       AccountNumber("account-rpc"),
+                   }));
 
-   reg_rpc(bc, roothost_rpc, roothost_rpc);
-   upload(bc, roothost_rpc, "/", "text/html", "../contracts/user/rpc_roothost_sys/ui/index.html");
-   upload(bc, roothost_rpc, "/ui/index.js", "text/javascript",
-          "../contracts/user/rpc_roothost_sys/ui/index.js");
+   reg_rpc(bc, common_sys, common_sys);
+   upload(bc, common_sys, "/", "text/html", "../contracts/user/common_sys/ui/index.html");
+   upload(bc, common_sys, "/common/rpc.mjs", "text/javascript",
+          "../contracts/user/common_sys/common/rpc.mjs");
+   upload(bc, common_sys, "/ui/index.js", "text/javascript",
+          "../contracts/user/common_sys/ui/index.js");
 
    reg_rpc(bc, system_contract::account_sys::contract, account_rpc);
    upload(bc, account_rpc, "/", "text/html", "../contracts/system/rpc_account_sys/ui/index.html");
-   upload(bc, account_rpc, "/ui/index.js", "text/html",
+   upload(bc, account_rpc, "/ui/index.js", "text/javascript",
           "../contracts/system/rpc_account_sys/ui/index.js");
 
-   push_action(bc, asys.newAccount(AccountNumber("alice"),
-                                   system_contract::transaction_sys::contract, false));
-   push_action(bc, asys.newAccount(AccountNumber("bob"), system_contract::transaction_sys::contract,
-                                   false));
+   reg_rpc(bc, "blocklog-sys"_a, "blocklog-sys"_a);
+   upload(bc, "blocklog-sys"_a, "/", "text/html", "../contracts/user/blocklog_sys/ui/index.html");
+   upload(bc, "blocklog-sys"_a, "/ui/index.js", "text/javascript",
+          "../contracts/user/blocklog_sys/ui/index.js");
 
    bc.commit();
 }
@@ -275,6 +284,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
       bootstrap_chain(*system);
 
    // TODO: temporary loop
+   // TODO: replay
    while (true)
    {
       std::this_thread::sleep_for(std::chrono::milliseconds{1000});
@@ -294,7 +304,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
             push_transaction(bc, entry);
 
          bc.commit();
-         std::cout << psio::convert_to_json((BlockHeader&)bc.current) << "\n";
+         std::cout << psio::convert_to_json(bc.current.header) << "\n";
       }
    }
 }

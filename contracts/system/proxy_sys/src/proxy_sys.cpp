@@ -1,4 +1,4 @@
-#include <contracts/system/rpc_sys.hpp>
+#include <contracts/system/proxy_sys.hpp>
 #include <psio/fracpack.hpp>
 
 #include <psibase/dispatch.hpp>
@@ -29,7 +29,7 @@ namespace psibase
    };
    PSIO_REFLECT(RegisteredContractRow, contract, rpcContract)
 
-   void rpc_sys::register_contract(AccountNumber contract, AccountNumber rpcContract)
+   void proxy_sys::registerServer(AccountNumber contract, AccountNumber rpcContract)
    {
       check(contract == get_sender(), "wrong sender");
       RegisteredContractRow row{
@@ -38,13 +38,8 @@ namespace psibase
       };
       kv_put(row.key(get_receiver()), row);
    }
-}  // namespace psibase
 
-PSIBASE_DISPATCH(psibase::rpc_sys)
-
-namespace psibase
-{
-   extern "C" [[clang::export_name("rpc")]] void rpc()
+   extern "C" [[clang::export_name("serve")]] void serve()
    {
       auto act = get_current_action();
       // TODO: use a view
@@ -53,13 +48,17 @@ namespace psibase
       std::string contractName;
 
       // Path reserved across all subdomains
-      if (req.target.starts_with("/roothost"))
-         contractName = "roothost-sys";
+      if (req.target.starts_with("/common"))
+         contractName = "common-sys";
+
+      // subdomain
       else if (req.host.size() > req.root_host.size() + 1 && req.host.ends_with(req.root_host) &&
                req.host[req.host.size() - req.root_host.size() - 1] == '.')
          contractName.assign(req.host.begin(), req.host.end() - req.root_host.size() - 1);
+
+      // root domain
       else
-         contractName = "roothost-sys";
+         contractName = "common-sys";
 
       auto contract = AccountNumber(contractName);
       auto reg      = kv_get<RegisteredContractRow>(registeredContractKey(act.contract, contract));
@@ -67,8 +66,10 @@ namespace psibase
          abort_message_str("contract not registered: " + contract.str());
 
       // TODO: avoid repacking (both directions)
-      psibase::actor<rpc_interface> iface(act.contract, reg->rpcContract);
-      set_retval(iface.rpc_sys(req).unpack());
-   }  // rpc()
+      psibase::actor<ServerInterface> iface(act.contract, reg->rpcContract);
+      set_retval(iface.serveSys(req).unpack());
+   }  // serve()
 
 }  // namespace psibase
+
+PSIBASE_DISPATCH(psibase::proxy_sys)

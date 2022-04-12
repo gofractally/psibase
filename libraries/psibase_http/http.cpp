@@ -163,7 +163,12 @@ namespace psibase::http
       {
       }
 
-      virtual ~server_impl() { stop(); }
+      virtual ~server_impl()
+      {
+         // TODO: BUG: refcount fell to 0, but threads haven't stopped
+         //            yet. A thread may try to bump it back up.
+         stop();
+      }
 
       bool start();
 
@@ -255,7 +260,7 @@ namespace psibase::http
 
          // TODO: simplify rule for separating native vs contract
          if (req.target() == "/" || req.target().starts_with("/rpc") ||
-             req.target().starts_with("/roothost") || req.target().starts_with("/ui") ||
+             req.target().starts_with("/common") || req.target().starts_with("/ui") ||
              host != server.http_config->host && host.ends_with(server.http_config->host) &&
                  !req.target().starts_with("/native"))
          {
@@ -280,7 +285,7 @@ namespace psibase::http
             signed_transaction trx;
             action             act{
                             .sender   = AccountNumber(),
-                            .contract = rpcContractNum,
+                            .contract = proxyContractNum,
                             .raw_data = psio::convert_to_frac(data),
             };
             transaction_trace   trace;

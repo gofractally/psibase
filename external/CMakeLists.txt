@@ -25,10 +25,9 @@ if(IS_NATIVE)
     find_package(Boost 1.67 REQUIRED COMPONENTS date_time filesystem chrono iostreams)
 
     if(NOT CLIO_ONLY)
-        add_library(eos-vm INTERFACE)
-        target_include_directories(eos-vm INTERFACE
-            ${ROOT_SOURCE_DIR}/external/eos/libraries/eos-vm/include
-        )
+        option(ENABLE_INSTALL "enable this library to be installed" OFF)
+        option(ENABLE_TOOLS "enable building of tools" OFF)
+        add_subdirectory(eos-vm)
 
         set(MDBX_OUTPUT_DIR ${ROOT_BINARY_DIR}/mdbx)
         set(MDBX_BUILD_TIMESTAMP unknown)

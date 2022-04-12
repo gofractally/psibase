@@ -5,6 +5,7 @@ function(add suffix)
     target_link_libraries(psibase${suffix} PUBLIC abieos${suffix} psio boost OpenSSL::Crypto)
     target_sources(psibase${suffix} PRIVATE
         common/src/crypto.cpp
+        common/src/time.cpp
         common/src/trace.cpp
     )
 

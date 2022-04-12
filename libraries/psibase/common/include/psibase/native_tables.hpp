@@ -9,9 +9,10 @@ namespace psibase
    // TODO: rename to make it clear it's only for native tables
    using table_num = uint16_t;
 
-   static constexpr table_num status_table  = 1;
-   static constexpr table_num account_table = 2;
-   static constexpr table_num code_table    = 3;
+   static constexpr table_num status_table        = 1;
+   static constexpr table_num account_table       = 2;
+   static constexpr table_num code_table          = 3;
+   static constexpr table_num databaseStatusTable = 4;
 
    inline auto status_key()
    {
@@ -81,4 +82,20 @@ namespace psibase
       auto                  key() const { return code_key(code_hash, vm_type, vm_version); }
    };
    PSIO_REFLECT(code_row, code_hash, vm_type, vm_version, ref_count, code)
+
+   inline auto databaseStatusKey()
+   {
+      return std::tuple{databaseStatusTable};
+   }
+   struct DatabaseStatusRow
+   {
+      uint64_t nextEventNumber = 1;
+
+      // This table is in native_constrained. The native code blocks contracts
+      // from writing to this since it could break backing stores.
+      static constexpr auto kv_map = psibase::kv_map::native_constrained;
+      static auto           key() { return databaseStatusKey(); }
+   };
+   PSIO_REFLECT(DatabaseStatusRow, nextEventNumber)
+
 }  // namespace psibase

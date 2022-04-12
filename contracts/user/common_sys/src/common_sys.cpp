@@ -1,7 +1,7 @@
-#include "contracts/system/rpc_roothost_sys.hpp"
+#include "contracts/system/common_sys.hpp"
 
 #include <contracts/system/account_sys.hpp>
-#include <contracts/system/rpc_sys.hpp>
+#include <contracts/system/proxy_sys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
 
@@ -28,7 +28,7 @@ PSIO_REFLECT(WebContentRow, path, contentType, content)
 
 namespace psibase
 {
-   rpc_reply_data rpc_roothost_sys::rpc_sys(rpc_request_data request)
+   rpc_reply_data common_sys::serveSys(rpc_request_data request)
    {
       auto to_json = [](const auto& obj)
       {
@@ -50,15 +50,28 @@ namespace psibase
             };
          }
 
-         if (request.target == "/roothost/roothost")
+         if (request.target == "/common/rootdomain")
             return to_json(request.root_host);
-         if (request.target == "/roothost/roothost.js")
+         if (request.target == "/common/rootdomain.js")
          {
-            auto js = "const roothost = '" + request.root_host + "';\n";
+            auto js = "const rootdomain = '" + request.root_host + "';\n";
             js +=
-                "function roothostUrl(contract, path) {\n"
+                "function siblingUrl(contract, path) {\n"
                 "    return location.protocol + '//' + (contract ? contract + '.' : '') +\n"
-                "           roothost + ':' + location.port + '/' + (path || '');\n"
+                "           rootdomain + ':' + location.port + '/' + (path || '');\n"
+                "}\n";
+            return rpc_reply_data{
+                .contentType = "text/javascript",
+                .reply       = {js.begin(), js.end()},
+            };
+         }
+         if (request.target == "/common/rootdomain.mjs")
+         {
+            auto js = "export const rootdomain = '" + request.root_host + "';\n";
+            js +=
+                "export function siblingUrl(contract, path) {\n"
+                "    return location.protocol + '//' + (contract ? contract + '.' : '') +\n"
+                "           rootdomain + ':' + location.port + '/' + (path || '');\n"
                 "}\n";
             return rpc_reply_data{
                 .contentType = "text/javascript",
@@ -70,7 +83,7 @@ namespace psibase
       if (request.method == "POST")
       {
          // TODO: move to an ABI wasm?
-         if (request.target == "/roothost/pack/signed_transaction")
+         if (request.target == "/common/pack/signed_transaction")
          {
             request.body.push_back(0);
             eosio::json_token_stream jstream{request.body.data()};
@@ -84,11 +97,11 @@ namespace psibase
       }
 
       abort_message_str("not found");
-   }  // rpc_roothost_sys::rpc_sys
+   }  // common_sys::serveSys
 
-   void rpc_roothost_sys::upload_rpc_sys(psio::const_view<std::string>       path,
-                                         psio::const_view<std::string>       contentType,
-                                         psio::const_view<std::vector<char>> content)
+   void common_sys::uploadSys(psio::const_view<std::string>       path,
+                              psio::const_view<std::string>       contentType,
+                              psio::const_view<std::vector<char>> content)
    {
       check(get_sender() == get_receiver(), "wrong sender");
 
@@ -109,4 +122,4 @@ namespace psibase
 
 }  // namespace psibase
 
-PSIBASE_DISPATCH(psibase::rpc_roothost_sys)
+PSIBASE_DISPATCH(psibase::common_sys)

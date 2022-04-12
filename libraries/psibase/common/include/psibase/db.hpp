@@ -13,5 +13,7 @@ namespace psibase
       subjective,            // Data that is not part of consensus
       write_only,            // Write-only during transactions. Readable during RPC,
                              //   also subjectively writable by node operator.
+      block_log,             // Not available during transactions. Readable during RPC.
+      event,                 // Events
    };
 }  // namespace psibase

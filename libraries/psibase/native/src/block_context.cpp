@@ -32,6 +32,13 @@ namespace psibase
          status.emplace();
          db.kv_put(status_row::kv_map, status->key(), *status);
       }
+      auto dbStatus = db.kv_get<DatabaseStatusRow>(DatabaseStatusRow::kv_map, databaseStatusKey());
+      if (!dbStatus)
+      {
+         dbStatus.emplace();
+         db.kv_put(DatabaseStatusRow::kv_map, dbStatus->key(), *dbStatus);
+      }
+      databaseStatus = *dbStatus;
 
       if (status->head)
       {
@@ -83,6 +90,11 @@ namespace psibase
       if (is_genesis_block)
          status->chain_id = status->head->id;
       db.kv_put(status_row::kv_map, status->key(), *status);
+
+      // TODO: store block IDs somewhere?
+      // TODO: store block proofs somewhere
+      // TODO: avoid repacking
+      db.kv_put(kv_map::block_log, current.header.num, current);
 
       session.commit();
    }

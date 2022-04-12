@@ -46,10 +46,8 @@ namespace symbol_sys
       tables db{contract};
    };
 
-   // clang-format off
-   PSIO_REFLECT_INTERFACE(symbol_contract, 
-      (create, 0, owner, max_supply)
-   );
-   // clang-format on
+   PSIO_REFLECT(  //
+       symbol_contract,
+       method(create, owner, max_supply));
 
 }  // namespace symbol_sys

@@ -17,8 +17,8 @@ namespace exchange_sys
    };
 
    // clang-format off
-   PSIO_REFLECT_INTERFACE(exchange_contract, 
-      (stub, 0)
+   PSIO_REFLECT(exchange_contract, 
+      method(stub)
    );
    // clang-format on
 

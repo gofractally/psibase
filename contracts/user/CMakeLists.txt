@@ -1,13 +1,14 @@
 function(add_user_contract suffix name)
     add_executable(${name}${suffix} ${ARGN})
-    target_include_directories(${name}${suffix} PUBLIC 
+    target_include_directories(${name}${suffix} PUBLIC
+        contract/include
         include
+        ../common_sys/include
+        ../exchange_sys/include
         ../name_sys/include
         ../nft_sys/include
-        ../rpc_roothost_sys/include
         ../symbol_sys/include
         ../tokens_sys/include
-        ../exchange_sys/include
         ../../system/account_sys/include
         ../../system/auth_ec_sys/include
         ../../system/auth_fake_sys/include
@@ -21,7 +22,7 @@ endfunction(add_user_contract)
 function(add_user_test suffix name)
     set(TARGET ${name}-test${suffix})
     add_executable(${TARGET} ${ARGN})
-    target_include_directories(${TARGET} PUBLIC 
+    target_include_directories(${TARGET} PUBLIC
       ../include
       ../../name_sys/include
       ../../nft_sys/include
@@ -49,11 +50,12 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
+    add_subdirectory(blocklog_sys)
+    add_subdirectory(common_sys)
     add_subdirectory(exchange_sys)
     add_subdirectory(mincon)
     add_subdirectory(name_sys)
     add_subdirectory(nft_sys)
-    add_subdirectory(rpc_roothost_sys)
     add_subdirectory(symbol_sys)
     add_subdirectory(tokens_sys)
 endif()

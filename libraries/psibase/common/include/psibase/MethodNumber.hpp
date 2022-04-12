@@ -14,19 +14,7 @@ namespace psibase
       {
       }
       std::string str() const { return psio::detail::number_to_method(value); }
-      friend bool operator==(const MethodNumber& a, const MethodNumber& b)
-      {
-         return a.value == b.value;
-      }
-      friend bool operator<(const MethodNumber& a, const MethodNumber& b)
-      {
-         return a.value < b.value;
-      }
-      friend bool operator!=(const MethodNumber& a, const MethodNumber& b)
-      {
-         return a.value != b.value;
-      }
-      //auto operator <=> (const MethodNumber&)const = default;
+      auto        operator<=>(const MethodNumber&) const = default;
    };
    PSIO_REFLECT(MethodNumber, value)
 

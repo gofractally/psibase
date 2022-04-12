@@ -4,6 +4,9 @@
  */
 #pragma once
 
+#include <stdint.h>
+#include <string.h>
+
 #if defined(COMPILING_NEWCHAIN_WASM)
 namespace psibase
 {

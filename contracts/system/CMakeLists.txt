@@ -11,8 +11,8 @@ function(add suffix)
         account_sys/include
         auth_ec_sys/include
         auth_fake_sys/include
+        proxy_sys/include
         rpc_account_sys/include
-        rpc_sys/include
         test/include
         transaction_sys/include
         verify_ec_sys/include
@@ -26,8 +26,8 @@ if(DEFINED IS_WASM)
     add_subdirectory(account_sys)
     add_subdirectory(auth_ec_sys)
     add_subdirectory(auth_fake_sys)
+    add_subdirectory(proxy_sys)
     add_subdirectory(rpc_account_sys)
-    add_subdirectory(rpc_sys)
     add_subdirectory(transaction_sys)
     add_subdirectory(verify_ec_sys)
 endif()

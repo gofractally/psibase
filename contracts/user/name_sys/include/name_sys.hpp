@@ -36,8 +36,8 @@ namespace name_sys
    };
 
    // clang-format off
-   PSIO_REFLECT_INTERFACE(name_contract, 
-      (create, 0, account, ram_payer)
+   PSIO_REFLECT(name_contract, 
+      method(create, account, ram_payer)
    );
    // clang-format on
 

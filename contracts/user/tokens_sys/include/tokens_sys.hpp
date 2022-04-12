@@ -85,10 +85,8 @@ namespace tokens_sys
       tables db{contract};
    };
 
-   // clang-format off
-   PSIO_REFLECT_INTERFACE(tokens_contract, 
-      (open, 0, account, token_id, storage_payer)
-   );
-   // clang-format on
+   PSIO_REFLECT(  //
+       tokens_contract,
+       method(open, account, token_id, storage_payer));
 
 }  // namespace tokens_sys

@@ -1,4 +1,5 @@
 #pragma once
+#include <compare>
 #include <psibase/name.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
@@ -12,22 +13,10 @@ namespace psibase
       constexpr explicit AccountNumber(uint64_t v) : value(v) {}
       constexpr explicit AccountNumber(std::string_view s) : value(name_to_number(s)) {}
       std::string str() const { return number_to_name(value); }
-      friend bool operator==(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value == b.value;
-      }
-      friend bool operator<(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value < b.value;
-      }
-      friend bool operator!=(const AccountNumber& a, const AccountNumber& b)
-      {
-         return a.value != b.value;
-      }
-      //auto operator <=> (const AccountNumber&)const = default;
+      auto        operator<=>(const AccountNumber&) const = default;
    };
    PSIO_REFLECT(AccountNumber, value)
-   EOSIO_REFLECT(AccountNumber, value) //Todo - remove when kv table uses PSIO
+   EOSIO_REFLECT(AccountNumber, value)  //Todo - remove when kv table uses PSIO
 
    // TODO: remove
    using account_num = AccountNumber;
@@ -44,6 +33,9 @@ namespace psibase
       result = AccountNumber{stream.get_string()};
    }
 
+   // TODO: This special rule causes kv sort order and AccountNumber::operator<=>()
+   //       to disagree. This will cause nasty headaches for someone.
+   // Fix:  Drop this overload and uncomment the byte swap in execution_context.
    template <typename S>
    void to_key(const AccountNumber& k, S& s)
    {

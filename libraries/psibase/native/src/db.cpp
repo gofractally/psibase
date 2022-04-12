@@ -32,27 +32,32 @@ namespace psibase
       const std::unique_ptr<mdbx::env_managed> state_env;
       const std::unique_ptr<mdbx::env_managed> subjective_env;
       const std::unique_ptr<mdbx::env_managed> write_only_env;
+      const std::unique_ptr<mdbx::env_managed> block_log_env;
       const mdbx::map_handle                   contract_map;
       const mdbx::map_handle                   native_constrained_map;
       const mdbx::map_handle                   native_unconstrained_map;
       const mdbx::map_handle                   subjective_map;
       const mdbx::map_handle                   write_only_map;
+      const mdbx::map_handle                   event_map;
+      const mdbx::map_handle                   block_log_map;
 
       shared_database_impl(const boost::filesystem::path& dir)
           : state_env{construct_env(dir / "state", 3)},
             subjective_env{construct_env(dir / "subjective")},
-            write_only_env{construct_env(dir / "write_only")},
+            write_only_env{construct_env(dir / "write_only", 2)},
+            block_log_env{construct_env(dir / "block_log")},
             contract_map{construct_kv_map(*state_env, "contract")},
             native_constrained_map{construct_kv_map(*state_env, "native_constrained")},
             native_unconstrained_map{construct_kv_map(*state_env, "native_unconstrained")},
             subjective_map{construct_kv_map(*subjective_env, nullptr)},
-            write_only_map{construct_kv_map(*write_only_env, nullptr)}
+            write_only_map{construct_kv_map(*write_only_env, "write_only")},
+            event_map{construct_kv_map(*write_only_env, "event")},
+            block_log_map{construct_kv_map(*block_log_env, nullptr)}
       {
       }
 
       mdbx::map_handle get_map(kv_map map)
       {
-         // TODO: switch to array
          if (map == kv_map::contract)
             return contract_map;
          if (map == kv_map::native_constrained)
@@ -63,6 +68,10 @@ namespace psibase
             return subjective_map;
          if (map == kv_map::write_only)
             return write_only_map;
+         if (map == kv_map::event)
+            return write_only_map;
+         if (map == kv_map::block_log)
+            return block_log_map;
          throw std::runtime_error("unknown kv_map");
       }
    };
@@ -78,13 +87,15 @@ namespace psibase
       std::vector<mdbx::txn_managed>   transactions;
       std::vector<mdbx::txn_managed>   write_only_transactions;
       std::optional<mdbx::txn_managed> subjective_transaction;
+      std::optional<mdbx::txn_managed> block_log_transaction;
       mdbx::cursor_managed             cursor;
 
       bool transactions_ok()
       {
          // This mismatch can occur if start_*() or commit() throw
          return transactions.size() == write_only_transactions.size() &&
-                transactions.empty() == !subjective_transaction.has_value();
+                transactions.empty() == !subjective_transaction.has_value() &&
+                transactions.empty() == !block_log_transaction.has_value();
       }
 
       bool transactions_available() { return transactions_ok() && !transactions.empty(); }
@@ -94,7 +105,11 @@ namespace psibase
          eosio::check(transactions_available(), "no active database transactions");
          if (map == kv_map::subjective)
             return *subjective_transaction;
+         else if (map == kv_map::block_log)
+            return *block_log_transaction;
          else if (map == kv_map::write_only)
+            return write_only_transactions.back();
+         else if (map == kv_map::event)
             return write_only_transactions.back();
          else
             return transactions.back();
@@ -115,6 +130,8 @@ namespace psibase
       impl->write_only_transactions.push_back(impl->shared.impl->write_only_env->start_read());
       if (!impl->subjective_transaction)
          impl->subjective_transaction.emplace(impl->shared.impl->subjective_env->start_read());
+      if (!impl->block_log_transaction)
+         impl->block_log_transaction.emplace(impl->shared.impl->block_log_env->start_read());
       return {this};
    }
 
@@ -126,6 +143,7 @@ namespace psibase
          impl->transactions.push_back(impl->shared.impl->state_env->start_write());
          impl->write_only_transactions.push_back(impl->shared.impl->write_only_env->start_write());
          impl->subjective_transaction.emplace(impl->shared.impl->subjective_env->start_write());
+         impl->block_log_transaction.emplace(impl->shared.impl->block_log_env->start_write());
       }
       else
       {
@@ -136,13 +154,31 @@ namespace psibase
       return {this};
    }
 
+   // TODO: consider flushing disk after each commit when
+   //       transactions.size() falls to 0.
    void database::commit(database::session&)
    {
       eosio::check(impl->transactions_available(), "no active database transactions during commit");
-      impl->transactions.back().commit();
-      impl->transactions.pop_back();
+      if (impl->transactions.size() == 1)
+      {
+         // Commit first to prevent consensus state from getting ahead of block
+         // log. If the consensus state fails to commit, then replaying the blocks
+         // can catch the consensus state back up on restart.
+         impl->block_log_transaction->commit();
+         impl->block_log_transaction.reset();
+      }
+
+      // Commit write-only before consensus state to prevent consensus from
+      // getting ahead. If write-only commits, but consensus state fails to
+      // commit, then replaying the block on restart will fix up the problem.
       impl->write_only_transactions.back().commit();
       impl->write_only_transactions.pop_back();
+
+      // Consensus state.
+      impl->transactions.back().commit();
+      impl->transactions.pop_back();
+
+      // It's no big deal if this fails to commit
       if (impl->transactions.empty())
       {
          impl->subjective_transaction->commit();
@@ -175,6 +211,8 @@ namespace psibase
          }
          impl->subjective_transaction.reset();
       }
+      if (impl->transactions.empty())
+         impl->block_log_transaction.reset();
    }
 
    void database::kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
