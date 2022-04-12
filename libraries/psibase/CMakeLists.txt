@@ -101,7 +101,7 @@ function(add suffix)
             ../../contracts/system/auth_ec_sys/include
             ../../contracts/system/auth_fake_sys/include
             ../../contracts/system/rpc_account_sys/include
-            ../../contracts/system/rpc_sys/include
+            ../../contracts/system/proxy_sys/include
             ../../contracts/system/transaction_sys/include
             ../../contracts/system/verify_ec_sys/include
         )

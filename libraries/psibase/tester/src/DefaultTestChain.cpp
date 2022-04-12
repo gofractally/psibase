@@ -13,8 +13,8 @@
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/auth_ec_sys.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
+#include <contracts/system/proxy_sys.hpp>
 #include <contracts/system/rpc_account_sys.hpp>
-#include <contracts/system/rpc_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
 
@@ -60,10 +60,10 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
                         .code          = read_whole_file("account_sys.wasm"),
                     },
                     {
-                        .contract      = system_contract::rpc_account_sys::contract,
+                        .contract      = proxyContractNum,
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
-                        .code          = read_whole_file("rpc_sys.wasm"),
+                        .code          = read_whole_file("proxy_sys.wasm"),
                     },
                     {
                         .contract      = system_contract::auth_fake_sys::contract,
@@ -97,12 +97,12 @@ void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
 
    auto trace = push_transaction(make_transaction(  //
        {asys.startup(std::vector<AccountNumber>{
-           {system_contract::transaction_sys::contract},
-           {system_contract::account_sys::contract},
-           {rpcContractNum},
-           {system_contract::auth_fake_sys::contract},
-           {system_contract::auth_ec_sys::contract},
-           {system_contract::verify_ec_sys::contract},
+           system_contract::transaction_sys::contract,
+           system_contract::account_sys::contract,
+           proxyContractNum,
+           system_contract::auth_fake_sys::contract,
+           system_contract::auth_ec_sys::contract,
+           system_contract::verify_ec_sys::contract,
        })}));
 
    eosio::check(psibase::show(show, trace) == "", "Failed to create system contract accounts");
