@@ -7,36 +7,52 @@
 
 namespace UserContract
 {
-   namespace Errors
-   {
-      std::string_view nftDNE                 = "NFT does not exist";
-      std::string_view debitRequiresCredit    = "NFT can only be debited after being credited";
-      std::string_view uncreditRequiresCredit = "NFT can only be uncredited after being credited";
-      std::string_view creditorIsDebitor      = "Creditor and debitor cannot be the same account";
-      std::string_view creditorAction         = "Only the creditor may perform this action";
+   // struct SharedRecord
+   // {
+   //    SharedAccount sa;
+   //    uint64_t      id;
 
-      // Todo: Move to somewhere common
-      std::string_view missingRequiredAuth = "Missing required authority";
+   //    static bool isValidKey(const uint64_t& id) { return id != 0; }
 
-   }  // namespace Errors
+   //    struct DiskUsage
+   //    {
+   //       static constexpr int64_t firstEmplace      = 100;
+   //       static constexpr int64_t subsequentEmplace = 100;
+   //       static constexpr int64_t update            = 100;
+   //    };
+
+   //    friend std::strong_ordering operator<=>(const SharedRecord&, const SharedRecord&) = default;
+   // };
+   // EOSIO_REFLECT(SharedRecord, sa, id);
+   // PSIO_REFLECT(SharedRecord, sa, id);
+
+   // using SharedTable_t = psibase::table<SharedRecord, &SharedRecord::sa, &SharedRecord::id>;
 
    using NID = uint64_t;  //TODO: change to 32 bit
-
-   struct AdRow
+   struct AdRecord
    {
       psibase::AccountNumber user;
       bool                   autodebit;
-   };
-   EOSIO_REFLECT(AdRow, user, autodebit);
-   PSIO_REFLECT(AdRow, user, autodebit);
 
-   using AdTable_t = psibase::table<AdRow, &AdRow::user>;
-   struct NftRow
+      struct DiskUsage
+      {
+         static constexpr int64_t firstEmplace      = 100;
+         static constexpr int64_t subsequentEmplace = 100;
+         static constexpr int64_t update            = 100;
+      };
+
+      friend std::strong_ordering operator<=>(const AdRecord&, const AdRecord&) = default;
+   };
+   EOSIO_REFLECT(AdRecord, user, autodebit);
+   PSIO_REFLECT(AdRecord, user, autodebit);
+
+   using AdTable_t = psibase::table<AdRecord, &AdRecord::user>;
+   struct NftRecord
    {
       NID                    id;
       psibase::AccountNumber issuer;
       psibase::AccountNumber owner;
-      psibase::AccountNumber approvedAccount;
+      psibase::AccountNumber creditedTo;
 
       static bool isValidKey(const NID& id) { return id != 0; }
 
@@ -47,40 +63,55 @@ namespace UserContract
          static constexpr int64_t update            = 100;
       };
 
-      friend std::strong_ordering operator<=>(const NftRow&, const NftRow&) = default;
+      friend std::strong_ordering operator<=>(const NftRecord&, const NftRecord&) = default;
    };
-   EOSIO_REFLECT(NftRow, id, issuer, owner, approvedAccount);
-   PSIO_REFLECT(NftRow, id, issuer, owner, approvedAccount);
+   EOSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
+   PSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
 
-   using nft_table_t = psibase::table<NftRow, &NftRow::id>;
+   using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;
 
-   using tables = psibase::contract_tables<nft_table_t, AdTable_t>;
+   using tables = psibase::contract_tables<NftTable_t, AdTable_t>;
    class NftSys : public psibase::contract
    {
      public:
       static constexpr psibase::AccountNumber contract = "nft-sys"_a;
 
-      using sub_id_type = uint32_t;
+      struct Errors
+      {
+         static constexpr std::string_view nftDNE = "NFT does not exist";
+         static constexpr std::string_view debitRequiresCredit =
+             "NFT can only be debited after being credited";
+         static constexpr std::string_view uncreditRequiresCredit =
+             "NFT can only be uncredited after being credited";
+         static constexpr std::string_view creditorIsDebitor =
+             "Creditor and debitor cannot be the same account";
+         static constexpr std::string_view creditorAction =
+             "Only the creditor may perform this action";
+         static constexpr std::string_view receiverDNE     = "Receiver DNE";
+         static constexpr std::string_view alreadyCredited = "NFT already credited to an account";
+
+         // Todo: Move to somewhere common
+         static constexpr std::string_view missingRequiredAuth = "Missing required authority";
+      };
 
       // Create a new NFT in issuer's scope, with sub_id 0
       NID  mint();
-      void burn(NID nftId){};
+      void burn(NID nftId);
 
-      void autodebit(bool autoDebit);
+      void autodebit(bool autodebit);
 
-      void credit(psibase::AccountNumber receiver, NID nftId, std::string memo) {}
-      void uncredit(psibase::AccountNumber receiver, NID nftId) {}
-      void debit(psibase::AccountNumber sender, NID nftId) {}
-
-      void approve(NID nftId, psibase::AccountNumber account) {}
-      void unapprove(NID nftId, psibase::AccountNumber account) {}
+      void credit(psibase::AccountNumber receiver, NID nftId, std::string memo);
+      void uncredit(NID nftId);
+      void debit(NID nftId);
 
       // Read-only interface
-      std::optional<NftRow> getNft(NID nftId);
-      int64_t               isAutodebit();
+      std::optional<NftRecord> getNft(NID nftId);
+      bool                     isAutodebit();
 
      private:
       tables db{contract};
+
+      bool _isAutoDebit(psibase::AccountNumber account);
    };
 
    // clang-format off
@@ -88,17 +119,14 @@ namespace UserContract
       (mint, 0), 
       (burn, 1, nftId),
 
-      (autodebit, 2, autoDebit),
+      (autodebit, 2, autodebit),
 
       (credit, 3, receiver, nftId, memo),
-      (uncredit, 4, receiver, nftId),
-      (debit, 5, sender, nftId),
+      (uncredit, 4, nftId),
+      (debit, 5, nftId),
       
-      (approve, 6, nftId, account),
-      (unapprove, 7, nftId, account),
-      
-      (getNft, 8, nftId),
-      (isAutodebit, 9)
+      (getNft, 6, nftId),
+      (isAutodebit, 7)
    );
    // clang-format on
 
