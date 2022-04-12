@@ -33,6 +33,9 @@ namespace psibase
       result = AccountNumber{stream.get_string()};
    }
 
+   // TODO: This special rule causes kv sort order and AccountNumber::operator<=>()
+   //       to disagree. This will cause nasty headaches for someone.
+   // Fix:  Drop this overload and uncomment the byte swap in execution_context.
    template <typename S>
    void to_key(const AccountNumber& k, S& s)
    {
