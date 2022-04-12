@@ -15,7 +15,8 @@ namespace psibase
       psibase::system_context& system_context;
       database                 db;
       database::session        session;
-      block                    current;
+      Block                    current;
+      DatabaseStatusRow        databaseStatus;
       bool                     is_producing        = false;
       bool                     is_read_only        = false;
       bool                     is_genesis_block    = false;

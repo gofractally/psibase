@@ -228,7 +228,14 @@ namespace psibase
          }
          if (map == uint32_t(kv_map::write_only) && trx_context.block_context.is_read_only)
             return (kv_map)map;
-         throw std::runtime_error("contract may not read this map");
+         throw std::runtime_error("contract may not read this map, or must use another intrinsic");
+      }
+
+      kv_map get_map_read_sequential(uint32_t map)
+      {
+         if (map == uint32_t(kv_map::event) && trx_context.block_context.is_read_only)
+            return (kv_map)map;
+         throw std::runtime_error("contract may not read this map, or must use another intrinsic");
       }
 
       kv_map get_map_write(uint32_t map, eosio::input_stream key)
@@ -262,12 +269,24 @@ namespace psibase
          if (map == uint32_t(kv_map::native_unconstrained) &&
              (contract_account.flags & account_row::allow_write_native))
             return (kv_map)map;
-         throw std::runtime_error("contract may not write this map");
+         throw std::runtime_error("contract may not write this map, or must use another intrinsic");
+      }
+
+      kv_map get_map_write_sequential(uint32_t map)
+      {
+         eosio::check(!trx_context.block_context.is_read_only, "writes disabled during query");
+
+         if (map == uint32_t(kv_map::event))
+            return (kv_map)map;
+         throw std::runtime_error("contract may not write this map, or must use another intrinsic");
       }
 
       void verify_write_constrained(eosio::input_stream key, eosio::input_stream value)
       {
-         // Only the code table currently lives in native_constrained
+         // Currently, code is the only table which lives in native_constrained
+         // which is writable by contracts. The other tables aren't writable by
+         // contracts.
+         //
          // TODO: use a view here instead of unpacking to a rich object
          // TODO: verify fracpack; no unknown
          auto code = psio::convert_from_frac<code_row>(psio::input_stream(value.pos, value.end));
@@ -403,6 +422,30 @@ namespace psibase
       }
 
       // TODO: track consumption
+      // TODO: restrict value size
+      // TODO: don't let timer abort db operation
+      uint64_t kv_put_sequential(uint32_t map, span<const char> value)
+      {
+         auto m = get_map_write_sequential(map);
+
+         eosio::input_stream v{value.data(), value.size()};
+         eosio::check(v.remaining() >= sizeof(BlockNum) + sizeof(AccountNumber::value),
+                      "value prefix must match block number and contract during write");
+         auto blockNum = eosio::from_bin<BlockNum>(v);
+         auto contract = eosio::from_bin<AccountNumber>(v);
+         eosio::check(blockNum == trx_context.block_context.current.header.num &&
+                          contract == contract_account.num,
+                      "value prefix must match block number and contract during write");
+
+         auto& dbStatus    = trx_context.block_context.databaseStatus;
+         auto  indexNumber = dbStatus.nextEventNumber++;
+         db.kv_put(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
+
+         db.kv_put_raw(m, eosio::convert_to_key(indexNumber), {value.data(), value.size()});
+         return indexNumber;
+      }  // kv_put_sequential()
+
+      // TODO: track consumption
       // TODO: don't let timer abort db operation
       void kv_remove(uint32_t map, span<const char> key)
       {
@@ -414,6 +457,13 @@ namespace psibase
       uint32_t kv_get(uint32_t map, span<const char> key)
       {
          return set_result(db.kv_get_raw(get_map_read(map), {key.data(), key.size()}));
+      }
+
+      // TODO: don't let timer abort db operation
+      uint32_t kv_get_sequential(uint32_t map, uint64_t indexNumber)
+      {
+         auto m = get_map_read_sequential(map);
+         return set_result(db.kv_get_raw(get_map_read(map), eosio::convert_to_key(indexNumber)));
       }
 
       // TODO: don't let timer abort db operation
@@ -462,8 +512,10 @@ namespace psibase
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
       rhf_t::add<&execution_context_impl::kv_put>("env", "kv_put");
+      rhf_t::add<&execution_context_impl::kv_put_sequential>("env", "kv_put_sequential");
       rhf_t::add<&execution_context_impl::kv_remove>("env", "kv_remove");
       rhf_t::add<&execution_context_impl::kv_get>("env", "kv_get");
+      rhf_t::add<&execution_context_impl::kv_get_sequential>("env", "kv_get_sequential");
       rhf_t::add<&execution_context_impl::kv_greater_equal>("env", "kv_greater_equal");
       rhf_t::add<&execution_context_impl::kv_less_than>("env", "kv_less_than");
       rhf_t::add<&execution_context_impl::kv_max>("env", "kv_max");

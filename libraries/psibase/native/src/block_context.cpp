@@ -32,6 +32,13 @@ namespace psibase
          status.emplace();
          db.kv_put(status_row::kv_map, status->key(), *status);
       }
+      auto dbStatus = db.kv_get<DatabaseStatusRow>(DatabaseStatusRow::kv_map, databaseStatusKey());
+      if (!dbStatus)
+      {
+         dbStatus.emplace();
+         db.kv_put(DatabaseStatusRow::kv_map, dbStatus->key(), *dbStatus);
+      }
+      databaseStatus = *dbStatus;
 
       if (status->head)
       {

@@ -38,25 +38,26 @@ namespace psibase
       const mdbx::map_handle                   native_unconstrained_map;
       const mdbx::map_handle                   subjective_map;
       const mdbx::map_handle                   write_only_map;
+      const mdbx::map_handle                   event_map;
       const mdbx::map_handle                   block_log_map;
 
       shared_database_impl(const boost::filesystem::path& dir)
           : state_env{construct_env(dir / "state", 3)},
             subjective_env{construct_env(dir / "subjective")},
-            write_only_env{construct_env(dir / "write_only")},
+            write_only_env{construct_env(dir / "write_only", 2)},
             block_log_env{construct_env(dir / "block_log")},
             contract_map{construct_kv_map(*state_env, "contract")},
             native_constrained_map{construct_kv_map(*state_env, "native_constrained")},
             native_unconstrained_map{construct_kv_map(*state_env, "native_unconstrained")},
             subjective_map{construct_kv_map(*subjective_env, nullptr)},
-            write_only_map{construct_kv_map(*write_only_env, nullptr)},
+            write_only_map{construct_kv_map(*write_only_env, "write_only")},
+            event_map{construct_kv_map(*write_only_env, "event")},
             block_log_map{construct_kv_map(*block_log_env, nullptr)}
       {
       }
 
       mdbx::map_handle get_map(kv_map map)
       {
-         // TODO: switch to array
          if (map == kv_map::contract)
             return contract_map;
          if (map == kv_map::native_constrained)
@@ -66,6 +67,8 @@ namespace psibase
          if (map == kv_map::subjective)
             return subjective_map;
          if (map == kv_map::write_only)
+            return write_only_map;
+         if (map == kv_map::event)
             return write_only_map;
          if (map == kv_map::block_log)
             return block_log_map;
@@ -105,6 +108,8 @@ namespace psibase
          else if (map == kv_map::block_log)
             return *block_log_transaction;
          else if (map == kv_map::write_only)
+            return write_only_transactions.back();
+         else if (map == kv_map::event)
             return write_only_transactions.back();
          else
             return transactions.back();

@@ -5,7 +5,8 @@
 /// use when invoking those intrinsics.
 #[repr(u32)]
 pub enum KvMap {
-    /// Most contracts should store their tables here.
+    /// Most contracts should store their tables here. The first 64
+    /// bits of the key match the contract.
     Contract,
 
     /// Native tables which enforce constraints during write. Only
@@ -32,4 +33,20 @@ pub enum KvMap {
     /// This contains the block log. Transactions don't have access to
     /// it, but RPC does.
     BlockLog,
+
+    /// Write-only during transactions, and read-only during RPC.
+    /// Individual nodes may modify this map, expire data from this
+    /// map, or wipe it entirely at will.
+    ///
+    /// TODO: this policy may eventually change to allow time-limited
+    /// or capacity-limited read access during transactions.
+    ///
+    /// Key is an auto-incremented, 64-bit unsigned number. The
+    /// value must begin with:
+    ///     * 32 bit: block number
+    ///     * 64 bit: contract
+    /// Only usable with these intrinsics:
+    ///     * kv_put_sequential
+    ///     * kv_get_sequential
+    Event,
 }
