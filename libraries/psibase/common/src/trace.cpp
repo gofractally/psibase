@@ -78,6 +78,13 @@ namespace psibase
       }
    }
 
+   std::string pretty_trace(const action_trace& atrace, const std::string& indent)
+   {
+      std::string result;
+      pretty_trace(result, atrace, indent);
+      return result;
+   }
+
    std::string pretty_trace(const transaction_trace& ttrace, const std::string& indent)
    {
       std::string result;
