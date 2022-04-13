@@ -22,9 +22,9 @@ jobs:
       - name: Build
         run: |
           set -e
-          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
-          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} ${UBUNTU_2004_IMAGE}"
-          docker pull ${UBUNTU_2004_IMAGE}
+          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} --user $(id -u):$(id -g) jamesmart/cpp-dev-env:latest"
+          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} jamesmart/cpp-dev-env:latest"
+          docker pull jamesmart/cpp-dev-env:latest
           echo =====
           ${DOCKER}
           echo =====
