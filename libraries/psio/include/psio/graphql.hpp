@@ -30,6 +30,12 @@ namespace psio
       return true;
    }
 
+   template <std::size_t Size>
+   constexpr bool use_json_string_for_gql(std::array<unsigned char, Size>*)
+   {
+      return true;
+   }
+
    template <typename T>
    auto get_gql_name(T*) -> std::enable_if_t<use_json_string_for_gql((T*)nullptr), const char*>
    {

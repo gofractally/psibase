@@ -228,6 +228,8 @@ namespace psibase
          }
          if (map == uint32_t(kv_map::write_only) && trx_context.block_context.is_read_only)
             return (kv_map)map;
+         if (map == uint32_t(kv_map::block_log) && trx_context.block_context.is_read_only)
+            return (kv_map)map;
          throw std::runtime_error("contract may not read this map, or must use another intrinsic");
       }
 
