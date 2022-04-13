@@ -38,7 +38,7 @@ const App = () => {
                 <tbody>
                     <tr>
                         <th style=${tdStyle}>Block</th>
-                        <th style=${tdStyle}>Id</th>
+                        <th style=${tdStyle}>Previous</th>
                         <th style=${tdStyle}>Time</th>
                     </tr>
                     ${pagedResult.result.data?.blocks.edges.map?.(e => html`<tr>
