@@ -110,9 +110,9 @@ namespace psibase
    // TODO: Consider placing consensus alg in a contract; might affect how header is laid out.
    struct BlockHeader
    {
-      Checksum256  previous;
-      block_num    num = 0;  // TODO: pack into previous instead?
-      TimePointSec time;     // TODO: switch to microseconds
+      Checksum256  previous = {};
+      block_num    num      = 0;  // TODO: pack into previous instead?
+      TimePointSec time;          // TODO: switch to microseconds
    };
    EOSIO_REFLECT(BlockHeader, previous, num, time)
    PSIO_REFLECT(BlockHeader, previous, num, time)
