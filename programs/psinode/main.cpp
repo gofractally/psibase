@@ -157,6 +157,8 @@ void bootstrap_chain(system_context& system)
    upload(bc, common_sys, "/", "text/html", "../contracts/user/common_sys/ui/index.html");
    upload(bc, common_sys, "/common/rpc.mjs", "text/javascript",
           "../contracts/user/common_sys/common/rpc.mjs");
+   upload(bc, common_sys, "/common/useGraphQLQuery.mjs", "text/javascript",
+          "../contracts/user/common_sys/common/useGraphQLQuery.mjs");
    upload(bc, common_sys, "/ui/index.js", "text/javascript",
           "../contracts/user/common_sys/ui/index.js");
 
