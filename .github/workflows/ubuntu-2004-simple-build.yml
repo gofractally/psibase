@@ -1,0 +1,37 @@
+
+name: CheckBuild
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  workflow_dispatch:
+
+jobs:
+  ubuntu-2004-build:
+    name: Ubuntu 20.04 | Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Build
+        run: |
+          set -e
+          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
+          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} ${UBUNTU_2004_IMAGE}"
+          docker pull ${UBUNTU_2004_IMAGE}
+          echo =====
+          ${DOCKER}
+          echo =====
+          mkdir build
+          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release .."
+          echo =====
+          ${DOCKER} bash -c "cd build && make -j $(nproc)"
+          echo =====
+          ls -la ${GITHUB_WORKSPACE}
+          echo =====
