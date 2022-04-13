@@ -115,7 +115,7 @@ namespace psibase
       TimePointSec time;     // TODO: switch to microseconds
    };
    EOSIO_REFLECT(BlockHeader, previous, num, time)
-   PSIO_REFLECT(BlockHeader, /*previous,*/ num, time)
+   PSIO_REFLECT(BlockHeader, previous, num, time)
 
    struct Block
    {

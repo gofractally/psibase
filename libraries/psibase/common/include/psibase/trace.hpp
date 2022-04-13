@@ -60,5 +60,6 @@ namespace psibase
    void pretty_trace(std::string&             dest,
                      const transaction_trace& ttrace,
                      const std::string&       indent = "");
+   std::string pretty_trace(const action_trace& atrace, const std::string& indent = "");
    std::string pretty_trace(const transaction_trace& ttrace, const std::string& indent = "");
 }  // namespace psibase

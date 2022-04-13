@@ -34,17 +34,18 @@ struct Root
                                       std::optional<int>         last,
                                       std::optional<std::string> after) const
    {
-      return psio::make_connection<ChainAccountConnection, std::string>(
-          {}, {}, {}, {}, first, last, before, after, accounts, [](auto e) { return e.firstName; },
-          [](auto e) { return e; },
-          [](const auto& container, auto key)
+      return psio::makeConnection<ChainAccountConnection, std::string>(
+          {}, {}, {}, {}, first, last, before, after, accounts.begin(), accounts.end(),
+          [](auto& it) { ++it; }, [](auto& it) { --it; }, [](auto e) { return e->firstName; },
+          [](auto e) { return *e; },
+          [this](auto key)
           {
-             return std::lower_bound(container.begin(), container.end(), Account{key},
+             return std::lower_bound(accounts.begin(), accounts.end(), Account{key},
                                      [](auto a, auto b) { return a.firstName < b.firstName; });
           },
-          [](const auto& container, auto key)
+          [this](auto key)
           {
-             return std::upper_bound(container.begin(), container.end(), Account{key},
+             return std::upper_bound(accounts.begin(), accounts.end(), Account{key},
                                      [](auto a, auto b) { return a.firstName < b.firstName; });
           });
    }

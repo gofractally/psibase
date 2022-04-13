@@ -33,7 +33,7 @@ function(native_and_wasm_test N)
     )
 endfunction()
 
-find_package(Boost 1.40 REQUIRED)
+find_package(Boost 1.72 REQUIRED)
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${Boost_INCLUDE_DIR})
 target_link_libraries(boost INTERFACE ${Boost_LIBRARIES})
