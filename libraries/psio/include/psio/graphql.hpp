@@ -19,7 +19,10 @@ namespace psio
       return false;
    }
 
-   //inline constexpr bool use_json_string_for_gql(public_key*) { return true; }
+   inline constexpr bool use_json_string_for_gql(std::vector<char>*)
+   {
+      return true;
+   }
 
    template <std::size_t Size>
    constexpr bool use_json_string_for_gql(std::array<char, Size>*)
@@ -237,7 +240,7 @@ namespace psio
       char             current_puncuator = 0;
 
       gql_stream(input_stream input) : input{input} { skip(); }
-      gql_stream(const gql_stream&) = default;
+      gql_stream(const gql_stream&)            = default;
       gql_stream& operator=(const gql_stream&) = default;
 
       void skip()
@@ -616,7 +619,7 @@ namespace psio
 
    template <typename T, typename OS, typename E>
    auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
-       -> std::enable_if_t<is_std_vector<T>::value, bool>
+       -> std::enable_if_t<is_std_vector<T>::value && !use_json_string_for_gql((T*)nullptr), bool>
    {
       output_stream.write('[');
       bool first = true;

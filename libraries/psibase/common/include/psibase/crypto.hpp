@@ -22,12 +22,15 @@ namespace psibase
       return sha256(bin.data(), bin.size());
    }
 
+   // TODO: wrap variant in struct to prevent type ambiguities (variant<array, array>)
    using EccPublicKey = std::array<uint8_t, 33>;
    using PublicKey    = std::variant<EccPublicKey, EccPublicKey>;  // k1, r1
 
+   // TODO: wrap variant in struct to prevent type ambiguities (variant<array, array>)
    using EccPrivateKey = std::array<uint8_t, 32>;
    using PrivateKey    = std::variant<EccPrivateKey, EccPrivateKey>;  // k1, r1
 
+   // TODO: wrap variant in struct to prevent type ambiguities (variant<array, array>)
    using EccSignature = std::array<uint8_t, 64>;
    using Signature    = std::variant<EccSignature, EccSignature>;  // k1, r1
 
@@ -49,6 +52,10 @@ namespace psibase
       auto s = stream.get_string();
       obj    = publicKeyFromString(s);
    }
+   inline constexpr bool use_json_string_for_gql(PublicKey*)
+   {
+      return true;
+   }
 
    template <typename S>
    void to_json(const PrivateKey& obj, S& stream)
@@ -60,6 +67,10 @@ namespace psibase
    {
       obj = privateKeyFromString(stream.get_string());
    }
+   inline constexpr bool use_json_string_for_gql(PrivateKey*)
+   {
+      return true;
+   }
 
    template <typename S>
    void to_json(const Signature& obj, S& stream)
@@ -70,6 +81,10 @@ namespace psibase
    void from_json(Signature& obj, S& stream)
    {
       obj = signatureFromString(stream.get_string());
+   }
+   inline constexpr bool use_json_string_for_gql(Signature*)
+   {
+      return true;
    }
 
 }  // namespace psibase

@@ -33,6 +33,11 @@ namespace psibase
       result = AccountNumber{stream.get_string()};
    }
 
+   inline constexpr bool use_json_string_for_gql(AccountNumber*)
+   {
+      return true;
+   }
+
    // TODO: This special rule causes kv sort order and AccountNumber::operator<=>()
    //       to disagree. This will cause nasty headaches for someone.
    // Fix:  Drop this overload and uncomment the byte swap in execution_context.

@@ -34,7 +34,7 @@ struct Root
                                       std::optional<int>         last,
                                       std::optional<std::string> after) const
    {
-      return psio::makeConnection<ChainAccountConnection, std::string, Account>(
+      return psio::makeConnection<ChainAccountConnection, std::string>(
           {}, {}, {}, {}, first, last, before, after, accounts.begin(), accounts.end(),
           [](auto& it) { ++it; }, [](auto& it) { --it; }, [](auto e) { return e->firstName; },
           [](auto e) { return *e; },

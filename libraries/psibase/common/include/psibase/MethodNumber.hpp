@@ -30,6 +30,11 @@ namespace psibase
       result = MethodNumber{stream.get_string()};
    }
 
+   inline constexpr bool use_json_string_for_gql(MethodNumber*)
+   {
+      return true;
+   }
+
    template <typename S>
    void to_key(const MethodNumber& k, S& s)
    {

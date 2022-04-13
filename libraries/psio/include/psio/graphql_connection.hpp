@@ -37,7 +37,6 @@ namespace psio
    // To enable cursors to function correctly, container must not have duplicate keys
    template <typename Connection,
              typename Key,
-             typename T,
              typename Iter,
              typename Incr_Iter,
              typename Decr_Iter,
@@ -114,8 +113,11 @@ namespace psio
       if (last && !first)
       {
          result.pageInfo.hasNextPage = end != rangeEnd;
-         for (; it != end && (*last)-- > 0; decrIter(end))
-            add_edge(std::prev(end));
+         while (it != end && (*last)-- > 0)
+         {
+            decrIter(end);
+            add_edge(end);
+         }
          result.pageInfo.hasPreviousPage = end != rangeBegin;
          std::reverse(result.edges.begin(), result.edges.end());
       }

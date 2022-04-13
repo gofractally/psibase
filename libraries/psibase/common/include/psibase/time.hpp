@@ -42,4 +42,10 @@ namespace psibase
    {
       return to_json(microseconds_to_str(uint64_t(obj.seconds) * 1'000'000), stream);
    }
+
+   inline constexpr bool use_json_string_for_gql(TimePointSec*)
+   {
+      return true;
+   }
+
 }  // namespace psibase
