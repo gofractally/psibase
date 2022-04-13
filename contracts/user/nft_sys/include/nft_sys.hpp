@@ -1,75 +1,13 @@
 #pragma once
 
-#include <compare>
 #include <psibase/actor.hpp>
-#include <psibase/table.hpp>
+#include <psibase/contract.hpp>
 #include <string_view>
+
+#include "tables.hpp"
 
 namespace UserContract
 {
-   // struct SharedRecord
-   // {
-   //    SharedAccount sa;
-   //    uint64_t      id;
-
-   //    static bool isValidKey(const uint64_t& id) { return id != 0; }
-
-   //    struct DiskUsage
-   //    {
-   //       static constexpr int64_t firstEmplace      = 100;
-   //       static constexpr int64_t subsequentEmplace = 100;
-   //       static constexpr int64_t update            = 100;
-   //    };
-
-   //    friend std::strong_ordering operator<=>(const SharedRecord&, const SharedRecord&) = default;
-   // };
-   // EOSIO_REFLECT(SharedRecord, sa, id);
-   // PSIO_REFLECT(SharedRecord, sa, id);
-
-   // using SharedTable_t = psibase::table<SharedRecord, &SharedRecord::sa, &SharedRecord::id>;
-
-   using NID = uint64_t;  //TODO: change to 32 bit
-   struct AdRecord
-   {
-      psibase::AccountNumber user;
-      bool                   autodebit;
-
-      struct DiskUsage
-      {
-         static constexpr int64_t firstEmplace      = 100;
-         static constexpr int64_t subsequentEmplace = 100;
-         static constexpr int64_t update            = 100;
-      };
-
-      friend std::strong_ordering operator<=>(const AdRecord&, const AdRecord&) = default;
-   };
-   EOSIO_REFLECT(AdRecord, user, autodebit);
-   PSIO_REFLECT(AdRecord, user, autodebit);
-
-   using AdTable_t = psibase::table<AdRecord, &AdRecord::user>;
-   struct NftRecord
-   {
-      NID                    id;
-      psibase::AccountNumber issuer;
-      psibase::AccountNumber owner;
-      psibase::AccountNumber creditedTo;
-
-      static bool isValidKey(const NID& id) { return id != 0; }
-
-      struct DiskUsage
-      {
-         static constexpr int64_t firstEmplace      = 100;
-         static constexpr int64_t subsequentEmplace = 100;
-         static constexpr int64_t update            = 100;
-      };
-
-      friend std::strong_ordering operator<=>(const NftRecord&, const NftRecord&) = default;
-   };
-   EOSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
-   PSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
-
-   using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;
-
    using tables = psibase::contract_tables<NftTable_t, AdTable_t>;
    class NftSys : public psibase::contract
    {

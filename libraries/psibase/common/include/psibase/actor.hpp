@@ -1,31 +1,11 @@
 #pragma once
 #include <psibase/block.hpp>
+#include <psibase/contract.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
 {
-   /** all contracts should derive from psibase::contract */
-   class contract
-   {
-     public:
-      account_num get_sender() const { return _sender; }
-      account_num get_receiver() const { return _receiver; }
-
-     private:
-      template <typename Contract>
-      friend void dispatch(account_num receiver, account_num sender);
-
-      /* called by dispatch */
-      void dispatch_set_sender_receiver(account_num sender, account_num receiver)
-      {
-         _sender   = sender;
-         _receiver = receiver;
-      }
-      account_num _sender;
-      account_num _receiver;
-   };
-
    /**
  *  When an action is called it returns 
  *
