@@ -1,10 +1,5 @@
 #include <contracts/system/auth_ec_sys.hpp>
-#include <contracts/system/verify_ec_sys.hpp>
-#include <psibase/DefaultTestChain.hpp>
-
-#include <psibase/contract_entry.hpp>
-#include <psibase/native_tables.hpp>
-#include <psio/to_json.hpp>
+#include <contracts/system/test.hpp>
 
 #include "test-cntr.hpp"
 
@@ -23,15 +18,17 @@ static auto pub_key2 =
 
 TEST_CASE("ec")
 {
-   DefaultTestChain t;
-   auto             test_contract = t.add_contract("test-cntr"_a, "test-cntr.wasm");
+   test_chain t;
+   t.start_block();
+   boot_minimal(t);
 
-   auto alice = t.as(t.add_account(AccountNumber("alice")));
-   auto bob   = t.as(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
+   // use fake auth
+   auto test_contract = add_contract(t, "test-cntr", "test-cntr.wasm");
+   auto alice         = add_account(t, AccountNumber("alice"));
+   auto bob           = add_account(t, AccountNumber("bob"), AccountNumber("auth-ec-sys"));
 
    // use "real" auth
-   auto sue = t.add_ec_account("sue", pub_key1);
-
+   auto sue = add_ec_account(t, "sue", pub_key1);
    expect(t.push_transaction(t.make_transaction({{
               .sender   = bob,
               .contract = test_contract,

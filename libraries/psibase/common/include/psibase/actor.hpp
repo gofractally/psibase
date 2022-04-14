@@ -58,7 +58,7 @@ namespace psibase
       }
    };
 
-   //#ifdef __wasm__
+#ifdef __wasm__
    template <typename T>
    psio::shared_view_ptr<T> fraccall(const action& a)
    {
@@ -144,12 +144,11 @@ namespace psibase
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
    };
-   //#endif  // __wasm__
+#endif  // __wasm__
 
    /**
  *  Builds actions to add to transactions
  */
-
    template <typename T>
    struct transactor : public psio::reflect<T>::template proxy<action_builder_proxy>
    {

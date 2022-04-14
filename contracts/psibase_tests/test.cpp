@@ -1,6 +1,6 @@
 #define CATCH_CONFIG_MAIN
+#include <contracts/system/test.hpp>
 
-#include <psibase/DefaultTestChain.hpp>
 #include "test-cntr.hpp"
 
 using namespace eosio;
@@ -8,9 +8,10 @@ using namespace psibase;
 
 TEST_CASE("recursion")
 {
-   DefaultTestChain t;
-   t.add_contract(AccountNumber("test-cntr"), "test-cntr.wasm");
-
+   test_chain t;
+   t.start_block();
+   boot_minimal(t);
+   add_contract(t, AccountNumber("test-cntr"), "test-cntr.wasm");
    REQUIRE(                          //
        show(false,                   //
             t.push_transaction(      //
@@ -27,9 +28,10 @@ TEST_CASE("recursion")
 
 TEST_CASE("kv")
 {
-   DefaultTestChain t;
-
-   auto test_kv_contract = t.add_contract("test_kv", "test_kv.wasm");
+   test_chain t;
+   t.start_block();
+   boot_minimal(t);
+   auto test_kv_contract = add_contract(t, "test-kv", "test_kv.wasm");
    REQUIRE(                          //
        show(false,                   //
             t.push_transaction(      //

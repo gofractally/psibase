@@ -13,15 +13,15 @@ namespace tokens_sys
 
    struct token_row
    {
-      UserContract::NID nft_id;
-      uint32_t          key;
-      bool              authorize;
-      bool              recall;
-      uint64_t          daily_inf_per_limit;
-      uint64_t          yearly_inf_per_limit;
-      uint64_t          allowed_daily_inflation;
-      int64_t           avg_daily_inflation;
-      int64_t           avg_yearly_inflation;
+      nft_sys::nid nft_id;
+      uint32_t     key;
+      bool         authorize;
+      bool         recall;
+      uint64_t     daily_inf_per_limit;
+      uint64_t     yearly_inf_per_limit;
+      uint64_t     allowed_daily_inflation;
+      int64_t      avg_daily_inflation;
+      int64_t      avg_yearly_inflation;
 
       eosio::time_point_sec last_update;
 
