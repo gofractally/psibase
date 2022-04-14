@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/AccountNumber.hpp>
+#include <psibase/actor.hpp>
 
 namespace psibase
 {
@@ -25,4 +26,31 @@ namespace psibase
       AccountNumber _sender;
       AccountNumber _receiver;
    };
+
+   template <typename Child>
+   class contract2 : public contract
+   {
+     protected:
+      struct UserContext
+      {
+         AccountNumber account;
+
+         template <typename Contract>
+         auto at() const
+         {
+            return actor<Contract>(account, Contract::contract);
+         }
+
+         operator AccountNumber() { return account; }
+      };
+
+      auto as(AccountNumber sender) { return UserContext{sender}; }
+
+      template <typename Contract>
+      auto at()
+      {
+         return as(Child::contract).template at<Contract>();
+      }
+   };
+
 };  // namespace psibase

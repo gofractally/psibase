@@ -64,9 +64,7 @@ void NftSys::credit(psibase::AccountNumber receiver, NID nftId, std::string memo
    check(record->owner == get_sender(), Errors::missingRequiredAuth);
    check(receiver != record->owner, Errors::creditorIsDebitor);
    check(record->creditedTo == account_sys::null_account, Errors::alreadyCredited);
-
-   auto exists = actor<account_sys>(contract, account_sys::contract).exists(receiver);
-   check(exists, Errors::receiverDNE);
+   check(at<account_sys>().exists(receiver), Errors::receiverDNE);
 
    bool transferred = _isAutoDebit(receiver);
 

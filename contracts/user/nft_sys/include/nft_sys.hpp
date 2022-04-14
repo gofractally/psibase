@@ -6,7 +6,7 @@
 
 namespace UserContract
 {
-   class NftSys : public psibase::contract
+   class NftSys : public psibase::contract2<NftSys>
    {
      public:
       using tables = psibase::contract_tables<NftTable_t, AdTable_t>;
