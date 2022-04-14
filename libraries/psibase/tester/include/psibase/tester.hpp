@@ -144,7 +144,7 @@ namespace psibase
 
       test_chain(const char* snapshot = nullptr, uint64_t state_size = 1024 * 1024 * 1024);
       test_chain(const test_chain&) = delete;
-      ~test_chain();
+      virtual ~test_chain();
 
       test_chain& operator=(const test_chain&) = delete;
 
