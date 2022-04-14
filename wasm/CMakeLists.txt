@@ -16,6 +16,9 @@ if(${FORCE_COLORED_OUTPUT})
     add_compile_options(-fcolor-diagnostics)
 endif()
 
+# Point to psisdk-config.cmake to allow documentation examples to build
+set(psisdk_DIR ${CMAKE_SOURCE_DIR})
+
 function(native_test N)
 endfunction()
 
@@ -190,5 +193,6 @@ endif()
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../contracts contracts)
+add_subdirectory(../doc/psisdk/src/cpp-contract doc-examples)
 add_subdirectory(../programs programs)
 add_subdirectory(boost)
