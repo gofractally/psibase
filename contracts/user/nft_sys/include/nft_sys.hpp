@@ -2,7 +2,8 @@
 
 #include <psibase/actor.hpp>
 #include <psibase/contract.hpp>
-#include "errors.hpp"
+#include <string_view>
+
 #include "tables.hpp"
 
 namespace UserContract
@@ -13,14 +14,35 @@ namespace UserContract
      public:
       static constexpr psibase::AccountNumber contract = "nft-sys"_a;
 
+      struct Errors
+      {
+         static constexpr std::string_view nftDNE = "NFT does not exist";
+         static constexpr std::string_view debitRequiresCredit =
+             "NFT can only be debited after being credited";
+         static constexpr std::string_view uncreditRequiresCredit =
+             "NFT can only be uncredited after being credited";
+         static constexpr std::string_view creditorIsDebitor =
+             "Creditor and debitor cannot be the same account";
+         static constexpr std::string_view creditorAction =
+             "Only the creditor may perform this action";
+         static constexpr std::string_view receiverDNE     = "Receiver DNE";
+         static constexpr std::string_view alreadyCredited = "NFT already credited to an account";
+
+         // Todo: Move to somewhere common
+         static constexpr std::string_view missingRequiredAuth = "Missing required authority";
+      };
+
+      // Create a new NFT in issuer's scope, with sub_id 0
       NID  mint();
       void burn(NID nftId);
+
       void autodebit(bool autodebit);
+
       void credit(psibase::AccountNumber receiver, NID nftId, std::string memo);
       void uncredit(NID nftId);
       void debit(NID nftId);
 
-      // Read-only:
+      // Read-only interface
       std::optional<NftRecord> getNft(NID nftId);
       bool                     isAutodebit();
 
