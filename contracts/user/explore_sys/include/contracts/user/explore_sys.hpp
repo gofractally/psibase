@@ -5,7 +5,7 @@
 
 namespace system_contract
 {
-   struct blocklog_sys : public psibase::contract
+   struct explore_sys : public psibase::contract
    {
       static constexpr auto contract = psibase::proxyContractNum;
 
@@ -14,7 +14,7 @@ namespace system_contract
                                         psio::const_view<std::string>       contentType,
                                         psio::const_view<std::vector<char>> content);
    };
-   PSIO_REFLECT(blocklog_sys,
+   PSIO_REFLECT(explore_sys,
                 method(serveSys, request),
                 method(uploadSys, path, contentType, content))
 }  // namespace system_contract

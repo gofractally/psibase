@@ -1,4 +1,4 @@
-#include "contracts/user/blocklog_sys.hpp"
+#include "contracts/user/explore_sys.hpp"
 
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/KVGraphQLConnection.hpp>
@@ -65,7 +65,7 @@ PSIO_REFLECT(  //
 
 namespace system_contract
 {
-   psibase::rpc_reply_data blocklog_sys::serveSys(psibase::rpc_request_data request)
+   psibase::rpc_reply_data explore_sys::serveSys(psibase::rpc_request_data request)
    {
       if (request.method == "GET")
       {
@@ -93,11 +93,11 @@ namespace system_contract
       }
 
       psibase::abort_message_str("not found");
-   }  // blocklog_sys::proxy_sys
+   }  // explore_sys::proxy_sys
 
-   void blocklog_sys::uploadSys(psio::const_view<std::string>       path,
-                                psio::const_view<std::string>       contentType,
-                                psio::const_view<std::vector<char>> content)
+   void explore_sys::uploadSys(psio::const_view<std::string>       path,
+                               psio::const_view<std::string>       contentType,
+                               psio::const_view<std::vector<char>> content)
    {
       psibase::check(get_sender() == get_receiver(), "wrong sender");
 
@@ -118,4 +118,4 @@ namespace system_contract
 
 }  // namespace system_contract
 
-PSIBASE_DISPATCH(system_contract::blocklog_sys)
+PSIBASE_DISPATCH(system_contract::explore_sys)

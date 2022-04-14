@@ -28,7 +28,7 @@ const App = () => {
     return html`
         <div>
             <a href=${siblingUrl()}>psibase</a>
-            <h1>blocklog-sys</h1>
+            <h1>explore-sys</h1>
         
             <button onClick=${pagedResult.first}>First</button>
             <button disabled=${!pagedResult.hasPreviousPage} onClick=${pagedResult.previous}>Previous</button>

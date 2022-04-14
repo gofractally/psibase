@@ -130,10 +130,10 @@ void bootstrap_chain(system_context& system)
                         .code          = read_whole_file("rpc_account_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber("blocklog-sys"),
+                        .contract      = AccountNumber("explore-sys"),
                         .auth_contract = system_contract::auth_fake_sys::contract,
                         .flags         = 0,
-                        .code          = read_whole_file("blocklog_sys.wasm"),
+                        .code          = read_whole_file("explore_sys.wasm"),
                     },
                 },
         });
@@ -167,10 +167,10 @@ void bootstrap_chain(system_context& system)
    upload(bc, account_rpc, "/ui/index.js", "text/javascript",
           "../contracts/system/rpc_account_sys/ui/index.js");
 
-   reg_rpc(bc, "blocklog-sys"_a, "blocklog-sys"_a);
-   upload(bc, "blocklog-sys"_a, "/", "text/html", "../contracts/user/blocklog_sys/ui/index.html");
-   upload(bc, "blocklog-sys"_a, "/ui/index.js", "text/javascript",
-          "../contracts/user/blocklog_sys/ui/index.js");
+   reg_rpc(bc, "explore-sys"_a, "explore-sys"_a);
+   upload(bc, "explore-sys"_a, "/", "text/html", "../contracts/user/explore_sys/ui/index.html");
+   upload(bc, "explore-sys"_a, "/ui/index.js", "text/javascript",
+          "../contracts/user/explore_sys/ui/index.js");
 
    bc.commit();
 }
