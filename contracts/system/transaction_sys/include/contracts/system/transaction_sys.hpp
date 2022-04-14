@@ -2,7 +2,7 @@
 
 #include <eosio/from_bin.hpp>
 #include <eosio/to_bin.hpp>
-#include <psibase/actor.hpp>
+#include <psibase/contract.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
 

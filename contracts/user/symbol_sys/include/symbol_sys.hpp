@@ -1,7 +1,7 @@
 #pragma once
 
 #include <compare>
-#include <psibase/actor.hpp>
+#include <psibase/contract.hpp>
 #include <psibase/table.hpp>
 #include <string_view>
 

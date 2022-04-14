@@ -5,6 +5,7 @@
 #include <contracts/system/rpc_account_sys.hpp>
 #include <contracts/system/transaction_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
+#include <psibase/actor.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psibase/http.hpp>
 #include <psibase/transaction_context.hpp>
@@ -40,8 +41,7 @@ std::vector<char> read_whole_file(const char* filename)
 // TODO: configurable wasm locations
 void bootstrap_chain(system_context& system)
 {
-   auto push = [&](auto& bc, AccountNumber sender, AccountNumber contract, const auto& data)
-   {
+   auto push = [&](auto& bc, AccountNumber sender, AccountNumber contract, const auto& data) {
       signed_transaction t;
       t.trx.expiration.seconds = bc.current.header.time.seconds + 1;
       t.trx.actions.push_back({
@@ -52,24 +52,21 @@ void bootstrap_chain(system_context& system)
       bc.push_transaction(t);
    };
 
-   auto push_action = [&](auto& bc, action a)
-   {
+   auto push_action = [&](auto& bc, action a) {
       signed_transaction t;
       t.trx.expiration.seconds = bc.current.header.time.seconds + 1;
       t.trx.actions.push_back({a});
       bc.push_transaction(t);
    };
 
-   auto reg_rpc = [&](auto& bc, account_num contract, account_num rpc_contract)
-   {
+   auto reg_rpc = [&](auto& bc, account_num contract, account_num rpc_contract) {
       push_action(
           bc,
           transactor<proxy_sys>(contract, proxyContractNum).registerServer(contract, rpc_contract));
    };
 
    auto upload = [&](auto& bc, account_num contract, const char* path, const char* contentType,
-                     const char* filename)
-   {
+                     const char* filename) {
       transactor<system_contract::rpc_account_sys> rasys(contract, contract);
       push_action(bc, rasys.uploadSys(path, contentType, read_whole_file(filename)));
    };
@@ -187,11 +184,8 @@ struct transaction_queue
    std::vector<entry> entries;
 };
 
-#define RETHROW_BAD_ALLOC  \
-   catch (std::bad_alloc&) \
-   {                       \
-      throw;               \
-   }
+#define RETHROW_BAD_ALLOC \
+   catch (std::bad_alloc&) { throw; }
 
 #define CATCH_IGNORE \
    catch (...) {}
@@ -272,9 +266,8 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 
       // TODO: speculative execution on non-producers
       if (produce)
-         http_config->push_transaction_async =
-             [queue](std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
-         {
+         http_config->push_transaction_async = [queue](std::vector<char> packed_signed_trx,
+                                                       http::push_transaction_callback callback) {
             std::scoped_lock lock{queue->mutex};
             queue->entries.push_back({std::move(packed_signed_trx), std::move(callback)});
          };

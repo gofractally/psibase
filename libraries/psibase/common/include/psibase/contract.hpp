@@ -25,5 +25,4 @@ namespace psibase
       AccountNumber _sender;
       AccountNumber _receiver;
    };
-
 };  // namespace psibase

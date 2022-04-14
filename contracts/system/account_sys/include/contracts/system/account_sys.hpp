@@ -1,5 +1,5 @@
 #pragma once
-#include <psibase/actor.hpp>
+#include <psibase/contract.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/name.hpp>
 #include <psibase/native_tables.hpp>

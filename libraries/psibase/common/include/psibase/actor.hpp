@@ -1,6 +1,5 @@
 #pragma once
 #include <psibase/block.hpp>
-#include <psibase/contract.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psio/fracpack.hpp>
 

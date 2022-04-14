@@ -4,6 +4,9 @@
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
 
+// Todo - remove when kv table uses PSIO
+#include <eosio/reflection.hpp>
+
 namespace psibase
 {
    struct AccountNumber final
@@ -33,10 +36,7 @@ namespace psibase
       result = AccountNumber{stream.get_string()};
    }
 
-   inline constexpr bool use_json_string_for_gql(AccountNumber*)
-   {
-      return true;
-   }
+   inline constexpr bool use_json_string_for_gql(AccountNumber*) { return true; }
 
    // TODO: This special rule causes kv sort order and AccountNumber::operator<=>()
    //       to disagree. This will cause nasty headaches for someone.

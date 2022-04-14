@@ -6,6 +6,7 @@
 #include <optional>
 #include <psio/error.hpp>
 #include <psio/reflect.hpp>
+#include <system_error>
 #include <tuple>
 #include <variant>
 #include <vector>
@@ -77,7 +78,6 @@ namespace std
 
 namespace psio
 {
-
    class from_json_error_category_type : public std::error_category
    {
      public:
@@ -87,7 +87,7 @@ namespace psio
       {
          switch (static_cast<from_json_error>(c))
          {
-               // clang-format off
+            // clang-format off
                case from_json_error::no_error:                            return "No error";
 
                case from_json_error::expected_end:                        return "Expected end of json";
@@ -160,7 +160,7 @@ namespace psio
    {
       switch (err)
       {
-         // clang-format off
+            // clang-format off
       case rapidjson::kParseErrorNone:                            return from_json_error::no_error;
       case rapidjson::kParseErrorDocumentEmpty:                   return from_json_error::document_empty;
       case rapidjson::kParseErrorDocumentRootNotSingular:         return from_json_error::document_root_not_singular;
@@ -243,7 +243,8 @@ namespace psio
             throw_error(from_json_error::expected_end);
       }
 
-      bool is_null() {
+      bool is_null()
+      {
          auto t = peek_token();
          return (t.get().type == json_token_type::type_null);
       }
@@ -372,8 +373,7 @@ namespace psio
    template <typename SrcIt, typename DestIt>
    [[nodiscard]] bool unhex(DestIt dest, SrcIt begin, SrcIt end)
    {
-      auto get_digit = [&](uint8_t& nibble)
-      {
+      auto get_digit = [&](uint8_t& nibble) {
          if (*begin >= '0' && *begin <= '9')
             nibble = *begin++ - '0';
          else if (*begin >= 'a' && *begin <= 'f')
@@ -681,14 +681,12 @@ void from_json(int32_t& result, S& stream) {
       }
 
       stream.get_start_array();
-      tuple_for_each(result,
-                     [&](int idx, auto& item)
-                     {
-                        auto t = stream.peek_token();
-                        if (t.get().type == json_token_type::type_end_array)
-                           return;
-                        from_json(item, stream);
-                     });
+      tuple_for_each(result, [&](int idx, auto& item) {
+         auto t = stream.peek_token();
+         if (t.get().type == json_token_type::type_end_array)
+            return;
+         from_json(item, stream);
+      });
       stream.get_end_array();
    }
 
@@ -749,29 +747,23 @@ void from_json(int32_t& result, S& stream) {
    {
       if constexpr (reflect<T>::is_struct)
       {
-         from_json_object(
-             stream,
-             [&](std::string_view key) -> void
-             {
-                bool found = false;
-                reflect<T>::get(
-                    key,
-                    [&](auto member)
-                    {
-                       if constexpr (not std::is_member_function_pointer_v<decltype(member)>)
-                       {
-                          from_json(obj.*member, stream);
-                          found = true;
-                       }
-                       else
-                       {
-                       }
-                    });
-                if (not found)
-                {
-                   from_json_skip_value(stream);
-                }
-             });
+         from_json_object(stream, [&](std::string_view key) -> void {
+            bool found = false;
+            reflect<T>::get(key, [&](auto member) {
+               if constexpr (not std::is_member_function_pointer_v<decltype(member)>)
+               {
+                  from_json(obj.*member, stream);
+                  found = true;
+               }
+               else
+               {
+               }
+            });
+            if (not found)
+            {
+               from_json_skip_value(stream);
+            }
+         });
       }
       else
       {
