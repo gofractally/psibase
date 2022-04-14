@@ -33,7 +33,7 @@ namespace psibase
    template <typename Contract>
    void dispatch(AccountNumber sender, AccountNumber receiver)
    {
-      Contract contract;
+      Contract contract;  // TODO: Make this static?
       contract.psibase::contract::dispatch_set_sender_receiver(sender, receiver);
       auto act = get_current_action_view();  /// action view...
 
@@ -67,6 +67,7 @@ namespace psibase
 
 }  // namespace psibase
 
+// TODO: prevent recursion, but allow opt-in
 #define PSIBASE_DISPATCH(CONTRACT)                                                        \
    extern "C" void called(psibase::AccountNumber receiver, psibase::AccountNumber sender) \
    {                                                                                      \

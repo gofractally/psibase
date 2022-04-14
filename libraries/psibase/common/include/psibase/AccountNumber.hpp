@@ -1,5 +1,6 @@
 #pragma once
 #include <compare>
+#include <eosio/reflection.hpp>
 #include <psibase/name.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
