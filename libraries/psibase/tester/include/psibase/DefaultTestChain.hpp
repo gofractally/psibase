@@ -11,7 +11,7 @@ namespace psibase
    {
      public:
       DefaultTestChain(
-          const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts = {{}},
+          const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts = {},
           const char*                                               snapshot            = nullptr,
           uint64_t state_size = 1024 * 1024 * 1024);
 

@@ -29,7 +29,7 @@ TEST_CASE("kv")
 {
    DefaultTestChain t;
 
-   auto test_kv_contract = t.add_contract("test_kv", "test_kv.wasm");
+   auto test_kv_contract = t.add_contract("test-kv", "test_kv.wasm");
    REQUIRE(                          //
        show(false,                   //
             t.push_transaction(      //
