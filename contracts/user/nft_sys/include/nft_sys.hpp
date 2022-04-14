@@ -1,16 +1,15 @@
 #pragma once
 
-#include <psibase/actor.hpp>
 #include <psibase/contract.hpp>
 #include "errors.hpp"
 #include "tables.hpp"
 
 namespace UserContract
 {
-   using tables = psibase::contract_tables<NftTable_t, AdTable_t>;
    class NftSys : public psibase::contract
    {
      public:
+      using tables = psibase::contract_tables<NftTable_t, AdTable_t>;
       static constexpr psibase::AccountNumber contract = "nft-sys"_a;
 
       NID  mint();
@@ -28,6 +27,7 @@ namespace UserContract
       tables db{contract};
 
       bool _isAutoDebit(psibase::AccountNumber account);
+      bool _exists(NID nftId);
    };
 
    // clang-format off
