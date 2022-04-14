@@ -1,10 +1,10 @@
 function(add suffix)
-    add_user_contract("${suffix}" tokens_sys contract/src/tokens_sys.cpp)
+    add_user_contract("${suffix}" tokens_sys src/tokens_sys.cpp)
 endfunction(add)
 
 add("")
 add("-debug")
 
-#add_subdirectory(contract/test)
+#add_subdirectory(test)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

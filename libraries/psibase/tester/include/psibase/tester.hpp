@@ -1,7 +1,8 @@
 #pragma once
-
+#include <catch2/catch.hpp>
 #include <eosio/asset.hpp>
 #include <iostream>
+#include <psibase/actor.hpp>
 #include <psibase/trace.hpp>
 
 namespace psibase
@@ -15,6 +16,43 @@ namespace psibase
       template <typename R, typename C, typename... Args>
       R get_return_type(R (C::*f)(Args...) const);
    }  // namespace internal_use_do_not_use
+
+   auto debugCounter = [i = 0](const std::string& prefix = "") mutable {
+      std::cout << "\n" << prefix << " DebugCounter " << ++i << "\n\n";
+   };
+
+   inline std::string show(bool include, transaction_trace t)
+   {
+      if (include || t.error)
+         std::cout << pretty_trace(trim_raw_data(t)) << "\n";
+      if (t.error)
+         return *t.error;
+      return {};
+   }
+
+   inline const action_trace& get_top_action(transaction_trace& t, size_t num)
+   {
+      // TODO: redesign transaction_trace to make this easier
+      // Current layout:
+      //    verify proof 0
+      //    verify proof 1
+      //    ...
+      //    transaction.sys (below is interspersed with events, console, etc. in execution order)
+      //        check_auth
+      //        action 0
+      //        check_auth
+      //        action 1
+      //        ...
+      eosio::check(!t.action_traces.empty(), "transaction_trace has no actions");
+      auto&                            root = t.action_traces.back();
+      std::vector<const action_trace*> top_traces;
+      for (auto& inner : root.inner_traces)
+         if (std::holds_alternative<action_trace>(inner.inner))
+            top_traces.push_back(&std::get<action_trace>(inner.inner));
+      eosio::check(!(top_traces.size() & 1), "unexpected number of action traces");
+      eosio::check(2 * num + 1 < top_traces.size(), "trace not found");
+      return *top_traces[2 * num + 1];
+   }
 
    std::vector<char> read_whole_file(std::string_view filename);
 
@@ -35,6 +73,59 @@ namespace psibase
     * Sign a digest
     */
    Signature sign(const PrivateKey& key, const Checksum256& digest);
+
+   class TraceResult
+   {
+     public:
+      TraceResult(transaction_trace&& t);
+      bool succeeded();
+      bool failed(std::string_view expected);
+      bool diskConsumed(const std::vector<std::pair<AccountNumber, int64_t>>& consumption);
+
+      const transaction_trace& trace() { return _t; }
+
+     protected:
+      transaction_trace _t;
+   };
+
+   template <typename ReturnType>
+   class Result : public TraceResult
+   {
+     public:
+      Result(transaction_trace&& t)
+          : TraceResult(std::forward<transaction_trace>(t)), _return(std::nullopt)
+      {
+         auto actionTrace = get_top_action(t, 0);
+         if (actionTrace.raw_retval.size() != 0)
+         {
+            _return = psio::convert_from_frac<ReturnType>(actionTrace.raw_retval);
+         }
+      }
+
+      ReturnType returnVal()
+      {
+         if (_return.has_value())
+         {
+            return (*_return);
+         }
+         else
+         {
+            show(true, _t);
+            eosio::check(false, "Action aborted, no return value");
+            return ReturnType();  // Silence compiler warning
+         }
+      }
+
+     private:
+      std::optional<ReturnType> _return;
+   };
+
+   template <>
+   class Result<void> : public TraceResult
+   {
+     public:
+      Result(transaction_trace&& t) : TraceResult(std::forward<transaction_trace>(t)) {}
+   };
 
    /**
     * Manages a chain.
@@ -122,36 +213,6 @@ namespace psibase
       transaction_trace transact(std::vector<action>&& actions,
                                  const char*           expected_except = nullptr);
 
-      /**
-       * Pushes a transaction with action onto the chain and converts its return value.
-       * If no block is currently pending, starts one.
-       */
-      template <typename Action, typename... Args>
-      auto action_with_return(const Action& action, Args&&... args)
-      {
-         using Ret  = decltype(internal_use_do_not_use::get_return_type(Action::get_mem_ptr()));
-         auto trace = transact({action.to_action(std::forward<Args>(args)...)});
-         return convert_from_bin<Ret>(trace.action_traces[0].return_value);
-      }
-
-      template <typename Action, typename... Args>
-      auto act(const std::optional<std::vector<std::vector<char>>>& cfd,
-               const Action&                                        action,
-               Args&&... args)
-      {
-         using Ret  = decltype(internal_use_do_not_use::get_return_type(Action::get_mem_ptr()));
-         auto trace = this->trace(cfd, action, std::forward<Args>(args)...);
-         expect(trace);
-         if constexpr (!std::is_same_v<Ret, void>)
-         {
-            return convert_from_bin<Ret>(trace.action_traces[0].return_value);
-         }
-         else
-         {
-            return trace;
-         }
-      }
-
       template <typename Action, typename... Args>
       auto trace(const std::optional<std::vector<std::vector<char>>>& cfd,
                  const Action&                                        action,
@@ -171,40 +232,65 @@ namespace psibase
          }
       }
 
-      struct user_context
+      template <typename Action>
+      auto trace(Action&& a)
       {
-         test_chain&                t;
-         account_num                sender;
-         std::optional<account_num> contract;
+         return push_transaction(make_transaction({a}));
+      }
 
-         user_context with_code(account_num contract)
+      /**
+    *  This will push a transaction and return the trace and return value
+    */
+      struct push_transaction_proxy
+      {
+         push_transaction_proxy(test_chain& t, AccountNumber s, AccountNumber r)
+             : chain(t), sender(s), receiver(r)
          {
-            user_context uc = *this;
-            uc.contract     = contract;
-            return uc;
          }
 
-         template <typename Action, typename... Args>
-         auto act(Args&&... args)
-         {
-            if (contract)
-               return t.act(Action(*contract, sender), std::forward<Args>(args)...);
-            else
-               return t.act(Action(sender), std::forward<Args>(args)...);
-         }
+         test_chain&   chain;
+         AccountNumber sender;
+         AccountNumber receiver;
 
-         template <typename Action, typename... Args>
-         auto trace(Args&&... args)
+         template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+         auto call(Args&&... args) const
          {
-            if (contract)
-               return t.trace(Action(*contract, sender), std::forward<Args>(args)...);
-            else
-               return t.trace(Action(sender), std::forward<Args>(args)...);
+            using result_type = decltype(psio::result_of(MemberPtr));
+
+            auto act = action_builder_proxy(sender, receiver)
+                           .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
+
+            return Result<result_type>(chain.trace(act));
          }
       };
 
-      auto as(account_num sender) { return user_context{*this, sender}; }
+      template <typename Contract>
+      struct ContractUser : public psio::reflect<Contract>::template proxy<push_transaction_proxy>
+      {
+         using base = typename psio::reflect<Contract>::template proxy<push_transaction_proxy>;
+         using base::base;
+
+         auto* operator->() const { return this; }
+         auto& operator*() const { return *this; }
+      };
+
+      struct UserContext
+      {
+         test_chain&   t;
+         AccountNumber id;
+
+         template <typename Other>
+         auto at() const
+         {
+            return ContractUser<Other>(t, id, Other::contract);
+         }
+
+         operator AccountNumber() { return id; }
+      };
+
+      auto as(AccountNumber id) { return UserContext{*this, id}; }
    };  // test_chain
+
 }  // namespace psibase
 
 namespace eosio
