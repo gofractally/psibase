@@ -1,11 +1,10 @@
-
 name: CheckBuild
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
   workflow_dispatch:
 
@@ -17,11 +16,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          submodules: recursive
           fetch-depth: 0
+          ssh-key: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
+          persist-credentials: true
       - name: Build
         run: |
           set -e
+          git submodule update --init --recursive
+          echo =====
           export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} --user $(id -u):$(id -g) jamesmart/cpp-dev-env:latest"
           export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} jamesmart/cpp-dev-env:latest"
           docker pull jamesmart/cpp-dev-env:latest
