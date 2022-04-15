@@ -24,6 +24,8 @@ jobs:
         run: |
           set -e
           echo =====
+          mkdir -p $HOME/.ssh
+          chmod 700 $HOME/.ssh
           echo "$LIBMDBX_MIRROR_PRIVATE_KEY" > $HOME/.ssh/libmdbx-mirror.key
           chmod 600 $HOME/.ssh/libmdbx-mirror.key
           git rm external/libmdbx
