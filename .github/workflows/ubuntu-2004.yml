@@ -10,6 +10,7 @@ on:
 
 env:
   UBUNTU_2004_IMAGE: "ghcr.io/gofractally/psibase-ubuntu-2004-builder:406069aa1dc99fff64f3bbcd6dc0ce71608371f0"
+  LIBMDBX_MIRROR_PRIVATE_KEY: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
 
 jobs:
   ubuntu-2004-build:
