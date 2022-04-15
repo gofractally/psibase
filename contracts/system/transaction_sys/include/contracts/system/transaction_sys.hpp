@@ -2,13 +2,13 @@
 
 #include <eosio/from_bin.hpp>
 #include <eosio/to_bin.hpp>
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
 
 namespace system_contract
 {
-   class transaction_sys : public psibase::contract
+   class transaction_sys : public psibase::Contract
    {
      public:
       static constexpr auto     contract = psibase::AccountNumber("transact-sys");

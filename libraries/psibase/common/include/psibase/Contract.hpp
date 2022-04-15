@@ -4,8 +4,8 @@
 
 namespace psibase
 {
-   /** all contracts should derive from psibase::contract */
-   class contract
+   /** all contracts should derive from psibase::Contract */
+   class Contract
    {
      public:
       AccountNumber get_sender() const { return _sender; }

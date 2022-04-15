@@ -1,13 +1,13 @@
 #pragma once
 
 #include <compare>
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/table.hpp>
 #include <string_view>
 
 namespace exchange_sys
 {
-   class exchange_contract : public psibase::contract
+   class exchange_contract : public psibase::Contract
    {
      public:
       static constexpr psibase::AccountNumber contract = "exchange-sys"_a;

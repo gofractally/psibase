@@ -34,7 +34,7 @@ namespace psibase
    void dispatch(AccountNumber sender, AccountNumber receiver)
    {
       Contract contract;  // TODO: Make this static?
-      contract.psibase::contract::dispatch_set_sender_receiver(sender, receiver);
+      contract.psibase::Contract::dispatch_set_sender_receiver(sender, receiver);
       auto act = get_current_action_view();  /// action view...
 
       bool called = psio::reflect<Contract>::get_by_name(

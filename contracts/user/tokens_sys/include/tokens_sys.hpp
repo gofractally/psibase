@@ -1,7 +1,7 @@
 #pragma once
 
 #include <compare>
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/table.hpp>
 #include <string_view>
 
@@ -53,7 +53,7 @@ namespace tokens_sys
    using token_table_t = psibase::table<token_row, &token_row::nft_id>;
 
    using tables = psibase::contract_tables<token_table_t>;
-   class tokens_contract : public psibase::contract
+   class tokens_contract : public psibase::Contract
    {
      public:
       static constexpr psibase::AccountNumber contract = "tokens-sys"_a;

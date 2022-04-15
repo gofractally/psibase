@@ -1,11 +1,11 @@
 #pragma once
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psibase/native_tables.hpp>
 
 namespace system_contract
 {
-   struct rpc_account_sys : public psibase::contract
+   struct rpc_account_sys : public psibase::Contract
    {
       psibase::rpc_reply_data serveSys(psibase::rpc_request_data request);
       void                    uploadSys(psio::const_view<std::string>       path,

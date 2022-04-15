@@ -1,12 +1,12 @@
 #pragma once
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/name.hpp>
 #include <psibase/native_tables.hpp>
 
 namespace system_contract
 {
-   class account_sys : public psibase::contract
+   class account_sys : public psibase::Contract
    {
      public:
       static constexpr auto     contract       = psibase::AccountNumber("account-sys");

@@ -1,11 +1,11 @@
 #pragma once
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psibase/native_tables.hpp>
 
 namespace psibase
 {
-   struct common_sys : psibase::contract
+   struct common_sys : psibase::Contract
    {
       static constexpr auto contract = psibase::AccountNumber("common-sys");
 

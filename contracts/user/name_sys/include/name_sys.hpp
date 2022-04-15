@@ -1,7 +1,7 @@
 #pragma once
 
 #include <compare>
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/table.hpp>
 #include <string_view>
 
@@ -21,7 +21,7 @@ namespace name_sys
    using display_name_table_t = psibase::table<display_name_row, &display_name_row::acc>;
 
    using tables = psibase::contract_tables<display_name_table_t>;
-   class name_contract : public psibase::contract
+   class name_contract : public psibase::Contract
    {
      public:
       static constexpr psibase::AccountNumber contract = "name-sys"_a;

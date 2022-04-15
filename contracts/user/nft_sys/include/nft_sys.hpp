@@ -1,12 +1,12 @@
 #pragma once
 
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include "errors.hpp"
 #include "tables.hpp"
 
 namespace UserContract
 {
-   class NftSys : public psibase::contract
+   class NftSys : public psibase::Contract
    {
      public:
       using tables = psibase::contract_tables<NftTable_t, AdTable_t>;

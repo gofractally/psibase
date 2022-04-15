@@ -1,7 +1,7 @@
 #pragma once
 
 #include <compare>
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/table.hpp>
 #include <string_view>
 
@@ -22,7 +22,7 @@ namespace symbol_sys
    using symbol_table_t = psibase::table<symbol_row, &symbol_row::nft_id>;
 
    using tables = psibase::contract_tables<symbol_table_t>;
-   class symbol_contract : public psibase::contract
+   class symbol_contract : public psibase::Contract
    {
      public:
       static constexpr psibase::AccountNumber contract = "symbol-sys"_a;
