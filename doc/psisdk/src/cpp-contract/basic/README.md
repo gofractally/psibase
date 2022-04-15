@@ -25,11 +25,22 @@ cmake `psisdk-cmake-args` ..
 make -j $(nproc)
 ```
 
+## Installing the contract
+
+This, when run on a local test chain, will:
+
+- Create the `example` account, if it doesn't already exist. The account will be keyless (not suitable for production).
+- Install the `example.wasm` contract on that contract
+
+```sh
+psibase install example example.wasm
+```
+
 ## Trying the contract
 
 Even though other contracts may call into our contract's `add` and `multiply` methods,
 we haven't provided end users with a way to construct transactions which use them.
-That's the topic of the next section, [User Interface](../ui/index.html).
+That's the topic of the next section, [Minimal User Interface](../minimal-ui/index.html).
 
 ## Homework
 
@@ -40,7 +51,8 @@ you avoid it?
 ## vscode support
 
 The following files configure vscode:
-* [.vscode/c_cpp_properties.json](.vscode/c_cpp_properties.json)
-* [.vscode/settings.json](.vscode/settings.json)
+
+- [.vscode/c_cpp_properties.json](.vscode/c_cpp_properties.json)
+- [.vscode/settings.json](.vscode/settings.json)
 
 Code completion and symbol lookup does not work until the project is built (above).
