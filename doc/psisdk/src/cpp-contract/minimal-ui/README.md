@@ -27,8 +27,16 @@ make -j $(nproc)
 
 ## Installing the contract
 
+The `--register-ui` option registers the contract with the `proxy-sys` contract. This allows the contract to:
+
+- Optionally serve files via HTTP
+- Optionally respond to RPC requests
+- Optionally respond to GraphQL requests
+
+`proxy-sys` calls into the contract's `serveSys` action. See [Calling Other Contracts](../calling/index.html) to see how contracts do this.
+
 ```sh
-psibase install example example.wasm
+psibase install --register-ui example example.wasm
 ```
 
 ## Trying the contract

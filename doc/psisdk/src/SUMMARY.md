@@ -5,6 +5,7 @@
 - [C++ Contracts]()
   - [Basic Contract](cpp-contract/basic/README.md)
   - [Minimal UI](cpp-contract/minimal-ui/README.md)
+  - [Calling Others](cpp-contract/calling/README.md)
   - [Recursion]()
   - [Debugging]()
 - [Rust Contracts]()
