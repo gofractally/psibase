@@ -29,7 +29,7 @@ jobs:
           echo "$LIBMDBX_MIRROR_PRIVATE_KEY" > $HOME/.ssh/libmdbx-mirror.key
           chmod 600 $HOME/.ssh/libmdbx-mirror.key
           git rm external/libmdbx
-          GIT_SSH_COMMAND="ssh -i $$HOME/.ssh/libmdbx-mirror.key" git submodule add git@github.com:gofractally/libmdbx-mirror.git external/libmdbx/
+          GIT_SSH_COMMAND="ssh -i $HOME/.ssh/libmdbx-mirror.key" git submodule add git@github.com:gofractally/libmdbx-mirror.git external/libmdbx/
           git submodule update --init --recursive
           echo =====
           export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} --user $(id -u):$(id -g) jamesmart/cpp-dev-env:latest"
