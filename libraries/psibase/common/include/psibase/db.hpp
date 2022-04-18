@@ -15,5 +15,6 @@ namespace psibase
                              //   also subjectively writable by node operator.
       block_log,             // Not available during transactions. Readable during RPC.
       event,                 // Events
+      ui_event,              // User Interface Events (short-lived)
    };
 }  // namespace psibase

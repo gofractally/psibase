@@ -6,6 +6,7 @@ fn main() {
         .file("../../external/simdjson/simdjson.cpp")
         .flag("-std=gnu++2a")
         .include(Path::new("../../libraries/psio/include"))
+        .include(Path::new("../../libraries/psio/consthash/include"))
         .include(Path::new("../../external/rapidjson/include"))
         .include(Path::new("../../external/simdjson/include"))
         .cpp_link_stdlib(Some("stdc++")) // TODO: doc says this should be auto detected
