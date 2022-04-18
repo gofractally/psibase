@@ -14,7 +14,7 @@ namespace UserContract
 
       NID  mint();
       void burn(NID nftId);
-      void autodebit(bool autodebit);
+      void autodebit(bool enable);
       void credit(psibase::AccountNumber receiver, NID nftId, std::string memo);
       void uncredit(NID nftId);
       void debit(NID nftId);
@@ -35,7 +35,7 @@ namespace UserContract
       method(mint), 
       method(burn, nftId),
 
-      method(autodebit, autodebit),
+      method(autodebit, enable),
 
       method(credit, receiver, nftId, memo),
       method(uncredit, nftId),

@@ -3,7 +3,7 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <psibase/DefaultTestChain.hpp>
-#include "tokens_sys.hpp"
+#include "token_sys.hpp"
 
 using namespace psibase;
 

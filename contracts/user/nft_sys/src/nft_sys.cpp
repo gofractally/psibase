@@ -50,9 +50,9 @@ void NftSys::burn(NID nftId)
    stubs::burnNFT();
 }
 
-void NftSys::autodebit(bool autodebit)
+void NftSys::autodebit(bool enable)
 {
-   auto adRecord = AdRecord{.user = get_sender(), .autodebit = autodebit};
+   auto adRecord = AdRecord{.user = get_sender(), .autodebit = enable};
    db.open<AdTable_t>().put(adRecord);
 }
 

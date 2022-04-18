@@ -13,7 +13,6 @@ function(add suffix)
         auth_fake_sys/include
         proxy_sys/include
         rpc_account_sys/include
-        test/include
         transaction_sys/include
         verify_ec_sys/include
     )
