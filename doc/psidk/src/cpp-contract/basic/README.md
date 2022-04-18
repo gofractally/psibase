@@ -21,7 +21,7 @@ This will create `example.wasm`:
 ```sh
 mkdir build
 cd build
-cmake `psisdk-cmake-args` ..
+cmake `psidk-cmake-args` ..
 make -j $(nproc)
 ```
 

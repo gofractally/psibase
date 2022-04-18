@@ -1,4 +1,4 @@
-# psisdk
+# psidk
 
 - [Introduction](README.md)
 - [Installation]()

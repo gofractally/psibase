@@ -1,6 +1,6 @@
 # Minimal User Interface
 
-psisdk can provide a minimal UI to your contracts. This UI can help get you started developing your own contracts, but isn't suitable for end users.
+psidk can provide a minimal UI to your contracts. This UI can help get you started developing your own contracts, but isn't suitable for end users.
 
 Here is the contract definition. Place `example.cpp` and `CMakeLists.txt` in an empty folder.
 
@@ -21,7 +21,7 @@ This will create `example.wasm`:
 ```sh
 mkdir build
 cd build
-cmake `psisdk-cmake-args` ..
+cmake `psidk-cmake-args` ..
 make -j $(nproc)
 ```
 
