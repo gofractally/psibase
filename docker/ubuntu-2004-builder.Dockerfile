@@ -62,5 +62,12 @@ RUN cd /opt \
     && export PATH="/opt/node-v14.16.0-linux-x64/bin:$PATH" \
     && npm i -g yarn
 
+RUN cd /root \
+    && curl --proto '=https' --tlsv1.2 -sSf -o rustup.sh https://sh.rustup.rs \
+    && chmod 700 rustup.sh \
+    && ./rustup.sh -y --no-modify-path \
+    && /root/.cargo/bin/cargo install mdbook \
+    && rm rustup.sh
+
 ENV WASI_SDK_PREFIX=/opt/wasi-sdk-14.0
-ENV PATH=/opt/node-v14.16.0-linux-x64/bin:$PATH
+ENV PATH=/root/.cargo/bin:/opt/node-v14.16.0-linux-x64/bin:$PATH
