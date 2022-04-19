@@ -14,19 +14,18 @@ namespace UserContract
 
       NID  mint();
       void burn(NID nftId);
+      void credit(NID nftId, psibase::AccountNumber receiver, psio::const_view<std::string> memo);
+      void uncredit(NID nftId, psio::const_view<std::string> memo);
+      void debit(NID nftId, psio::const_view<std::string> memo);
       void autodebit(bool enable);
-      void credit(psibase::AccountNumber receiver, NID nftId, std::string memo);
-      void uncredit(NID nftId);
-      void debit(NID nftId);
 
       // Read-only:
       std::optional<NftRecord> getNft(NID nftId);
-      bool                     isAutodebit();
+      bool                     isAutodebit(psibase::AccountNumber account);
 
      private:
       tables db{contract};
 
-      bool _isAutoDebit(psibase::AccountNumber account);
       bool _exists(NID nftId);
    };
 
@@ -34,15 +33,13 @@ namespace UserContract
    PSIO_REFLECT(NftSys, 
       method(mint), 
       method(burn, nftId),
-
+      method(credit, nftId, receiver, memo),
+      method(uncredit, nftId, memo),
+      method(debit, nftId, memo),
       method(autodebit, enable),
 
-      method(credit, receiver, nftId, memo),
-      method(uncredit, nftId),
-      method(debit, nftId),
-      
       method(getNft, nftId),
-      method(isAutodebit)
+      method(isAutodebit, account)
    );
    // clang-format on
 

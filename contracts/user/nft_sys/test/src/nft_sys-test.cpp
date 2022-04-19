@@ -21,7 +21,21 @@ using UserContract::NftRecord;
 namespace
 {
    constexpr bool storageBillingImplemented = false;
-}
+
+   struct DiskUsage_AutodebitRecord
+   {
+      static constexpr int64_t firstEmplace      = 100;
+      static constexpr int64_t subsequentEmplace = 100;
+      static constexpr int64_t update            = 100;
+   };
+
+   struct DiskUsage_NftRecord
+   {
+      static constexpr int64_t firstEmplace      = 100;
+      static constexpr int64_t subsequentEmplace = 100;
+      static constexpr int64_t update            = 100;
+   };
+}  // namespace
 
 SCENARIO("Minting & burning nfts")
 {
@@ -61,7 +75,7 @@ SCENARIO("Minting & burning nfts")
          t.start_block();
          THEN("Alice consumes storage space as expected")
          {
-            CHECK(mint.diskConsumed({{alice.id, NftRecord::DiskUsage::firstEmplace}}));
+            CHECK(mint.diskConsumed({{alice.id, DiskUsage_NftRecord::firstEmplace}}));
             CHECK(storageBillingImplemented);
          }
          THEN("Alice can burn the NFT")
@@ -105,7 +119,7 @@ SCENARIO("Minting & burning nfts")
 
             THEN("Bob's pays for an expected amount of storage space")
             {
-               CHECK(mint.diskConsumed({{bob.id, NftRecord::DiskUsage::subsequentEmplace}}));
+               CHECK(mint.diskConsumed({{bob.id, DiskUsage_NftRecord::subsequentEmplace}}));
                CHECK(storageBillingImplemented);
             }
          }
@@ -130,29 +144,29 @@ SCENARIO("Transferring NFTs")
 
       THEN("Bob is configured to use auto-debit by default")
       {
-         auto isAutodebit = b.isAutodebit();
+         auto isAutodebit = b.isAutodebit(bob);
 
          CHECK(isAutodebit.succeeded());
          CHECK(true == isAutodebit.returnVal());
       }
       THEN("Bob is able to opt out of auto-debit")
       {
-         bool isAutodebit = b.isAutodebit().returnVal();
+         bool isAutodebit = b.isAutodebit(bob).returnVal();
          CHECK(isAutodebit);
 
          auto autodebit = b.autodebit(false);
          CHECK(autodebit.succeeded());
 
-         isAutodebit = b.isAutodebit().returnVal();
+         isAutodebit = b.isAutodebit(bob).returnVal();
          CHECK(!isAutodebit);
       }
 
       THEN("Alice is unable to credit, uncredit, or debit a non-existent NFT")
       {
-         CHECK(a.credit(bob, 1, "memo").failed(nftDNE));
-         CHECK(a.uncredit(1).failed(nftDNE));
-         CHECK(a.debit(1).failed(nftDNE));
-         CHECK(a.debit(1).failed(nftDNE));
+         CHECK(a.credit(1, bob, "memo").failed(nftDNE));
+         CHECK(a.uncredit(1, "memo").failed(nftDNE));
+         CHECK(a.debit(1, "memo").failed(nftDNE));
+         CHECK(a.debit(1, "memo").failed(nftDNE));
       }
       AND_GIVEN("Alice has minted an NFT")
       {
@@ -161,26 +175,26 @@ SCENARIO("Transferring NFTs")
 
          THEN("No one can debit or uncredit the NFT")
          {
-            CHECK(b.debit(nft.id).failed(debitRequiresCredit));
-            CHECK(b.uncredit(nft.id).failed(uncreditRequiresCredit));
-            CHECK(a.uncredit(nft.id).failed(uncreditRequiresCredit));
+            CHECK(b.debit(nft.id, "memo").failed(debitRequiresCredit));
+            CHECK(b.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
+            CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
          }
 
          THEN("Bob may not credit the NFT to Bob")
          {
-            CHECK(b.credit(alice, nft.id, "memo").failed(missingRequiredAuth));
+            CHECK(b.credit(nft.id, alice, "memo").failed(missingRequiredAuth));
          }
          THEN("Alice may not credit the NFT to herself")
          {
-            CHECK(a.credit(alice, nft.id, "memo").failed(creditorIsDebitor));
+            CHECK(a.credit(nft.id, alice, "memo").failed(creditorIsDebitor));
          }
          THEN("Alice may credit the NFT to Bob")
          {
-            CHECK(a.credit(bob, nft.id, "memo").succeeded());
+            CHECK(a.credit(nft.id, bob, "memo").succeeded());
          }
          WHEN("Alice credits the NFT to Bob")
          {
-            auto credit = a.credit(bob, nft.id, "memo");
+            auto credit = a.credit(nft.id, bob, "memo");
 
             THEN("Bob immediately owns the NFT")
             {
@@ -189,13 +203,13 @@ SCENARIO("Transferring NFTs")
             }
             THEN("The payer for storage costs of the NFT are updated accordingly")
             {
-               CHECK(credit.diskConsumed({{alice.id, -1 * NftRecord::DiskUsage::update},
-                                          {bob.id, NftRecord::DiskUsage::update}}));
+               CHECK(credit.diskConsumed({{alice.id, -1 * DiskUsage_NftRecord::update},
+                                          {bob.id, DiskUsage_NftRecord::update}}));
                CHECK(storageBillingImplemented);
             }
             THEN("Alice has no chance to uncredit the NFT")
             {
-               CHECK(a.uncredit(nft.id).failed(uncreditRequiresCredit));
+               CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
             }
          }
          WHEN("Bob opts out of auto-debit")
@@ -204,7 +218,7 @@ SCENARIO("Transferring NFTs")
 
             AND_WHEN("Alice credits the NFT to Bob")
             {
-               auto credit = a.credit(bob, nft.id, "memo");
+               auto credit = a.credit(nft.id, bob, "memo");
 
                THEN("The NFT is not yet owned by Bob")
                {
@@ -216,27 +230,27 @@ SCENARIO("Transferring NFTs")
                }
                THEN("Alice and Charlie may not debit the NFT")
                {
-                  CHECK(a.debit(nft.id).failed(debitRequiresCredit));
-                  CHECK(c.debit(nft.id).failed(debitRequiresCredit));
+                  CHECK(a.debit(nft.id, "memo").failed(debitRequiresCredit));
+                  CHECK(c.debit(nft.id, "memo").failed(debitRequiresCredit));
                }
                THEN("Bob and Charlie may not uncredit the NFT")
                {
-                  CHECK(b.uncredit(nft.id).failed(creditorAction));
-                  CHECK(c.uncredit(nft.id).failed(creditorAction));
+                  CHECK(b.uncredit(nft.id, "memo").failed(creditorAction));
+                  CHECK(c.uncredit(nft.id, "memo").failed(creditorAction));
                }
                THEN("Bob may debit the NFT")
                {
-                  auto debit = b.debit(nft.id);
+                  auto debit = b.debit(nft.id, "memo");
                   CHECK(debit.succeeded());
                   AND_THEN("The payer for storage costs of the NFT are updated accordingly")
                   {
-                     debit.diskConsumed({{alice.id, -1 * NftRecord::DiskUsage::update},
-                                         {bob.id, NftRecord::DiskUsage::update}});
+                     debit.diskConsumed({{alice.id, -1 * DiskUsage_NftRecord::update},
+                                         {bob.id, DiskUsage_NftRecord::update}});
                   }
                }
                THEN("Alice may uncredit the NFT")
                {
-                  auto uncredit = a.uncredit(nft.id);
+                  auto uncredit = a.uncredit(nft.id, "memo");
                   CHECK(uncredit.succeeded());
 
                   AND_THEN("The payer for storage costs of the NFT do not change")
@@ -246,43 +260,43 @@ SCENARIO("Transferring NFTs")
                }
                THEN("Alice may not credit the NFT to someone else")
                {
-                  auto credit = a.credit(charlie, nft.id, "Memo");
+                  auto credit = a.credit(nft.id, charlie, "Memo");
                   CHECK(credit.failed(alreadyCredited));
                }
                AND_WHEN("Bob debits the NFT")
                {
-                  auto debit = b.debit(nft.id);
+                  auto debit = b.debit(nft.id, "memo");
 
                   THEN("Bob owns the NFT") { CHECK(bob.id == b.getNft(nft.id).returnVal()->owner); }
                   THEN("Alice and Charlie may not uncredit or debit the NFT")
                   {
-                     CHECK(a.uncredit(nft.id).failed(uncreditRequiresCredit));
-                     CHECK(a.debit(nft.id).failed(debitRequiresCredit));
-                     CHECK(c.uncredit(nft.id).failed(uncreditRequiresCredit));
-                     CHECK(c.debit(nft.id).failed(debitRequiresCredit));
+                     CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
+                     CHECK(a.debit(nft.id, "memo").failed(debitRequiresCredit));
+                     CHECK(c.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
+                     CHECK(c.debit(nft.id, "memo").failed(debitRequiresCredit));
                   }
                   THEN("Bob may not debit the NFT again")
                   {
-                     CHECK(b.debit(nft.id).failed(debitRequiresCredit));
+                     CHECK(b.debit(nft.id, "memo").failed(debitRequiresCredit));
                   }
                }
                AND_WHEN("Alice uncredits the NFT")
                {
-                  a.uncredit(nft.id);
+                  a.uncredit(nft.id, "memo");
 
                   THEN("No one can debit or uncredit the NFT")
                   {
-                     CHECK(a.uncredit(nft.id).failed(uncreditRequiresCredit));
-                     CHECK(b.uncredit(nft.id).failed(uncreditRequiresCredit));
-                     CHECK(c.uncredit(nft.id).failed(uncreditRequiresCredit));
+                     CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
+                     CHECK(b.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
+                     CHECK(c.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
 
-                     CHECK(a.debit(nft.id).failed(debitRequiresCredit));
-                     CHECK(b.debit(nft.id).failed(debitRequiresCredit));
-                     CHECK(c.debit(nft.id).failed(debitRequiresCredit));
+                     CHECK(a.debit(nft.id, "memo").failed(debitRequiresCredit));
+                     CHECK(b.debit(nft.id, "memo").failed(debitRequiresCredit));
+                     CHECK(c.debit(nft.id, "memo").failed(debitRequiresCredit));
                   }
                   THEN("Alice may credit the NFT again")
                   {
-                     CHECK(a.credit(bob, nft.id, "memo").succeeded());
+                     CHECK(a.credit(nft.id, bob, "memo").succeeded());
                   }
                }
             }

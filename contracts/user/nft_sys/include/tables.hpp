@@ -7,24 +7,18 @@ namespace UserContract
 {
    using NID = uint32_t;
 
-   struct AdRecord
+   struct AutodebitRecord
    {
       psibase::AccountNumber user;
       bool                   autodebit;
 
-      struct DiskUsage
-      {
-         static constexpr int64_t firstEmplace      = 100;
-         static constexpr int64_t subsequentEmplace = 100;
-         static constexpr int64_t update            = 100;
-      };
-
-      friend std::strong_ordering operator<=>(const AdRecord&, const AdRecord&) = default;
+      friend std::strong_ordering operator<=>(const AutodebitRecord&,
+                                              const AutodebitRecord&) = default;
    };
-   EOSIO_REFLECT(AdRecord, user, autodebit);
-   PSIO_REFLECT(AdRecord, user, autodebit);
+   EOSIO_REFLECT(AutodebitRecord, user, autodebit);
+   PSIO_REFLECT(AutodebitRecord, user, autodebit);
+   using AdTable_t = psibase::table<AutodebitRecord, &AutodebitRecord::user>;
 
-   using AdTable_t = psibase::table<AdRecord, &AdRecord::user>;
    struct NftRecord
    {
       NID                    id;
@@ -34,17 +28,13 @@ namespace UserContract
 
       static bool isValidKey(const NID& id) { return id != 0; }
 
-      struct DiskUsage
-      {
-         static constexpr int64_t firstEmplace      = 100;
-         static constexpr int64_t subsequentEmplace = 100;
-         static constexpr int64_t update            = 100;
-      };
-
       friend std::strong_ordering operator<=>(const NftRecord&, const NftRecord&) = default;
    };
    EOSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
    PSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
-
+   // Todo: Also index by issuer and owner when additional indices are possible
    using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;
+
+   // Todo: separate creditedTo into its own table
+
 }  // namespace UserContract
