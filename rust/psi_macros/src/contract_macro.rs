@@ -12,7 +12,7 @@ pub fn contract_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream 
     });
     let item = parse_macro_input!(item as Item);
     match item {
-        Item::Mod(impl_mod) => process_mod(iface_mod_name, impl_mod).into(),
+        Item::Mod(impl_mod) => process_mod(iface_mod_name, impl_mod),
         _ => {
             abort!(item, "contract attribute may only be used on a module")
         }
@@ -46,7 +46,7 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
         for (item_index, item) in items.iter_mut().enumerate() {
             match item {
                 Item::Fn(f) => {
-                    if let Some(_) = f.attrs.iter().position(is_action_attr) {
+                    if f.attrs.iter().any(is_action_attr) {
                         action_fns.push(item_index);
                     }
                 }

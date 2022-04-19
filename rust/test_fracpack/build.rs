@@ -5,6 +5,8 @@ fn main() {
         .file("tests/test.cpp")
         .file("../../external/simdjson/simdjson.cpp")
         .flag("-std=gnu++2a")
+        .flag("-Wno-sign-compare") // TODO
+        .flag("-Wno-ambiguous-reversed-operator") // TODO
         .include(Path::new("../../libraries/psio/include"))
         .include(Path::new("../../libraries/psio/consthash/include"))
         .include(Path::new("../../external/rapidjson/include"))
