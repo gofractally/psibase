@@ -15,7 +15,8 @@ namespace system_contract
       static constexpr uint64_t contract_flags =
           psibase::account_row::allow_sudo | psibase::account_row::allow_write_native;
 
-      psibase::BlockNum headBlockNum();
+      psibase::BlockNum     headBlockNum() const;
+      psibase::TimePointSec blockTime() const;
 
       // TODO: move to another contract
       uint8_t setCode(psibase::AccountNumber contract,

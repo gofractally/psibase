@@ -55,39 +55,35 @@ namespace psibase
    EOSIO_REFLECT(Claim, contract, raw_data)
    PSIO_REFLECT(Claim, contract, raw_data)
 
+   /* mark this as final and put it in memory order that
+    * has no padding nor alignment requirements so these fields
+    * can be effeciently memcpy 
+    *
+    * - do not add any fields that may allocate memory 
+    *
+    *   Tapos = Transactions as Proof of Stake
+    */
+   struct FRACPACK Tapos final
+   {
+      static constexpr uint16_t do_not_broadcast = 1u << 0;
+
+      TimePointSec expiration;
+      uint16_t     flags            = 0;
+      uint32_t     ref_block_prefix = 0;
+      uint16_t     ref_block_num    = 0;
+   };
+   PSIO_REFLECT(Tapos, expiration, flags, ref_block_prefix, ref_block_num)
+   EOSIO_REFLECT(Tapos, expiration, flags, ref_block_prefix, ref_block_num)
+
    // TODO: separate native-defined fields from contract-defined fields
    struct transaction
    {
-      static constexpr uint32_t do_not_broadcast = 1u << 0;
-
-      TimePointSec        expiration;
-      uint16_t            ref_block_num       = 0;
-      uint32_t            ref_block_prefix    = 0;
-      uint16_t            max_net_usage_words = 0;  // 8-byte words
-      uint16_t            max_cpu_usage_ms    = 0;
-      uint32_t            flags               = 0;
+      Tapos               tapos;
       std::vector<Action> actions;
       std::vector<Claim>  claims;  // TODO: Is there standard terminology that we could use?
    };
-   EOSIO_REFLECT(transaction,
-                 expiration,
-                 ref_block_num,
-                 ref_block_prefix,
-                 max_net_usage_words,
-                 max_cpu_usage_ms,
-                 flags,
-                 actions,
-                 claims)
-
-   PSIO_REFLECT(transaction,
-                expiration,
-                ref_block_num,
-                ref_block_prefix,
-                max_net_usage_words,
-                max_cpu_usage_ms,
-                flags,
-                actions,
-                claims)
+   EOSIO_REFLECT(transaction, tapos, actions, claims)
+   PSIO_REFLECT(transaction, tapos, actions, claims)
 
    // TODO: pruning proofs?
    // TODO: compression? There's a time/space tradeoff and it complicates client libraries.

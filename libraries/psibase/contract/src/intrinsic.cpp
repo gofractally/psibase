@@ -34,6 +34,7 @@ namespace psibase
    {
       psio::shared_view_ptr<Action> ptr(psio::size_tag{raw::get_current_action()});
       raw::get_result(ptr.data(), ptr.size());
+      check( ptr.validate_all_known(), "invalid action format" );
       return ptr;
    }
 

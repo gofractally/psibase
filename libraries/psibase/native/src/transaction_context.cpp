@@ -24,7 +24,6 @@ namespace psibase
    void transaction_context::exec_transaction()
    {
       // TODO: move checks into wasm
-      eosio::check(block_context.current.header.time < trx.trx.expiration, "transaction expired");
       eosio::check(!trx.trx.actions.empty(), "transaction has no actions");
 
       // Prepare for execution

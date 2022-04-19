@@ -17,12 +17,19 @@ static const auto& getStatus()
 
 namespace system_contract
 {
-   psibase::BlockNum transaction_sys::headBlockNum()
+   psibase::BlockNum transaction_sys::headBlockNum() const
    {
       auto& stat = getStatus();
       if (stat && stat->head)
          return stat->head->header.num;
       return 1;  // next block (currently being produced) is 2 (genesis)
+   }
+   psibase::TimePointSec transaction_sys::blockTime() const
+   {
+      auto& stat = getStatus();
+      if (stat && stat->head)
+         return stat->head->header.time;
+      return {};
    }
 
    // TODO: move to another contract
@@ -92,6 +99,14 @@ namespace system_contract
       auto top_act = get_current_action();
       // TODO: avoid copying inner raw_data during unpack
       auto trx = psio::convert_from_frac<transaction>(top_act.raw_data);
+
+      check( trx.actions.size() > 0, "transaction has no actions" );
+
+      if (const auto& stat = getStatus())
+      {
+         check(stat->head->header.time <= trx.tapos.expiration, "transaction has expired");
+      }
+
       for (auto& act : trx.actions)
       {
          auto account = kv_get<account_row>(account_row::kv_map, account_key(act.sender));

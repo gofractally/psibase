@@ -1946,7 +1946,7 @@ namespace psio
 
       operator std::vector<T>() const
       {
-         input_stream   in(pos, pos + 0xfffffff);  /// TOOD: maintain real end
+         input_stream   in(pos, pos + 0xfffffff);  /// TODO: maintain real end
          std::vector<T> tmp;
          fracunpack<std::vector<T>>(tmp, in);
          return tmp;
@@ -2463,6 +2463,15 @@ namespace psio
          }
          return false;
       }
+      bool validate_all_known() const
+      {
+         if (_data)
+         {
+            return psio::fracvalidate<T>(data(), data() + size()).valid_and_known();
+         }
+         return false;
+      }
+
 
       T unpack() const
       {
@@ -2509,6 +2518,14 @@ namespace psio
       if (fracvalidate<T>(b.data(), b.data() + b.size()).valid)
          return convert_from_frac<T>(b);
       throw_error(stream_error::invalid_frac_encoding);
+   }
+
+   template <typename T>
+   auto make_view(const char* data, size_t size)
+   {
+      if (fracvalidate<T>(data, size).valid_and_known())
+         return const_view<T>(data);
+      return const_view<T>();
    }
 
 }  // namespace psio
