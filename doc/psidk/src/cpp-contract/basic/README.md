@@ -29,11 +29,11 @@ make -j $(nproc)
 
 This, when run on a local test chain, will:
 
-- Create the `example` account, if it doesn't already exist. The account will be keyless (not suitable for production).
-- Install the `example.wasm` contract on that contract
+- Create the `example` account, if it doesn't already exist. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public chains. `-i` is a shortcut for `--create-insecure-account`.
+- Install the `example.wasm` contract on that contract.
 
 ```sh
-psibase install example example.wasm
+psibase install -i example example.wasm
 ```
 
 ## Trying the contract
