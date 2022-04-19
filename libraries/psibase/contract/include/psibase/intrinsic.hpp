@@ -208,15 +208,13 @@ namespace psibase
    // Add a sequentially-numbered record. Returns the id.
    template <typename Type, typename V>
    auto kv_put_sequential(kv_map        map,
-                          BlockNum      blockNum,
                           AccountNumber contract,
                           Type          type,
                           const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
-      std::vector<char>     packed(psio::fracpack_size(blockNum) + psio::fracpack_size(contract) +
+      std::vector<char>     packed(psio::fracpack_size(contract) +
                                    psio::fracpack_size(type) + psio::fracpack_size(value));
       psio::fast_buf_stream stream(packed.data(), packed.size());
-      psio::fracpack(blockNum, stream);
       psio::fracpack(contract, stream);
       psio::fracpack(type, stream);
       psio::fracpack(value, stream);
