@@ -89,13 +89,14 @@ namespace psibase
    }
    struct DatabaseStatusRow
    {
-      uint64_t nextEventNumber = 1;
+      uint64_t nextEventNumber   = 1;
+      uint64_t nextUIEventNumber = 1;
 
       // This table is in native_constrained. The native code blocks contracts
       // from writing to this since it could break backing stores.
       static constexpr auto kv_map = psibase::kv_map::native_constrained;
       static auto           key() { return databaseStatusKey(); }
    };
-   PSIO_REFLECT(DatabaseStatusRow, nextEventNumber)
+   PSIO_REFLECT(DatabaseStatusRow, nextEventNumber, nextUIEventNumber)
 
 }  // namespace psibase

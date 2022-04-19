@@ -237,6 +237,8 @@ namespace psibase
       {
          if (map == uint32_t(kv_map::event) && trx_context.block_context.is_read_only)
             return (kv_map)map;
+         if (map == uint32_t(kv_map::ui_event) && trx_context.block_context.is_read_only)
+            return (kv_map)map;
          throw std::runtime_error("contract may not read this map, or must use another intrinsic");
       }
 
@@ -281,6 +283,8 @@ namespace psibase
          eosio::check(!trx_context.block_context.is_read_only, "writes disabled during query");
 
          if (map == uint32_t(kv_map::event))
+            return (kv_map)map;
+         if (map == uint32_t(kv_map::ui_event))
             return (kv_map)map;
          throw std::runtime_error("contract may not write this map, or must use another intrinsic");
       }
@@ -433,16 +437,20 @@ namespace psibase
          auto m = get_map_write_sequential(map);
 
          eosio::input_stream v{value.data(), value.size()};
-         eosio::check(v.remaining() >= sizeof(BlockNum) + sizeof(AccountNumber::value),
-                      "value prefix must match block number and contract during write");
-         auto blockNum = eosio::from_bin<BlockNum>(v);
+         eosio::check(v.remaining() >= sizeof(AccountNumber::value),
+                      "value prefix must match contract during write");
          auto contract = eosio::from_bin<AccountNumber>(v);
-         eosio::check(blockNum == trx_context.block_context.current.header.num &&
-                          contract == contract_account.num,
-                      "value prefix must match block number and contract during write");
+         eosio::check(contract == contract_account.num,
+                      "value prefix must match contract during write");
 
-         auto& dbStatus    = trx_context.block_context.databaseStatus;
-         auto  indexNumber = dbStatus.nextEventNumber++;
+         auto&    dbStatus = trx_context.block_context.databaseStatus;
+         uint64_t indexNumber;
+         if (map == uint32_t(kv_map::event))
+            indexNumber = dbStatus.nextEventNumber++;
+         else if (map == uint32_t(kv_map::ui_event))
+            indexNumber = dbStatus.nextUIEventNumber++;
+         else
+            eosio::check(false, "kv_put_sequential: unsupported map");
          db.kv_put(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
 
          db.kv_put_raw(m, eosio::convert_to_key(indexNumber), {value.data(), value.size()});

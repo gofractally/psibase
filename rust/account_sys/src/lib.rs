@@ -1,4 +1,4 @@
-use psibase::*;
+use libpsibase::*;
 use serde::Serialize;
 use serde_json::json;
 

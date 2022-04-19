@@ -1,2 +1,2 @@
 [workspace]
-members = ["account_sys", "fracpack", "test_fracpack", "psibase", "psi_macros"]
+members = ["account_sys", "fracpack", "test_fracpack", "libpsibase", "psi_macros"]
