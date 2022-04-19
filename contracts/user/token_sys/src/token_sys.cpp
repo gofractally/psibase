@@ -30,26 +30,26 @@ void TokenSys::autodebit(bool enable)
    // NOP
 }
 
-void TokenSys::credit(TID                    tokenId,
-                      psibase::AccountNumber receiver,
-                      uint64_t               amount,
-                      const std::string&     memo)
+void TokenSys::credit(TID                           tokenId,
+                      psibase::AccountNumber        receiver,
+                      uint64_t                      amount,
+                      psio::const_view<std::string> memo)
 {
    // NOP
 }
 
-void TokenSys::uncredit(TID                    tokenId,
-                        psibase::AccountNumber receiver,
-                        uint64_t               amount,
-                        std::string            memo)
+void TokenSys::uncredit(TID                           tokenId,
+                        psibase::AccountNumber        receiver,
+                        uint64_t                      amount,
+                        psio::const_view<std::string> memo)
 {
    // NOP
 }
 
-void TokenSys::debit(TID                    tokenId,
-                     psibase::AccountNumber sender,
-                     uint64_t               amount,
-                     const std::string&     memo)
+void TokenSys::debit(TID                           tokenId,
+                     psibase::AccountNumber        sender,
+                     uint64_t                      amount,
+                     psio::const_view<std::string> memo)
 {
    // NOP
 }
@@ -59,7 +59,7 @@ std::optional<TokenRecord> TokenSys::getToken(TID tokenId)
    // NOP
 }
 
-bool TokenSys::isAutodebit()
+bool TokenSys::isAutodebit(psibase::AccountNumber account)
 {
    // NOP
 }

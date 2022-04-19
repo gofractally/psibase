@@ -6,6 +6,19 @@
 
 using namespace psibase;
 
+namespace
+{
+   constexpr bool storageBillingImplemented = false;
+
+   struct DiskUsage_TokenRecord
+   {
+      static constexpr int64_t firstEmplace      = 100;
+      static constexpr int64_t subsequentEmplace = 100;
+      static constexpr int64_t update            = 100;
+   };
+
+}  // namespace
+
 SCENARIO("Creating a token")
 {
    GIVEN("An empty chain with user Alice")

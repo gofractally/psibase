@@ -29,31 +29,30 @@ namespace UserContract
 
       void unrecallable(TID tokenId);
 
-      //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, uint64_t daily_limit_qty);
-      //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, uint64_t yearly_limit_qty);
+      void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, uint64_t daily_limit_qty);
+      void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, uint64_t yearly_limit_qty);
 
       void burn(TID tokenId, uint64_t amount);
       void autodebit(bool enable);
-      void credit(TID                    tokenId,
-                  psibase::AccountNumber receiver,
-                  uint64_t               amount,
-                  const std::string&     memo);
-      void uncredit(TID                    tokenId,
-                    psibase::AccountNumber receiver,
-                    uint64_t               amount,
-                    std::string            memo);
-      void debit(TID                    tokenId,
-                 psibase::AccountNumber sender,
-                 uint64_t               amount,
-                 const std::string&     memo);
+      void credit(TID                           tokenId,
+                  psibase::AccountNumber        receiver,
+                  uint64_t                      amount,
+                  psio::const_view<std::string> memo);
+      void uncredit(TID                           tokenId,
+                    psibase::AccountNumber        receiver,
+                    uint64_t                      amount,
+                    psio::const_view<std::string> memo);
+      void debit(TID                           tokenId,
+                 psibase::AccountNumber        sender,
+                 uint64_t                      amount,
+                 psio::const_view<std::string> memo);
 
       std::optional<TokenRecord> getToken(TID tokenId);
-      bool                       isAutodebit();
+      bool                       isAutodebit(psibase::AccountNumber account);
 
      private:
       tables db{contract};
 
-      bool _isAutoDebit(psibase::AccountNumber account);
       bool _exists(TID tokenId);
    };
 
