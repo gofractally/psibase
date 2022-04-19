@@ -35,8 +35,8 @@ change based on the prior element.
 */
 #pragma once
 #include <consthash/cityhash64.hxx>
-#include <string>
 #include <limits>
+#include <string>
 
 namespace psio
 {
@@ -365,11 +365,17 @@ namespace psio
          return m_output;
       }  // name_to_number
 
+      inline constexpr bool is_hash_name(uint64_t h)
+      {
+         return (h & (uint64_t(0x01) << (64 - 8))) > 0;
+      }
+
       inline std::string number_to_method(uint64_t input)
       {
          if (not input)
             return std::string();
-         if (input & (uint64_t(0x01) << (64 - 8)))
+         //if (input & (uint64_t(0x01) << (64 - 8)))
+         if (is_hash_name(input))
          {
             std::string str = "#";
             /// then it is a hash
