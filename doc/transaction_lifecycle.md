@@ -14,6 +14,9 @@ referenced block.  All told, this prevents attackers from forking a chain in sec
 migrating most of the transactions from the legitimate chain to a forked chain. This hash is
 "proof" the the transactor has some stake in building on a particular state.
 
+TaPoS data will be available via a special KV_MAP which can only be read by the transact contract. This
+will allow it to utilize a circular buffer optimization rather than using 65k database rows.
+
 ## Transaction Sequence Numbers
 
 Every transaction includes numbers that allow the sender of the first action (aka the first sender)
