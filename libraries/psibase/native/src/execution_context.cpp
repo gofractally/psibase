@@ -372,8 +372,8 @@ namespace psibase
 
       void abort_message(span<const char> str)
       {
-         throw std::runtime_error("contract aborted with message: " +
-                                  std::string(str.data(), str.size()));
+         throw std::runtime_error("contract " + contract_account.num.str() +
+                                  " aborted with message: " + std::string(str.data(), str.size()));
       }
 
       uint32_t get_current_action()
