@@ -336,7 +336,9 @@ namespace std
 #define PSIO_MATCH_ITEMSbase(...) (PSIO_KEEP_BASE, __VA_ARGS__), 1
 #define PSIO_MATCH_ITEMSnumbered(...) (PSIO_KEEP_NUMBERED, __VA_ARGS__), 1
 #define PSIO_MATCH_ITEMSmethod(...) (PSIO_KEEP_METHOD, __VA_ARGS__), 1
+
 #define PSIO_MATCH_ITEMSallowHashedMethods(...) (PSIO_KEEP_FLAG, allowHashedMethods), 1
+#define PSIO_HAS_FLAG_IMPL_allowHashedMethods_allowHashedMethods(...) , 1
 
 // numbered(int, ident)
 // unnumbered(ident)
@@ -382,7 +384,6 @@ namespace std
        PSIO_SEQ_FILTER(PSIO_HAS_FLAG_IMPL, flag, PSIO_REFLECT_FLAGS(__VA_ARGS__))))
 #define PSIO_HAS_FLAG_IMPL(s, flag, elem) \
    PSIO_MATCH_ADD_PAREN(BOOST_PP_CAT(BOOST_PP_CAT(PSIO_HAS_FLAG_IMPL_, flag), _), elem)
-#define PSIO_HAS_FLAG_IMPL_allowHashedMethods_allowHashedMethods(...) , 1
 
 // numbered(int, ident)       => ident
 // unnumbered(ident)          => ident
