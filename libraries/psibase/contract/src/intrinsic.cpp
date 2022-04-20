@@ -8,11 +8,14 @@ namespace psibase
    {
       std::vector<char> result(size);
       if (size)
-         raw::get_result(result.data(), result.size());
+         raw::get_result(result.data(), result.size(), 0);
       return result;
    }
 
-   std::vector<char> get_result() { return get_result(raw::get_result(nullptr, 0)); }
+   std::vector<char> get_result()
+   {
+      return get_result(raw::get_result(nullptr, 0, 0));
+   }
 
    std::vector<char> get_key(uint32_t size)
    {
@@ -22,7 +25,10 @@ namespace psibase
       return key;
    }
 
-   std::vector<char> get_key() { return get_key(raw::get_key(nullptr, 0)); }
+   std::vector<char> get_key()
+   {
+      return get_key(raw::get_key(nullptr, 0));
+   }
 
    Action get_current_action()
    {
@@ -33,8 +39,8 @@ namespace psibase
    psio::shared_view_ptr<Action> get_current_action_view()
    {
       psio::shared_view_ptr<Action> ptr(psio::size_tag{raw::get_current_action()});
-      raw::get_result(ptr.data(), ptr.size());
-      check( ptr.validate_all_known(), "invalid action format" );
+      raw::get_result(ptr.data(), ptr.size(), 0);
+      check(ptr.validate_all_known(), "invalid action format");
       return ptr;
    }
 
@@ -48,5 +54,8 @@ namespace psibase
       return get_result(raw::call(action.pos, action.remaining()));
    }
 
-   std::vector<char> call(const action& action) { return call(psio::convert_to_frac(action)); }
+   std::vector<char> call(const action& action)
+   {
+      return call(psio::convert_to_frac(action));
+   }
 }  // namespace psibase

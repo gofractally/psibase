@@ -341,11 +341,11 @@ namespace psibase
          return result_value.size();
       }
 
-      // TODO: offset
-      uint32_t get_result(span<char> dest)
+      uint32_t get_result(span<char> dest, uint32_t offset)
       {
-         if (!result_value.empty())
-            memcpy(dest.data(), result_value.data(), std::min(result_value.size(), dest.size()));
+         if (offset < result_value.size() && dest.size())
+            memcpy(dest.data(), result_value.data() + offset,
+                   std::min(result_value.size() - offset, dest.size()));
          return result_value.size();
       }
 

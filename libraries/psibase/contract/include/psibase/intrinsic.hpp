@@ -19,8 +19,11 @@ namespace psibase
    namespace raw
    {
       // Intrinsics which return data do it by storing it in a result buffer.
-      // get_result copies min(dest_size, result_size) bytes into dest and returns result_size.
-      PSIBASE_INTRINSIC(get_result) uint32_t get_result(const char* dest, uint32_t dest_size);
+      // get_result copies min(dest_size, result_size - offset) bytes from
+      // result + offset into dest and returns result_size. If offset >= result_size,
+      // then it skips the copy.
+      PSIBASE_INTRINSIC(get_result)
+      uint32_t get_result(const char* dest, uint32_t dest_size, uint32_t offset);
 
       // Intrinsics which return keys do it by storing it in a key buffer.
       // get_key copies min(dest_size, key_size) bytes into dest and returns key_size.
