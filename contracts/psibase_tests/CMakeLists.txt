@@ -1,3 +1,5 @@
+enable_testing()
+
 function(contract name suffix)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC include)
@@ -10,15 +12,16 @@ function(add suffix)
     contract(test_kv "${suffix}" test_kv.cpp)
     contract(test_table "${suffix}" test_table.cpp)
 
-    add_executable(tests${suffix} test.cpp test-ec.cpp)
-    target_include_directories(tests${suffix} PUBLIC include)
-    target_link_libraries(tests${suffix} contracts_system${suffix} nctestlib )
-    set_target_properties(tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+    add_executable(psibase-tests${suffix} test.cpp test-ec.cpp)
+    target_include_directories(psibase-tests${suffix} PUBLIC include)
+    target_link_libraries(psibase-tests${suffix} contracts_system${suffix} nctestlib )
+    set_target_properties(psibase-tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add)
 
 if(DEFINED IS_WASM)
     add("")
     add("-debug")
+    add_wasm_test(psibase-tests)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

@@ -22,7 +22,7 @@ set(psidk_DIR ${CMAKE_SOURCE_DIR})
 function(native_test N)
 endfunction()
 
-function(add_cltester_test N)
+function(add_wasm_test N)
     add_test(
         NAME t-${N}
         WORKING_DIRECTORY ${ROOT_BINARY_DIR}
