@@ -1,4 +1,16 @@
+use anyhow::{Context, Result};
+use chrono::{Duration, SecondsFormat, Utc};
 use clap::{Parser, Subcommand};
+use custom_error::custom_error;
+use reqwest::Url;
+use serde_json::Value;
+
+mod bridge;
+
+custom_error! { Error
+    BadResponseFormat   = "Invalid response format from server",
+    Msg{s:String}       = "{s}",
+}
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
@@ -39,8 +51,191 @@ enum Commands {
     },
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _args = Args::parse();
+// TODO: move to lib
+fn to_hex(bytes: &[u8]) -> String {
+    let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    for byte in bytes {
+        result.push(DIGITS[(byte >> 4) as usize]);
+        result.push(DIGITS[(byte & 0x0f) as usize]);
+    }
+    String::from_utf8(result).unwrap()
+}
+
+// TODO: replace
+fn new_account(account: &str, auth_contract: &str) -> Result<String, anyhow::Error> {
+    Ok(to_hex(
+        bridge::ffi::pack_new_account(&format!(
+            r#"{{
+                "account": {},
+                "auth_contract": {},
+                "allow_sudo": false
+            }}"#,
+            serde_json::to_string(account)?,
+            serde_json::to_string(auth_contract)?
+        ))
+        .as_slice(),
+    ))
+}
+
+// TODO: replace
+fn set_code(contract: &str, code: &str) -> Result<String, anyhow::Error> {
+    Ok(to_hex(
+        bridge::ffi::pack_set_code(&format!(
+            r#"{{
+                "contract": {},
+                "vm_type": 0,
+                "vm_version": 0,
+                "code": {}
+            }}"#,
+            serde_json::to_string(contract)?,
+            serde_json::to_string(code)?
+        ))
+        .as_slice(),
+    ))
+}
+
+// TODO: replace with struct
+fn action_json(
+    sender: &str,
+    contract: &str,
+    method: &str,
+    raw_data: &str,
+) -> Result<String, anyhow::Error> {
+    Ok(format!(
+        r#"{{
+            "sender": {},
+            "contract": {},
+            "method": {},
+            "raw_data": {}
+        }}"#,
+        serde_json::to_string(sender)?,
+        serde_json::to_string(contract)?,
+        serde_json::to_string(method)?,
+        serde_json::to_string(raw_data)?
+    ))
+}
+
+// TODO: replace with struct
+fn transaction_json(expiration: &str, actions: &[String]) -> Result<String, anyhow::Error> {
+    Ok(format!(
+        r#"{{
+            "tapos": {{
+                "expiration": {}
+            }},
+            "actions": [{}]
+        }}"#,
+        serde_json::to_string(expiration)?,
+        actions.join(",")
+    ))
+}
+
+// TODO: replace with struct
+fn signed_transaction_json(trx: &str) -> Result<String, anyhow::Error> {
+    Ok(format!(
+        r#"{{
+            "trx": {}
+        }}"#,
+        trx
+    ))
+}
+
+async fn push_transaction_impl(
+    args: &Args,
+    client: reqwest::Client,
+    packed: Vec<u8>,
+) -> Result<(), anyhow::Error> {
+    let resp = client
+        .post(Url::parse(&args.api)?.join("native/push_transaction")?)
+        .body(packed)
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await?;
+    let json: Value = serde_json::de::from_str(&resp)?;
+    // println!("{:#?}", json);
+    let err = json.get("error").and_then(|v| v.as_str());
+    if let Some(e) = err {
+        if !e.is_empty() {
+            Err(Error::Msg { s: e.to_string() })?;
+        }
+    }
+    Ok(())
+}
+
+async fn push_transaction(
+    args: &Args,
+    client: reqwest::Client,
+    packed: Vec<u8>,
+) -> Result<(), anyhow::Error> {
+    push_transaction_impl(args, client, packed)
+        .await
+        .context("Failed to push transaction")?;
+    Ok(())
+}
+
+async fn install(
+    args: &Args,
+    client: reqwest::Client,
+    account: &str,
+    filename: &str,
+    create_insecure_account: bool,
+    _register_proxy: bool,
+) -> Result<(), anyhow::Error> {
+    let wasm = std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?;
+    let mut actions: Vec<String> = Vec::new();
+    if create_insecure_account {
+        // TODO: check if account exists
+        actions.push(action_json(
+            "account-sys",
+            "account-sys",
+            "newAccount",
+            &new_account(account, "auth-fake-sys")?,
+        )?);
+    }
+    actions.push(action_json(
+        account,
+        "transact-sys",
+        "setCode",
+        &set_code(account, &to_hex(&wasm))?,
+    )?);
+    // TODO register_proxy
+    let signed_json = signed_transaction_json(&transaction_json(
+        &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
+        &actions,
+    )?)?;
+    // println!("{}", signed_json);
+    let packed_signed = bridge::ffi::pack_signed_transaction(&signed_json);
+    // println!("{}", to_hex(packed_signed.as_slice()));
+    push_transaction(args, client, packed_signed.as_slice().into()).await?;
+    println!("Ok");
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    let args = Args::parse();
+    let client = reqwest::Client::new();
+    // TODO: environment variable for url
+    match &args.command {
+        Commands::Install {
+            account,
+            filename,
+            create_insecure_account,
+            register_proxy,
+        } => {
+            install(
+                &args,
+                client,
+                account,
+                filename,
+                *create_insecure_account,
+                *register_proxy,
+            )
+            .await?
+        }
+    }
 
     Ok(())
 }

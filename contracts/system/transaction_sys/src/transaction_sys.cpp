@@ -100,7 +100,7 @@ namespace system_contract
       // TODO: avoid copying inner raw_data during unpack
       auto trx = psio::convert_from_frac<transaction>(top_act.raw_data);
 
-      check( trx.actions.size() > 0, "transaction has no actions" );
+      check(trx.actions.size() > 0, "transaction has no actions");
 
       if (const auto& stat = getStatus())
       {
@@ -110,7 +110,8 @@ namespace system_contract
       for (auto& act : trx.actions)
       {
          auto account = kv_get<account_row>(account_row::kv_map, account_key(act.sender));
-         check(!!account, "unknown sender");
+         if (!account)
+            abort_message_str("unknown sender " + act.sender.str());
 
          // actor<system_contract::auth_fake_sys> auth(system_contract::transaction_sys::contract,
          //                                            account->auth_contract);

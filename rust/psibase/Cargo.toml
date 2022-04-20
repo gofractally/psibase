@@ -5,4 +5,17 @@ edition = "2021"
 publish = false
 
 [dependencies]
+anyhow = "1.0"
+chrono = "0.4"
 clap = {version = "3.1", features = ["derive"]}
+custom_error = "1.9"
+cxx = "1.0"
+fracpack = { version = "0.1.0", path = "../fracpack" }
+psi_macros = { version = "0.1.0", path = "../psi_macros" }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+
+[build-dependencies]
+cxx-build = "1.0"
