@@ -30,6 +30,9 @@ if(BUILD_NATIVE)
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\")\n")
 endif()
 
+option(BUILD_RELEASE_WASM "Build release wasms" ON)
+option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
+
 if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
@@ -40,6 +43,8 @@ if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
         STEP_TARGETS configure
         CMAKE_ARGS
             -DCMAKE_BUILD_TYPE=
+            -DBUILD_RELEASE_WASM=${BUILD_RELEASE_WASM}
+            -DBUILD_DEBUG_WASM=${BUILD_DEBUG_WASM}
             -DCMAKE_TARGET_MESSAGES=${CMAKE_TARGET_MESSAGES}
             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/wasm/toolchain.cmake
             -DWASI_SDK_PREFIX=${WASI_SDK_PREFIX}

@@ -47,7 +47,7 @@ namespace psibase
       if constexpr (not std::is_same_v<void, T>)
       {
          psio::shared_view_ptr<T> result(psio::size_tag{result_size});
-         raw::get_result(result.data(), result_size);
+         raw::get_result(result.data(), result_size, 0);
          check(result.validate(), "value returned was not serialized as expected");
          return result;
       }

@@ -75,13 +75,13 @@ namespace psibase
          int sz = raw::kv_get(map, key.data(), key.size());
          check(sz >= 0, "no such key");
          c.resize(sz);
-         raw::get_result(c.data(), c.size());
+         raw::get_result(c.data(), c.size(), 0);
          if (is_secondary)
          {
             int sz = raw::kv_get(map, c.data(), c.size());
             check(sz >= 0, "primary key not found");
             c.resize(sz);
-            raw::get_result(c.data(), c.size());
+            raw::get_result(c.data(), c.size(), 0);
          }
       }
       std::vector<char> operator*() const
@@ -306,12 +306,12 @@ namespace psibase
             return {};
          }
          buffer.resize(res);
-         raw::get_result(buffer.data(), buffer.size());
+         raw::get_result(buffer.data(), buffer.size(), 0);
          if (is_secondary())
          {
             res = raw::kv_get(map, buffer.data(), buffer.size());
             buffer.resize(res);
-            raw::get_result(buffer.data(), buffer.size());
+            raw::get_result(buffer.data(), buffer.size(), 0);
          }
          return eosio::convert_from_bin<T>(buffer);
       }
@@ -359,7 +359,7 @@ namespace psibase
             if (sz != -1)
             {
                std::vector<char> buffer(sz);
-               raw::get_result(buffer.data(), buffer.size());
+               raw::get_result(buffer.data(), buffer.size(), 0);
                auto data              = eosio::convert_from_bin<T>(std::move(buffer));
                auto replace_secondary = [&](uint8_t& idx, auto wrapped) {
                   auto old_key = std::invoke(decltype(wrapped)::value, data);

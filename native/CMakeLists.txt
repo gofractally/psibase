@@ -25,6 +25,9 @@ function(native_test N)
     )
 endfunction()
 
+function(add_wasm_test N)
+endfunction()
+
 function(native_and_wasm_test N)
     add_test(
         NAME n-${N}
