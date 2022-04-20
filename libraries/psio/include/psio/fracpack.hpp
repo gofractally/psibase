@@ -1582,6 +1582,15 @@ namespace psio
    {
       const_frac_proxy_view(const char* c) : buffer(c) {}
 
+      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
+      auto operator[]( T&& k ) const {
+         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      }
+      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
+      auto operator[]( T&& k ) {
+         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      }
+
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
       auto get() const
       {
@@ -1626,6 +1635,15 @@ namespace psio
    struct frac_proxy_view
    {
       frac_proxy_view(char* c) : buffer(c) {}
+
+      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
+      auto operator[]( T&& k ) const {
+         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      }
+      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
+      auto operator[]( T&& k ) {
+         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      }
 
       /** This method is called by the reflection library to get the field */
       template <uint32_t idx, uint64_t Name, auto MemberPtr>

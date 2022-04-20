@@ -5,7 +5,7 @@
 
 namespace psibase
 {
-   struct common_sys : psibase::Contract
+   struct common_sys : psibase::Contract<common_sys>
    {
       static constexpr auto contract = psibase::AccountNumber("common-sys");
 

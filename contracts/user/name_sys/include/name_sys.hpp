@@ -21,7 +21,7 @@ namespace name_sys
    using display_name_table_t = psibase::table<display_name_row, &display_name_row::acc>;
 
    using tables = psibase::contract_tables<display_name_table_t>;
-   class name_contract : public psibase::Contract
+   class name_contract : public psibase::Contract<name_contract>
    {
      public:
       static constexpr psibase::AccountNumber contract = "name-sys"_a;

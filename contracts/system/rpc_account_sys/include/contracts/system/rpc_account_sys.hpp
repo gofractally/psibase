@@ -5,7 +5,7 @@
 
 namespace system_contract
 {
-   struct rpc_account_sys : public psibase::Contract
+   struct rpc_account_sys : public psibase::Contract<rpc_account_sys>
    {
       psibase::rpc_reply_data serveSys(psibase::rpc_request_data request);
       void                    uploadSys(psio::const_view<std::string>       path,

@@ -5,7 +5,7 @@
 
 namespace system_contract
 {
-   struct explore_sys : public psibase::Contract
+   struct explore_sys : public psibase::Contract<explore_sys>
    {
       static constexpr auto contract = psibase::proxyContractNum;
 

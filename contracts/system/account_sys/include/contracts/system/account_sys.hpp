@@ -6,7 +6,7 @@
 
 namespace system_contract
 {
-   class account_sys : public psibase::Contract
+   class account_sys : public psibase::Contract<account_sys>
    {
      public:
       static constexpr auto     contract       = psibase::AccountNumber("account-sys");
@@ -18,7 +18,21 @@ namespace system_contract
                       psibase::AccountNumber auth_contract,
                       bool                   allow_sudo);
       bool exists(psibase::AccountNumber num);
+
+
+
+      struct Events {
+         struct History {
+         };
+         struct Ui {
+         };
+         struct Merkel {
+         };
+      };
+
+//      using Database = Tables<>
    };
+
 
    PSIO_REFLECT(account_sys,
                 method(startup, existing_accounts),

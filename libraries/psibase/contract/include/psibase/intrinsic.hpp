@@ -14,6 +14,8 @@
 
 namespace psibase
 {
+   using EventNumber = uint64_t;
+
    // These use mangled names instead of extern "C" to prevent collisions
    // with other libraries. e.g. libc++'s abort_message
    namespace raw
@@ -64,7 +66,7 @@ namespace psibase
 
       // Add a sequentially-numbered record. Returns the id.
       PSIBASE_INTRINSIC(kv_put_sequential)
-      uint64_t kv_put_sequential(kv_map map, const char* value, uint32_t value_len);
+      EventNumber kv_put_sequential(kv_map map, const char* value, uint32_t value_len);
 
       // Remove a key-value pair if it exists
       PSIBASE_INTRINSIC(kv_remove) void kv_remove(kv_map map, const char* key, uint32_t key_len);
@@ -75,7 +77,7 @@ namespace psibase
 
       // Get a sequentially-numbered record. If id is available, then sets result to value and
       // returns size. If id does not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kv_get_sequential) uint32_t kv_get_sequential(kv_map map, uint64_t id);
+      PSIBASE_INTRINSIC(kv_get_sequential) uint32_t kv_get_sequential(kv_map map, EventNumber id);
 
       // Get the first key-value pair which is greater than or equal to the provided
       // key. If one is found, and the first match_key_size bytes of the found key
@@ -322,8 +324,6 @@ namespace psibase
    //   This prevents a spurious abort from mismatched serialization.
    // * If matchType is non-null, and the record type doesn't match, then return nullopt.
    //   This prevents a spurious abort from mismatched serialization.
-   // * If blockNum is non-null, then it receives the block number the record was written in. It is
-   //   left untouched if the record is not available.
    // * If contract is non-null, then it receives the contract that wrote the record. It is
    //   left untouched if the record is not available.
    // * If type is non-null, then it receives the record type. It is left untouched if either the record
@@ -333,7 +333,6 @@ namespace psibase
                                              uint64_t             id,
                                              const AccountNumber* matchContract = nullptr,
                                              const Type*          matchType     = nullptr,
-                                             BlockNum*            blockNum      = nullptr,
                                              AccountNumber*       contract      = nullptr,
                                              Type*                type          = nullptr)
    {
@@ -343,12 +342,8 @@ namespace psibase
          return result;
       psio::input_stream stream(v->data(), v->size());
 
-      BlockNum      bn;
       AccountNumber c;
-      fracunpack(bn, stream);
       fracunpack(c, stream);
-      if (blockNum)
-         *blockNum = bn;
       if (contract)
          *contract = c;
       if (matchContract && *matchContract != c)

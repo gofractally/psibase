@@ -8,7 +8,7 @@
 
 namespace system_contract
 {
-   class transaction_sys : public psibase::Contract
+   class transaction_sys : public psibase::Contract<transaction_sys>
    {
      public:
       static constexpr auto     contract = psibase::AccountNumber("transact-sys");

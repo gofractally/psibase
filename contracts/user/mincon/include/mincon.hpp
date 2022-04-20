@@ -5,7 +5,7 @@
 
 namespace company
 {
-   class min_contract : public psibase::Contract
+   class min_contract : public psibase::Contract<min_contract>
    {
      public:
       static constexpr psibase::account_id_type id = psibase::name_to_number("mincon");  //_a;

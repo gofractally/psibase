@@ -7,7 +7,7 @@
 
 namespace exchange_sys
 {
-   class exchange_contract : public psibase::Contract
+   class exchange_contract : public psibase::Contract<exchange_contract>
    {
      public:
       static constexpr psibase::AccountNumber contract = "exchange-sys"_a;

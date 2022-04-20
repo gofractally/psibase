@@ -2,7 +2,7 @@
 #include <psibase/dispatch.hpp>
 
 // The contract
-struct ExampleContract : psibase::Contract
+struct ExampleContract : psibase::Contract<ExampleContract>
 {
    // Add two numbers
    int32_t add(int32_t a, int32_t b) { return a + b; }

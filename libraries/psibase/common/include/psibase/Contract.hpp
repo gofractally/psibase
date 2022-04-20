@@ -1,15 +1,37 @@
 #pragma once
 
 #include <psibase/AccountNumber.hpp>
+#include <psibase/actor.hpp>
 
 namespace psibase
 {
    /** all contracts should derive from psibase::Contract */
+   template <typename DerivedContract>
    class Contract
    {
      public:
       AccountNumber get_sender() const { return _sender; }
       AccountNumber get_receiver() const { return _receiver; }
+
+      auto emit() const { return EventEmitter<DerivedContract>(_receiver); }
+      auto events() const { return EventReader<DerivedContract>(_receiver); }
+
+      auto as(AccountNumber u = AccountNumber())
+      {
+         if (u == AccountNumber())
+            return actor<DerivedContract>(_sender, _receiver);
+         return actor<DerivedContract>(u, _receiver);
+      }
+
+      template <typename T = DerivedContract>
+      actor<T> at(AccountNumber callee)
+      {
+         return actor<T>(_receiver, callee);
+      }
+
+      //typename DerivedContract::Database& db(){ static table<...> t; return t; }
+      // events().ui().credited(N) -> tuple
+      // emit().ui().credited(...)
 
      private:
       template <typename Contract>
@@ -25,4 +47,17 @@ namespace psibase
       AccountNumber _sender;
       AccountNumber _receiver;
    };
+
 };  // namespace psibase
+
+#define PSIBASE_REFLECT_HISTOY_EVENTS(CONTRACT, ...)            \
+   using CONTRACT##_EventsHistory = CONTRACT ::Events::History; \
+   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsHistory), __VA_ARGS__)
+
+#define PSIBASE_REFLECT_UI_EVENTS(CONTRACT, ...)      \
+   using CONTRACT##_EventsUi = CONTRACT ::Events::Ui; \
+   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsUi), __VA_ARGS__)
+
+#define PSIBASE_REFLECT_MERKEL_EVENTS(CONTRACT, ...)          \
+   using CONTRACT##_EventsMerkle = CONTRACT ::Events::Merkel; \
+   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsMerkle), __VA_ARGS__)

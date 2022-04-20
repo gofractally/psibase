@@ -21,7 +21,7 @@ namespace psibase
    };
    PSIO_REFLECT(ServerUploadInterface, method(uploadSys, path, contentType, content))
 
-   struct proxy_sys : psibase::Contract
+   struct proxy_sys : psibase::Contract<proxy_sys>
    {
       // TODO: allow contract to register multiple contracts to handle
       //    * sub.dom.ains.contract
