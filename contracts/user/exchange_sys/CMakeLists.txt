@@ -2,8 +2,7 @@ function(add suffix)
     add_user_contract("${suffix}" exchange_sys src/exchange_sys.cpp)
 endfunction(add)
 
-add("")
-add("-debug")
+conditional_add()
 
 add_subdirectory(test)
 

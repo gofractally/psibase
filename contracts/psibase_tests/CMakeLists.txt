@@ -19,9 +19,8 @@ function(add suffix)
 endfunction(add)
 
 if(DEFINED IS_WASM)
-    add("")
-    add("-debug")
-    add_wasm_test(psibase-tests)
+    conditional_add()
+    add_wasm_test_release(psibase-tests)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
