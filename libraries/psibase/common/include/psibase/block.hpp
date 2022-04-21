@@ -9,7 +9,6 @@
 
 namespace psibase
 {
-   using String    = std::string;
    using BlockNum  = uint32_t;
    using block_num = BlockNum;
 

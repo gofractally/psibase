@@ -1,7 +1,8 @@
+#pragma once
+
 #include <compare>
 #include <limits>
-
-#pragma once
+#include <psio/fracpack.hpp>
 
 namespace psibase
 {
