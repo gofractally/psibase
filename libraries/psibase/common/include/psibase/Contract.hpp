@@ -5,6 +5,12 @@
 
 namespace psibase
 {
+   template <typename T>
+   concept HasContractName = requires(T)
+   {
+      {T::contract};
+   };
+
    /** all contracts should derive from psibase::Contract */
    template <typename DerivedContract>
    class Contract
@@ -29,9 +35,11 @@ namespace psibase
          return actor<T>(_receiver, callee);
       }
 
-      //typename DerivedContract::Database& db(){ static table<...> t; return t; }
-      // events().ui().credited(N) -> tuple
-      // emit().ui().credited(...)
+      template <typename T = DerivedContract>
+      requires HasContractName<T> actor<T> at()
+      {
+         return at<T>(T::contract);
+      }
 
      private:
       template <typename Contract>

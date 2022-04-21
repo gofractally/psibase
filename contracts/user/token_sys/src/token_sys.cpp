@@ -9,6 +9,7 @@ using psio::const_view;
 TID TokenSys::create(Precision precision, Quantity max_supply)
 {
    // NOP
+   return 0;
 }
 
 void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver)
@@ -52,11 +53,19 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 std::optional<TokenRecord> TokenSys::getToken(TID tokenId)
 {
    // NOP
+   return std::nullopt;
+}
+
+Quantity TokenSys::getBalance(TID tokenId)
+{
+   // NOP
+   return 0;
 }
 
 bool TokenSys::isAutodebit(AccountNumber account)
 {
    // NOP
+   return false;
 }
 
 PSIBASE_DISPATCH(UserContract::TokenSys)

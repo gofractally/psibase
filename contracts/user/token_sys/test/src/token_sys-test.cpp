@@ -6,6 +6,8 @@
 
 using namespace psibase;
 using UserContract::TokenSys;
+using namespace UserContract::Errors;
+using namespace UserContract;
 
 namespace
 {
@@ -20,30 +22,55 @@ namespace
 
 }  // namespace
 
+SCENARIO("Data type tests")
+{
+   // Test Precision
+   // Test Quantity
+}
+
 SCENARIO("Creating a token")
 {
    GIVEN("An empty chain with user Alice")
    {
       DefaultTestChain t({{TokenSys::contract, "token_sys.wasm"}});
-      auto             alice = t.as(t.add_account("alice"_a));
-      auto             bob   = t.as(t.add_account("bob"_a));
 
-      auto a = alice.at<TokenSys>();
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
 
       THEN("Alice may create a token")
-      {  //
-         a.create(8, 1'000'000'000).succeeded();
-      }
-      THEN("Alice may not create a token with out of range precision or max_supply")
       {
-         a.create(2e9, 1'000'000'000).succeeded();
+         auto create = a.create(8, 1'000'000'000);
+         CHECK(create.succeeded());
+
+         AND_THEN("The token exists")
+         {
+            auto tokenId     = create.returnVal();
+            auto tokenRecord = a.getToken(tokenId).returnVal();
+
+            CHECK(tokenRecord.has_value());
+         }
       }
       WHEN("Alice creates a token")
       {
-         THEN("The token exists") {}
+         auto tokenId = a.create(8, 1'000'000'000).returnVal();
+         auto token1  = a.getToken(tokenId).returnVal();
+
          THEN("Alice may create a second token")
          {
-            AND_THEN("The issuer NFT is different from the first token NFT") {}
+            t.start_block();
+
+            auto create = a.create(8, 1'000'000'000);
+            CHECK(create.succeeded());
+
+            auto tokenId = create.returnVal();
+            auto token2  = a.getToken(tokenId).returnVal();
+            CHECK(token2.has_value());
+
+            AND_THEN("The owner NFT is different from the first token owner NFT")
+            {
+               CHECK(token1->ownerNft != token2->ownerNft);
+            }
          }
       }
    }
@@ -53,17 +80,52 @@ SCENARIO("Minting tokens")
 {
    GIVEN("Alice created a token")
    {
-      THEN("Alice may mint new tokens") {}
-      THEN("Alice may not mint negative amounts of tokens") {}
-      WHEN("Alice mints 100 tokens to herself")
+      DefaultTestChain t({{TokenSys::contract, "token_sys.wasm"}});
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
+      auto b     = bob.at<TokenSys>();
+
+      auto tokenId = a.create(8, 1'000'000'000).returnVal();
+      auto token   = a.getToken(tokenId).returnVal();
+
+      THEN("Bob may not mint them")
       {
-         THEN("She owns 100 tokens") {}
+         auto mint = b.mint(tokenId, 1000, bob);
+         CHECK(mint.failed(missingRequiredAuth));
       }
-      WHEN("Alice mints 100 tokens to Bob")
+      THEN("Alice may not mint them with an invalid token ID")
       {
-         THEN("Bob owns 100 tokens") {}
+         // NOP
+         CHECK(false);  // Unimplemented
       }
-      THEN("Bob may not mint new tokens") {}
+      THEN("Alice may not mint them to an invalid Account")
+      {
+         // NOP
+         CHECK(false);  // Unimplemented
+         // This and prior test case make me with there was a system for type-specific context-*aware* testing
+         // Put the logic to ensure that an account is valid and a token is valid in one place
+      }
+      THEN("Alice may mint new tokens")
+      {
+         auto mint1 = a.mint(tokenId, 1000, alice);
+         auto mint2 = a.mint(tokenId, 1000, bob);
+         CHECK(mint1.succeeded());
+         CHECK(mint2.succeeded());
+
+         AND_THEN("The tokens were allocated accordingly")
+         {
+            auto getBalanceAlice = a.getBalance(tokenId);
+            auto getBalanceBob   = b.getBalance(tokenId);
+
+            CHECK(getBalanceAlice.succeeded());
+            CHECK(getBalanceAlice.returnVal() == 1000);
+
+            CHECK(getBalanceBob.succeeded());
+            CHECK(getBalanceBob.returnVal() == 1000);
+         }
+      }
    }
 
    GIVEN("A token created by Alice with inflation limits")

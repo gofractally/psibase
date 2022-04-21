@@ -12,7 +12,7 @@ namespace UserContract
    {
       static constexpr uint8_t          PRECISION_MIN = 0;
       static constexpr uint8_t          PRECISION_MAX = 16;
-      static constexpr std::string_view error_invalid = "Value exceeds Precision maximum value";
+      static constexpr std::string_view error_invalid = "Value exceeds allowed Precision range";
 
       uint8_t value;
 
@@ -45,7 +45,7 @@ namespace UserContract
       Quantity(Quantity_t q) : value{q} {}
       Quantity() : Quantity(0) {}
 
-      operator uint64_t() { return value; }
+      operator Quantity_t() { return value; }
 
       Quantity operator+(const Quantity& q2)
       {
@@ -74,6 +74,8 @@ namespace UserContract
       }
 
       friend std::strong_ordering operator<=>(const Quantity&, const Quantity&) = default;
+
+      bool operator==(int otherValue) const { return static_cast<Quantity_t>(otherValue) == value; }
    };
    PSIO_REFLECT(Quantity, value);
    EOSIO_REFLECT(Quantity, value);

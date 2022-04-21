@@ -3,6 +3,7 @@
 #include <psibase/Contract.hpp>
 #include <psibase/String.hpp>
 #include <string>
+#include "errors.hpp"
 #include "tables.hpp"
 #include "token_sys.hpp"
 #include "types.hpp"
@@ -50,6 +51,7 @@ namespace UserContract
                  psio::const_view<psibase::String> memo);
 
       std::optional<TokenRecord> getToken(TID tokenId);
+      Quantity                   getBalance(TID tokenId);
       bool                       isAutodebit(psibase::AccountNumber account);
 
      private:
@@ -70,6 +72,7 @@ namespace UserContract
       method(uncredit, tokenId, receiver, amount, memo),
       method(debit, tokenId, sender, amount, memo),
       method(getToken, tokenId),
+      method(getBalance, tokenId),
       method(isAutodebit)
     );
    // clang-format on
