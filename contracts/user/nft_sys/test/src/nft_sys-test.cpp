@@ -192,6 +192,27 @@ SCENARIO("Transferring NFTs")
          {
             CHECK(a.credit(nft.id, bob, "memo").succeeded());
          }
+         THEN("Alice may credit the NFT to Bob with an acceptably long memo")
+         {
+            string validMemo =
+                "0123456789ABCDEF"
+                "0123456789ABCDEF"
+                "0123456789ABCDEF"
+                "0123456789ABCDEF"
+                "0123456789ABCDEF";
+            CHECK(a.credit(nft.id, bob, validMemo).succeeded());
+         }
+         THEN("Alice may not credit the NFT to Bob with an unacceptably long memo")
+         {
+            string invalidMemo =
+                "0123456789ABCDEF"
+                "0123456789ABCDEF"
+                "0123456789ABCDEF"
+                "0123456789ABCDEF"
+                "0123456789ABCDEF"
+                "1";
+            CHECK(a.credit(nft.id, bob, invalidMemo).failed(String::error_invalid));
+         }
          WHEN("Alice credits the NFT to Bob")
          {
             auto credit = a.credit(nft.id, bob, "memo");
