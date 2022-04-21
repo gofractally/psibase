@@ -113,6 +113,7 @@ AccountNumber DefaultTestChain::add_account(
     AccountNumber auth_contract /* = AccountNumber("auth-fake-sys") */,
     bool          show /* = false */)
 {
+   std::cout << "add_account: ?\n";
    transactor<system_contract::account_sys> asys(system_contract::transaction_sys::contract,
                                                  system_contract::account_sys::contract);
 
@@ -129,6 +130,7 @@ AccountNumber DefaultTestChain::add_account(
     AccountNumber auth_contract /* = AccountNumber("auth-fake-sys")*/,
     bool          show /* = false */)
 {
+   std::cout << "add_account: " << acc <<"\n";
    return add_account(AccountNumber(acc), auth_contract, show);
 }
 
@@ -157,6 +159,7 @@ AccountNumber DefaultTestChain::add_ec_account(const char*      name,
                                                const PublicKey& public_key,
                                                bool             show /* = false */)
 {
+   std::cout << "add_ec_account: ?\n";
    return add_ec_account(AccountNumber(name), public_key, show);
 }
 
@@ -164,6 +167,7 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
                                              const char*   filename,
                                              bool          show /* = false */)
 {
+   std::cout << "add_contract_account: '" << acc.str() << "'\n";
    add_account(acc, AccountNumber("auth-fake-sys"), show);
    transactor<system_contract::transaction_sys> tsys{acc,
                                                      system_contract::transaction_sys::contract};
@@ -180,5 +184,6 @@ AccountNumber DefaultTestChain::add_contract(const char* acc,
                                              const char* filename,
                                              bool        show /* = false */)
 {
+   std::cout <<"add_contract: '" << acc <<"'\n";
    return add_contract(AccountNumber(acc), filename, show);
 }

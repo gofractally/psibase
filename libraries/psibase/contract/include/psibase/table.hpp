@@ -214,7 +214,8 @@ namespace psibase
    };
 
    template <typename T, typename U>
-   concept compatible_key_prefix_unqual = std::same_as<T, U> || compatible_tuple_prefix<T, U>::value;
+   concept compatible_key_prefix_unqual =
+       std::same_as<T, U> || compatible_tuple_prefix<T, U>::value;
    template <typename T, typename U>
    concept compatible_key_prefix =
        compatible_key_prefix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
@@ -350,6 +351,7 @@ namespace psibase
       explicit table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
       void put(const T& arg)
       {
+         eosio::print( "put..\n");
          auto pk = serialize_key(0, std::invoke(Primary, arg));
          if constexpr (sizeof...(Secondary) > 0)
          {
@@ -361,7 +363,9 @@ namespace psibase
                std::vector<char> buffer(sz);
                raw::get_result(buffer.data(), buffer.size(), 0);
                auto data              = eosio::convert_from_bin<T>(std::move(buffer));
-               auto replace_secondary = [&](uint8_t& idx, auto wrapped) {
+               auto replace_secondary = [&](uint8_t& idx, auto wrapped)
+               {
+                  eosio::print( "   idx: ", int(idx), " replace secondary....\n");
                   auto old_key = std::invoke(decltype(wrapped)::value, data);
                   auto new_key = std::invoke(decltype(wrapped)::value, arg);
                   if (old_key != new_key)
@@ -381,8 +385,15 @@ namespace psibase
             }
             else
             {
-               auto write_secondary = [&](uint8_t idx, auto wrapped) {
-                  auto key          = std::invoke(decltype(wrapped)::value, arg);
+               auto write_secondary = [&](uint8_t& idx, auto wrapped)
+               {
+                  eosio::print( "   idx: ", int(idx), " write secondary....\n");
+                  //auto key          = std::invoke(decltype(wrapped)::value, arg);
+                  //arg.z;
+                  //wrapped.y;
+                  auto key          = std::invoke(wrapped, arg);
+
+                  eosio::print( psio::convert_to_json(key), "\n" );
                   key_buffer.back() = idx;
                   eosio::convert_to_key(key, key_buffer);
                   kv_insert(map, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
@@ -390,7 +401,8 @@ namespace psibase
                   ++idx;
                };
                std::uint8_t idx = 1;
-               (write_secondary(idx, wrap<Secondary>()), ...);
+               eosio::print( "   secondary size: ", sizeof...(Secondary) );
+               (write_secondary(idx, Secondary),...);
             }
          }
          auto serialized = eosio::convert_to_bin(arg);

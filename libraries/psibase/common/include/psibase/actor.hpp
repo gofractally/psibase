@@ -132,11 +132,9 @@ namespace psibase
          psibase::check(header.event_type == Name, "unexpected event type");
          psibase::check(header.sender == sender, "unexpected event sender");
 
-         std::vector<char> tmp(size);
-         raw::get_result(tmp.data(), tmp.size());
-
          psio::shared_view_ptr<param_tuple> ptr(psio::size_tag{size - 8});
-         memcpy(ptr.data(), tmp.data() + 8, ptr.size());
+         raw::get_result(ptr.data(), ptr.size(), 8);
+
          return ptr;
       }
    };

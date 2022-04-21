@@ -259,11 +259,7 @@ namespace psibase
          if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
          {
             uint64_t prefix = contract_account.num.value;
-            // TODO DAN: remove this later...
-            // TODO TODD: Commenting this out and adding the special overload to_key(AccountNumber)
-            //            causes kv sort order and AccountNumber::operator<=>() to disagree. This will
-            //            cause nasty headaches for someone.
-            //std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
+            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             eosio::check(
                 key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
                 "key prefix must match contract during write");

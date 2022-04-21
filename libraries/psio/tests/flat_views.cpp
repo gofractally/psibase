@@ -266,3 +266,4 @@ TEST_CASE("flatview")
    std::cout << "non_ref->nrn.lite: " << me->non_ref->nrn.lite << "\n";
    */
 }
+

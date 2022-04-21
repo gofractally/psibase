@@ -431,7 +431,7 @@ namespace std
       auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem));                                \
       (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .offset = off,    \
                                                          .number = PSIO_NUMBER_OR_AUTO(i, elem)}, \
-                              &STRUCT::PSIO_GET_IDENT(elem));                                     \
+                              &OtherType::PSIO_GET_IDENT(elem));                                  \
    }
 
 #define PSIO_FOR_EACH_METHOD(r, STRUCT, elem)                                                     \
@@ -513,84 +513,98 @@ namespace std
  *    * method(ident, arg1, ...):      method
  *    * numbered(int, ident):          non-static data member with field number
  */
-#define PSIO_REFLECT(STRUCT, ...)                                                                 \
-   PSIO_REFLECT_TYPENAME(STRUCT)                                                                  \
-   struct reflect_impl_##STRUCT                                                                   \
-   {                                                                                              \
-      static constexpr bool is_defined = true;                                                    \
-      static constexpr bool is_struct  = true;                                                    \
-      static constexpr bool requires_compressed_method_names()                                    \
-      {                                                                                           \
-         constexpr bool allowHashedMethods = PSIO_HAS_FLAG(allowHashedMethods, __VA_ARGS__);      \
-         BOOST_PP_SEQ_FOR_EACH(PSIO_REQ_COMPRESS, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__));     \
-         return !allowHashedMethods;                                                              \
-      }                                                                                           \
-      static inline constexpr const char* name() { return BOOST_PP_STRINGIZE(STRUCT); }           \
-      typedef std::tuple<BOOST_PP_IIF(                                                            \
-          BOOST_PP_CHECK_EMPTY(PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)),                           \
-          PSIO_EMPTY,                                                                             \
-          PSIO_SEQ_TO_VA_ARGS)(                                                                   \
-          PSIO_SEQ_TRANSFORM(PSIO_TUPLE_TYPE, STRUCT, PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)))>   \
-          struct_tuple_type;                                                                      \
-      template <typename L>                                                                       \
-      constexpr inline static void for_each(L&& lambda)                                           \
-      {                                                                                           \
-         BOOST_PP_SEQ_FOR_EACH_I(PSIO_FOR_EACH_MEMBER, STRUCT,                                    \
-                                 PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                          \
-         BOOST_PP_SEQ_FOR_EACH(PSIO_FOR_EACH_METHOD, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__))   \
-      }                                                                                           \
-      template <typename L>                                                                       \
-      inline static constexpr bool get(const std::string_view& m, L&& lambda)                     \
-      {                                                                                           \
-         BOOST_PP_SEQ_FOR_EACH(PSIO_GET_BY_STR, STRUCT, PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))   \
-         BOOST_PP_SEQ_FOR_EACH(PSIO_GET_BY_STR, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__))        \
-         return false;                                                                            \
-      }                                                                                           \
-      template <typename L>                                                                       \
-      inline static constexpr bool get(int64_t m, L&& lambda)                                     \
-      {                                                                                           \
-         switch (m)                                                                               \
-         {                                                                                        \
-            BOOST_PP_SEQ_FOR_EACH_I(PSIO_GET_BY_NUMBER, STRUCT,                                   \
-                                    PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                       \
-         }                                                                                        \
-         return false;                                                                            \
-      }                                                                                           \
-      template <typename L>                                                                       \
-      inline static bool get_by_name(uint64_t n, L&& lambda)                                      \
-      {                                                                                           \
-         switch (n)                                                                               \
-         {                                                                                        \
-            BOOST_PP_SEQ_FOR_EACH_I(PSIO_GET_MEMBER_BY_NAME, STRUCT,                              \
-                                    PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                       \
-            BOOST_PP_SEQ_FOR_EACH(PSIO_GET_METHOD_BY_NAME, STRUCT,                                \
-                                  PSIO_REFLECT_METHODS(__VA_ARGS__))                              \
-         }                                                                                        \
-         return false;                                                                            \
-      }                                                                                           \
-      static constexpr auto member_pointers()                                                     \
-      {                                                                                           \
-         return std::make_tuple(PSIO_MEMBER_POINTER(STRUCT, PSIO_REFLECT_MEMBERS(__VA_ARGS__)));  \
-      }                                                                                           \
-                                                                                                  \
-      template <typename ProxyObject>                                                             \
-      struct proxy                                                                                \
-      {                                                                                           \
-        private:                                                                                  \
-         ProxyObject _psio_proxy_obj;                                                             \
-                                                                                                  \
-        public:                                                                                   \
-         template <typename... Args>                                                              \
-         explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)            \
-         {                                                                                        \
-         }                                                                                        \
-         auto&              psio_get_proxy() const { return _psio_proxy_obj; }                    \
-         ProxyObject*       operator->() { return &_psio_proxy_obj; }                             \
-         const ProxyObject* operator->() const { return &_psio_proxy_obj; }                       \
-         ProxyObject&       operator*() { return _psio_proxy_obj; }                               \
-         const ProxyObject& operator*() const { return _psio_proxy_obj; }                         \
-         BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_DATA, STRUCT, PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)) \
-         BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_METHOD, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__))    \
-      };                                                                                          \
-   };                                                                                             \
+#define PSIO_REFLECT(STRUCT, ...)                                                                  \
+   PSIO_REFLECT_TYPENAME(STRUCT)                                                                   \
+   struct reflect_impl_##STRUCT                                                                    \
+   {                                                                                               \
+      static constexpr bool is_defined = true;                                                     \
+      static constexpr bool is_struct  = true;                                                     \
+      static constexpr bool requires_compressed_method_names()                                     \
+      {                                                                                            \
+         constexpr bool allowHashedMethods = PSIO_HAS_FLAG(allowHashedMethods, __VA_ARGS__);       \
+         BOOST_PP_SEQ_FOR_EACH(PSIO_REQ_COMPRESS, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__));      \
+         return !allowHashedMethods;                                                               \
+      }                                                                                            \
+      static inline constexpr const char* name() { return BOOST_PP_STRINGIZE(STRUCT); }            \
+      typedef std::tuple<BOOST_PP_IIF(                                                             \
+          BOOST_PP_CHECK_EMPTY(PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)),                            \
+          PSIO_EMPTY,                                                                              \
+          PSIO_SEQ_TO_VA_ARGS)(                                                                    \
+          PSIO_SEQ_TRANSFORM(PSIO_TUPLE_TYPE, STRUCT, PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)))>    \
+          struct_tuple_type;                                                                       \
+      template <typename OtherType = STRUCT, typename L>                                           \
+      constexpr inline static void for_each(L&& lambda)                                            \
+      {                                                                                            \
+         BOOST_PP_SEQ_FOR_EACH_I(PSIO_FOR_EACH_MEMBER, STRUCT,                                     \
+                                 PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                           \
+         BOOST_PP_SEQ_FOR_EACH(PSIO_FOR_EACH_METHOD, OtherType, PSIO_REFLECT_METHODS(__VA_ARGS__)) \
+      }                                                                                            \
+      template <typename L>                                                                        \
+      inline static constexpr bool get(const std::string_view& m, L&& lambda)                      \
+      {                                                                                            \
+         BOOST_PP_SEQ_FOR_EACH(PSIO_GET_BY_STR, STRUCT, PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))    \
+         BOOST_PP_SEQ_FOR_EACH(PSIO_GET_BY_STR, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__))         \
+         return false;                                                                             \
+      }                                                                                            \
+      template <typename L>                                                                        \
+      inline static constexpr bool get(int64_t m, L&& lambda)                                      \
+      {                                                                                            \
+         switch (m)                                                                                \
+         {                                                                                         \
+            BOOST_PP_SEQ_FOR_EACH_I(PSIO_GET_BY_NUMBER, STRUCT,                                    \
+                                    PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                        \
+         }                                                                                         \
+         return false;                                                                             \
+      }                                                                                            \
+      template <typename L>                                                                        \
+      inline static bool get_by_name(uint64_t n, L&& lambda)                                       \
+      {                                                                                            \
+         switch (n)                                                                                \
+         {                                                                                         \
+            BOOST_PP_SEQ_FOR_EACH_I(PSIO_GET_MEMBER_BY_NAME, STRUCT,                               \
+                                    PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                        \
+            BOOST_PP_SEQ_FOR_EACH(PSIO_GET_METHOD_BY_NAME, STRUCT,                                 \
+                                  PSIO_REFLECT_METHODS(__VA_ARGS__))                               \
+         }                                                                                         \
+         return false;                                                                             \
+      }                                                                                            \
+      static constexpr auto member_pointers()                                                      \
+      {                                                                                            \
+         return std::make_tuple(PSIO_MEMBER_POINTER(STRUCT, PSIO_REFLECT_MEMBERS(__VA_ARGS__)));   \
+      }                                                                                            \
+      template <auto mptr>                                                                         \
+      static constexpr auto get_member_number()                                                    \
+      {                                                                                            \
+         uint32_t i = -1;                                                                          \
+         for_each(                                                                                 \
+             [&](const psio::meta& m, auto p)                                                      \
+             {                                                                                     \
+                if (p == mptr)                                                                     \
+                   i = m.number;                                                                   \
+             });                                                                                   \
+         if (i == -1)                                                                              \
+            abort();                                                                               \
+         return i;                                                                                 \
+      }                                                                                            \
+      template <typename ProxyObject>                                                              \
+      struct proxy                                                                                 \
+      {                                                                                            \
+        private:                                                                                   \
+         ProxyObject _psio_proxy_obj;                                                              \
+                                                                                                   \
+        public:                                                                                    \
+         template <typename... Args>                                                               \
+         explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)             \
+         {                                                                                         \
+         }                                                                                         \
+         auto&              psio_get_proxy() const { return _psio_proxy_obj; }                     \
+         ProxyObject*       operator->() { return &_psio_proxy_obj; }                              \
+         const ProxyObject* operator->() const { return &_psio_proxy_obj; }                        \
+         ProxyObject&       operator*() { return _psio_proxy_obj; }                                \
+         const ProxyObject& operator*() const { return _psio_proxy_obj; }                          \
+         BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_DATA, STRUCT, PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))  \
+         BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_METHOD, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__))     \
+      };                                                                                           \
+   };                                                                                              \
    reflect_impl_##STRUCT get_reflect_impl(const STRUCT&);
+

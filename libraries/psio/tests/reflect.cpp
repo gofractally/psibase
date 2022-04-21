@@ -151,3 +151,18 @@ TEST_CASE( "schema" ) {
   std::cout << "flat schema: " << format_json(apischema) << "\n";
 
 }
+
+struct tablerow {
+   int a;
+   std::string b;
+   static auto ab() { return std::make_tuple( &tablerow::a, &tablerow::b ); }
+};
+PSIO_REFLECT( tablerow, a, b, method(ab) )
+
+
+TEST_CASE( "staticmethod" ) {
+     psio::reflect<tablerow> r;
+}
+
+TEST_CASE( "staticfunc" ) {
+}
