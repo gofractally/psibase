@@ -1,7 +1,7 @@
 #pragma once
 
+#include <psibase/Contract.hpp>
 #include <psibase/String.hpp>
-#include <psibase/contract.hpp>
 #include <string>
 #include "tables.hpp"
 #include "token_sys.hpp"

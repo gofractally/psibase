@@ -1,11 +1,11 @@
 #pragma once
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psibase/native_tables.hpp>
 
 namespace system_contract
 {
-   struct explore_sys : public psibase::contract
+   struct explore_sys : public psibase::Contract<explore_sys>
    {
       static constexpr auto contract = psibase::proxyContractNum;
 

@@ -16,16 +16,28 @@ if(${FORCE_COLORED_OUTPUT})
     add_compile_options(-fcolor-diagnostics)
 endif()
 
+option(BUILD_RELEASE_WASM "Build release wasms" ON)
+option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
+
+# Point to psidk-config.cmake to allow documentation examples to build
+set(psidk_DIR ${CMAKE_SOURCE_DIR})
+
 function(native_test N)
 endfunction()
 
-function(add_cltester_test N)
+function(add_wasm_test N)
     add_test(
         NAME t-${N}
         WORKING_DIRECTORY ${ROOT_BINARY_DIR}
         COMMAND ./psitest -v ${N}.wasm -s
     )
     set_tests_properties(t-${N} PROPERTIES ENVIRONMENT NODE_PATH=dist)
+endfunction()
+
+function(add_wasm_test_release N)
+    if(BUILD_RELEASE_WASM)
+        add_wasm_test(${N})
+    endif()
 endfunction()
 
 function(native_and_wasm_test N)
@@ -44,6 +56,15 @@ function(copy_headers from to)
     )
     file(COPY ${foo} DESTINATION ${ROOT_BINARY_DIR}/clsdk/${to})
 endfunction()
+
+macro(conditional_add)
+    if(BUILD_RELEASE_WASM)
+        add("")
+    endif()
+    if(BUILD_DEBUG_WASM)
+        add("-debug")
+    endif()
+endmacro()
 
 file(COPY ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${ROOT_BINARY_DIR}/clsdk/licenses)
 
@@ -190,5 +211,6 @@ endif()
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../contracts contracts)
+add_subdirectory(../doc/psidk/src/cpp-contract doc-examples)
 add_subdirectory(../programs programs)
 add_subdirectory(boost)

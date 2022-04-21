@@ -2,8 +2,7 @@ function(add suffix)
     add_user_contract("${suffix}" token_sys src/token_sys.cpp)
 endfunction(add)
 
-add("")
-add("-debug")
+conditional_add()
 
 add_subdirectory(test)
 

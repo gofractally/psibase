@@ -237,8 +237,12 @@ namespace psibase
       {
          if (map == uint32_t(kv_map::event) && trx_context.block_context.is_read_only)
             return (kv_map)map;
+         if (map == uint32_t(kv_map::ui_event) && trx_context.block_context.is_read_only)
+            return (kv_map)map;
          throw std::runtime_error("contract may not read this map, or must use another intrinsic");
       }
+
+      bool key_has_contract_prefix(uint32_t map) { return map == uint32_t(kv_map::contract); }
 
       kv_map get_map_write(uint32_t map, eosio::input_stream key)
       {
@@ -279,6 +283,8 @@ namespace psibase
          eosio::check(!trx_context.block_context.is_read_only, "writes disabled during query");
 
          if (map == uint32_t(kv_map::event))
+            return (kv_map)map;
+         if (map == uint32_t(kv_map::ui_event))
             return (kv_map)map;
          throw std::runtime_error("contract may not write this map, or must use another intrinsic");
       }
@@ -335,11 +341,11 @@ namespace psibase
          return result_value.size();
       }
 
-      // TODO: offset
-      uint32_t get_result(span<char> dest)
+      uint32_t get_result(span<char> dest, uint32_t offset)
       {
-         if (!result_value.empty())
-            memcpy(dest.data(), result_value.data(), std::min(result_value.size(), dest.size()));
+         if (offset < result_value.size() && dest.size())
+            memcpy(dest.data(), result_value.data() + offset,
+                   std::min(result_value.size() - offset, dest.size()));
          return result_value.size();
       }
 
@@ -366,8 +372,8 @@ namespace psibase
 
       void abort_message(span<const char> str)
       {
-         throw std::runtime_error("contract aborted with message: " +
-                                  std::string(str.data(), str.size()));
+         throw std::runtime_error("contract " + contract_account.num.str() +
+                                  " aborted with message: " + std::string(str.data(), str.size()));
       }
 
       uint32_t get_current_action()
@@ -431,16 +437,20 @@ namespace psibase
          auto m = get_map_write_sequential(map);
 
          eosio::input_stream v{value.data(), value.size()};
-         eosio::check(v.remaining() >= sizeof(BlockNum) + sizeof(AccountNumber::value),
-                      "value prefix must match block number and contract during write");
-         auto blockNum = eosio::from_bin<BlockNum>(v);
+         eosio::check(v.remaining() >= sizeof(AccountNumber::value),
+                      "value prefix must match contract during write");
          auto contract = eosio::from_bin<AccountNumber>(v);
-         eosio::check(blockNum == trx_context.block_context.current.header.num &&
-                          contract == contract_account.num,
-                      "value prefix must match block number and contract during write");
+         eosio::check(contract == contract_account.num,
+                      "value prefix must match contract during write");
 
-         auto& dbStatus    = trx_context.block_context.databaseStatus;
-         auto  indexNumber = dbStatus.nextEventNumber++;
+         auto&    dbStatus = trx_context.block_context.databaseStatus;
+         uint64_t indexNumber;
+         if (map == uint32_t(kv_map::event))
+            indexNumber = dbStatus.nextEventNumber++;
+         else if (map == uint32_t(kv_map::ui_event))
+            indexNumber = dbStatus.nextUIEventNumber++;
+         else
+            eosio::check(false, "kv_put_sequential: unsupported map");
          db.kv_put(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
 
          db.kv_put_raw(m, eosio::convert_to_key(indexNumber), {value.data(), value.size()});
@@ -472,6 +482,9 @@ namespace psibase
       uint32_t kv_greater_equal(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
+         if (key_has_contract_prefix(map))
+            eosio::check(match_key_size >= sizeof(AccountNumber::value),
+                         "match_key_size is smaller than 8 bytes");
          return set_result(
              db.kv_greater_equal_raw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
@@ -480,6 +493,9 @@ namespace psibase
       uint32_t kv_less_than(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
+         if (key_has_contract_prefix(map))
+            eosio::check(match_key_size >= sizeof(AccountNumber::value),
+                         "match_key_size is smaller than 8 bytes");
          return set_result(
              db.kv_less_than_raw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
@@ -487,6 +503,8 @@ namespace psibase
       // TODO: don't let timer abort db operation
       uint32_t kv_max(uint32_t map, span<const char> key)
       {
+         if (key_has_contract_prefix(map))
+            eosio::check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
          return set_result(db.kv_max_raw(get_map_read(map), {key.data(), key.size()}));
       }
    };  // execution_context_impl

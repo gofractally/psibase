@@ -141,7 +141,7 @@ namespace psibase
          if (commit)
          {
             // TODO: limit billed time in block
-            eosio::check(!(trx.trx.flags & transaction::do_not_broadcast),
+            eosio::check(!(trx.trx.tapos.flags & Tapos::do_not_broadcast),
                          "cannot commit a do_not_broadcast transaction");
             t.session.commit();
             active = true;

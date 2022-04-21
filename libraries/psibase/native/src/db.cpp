@@ -39,12 +39,13 @@ namespace psibase
       const mdbx::map_handle                   subjective_map;
       const mdbx::map_handle                   write_only_map;
       const mdbx::map_handle                   event_map;
+      const mdbx::map_handle                   ui_event_map;
       const mdbx::map_handle                   block_log_map;
 
       shared_database_impl(const boost::filesystem::path& dir)
           : state_env{construct_env(dir / "state", 3)},
             subjective_env{construct_env(dir / "subjective")},
-            write_only_env{construct_env(dir / "write_only", 2)},
+            write_only_env{construct_env(dir / "write_only", 3)},
             block_log_env{construct_env(dir / "block_log")},
             contract_map{construct_kv_map(*state_env, "contract")},
             native_constrained_map{construct_kv_map(*state_env, "native_constrained")},
@@ -52,6 +53,7 @@ namespace psibase
             subjective_map{construct_kv_map(*subjective_env, nullptr)},
             write_only_map{construct_kv_map(*write_only_env, "write_only")},
             event_map{construct_kv_map(*write_only_env, "event")},
+            ui_event_map{construct_kv_map(*write_only_env, "ui_event")},
             block_log_map{construct_kv_map(*block_log_env, nullptr)}
       {
       }
@@ -69,6 +71,8 @@ namespace psibase
          if (map == kv_map::write_only)
             return write_only_map;
          if (map == kv_map::event)
+            return write_only_map;
+         if (map == kv_map::ui_event)
             return write_only_map;
          if (map == kv_map::block_log)
             return block_log_map;
@@ -110,6 +114,8 @@ namespace psibase
          else if (map == kv_map::write_only)
             return write_only_transactions.back();
          else if (map == kv_map::event)
+            return write_only_transactions.back();
+         else if (map == kv_map::ui_event)
             return write_only_transactions.back();
          else
             return transactions.back();

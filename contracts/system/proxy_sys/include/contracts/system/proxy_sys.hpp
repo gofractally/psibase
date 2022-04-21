@@ -1,19 +1,19 @@
 #pragma once
-#include <psibase/contract.hpp>
+#include <psibase/Contract.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psibase/native_tables.hpp>
 
 namespace psibase
 {
    // Contracts which serve http implement this
-   struct ServerInterface : psibase::contract
+   struct ServerInterface
    {
       rpc_reply_data serveSys(rpc_request_data request);
    };
    PSIO_REFLECT(ServerInterface, method(serveSys, request))
 
    // Contracts which support uploading files implement this
-   struct ServerUploadInterface : psibase::contract
+   struct ServerUploadInterface
    {
       void uploadSys(psio::const_view<std::string>       path,
                      psio::const_view<std::string>       contentType,
@@ -21,7 +21,7 @@ namespace psibase
    };
    PSIO_REFLECT(ServerUploadInterface, method(uploadSys, path, contentType, content))
 
-   struct proxy_sys : psibase::contract
+   struct proxy_sys : psibase::Contract<proxy_sys>
    {
       // TODO: allow contract to register multiple contracts to handle
       //    * sub.dom.ains.contract

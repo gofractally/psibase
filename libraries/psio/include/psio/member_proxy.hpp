@@ -27,6 +27,7 @@ namespace psio
       constexpr auto       operator*() { return get(); }
       constexpr const auto operator*() const { return get(); }
 
+      /*
       template <typename T>
       constexpr auto operator[](T&& k)
       {
@@ -38,6 +39,12 @@ namespace psio
       {
          return get()[std::forward<T>(k)];
       }
+      */
+
+      template <typename T>
+      constexpr auto       operator[](T&& k) { return (_proxy.template operator[]<I, Name, mptr>(std::forward<T>(k))); }
+      template <typename T>
+      constexpr const auto operator[](T&& k) const { return (_proxy.template operator[]<I, Name, mptr>(std::forward<T>(k))); }
 
       template <typename S>
       friend S& operator<<(S& stream, const member_proxy& member)

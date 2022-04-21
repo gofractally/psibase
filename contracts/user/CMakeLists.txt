@@ -39,6 +39,18 @@ function(add_user_test suffix name)
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add_user_test)
 
+function(add_user_test_release name)
+    if(BUILD_RELEASE_WASM)
+        add_user_test("" ${name} ${ARGN})
+    endif()
+endfunction()
+
+function(add_user_test_debug name)
+    if(BUILD_DEBUG_WASM)
+        add_user_test("-debug" ${name} ${ARGN})
+    endif()
+endfunction()
+
 function(add suffix)
     add_library(contracts_user${suffix} INTERFACE)
     target_include_directories(contracts_user${suffix} INTERFACE

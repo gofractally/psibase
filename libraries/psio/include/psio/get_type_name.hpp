@@ -222,14 +222,22 @@ namespace psio
       return r;
    }
    */
+   inline constexpr uint64_t city_hash_name( std::string_view str ) {
+      return consthash::city64(str.data(), str.size()) | (uint64_t(0x01) << (64 - 8));
+   }
+
    inline constexpr uint64_t hash_name(std::string_view str)
    {
       uint64_t n = detail::method_to_number(str);
       if (n)
       {
          return n;
+      } else {
+         return city_hash_name(str);
       }
-      return consthash::city64(str.data(), str.size());
+   }
+   inline constexpr bool is_compressed_name( uint64_t c ) {
+      return not detail::is_hash_name(c);
    }
 
    template <typename T>

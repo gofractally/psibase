@@ -1,5 +1,6 @@
 name: Ubuntu 20.04
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -8,7 +9,8 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/contract-lab-ubuntu-2004-builder:ccaa037795aca7ee3353d5d8e80a02f2df5b4384"
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:23fd6d904ef2a67a9d2cb3b89d82ad5b60cf5f7a"
+  LIBMDBX_MIRROR_PRIVATE_KEY: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
 
 jobs:
   ubuntu-2004-build:
@@ -22,9 +24,9 @@ jobs:
           string(TIMESTAMP current_date "%Y-%m-%d-%H-%M-%S" UTC)
           message("::set-output name=timestamp::${current_date}")
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
-          submodules: recursive
+          submodules: false
           fetch-depth: 0
       - name: Preserve ccache
         uses: actions/cache@v1.1.0
@@ -36,6 +38,15 @@ jobs:
       - name: Build
         run: |
           set -e
+          echo =====
+          mkdir -p $HOME/.ssh
+          chmod 700 $HOME/.ssh
+          echo "$LIBMDBX_MIRROR_PRIVATE_KEY" > $HOME/.ssh/libmdbx-mirror.key
+          chmod 600 $HOME/.ssh/libmdbx-mirror.key
+          git rm external/libmdbx
+          GIT_SSH_COMMAND="ssh -i $HOME/.ssh/libmdbx-mirror.key" git submodule add git@github.com:gofractally/libmdbx-mirror.git external/libmdbx/
+          git submodule update --init --recursive
+          echo =====
           export CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache
           export CCACHE_CONFIGPATH=${GITHUB_WORKSPACE}/ccache.conf
           echo max_size = 600M >${GITHUB_WORKSPACE}/ccache.conf
@@ -47,7 +58,7 @@ jobs:
           ${DOCKER} ccache -s
           echo =====
           mkdir build
-          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
+          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
           echo =====
@@ -57,13 +68,3 @@ jobs:
           echo =====
           ${DOCKER} ccache -s
           echo =====
-          echo nodeos version:
-          ${DOCKER} build/clsdk/bin/nodeos --version
-          ${DOCKER} build/clsdk/bin/nodeos --full-version
-          echo =====
-          bash -c "cd build && tar czf ../clsdk-ubuntu-20-04.tar.gz clsdk"
-      - name: Upload build
-        uses: actions/upload-artifact@v1
-        with:
-          name: ubuntu-2004-build
-          path: clsdk-ubuntu-20-04.tar.gz

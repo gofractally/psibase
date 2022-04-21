@@ -14,13 +14,18 @@
 
 namespace psibase
 {
+   using EventNumber = uint64_t;
+
    // These use mangled names instead of extern "C" to prevent collisions
    // with other libraries. e.g. libc++'s abort_message
    namespace raw
    {
       // Intrinsics which return data do it by storing it in a result buffer.
-      // get_result copies min(dest_size, result_size) bytes into dest and returns result_size.
-      PSIBASE_INTRINSIC(get_result) uint32_t get_result(const char* dest, uint32_t dest_size);
+      // get_result copies min(dest_size, result_size - offset) bytes from
+      // result + offset into dest and returns result_size. If offset >= result_size,
+      // then it skips the copy.
+      PSIBASE_INTRINSIC(get_result)
+      uint32_t get_result(const char* dest, uint32_t dest_size, uint32_t offset);
 
       // Intrinsics which return keys do it by storing it in a key buffer.
       // get_key copies min(dest_size, key_size) bytes into dest and returns key_size.
@@ -64,7 +69,7 @@ namespace psibase
 
       // Add a sequentially-numbered record. Returns the id.
       PSIBASE_INTRINSIC(kv_put_sequential)
-      uint64_t kv_put_sequential(kv_map map, const char* value, uint32_t value_len);
+      EventNumber kv_put_sequential(kv_map map, const char* value, uint32_t value_len);
 
       // Remove a key-value pair if it exists
       PSIBASE_INTRINSIC(kv_remove) void kv_remove(kv_map map, const char* key, uint32_t key_len);
@@ -75,7 +80,7 @@ namespace psibase
 
       // Get a sequentially-numbered record. If id is available, then sets result to value and
       // returns size. If id does not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kv_get_sequential) uint32_t kv_get_sequential(kv_map map, uint64_t id);
+      PSIBASE_INTRINSIC(kv_get_sequential) uint32_t kv_get_sequential(kv_map map, EventNumber id);
 
       // Get the first key-value pair which is greater than or equal to the provided
       // key. If one is found, and the first match_key_size bytes of the found key
@@ -208,15 +213,13 @@ namespace psibase
    // Add a sequentially-numbered record. Returns the id.
    template <typename Type, typename V>
    auto kv_put_sequential(kv_map        map,
-                          BlockNum      blockNum,
                           AccountNumber contract,
                           Type          type,
                           const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
-      std::vector<char>     packed(psio::fracpack_size(blockNum) + psio::fracpack_size(contract) +
+      std::vector<char>     packed(psio::fracpack_size(contract) +
                                    psio::fracpack_size(type) + psio::fracpack_size(value));
       psio::fast_buf_stream stream(packed.data(), packed.size());
-      psio::fracpack(blockNum, stream);
       psio::fracpack(contract, stream);
       psio::fracpack(type, stream);
       psio::fracpack(value, stream);
@@ -324,8 +327,6 @@ namespace psibase
    //   This prevents a spurious abort from mismatched serialization.
    // * If matchType is non-null, and the record type doesn't match, then return nullopt.
    //   This prevents a spurious abort from mismatched serialization.
-   // * If blockNum is non-null, then it receives the block number the record was written in. It is
-   //   left untouched if the record is not available.
    // * If contract is non-null, then it receives the contract that wrote the record. It is
    //   left untouched if the record is not available.
    // * If type is non-null, then it receives the record type. It is left untouched if either the record
@@ -335,7 +336,6 @@ namespace psibase
                                              uint64_t             id,
                                              const AccountNumber* matchContract = nullptr,
                                              const Type*          matchType     = nullptr,
-                                             BlockNum*            blockNum      = nullptr,
                                              AccountNumber*       contract      = nullptr,
                                              Type*                type          = nullptr)
    {
@@ -345,12 +345,8 @@ namespace psibase
          return result;
       psio::input_stream stream(v->data(), v->size());
 
-      BlockNum      bn;
       AccountNumber c;
-      fracunpack(bn, stream);
       fracunpack(c, stream);
-      if (blockNum)
-         *blockNum = bn;
       if (contract)
          *contract = c;
       if (matchContract && *matchContract != c)

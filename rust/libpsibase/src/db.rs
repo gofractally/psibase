@@ -49,4 +49,8 @@ pub enum KvMap {
     ///     * kv_put_sequential
     ///     * kv_get_sequential
     Event,
+
+    /// Like Event, but short-lived. These events signal currently-connected
+    /// user interfaces.
+    UIEvent,
 }

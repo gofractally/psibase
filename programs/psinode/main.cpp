@@ -43,7 +43,7 @@ void bootstrap_chain(system_context& system)
 {
    auto push = [&](auto& bc, AccountNumber sender, AccountNumber contract, const auto& data) {
       signed_transaction t;
-      t.trx.expiration.seconds = bc.current.header.time.seconds + 1;
+      t.trx.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
       t.trx.actions.push_back({
           .sender   = sender,
           .contract = contract,
@@ -54,7 +54,7 @@ void bootstrap_chain(system_context& system)
 
    auto push_action = [&](auto& bc, action a) {
       signed_transaction t;
-      t.trx.expiration.seconds = bc.current.header.time.seconds + 1;
+      t.trx.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
       t.trx.actions.push_back({a});
       bc.push_transaction(t);
    };
@@ -254,7 +254,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
       // TODO: config file
       auto http_config = std::make_shared<http::http_config>(http::http_config{
           .num_threads      = 4,
-          .max_request_size = 1024,
+          .max_request_size = 400 * 1024,
           .idle_timeout_ms  = std::chrono::milliseconds{1000},
           .allow_origin     = "*",
           .static_dir       = "",

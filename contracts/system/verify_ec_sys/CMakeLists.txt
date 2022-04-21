@@ -13,5 +13,4 @@ function(add suffix)
     )
 endfunction(add)
 
-add("")
-add("-debug")
+conditional_add()

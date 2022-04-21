@@ -17,17 +17,20 @@ on:
 
 jobs:
   ubuntu-2004-builder:
-    name: contract-lab-ubuntu-2004-builder
+    name: psibase-ubuntu-2004-builder
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          fetch-depth: 0
 
       - name: Preparation
         id: prep
         run: |
           REGISTRY="ghcr.io"
-          IMAGE="${REGISTRY}/${{ github.repository_owner }}/contract-lab-ubuntu-2004-builder"
+          IMAGE="${REGISTRY}/${{ github.repository_owner }}/psibase-ubuntu-2004-builder"
           TAGS="${IMAGE}:${{ github.sha }}"
           echo ::set-output name=tags::${TAGS,,}
 
@@ -50,6 +53,7 @@ jobs:
       - name: Build & Publish Image
         uses: docker/build-push-action@v2
         with:
+          context: .
           push: true
           file: docker/ubuntu-2004-builder.Dockerfile
           tags: ${{ steps.prep.outputs.tags }}
