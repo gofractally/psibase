@@ -57,3 +57,13 @@ target_sources( psio INTERFACE
 
 add_subdirectory( consthash )
 add_subdirectory(tests)
+
+if(IS_WASM)
+    copy_headers(include/psio psio/include/psio)
+    copy_headers(include/psio/bytes psio/include/psio/bytes)
+    copy_headers(include/psio/from_bin psio/include/psio/from_bin)
+    copy_headers(include/psio/from_json psio/include/psio/from_json)
+    copy_headers(include/psio/json psio/include/psio/json)
+    copy_headers(include/psio/to_bin psio/include/psio/to_bin)
+    copy_headers(include/psio/to_json psio/include/psio/to_json)
+endif()

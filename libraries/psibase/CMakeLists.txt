@@ -135,7 +135,9 @@ function(add suffix)
         target_include_directories(psitestlib${suffix} PRIVATE
             ../../contracts/system/verify_ec_sys/include
         )
-        target_link_options(psitestlib${suffix} INTERFACE -Wl,--export-table)
+        target_link_options(psitestlib${suffix} INTERFACE
+            -Wl,--export-table # TODO: remove
+        )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start
             -nostdlib
@@ -163,4 +165,30 @@ endfunction()
 add("")
 if(DEFINED IS_WASM)
     add("-debug")
+    add("-psidk")
+    add("-debug-psidk")
+
+    foreach(suffix "" "-debug")
+        foreach(lib psibase psibase-contract-base psibase-contracts-wasi-polyfill psitestlib)
+            set_target_properties(${lib}${suffix}-psidk PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
+            set_target_properties(${lib}${suffix}-psidk PROPERTIES ARCHIVE_OUTPUT_NAME ${lib}${suffix})
+        endforeach()
+    endforeach()
+endif()
+
+if(IS_WASM)
+    copy_headers(common/include/psibase psibase/common/include/psibase)
+    copy_headers(contract/include/psibase psibase/contract/include/psibase)
+    copy_headers(tester/include/psibase psibase/tester/include/psibase)
+    #file(COPY contracts/wasi-polyfill DESTINATION ${ROOT_BINARY_DIR}/psidk/psibase/contracts)
+    #file(COPY tester/wasi_polyfill DESTINATION ${ROOT_BINARY_DIR}/psidk/psibase/tester)
+    configure_file(contract/src/abort_message.cpp ${ROOT_BINARY_DIR}/psidk/contract/src/abort_message.cpp COPYONLY)
+    #configure_file(crypto.cpp ${ROOT_BINARY_DIR}/psidk/psibase/crypto.cpp COPYONLY)
+    #configure_file(eosiolib.cpp ${ROOT_BINARY_DIR}/psidk/psibase/eosiolib.cpp COPYONLY)
+    configure_file(contract/src/simple_malloc.cpp ${ROOT_BINARY_DIR}/psidk/psibase/simple_malloc.cpp COPYONLY)
+    #configure_file(tester/tester_intrinsics.cpp ${ROOT_BINARY_DIR}/psidk/psibase/tester/tester_intrinsics.cpp COPYONLY)
+    #configure_file(tester/tester.cpp ${ROOT_BINARY_DIR}/psidk/psibase/tester/tester.cpp COPYONLY)
+    #configure_file(sdk/psidk-cmake-args ${ROOT_BINARY_DIR}/psidk/bin/psidk-cmake-args COPYONLY)
+    #configure_file(sdk/toolchain.cmake ${ROOT_BINARY_DIR}/psidk/toolchain.cmake COPYONLY)
+    #configure_file(sdk/psidk-config.cmake ${ROOT_BINARY_DIR}/psidk/psidk-config.cmake COPYONLY)
 endif()
