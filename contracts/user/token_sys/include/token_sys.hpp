@@ -20,7 +20,7 @@
 
 namespace UserContract
 {
-   class TokenSys : public psibase::contract
+   class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
       using tables = psibase::contract_tables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t>;

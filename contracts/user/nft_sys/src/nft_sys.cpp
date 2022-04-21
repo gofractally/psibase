@@ -65,7 +65,7 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
    check(record->owner == sender, Errors::missingRequiredAuth);
    check(receiver != record->owner, Errors::creditorIsDebitor);
    check(record->creditedTo == account_sys::null_account, Errors::alreadyCredited);
-   check(at<account_sys>().exists(receiver), Errors::receiverDNE);
+   check(at<account_sys>(account_sys::contract).exists(receiver), Errors::receiverDNE);
    bool transferred = isAutodebit(receiver);
 
    if (transferred)
