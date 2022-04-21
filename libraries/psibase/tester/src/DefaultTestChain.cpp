@@ -6,7 +6,6 @@
 // Not sure which of these I need //////
 #include <secp256k1.h>
 #include <eosio/abi.hpp>
-#include <eosio/authority.hpp>
 #include <eosio/from_string.hpp>
 ////////////////////////////////////////
 

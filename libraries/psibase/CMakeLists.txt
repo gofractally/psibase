@@ -57,7 +57,7 @@ function(add suffix)
             -Wl,--no-merge-data-segments
             -nostdlib
         )
-        target_include_directories(psibase-contract-base${suffix} PUBLIC contract/include ../eosiolib/core/include ../eosiolib/contracts/include)
+        target_include_directories(psibase-contract-base${suffix} PUBLIC contract/include)
 
         file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
@@ -123,8 +123,6 @@ function(add suffix)
         )
         target_include_directories(psitestlib${suffix} PUBLIC
             contract/include
-            ../eosiolib/core/include
-            ../eosiolib/contracts/include
             tester/include
             ../../contracts/system/account_sys/include
             ../../contracts/system/auth_ec_sys/include
