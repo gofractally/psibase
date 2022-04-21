@@ -5,6 +5,7 @@
 #include <psibase/DefaultTestChain.hpp>
 
 using namespace psibase;
+using UserContract::TokenSys;
 
 namespace
 {
@@ -23,8 +24,20 @@ SCENARIO("Creating a token")
 {
    GIVEN("An empty chain with user Alice")
    {
-      THEN("Alice may create a token") {}
-      THEN("Alice may not create a token with out of range precision or max_supply") {}
+      DefaultTestChain t({{TokenSys::contract, "token_sys.wasm"}});
+      auto             alice = t.as(t.add_account("alice"_a));
+      auto             bob   = t.as(t.add_account("bob"_a));
+
+      auto a = alice.at<TokenSys>();
+
+      THEN("Alice may create a token")
+      {  //
+         a.create(8, 1'000'000'000).succeeded();
+      }
+      THEN("Alice may not create a token with out of range precision or max_supply")
+      {
+         a.create(2e9, 1'000'000'000).succeeded();
+      }
       WHEN("Alice creates a token")
       {
          THEN("The token exists") {}

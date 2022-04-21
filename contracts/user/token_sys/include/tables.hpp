@@ -46,7 +46,7 @@ namespace UserContract
 
    struct Flags
    {
-      Bitset bits;
+      psibase::Bitset bits;
 
       enum FlagType
       {

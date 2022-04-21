@@ -4,13 +4,14 @@
 
 using namespace UserContract;
 using namespace psibase;
+using psio::const_view;
 
-TID TokenSys::create(uint8_t precision, uint64_t max_supply)
+TID TokenSys::create(Precision precision, Quantity max_supply)
 {
    // NOP
 }
 
-void TokenSys::mint(TID tokenId, uint64_t amount, psibase::AccountNumber receiver)
+void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver)
 {
    // NOP
 }
@@ -20,7 +21,7 @@ void TokenSys::unrecallable(TID tokenId)
    // NOP
 }
 
-void TokenSys::burn(TID tokenId, uint64_t amount)
+void TokenSys::burn(TID tokenId, Quantity amount)
 {
    // NOP
 }
@@ -30,26 +31,20 @@ void TokenSys::autodebit(bool enable)
    // NOP
 }
 
-void TokenSys::credit(TID                           tokenId,
-                      psibase::AccountNumber        receiver,
-                      uint64_t                      amount,
-                      psio::const_view<std::string> memo)
+void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
 {
    // NOP
 }
 
-void TokenSys::uncredit(TID                           tokenId,
-                        psibase::AccountNumber        receiver,
-                        uint64_t                      amount,
-                        psio::const_view<std::string> memo)
+void TokenSys::uncredit(TID                tokenId,
+                        AccountNumber      receiver,
+                        Quantity           amount,
+                        const_view<String> memo)
 {
    // NOP
 }
 
-void TokenSys::debit(TID                           tokenId,
-                     psibase::AccountNumber        sender,
-                     uint64_t                      amount,
-                     psio::const_view<std::string> memo)
+void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
 {
    // NOP
 }
@@ -59,7 +54,7 @@ std::optional<TokenRecord> TokenSys::getToken(TID tokenId)
    // NOP
 }
 
-bool TokenSys::isAutodebit(psibase::AccountNumber account)
+bool TokenSys::isAutodebit(AccountNumber account)
 {
    // NOP
 }

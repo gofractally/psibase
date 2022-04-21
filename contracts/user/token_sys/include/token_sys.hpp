@@ -1,9 +1,11 @@
 #pragma once
 
+#include <psibase/String.hpp>
 #include <psibase/contract.hpp>
 #include <string>
 #include "tables.hpp"
 #include "token_sys.hpp"
+#include "types.hpp"
 
 /* 04/18/2022
  * James and Dan call notes:
@@ -21,31 +23,31 @@ namespace UserContract
    class TokenSys : public psibase::contract
    {
      public:
-      using tables                                     = psibase::contract_tables<TokenTable_t>;
+      using tables = psibase::contract_tables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t>;
       static constexpr psibase::AccountNumber contract = "token-sys"_a;
 
-      TID  create(uint8_t precision, uint64_t max_supply);
-      void mint(TID tokenId, uint64_t amount, psibase::AccountNumber receiver);
+      TID  create(Precision precision, Quantity max_supply);
+      void mint(TID tokenId, Quantity amount, psibase::AccountNumber receiver);
 
       void unrecallable(TID tokenId);
 
-      void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, uint64_t daily_limit_qty);
-      void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, uint64_t yearly_limit_qty);
+      void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
+      void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
 
-      void burn(TID tokenId, uint64_t amount);
+      void burn(TID tokenId, Quantity amount);
       void autodebit(bool enable);
-      void credit(TID                           tokenId,
-                  psibase::AccountNumber        receiver,
-                  uint64_t                      amount,
-                  psio::const_view<std::string> memo);
-      void uncredit(TID                           tokenId,
-                    psibase::AccountNumber        receiver,
-                    uint64_t                      amount,
-                    psio::const_view<std::string> memo);
-      void debit(TID                           tokenId,
-                 psibase::AccountNumber        sender,
-                 uint64_t                      amount,
-                 psio::const_view<std::string> memo);
+      void credit(TID                               tokenId,
+                  psibase::AccountNumber            receiver,
+                  Quantity                          amount,
+                  psio::const_view<psibase::String> memo);
+      void uncredit(TID                               tokenId,
+                    psibase::AccountNumber            receiver,
+                    Quantity                          amount,
+                    psio::const_view<psibase::String> memo);
+      void debit(TID                               tokenId,
+                 psibase::AccountNumber            sender,
+                 Quantity                          amount,
+                 psio::const_view<psibase::String> memo);
 
       std::optional<TokenRecord> getToken(TID tokenId);
       bool                       isAutodebit(psibase::AccountNumber account);
