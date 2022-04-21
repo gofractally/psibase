@@ -33,9 +33,9 @@ function(add suffix)
             COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc++abi-shrunk${suffix}.a abort_message.cpp.o
         )
 
-        add_library(eosio-contracts-wasi-polyfill${suffix})
-        target_link_libraries(eosio-contracts-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
-        target_sources(eosio-contracts-wasi-polyfill${suffix} PRIVATE
+        add_library(psibase-contracts-wasi-polyfill${suffix})
+        target_link_libraries(psibase-contracts-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
+        target_sources(psibase-contracts-wasi-polyfill${suffix} PRIVATE
             contract/src/wasi-polyfill/__wasi_fd_fdstat_get.cpp
             contract/src/wasi-polyfill/__wasi_fd_close.cpp
             contract/src/wasi-polyfill/__wasi_fd_seek.cpp
@@ -44,8 +44,8 @@ function(add suffix)
 
         add_library(psibase-contract-base${suffix})
         target_sources(psibase-contract-base${suffix} PRIVATE
-            contract/src/eosio_polyfill.cpp
             contract/src/intrinsic.cpp
+            contract/src/print.cpp
         )
         target_link_libraries(psibase-contract-base${suffix} PUBLIC psibase${suffix})
         target_compile_options(psibase-contract-base${suffix} PUBLIC -DCOMPILING_CONTRACT)
@@ -71,7 +71,7 @@ function(add suffix)
             c++abi-replacements${suffix}
             -lc-no-malloc${suffix}
             simple-malloc${suffix}
-            eosio-contracts-wasi-polyfill${suffix}
+            psibase-contracts-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
 
@@ -83,7 +83,7 @@ function(add suffix)
             -lc++abi-shrunk${suffix}
             c++abi-replacements${suffix}
             -lc
-            eosio-contracts-wasi-polyfill${suffix}
+            psibase-contracts-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
 
@@ -92,22 +92,22 @@ function(add suffix)
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
             contract/src/intrinsic.cpp
-            ../eosiolib/tester/tester_intrinsics.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_args_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_args_sizes_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_clock_time_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_environ_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_environ_sizes_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_close.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_fdstat_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_fdstat_set_flags.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_prestat_dir_name.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_prestat_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_read.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_seek.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_write.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_path_open.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_proc_exit.cpp
+            tester/src/tester_intrinsics.cpp
+            tester/src/wasi_polyfill/__wasi_args_get.cpp
+            tester/src/wasi_polyfill/__wasi_args_sizes_get.cpp
+            tester/src/wasi_polyfill/__wasi_clock_time_get.cpp
+            tester/src/wasi_polyfill/__wasi_environ_get.cpp
+            tester/src/wasi_polyfill/__wasi_environ_sizes_get.cpp
+            tester/src/wasi_polyfill/__wasi_fd_close.cpp
+            tester/src/wasi_polyfill/__wasi_fd_fdstat_get.cpp
+            tester/src/wasi_polyfill/__wasi_fd_fdstat_set_flags.cpp
+            tester/src/wasi_polyfill/__wasi_fd_prestat_dir_name.cpp
+            tester/src/wasi_polyfill/__wasi_fd_prestat_get.cpp
+            tester/src/wasi_polyfill/__wasi_fd_read.cpp
+            tester/src/wasi_polyfill/__wasi_fd_seek.cpp
+            tester/src/wasi_polyfill/__wasi_fd_write.cpp
+            tester/src/wasi_polyfill/__wasi_path_open.cpp
+            tester/src/wasi_polyfill/__wasi_proc_exit.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
         target_link_libraries(psitestlib${suffix} PUBLIC
