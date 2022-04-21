@@ -5,8 +5,6 @@
 #include <psibase/dispatch.hpp>
 #include <psio/fracpack.hpp>
 
-#include "events.hpp"
-
 using namespace psibase;
 using namespace UserContract;
 using psio::const_view;
@@ -16,9 +14,9 @@ using system_contract::account_sys;
 namespace stubs
 {
    // Replace with auth calls when available
-   bool      require_auth(AccountNumber acc) { return true; }
-   void      burnNFT() { check(false, "DB missing ability to delete records"); }
-   NftEvents event;
+   bool           require_auth(AccountNumber acc) { return true; }
+   void           burnNFT() { check(false, "DB missing ability to delete records"); }
+   NftSys::Events event;
 }  // namespace stubs
 
 NID NftSys::mint()
@@ -39,7 +37,7 @@ NID NftSys::mint()
        .creditedTo = account_sys::null_account  //
    });
 
-   stubs::event.minted(newId, issuer);
+   stubs::event.history.minted(newId, issuer);
 
    return newId;
 }
@@ -55,10 +53,10 @@ void NftSys::burn(NID nftId)
 
    stubs::burnNFT();
 
-   stubs::event.burned(nftId);
+   stubs::event.history.burned(nftId);
 }
 
-void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<string> memo)
+void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<String> memo)
 {
    auto record = getNft(nftId);
    check(record.has_value(), Errors::nftDNE);
@@ -80,15 +78,15 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<strin
    }
    db.open<NftTable_t>().put(*record);
 
-   stubs::event.credited(nftId, sender, receiver, memo);
+   stubs::event.ui.credited(nftId, sender, receiver, memo);
 
    if (transferred)
    {
-      stubs::event.transferred(nftId, sender, receiver, memo);
+      stubs::event.merkle.transferred(nftId, sender, receiver, memo);
    }
 }
 
-void NftSys::uncredit(NID nftId, const_view<string> memo)
+void NftSys::uncredit(NID nftId, const_view<String> memo)
 {
    auto record = getNft(nftId);
    check(record.has_value(), Errors::nftDNE);
@@ -102,10 +100,10 @@ void NftSys::uncredit(NID nftId, const_view<string> memo)
    record->creditedTo = account_sys::null_account;
    db.open<NftTable_t>().put(*record);
 
-   stubs::event.uncredited(nftId, sender, receiver, memo);
+   stubs::event.ui.uncredited(nftId, sender, receiver, memo);
 }
 
-void NftSys::debit(NID nftId, const_view<string> memo)
+void NftSys::debit(NID nftId, const_view<String> memo)
 {
    auto record = getNft(nftId);
    check(record.has_value(), Errors::nftDNE);
@@ -122,7 +120,7 @@ void NftSys::debit(NID nftId, const_view<string> memo)
 
    db.open<NftTable_t>().put(*record);
 
-   stubs::event.transferred(nftId, creditor, debiter, memo);
+   stubs::event.merkle.transferred(nftId, creditor, debiter, memo);
 }
 
 void NftSys::autodebit(bool enable)
@@ -132,11 +130,11 @@ void NftSys::autodebit(bool enable)
 
    if (enable)
    {
-      stubs::event.enabledAutodebit(get_sender());
+      stubs::event.history.enabledAutodebit(get_sender());
    }
    else
    {
-      stubs::event.disabledAutodebit(get_sender());
+      stubs::event.history.disabledAutodebit(get_sender());
    }
 }
 
