@@ -58,8 +58,8 @@ function(add suffix)
             ${LIBCLANG_RT_BUILTINS}
         )
 
-        add_library(nctestlib${suffix})
-        target_sources(nctestlib${suffix} PRIVATE
+        add_library(psitestlib${suffix})
+        target_sources(psitestlib${suffix} PRIVATE
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
             contract/src/intrinsic.cpp
@@ -80,8 +80,8 @@ function(add suffix)
             ../eosiolib/tester/wasi_polyfill/__wasi_path_open.cpp
             ../eosiolib/tester/wasi_polyfill/__wasi_proc_exit.cpp
         )
-        target_compile_options(nctestlib${suffix} PUBLIC -DCOMPILING_TESTS)
-        target_link_libraries(nctestlib${suffix} PUBLIC
+        target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
+        target_link_libraries(psitestlib${suffix} PUBLIC
             psibase${suffix}
             catch2
             boost
@@ -92,7 +92,7 @@ function(add suffix)
             ${LIBCLANG_RT_BUILTINS}
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
         )
-        target_include_directories(nctestlib${suffix} PUBLIC
+        target_include_directories(psitestlib${suffix} PUBLIC
             contract/include
             ../eosiolib/core/include
             ../eosiolib/contracts/include
@@ -105,11 +105,11 @@ function(add suffix)
             ../../contracts/system/transaction_sys/include
             ../../contracts/system/verify_ec_sys/include
         )
-        target_include_directories(nctestlib${suffix} PRIVATE
+        target_include_directories(psitestlib${suffix} PRIVATE
             ../../contracts/system/verify_ec_sys/include
         )
-        target_link_options(nctestlib${suffix} INTERFACE -Wl,--export-table)
-        target_link_options(nctestlib${suffix} PUBLIC
+        target_link_options(psitestlib${suffix} INTERFACE -Wl,--export-table)
+        target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start
             -nostdlib
         )

@@ -14,7 +14,7 @@ function(add suffix)
 
     add_executable(psibase-tests${suffix} test.cpp test-ec.cpp)
     target_include_directories(psibase-tests${suffix} PUBLIC include)
-    target_link_libraries(psibase-tests${suffix} contracts_system${suffix} nctestlib )
+    target_link_libraries(psibase-tests${suffix} contracts_system${suffix} psitestlib )
     set_target_properties(psibase-tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add)
 
