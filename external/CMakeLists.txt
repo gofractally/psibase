@@ -91,4 +91,9 @@ add_dependencies(catch2 catch2-ext)
 
 if(IS_WASM)
     target_compile_options(catch2 INTERFACE -DCATCH_CONFIG_NO_POSIX_SIGNALS -DCATCH_CONFIG_DISABLE_EXCEPTIONS)
+
+    # TODO: copy simdjson license to clsdk/licenses
+    # TODO: debug vs release builds
+    copy_headers(simdjson/include simdjson/include)
+    set_target_properties(simdjson PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
 endif()

@@ -30,19 +30,30 @@ function(add_libs suffix)
         -labieos${suffix}
     )
 
+    add_library(simdjson${suffix} INTERFACE)
+    target_include_directories(simdjson${suffix} INTERFACE
+        ${psidk_DIR}/simdjson/include
+    )
+    target_link_libraries(simdjson${suffix} INTERFACE
+        -L${psidk_DIR}/lib-wasm
+        -lsimdjson # TODO: ${suffix}
+    )
+
     add_library(psio${suffix} INTERFACE)
     target_include_directories(psio${suffix} INTERFACE
+        ${psidk_DIR}/consthash/include
         ${psidk_DIR}/psio/include
-        ${psidk_DIR}/rapidjson/include)
-    target_link_libraries(psio${suffix} INTERFACE wasm-base${suffix})
+        ${psidk_DIR}/rapidjson/include
+    )
     target_link_libraries(psio${suffix} INTERFACE
-        -L${psidk_DIR}/lib-wasm
         boost
+        simdjson${suffix}
+        wasm-base${suffix}
     )
 
     add_library(simple-malloc${suffix} EXCLUDE_FROM_ALL)
     target_link_libraries(simple-malloc${suffix} PUBLIC wasm-base${suffix})
-    target_sources(simple-malloc${suffix} PRIVATE ${psidk_DIR}/eosiolib/simple_malloc.cpp)
+    target_sources(simple-malloc${suffix} PRIVATE ${psidk_DIR}/psibase/simple_malloc.cpp)
     add_custom_command(
         TARGET simple-malloc${suffix}
         PRE_LINK
@@ -52,7 +63,7 @@ function(add_libs suffix)
 
     add_library(c++abi-replacements${suffix} EXCLUDE_FROM_ALL)
     target_link_libraries(c++abi-replacements${suffix} PUBLIC wasm-base${suffix})
-    target_sources(c++abi-replacements${suffix} PRIVATE contract/src/abort_message.cpp)
+    target_sources(c++abi-replacements${suffix} PRIVATE ${psidk_DIR}/contract/src/abort_message.cpp)
     add_custom_command(
         TARGET c++abi-replacements${suffix}
         PRE_LINK
@@ -61,7 +72,7 @@ function(add_libs suffix)
     )
 
     add_library(psibase${suffix} INTERFACE)
-    target_include_directories(psibase${suffix} PUBLIC ${psidk_DIR}/common/include)
+    target_include_directories(psibase${suffix} INTERFACE ${psidk_DIR}/psibase/common/include)
     target_link_libraries(psibase${suffix} INTERFACE
         wasm-base${suffix}
         -lpsibase${suffix}
@@ -71,7 +82,7 @@ function(add_libs suffix)
     )
 
     add_library(psibase-contract-base${suffix} INTERFACE)
-    target_link_libraries(eosio-contract-base${suffix} INTERFACE
+    target_link_libraries(psibase-contract-base${suffix} INTERFACE
         psibase${suffix}
         -lpsibase-contract-base${suffix}
     )
@@ -84,7 +95,7 @@ function(add_libs suffix)
         -Wl,--no-merge-data-segments
         -nostdlib
     )
-    target_include_directories(psibase-contract-base${suffix} INTERFACE ${psidk_DIR}/contract/include)
+    target_include_directories(psibase-contract-base${suffix} INTERFACE ${psidk_DIR}/psibase/contract/include)
 
     file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
@@ -142,7 +153,6 @@ function(add_libs suffix)
         -Wl,--entry,_start
         -nostdlib
     )
-    endif()
 endfunction()
 
 add_libs("")

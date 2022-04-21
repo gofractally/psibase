@@ -53,6 +53,7 @@ function(copy_headers from to)
     file(GLOB foo
         ${CMAKE_CURRENT_SOURCE_DIR}/${from}/*.h
         ${CMAKE_CURRENT_SOURCE_DIR}/${from}/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/${from}/*.hxx
     )
     file(COPY ${foo} DESTINATION ${ROOT_BINARY_DIR}/psidk/${to})
 endfunction()
