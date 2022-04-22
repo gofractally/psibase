@@ -54,8 +54,8 @@ jobs:
           echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
           export SCCACHE_CACHE_SIZE=200M
           export RUSTC_WRAPPER=sccache
-          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
-          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE ${UBUNTU_2004_IMAGE}"
+          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
+          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER ${UBUNTU_2004_IMAGE}"
           docker pull ${UBUNTU_2004_IMAGE}
           echo =====
           ${DOCKER} ccache -s
