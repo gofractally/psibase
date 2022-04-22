@@ -70,5 +70,7 @@ RUN cd /root \
     && /root/.cargo/bin/cargo install sccache \
     && rm rustup.sh
 
+RUN chmod o+rx /root
+
 ENV WASI_SDK_PREFIX=/opt/wasi-sdk-14.0
 ENV PATH=/root/.cargo/bin:/opt/node-v14.16.0-linux-x64/bin:$PATH

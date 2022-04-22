@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:d16ae1cabd75074340ff5118540aacdfc6f9c64e"
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:f30bac61649a61f03dc32fe04651201e51463225"
   LIBMDBX_MIRROR_PRIVATE_KEY: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
 
 jobs:
@@ -62,6 +62,7 @@ jobs:
 
           ${DOCKER} echo $PATH
           echo =====
+          ${DOCKER} ls -l /
           ${DOCKER} ls -l /root
           ${DOCKER} ls -l /root/.cargo
           ${DOCKER} ls -l /root/.cargo/bin
