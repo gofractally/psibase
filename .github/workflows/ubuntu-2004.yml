@@ -52,6 +52,7 @@ jobs:
           export CCACHE_CONFIGPATH=${GITHUB_WORKSPACE}/ccache.conf
           echo max_size = 600M >${GITHUB_WORKSPACE}/ccache.conf
           echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
+          mkdir -p ${CCACHE_DIR}
           export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CACHES_DIR -e CCACHE_CONFIGPATH --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
           export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CACHES_DIR -e CCACHE_CONFIGPATH ${UBUNTU_2004_IMAGE}"
           docker pull ${UBUNTU_2004_IMAGE}
