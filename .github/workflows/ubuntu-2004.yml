@@ -60,11 +60,11 @@ jobs:
           ${DOCKER} ccache -s
           echo =====
 
-          echo $PATH
+          ${DOCKER} echo $PATH
           echo =====
-          ls -l /root
-          ls -l /root/.cargo
-          ls -l /root/.cargo/bin
+          ${DOCKER} ls -l /root
+          ${DOCKER} ls -l /root/.cargo
+          ${DOCKER} ls -l /root/.cargo/bin
 
           echo =====
           ${DOCKER} sccache -s
