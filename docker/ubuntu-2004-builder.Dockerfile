@@ -67,6 +67,7 @@ RUN cd /root \
     && chmod 700 rustup.sh \
     && ./rustup.sh -y --no-modify-path \
     && /root/.cargo/bin/cargo install mdbook \
+    && /root/.cargo/bin/cargo install sccache \
     && rm rustup.sh
 
 ENV WASI_SDK_PREFIX=/opt/wasi-sdk-14.0
