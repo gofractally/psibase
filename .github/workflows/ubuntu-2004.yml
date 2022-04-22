@@ -47,19 +47,12 @@ jobs:
           GIT_SSH_COMMAND="ssh -i $HOME/.ssh/libmdbx-mirror.key" git submodule add git@github.com:gofractally/libmdbx-mirror.git external/libmdbx/
           git submodule update --init --recursive
           echo =====
-          export CACHES_DIR=${GITHUB_WORKSPACE}/.caches
           export CCACHE_DIR=${GITHUB_WORKSPACE}/.caches/ccache
           export CCACHE_CONFIGPATH=${GITHUB_WORKSPACE}/ccache.conf
-
-          echo "1 CACHES_DIR <$CACHES_DIR>"
-          echo "2 CCACHE_DIR <$CCACHE_DIR>"
-          echo "3 CCACHE_CONFIGPATH <$CCACHE_CONFIGPATH>"
-
           echo max_size = 600M >${GITHUB_WORKSPACE}/ccache.conf
           echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
-          mkdir -p ${CCACHE_DIR}
-          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CACHES_DIR -e CCACHE_CONFIGPATH --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
-          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CACHES_DIR -e CCACHE_CONFIGPATH ${UBUNTU_2004_IMAGE}"
+          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
+          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH ${UBUNTU_2004_IMAGE}"
           docker pull ${UBUNTU_2004_IMAGE}
           echo =====
           ${DOCKER} ccache -s
