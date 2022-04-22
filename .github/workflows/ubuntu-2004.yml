@@ -48,30 +48,22 @@ jobs:
           git submodule update --init --recursive
           echo =====
           export CCACHE_DIR=${GITHUB_WORKSPACE}/.caches/ccache
-          export SCCACHE_DIR=${GITHUB_WORKSPACE}/.caches/ccache
+          export SCCACHE_DIR=${GITHUB_WORKSPACE}/.caches/sccache
           export CCACHE_CONFIGPATH=${GITHUB_WORKSPACE}/ccache.conf
           echo max_size = 600M >${GITHUB_WORKSPACE}/ccache.conf
           echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
           export SCCACHE_CACHE_SIZE=200M
+          export RUSTC_WRAPPER=sccache
           export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
           export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE ${UBUNTU_2004_IMAGE}"
           docker pull ${UBUNTU_2004_IMAGE}
           echo =====
           ${DOCKER} ccache -s
           echo =====
-
-          ${DOCKER} echo $PATH
-          echo =====
-          ${DOCKER} ls -l /
-          ${DOCKER} ls -l /root
-          ${DOCKER} ls -l /root/.cargo
-          ${DOCKER} ls -l /root/.cargo/bin
-
-          echo =====
           ${DOCKER} sccache -s
           echo =====
           mkdir build
-          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
+          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DBUILD_RUST=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
           echo =====

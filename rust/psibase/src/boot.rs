@@ -210,6 +210,7 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
         &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
         &[
             action_json("account-sys", "account-sys", "startup", &startup()?)?,
+            // common-sys
             reg_rpc("common-sys", "common-sys")?,
             upload_sys(
                 "common-sys",
@@ -235,6 +236,7 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
                 "text/javascript",
                 include_bytes!("../../../contracts/user/common_sys/ui/index.js"),
             )?,
+            // account-sys
             reg_rpc("account-sys", "account-rpc")?,
             upload_sys(
                 "account-rpc",
@@ -248,6 +250,7 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
                 "text/javascript",
                 include_bytes!("../../../contracts/system/rpc_account_sys/ui/index.js"),
             )?,
+            // explore-sys
             reg_rpc("explore-sys", "explore-sys")?,
             upload_sys(
                 "explore-sys",
