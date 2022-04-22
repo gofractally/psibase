@@ -77,4 +77,9 @@ if(BUILD_RUST)
     )
 endif()
 
+option(BUILD_EXAMPLES "Build examples" ON)
+if(BUILD_EXAMPLES)
+    add_subdirectory(doc/psidk/src/cpp-contract doc-examples)
+endif()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
