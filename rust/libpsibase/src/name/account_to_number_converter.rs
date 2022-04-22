@@ -2,32 +2,32 @@ use super::constants::*;
 use super::frequency::NameFrequency;
 
 #[derive(Debug)]
-pub struct StringToNumberConverter {
+pub struct AccountToNumberConverter {
     bit: u8,
     next_byte: u8,
     mask: u8,
     output: u64,
 }
 
-impl StringToNumberConverter {
-    pub fn convert(name: &str) -> u64 {
-        let extractor = StringToNumberConverter {
+impl AccountToNumberConverter {
+    pub fn convert(s: &str) -> u64 {
+        let converter = AccountToNumberConverter {
             bit: 0,
             next_byte: 0,
             mask: 0x80,
             output: 0,
         };
-        extractor.to_64(name)
+        converter.to_u64(s)
     }
 
-    fn to_64(mut self, name: &str) -> u64 {
+    fn to_u64(mut self, account: &str) -> u64 {
         let mut high: u32 = MAX_CODE;
         let mut low: u32 = 0;
         let mut pending_bits = 0;
 
-        let mut name_model = NameFrequency::default();
+        let mut name_model = NameFrequency::new(&MODEL_CF);
 
-        let mut name_bytes = name.bytes();
+        let mut name_bytes = account.bytes();
 
         for _ in 0..=name_bytes.len() {
             let c = name_bytes.next().unwrap_or(0);
@@ -48,12 +48,14 @@ impl StringToNumberConverter {
             low = low + (range * p.low / p.count);
 
             loop {
+                if self.bit >= 64 {
+                    break;
+                }
+
                 if high < ONE_HALF {
-                    self.put_bit_plus_pending(false, pending_bits);
-                    pending_bits = 0;
+                    pending_bits = self.put_bit_plus_pending(false, pending_bits);
                 } else if low >= ONE_HALF {
-                    self.put_bit_plus_pending(true, pending_bits);
-                    pending_bits = 0;
+                    pending_bits = self.put_bit_plus_pending(true, pending_bits);
                 } else if low >= ONE_FOURTH && high < THREE_FOURTHS {
                     pending_bits += 1;
                     low -= ONE_FOURTH;
@@ -88,13 +90,14 @@ impl StringToNumberConverter {
         self.output
     }
 
-    fn put_bit_plus_pending(&mut self, bit: bool, pending_bits: u8) {
+    fn put_bit_plus_pending(&mut self, bit: bool, pending_bits: u8) -> u8 {
         let mut pending_bits = pending_bits;
         self.put_bit(bit);
         while pending_bits > 0 {
             self.put_bit(!bit);
             pending_bits -= 1;
         }
+        pending_bits
     }
 
     fn put_bit(&mut self, bit: bool) {

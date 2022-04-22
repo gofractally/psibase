@@ -7,30 +7,37 @@ pub struct Probability {
     pub count: u32,
 }
 
-#[derive(Default)]
-pub struct NameFrequency {
+pub struct NameFrequency<'a, const CHARS: usize, const WIDTH: usize> {
     last_byte: u8,
+    model_cf: &'a [[u16; CHARS]; WIDTH],
 }
 
-impl NameFrequency {
+impl<'a, const CHARS: usize, const WIDTH: usize> NameFrequency<'a, CHARS, WIDTH> {
+    pub fn new(model_cf: &'a [[u16; CHARS]; WIDTH]) -> Self {
+        NameFrequency {
+            last_byte: 0,
+            model_cf,
+        }
+    }
+
     pub fn get_probability(&mut self, c: u8) -> Probability {
-        let cumulative_frequency = MODEL_CF[self.last_byte as usize];
+        let cumulative_frequency = self.model_cf[self.last_byte as usize];
         self.last_byte = c;
         Probability {
             low: cumulative_frequency[c as usize] as u32,
             high: cumulative_frequency[(c + 1) as usize] as u32,
-            count: cumulative_frequency[MODEL_WIDTH] as u32,
+            count: cumulative_frequency[WIDTH] as u32,
         }
     }
 
     pub fn get_count(&self) -> u32 {
-        MODEL_CF[self.last_byte as usize][MODEL_WIDTH] as u32
+        self.model_cf[self.last_byte as usize][WIDTH] as u32
     }
 
     pub fn get_char(&mut self, scaled_value: u32) -> (Probability, u8) {
-        let cumulative_frequency = MODEL_CF[self.last_byte as usize];
+        let cumulative_frequency = self.model_cf[self.last_byte as usize];
 
-        for i in 0..MODEL_WIDTH {
+        for i in 0..WIDTH {
             if scaled_value >= cumulative_frequency[i + 1] as u32 {
                 continue;
             }
@@ -39,7 +46,7 @@ impl NameFrequency {
             let p = Probability {
                 low: cumulative_frequency[c as usize] as u32,
                 high: cumulative_frequency[(c + 1) as usize] as u32,
-                count: cumulative_frequency[MODEL_WIDTH] as u32,
+                count: cumulative_frequency[WIDTH] as u32,
             };
 
             if p.count == 0 {

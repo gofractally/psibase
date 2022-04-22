@@ -2,16 +2,16 @@ use super::constants::*;
 use super::frequency::NameFrequency;
 
 #[derive(Debug)]
-pub struct NumberToStringConverter {
+pub struct NumberToAccountConverter {
     current_byte: i32,
     last_mask: u8,
     not_eof: i32,
     input: u64,
 }
 
-impl NumberToStringConverter {
+impl NumberToAccountConverter {
     pub fn convert(num: u64) -> String {
-        let extractor = NumberToStringConverter {
+        let extractor = NumberToAccountConverter {
             current_byte: 0,
             last_mask: 1,
             not_eof: 64 + 16,
@@ -28,7 +28,7 @@ impl NumberToStringConverter {
         let mut low: u32 = 0;
         let mut value: u32 = 0;
 
-        let mut name_model = NameFrequency::default();
+        let mut name_model = NameFrequency::new(&MODEL_CF);
 
         for _ in 0..CODE_VALUE_BITS {
             value <<= 1;
