@@ -1,14 +1,12 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
+// TODO: remove unsupported types
+
 #pragma once
 #include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
 
-namespace eosio
+namespace psibase
 {
    namespace internal_use_do_not_use
    {
@@ -22,9 +20,9 @@ namespace eosio
 
          [[clang::import_name("printui")]] void printui(uint64_t);
 
-         [[clang::import_name("printi128")]] void printi128(const int128_t*);
+         // [[clang::import_name("printi128")]] void printi128(const int128_t*);
 
-         [[clang::import_name("printui128")]] void printui128(const uint128_t*);
+         // [[clang::import_name("printui128")]] void printui128(const uint128_t*);
 
          [[clang::import_name("printsf")]] void printsf(float);
 
@@ -79,7 +77,10 @@ namespace eosio
     *  @param ptr - a string
     *  @param len - number of chars to print
     */
-   inline void printl(const char* ptr, size_t len) { internal_use_do_not_use::prints_l(ptr, len); }
+   inline void printl(const char* ptr, size_t len)
+   {
+      internal_use_do_not_use::prints_l(ptr, len);
+   }
 
    /**
     *  Prints string
@@ -87,7 +88,10 @@ namespace eosio
     *  @ingroup console
     *  @param ptr - a null terminated string
     */
-   inline void print(const char* ptr) { internal_use_do_not_use::prints(ptr); }
+   inline void print(const char* ptr)
+   {
+      internal_use_do_not_use::prints(ptr);
+   }
 
    /**
     *  Prints string
@@ -112,7 +116,7 @@ namespace eosio
    }
 
    /**
-    * Prints 8-128 bit signed integer
+    * Prints 8-64 bit signed integer
     *
     * @param num to be printed
     */
@@ -122,16 +126,17 @@ namespace eosio
                               int> = 0>
    inline void print(T num)
    {
-      if constexpr (std::is_same<T, int128_t>::value)
+      /*if constexpr (std::is_same<T, int128_t>::value)
          internal_use_do_not_use::printi128(&num);
-      else if constexpr (std::is_same<T, char>::value)
+      else*/
+      if constexpr (std::is_same<T, char>::value)
          internal_use_do_not_use::prints_l(&num, 1);
       else
          internal_use_do_not_use::printi(num);
    }
 
    /**
-    *  Prints 8-128 bit unsigned integer
+    *  Prints 8-64 bit unsigned integer
     *
     *  @param num to be printed
     */
@@ -141,9 +146,10 @@ namespace eosio
                               int> = 0>
    inline void print(T num)
    {
-      if constexpr (std::is_same<T, uint128_t>::value)
+      /*if constexpr (std::is_same<T, uint128_t>::value)
          internal_use_do_not_use::printui128(&num);
-      else if constexpr (std::is_same<T, bool>::value)
+      else*/
+      if constexpr (std::is_same<T, bool>::value)
          internal_use_do_not_use::prints(num ? "true" : "false");
       else
          internal_use_do_not_use::printui(num);
@@ -155,7 +161,10 @@ namespace eosio
     *  @ingroup console
     *  @param num to be printed
     */
-   inline void print(float num) { internal_use_do_not_use::printsf(num); }
+   inline void print(float num)
+   {
+      internal_use_do_not_use::printsf(num);
+   }
 
    /**
     *  Prints double-precision floating point number (i.e. double)
@@ -163,7 +172,10 @@ namespace eosio
     *  @ingroup console
     *  @param num to be printed
     */
-   inline void print(double num) { internal_use_do_not_use::printdf(num); }
+   inline void print(double num)
+   {
+      internal_use_do_not_use::printdf(num);
+   }
 
    /**
     *  Prints quadruple-precision floating point number (i.e. long double)
@@ -171,7 +183,10 @@ namespace eosio
     *  @ingroup console
     *  @param num to be printed
     */
-   inline void print(long double num) { internal_use_do_not_use::printqf(&num); }
+   inline void print(long double num)
+   {
+      internal_use_do_not_use::printqf(&num);
+   }
 
    /**
     *  Prints class object
@@ -192,7 +207,10 @@ namespace eosio
     *  @ingroup console
     *  @param s null terminated string to be printed
     */
-   inline void print_f(const char* s) { internal_use_do_not_use::prints(s); }
+   inline void print_f(const char* s)
+   {
+      internal_use_do_not_use::prints(s);
+   }
 
    /**
     *  Prints formatted string. It behaves similar to C printf/
@@ -292,4 +310,4 @@ namespace eosio
    /// @endcond
 
    static iostream cout;
-}  // namespace eosio
+}  // namespace psibase

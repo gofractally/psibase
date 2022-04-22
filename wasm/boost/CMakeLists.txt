@@ -36,5 +36,5 @@ endif()
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
-file(COPY ${BOOST_BOOST} DESTINATION ${ROOT_BINARY_DIR}/clsdk/boost)
-configure_file(${BOOST_EXTRACTED}/LICENSE_1_0.txt ${ROOT_BINARY_DIR}/clsdk/licenses/LICENSE.boost COPYONLY)
+file(COPY ${BOOST_BOOST} DESTINATION ${ROOT_BINARY_DIR}/psidk/boost)
+configure_file(${BOOST_EXTRACTED}/LICENSE_1_0.txt ${ROOT_BINARY_DIR}/psidk/licenses/LICENSE.boost COPYONLY)

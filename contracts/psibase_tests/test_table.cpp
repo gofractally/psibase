@@ -66,12 +66,12 @@ namespace table_test
       auto        t1   = t.open<table1>();
       auto        idx0 = t1.get_index<0>();
       auto        idx1 = t1.get_index<1>();
-      eosio::print("start put\n");
+      //eosio::print("start put\n");
       t1.put(S1{0, 1, 2});
-      eosio::print("start get\n");
-      eosio::print("primary:", psio::convert_to_json(S1{0, 1, 2}));
-      eosio::print("\n idx0: ", psio::convert_to_json(idx0.get(0)));
-      eosio::print("\n idx1: ", psio::convert_to_json(idx1.get(1)));
+      //eosio::print("start get\n");
+      //eosio::print("primary:", psio::convert_to_json(S1{0, 1, 2}));
+      //eosio::print("\n idx0: ", psio::convert_to_json(idx0.get(0)));
+      //eosio::print("\n idx1: ", psio::convert_to_json(idx1.get(1)));
       check(idx0.get(0) == S1{0, 1, 2}, "get0");
       check(idx1.get(1) == S1{0, 1, 2}, "get1");
       t1.put(S1{0, 2, 3});

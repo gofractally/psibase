@@ -13,10 +13,39 @@ function(add suffix)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
         target_include_directories(psibase${suffix} PUBLIC common/include)
 
+        add_library(simple-malloc${suffix})
+        target_link_libraries(simple-malloc${suffix} PUBLIC wasm-base${suffix})
+        target_sources(simple-malloc${suffix} PRIVATE contract/src/simple_malloc.cpp)
+        add_custom_command(
+            TARGET simple-malloc${suffix}
+            PRE_LINK
+            COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/libc.a libc-no-malloc${suffix}.a
+            COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc-no-malloc${suffix}.a dlmalloc.o
+        )
+
+        add_library(c++abi-replacements${suffix})
+        target_link_libraries(c++abi-replacements${suffix} PUBLIC wasm-base${suffix})
+        target_sources(c++abi-replacements${suffix} PRIVATE contract/src/abort_message.cpp)
+        add_custom_command(
+            TARGET c++abi-replacements${suffix}
+            PRE_LINK
+            COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/libc++abi.a libc++abi-shrunk${suffix}.a
+            COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc++abi-shrunk${suffix}.a abort_message.cpp.o
+        )
+
+        add_library(psibase-contracts-wasi-polyfill${suffix})
+        target_link_libraries(psibase-contracts-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
+        target_sources(psibase-contracts-wasi-polyfill${suffix} PRIVATE
+            contract/src/wasi-polyfill/__wasi_fd_fdstat_get.cpp
+            contract/src/wasi-polyfill/__wasi_fd_close.cpp
+            contract/src/wasi-polyfill/__wasi_fd_seek.cpp
+            contract/src/wasi-polyfill/__wasi_fd_write.cpp
+        )
+
         add_library(psibase-contract-base${suffix})
         target_sources(psibase-contract-base${suffix} PRIVATE
-            contract/src/eosio_polyfill.cpp
             contract/src/intrinsic.cpp
+            contract/src/print.cpp
         )
         target_link_libraries(psibase-contract-base${suffix} PUBLIC psibase${suffix})
         target_compile_options(psibase-contract-base${suffix} PUBLIC -DCOMPILING_CONTRACT)
@@ -28,21 +57,21 @@ function(add suffix)
             -Wl,--no-merge-data-segments
             -nostdlib
         )
-        target_include_directories(psibase-contract-base${suffix} PUBLIC contract/include ../eosiolib/core/include ../eosiolib/contracts/include)
+        target_include_directories(psibase-contract-base${suffix} PUBLIC contract/include)
 
         file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
         # Contract with simple malloc/free
         add_library(psibase-contract-simple-malloc${suffix} INTERFACE)
         target_link_libraries(psibase-contract-simple-malloc${suffix} INTERFACE
-            -L${ROOT_BINARY_DIR}/wasm/libraries/eosiolib
+            -L${ROOT_BINARY_DIR}/wasm/libraries/psibase
             psibase-contract-base${suffix}
             -lc++
             -lc++abi-shrunk${suffix}
             c++abi-replacements${suffix}
             -lc-no-malloc${suffix}
             simple-malloc${suffix}
-            eosio-contracts-wasi-polyfill${suffix}
+            psibase-contracts-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
 
@@ -54,34 +83,34 @@ function(add suffix)
             -lc++abi-shrunk${suffix}
             c++abi-replacements${suffix}
             -lc
-            eosio-contracts-wasi-polyfill${suffix}
+            psibase-contracts-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
 
-        add_library(nctestlib${suffix})
-        target_sources(nctestlib${suffix} PRIVATE
+        add_library(psitestlib${suffix})
+        target_sources(psitestlib${suffix} PRIVATE
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
             contract/src/intrinsic.cpp
-            ../eosiolib/tester/tester_intrinsics.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_args_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_args_sizes_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_clock_time_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_environ_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_environ_sizes_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_close.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_fdstat_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_fdstat_set_flags.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_prestat_dir_name.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_prestat_get.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_read.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_seek.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_fd_write.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_path_open.cpp
-            ../eosiolib/tester/wasi_polyfill/__wasi_proc_exit.cpp
+            tester/src/tester_intrinsics.cpp
+            tester/src/wasi_polyfill/__wasi_args_get.cpp
+            tester/src/wasi_polyfill/__wasi_args_sizes_get.cpp
+            tester/src/wasi_polyfill/__wasi_clock_time_get.cpp
+            tester/src/wasi_polyfill/__wasi_environ_get.cpp
+            tester/src/wasi_polyfill/__wasi_environ_sizes_get.cpp
+            tester/src/wasi_polyfill/__wasi_fd_close.cpp
+            tester/src/wasi_polyfill/__wasi_fd_fdstat_get.cpp
+            tester/src/wasi_polyfill/__wasi_fd_fdstat_set_flags.cpp
+            tester/src/wasi_polyfill/__wasi_fd_prestat_dir_name.cpp
+            tester/src/wasi_polyfill/__wasi_fd_prestat_get.cpp
+            tester/src/wasi_polyfill/__wasi_fd_read.cpp
+            tester/src/wasi_polyfill/__wasi_fd_seek.cpp
+            tester/src/wasi_polyfill/__wasi_fd_write.cpp
+            tester/src/wasi_polyfill/__wasi_path_open.cpp
+            tester/src/wasi_polyfill/__wasi_proc_exit.cpp
         )
-        target_compile_options(nctestlib${suffix} PUBLIC -DCOMPILING_TESTS)
-        target_link_libraries(nctestlib${suffix} PUBLIC
+        target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
+        target_link_libraries(psitestlib${suffix} PUBLIC
             psibase${suffix}
             catch2
             boost
@@ -92,10 +121,8 @@ function(add suffix)
             ${LIBCLANG_RT_BUILTINS}
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
         )
-        target_include_directories(nctestlib${suffix} PUBLIC
+        target_include_directories(psitestlib${suffix} PUBLIC
             contract/include
-            ../eosiolib/core/include
-            ../eosiolib/contracts/include
             tester/include
             ../../contracts/system/account_sys/include
             ../../contracts/system/auth_ec_sys/include
@@ -105,11 +132,13 @@ function(add suffix)
             ../../contracts/system/transaction_sys/include
             ../../contracts/system/verify_ec_sys/include
         )
-        target_include_directories(nctestlib${suffix} PRIVATE
+        target_include_directories(psitestlib${suffix} PRIVATE
             ../../contracts/system/verify_ec_sys/include
         )
-        target_link_options(nctestlib${suffix} INTERFACE -Wl,--export-table)
-        target_link_options(nctestlib${suffix} PUBLIC
+        target_link_options(psitestlib${suffix} INTERFACE
+            -Wl,--export-table # TODO: remove
+        )
+        target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start
             -nostdlib
         )
@@ -136,4 +165,24 @@ endfunction()
 add("")
 if(DEFINED IS_WASM)
     add("-debug")
+    add("-psidk")
+    add("-debug-psidk")
+
+    foreach(suffix "" "-debug")
+        foreach(lib psibase psibase-contract-base psibase-contracts-wasi-polyfill psitestlib)
+            set_target_properties(${lib}${suffix}-psidk PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
+            set_target_properties(${lib}${suffix}-psidk PROPERTIES ARCHIVE_OUTPUT_NAME ${lib}${suffix})
+        endforeach()
+    endforeach()
+endif()
+
+if(IS_WASM)
+    copy_headers(common/include/psibase psibase/common/include/psibase)
+    copy_headers(contract/include/psibase psibase/contract/include/psibase)
+    copy_headers(tester/include/psibase psibase/tester/include/psibase)
+    configure_file(contract/src/abort_message.cpp ${ROOT_BINARY_DIR}/psidk/contract/src/abort_message.cpp COPYONLY)
+    configure_file(contract/src/simple_malloc.cpp ${ROOT_BINARY_DIR}/psidk/psibase/simple_malloc.cpp COPYONLY)
+    configure_file(sdk/psidk-cmake-args ${ROOT_BINARY_DIR}/psidk/bin/psidk-cmake-args COPYONLY)
+    configure_file(sdk/toolchain.cmake ${ROOT_BINARY_DIR}/psidk/toolchain.cmake COPYONLY)
+    configure_file(sdk/psidk-config.cmake ${ROOT_BINARY_DIR}/psidk/psidk-config.cmake COPYONLY)
 endif()

@@ -1,6 +1,5 @@
 #pragma once
 #include <catch2/catch.hpp>
-#include <eosio/asset.hpp>
 #include <iostream>
 #include <psibase/actor.hpp>
 #include <psibase/trace.hpp>
@@ -57,10 +56,6 @@ namespace psibase
    std::vector<char> read_whole_file(std::string_view filename);
 
    int32_t execute(std::string_view command);
-
-   eosio::asset string_to_asset(const char* s);
-
-   inline eosio::asset s2a(const char* s) { return string_to_asset(s); }
 
    /**
     * Validates the status of a transaction.  If expected_except is "", then the
@@ -292,18 +287,3 @@ namespace psibase
    };  // test_chain
 
 }  // namespace psibase
-
-namespace eosio
-{
-   template <std::size_t Size>
-   std::ostream& operator<<(std::ostream& os, const fixed_bytes<Size>& d)
-   {
-      auto arr = d.extract_as_byte_array();
-      psibase::internal_use_do_not_use::hex(arr.begin(), arr.end(), os);
-      return os;
-   }
-
-   std::ostream& operator<<(std::ostream& os, const time_point_sec& obj);
-   std::ostream& operator<<(std::ostream& os, const name& obj);
-   std::ostream& operator<<(std::ostream& os, const asset& obj);
-}  // namespace eosio

@@ -5,6 +5,7 @@
 #include <psibase/actor.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/native_tables.hpp>
+#include <psibase/print.hpp>
 
 using namespace psibase;
 
@@ -15,7 +16,10 @@ namespace system_contract::auth_ec_sys
    using table_num                       = uint32_t;
    static constexpr table_num auth_table = 1;
 
-   inline auto auth_key(account_num account) { return std::tuple{contract, auth_table, account}; }
+   inline auto auth_key(account_num account)
+   {
+      return std::tuple{contract, auth_table, account};
+   }
    struct auth_row
    {
       account_num account;
@@ -28,7 +32,7 @@ namespace system_contract::auth_ec_sys
    void exec(account_num this_contract, account_num sender, auth_check& args)
    {
       if (enable_print)
-         eosio::print("auth_check\n");
+         print("auth_check\n");
       auto row = kv_get<auth_row>(auth_key(args.action.sender));
       check(!!row, "sender does not have a public key");
       auto expected = psio::convert_to_frac(row->pubkey);
@@ -64,7 +68,8 @@ namespace system_contract::auth_ec_sys
       auto act  = get_current_action();
       auto data = psio::convert_from_frac<action>(act.raw_data);
       std::visit(
-          [&](auto& x) {
+          [&](auto& x)
+          {
              if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
                 exec(this_contract, sender, x);
              else
@@ -74,5 +79,8 @@ namespace system_contract::auth_ec_sys
    }
 
    extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
+   extern "C" void start(account_num this_contract)
+   {
+      __wasm_call_ctors();
+   }
 }  // namespace system_contract::auth_ec_sys

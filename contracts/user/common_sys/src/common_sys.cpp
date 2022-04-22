@@ -2,6 +2,7 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/proxy_sys.hpp>
+#include <eosio/to_json.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
 

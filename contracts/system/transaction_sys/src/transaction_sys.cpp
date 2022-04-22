@@ -4,6 +4,7 @@
 
 #include <psibase/crypto.hpp>
 #include <psibase/native_tables.hpp>
+#include <psibase/print.hpp>
 
 using namespace psibase;
 
@@ -88,7 +89,7 @@ namespace system_contract
    extern "C" [[clang::export_name("process_transaction")]] void process_transaction()
    {
       if (enable_print)
-         eosio::print("process_transaction\n");
+         print("process_transaction\n");
 
       // TODO: expiration
       // TODO: check ref_block_num, ref_block_prefix
@@ -135,10 +136,10 @@ namespace system_contract
              }}),
          };
          if (enable_print)
-            eosio::print("call auth_check\n");
+            print("call auth_check\n");
          call(outer);  // TODO: avoid copy (serializing outer)
          if (enable_print)
-            eosio::print("call action\n");
+            print("call action\n");
          call(act);  // TODO: avoid copy (serializing)
       }
    }

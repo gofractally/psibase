@@ -48,7 +48,6 @@ namespace system_contract
          write_console(auth_contract.str());
       }
 
-      eosio::print( "account: '", acc.str(), "'" );
       check(acc.value, "empty account name");
       check(!exists(acc), "account already exists");
       check(exists(auth_contract), "unknown auth contract");
