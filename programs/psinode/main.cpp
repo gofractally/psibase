@@ -38,7 +38,7 @@ std::vector<char> read_whole_file(const char* filename)
    return buf;
 }
 
-// TODO: configurable wasm locations
+// TODO: remove; now lives in rust/psibase
 void bootstrap_chain(system_context& system)
 {
    auto push = [&](auto& bc, AccountNumber sender, AccountNumber contract, const auto& data)
@@ -180,7 +180,9 @@ struct transaction_queue
 {
    struct entry
    {
+      bool                            is_boot = false;
       std::vector<char>               packed_signed_trx;
+      http::push_boot_callback        boot_callback;
       http::push_transaction_callback callback;
    };
 
@@ -197,6 +199,76 @@ struct transaction_queue
 #define CATCH_IGNORE \
    catch (...) {}
 
+bool push_boot(block_context& bc, transaction_queue::entry& entry)
+{
+   try
+   {
+      // TODO: verify no extra data
+      // TODO: view
+      auto transactions =
+          psio::convert_from_frac<std::vector<signed_transaction>>(entry.packed_signed_trx);
+      transaction_trace trace;
+
+      try
+      {
+         if (!bc.need_genesis_action)
+         {
+            trace.error = "chain is already booted";
+         }
+         else
+         {
+            for (auto& trx : transactions)
+            {
+               trace = {};
+               bc.push_transaction(trx, trace);
+            }
+         }
+      }
+      RETHROW_BAD_ALLOC
+      catch (...)
+      {
+         // Don't give a false positive
+         if (!trace.error)
+            throw;
+      }
+
+      try
+      {
+         if (trace.error)
+         {
+            entry.boot_callback(std::move(trace.error));
+         }
+         else
+         {
+            entry.boot_callback(std::nullopt);
+            return true;
+         }
+      }
+      RETHROW_BAD_ALLOC
+      CATCH_IGNORE
+   }
+   RETHROW_BAD_ALLOC
+   catch (std::exception& e)
+   {
+      try
+      {
+         entry.boot_callback(e.what());
+      }
+      RETHROW_BAD_ALLOC
+      CATCH_IGNORE
+   }
+   catch (...)
+   {
+      try
+      {
+         entry.boot_callback("unknown error");
+      }
+      RETHROW_BAD_ALLOC
+      CATCH_IGNORE
+   }
+   return false;
+}  // push_boot
+
 void push_transaction(block_context& bc, transaction_queue::entry& entry)
 {
    try
@@ -208,7 +280,10 @@ void push_transaction(block_context& bc, transaction_queue::entry& entry)
 
       try
       {
-         bc.push_transaction(trx, trace);
+         if (bc.need_genesis_action)
+            trace.error = "Need genesis block; use 'psibase boot' to boot chain";
+         else
+            bc.push_transaction(trx, trace);
       }
       RETHROW_BAD_ALLOC
       catch (...)
@@ -261,7 +336,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
       // TODO: config file
       auto http_config = std::make_shared<http::http_config>(http::http_config{
           .num_threads      = 4,
-          .max_request_size = 400 * 1024,
+          .max_request_size = 10 * 1024 * 1024,
           .idle_timeout_ms  = std::chrono::milliseconds{1000},
           .allow_origin     = "*",
           .static_dir       = "",
@@ -273,18 +348,31 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 
       // TODO: speculative execution on non-producers
       if (produce)
+      {
+         http_config->push_boot_async = [queue](std::vector<char>        packed_signed_transactions,
+                                                http::push_boot_callback callback)
+         {
+            std::scoped_lock lock{queue->mutex};
+            queue->entries.push_back(
+                {true, std::move(packed_signed_transactions), std::move(callback), {}});
+         };
+
          http_config->push_transaction_async =
              [queue](std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
          {
             std::scoped_lock lock{queue->mutex};
-            queue->entries.push_back({std::move(packed_signed_trx), std::move(callback)});
+            queue->entries.push_back(
+                {false, std::move(packed_signed_trx), {}, std::move(callback)});
          };
+      }
 
       auto server = http::server::create(http_config, shared_state);
    }
 
    if (bootstrap)
       bootstrap_chain(*system);
+
+   bool showedBootMsg = false;
 
    // TODO: temporary loop
    // TODO: replay
@@ -302,10 +390,26 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
          block_context bc{*system, true, true};
          bc.start();
 
-         // TODO: block limits
+         bool abort_boot = false;
          for (auto& entry : entries)
-            push_transaction(bc, entry);
+         {
+            if (entry.is_boot)
+               abort_boot = !push_boot(bc, entry);
+            else
+               push_transaction(bc, entry);
+         }
+         if (abort_boot)
+            continue;
 
+         if (bc.need_genesis_action)
+         {
+            if (!showedBootMsg)
+            {
+               std::cout << "Need genesis block; use 'psibase boot' to boot chain\n";
+               showedBootMsg = true;
+            }
+            continue;
+         }
          bc.commit();
          std::cout << psio::convert_to_json(bc.current.header) << "\n";
       }

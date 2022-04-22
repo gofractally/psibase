@@ -5,6 +5,7 @@ use custom_error::custom_error;
 use reqwest::Url;
 use serde_json::Value;
 
+mod boot;
 mod bridge;
 
 custom_error! { Error
@@ -30,6 +31,9 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Boot a development chain
+    Boot {},
+
     /// Install a contract
     Install {
         /// Account to install contract on
@@ -145,15 +149,21 @@ async fn push_transaction_impl(
     client: reqwest::Client,
     packed: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
-    let resp = client
+    let mut response = client
         .post(Url::parse(&args.api)?.join("native/push_transaction")?)
         .body(packed)
         .send()
-        .await?
-        .error_for_status()?
-        .text()
         .await?;
-    let json: Value = serde_json::de::from_str(&resp)?;
+    if response.status().is_client_error() {
+        response = response.error_for_status()?;
+    }
+    if response.status().is_server_error() {
+        return Err(anyhow::Error::new(Error::Msg {
+            s: response.text().await?,
+        }));
+    }
+    let text = response.text().await?;
+    let json: Value = serde_json::de::from_str(&text)?;
     // println!("{:#?}", json);
     let err = json.get("error").and_then(|v| v.as_str());
     if let Some(e) = err {
@@ -219,6 +229,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let client = reqwest::Client::new();
     // TODO: environment variable for url
     match &args.command {
+        Commands::Boot {} => boot::boot(&args, client).await?,
         Commands::Install {
             account,
             filename,

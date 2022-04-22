@@ -9,6 +9,8 @@ namespace psio
      *  exceptions and do something else, this
      *  wraps that.
      */
+   // TODO: MAJOR: this ends up throwing enums, const char*'s, and other
+   //              things not derived from std::exception
    template <typename T>
    [[noreturn]] void throw_error(T&& e)
    {

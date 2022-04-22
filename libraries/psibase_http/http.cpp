@@ -282,6 +282,9 @@ namespace psibase::http
             eosio::finally f{[&]() { server.shared_state->add_system_context(std::move(system)); }};
             block_context  bc{*system, read_only{}};
             bc.start();
+            if (bc.need_genesis_action)
+               return send(error(bhttp::status::internal_server_error,
+                                 "Need genesis block; use 'psibase boot' to boot chain"));
             signed_transaction trx;
             action             act{
                             .sender   = AccountNumber(),
@@ -296,6 +299,42 @@ namespace psibase::http
             // printf("%s\n", pretty_trace(atrace).c_str());
             auto result = psio::convert_from_frac<rpc_reply_data>(atrace.raw_retval);
             return send(ok(std::move(result.reply), result.contentType.c_str()));
+         }
+         else if (req.target() == "/native/push_boot" && req.method() == bhttp::verb::post &&
+                  server.http_config->push_boot_async)
+         {
+            server.http_config->push_boot_async(
+                std::move(req.body()),
+                [error, ok, session = send.self.derived_session().shared_from_this(),
+                 server = send.self.server.shared_from_this()](push_boot_result result)
+                {
+                   // inside foreign thread; the server capture above keeps ioc alive.
+                   net::post(
+                       session->stream.socket().get_executor(),
+                       [error, ok, session = std::move(session), result = std::move(result)]
+                       {
+                          // inside http thread pool. If we reached here, then the server
+                          // and ioc are still alive. This lambda doesn't capture server since
+                          // that would leak memory (circular) if the ioc threads were shut down.
+                          try
+                          {
+                             session->queue_.pause_read = false;
+                             if (!result)
+                                session->queue_(ok({'t', 'r', 'u', 'e'}, "application/json"));
+                             else
+                                session->queue_(
+                                    error(bhttp::status::internal_server_error, *result));
+                             if (session->queue_.can_read())
+                                session->do_read();
+                          }
+                          catch (...)
+                          {
+                             session->do_close();
+                          }
+                       });
+                });
+            send.pause_read = true;
+            return;
          }
          else if (req.target() == "/native/push_transaction" && req.method() == bhttp::verb::post &&
                   server.http_config->push_transaction_async)

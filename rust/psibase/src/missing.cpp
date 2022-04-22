@@ -33,6 +33,30 @@ struct SetCode
 PSIO_REFLECT(SetCode, contract, vm_type, vm_version, code)
 EOSIO_REFLECT(SetCode, contract, vm_type, vm_version, code)
 
+struct Startup
+{
+   std::vector<psibase::AccountNumber> existing_accounts;
+};
+PSIO_REFLECT(Startup, existing_accounts)
+EOSIO_REFLECT(Startup, existing_accounts)
+
+struct RegisterServer
+{
+   psibase::AccountNumber contract;
+   psibase::AccountNumber rpc_contract;
+};
+PSIO_REFLECT(RegisterServer, contract, rpc_contract);
+EOSIO_REFLECT(RegisterServer, contract, rpc_contract);
+
+struct UploadSys
+{
+   std::string       path;
+   std::string       contentType;
+   std::vector<char> content;
+};
+PSIO_REFLECT(UploadSys, path, contentType, content)
+EOSIO_REFLECT(UploadSys, path, contentType, content)
+
 template <typename T>
 std::unique_ptr<std::vector<uint8_t>> pack(const rust::Str& json)
 {
@@ -60,4 +84,29 @@ std::unique_ptr<std::vector<uint8_t>> pack_set_code(rust::Str json)
 std::unique_ptr<std::vector<uint8_t>> pack_signed_transaction(rust::Str json)
 {
    return pack<psibase::signed_transaction>(json);
+}
+
+std::unique_ptr<std::vector<uint8_t>> pack_signed_transactions(rust::Str json)
+{
+   return pack<std::vector<psibase::signed_transaction>>(json);
+}
+
+std::unique_ptr<std::vector<uint8_t>> pack_genesis_action_data(rust::Str json)
+{
+   return pack<psibase::genesis_action_data>(json);
+}
+
+std::unique_ptr<std::vector<uint8_t>> pack_startup(rust::Str json)
+{
+   return pack<Startup>(json);
+}
+
+std::unique_ptr<std::vector<uint8_t>> pack_register_server(rust::Str json)
+{
+   return pack<RegisterServer>(json);
+}
+
+std::unique_ptr<std::vector<uint8_t>> pack_upload_sys(rust::Str json)
+{
+   return pack<UploadSys>(json);
 }
