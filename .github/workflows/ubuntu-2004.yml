@@ -59,6 +59,14 @@ jobs:
           echo =====
           ${DOCKER} ccache -s
           echo =====
+
+          echo $PATH
+          echo =====
+          ls -l /root
+          ls -l /root/.cargo
+          ls -l /root/.cargo/bin
+
+          echo =====
           ${DOCKER} sccache -s
           echo =====
           mkdir build
