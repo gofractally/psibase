@@ -50,6 +50,11 @@ jobs:
           export CACHES_DIR=${GITHUB_WORKSPACE}/.caches
           export CCACHE_DIR=${GITHUB_WORKSPACE}/.caches/ccache
           export CCACHE_CONFIGPATH=${GITHUB_WORKSPACE}/ccache.conf
+
+          echo "1 CACHES_DIR <$CACHES_DIR>"
+          echo "2 CCACHE_DIR <$CCACHE_DIR>"
+          echo "3 CCACHE_CONFIGPATH <$CCACHE_CONFIGPATH>"
+
           echo max_size = 600M >${GITHUB_WORKSPACE}/ccache.conf
           echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
           mkdir -p ${CCACHE_DIR}
