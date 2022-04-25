@@ -1,6 +1,6 @@
 #pragma once
-#include <psio/protobuf/any.hpp>
 #include <functional>
+#include <psio/protobuf/any.hpp>
 
 namespace psio
 {
@@ -69,7 +69,7 @@ namespace psio
                              else
                              {
                                 any field_data = dispatch((obj.*mptr)(args...), field.filter);
-                                result.add(field.number.value, psio::to_bin(field_data));
+                                result.add(field.number.value, psio::convert_to_bin(field_data));
                              }
                           },
                           params);
@@ -102,7 +102,7 @@ namespace psio
                             for (const auto& item : obj.*mptr)
                             {
                                any field_data = dispatch(item, field.filter);
-                               result.add(field.number.value, psio::to_bin(field_data));
+                               result.add(field.number.value, psio::convert_to_bin(field_data));
                             }
                          }
                          else
@@ -120,7 +120,7 @@ namespace psio
                       else
                       {
                          any field_data = dispatch(obj.*mptr, field.filter);
-                         result.add(field.number.value, psio::to_bin(field_data));
+                         result.add(field.number.value, psio::convert_to_bin(field_data));
                       }
                    }
                 });

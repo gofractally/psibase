@@ -104,7 +104,7 @@ namespace psio
       Connection result;
       auto       add_edge = [&](const auto& it)
       {
-         auto bin    = to_bin(iterToKey(it));
+         auto bin    = convert_to_bin(iterToKey(it));
          auto cursor = to_hex(bin);
          result.edges.push_back(
              Edge<typename Connection::NodeType>{iterToNode(it), std::move(cursor)});

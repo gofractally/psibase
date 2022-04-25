@@ -113,7 +113,7 @@ namespace
    template <typename Key>
    std::string keyToString(const Key& key, std::string_view suffix, const char* prefix)
    {
-      auto whole = psio::to_bin(key);
+      auto whole = psio::convert_to_bin(key);
       auto ripe_digest =
           digestSuffixRipemd160(std::string_view(whole.data() + 1, whole.size() - 1), suffix);
       whole.insert(whole.end(), ripe_digest.data(), ripe_digest.data() + 4);
