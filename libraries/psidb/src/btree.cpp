@@ -3,40 +3,11 @@
 #include <cstdint>
 #include <cstring>
 
+#include <psidb/node_ptr.hpp>
+#include <psidb/page_types/internal_node.hpp>
 #include <sys/mman.h>
 
-
-using key_type = std::string_view;
-using page_id = std::uint32_t;
-using version_type = std::uint64_t;
-
-constexpr std::size_t page_size = 4096;
-constexpr std::size_t min_key_size = 16;
-
-enum class page_type : std::uint8_t {
-    node,
-    leaf
-};
-
-struct page_header {
-   page_type type;
-   page_id prev; // TODO: requires atomic updates
-   version_type version;
-};
-static_assert(sizeof(page_header) == 16);
-
-struct node_ptr {
-   node_ptr() = default;
-   node_ptr(std::nullptr_t) : node_ptr(nullptr, nullptr) {}
-   node_ptr(page_header* parent, std::uint32_t* id) : parent(parent), id(id) {}
-   // OPT: Since pages are aligned, parent == id & high_mask;
-   page_header* parent;
-   std::uint32_t* id;
-   std::uint32_t get_id() const { return *id; }
-   template<typename Page>
-   Page* get_parent() const { return static_cast<Page*>(parent); }
-   explicit operator bool() const { return id != 0; }
-};
+using namespace psidb;
 
 struct leaf_ptr {
    leaf_ptr() = default;
@@ -47,171 +18,8 @@ struct leaf_ptr {
    Page* get_parent() const { return static_cast<Page*>(parent); }
 };
 
-// moves data from [start, end) to [start+1, end+1)
-template<typename T>
-void shift_array(T* start, T* end) {
-   std::memmove(start + 1, start, (end - start) * sizeof(T));
-}
-
-static std::string_view unpad(std::string_view data) {
-   return {data.data(), data.data() + data.size() - 16 + data.back()};
-}
-
-struct page_internal_node : page_header {
-   static constexpr std::size_t capacity = (page_size - sizeof(page_header) - sizeof(page_id) - 2) / (min_key_size + sizeof(page_id) + 2);
-   std::uint8_t size;
-   std::uint8_t key_words;
-   // Keys are 16-byte aligned and padded to a multiple of 16 bytes
-   struct key_storage {
-      constexpr key_storage(std::size_t offset, std::size_t size)
-         : shifted_offset(offset / 16), shifted_size(size / 16) {}
-      std::uint8_t shifted_offset;
-      std::uint8_t shifted_size;
-      constexpr std::uint16_t offset() const { return shifted_offset * 16; }
-      constexpr std::uint16_t size() const { return shifted_size * 16; }
-   };
-   // Align buf to a multiple of 16 bytes
-   static constexpr std::size_t padding = (page_size - (sizeof(page_header) + 6 + capacity * 6)) % 16 / 2;
-   key_storage keys[capacity + padding];
-   page_id children[capacity + 1];
-   char buf[page_size - sizeof(page_header) - padding*2 - 6*capacity - 6];
-
-   std::string_view get_key(key_storage k) const {
-      return { buf + k.offset(), buf + k.offset() + k.size() };
-   }
-   std::string_view get_key(std::uint16_t idx) const {
-      return get_key(keys[idx]);
-   }
-   node_ptr child(uint16_t idx) {
-      return {this,&children[idx]};
-   }
-   uint16_t get_offset(node_ptr pos) {
-      return pos.id - children;
-   }
-   void append(std::string_view k, page_id rhs) {
-      insert_unchecked(size, k, rhs);
-   }
-   // \pre the most recently inserted key must be at the end
-   void pop_back() {
-      --size;
-      key_words -= keys[size].shifted_size;
-   }
-   void set(page_id first) {
-      size = 0;
-      key_words = 0;
-      children[0] = first;
-   }
-   void set(page_id lhs, std::string_view k, page_id rhs) {
-      size = 0;
-      key_words = 0;
-      children[0] = lhs;
-      append(k, rhs);
-   }
-   // \return the key corresponding to the midpoint.  The result points to
-   // memory owned by one of the nodes and is invalidated by any modification to
-   // either node.
-   std::string_view split(page_internal_node* other, std::uint16_t idx, std::string_view k, page_id p) {
-      std::uint32_t total_key_size = 0;
-      auto copy_some = [&](std::uint32_t start, std::uint32_t end) {
-         for(; start != end; ++start) {
-            other->append(get_key(start), children[start + 1]);
-         }
-      };
-      // OPT: This loop can be vectorized
-      for(std::uint32_t i = 0; i < idx; ++i) {
-         total_key_size += keys[i].size();
-         if(total_key_size > sizeof(buf)/2) {
-            other->set(children[i + 1]);
-            copy_some(i + 1, idx);
-            other->append(k, p);
-            copy_some(idx, size);
-            truncate(i + 1);
-            pop_back();
-            return this->get_key(i);
-         }
-      }
-      {
-         total_key_size += k.size();
-         if(total_key_size > sizeof(buf)/2) {
-            other->set(p);
-            copy_some(idx, size);
-            truncate(idx);
-            return k;
-         }
-      }
-      for(std::uint32_t i = idx; i < size; ++i) {
-         total_key_size += keys[i].size();
-         if(total_key_size > sizeof(buf)/2) {
-            other->set(children[i + 1]);
-            copy_some(i + 1, size);
-            other->append(get_key(i), 0);
-            other->pop_back();
-            truncate(i);
-            insert_unchecked(idx, k, p);
-            return other->get_key(other->size);
-         }
-      }
-      __builtin_unreachable();
-   }
-
-   void truncate(std::uint16_t pos) {
-      char tmp[sizeof(buf)];
-      std::uint32_t offset = 0;
-      auto append_string = [&](std::string_view data) {
-         std::memcpy(tmp + offset, data.data(), data.size());
-         offset += data.size();
-      };
-      for(std::uint32_t i = 0; i < pos; ++i) {
-         auto& keyref = keys[i];
-         auto prev_offset = offset;
-         append_string(get_key(keyref));
-         keyref.shifted_offset = prev_offset/16;
-      }
-      std::memcpy(buf, tmp, offset);
-      size = pos;
-      key_words = offset/16;
-   }
-   bool insert(node_ptr pos, std::string_view key, page_id p) {
-      if(key_words * 16 + key.size() > sizeof(buf)) {
-         return false;
-      }
-      insert_unchecked(get_offset(pos), key, p);
-      return true;
-   }
-   void insert_unchecked(std::uint16_t idx, std::string_view key, page_id p) {
-      assert(size < capacity);
-      // copy key
-      std::memcpy(buf + key_words * 16, key.data(), key.size());
-      shift_array(keys + idx, keys + size);
-      keys[idx] = {static_cast<std::uint16_t>(key_words*16), key.size()};
-      shift_array(children + idx, children + size + 1);
-      children[idx + 1] = p;
-      // OPT: Does not alias key...
-      ++size;
-      key_words += key.size() / 16;
-   }
-   bool insert(std::string_view key, page_id p) {
-      if(key_words * 16 + key.size() > sizeof(buf)) {
-         return false;
-      }
-      insert_unchecked(lower_bound_impl(key), key, p);
-   }
-
-   std::uint16_t lower_bound_impl(std::string_view key) {
-      std::uint16_t i = 0;
-      for(; i < size; ++i) {
-         if(key < unpad(get_key(i))) {
-            break;
-         }
-      }
-      return i;
-   }
-   node_ptr lower_bound(std::string_view key) {
-      return {this, children + lower_bound_impl(key)};
-   }
-};
 static_assert(sizeof(page_internal_node) == page_size);
-static_assert(sizeof(page_internal_node::buf) % 16 == 0);
+static_assert(sizeof(page_internal_node::_buf) % 16 == 0);
 
 struct key_value {
    std::string_view key;
@@ -521,7 +329,7 @@ private:
       return db->get_page(id, version);
    }
    page_header* get_page(node_ptr p) {
-      return get_page(p.get_id());
+      return get_page(*p);
    }
    node_ptr lower_bound(page_header* p, key_type key) {
       return visit(p, [&](auto* p){ return lower_bound(p, key); });
