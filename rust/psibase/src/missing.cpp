@@ -10,7 +10,7 @@
 #pragma GCC diagnostic push
 #include <eosio/from_json.hpp>
 #include <psibase/block.hpp>
-#include <psio/bytes/to_json.hpp>
+#include <psio/bytes.hpp>
 #include <psio/fracpack.hpp>
 #pragma GCC diagnostic pop
 

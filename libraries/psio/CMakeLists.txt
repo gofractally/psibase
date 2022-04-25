@@ -42,10 +42,6 @@ target_sources( psio INTERFACE
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes.hpp
 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes/from_json.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes/to_json.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes/to_bin.hpp
-
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_protobuf.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_protobuf.hpp
 
