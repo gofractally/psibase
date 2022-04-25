@@ -44,7 +44,7 @@ namespace psio
          for (const auto& field : q.fields)
          {
             reflect<T>::get(
-                int64_t(field.number),
+                int64_t(field.number.value),
                 [&](auto mptr)
                 {
                    using member_ptr_type = decltype(mptr);
@@ -65,11 +65,11 @@ namespace psio
                                 /// TODO:
                              }
                              else if constexpr (not reflect<return_type>::is_struct)
-                                result.add(field.number, (obj.*mptr)(args...));
+                                result.add(field.number.value, (obj.*mptr)(args...));
                              else
                              {
                                 any field_data = dispatch((obj.*mptr)(args...), field.filter);
-                                result.add(field.number, psio::to_bin(field_data));
+                                result.add(field.number.value, psio::to_bin(field_data));
                              }
                           },
                           params);
@@ -95,32 +95,32 @@ namespace psio
                          }
                          else if constexpr (std::is_arithmetic_v<value_type>)
                          {
-                            result.add(field.number, obj.*mptr);
+                            result.add(field.number.value, obj.*mptr);
                          }
                          else if constexpr (reflect<value_type>::is_struct)
                          {
                             for (const auto& item : obj.*mptr)
                             {
                                any field_data = dispatch(item, field.filter);
-                               result.add(field.number, psio::to_bin(field_data));
+                               result.add(field.number.value, psio::to_bin(field_data));
                             }
                          }
                          else
                          {
                             for (const auto& item : obj.*mptr)
                             {
-                               result.add(field.number, item);
+                               result.add(field.number.value, item);
                             }
                          }
                       }
                       else if constexpr (not reflect<member_type>::is_struct)
                       {
-                         result.add(field.number, obj.*mptr);
+                         result.add(field.number.value, obj.*mptr);
                       }
                       else
                       {
                          any field_data = dispatch(obj.*mptr, field.filter);
-                         result.add(field.number, psio::to_bin(field_data));
+                         result.add(field.number.value, psio::to_bin(field_data));
                       }
                    }
                 });
@@ -174,7 +174,7 @@ namespace psio
          query_proxy& call(const meta& ref, Mptr mptr)
          {
             q.fields.push_back({
-                .number = ref.number,
+                .number = {uint32_t(ref.number)},
             });
             return *this;
          }

@@ -56,7 +56,7 @@ namespace psio
                             }
                             else
                             {
-                               result.fields.push_back(field_query{ref.number});
+                               result.fields.push_back(field_query{{(uint32_t)ref.number}});
                             }
                          }
                       }
