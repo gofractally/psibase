@@ -50,7 +50,7 @@ namespace UserContract
 
       enum FlagType
       {
-         recallable = 0,
+         unrecallable = 0,
          // ... space for 15 more
          invalid = 16
       };

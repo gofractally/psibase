@@ -8,10 +8,13 @@ using namespace psibase;
 using UserContract::TokenSys;
 using namespace UserContract::Errors;
 using namespace UserContract;
+using FlagType = Flags::FlagType;
 
 namespace
 {
-   constexpr bool storageBillingImplemented = false;
+   constexpr bool storageBillingImplemented  = false;
+   constexpr bool inflationLimitsImplemented = false;
+   constexpr bool tokenSymbolsSupported      = false;
 
    struct DiskUsage_TokenRecord
    {
@@ -20,19 +23,26 @@ namespace
       static constexpr int64_t update            = 100;
    };
 
+   const psibase::String memo{"memo"};
+
+   const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
+       {TokenSys::contract, "token_sys.wasm"},
+       {NftSys::contract, "nft_sys.wasm"}};
+
 }  // namespace
 
-SCENARIO("Data type tests")
-{
-   // Test Precision
-   // Test Quantity
-}
+/* Todo:
+ *    Templatize psibase::Bitset
+ *    Test Precision and Quantity types
+ *    Code review psibase::Bitset and psibase::String
+ *    Code review token tables
+*/
 
 SCENARIO("Creating a token")
 {
    GIVEN("An empty chain with user Alice")
    {
-      DefaultTestChain t({{TokenSys::contract, "token_sys.wasm"}});
+      DefaultTestChain t(neededContracts);
 
       auto alice = t.as(t.add_account("alice"_a));
       auto a     = alice.at<TokenSys>();
@@ -80,7 +90,7 @@ SCENARIO("Minting tokens")
 {
    GIVEN("Alice created a token")
    {
-      DefaultTestChain t({{TokenSys::contract, "token_sys.wasm"}});
+      DefaultTestChain t(neededContracts);
 
       auto alice = t.as(t.add_account("alice"_a));
       auto a     = alice.at<TokenSys>();
@@ -97,15 +107,13 @@ SCENARIO("Minting tokens")
       }
       THEN("Alice may not mint them with an invalid token ID")
       {
-         // NOP
-         CHECK(false);  // Unimplemented
+         auto mint = a.mint(999, 1000, alice);
+         CHECK(mint.failed(invalidTokenId));
       }
       THEN("Alice may not mint them to an invalid Account")
       {
-         // NOP
-         CHECK(false);  // Unimplemented
-         // This and prior test case make me with there was a system for type-specific context-*aware* testing
-         // Put the logic to ensure that an account is valid and a token is valid in one place
+         auto mint = a.mint(tokenId, 1000, "notreal"_a);
+         CHECK(mint.failed(invalidAccount));
       }
       THEN("Alice may mint new tokens")
       {
@@ -116,8 +124,8 @@ SCENARIO("Minting tokens")
 
          AND_THEN("The tokens were allocated accordingly")
          {
-            auto getBalanceAlice = a.getBalance(tokenId);
-            auto getBalanceBob   = b.getBalance(tokenId);
+            auto getBalanceAlice = a.getBalance(tokenId, alice);
+            auto getBalanceBob   = b.getBalance(tokenId, bob);
 
             CHECK(getBalanceAlice.succeeded());
             CHECK(getBalanceAlice.returnVal() == 1000);
@@ -130,21 +138,61 @@ SCENARIO("Minting tokens")
 
    GIVEN("A token created by Alice with inflation limits")
    {
-      THEN("Alice may not exceed those inflation limits") {}
-      THEN("Alice may not raise those inflation limits") {}
+      CHECK(inflationLimitsImplemented);
+
+      THEN("Alice may not exceed those inflation limits")
+      {  //
+         CHECK(inflationLimitsImplemented);
+      }
+      THEN("Alice may not raise those inflation limits")
+      {  //
+         CHECK(inflationLimitsImplemented);
+      }
    }
+}
+
+SCENARIO("Setting flags")
+{
+   // Todo - test setting invalid flags fails
+   // Should flags be defineable by child contracts? Or do we define all token flags?
 }
 
 SCENARIO("Recalling tokens")
 {
    GIVEN("Alice created a new token and issued some to Bob")
    {
-      THEN("The token is recallable by default") {}
-      THEN("Alice can recall Bob's tokens") {}
-      THEN("The token issuer may turn off recallability") {}
-      WHEN("The token issuer turns off recallability")
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
+      auto b     = bob.at<TokenSys>();
+
+      auto tokenId = a.create(8, 1'000'000'000).returnVal();
+      auto token   = a.getToken(tokenId).returnVal();
+      a.mint(tokenId, 1000, bob);
+
+      THEN("The token is recallable by default")
       {
-         THEN("Alice may not recall Bob's tokens") {}
+         CHECK((token.has_value() && false == (*token).flags.get(FlagType::unrecallable)));
+      }
+      THEN("Alice can recall Bob's tokens")
+      {
+         auto recall = a.recall(tokenId, bob, 1000, "recall memo");
+         CHECK(recall.succeeded());
+      }
+      THEN("The token issuer may turn off recallability")
+      {
+         auto set = a.set(tokenId, FlagType::unrecallable);
+         CHECK(set.succeeded());
+         auto unrecallable = a.getToken(tokenId).returnVal()->flags.get(FlagType::unrecallable);
+         CHECK(true == unrecallable);
+
+         AND_THEN("Alice may not recall Bob's tokens")
+         {
+            auto recall = a.recall(tokenId, bob, 1000, "recall memo");
+            CHECK(recall.failed(tokenUnrecallable));
+         }
       }
    }
 }
@@ -153,21 +201,79 @@ SCENARIO("Interactions with the Issuer NFT")
 {
    GIVEN("Alice created and distributed a token")
    {
-      WHEN("Alice transfers the issuer NFT to Bob")
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
+      auto b     = bob.at<TokenSys>();
+
+      auto tokenId = a.create(8, 1'000'000'000).returnVal();
+      auto token   = a.getToken(tokenId).returnVal();
+      auto nft     = alice.at<NftSys>().getNft(token->ownerNft).returnVal();
+
+      THEN("The Issuer NFT is owned by Alice")
       {
-         THEN("The token record is identical") {}
-         THEN("Bob may mint new tokens") {}
-         THEN("Alice may not mint new tokens") {}
-         THEN("Alice may not recall Bob's tokens") {}
-         THEN("Bob may recall Alice's tokens") {}
+         CHECK((nft.has_value() && nft->owner == alice.id));
+      }
+      WHEN("Alice credits the issuer NFT to Bob")
+      {
+         alice.at<NftSys>().credit(nft->id, bob, memo);
+
+         THEN("The NFT is owned by Bob")
+         {
+            auto newNft = alice.at<NftSys>().getNft(token->ownerNft).returnVal();
+            nft->owner  = bob.id;
+            CHECK(newNft == nft);
+         }
+         THEN("The token record is identical")
+         {  //
+            CHECK(a.getToken(tokenId).returnVal() == token);
+         }
+         THEN("Bob may mint new tokens")
+         {  //
+            CHECK(b.mint(tokenId, 1000, bob).succeeded());
+         }
+         THEN("Alice may not mint new tokens")
+         {
+            CHECK(a.mint(tokenId, 1000, alice).failed(missingRequiredAuth));
+         }
+         THEN("Alice may not recall Bob's tokens")
+         {
+            b.mint(tokenId, 1000, bob);
+            CHECK(a.recall(tokenId, bob, 1000, memo).failed(missingRequiredAuth));
+         }
+         THEN("Bob may recall Alice's tokens")
+         {
+            b.mint(tokenId, 1000, alice);
+            CHECK(b.recall(tokenId, alice, 1000, memo).succeeded());
+         }
       }
       WHEN("Alice burns the issuer NFT")
       {
-         THEN("Alice may not mint new tokens") {}
-         THEN("Alice may not transfer the issuer NFT") {}
-         THEN("Alice may not recall Bob's tokens") {}
-         THEN("Alice may not update the token inflation") {}
-         THEN("Alice may not update the token recallability") {}
+         a.mint(tokenId, 1000, bob);
+         alice.at<NftSys>().burn(nft->id);
+
+         THEN("Alice may not mint new tokens")
+         {
+            CHECK(a.mint(tokenId, 1000, alice).failed(missingRequiredAuth));
+         }
+         THEN("Alice may not credit the issuer NFT to anyone")
+         {
+            CHECK(alice.at<NftSys>().credit(nft->id, bob, memo).failed(missingRequiredAuth));
+         }
+         THEN("Alice may not recall Bob's tokens")
+         {
+            CHECK(a.recall(tokenId, bob, 1000, memo).failed(missingRequiredAuth));
+         }
+         THEN("Alice may not update the token inflation")
+         {  //
+            CHECK(inflationLimitsImplemented);
+         }
+         THEN("Alice may not update the token recallability")
+         {
+            CHECK(a.set(tokenId, FlagType::unrecallable).failed(missingRequiredAuth));
+         }
       }
    }
 }
@@ -176,26 +282,76 @@ SCENARIO("Burning tokens")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
-      THEN("Alice may not burn 101 tokens") {}
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
+      auto b     = bob.at<TokenSys>();
+
+      auto tokenId = a.create(8, 1'000'000'000).returnVal();
+      auto token   = a.getToken(tokenId).returnVal();
+      auto mint    = a.mint(tokenId, 100, alice);
+      auto mint2   = a.mint(tokenId, 100, bob);
+
+      THEN("Alice may not burn 101 tokens")
+      {
+         CHECK(a.burn(tokenId, 101).failed(insufficientBalance));
+      }
       THEN("Alice may burn 60 tokens")
       {
-         AND_THEN("Alice may not burn 41 more") {}
-         AND_THEN("Alice may burn 40 more") {}
+         CHECK(a.burn(tokenId, 60).succeeded());
+
+         AND_THEN("Alice may not burn 41 more")
+         {
+            CHECK(a.burn(tokenId, 41).failed(insufficientBalance));
+         }
+         AND_THEN("Alice may burn 40 more")
+         {  //
+            CHECK(a.burn(tokenId, 40).succeeded());
+         }
       }
       WHEN("Alice burns 60 tokens")
       {
-         THEN("She still owns 40 tokens") {}
-         THEN("Bob still owns 100 tokens") {}
+         a.burn(tokenId, 60);
+
+         THEN("She still owns 40 tokens")
+         {  //
+            CHECK(a.getBalance(tokenId, alice).returnVal() == 40);
+         }
+         THEN("Bob still owns 100 tokens")
+         {  //
+            CHECK(b.getBalance(tokenId, bob).returnVal() == 100);
+         }
       }
       WHEN("Alice burns 100 tokens")
       {
-         THEN("Her balance is 0") {}
-         THEN("She may not burn any more") {}
-         THEN("Bob may burn tokens") {}
+         a.burn(tokenId, 100);
+
+         THEN("Her balance is 0")
+         {  //
+            CHECK(a.getBalance(tokenId, alice).returnVal() == 0);
+         }
+         THEN("She may not burn any more")
+         {
+            CHECK(a.burn(tokenId, 1).failed(insufficientBalance));
+         }
+         THEN("Bob may burn tokens")
+         {  //
+            CHECK(b.burn(tokenId, 10).succeeded());
+         }
          AND_WHEN("Bob burns 10 tokens")
          {
-            THEN("Bob still has 90 tokens") {}
-            THEN("Alice still has 0 tokens") {}
+            b.burn(tokenId, 10);
+
+            THEN("Bob still has 90 tokens")
+            {  //
+               CHECK(b.getBalance(tokenId, bob).returnVal() == 90);
+            }
+            THEN("Alice still has 0 tokens")
+            {  //
+               CHECK(a.getBalance(tokenId, alice).returnVal() == 0);
+            }
          }
       }
    }
@@ -205,21 +361,64 @@ SCENARIO("Toggling auto-debit")
 {
    GIVEN("A chain with users Alice and Bob")
    {
-      THEN("Alice and Bob both have autodebit enabled") {}
-      THEN("Alice may disable autodebit") {}
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
+      auto b     = bob.at<TokenSys>();
+
+      THEN("Alice and Bob both have autodebit enabled")
+      {
+         auto isAutodebit1 = a.isAutodebit(alice);
+         REQUIRE(isAutodebit1.succeeded());
+         CHECK(isAutodebit1.returnVal() == true);
+
+         auto isAutodebit2 = a.isAutodebit(bob);
+         REQUIRE(isAutodebit2.succeeded());
+         CHECK(isAutodebit2.returnVal() == true);
+      }
+      THEN("Alice may disable autodebit")
+      {  //
+         CHECK(a.autodebit(false).succeeded());
+      }
       WHEN("Alice disables autodebit")
       {
-         THEN("Alice has autodebit disabled") {}
-         THEN("Bob still has autodebit enabled") {}
+         a.autodebit(false);
+
+         THEN("Alice has autodebit disabled")
+         {  //
+            CHECK(a.isAutodebit(alice).returnVal() == false);
+         }
+         THEN("Bob still has autodebit enabled")
+         {  //
+            CHECK(a.isAutodebit(bob).returnVal() == true);
+         }
          THEN("Alice may not disable autodebit again")
          {
-            AND_THEN("But Bob may disable autodebit") {}
+            CHECK(a.autodebit(false).failed(autodebitDisabled));
+
+            AND_THEN("But Bob may disable autodebit")
+            {  //
+               CHECK(b.autodebit(false).succeeded());
+            }
          }
-         THEN("Alice may re-enable autodebit") {}
-         WHEN("Alice re-enables autodebit"){}
+         THEN("Alice may re-enable autodebit")
+         {  //
+            CHECK(a.autodebit(true).succeeded());
+         }
+         WHEN("Alice re-enables autodebit")
          {
-            THEN("Alice has autodebit enabled") {}
-            THEN("Bob still has autodebit enabled") {}
+            a.autodebit(true);
+
+            THEN("Alice has autodebit enabled")
+            {  //
+               CHECK(a.isAutodebit(alice).returnVal() == true);
+            }
+            THEN("Bob still has autodebit enabled")
+            {
+               CHECK(a.isAutodebit(bob).returnVal() == true);
+            }
          }
       }
    }
@@ -229,20 +428,66 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
-      THEN("Alice may not credit Bob 101 tokens") {}
-      THEN("Alice may credit Bob 100 tokens") {}
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
+      auto b     = bob.at<TokenSys>();
+
+      auto tokenId = a.create(8, 1'000'000'000).returnVal();
+      auto token   = a.getToken(tokenId).returnVal();
+      auto mint    = a.mint(tokenId, 100, alice);
+      auto mint2   = a.mint(tokenId, 100, bob);
+
+      THEN("Alice may not credit Bob 101 tokens")
+      {
+         CHECK(a.credit(tokenId, bob, 101, memo).failed(insufficientBalance));
+      }
+      THEN("Alice may credit Bob 100 tokens")
+      {
+         CHECK(a.credit(tokenId, bob, 100, memo).succeeded());
+      }
       WHEN("Alice credits Bob 100 tokens")
       {
-         THEN("Bob immediately has 200 tokens") {}
-         THEN("Alice immediately has 0 tokens") {}
-         THEN("Alice may not credit Bob 1 token") {}
-         THEN("Bob may not debit any tokens") {}
-         THEN("Alice may not uncredit any tokens") {}
-         THEN("Bob may credit Alice 10 tokens") {}
+         a.credit(tokenId, bob, 100, memo);
+
+         THEN("Bob immediately has 200 tokens")
+         {  //
+            CHECK(b.getBalance(tokenId, bob).returnVal() == 200);
+         }
+         THEN("Alice immediately has 0 tokens")
+         {  //
+            CHECK(a.getBalance(tokenId, alice).returnVal() == 0);
+         }
+         THEN("Alice may not credit Bob 1 token")
+         {
+            CHECK(a.credit(tokenId, bob, 1, memo).failed(insufficientBalance));
+         }
+         THEN("Bob may not debit any tokens")
+         {
+            CHECK(b.debit(tokenId, alice, 1, memo).failed(debitRequiresCredit));
+         }
+         THEN("Alice may not uncredit any tokens")
+         {
+            CHECK(a.uncredit(tokenId, bob, 1, memo).failed(uncreditRequiresCredit));
+         }
+         THEN("Bob may credit Alice 10 tokens")
+         {
+            CHECK(b.credit(tokenId, alice, 10, memo).succeeded());
+         }
          AND_WHEN("Bob credits Alice 10 tokens")
          {
-            THEN("Bob has 190 tokens") {}
-            THEN("Alice has 10 tokens") {}
+            b.credit(tokenId, alice, 10, memo);
+
+            THEN("Bob has 190 tokens")
+            {  //
+               CHECK(b.getBalance(tokenId, bob).returnVal() == 190);
+            }
+            THEN("Alice has 10 tokens")
+            {  //
+               CHECK(a.getBalance(tokenId, alice).returnVal() == 10);
+            }
          }
       }
    }
@@ -291,6 +536,5 @@ SCENARIO("Crediting/uncrediting/debiting tokens, without auto-debit")
 
 SCENARIO("Interactions with symbols")
 {
-   INFO("Token symbols are not yet supported");
-   CHECK(false);
+   CHECK(tokenSymbolsSupported);
 }

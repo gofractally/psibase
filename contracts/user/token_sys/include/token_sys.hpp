@@ -30,7 +30,7 @@ namespace UserContract
       TID  create(Precision precision, Quantity max_supply);
       void mint(TID tokenId, Quantity amount, psibase::AccountNumber receiver);
 
-      void unrecallable(TID tokenId);
+      void set(TID tokenId, uint8_t flag);
 
       void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
       void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
@@ -49,9 +49,13 @@ namespace UserContract
                  psibase::AccountNumber            sender,
                  Quantity                          amount,
                  psio::const_view<psibase::String> memo);
+      void recall(TID                               tokenId,
+                  psibase::AccountNumber            from,
+                  Quantity                          amount,
+                  psio::const_view<psibase::String> memo);
 
       std::optional<TokenRecord> getToken(TID tokenId);
-      Quantity                   getBalance(TID tokenId);
+      Quantity                   getBalance(TID tokenId, psibase::AccountNumber account);
       bool                       isAutodebit(psibase::AccountNumber account);
 
      private:
@@ -64,15 +68,16 @@ namespace UserContract
    PSIO_REFLECT(TokenSys,
       method(create, precision, max_supply),
       method(mint, tokenId, amount, receiver),
-      method(unrecallable, tokenId),
+      method(set, tokenId, flag),
 
       method(burn, tokenId, amount),
       method(autodebit, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, amount, memo),
       method(debit, tokenId, sender, amount, memo),
+      method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
-      method(getBalance, tokenId),
+      method(getBalance, tokenId, account),
       method(isAutodebit)
     );
    // clang-format on

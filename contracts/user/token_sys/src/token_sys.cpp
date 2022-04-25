@@ -17,7 +17,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver)
    // NOP
 }
 
-void TokenSys::unrecallable(TID tokenId)
+void TokenSys::set(TID tokenId, uint8_t flag)
 {
    // NOP
 }
@@ -50,13 +50,18 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    // NOP
 }
 
+void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
+{
+   // NOP
+}
+
 std::optional<TokenRecord> TokenSys::getToken(TID tokenId)
 {
    // NOP
    return std::nullopt;
 }
 
-Quantity TokenSys::getBalance(TID tokenId)
+Quantity TokenSys::getBalance(TID tokenId, AccountNumber account)
 {
    // NOP
    return 0;

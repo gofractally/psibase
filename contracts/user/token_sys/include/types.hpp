@@ -2,9 +2,10 @@
 
 #include <compare>
 #include <eosio/check.hpp>
+#include <limits>
 #include <psio/fracpack.hpp>
 
-#include <limits>
+#include "tables.hpp"
 
 namespace UserContract
 {
@@ -79,5 +80,10 @@ namespace UserContract
    };
    PSIO_REFLECT(Quantity, value);
    EOSIO_REFLECT(Quantity, value);
+
+   // class Token
+   // {
+   //    Token(TID tokenId);
+   // };
 
 }  // namespace UserContract
