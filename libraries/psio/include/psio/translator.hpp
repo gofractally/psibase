@@ -57,19 +57,19 @@ namespace psio
 
       virtual std::vector<char> json_to_frac(std::string json) const override 
       {
-         auto t = from_json<T>(json);
+         auto t = convert_from_json<T>(json);
          return to_frac(t);
       }
 
       virtual std::vector<char> json_to_protobuf(std::string json) const override 
       {
-         auto t = from_json<T>(json);
+         auto t = convert_from_json<T>(json);
          return to_protobuf(t);
       }
 
       virtual std::vector<char> json_to_bin(std::string json) const override
       {
-         auto t = from_json<T>(json);
+         auto t = convert_from_json<T>(json);
          return to_bin(t);
       }
 
@@ -247,7 +247,7 @@ namespace psio
 
       std::vector<char> query_json_to_protobuf(string json_query) const
       {
-         auto jq  = from_json<psio::protobuf::json_query>(std::move(json_query));
+         auto jq  = convert_from_json<psio::protobuf::json_query>(std::move(json_query));
          auto pbq = psio::protobuf::from_json_query<T>(jq);
          return to_protobuf(pbq);
       }

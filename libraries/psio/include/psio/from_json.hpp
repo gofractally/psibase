@@ -189,7 +189,7 @@ namespace psio
      public:
       json_token current_token;
 
-      // This modifies json (ok... why?)
+      // This modifies json (an optimization inside rapidjson)
       json_token_stream(char* json) : ss{json} { reader.IterativeParseInit(); }
 
       bool complete() { return reader.IterativeParseComplete(); }
@@ -215,18 +215,15 @@ namespace psio
             abort_error(from_json_error::expected_end);
       }
 
-      bool is_null()
-      {
-         auto t = peek_token();
-         return (t.get().type == json_token_type::type_null);
-      }
-      void get_null()
+      bool get_null_pred()
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_null)
-            abort_error(from_json_error::expected_null);
+            return false;
          eat_token();
+         return true;
       }
+      void get_null() { check(get_null_pred(), from_json_error::expected_null); }
 
       bool get_bool()
       {
@@ -263,29 +260,51 @@ namespace psio
          return t.get().key;
       }
 
-      void get_end_object()
+      std::optional<std::string_view> maybe_get_key()
+      {
+         auto t = peek_token();
+         if (t.get().type != json_token_type::type_key)
+            return {};
+         eat_token();
+         return t.get().key;
+      }
+
+      bool get_end_object_pred()
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_end_object)
-            abort_error(from_json_error::expected_end_object);
+            return false;
          eat_token();
+         return true;
+      }
+      void get_end_object()
+      {
+         if (!get_end_object_pred())
+            abort_error(from_json_error::expected_end_object);
       }
 
-      void get_start_array()
+      bool get_start_array_pred()
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_start_array)
-            abort_error(from_json_error::expected_start_array);
+            return false;
          eat_token();
+         return true;
+      }
+      void get_start_array()
+      {
+         check(get_start_array_pred(), from_json_error::expected_start_array);
       }
 
-      void get_end_array()
+      bool get_end_array_pred()
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_end_array)
-            abort_error(from_json_error::expected_end_array);
+            return false;
          eat_token();
+         return true;
       }
+      void get_end_array() { check(get_end_array_pred(), from_json_error::expected_end_array); }
 
       // BaseReaderHandler methods
       bool Null()
@@ -522,36 +541,6 @@ namespace psio
          abort_error(from_json_error::expected_number);
    }
 
-   /*
-/// \group from_json_explicit
-template<typename S>
-void from_json(int32_t& result, S& stream) {
-   bool in_str = false;
-   if (pos != end && *pos == '"') {
-      in_str = true;
-      from_json_skip_space(pos, end);
-   }
-   bool neg = false;
-   if (pos != end && *pos == '-') {
-      neg = true;
-      ++pos;
-   }
-   bool found = false;
-   result     = 0;
-   while (pos != end && *pos >= '0' && *pos <= '9') {
-      result = result * 10 + *pos++ - '0';
-      found  = true;
-   }
-   check(found, "expected integer");
-   from_json_skip_space(pos, end);
-   if (in_str) {
-      from_json_expect(pos, end, '"', "expected integer");
-      from_json_skip_space(pos, end);
-   }
-   if (neg)
-      result = -result;
-}
-*/
    /// \group from_json_explicit
    template <typename S>
    void from_json(bool& result, S& stream)
@@ -580,10 +569,8 @@ void from_json(int32_t& result, S& stream) {
    template <typename T, typename S>
    void from_json(std::optional<T>& result, S& stream)
    {
-      result = std::optional<T>();
-      if (stream.is_null())
+      if (stream.get_null_pred())
       {
-         stream.get_null();
          result = std::nullopt;
       }
       else
@@ -594,22 +581,14 @@ void from_json(int32_t& result, S& stream) {
    }
 
    template <int N = 0, typename... T>
-   bool set_variant_impl(std::variant<T...>& result, uint32_t type)
+   void set_variant_impl(std::variant<T...>& result, uint32_t type)
    {
       if (type == N)
-      {
          result.template emplace<N>();
-         return true;
-      }
       else if constexpr (N + 1 < sizeof...(T))
-      {
-         return set_variant_impl<N + 1>(result, type);
-      }
-      return false;
+         set_variant_impl<N + 1>(result, type);
    }
 
-   /// TODO: this is attempting to parse variant as [ type, obj ],
-   ///   but to_json is encoding it as { type: "", value: }
    /// \group from_json_explicit
    template <typename... T, typename S>
    void from_json(std::variant<T...>& result, S& stream)
@@ -621,35 +600,32 @@ void from_json(int32_t& result, S& stream) {
       uint32_t type_idx = std::find(type_names, type_names + sizeof...(T), type) - type_names;
       if (type_idx >= sizeof...(T))
          abort_error(from_json_error::invalid_type_for_variant);
-      if (set_variant_impl(result, type_idx))
-      {
-         std::visit([&](auto& x) { return from_json(x, stream); }, result);
-      }
+      set_variant_impl(result, type_idx);
+      std::visit([&](auto& x) { from_json(x, stream); }, result);
       stream.get_end_array();
    }
 
    /**
- *  Accepts null as default value for all tuple elements
- *  Accepts [] with 0 to N as the first n elements and errors if there are too many elements
- *  accepts anything else as the presumed first element
- *
- *  TODO: make robust against adding elements to the tuple by droping all remaining values
- */
+    *  Accepts null as default value for all tuple elements
+    *  Accepts [] with 0 to N as the first n elements and errors if there are too many elements
+    *  accepts anything else as the presumed first element
+    *
+    *  TODO: make robust against adding elements to the tuple by droping all remaining values
+    */
    template <typename... T, typename S>
    void from_json(std::tuple<T...>& result, S& stream)
    {
       result = std::tuple<T...>();
       auto t = stream.peek_token();
       if (t.get().type == json_token_type::type_null)
-      {
          return;
-      }
 
       if constexpr (sizeof...(T) > 0)
       {
          if (t.get().type != json_token_type::type_start_array)
          {
             from_json(std::get<0>(result), stream);
+            return;
          }
       }
 
@@ -666,8 +642,11 @@ void from_json(int32_t& result, S& stream) {
    }
 
    /// \group from_json_explicit
-   template <typename S>
-   void from_json_hex(std::vector<char>& result, S& stream)
+   template <typename T, typename S>
+   auto from_json_hex(std::vector<T>& result, S& stream)
+       -> std::enable_if_t<std::is_same_v<T, char> || std::is_same_v<T, unsigned char> ||
+                               std::is_same_v<T, signed char>,
+                           void>
    {
       auto s = stream.get_string();
       if (s.size() & 1)
@@ -676,6 +655,24 @@ void from_json(int32_t& result, S& stream) {
       result.reserve(s.size() / 2);
       if (!unhex(std::back_inserter(result), s.begin(), s.end()))
          abort_error(from_json_error::expected_hex_string);
+   }
+
+   template <typename S>
+   void from_json(std::vector<char>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
+   template <typename S>
+   void from_json(std::vector<unsigned char>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
+   template <typename S>
+   void from_json(std::vector<signed char>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
    }
 
    /// \exclude
@@ -687,9 +684,7 @@ void from_json(int32_t& result, S& stream) {
       {
          auto t = stream.peek_token();
          if (t.get().type == json_token_type::type_end_object)
-         {
             break;
-         }
          auto k = stream.get_key();
          f(k);
       }
@@ -752,36 +747,9 @@ void from_json(int32_t& result, S& stream) {
       }
    }
 
-   /// not implimented, so don't link
+   /// not implemented, so don't link
    template <typename First, typename Second, typename S>
    void from_json(std::pair<First, Second>& obj, S& stream);
-
-   /*
-/// \output_section Convenience Wrappers
-/// Parse JSON and return result. This overload wraps the other `to_json` overloads.
-template <typename T>
-T from_json(const std::vector<char>& v) {
-   const char* pos = v.data();
-   const char* end = pos + v.size();
-   from_json_skip_space(pos, end);
-   T result;
-   from_json(result, pos, end);
-   from_json_expect_end(pos, end);
-   return result;
-}
-
-/// Parse JSON and return result. This overload wraps the other `to_json` overloads.
-template <typename T>
-T from_json(std::string_view s) {
-   const char* pos = s.data();
-   const char* end = pos + s.size();
-   from_json_skip_space(pos, end);
-   T result;
-   from_json(result, pos, end);
-   from_json_expect_end(pos, end);
-   return result;
-}
-*/
 
    /// Parse JSON and return result. This overload wraps the other `to_json` overloads.
    template <typename T, typename S>
@@ -793,52 +761,9 @@ T from_json(std::string_view s) {
    }
 
    template <typename T>
-   T from_json(std::string json)
+   T convert_from_json(std::string json)
    {
       json_token_stream stream(json.data());
       return from_json<T>(stream);
    }
-
-   /*
-/// \exclude
-template <size_t I, tagged_variant_options Options, typename... NamedTypes>
-__attribute__((noinline)) void parse_named_variant_impl(tagged_variant<Options, NamedTypes...>& v, size_t i,
-                                                        const char*& pos, const char* end) {
-   if constexpr (I < sizeof...(NamedTypes)) {
-      if (i == I) {
-         auto& q = v.value;
-         auto& x = q.template emplace<I>();
-         if constexpr (!is_named_empty_type_v<std::decay_t<decltype(x)>>) {
-            from_json_expect(pos, end, ',', "expected ,");
-            from_json(x, pos, end);
-         }
-      } else {
-         return parse_named_variant_impl<I + 1>(v, i, pos, end);
-      }
-   } else {
-      check(false, "invalid variant index");
-   }
-}
-
-/// \group from_json_explicit
-template <tagged_variant_options Options, typename... NamedTypes>
-__attribute__((noinline)) void from_json(tagged_variant<Options, NamedTypes...>& result, const char*& pos,
-                                          const char* end) {
-   from_json_skip_space(pos, end);
-   from_json_expect(pos, end, '[', "expected array");
-
-   psio::name name;
-   from_json(name, pos, end);
-
-   for (size_t i = 0; i < sizeof...(NamedTypes); ++i) {
-      if (name == tagged_variant<Options, NamedTypes...>::keys[i]) {
-         parse_named_variant_impl<0>(result, i, pos, end);
-         from_json_expect(pos, end, ']', "expected ]");
-         return;
-      }
-   }
-   check(false, "invalid variant index name");
-}
-*/
-
 }  // namespace psio
