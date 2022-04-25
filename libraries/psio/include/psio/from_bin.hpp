@@ -26,7 +26,7 @@ namespace psio
       do
       {
          if (shift >= 35)
-            throw_error(stream_error::invalid_varuint_encoding);
+            abort_error(stream_error::invalid_varuint_encoding);
          from_bin(b, stream);
          result |= uint32_t(b & 0x7f) << shift;
          shift += 7;
@@ -49,7 +49,7 @@ namespace psio
       do
       {
          if (shift >= 70)
-            throw_error(stream_error::invalid_varuint_encoding);
+            abort_error(stream_error::invalid_varuint_encoding);
          from_bin(b, stream);
          result |= uint64_t(b & 0x7f) << shift;
          shift += 7;
@@ -140,7 +140,7 @@ namespace psio
       uint32_t size;
       varuint32_from_bin(size, stream);
       if (size != N)
-         throw_error(stream_error::array_size_mismatch);
+         abort_error(stream_error::array_size_mismatch);
       if constexpr (has_bitwise_serialization<T>())
       {
          stream.read(reinterpret_cast<char*>(v), size * sizeof(T));
@@ -296,7 +296,7 @@ namespace psio
       }
       else
       {
-         throw_error(stream_error::bad_variant_index);
+         abort_error(stream_error::bad_variant_index);
       }
    }
 

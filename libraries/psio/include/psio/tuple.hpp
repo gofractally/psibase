@@ -29,7 +29,7 @@ namespace psio
           }
           else tuple_get<N + 1>(obj, pos, std::forward<L>(lambda) );
        } else {
-          throw_error(tuple_error::invalid_tuple_index);
+          abort_error(tuple_error::invalid_tuple_index);
        }
     }
 

@@ -162,7 +162,7 @@ namespace psio
       small_buffer<24> b;  // fpconv_dtoa generates at most 24 characters
       int              n = fpconv_dtoa(value, b.pos);
       if (n <= 0)
-         throw_error(stream_error::float_error);
+         abort_error(stream_error::float_error);
       b.pos += n;
       stream.write(b.data, b.pos - b.data);
    }
@@ -378,7 +378,7 @@ template <typename S> void to_json(float value, S& stream)              { return
       if (fbs.pos == fbs.end)
          return result;
       else
-         throw_error(stream_error::underrun);
+         abort_error(stream_error::underrun);
    }
 
    template <typename T>
@@ -390,7 +390,7 @@ template <typename S> void to_json(float value, S& stream)              { return
       pretty_stream<fixed_buf_stream> fbs(result.data(), result.size());
       to_json(t, fbs);
       if (fbs.pos != fbs.end)
-         throw_error(stream_error::underrun);
+         abort_error(stream_error::underrun);
       return result;
    }
 

@@ -5,23 +5,6 @@
 
 namespace psio
 {
-   /**
-     *  On some platforms we need to disable
-     *  exceptions and do something else, this
-     *  wraps that.
-     */
-   // TODO: MAJOR: this ends up throwing enums, const char*'s, and other
-   //              things not derived from std::exception
-   template <typename T>
-   [[noreturn]] void throw_error(T&& e)
-   {
-#ifdef __cpp_exceptions
-      throw e;
-#else
-      abort();
-#endif
-   }
-
    inline std::string_view error_to_str(std::string_view msg)
    {
       return msg;

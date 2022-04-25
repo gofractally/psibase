@@ -370,7 +370,7 @@ namespace psio
       fixed_buf_stream fbs(bin.data() + orig_size, ss.size);
       to_key(t, fbs);
       if (fbs.pos != fbs.end)
-         throw_error(stream_error::underrun);
+         abort_error(stream_error::underrun);
    }
 
    template <typename T>
