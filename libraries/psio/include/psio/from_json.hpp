@@ -66,27 +66,11 @@ namespace psio
       terminated,
       unspecific_syntax_error,
    };  // from_json_error
-}  // namespace psio
 
-namespace std
-{
-   template <>
-   struct is_error_code_enum<psio::from_json_error> : true_type
+   constexpr inline std::string_view error_to_str(from_json_error e)
    {
-   };
-}  // namespace std
-
-namespace psio
-{
-   class from_json_error_category_type : public std::error_category
-   {
-     public:
-      const char* name() const noexcept override final { return "ConversionError"; }
-
-      std::string message(int c) const override final
+      switch (e)
       {
-         switch (static_cast<from_json_error>(c))
-         {
             // clang-format off
                case from_json_error::no_error:                            return "No error";
 
@@ -137,23 +121,11 @@ namespace psio
                case from_json_error::number_miss_exponent:                return "Miss exponent in number";
                case from_json_error::terminated:                          return "Parsing was terminated";
                case from_json_error::unspecific_syntax_error:             return "Unspecific syntax error";
-               // clang-format on
+            // clang-format on
 
-            default:
-               return "unknown";
-         }
+         default:
+            return "unknown";
       }
-   };  // from_json_error_category_type
-
-   inline const from_json_error_category_type& from_json_error_category()
-   {
-      static from_json_error_category_type c;
-      return c;
-   }
-
-   inline std::error_code make_error_code(from_json_error e)
-   {
-      return {static_cast<int>(e), from_json_error_category()};
    }
 
    inline from_json_error convert_error(rapidjson::ParseErrorCode err)
@@ -161,24 +133,24 @@ namespace psio
       switch (err)
       {
             // clang-format off
-      case rapidjson::kParseErrorNone:                            return from_json_error::no_error;
-      case rapidjson::kParseErrorDocumentEmpty:                   return from_json_error::document_empty;
-      case rapidjson::kParseErrorDocumentRootNotSingular:         return from_json_error::document_root_not_singular;
-      case rapidjson::kParseErrorValueInvalid:                    return from_json_error::value_invalid;
-      case rapidjson::kParseErrorObjectMissName:                  return from_json_error::object_miss_name;
-      case rapidjson::kParseErrorObjectMissColon:                 return from_json_error::object_miss_colon;
-      case rapidjson::kParseErrorObjectMissCommaOrCurlyBracket:   return from_json_error::object_miss_comma_or_curly_bracket;
-      case rapidjson::kParseErrorArrayMissCommaOrSquareBracket:   return from_json_error::array_miss_comma_or_square_bracket;
-      case rapidjson::kParseErrorStringUnicodeEscapeInvalidHex:   return from_json_error::string_unicode_escape_invalid_hex;
-      case rapidjson::kParseErrorStringUnicodeSurrogateInvalid:   return from_json_error::string_unicode_surrogate_invalid;
-      case rapidjson::kParseErrorStringEscapeInvalid:             return from_json_error::string_escape_invalid;
-      case rapidjson::kParseErrorStringMissQuotationMark:         return from_json_error::string_miss_quotation_mark;
-      case rapidjson::kParseErrorStringInvalidEncoding:           return from_json_error::string_invalid_encoding;
-      case rapidjson::kParseErrorNumberTooBig:                    return from_json_error::number_too_big;
-      case rapidjson::kParseErrorNumberMissFraction:              return from_json_error::number_miss_fraction;
-      case rapidjson::kParseErrorNumberMissExponent:              return from_json_error::number_miss_exponent;
-      case rapidjson::kParseErrorTermination:                     return from_json_error::terminated;
-      case rapidjson::kParseErrorUnspecificSyntaxError:           return from_json_error::unspecific_syntax_error;
+         case rapidjson::kParseErrorNone:                            return from_json_error::no_error;
+         case rapidjson::kParseErrorDocumentEmpty:                   return from_json_error::document_empty;
+         case rapidjson::kParseErrorDocumentRootNotSingular:         return from_json_error::document_root_not_singular;
+         case rapidjson::kParseErrorValueInvalid:                    return from_json_error::value_invalid;
+         case rapidjson::kParseErrorObjectMissName:                  return from_json_error::object_miss_name;
+         case rapidjson::kParseErrorObjectMissColon:                 return from_json_error::object_miss_colon;
+         case rapidjson::kParseErrorObjectMissCommaOrCurlyBracket:   return from_json_error::object_miss_comma_or_curly_bracket;
+         case rapidjson::kParseErrorArrayMissCommaOrSquareBracket:   return from_json_error::array_miss_comma_or_square_bracket;
+         case rapidjson::kParseErrorStringUnicodeEscapeInvalidHex:   return from_json_error::string_unicode_escape_invalid_hex;
+         case rapidjson::kParseErrorStringUnicodeSurrogateInvalid:   return from_json_error::string_unicode_surrogate_invalid;
+         case rapidjson::kParseErrorStringEscapeInvalid:             return from_json_error::string_escape_invalid;
+         case rapidjson::kParseErrorStringMissQuotationMark:         return from_json_error::string_miss_quotation_mark;
+         case rapidjson::kParseErrorStringInvalidEncoding:           return from_json_error::string_invalid_encoding;
+         case rapidjson::kParseErrorNumberTooBig:                    return from_json_error::number_too_big;
+         case rapidjson::kParseErrorNumberMissFraction:              return from_json_error::number_miss_fraction;
+         case rapidjson::kParseErrorNumberMissExponent:              return from_json_error::number_miss_exponent;
+         case rapidjson::kParseErrorTermination:                     return from_json_error::terminated;
+         case rapidjson::kParseErrorUnspecificSyntaxError:           return from_json_error::unspecific_syntax_error;
             // clang-format on
 
          default:
@@ -232,7 +204,7 @@ namespace psio
                       ss, *this))
             return current_token;
          else
-            throw_error(convert_error(reader.GetParseErrorCode()));
+            abort_error(convert_error(reader.GetParseErrorCode()));
       }
 
       void eat_token() { current_token.type = json_token_type::type_unread; }
@@ -240,7 +212,7 @@ namespace psio
       void get_end()
       {
          if (current_token.type != json_token_type::type_unread || !complete())
-            throw_error(from_json_error::expected_end);
+            abort_error(from_json_error::expected_end);
       }
 
       bool is_null()
@@ -252,7 +224,7 @@ namespace psio
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_null)
-            throw_error(from_json_error::expected_null);
+            abort_error(from_json_error::expected_null);
          eat_token();
       }
 
@@ -260,7 +232,7 @@ namespace psio
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_bool)
-            throw_error(from_json_error::expected_bool);
+            abort_error(from_json_error::expected_bool);
          eat_token();
          return t.get().value_bool;
       }
@@ -269,7 +241,7 @@ namespace psio
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_string)
-            throw_error(from_json_error::expected_string);
+            abort_error(from_json_error::expected_string);
          eat_token();
          return t.get().value_string;
       }
@@ -278,7 +250,7 @@ namespace psio
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_start_object)
-            throw_error(from_json_error::expected_start_object);
+            abort_error(from_json_error::expected_start_object);
          eat_token();
       }
 
@@ -286,7 +258,7 @@ namespace psio
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_key)
-            throw_error(from_json_error::expected_key);
+            abort_error(from_json_error::expected_key);
          eat_token();
          return t.get().key;
       }
@@ -295,7 +267,7 @@ namespace psio
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_end_object)
-            throw_error(from_json_error::expected_end_object);
+            abort_error(from_json_error::expected_end_object);
          eat_token();
       }
 
@@ -303,7 +275,7 @@ namespace psio
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_start_array)
-            throw_error(from_json_error::expected_start_array);
+            abort_error(from_json_error::expected_start_array);
          eat_token();
       }
 
@@ -311,7 +283,7 @@ namespace psio
       {
          auto t = peek_token();
          if (t.get().type != json_token_type::type_end_array)
-            throw_error(from_json_error::expected_end_array);
+            abort_error(from_json_error::expected_end_array);
          eat_token();
       }
 
@@ -373,7 +345,8 @@ namespace psio
    template <typename SrcIt, typename DestIt>
    [[nodiscard]] bool unhex(DestIt dest, SrcIt begin, SrcIt end)
    {
-      auto get_digit = [&](uint8_t& nibble) {
+      auto get_digit = [&](uint8_t& nibble)
+      {
          if (*begin >= '0' && *begin <= '9')
             nibble = *begin++ - '0';
          else if (*begin >= 'a' && *begin <= 'f')
@@ -441,14 +414,14 @@ namespace psio
          T digit = (*pos++ - '0');
          // abs(result) can overflow.  Use -abs(result) instead.
          if (std::is_signed_v<T> && (-sign * limit + digit) / 10 > -sign * result)
-            throw_error(from_json_error::number_out_of_range);
+            abort_error(from_json_error::number_out_of_range);
          if (!std::is_signed_v<T> && (limit - digit) / 10 < result)
-            throw_error(from_json_error::number_out_of_range);
+            abort_error(from_json_error::number_out_of_range);
          result = result * 10 + sign * digit;
          found  = true;
       }
       if (pos != end || !found)
-         throw_error(from_json_error::expected_int);
+         abort_error(from_json_error::expected_int);
    }
 
    /// \group from_json_explicit
@@ -526,13 +499,13 @@ namespace psio
    {
       auto sv = stream.get_string();
       if (sv.empty())
-         throw_error(from_json_error::expected_number);
+         abort_error(from_json_error::expected_number);
       std::string s(sv);  // strtof expects a null-terminated string
       errno = 0;
       char* end;
       result = std::strtof(s.c_str(), &end);
       if (errno || end != s.c_str() + s.size())
-         throw_error(from_json_error::expected_number);
+         abort_error(from_json_error::expected_number);
    }
 
    template <typename S>
@@ -540,13 +513,13 @@ namespace psio
    {
       auto sv = stream.get_string();
       if (sv.empty())
-         throw_error(from_json_error::expected_number);
+         abort_error(from_json_error::expected_number);
       std::string s(sv);
       errno = 0;
       char* end;
       result = std::strtod(s.c_str(), &end);
       if (errno || end != s.c_str() + s.size())
-         throw_error(from_json_error::expected_number);
+         abort_error(from_json_error::expected_number);
    }
 
    /*
@@ -647,7 +620,7 @@ void from_json(int32_t& result, S& stream) {
       const char* const type_names[] = {get_type_name((T*)nullptr)...};
       uint32_t type_idx = std::find(type_names, type_names + sizeof...(T), type) - type_names;
       if (type_idx >= sizeof...(T))
-         throw_error(from_json_error::invalid_type_for_variant);
+         abort_error(from_json_error::invalid_type_for_variant);
       if (set_variant_impl(result, type_idx))
       {
          std::visit([&](auto& x) { return from_json(x, stream); }, result);
@@ -681,12 +654,14 @@ void from_json(int32_t& result, S& stream) {
       }
 
       stream.get_start_array();
-      tuple_for_each(result, [&](int idx, auto& item) {
-         auto t = stream.peek_token();
-         if (t.get().type == json_token_type::type_end_array)
-            return;
-         from_json(item, stream);
-      });
+      tuple_for_each(result,
+                     [&](int idx, auto& item)
+                     {
+                        auto t = stream.peek_token();
+                        if (t.get().type == json_token_type::type_end_array)
+                           return;
+                        from_json(item, stream);
+                     });
       stream.get_end_array();
    }
 
@@ -696,11 +671,11 @@ void from_json(int32_t& result, S& stream) {
    {
       auto s = stream.get_string();
       if (s.size() & 1)
-         throw_error(from_json_error::expected_hex_string);
+         abort_error(from_json_error::expected_hex_string);
       result.clear();
       result.reserve(s.size() / 2);
       if (!unhex(std::back_inserter(result), s.begin(), s.end()))
-         throw_error(from_json_error::expected_hex_string);
+         abort_error(from_json_error::expected_hex_string);
    }
 
    /// \exclude
@@ -747,23 +722,29 @@ void from_json(int32_t& result, S& stream) {
    {
       if constexpr (reflect<T>::is_struct)
       {
-         from_json_object(stream, [&](std::string_view key) -> void {
-            bool found = false;
-            reflect<T>::get(key, [&](auto member) {
-               if constexpr (not std::is_member_function_pointer_v<decltype(member)>)
-               {
-                  from_json(obj.*member, stream);
-                  found = true;
-               }
-               else
-               {
-               }
-            });
-            if (not found)
-            {
-               from_json_skip_value(stream);
-            }
-         });
+         from_json_object(
+             stream,
+             [&](std::string_view key) -> void
+             {
+                bool found = false;
+                reflect<T>::get(
+                    key,
+                    [&](auto member)
+                    {
+                       if constexpr (not std::is_member_function_pointer_v<decltype(member)>)
+                       {
+                          from_json(obj.*member, stream);
+                          found = true;
+                       }
+                       else
+                       {
+                       }
+                    });
+                if (not found)
+                {
+                   from_json_skip_value(stream);
+                }
+             });
       }
       else
       {
