@@ -32,10 +32,12 @@ namespace
 }  // namespace
 
 /* Todo:
+ *    Implement inflation limits
  *    Templatize psibase::Bitset
  *    Test Precision and Quantity types
  *    Code review psibase::Bitset and psibase::String
  *    Code review token tables
+ *    Code review UserContext class in Tester
 */
 
 SCENARIO("Creating a token")
@@ -497,44 +499,126 @@ SCENARIO("Crediting/uncrediting/debiting tokens, without auto-debit")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
+      auto b     = bob.at<TokenSys>();
+
+      auto tokenId = a.create(8, 1'000'000'000).returnVal();
+      auto token   = a.getToken(tokenId).returnVal();
+      auto mint    = a.mint(tokenId, 100, alice);
+      auto mint2   = a.mint(tokenId, 100, bob);
+
       AND_GIVEN("Alice turned off autodebit")
       {
-         THEN("Alice may credit Bob 50 tokens") {}
-         THEN("Bob may credit Alice 50 tokens") {}
+         a.autodebit(false);
+
+         THEN("Alice may credit Bob 50 tokens")
+         {
+            CHECK(a.credit(tokenId, bob, 50, memo).succeeded());
+         }
+         THEN("Bob may credit Alice 50 tokens")
+         {
+            CHECK(b.credit(tokenId, alice, 50, memo).succeeded());
+         }
          WHEN("Alice credits Bob 50 tokens")
          {
-            THEN("Bob immediately owns 150 tokens") {}
-            THEN("Alice immediately owns 50 tokens") {}
-            THEN("Alice and Bob may not uncredit any tokens") {}
-            THEN("Alice and Bob may not debit any tokens") {}
+            a.credit(tokenId, bob, 50, memo);
+
+            THEN("Bob immediately owns 150 tokens")
+            {  //
+               CHECK(150 == b.getBalance(tokenId, bob).returnVal());
+            }
+            THEN("Alice immediately owns 50 tokens")
+            {  //
+               CHECK(50 == a.getBalance(tokenId, alice).returnVal());
+            }
+            THEN("Alice and Bob may not uncredit any tokens")
+            {
+               CHECK(a.uncredit(tokenId, bob, 50, memo).failed(uncreditRequiresCredit));
+               CHECK(b.uncredit(tokenId, alice, 50, memo).failed(uncreditRequiresCredit));
+            }
+            THEN("Alice and Bob may not debit any tokens")
+            {
+               CHECK(a.debit(tokenId, bob, 50, memo).failed(debitRequiresCredit));
+               CHECK(b.debit(tokenId, alice, 50, memo).failed(debitRequiresCredit));
+            }
          }
          WHEN("Bob credits Alice 50 tokens")
          {
-            THEN("Bob still owns the 100 tokens") {}
-            THEN("Bob may not uncredit 51 tokens") {}
+            b.credit(tokenId, alice, 50, memo);
+
+            THEN("Bob owns 50 tokens in his individual balance")
+            {
+               CHECK(50 == b.getBalance(tokenId, bob).returnVal());
+               AND_THEN("Bob owns 50 tokens in his shared balance with Alice")
+               {
+                  CHECK(50 == b.getSharedBal(tokenId, bob, alice).returnVal());
+               }
+            }
+            THEN("Bob may not uncredit 51 tokens")
+            {
+               CHECK(b.uncredit(tokenId, alice, 51, memo).failed(insufficientBalance));
+            }
             THEN("Bob may uncredit 25 tokens")
             {
-               AND_THEN("Bob may not uncredit 26 tokens") {}
-               AND_THEN("Bob may uncredit 25 tokens") {}
-               AND_THEN("Alice may not debit 26 tokens") {}
-               AND_THEN("Alice may debit 25 tokens") {}
+               CHECK(b.uncredit(tokenId, alice, 25, memo).succeeded());
+               AND_THEN("Bob may not uncredit 26 tokens")
+               {
+                  CHECK(b.uncredit(tokenId, alice, 26, memo).failed(insufficientBalance));
+               }
+               AND_THEN("Bob may uncredit 25 tokens")
+               {
+                  CHECK(b.uncredit(tokenId, alice, 25, memo).succeeded());
+                  AND_THEN("Bob owns 0 tokens in his shared balance with Alice")
+                  {
+                     CHECK(0 == b.getSharedBal(tokenId, bob, alice).returnVal());
+                  }
+               }
+               AND_THEN("Alice may not debit 26 tokens")
+               {
+                  CHECK(a.debit(tokenId, bob, 26, memo).failed(insufficientBalance));
+               }
+               AND_THEN("Alice may debit 25 tokens")
+               {
+                  CHECK(a.debit(tokenId, bob, 25, memo).succeeded());
+                  AND_THEN("Bob has 0 tokens in his shared balance with Alice")
+                  {
+                     CHECK(0 == b.getSharedBal(tokenId, bob, alice).returnVal());
+                  }
+                  AND_THEN("Bob owns 75 tokens in his individual balance")
+                  {
+                     CHECK(75 == b.getBalance(tokenId, bob).returnVal());
+                  }
+                  AND_THEN("Alice owns 125 tokens in her individual balance")
+                  {
+                     CHECK(125 == a.getBalance(tokenId, alice).returnVal());
+                  }
+               }
             }
-            THEN("Alice may not debit 51 tokens") {}
-            THEN("Alice may debit 50 tokens") {}
-            AND_WHEN("Alice debits 50 tokens")
+            THEN("Alice may not debit 51 tokens")
             {
-               THEN("Alice owns 150 tokens") {}
-               THEN("Bob owns 50 tokens") {}
-               THEN("Alice may not debit any tokens") {}
-               THEN("Bob may not uncredit any tokens") {}
-               THEN("Bob may credit an additional 25 tokens") {}
+               CHECK(a.debit(tokenId, bob, 51, memo).failed(insufficientBalance));
+            }
+            THEN("Alice may debit 50 tokens")
+            {
+               CHECK(a.debit(tokenId, bob, 50, memo).succeeded());
+               AND_THEN("Alice may not debit any more tokens")
+               {
+                  CHECK(a.debit(tokenId, bob, 1, memo).failed(insufficientBalance));
+               }
+               AND_THEN("Bob may not uncredit any more tokens")
+               {
+                  CHECK(b.uncredit(tokenId, alice, 1, memo).failed(insufficientBalance));
+               }
+               AND_THEN("Bob may credit an additional 25 tokens")
+               {
+                  CHECK(b.credit(tokenId, alice, 25, memo).succeeded());
+               }
             }
          }
       }
    }
-}
-
-SCENARIO("Interactions with symbols")
-{
-   CHECK(tokenSymbolsSupported);
 }

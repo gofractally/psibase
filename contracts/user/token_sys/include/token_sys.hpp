@@ -56,6 +56,9 @@ namespace UserContract
 
       std::optional<TokenRecord> getToken(TID tokenId);
       Quantity                   getBalance(TID tokenId, psibase::AccountNumber account);
+      Quantity                   getSharedBal(TID                    tokenId,
+                                              psibase::AccountNumber creditor,
+                                              psibase::AccountNumber debitor);
       bool                       isAutodebit(psibase::AccountNumber account);
 
      private:
@@ -78,6 +81,7 @@ namespace UserContract
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(getBalance, tokenId, account),
+      method(getSharedBal, tokenId, creditor, debitor),
       method(isAutodebit)
     );
    // clang-format on

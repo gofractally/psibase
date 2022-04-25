@@ -67,6 +67,12 @@ Quantity TokenSys::getBalance(TID tokenId, AccountNumber account)
    return 0;
 }
 
+Quantity TokenSys::getSharedBal(TID tokenId, AccountNumber creditor, AccountNumber debitor)
+{
+   // NOP
+   return 0;
+}
+
 bool TokenSys::isAutodebit(AccountNumber account)
 {
    // NOP
