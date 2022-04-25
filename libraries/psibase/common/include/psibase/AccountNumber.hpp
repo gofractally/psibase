@@ -38,16 +38,6 @@ namespace psibase
    }
 
    inline constexpr bool use_json_string_for_gql(AccountNumber*) { return true; }
-
-   // TODO: This special rule causes kv sort order and AccountNumber::operator<=>()
-   //       to disagree. This will cause nasty headaches for someone.
-   // Fix:  Drop this overload and uncomment the byte swap in execution_context.
-   template <typename S>
-   void to_key(const AccountNumber& k, S& s)
-   {
-      s.write(&k.value, sizeof(k.value));
-   }
-
 }  // namespace psibase
 
 // TODO: move to psibase::literals (inline namespace)

@@ -34,13 +34,6 @@ namespace psibase
    {
       return true;
    }
-
-   template <typename S>
-   void to_key(const MethodNumber& k, S& s)
-   {
-      s.write(&k.value, sizeof(k.value));
-   }
-
 }  // namespace psibase
 
 // TODO: move to psibase::literals (inline namespace)
