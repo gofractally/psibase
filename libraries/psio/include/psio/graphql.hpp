@@ -2,7 +2,6 @@
 
 #include <cctype>
 #include <charconv>
-#include <psio/name.hpp>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
 #include <psio/to_json.hpp>
