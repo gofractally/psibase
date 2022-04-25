@@ -189,7 +189,6 @@ namespace psio
       for (; i < str.size() && i < 12; ++i)
       {
          uint64_t x = 0;
-         // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
          auto r = char_to_name_digit_strict(str[i], x);
          if (!r)
             return false;
@@ -198,7 +197,6 @@ namespace psio
       if (i < str.size() && i == 12)
       {
          uint64_t x = 0;
-         // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
          auto r = char_to_name_digit_strict(str[i], x);
          if (!r)
             return false;

@@ -77,7 +77,7 @@ namespace psio
          std::vector<char> bytes;
          bytes.reserve(s->size() / 2);
          if (from_hex(*s, bytes))
-            return from_bin<Key>(bytes);
+            return convert_from_bin<Key>(bytes);
          return {};
       };
 

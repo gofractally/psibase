@@ -112,20 +112,20 @@ namespace psio
 
       virtual std::vector<char> bin_to_protobuf(const std::vector<char>& b) const override
       {
-         auto t = from_bin<T>(b);
+         auto t = convert_from_bin<T>(b);
          return to_protobuf(t);
       }
 
       virtual std::vector<char> bin_to_frac(const std::vector<char>& b) const override
       {
-         auto t = from_bin<T>(b);
+         auto t = convert_from_bin<T>(b);
          return to_frac(t);
       }
 
 
       virtual std::string bin_to_json(const std::vector<char>& b) const override
       {
-         auto t = from_bin<T>(b);
+         auto t = convert_from_bin<T>(b);
          return convert_to_json(t);
       }
    };

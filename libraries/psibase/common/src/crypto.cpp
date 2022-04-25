@@ -107,7 +107,7 @@ namespace
       eosio::check(memcmp(ripe_digest.data(), whole.data() + whole.size() - 4, 4) == 0,
                    "Invalid key or signature");
       whole.erase(whole.end() - 4, whole.end());
-      return psio::from_bin<Key>(whole);
+      return psio::convert_from_bin<Key>(whole);
    }
 
    template <typename Key>
@@ -202,7 +202,7 @@ namespace psibase
          eosio::check(whole.size() >= 5, "Expected private key");
          whole[0] = KeyType::k1;
          whole.erase(whole.end() - 4, whole.end());
-         return psio::from_bin<PrivateKey>(whole);
+         return psio::convert_from_bin<PrivateKey>(whole);
       }
    }
 
