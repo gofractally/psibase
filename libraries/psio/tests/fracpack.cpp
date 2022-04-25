@@ -1758,7 +1758,7 @@ TEST_CASE("translate")
    std::cout << "================\n" << psio::format_json(tests1_data[0]);
    std::cout << "================\n" << psio::format_json(tests1_data[1]);
    std::cout << "================\n" << psio::format_json(tests1_data[2]);
-   auto t1d2_json  = psio::to_json(tests1_data[2]);
+   auto t1d2_json  = psio::convert_to_json(tests1_data[2]);
    auto t1d2_frac  = tr.json_to_frac(tr.get_type_num("OuterStruct"), t1d2_json);
    auto t1d2_json2 = tr.frac_to_json(tr.get_type_num("OuterStruct"), t1d2_frac);
 

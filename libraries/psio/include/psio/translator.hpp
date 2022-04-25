@@ -76,7 +76,7 @@ namespace psio
       virtual std::string protobuf_to_json(const std::vector<char>& b) const override
       {
          auto t = from_protobuf<T>(b);
-         return to_json(t);
+         return convert_to_json(t);
       }
 
       virtual std::vector<char> protobuf_to_bin(const std::vector<char>& b) const override
@@ -93,7 +93,7 @@ namespace psio
       virtual std::string frac_to_json(const std::vector<char>& b) const override
       {
          auto t = from_frac<T>(b);
-         return to_json(t);
+         return convert_to_json(t);
       }
 
       virtual std::vector<char> frac_to_bin(const std::vector<char>& b) const override
@@ -126,7 +126,7 @@ namespace psio
       virtual std::string bin_to_json(const std::vector<char>& b) const override
       {
          auto t = from_bin<T>(b);
-         return to_json(t);
+         return convert_to_json(t);
       }
    };
 
