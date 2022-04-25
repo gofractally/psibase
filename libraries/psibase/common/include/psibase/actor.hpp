@@ -156,9 +156,9 @@ namespace psibase
          return EventEmitter<typename T::HistoryEvents>(this->sender,
                                                         psibase::kv_map::history_event);
       }
-      auto merkel() const
+      auto merkle() const
       {
-         return EventEmitter<typename T::MerkelEvents>(this->sender, psibase::kv_map::merkel_event);
+         return EventEmitter<typename T::MerkleEvents>(this->sender, psibase::kv_map::merkle_event);
       }
       auto at(AccountNumber n) { return EventEmitter(n, this->event_log); }
 
@@ -181,9 +181,9 @@ namespace psibase
          return EventReader<typename T::HistoryEvents>(this->sender,
                                                        psibase::kv_map::history_event);
       }
-      auto merkel() const
+      auto merkle() const
       {
-         return EventReader<typename T::MerkelEvents>(this->sender, psibase::kv_map::merkel_event);
+         return EventReader<typename T::MerkleEvents>(this->sender, psibase::kv_map::merkle_event);
       }
       auto at(AccountNumber n) { return EventReader(n, this->event_log); }
 

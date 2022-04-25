@@ -19,20 +19,21 @@ namespace system_contract
                       bool                   allow_sudo);
       bool exists(psibase::AccountNumber num);
 
-
-
-      struct Events {
-         struct History {
+      struct Events
+      {
+         struct History
+         {
          };
-         struct Ui {
+         struct Ui
+         {
          };
-         struct Merkel {
+         struct Merkle
+         {
          };
       };
 
-//      using Database = Tables<>
+      //      using Database = Tables<>
    };
-
 
    PSIO_REFLECT(account_sys,
                 method(startup, existing_accounts),

@@ -19,8 +19,8 @@ namespace psibase
       /* designed for change events built on queries most recent finalized block,
        * and for user interfaces that want to subscribe to activity. Not readable by contracts
        */
-      ui_event,              // Events that are erased once block that produced them becomes final
-      merkel_event,          // Events that go into merkel tree, readable for 1 hour (configurable) or finality which ever is longer
-      history_event         // Events that go into long-term subjective history
+      ui_event,      // Events that are erased once block that produced them becomes final
+      merkle_event,  // Events that go into merkle tree, readable for 1 hour (configurable) or finality which ever is longer
+      history_event  // Events that go into long-term subjective history
    };
 }  // namespace psibase
