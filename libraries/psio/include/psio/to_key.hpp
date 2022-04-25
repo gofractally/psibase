@@ -1,11 +1,11 @@
 #pragma once
 
-//#include <deque>
-//#include <list>
-//#include <map>
-//#include <set>
 #include <cstring>
+#include <deque>
+#include <list>
+#include <map>
 #include <optional>
+#include <set>
 #include <tuple>
 #include <utility>
 #include <variant>
@@ -15,7 +15,6 @@
 
 namespace psio
 {
-
    template <typename... Ts, typename S>
    void to_key(const std::tuple<Ts...>& obj, S& stream);
 
@@ -29,7 +28,7 @@ namespace psio
    //
    // Overloads of to_key for user-defined types can be found by Koenig lookup.
    //
-   // Abieos provides specializations of to_key for the following types
+   // psio provides specializations of to_key for the following types
    // - std::string and std::string_view
    // - std::vector, std::list, std::deque
    // - std::tuple
@@ -39,7 +38,6 @@ namespace psio
    // - Arithmetic types
    // - Scoped enumeration types
    // - Reflected structs
-   // - All smart-contract related types defined by abieos
    template <typename T, typename S>
    void to_key(const T& obj, S& stream);
 
@@ -137,27 +135,29 @@ namespace psio
       return to_key_optional((const T*)nullptr, stream);
    }
 
-   /*
-template <typename T, typename S>
-void to_key(const std::list<T>& obj, S& stream) {
-   return to_key_range(obj, stream);
-}
+   template <typename T, typename S>
+   void to_key(const std::list<T>& obj, S& stream)
+   {
+      return to_key_range(obj, stream);
+   }
 
-template <typename T, typename S>
-void to_key(const std::deque<T>& obj, S& stream) {
-   return to_key_range(obj, stream);
-}
+   template <typename T, typename S>
+   void to_key(const std::deque<T>& obj, S& stream)
+   {
+      return to_key_range(obj, stream);
+   }
 
-template <typename T, typename S>
-void to_key(const std::set<T>& obj, S& stream) {
-   return to_key_range(obj, stream);
-}
+   template <typename T, typename S>
+   void to_key(const std::set<T>& obj, S& stream)
+   {
+      return to_key_range(obj, stream);
+   }
 
-template <typename T, typename U, typename S>
-void to_key(const std::map<T, U>& obj, S& stream) {
-   return to_key_range(obj, stream);
-}
-*/
+   template <typename T, typename U, typename S>
+   void to_key(const std::map<T, U>& obj, S& stream)
+   {
+      return to_key_range(obj, stream);
+   }
 
    template <typename T, typename S>
    void to_key(const std::optional<T>& obj, S& stream)
