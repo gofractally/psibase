@@ -221,7 +221,7 @@ namespace psio
       std::string             result(ss.size, 0);
       eosio::fixed_buf_stream fbs(result.data(), result.size());
       fill_gql_schema((T*)nullptr, fbs);
-      eosio::check(fbs.pos == fbs.end, eosio::convert_stream_error(eosio::stream_error::underrun));
+      eosio::check(fbs.pos == fbs.end, eosio::error_to_str(eosio::stream_error::underrun));
       return result;
    }
 */

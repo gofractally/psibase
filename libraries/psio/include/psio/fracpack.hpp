@@ -561,7 +561,7 @@ namespace psio
          {
             if (member.size() == 0)
             {
-               throw_error("shared_view_ptr is not allowed to be null");
+               abort_error("shared_view_ptr is not allowed to be null");
                /*
                uint32_t offset = 0;
                stream.write(&offset, sizeof(offset));
@@ -1033,7 +1033,7 @@ namespace psio
                memcpy(&vec_str_size, stream.pos + offset, sizeof(vec_str_size));
 
                if (vec_str_size == 0)
-                  throw_error(stream_error::empty_vec_used_offset);
+                  abort_error(stream_error::empty_vec_used_offset);
 
                stream.add_total_read(insubstream.get_total_read());
             }
@@ -1319,7 +1319,7 @@ namespace psio
          }
          else
          {
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          }
          return stream;
       }
@@ -2535,7 +2535,7 @@ namespace psio
    {
       if (fracvalidate<T>(b.data(), b.data() + b.size()).valid)
          return convert_from_frac<T>(b);
-      throw_error(stream_error::invalid_frac_encoding);
+      abort_error(stream_error::invalid_frac_encoding);
    }
 
    template <typename T>

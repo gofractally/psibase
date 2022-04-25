@@ -82,7 +82,7 @@ namespace psio
             }
             if (in.pos >= in.end)
             {
-               throw_error(psio::stream_error::overrun);
+               abort_error(psio::stream_error::overrun);
             }
          }
          else if (word_bits == 0xff)
@@ -103,7 +103,7 @@ namespace psio
             if (raw_words)
             {
                if (in.remaining() < uint32_t(raw_words * 8))
-                  throw_error(psio::stream_error::overrun);
+                  abort_error(psio::stream_error::overrun);
                out.write(in.pos, uint32_t(raw_words) * 8);
                in.pos += uint32_t(raw_words) * 8;
             }

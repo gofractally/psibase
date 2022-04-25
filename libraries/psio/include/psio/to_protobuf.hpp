@@ -180,7 +180,7 @@ namespace psio
       to_protobuf(t, fbs);
 
       if (fbs.pos != fbs.end)
-         throw_error(stream_error::underrun);
+         abort_error(stream_error::underrun);
       return result;
    }
 

@@ -31,29 +31,12 @@ namespace psio
       invalid_frac_encoding,
       empty_vec_used_offset  // !!!
    };                        // stream_error
-}  // namespace psio
 
-namespace std
-{
-   template <>
-   struct is_error_code_enum<psio::stream_error> : true_type
+   constexpr inline std::string_view error_to_str(stream_error e)
    {
-   };
-}  // namespace std
-
-namespace psio
-{
-
-   class stream_error_category_type : public std::error_category
-   {
-     public:
-      const char* name() const noexcept override final { return "ConversionError"; }
-
-      std::string message(int c) const override final
+      switch (e)
       {
-         switch (static_cast<stream_error>(c))
-         {
-               // clang-format off
+            // clang-format off
          case stream_error::no_error:                 return "No error";
          case stream_error::overrun:                  return "Stream overrun";
          case stream_error::underrun:                 return "Stream underrun";
@@ -67,23 +50,11 @@ namespace psio
          case stream_error::invalid_name_char13:      return "thirteenth character in name cannot be a letter that comes after j";
          case stream_error::name_too_long:            return "string is too long to be a valid name";
          case stream_error::json_writer_error: return "Error writing json";
-               // clang-format on
+            // clang-format on
 
-            default:
-               return "unknown";
-         }
+         default:
+            return "unknown";
       }
-   };  // stream_error_category_type
-
-   inline const stream_error_category_type& stream_error_category()
-   {
-      static stream_error_category_type c;
-      return c;
-   }
-
-   inline std::error_code make_error_code(stream_error e)
-   {
-      return {static_cast<int>(e), stream_error_category()};
    }
 
    template <typename T>
@@ -181,14 +152,14 @@ namespace psio
       void write(char ch)
       {
          if (pos >= end)
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          *pos++ = ch;
       }
 
       void write(const void* src, size_t size)
       {
          if (pos + size > end)
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          memcpy(pos, src, size);
          pos += size;
       }
@@ -210,7 +181,7 @@ namespace psio
       void skip(int32_t s)
       {
          if ((pos + s > end) or (pos + s < begin))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          pos += s;
       }
       auto get_pos() const { return pos; }
@@ -325,7 +296,7 @@ namespace psio
    void decrease_indent(pretty_stream<S>& s)
    {
       if (s.current_indent.size() < s.indent_size)
-         throw_error(stream_error::overrun);
+         abort_error(stream_error::overrun);
       s.current_indent.resize(s.current_indent.size() - s.indent_size);
    }
 
@@ -351,12 +322,12 @@ namespace psio
       input_stream(const char* pos, size_t size) : pos{pos}, end{pos + size}
       {
          if (size < 0)
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
       }
       input_stream(const char* pos, const char* end) : pos{pos}, end{end}
       {
          if (end < pos)
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
       }
       input_stream(const std::vector<char>& v) : pos{v.data()}, end{v.data() + v.size()} {}
       input_stream(std::string_view v) : pos{v.data()}, end{v.data() + v.size()} {}
@@ -369,7 +340,7 @@ namespace psio
       void check_available(size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
       }
 
       auto get_pos() const { return pos; }
@@ -377,13 +348,13 @@ namespace psio
       void checkread(size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          pos += size;
       }
       void read(void* dest, size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          memcpy(dest, pos, size);
          pos += size;
       }
@@ -397,14 +368,14 @@ namespace psio
       void skip(size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          pos += size;
       }
 
       void read_reuse_storage(const char*& result, size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          result = pos;
          pos += size;
       }
@@ -422,7 +393,7 @@ namespace psio
          total_read += v;
          if (size < get_total_read())
          {
-            throw_error(stream_error::doubleread);
+            abort_error(stream_error::doubleread);
          }
       }
       size_t get_total_read() const { return total_read + (pos - begin); }
@@ -432,12 +403,12 @@ namespace psio
           : begin(pos), pos{pos}, end{pos + size}, size(size)
       {
          if (size < 0)
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
       }
       check_input_stream(const char* pos, const char* end) : begin(pos), pos{pos}, end{end}
       {
          if (end < pos)
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
       }
       check_input_stream(const std::vector<char>& v)
           : begin(v.data()), pos{v.data()}, end{v.data() + v.size()}
@@ -456,7 +427,7 @@ namespace psio
       void check_available(size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
       }
 
       auto get_pos() const { return pos; }
@@ -464,13 +435,13 @@ namespace psio
       void checkread(size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          pos += size;
       }
       void read(void* dest, size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          memcpy(dest, pos, size);
          pos += size;
       }
@@ -484,14 +455,14 @@ namespace psio
       void skip(size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          pos += size;
       }
 
       void read_reuse_storage(const char*& result, size_t size)
       {
          if (size > size_t(end - pos))
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          result = pos;
          pos += size;
       }
