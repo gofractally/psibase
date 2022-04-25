@@ -248,11 +248,12 @@ SCENARIO("Transferring NFTs")
                THEN("The payer for storage costs of the NFT do not change")
                {
                   CHECK(credit.diskConsumed({{}}));
+                  CHECK(storageBillingImplemented);
                }
                THEN("Alice and Charlie may not debit the NFT")
                {
-                  CHECK(a.debit(nft.id, "memo").failed(debitRequiresCredit));
-                  CHECK(c.debit(nft.id, "memo").failed(debitRequiresCredit));
+                  CHECK(a.debit(nft.id, "memo").failed(missingRequiredAuth));
+                  CHECK(c.debit(nft.id, "memo").failed(missingRequiredAuth));
                }
                THEN("Bob and Charlie may not uncredit the NFT")
                {
