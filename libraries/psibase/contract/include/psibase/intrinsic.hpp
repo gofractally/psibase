@@ -16,6 +16,9 @@ namespace psibase
 {
    using EventNumber = uint64_t;
 
+   template <typename T>
+   concept NotOptional = std::is_base_of<std::false_type, eosio::is_std_optional<T>>::value;
+
    // These use mangled names instead of extern "C" to prevent collisions
    // with other libraries. e.g. libc++'s abort_message
    namespace raw
@@ -178,10 +181,7 @@ namespace psibase
    }
 
    // Set the return value of the currently-executing action
-   inline void set_retval_bytes(eosio::input_stream s)
-   {
-      raw::set_retval(s.pos, s.remaining());
-   }
+   inline void set_retval_bytes(eosio::input_stream s) { raw::set_retval(s.pos, s.remaining()); }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    inline void kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
@@ -190,16 +190,15 @@ namespace psibase
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
-   template <typename K, typename V>
+   template <typename K, NotOptional V>
    auto kv_put(kv_map map, const K& key, const V& value)
-       -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
    {
       kv_put_raw(map, eosio::convert_to_key(key), psio::convert_to_frac(value));
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
-   template <typename K, typename V>
-   auto kv_put(const K& key, const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+   template <typename K, NotOptional V>
+   auto kv_put(const K& key, const V& value)
    {
       kv_put(kv_map::contract, key, value);
    }
@@ -211,14 +210,11 @@ namespace psibase
    }
 
    // Add a sequentially-numbered record. Returns the id.
-   template <typename Type, typename V>
-   auto kv_put_sequential(kv_map        map,
-                          AccountNumber contract,
-                          Type          type,
-                          const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+   template <typename Type, NotOptional V>
+   auto kv_put_sequential(kv_map map, AccountNumber contract, Type type, const V& value)
    {
-      std::vector<char>     packed(psio::fracpack_size(contract) +
-                                   psio::fracpack_size(type) + psio::fracpack_size(value));
+      std::vector<char>     packed(psio::fracpack_size(contract) + psio::fracpack_size(type) +
+                               psio::fracpack_size(value));
       psio::fast_buf_stream stream(packed.data(), packed.size());
       psio::fracpack(contract, stream);
       psio::fracpack(type, stream);

@@ -60,12 +60,12 @@ namespace psibase
 
 #define PSIBASE_REFLECT_HISTORY_EVENTS(CONTRACT, ...)           \
    using CONTRACT##_EventsHistory = CONTRACT ::Events::History; \
-   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsHistory), __VA_ARGS__)
+   PSIO_REFLECT(CONTRACT##_EventsHistory, __VA_ARGS__)
 
 #define PSIBASE_REFLECT_UI_EVENTS(CONTRACT, ...)      \
    using CONTRACT##_EventsUi = CONTRACT ::Events::Ui; \
-   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsUi), __VA_ARGS__)
+   PSIO_REFLECT(CONTRACT##_EventsUi, __VA_ARGS__)
 
 #define PSIBASE_REFLECT_MERKLE_EVENTS(CONTRACT, ...)          \
    using CONTRACT##_EventsMerkle = CONTRACT ::Events::Merkle; \
-   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsMerkle), __VA_ARGS__)
+   PSIO_REFLECT(CONTRACT##_EventsMerkle, __VA_ARGS__)

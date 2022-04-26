@@ -14,9 +14,8 @@ using system_contract::account_sys;
 namespace stubs
 {
    // Replace with auth calls when available
-   bool           require_auth(AccountNumber acc) { return true; }
-   void           burnNFT() { check(false, "DB missing ability to delete records"); }
-   NftSys::Events event;
+   bool require_auth(AccountNumber acc) { return true; }
+   void burnNFT() { check(false, "DB missing ability to delete records"); }
 }  // namespace stubs
 
 NID NftSys::mint()
@@ -37,7 +36,7 @@ NID NftSys::mint()
        .creditedTo = account_sys::null_account  //
    });
 
-   stubs::event.history.minted(newId, issuer);
+   emit().history().minted(newId, issuer);
 
    return newId;
 }
@@ -53,7 +52,7 @@ void NftSys::burn(NID nftId)
 
    stubs::burnNFT();
 
-   stubs::event.history.burned(nftId);
+   emit().history().burned(nft->id);
 }
 
 void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<String> memo)
@@ -78,11 +77,11 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
    }
    db.open<NftTable_t>().put(*record);
 
-   stubs::event.ui.credited(nftId, sender, receiver, memo);
+   emit().ui().credited(nftId, sender, receiver, memo);
 
    if (transferred)
    {
-      stubs::event.merkle.transferred(nftId, sender, receiver, memo);
+      emit().merkle().transferred(nftId, sender, receiver, memo);
    }
 }
 
@@ -100,7 +99,7 @@ void NftSys::uncredit(NID nftId, const_view<String> memo)
    record->creditedTo = account_sys::null_account;
    db.open<NftTable_t>().put(*record);
 
-   stubs::event.ui.uncredited(nftId, sender, receiver, memo);
+   emit().ui().uncredited(nftId, sender, receiver, memo);
 }
 
 void NftSys::debit(NID nftId, const_view<String> memo)
@@ -120,7 +119,7 @@ void NftSys::debit(NID nftId, const_view<String> memo)
 
    db.open<NftTable_t>().put(*record);
 
-   stubs::event.merkle.transferred(nftId, creditor, debiter, memo);
+   emit().merkle().transferred(nftId, creditor, debiter, memo);
 }
 
 void NftSys::autodebit(bool enable)
@@ -130,11 +129,11 @@ void NftSys::autodebit(bool enable)
 
    if (enable)
    {
-      stubs::event.history.enabledAutodebit(get_sender());
+      emit().history().enabledAutodeb(get_sender());
    }
    else
    {
-      stubs::event.history.disabledAutodebit(get_sender());
+      emit().history().disabledAutodeb(get_sender());
    }
 }
 
