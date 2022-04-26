@@ -9,7 +9,6 @@
 #include <type_traits>
 #include <vector>
 
-#include <iostream>
 namespace psio
 {
    enum class stream_error
@@ -22,15 +21,12 @@ namespace psio
       varuint_too_big,
       invalid_varuint_encoding,
       bad_variant_index,
-      invalid_asset_format,
       array_size_mismatch,
-      invalid_name_char,
-      invalid_name_char13,
       name_too_long,
       json_writer_error,
       invalid_frac_encoding,
-      empty_vec_used_offset  // !!!
-   };                        // stream_error
+      empty_vec_used_offset,
+   };  // stream_error
 
    constexpr inline std::string_view error_to_str(stream_error e)
    {
@@ -40,16 +36,16 @@ namespace psio
          case stream_error::no_error:                 return "No error";
          case stream_error::overrun:                  return "Stream overrun";
          case stream_error::underrun:                 return "Stream underrun";
+         case stream_error::doubleread:               return "Double-read Error";
          case stream_error::float_error:              return "Float error";
          case stream_error::varuint_too_big:          return "Varuint too big";
          case stream_error::invalid_varuint_encoding: return "Invalid varuint encoding";
          case stream_error::bad_variant_index:        return "Bad variant index";
-         case stream_error::invalid_asset_format:     return "Invalid asset format";
          case stream_error::array_size_mismatch:      return "T[] size and unpacked size don't match";
-         case stream_error::invalid_name_char:        return "character is not in allowed character set for names";
-         case stream_error::invalid_name_char13:      return "thirteenth character in name cannot be a letter that comes after j";
-         case stream_error::name_too_long:            return "string is too long to be a valid name";
-         case stream_error::json_writer_error: return "Error writing json";
+         case stream_error::name_too_long:            return "String is too long to be a valid name";
+         case stream_error::json_writer_error:        return "Error writing json";
+         case stream_error::invalid_frac_encoding:    return "Invalid fracpack encoding";
+         case stream_error::empty_vec_used_offset:    return "empty_vec_used_offset";
             // clang-format on
 
          default:
@@ -98,19 +94,11 @@ namespace psio
          data.insert(data.end(), s, s + size);
       }
 
-      template <int size>
-      void write(const char (&src)[size])
-      {
-         write(src, size - 1);
-      }
-
       template <typename T>
       void write_raw(const T& v)
       {
          write(&v, sizeof(v));
       }
-
-      void write(const std::string& v) { write(v.c_str(), v.size()); }
    };
 
    struct vector_stream
@@ -126,19 +114,11 @@ namespace psio
          data.insert(data.end(), s, s + size);
       }
 
-      template <int size>
-      void write(const char (&src)[size])
-      {
-         write(src, size - 1);
-      }
-
       template <typename T>
       void write_raw(const T& v)
       {
          write(&v, sizeof(v));
       }
-
-      void write(const std::string& v) { write(v.c_str(), v.size()); }
    };
 
    struct fixed_buf_stream
@@ -164,19 +144,11 @@ namespace psio
          pos += size;
       }
 
-      template <int size>
-      void write(const char (&src)[size])
-      {
-         write(src, size - 1);
-      }
-
       template <typename T>
       void write_raw(const T& v)
       {
          write(&v, sizeof(v));
       }
-
-      void write(const std::string& v) { write(v.c_str(), v.size()); }
 
       void skip(int32_t s)
       {
@@ -184,9 +156,8 @@ namespace psio
             abort_error(stream_error::overrun);
          pos += s;
       }
-      auto get_pos() const { return pos; }
 
-      size_t remaining() { return end - pos; }
+      size_t remaining() const { return end - pos; }
       size_t consumed() const { return pos - begin; }
    };
 
@@ -209,24 +180,15 @@ namespace psio
          pos += size;
       }
 
-      template <int size>
-      void write(const char (&src)[size])
-      {
-         write(src, size - 1);
-      }
-
       template <typename T>
       void write_raw(const T& v)
       {
          write(&v, sizeof(v));
       }
 
-      void write(const std::string& v) { write(v.c_str(), v.size()); }
-
       void skip(int32_t s) { pos += s; }
-      auto get_pos() const { return pos; }
 
-      size_t remaining() { return end - pos; }
+      size_t remaining() const { return end - pos; }
       size_t consumed() const { return pos - begin; }
    };
 
@@ -234,25 +196,14 @@ namespace psio
    {
       size_t size = 0;
 
-      size_t get_pos() const { return size; }
-      void   write(char ch) { ++size; }
-      size_t consumed() const { return size; }
-
+      void write(char ch) { ++size; }
       void write(const void* src, size_t size) { this->size += size; }
-
-      template <int size>
-      void write(const char (&src)[size])
-      {
-         this->size += size - 1;
-      }
 
       template <typename T>
       void write_raw(const T& v)
       {
          size += sizeof(v);
       }
-
-      void write(const std::string& v) { write(v.c_str(), v.size()); }
 
       void skip(int32_t s) { size += s; }
    };
@@ -318,39 +269,27 @@ namespace psio
       const char* pos;
       const char* end;
 
-      input_stream() : pos{nullptr}, end{nullptr} {}
-      input_stream(const char* pos, size_t size) : pos{pos}, end{pos + size}
-      {
-         if (size < 0)
-            abort_error(stream_error::overrun);
-      }
-      input_stream(const char* pos, const char* end) : pos{pos}, end{end}
+      constexpr input_stream() : pos{nullptr}, end{nullptr} {}
+      constexpr input_stream(const char* pos, size_t size) : pos{pos}, end{pos + size} {}
+      constexpr input_stream(const char* pos, const char* end) : pos{pos}, end{end}
       {
          if (end < pos)
             abort_error(stream_error::overrun);
       }
       input_stream(const std::vector<char>& v) : pos{v.data()}, end{v.data() + v.size()} {}
-      input_stream(std::string_view v) : pos{v.data()}, end{v.data() + v.size()} {}
-      input_stream(const input_stream&) = default;
+      constexpr input_stream(std::string_view v) : pos{v.data()}, end{v.data() + v.size()} {}
+      constexpr input_stream(const input_stream&) = default;
 
       input_stream& operator=(const input_stream&) = default;
 
-      size_t remaining() { return end - pos; }
+      size_t remaining() const { return end - pos; }
 
-      void check_available(size_t size)
+      void check_available(size_t size) const
       {
          if (size > size_t(end - pos))
             abort_error(stream_error::overrun);
       }
 
-      auto get_pos() const { return pos; }
-
-      void checkread(size_t size)
-      {
-         if (size > size_t(end - pos))
-            abort_error(stream_error::overrun);
-         pos += size;
-      }
       void read(void* dest, size_t size)
       {
          if (size > size_t(end - pos))
@@ -387,7 +326,7 @@ namespace psio
       const char* pos;
       const char* end;
       size_t      total_read = 0;
-      size_t      size;
+      size_t      size       = 0;
       void        add_total_read(uint32_t v)
       {
          total_read += v;
@@ -398,14 +337,13 @@ namespace psio
       }
       size_t get_total_read() const { return total_read + (pos - begin); }
 
-      check_input_stream() : pos{nullptr}, end{nullptr} {}
-      check_input_stream(const char* pos, size_t size)
+      constexpr check_input_stream() : begin{nullptr}, pos{nullptr}, end{nullptr} {}
+      constexpr check_input_stream(const char* pos, size_t size)
           : begin(pos), pos{pos}, end{pos + size}, size(size)
       {
-         if (size < 0)
-            abort_error(stream_error::overrun);
       }
-      check_input_stream(const char* pos, const char* end) : begin(pos), pos{pos}, end{end}
+      constexpr check_input_stream(const char* pos, const char* end)
+          : begin(pos), pos{pos}, end{end}
       {
          if (end < pos)
             abort_error(stream_error::overrun);
@@ -414,30 +352,22 @@ namespace psio
           : begin(v.data()), pos{v.data()}, end{v.data() + v.size()}
       {
       }
-      check_input_stream(std::string_view v)
+      constexpr check_input_stream(std::string_view v)
           : begin(v.data()), pos{v.data()}, end{v.data() + v.size()}
       {
       }
-      check_input_stream(const check_input_stream&) = default;
+      constexpr check_input_stream(const check_input_stream&) = default;
 
       check_input_stream& operator=(const check_input_stream&) = default;
 
-      size_t remaining() { return end - pos; }
+      size_t remaining() const { return end - pos; }
 
-      void check_available(size_t size)
+      void check_available(size_t size) const
       {
          if (size > size_t(end - pos))
             abort_error(stream_error::overrun);
       }
 
-      auto get_pos() const { return pos; }
-
-      void checkread(size_t size)
-      {
-         if (size > size_t(end - pos))
-            abort_error(stream_error::overrun);
-         pos += size;
-      }
       void read(void* dest, size_t size)
       {
          if (size > size_t(end - pos))
