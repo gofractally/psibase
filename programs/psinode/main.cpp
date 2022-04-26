@@ -337,7 +337,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
       auto http_config = std::make_shared<http::http_config>(http::http_config{
           .num_threads      = 4,
           .max_request_size = 10 * 1024 * 1024,
-          .idle_timeout_ms  = std::chrono::milliseconds{1000},
+          .idle_timeout_ms  = std::chrono::milliseconds{4000},
           .allow_origin     = "*",
           .static_dir       = "",
           .address          = "0.0.0.0",

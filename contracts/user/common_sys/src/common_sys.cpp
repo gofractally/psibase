@@ -29,7 +29,7 @@ PSIO_REFLECT(WebContentRow, path, contentType, content)
 
 namespace psibase
 {
-   rpc_reply_data common_sys::serveSys(rpc_request_data request)
+   std::optional<rpc_reply_data> common_sys::serveSys(rpc_request_data request)
    {
       auto to_json = [](const auto& obj)
       {
@@ -45,7 +45,7 @@ namespace psibase
          auto content = kv_get<WebContentRow>(webContentKey(get_receiver(), request.target));
          if (!!content)
          {
-            return {
+            return rpc_reply_data{
                 .contentType = content->contentType,
                 .reply       = content->content,
             };
@@ -97,7 +97,7 @@ namespace psibase
          }
       }
 
-      abort_message_str("not found");
+      return std::nullopt;
    }  // common_sys::serveSys
 
    void common_sys::uploadSys(psio::const_view<std::string>       path,

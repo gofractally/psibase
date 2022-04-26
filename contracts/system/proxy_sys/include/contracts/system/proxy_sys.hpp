@@ -8,7 +8,7 @@ namespace psibase
    // Contracts which serve http implement this
    struct ServerInterface
    {
-      rpc_reply_data serveSys(rpc_request_data request);
+      std::optional<rpc_reply_data> serveSys(rpc_request_data request);
    };
    PSIO_REFLECT(ServerInterface, method(serveSys, request))
 

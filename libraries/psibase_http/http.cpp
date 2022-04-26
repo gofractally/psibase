@@ -295,8 +295,12 @@ namespace psibase::http
             tc.exec_rpc(act, atrace);
             // TODO: option to print this
             // printf("%s\n", pretty_trace(atrace).c_str());
-            auto result = psio::convert_from_frac<rpc_reply_data>(atrace.raw_retval);
-            return send(ok(std::move(result.reply), result.contentType.c_str()));
+            auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.raw_retval);
+            if (!result)
+               return send(
+                   error(bhttp::status::not_found,
+                         "The resource '" + req.target().to_string() + "' was not found.\n"));
+            return send(ok(std::move(result->reply), result->contentType.c_str()));
          }
          else if (req.target() == "/native/push_boot" && req.method() == bhttp::verb::post &&
                   server.http_config->push_boot_async)

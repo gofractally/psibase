@@ -9,7 +9,7 @@ namespace psibase
    template <typename Derived>
    struct SimpleUI
    {
-      rpc_reply_data serveSys(rpc_request_data request)
+      std::optional<rpc_reply_data> serveSys(rpc_request_data request)
       {
          if (request.method == "GET")
          {
@@ -21,7 +21,7 @@ namespace psibase
                };
             }
          }
-         abort_message_str("not found");
+         return std::nullopt;
       }
    };
 }  // namespace psibase
