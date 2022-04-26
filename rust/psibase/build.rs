@@ -12,7 +12,6 @@ fn main() {
         .flag("-Wno-unused-parameter") // TODO
         .include(Path::new("../../external/rapidjson/include"))
         .include(Path::new("../../external/simdjson/include"))
-        .include(Path::new("../../libraries/abieos/include"))
         .include(Path::new("../../libraries/psibase/common/include"))
         .include(Path::new("../../libraries/psio/consthash/include"))
         .include(Path::new("../../libraries/psio/include"))

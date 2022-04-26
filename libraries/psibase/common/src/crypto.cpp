@@ -1,9 +1,9 @@
 #include <psibase/crypto.hpp>
 
 #include <openssl/sha.h>
-#include <eosio/abieos_ripemd160.hpp>
 #include <psibase/check.hpp>
 #include <psio/from_bin.hpp>
+#include <psio/psio_ripemd160.hpp>
 #include <psio/to_bin.hpp>
 
 namespace
@@ -86,11 +86,11 @@ namespace
    template <typename... Container>
    std::array<unsigned char, 20> digestSuffixRipemd160(const Container&... data)
    {
-      std::array<unsigned char, 20>     digest;
-      abieos_ripemd160::ripemd160_state self;
-      abieos_ripemd160::ripemd160_init(&self);
-      (abieos_ripemd160::ripemd160_update(&self, data.data(), data.size()), ...);
-      psibase::check(abieos_ripemd160::ripemd160_digest(&self, digest.data()),
+      std::array<unsigned char, 20>   digest;
+      psio_ripemd160::ripemd160_state self;
+      psio_ripemd160::ripemd160_init(&self);
+      (psio_ripemd160::ripemd160_update(&self, data.data(), data.size()), ...);
+      psibase::check(psio_ripemd160::ripemd160_digest(&self, digest.data()),
                      "Invalid key or signature");
       return digest;
    }

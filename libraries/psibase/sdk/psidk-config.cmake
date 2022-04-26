@@ -19,17 +19,6 @@ add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${psidk_DIR}/boost)
 
 function(add_libs suffix)
-    add_library(abieos${suffix} INTERFACE)
-    target_include_directories(abieos${suffix} INTERFACE
-        ${psidk_DIR}/abieos/include
-        ${psidk_DIR}/rapidjson/include)
-    target_link_libraries(abieos${suffix} INTERFACE wasm-base${suffix})
-    target_link_libraries(abieos${suffix} INTERFACE
-        -L${psidk_DIR}/lib-wasm
-        boost
-        -labieos${suffix}
-    )
-
     add_library(simdjson${suffix} INTERFACE)
     target_include_directories(simdjson${suffix} INTERFACE
         ${psidk_DIR}/simdjson/include
@@ -76,7 +65,6 @@ function(add_libs suffix)
     target_link_libraries(psibase${suffix} INTERFACE
         wasm-base${suffix}
         -lpsibase${suffix}
-        abieos${suffix}
         psio${suffix}
         boost
     )

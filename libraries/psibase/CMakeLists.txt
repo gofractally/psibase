@@ -2,7 +2,7 @@ find_package(OpenSSL REQUIRED Crypto)
 
 function(add suffix)
     add_library(psibase${suffix})
-    target_link_libraries(psibase${suffix} PUBLIC abieos${suffix} psio boost OpenSSL::Crypto)
+    target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto)
     target_sources(psibase${suffix} PRIVATE
         common/src/crypto.cpp
         common/src/time.cpp

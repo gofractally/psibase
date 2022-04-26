@@ -129,7 +129,7 @@ struct test_chain
 
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
-      eosio::check(snapshot.empty(), "snapshots not implemented");
+      psibase::check(snapshot.empty(), "snapshots not implemented");
       dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
       db  = {dir};
       sys = std::make_unique<psibase::system_context>(psibase::system_context{db, {128}});

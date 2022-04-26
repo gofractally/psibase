@@ -1,7 +1,6 @@
 enable_testing()
 
 add_subdirectory(psio)
-add_subdirectory(abieos)
 add_subdirectory(psibase)
 
 if(DEFINED IS_NATIVE)

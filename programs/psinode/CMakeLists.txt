@@ -1,5 +1,5 @@
 add_executable(psinode main.cpp)
-target_link_libraries(psinode contracts_system psibase_http abieos debug_eos_vm)
+target_link_libraries(psinode contracts_system psibase_http debug_eos_vm)
 target_include_directories(psinode PUBLIC
     ../../libraries/psibase/contract/include
     ../../contracts/psibase_tests)
