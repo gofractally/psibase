@@ -68,7 +68,7 @@ namespace psibase
       auto upperBound = [&](const Key& key) -> Iter
       {
          // eosio::print("upperBound ", key, "\n");
-         auto k = eosio::convert_to_key(key);
+         auto k = psio::convert_to_key(key);
          k.push_back(0);
          if (auto v = kv_greater_equal_raw(map, k, keyPrefixSize))
             return toIter(psio::convert_from_frac<Value>(*v));
@@ -88,12 +88,12 @@ namespace psibase
          if (it.key)
          {
             // eosio::print("decrIter ", *it.key, "\n");
-            key = eosio::convert_to_key(*it.key);
+            key = psio::convert_to_key(*it.key);
          }
          else
          {
             // eosio::print("decrIter end\n");
-            key = eosio::convert_to_key(maxKey);
+            key = psio::convert_to_key(maxKey);
             key.push_back(0);
          }
          if (auto b = kv_less_than_raw(map, key, keyPrefixSize))

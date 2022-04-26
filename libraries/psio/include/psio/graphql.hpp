@@ -866,7 +866,7 @@ namespace psio
       {
          from_string(arg, input_stream.current_value);
          // TODO: prevent abort
-         //arg = eosio::convert_from_string<T>(input_stream.current_value);
+         //arg = psio::convert_from_string<T>(input_stream.current_value);
          input_stream.skip();
          return true;
       }

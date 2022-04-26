@@ -1,9 +1,9 @@
 #include <psibase/transaction_context.hpp>
 
-#include <eosio/from_bin.hpp>
 #include <psibase/action_context.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psibase/from_bin.hpp>
+#include <psio/from_bin.hpp>
 
 namespace psibase
 {

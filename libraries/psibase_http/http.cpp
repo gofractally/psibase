@@ -21,7 +21,7 @@
 #include <boost/optional.hpp>
 
 #include <eosio/finally.hpp>
-#include <eosio/to_json.hpp>
+#include <psio/to_json.hpp>
 
 #include <algorithm>
 #include <cstdlib>
@@ -48,8 +48,7 @@ struct error_info
    std::string      what    = {};
    std::vector<int> details = {};
 };
-
-EOSIO_REFLECT(error_info, code, name, what, details)
+PSIO_REFLECT(error_info, code, name, what, details)
 
 struct error_results
 {
@@ -57,8 +56,7 @@ struct error_results
    std::string message = {};
    error_info  error   = {};
 };
-
-EOSIO_REFLECT(error_results, code, message, error)
+PSIO_REFLECT(error_results, code, message, error)
 
 namespace psibase::http
 {
@@ -454,7 +452,7 @@ namespace psibase::http
             err.message    = "Internal Service Error";
             err.error.name = "exception";
             err.error.what = e.what();
-            return send(error(bhttp::status::internal_server_error, eosio::convert_to_json(err),
+            return send(error(bhttp::status::internal_server_error, psio::convert_to_json(err),
                               "application/json"));
          }
          catch (...)

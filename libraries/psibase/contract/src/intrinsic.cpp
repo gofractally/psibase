@@ -1,6 +1,6 @@
 #include <psibase/intrinsic.hpp>
 
-#include <eosio/from_bin.hpp>
+#include <psio/from_bin.hpp>
 
 namespace psibase
 {
@@ -49,7 +49,7 @@ namespace psibase
       return get_result(raw::call(action, len));
    }
 
-   std::vector<char> call(eosio::input_stream action)
+   std::vector<char> call(psio::input_stream action)
    {
       return get_result(raw::call(action.pos, action.remaining()));
    }

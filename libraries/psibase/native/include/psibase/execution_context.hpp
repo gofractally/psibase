@@ -12,11 +12,11 @@ namespace psibase
    struct database;
 
    // Only useful for genesis
-   void set_code(database&           db,
-                 account_num         contract,
-                 uint8_t             vm_type,
-                 uint8_t             vm_version,
-                 eosio::input_stream code);
+   void set_code(database&          db,
+                 account_num        contract,
+                 uint8_t            vm_type,
+                 uint8_t            vm_version,
+                 psio::input_stream code);
 
    struct wasm_cache_impl;
    struct wasm_cache

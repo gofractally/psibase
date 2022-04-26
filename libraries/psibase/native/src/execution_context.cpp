@@ -35,11 +35,11 @@ namespace psibase
    }
 
    // Only useful for genesis
-   void set_code(database&           db,
-                 account_num         contract,
-                 uint8_t             vm_type,
-                 uint8_t             vm_version,
-                 eosio::input_stream code)
+   void set_code(database&          db,
+                 account_num        contract,
+                 uint8_t            vm_type,
+                 uint8_t            vm_version,
+                 psio::input_stream code)
    {
       eosio::check(code.remaining(), "native set_code can't clear code");
       auto code_hash = sha256(code.pos, code.remaining());
@@ -244,7 +244,7 @@ namespace psibase
 
       bool key_has_contract_prefix(uint32_t map) { return map == uint32_t(kv_map::contract); }
 
-      kv_map get_map_write(uint32_t map, eosio::input_stream key)
+      kv_map get_map_write(uint32_t map, psio::input_stream key)
       {
          eosio::check(!trx_context.block_context.is_read_only, "writes disabled during query");
 
@@ -285,7 +285,7 @@ namespace psibase
          throw std::runtime_error("contract may not write this map, or must use another intrinsic");
       }
 
-      void verify_write_constrained(eosio::input_stream key, eosio::input_stream value)
+      void verify_write_constrained(psio::input_stream key, psio::input_stream value)
       {
          // Currently, code is the only table which lives in native_constrained
          // which is writable by contracts. The other tables aren't writable by
@@ -296,7 +296,7 @@ namespace psibase
          auto code = psio::convert_from_frac<code_row>(psio::input_stream(value.pos, value.end));
          auto code_hash = sha256(code.code.data(), code.code.size());
          eosio::check(code.code_hash == code_hash, "code_row has incorrect code_hash");
-         auto expected_key = eosio::convert_to_key(code.key());
+         auto expected_key = psio::convert_to_key(code.key());
          eosio::check(key.remaining() == expected_key.size() &&
                           !memcmp(key.pos, expected_key.data(), key.remaining()),
                       "code_row has incorrect key");
@@ -319,7 +319,7 @@ namespace psibase
          return result_value.size();
       }
 
-      uint32_t set_result(const std::optional<eosio::input_stream>& o)
+      uint32_t set_result(const std::optional<psio::input_stream>& o)
       {
          if (!o)
             return clear_result();
@@ -432,10 +432,10 @@ namespace psibase
       {
          auto m = get_map_write_sequential(map);
 
-         eosio::input_stream v{value.data(), value.size()};
+         psio::input_stream v{value.data(), value.size()};
          eosio::check(v.remaining() >= sizeof(AccountNumber::value),
                       "value prefix must match contract during write");
-         auto contract = eosio::from_bin<AccountNumber>(v);
+         auto contract = psio::from_bin<AccountNumber>(v);
          eosio::check(contract == contract_account.num,
                       "value prefix must match contract during write");
 
@@ -449,7 +449,7 @@ namespace psibase
             eosio::check(false, "kv_put_sequential: unsupported map");
          db.kv_put(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
 
-         db.kv_put_raw(m, eosio::convert_to_key(indexNumber), {value.data(), value.size()});
+         db.kv_put_raw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
          return indexNumber;
       }  // kv_put_sequential()
 
@@ -471,7 +471,7 @@ namespace psibase
       uint32_t kv_get_sequential(uint32_t map, uint64_t indexNumber)
       {
          auto m = get_map_read_sequential(map);
-         return set_result(db.kv_get_raw(m, eosio::convert_to_key(indexNumber)));
+         return set_result(db.kv_get_raw(m, psio::convert_to_key(indexNumber)));
       }
 
       // TODO: don't let timer abort db operation

@@ -66,7 +66,7 @@ namespace system_contract
          if (request.target == "/accounts")
          {
             std::vector<account_row> rows;
-            auto                     key     = eosio::convert_to_key(account_key({}));
+            auto                     key     = psio::convert_to_key(account_key({}));
             auto                     keySize = sizeof(account_table);
             while (true)
             {
@@ -88,9 +88,9 @@ namespace system_contract
          if (request.target == "/pack/create_account")
          {
             request.body.push_back(0);
-            eosio::json_token_stream jstream{request.body.data()};
-            CreateAccount            args;
-            eosio::from_json(args, jstream);
+            psio::json_token_stream jstream{request.body.data()};
+            CreateAccount           args;
+            psio::from_json(args, jstream);
             check(args.account.value, "Invalid or missing name");
             check(args.authContract.value, "Invalid or missing authContract");
             action act{

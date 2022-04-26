@@ -1,9 +1,8 @@
 #include <psibase/intrinsic.hpp>
 
-#include <eosio/asset.hpp>
-#include <eosio/from_bin.hpp>
-#include <eosio/to_bin.hpp>
 #include <psibase/print.hpp>
+#include <psio/from_bin.hpp>
+#include <psio/to_bin.hpp>
 
 using namespace psibase;
 
@@ -28,7 +27,7 @@ struct item
 
    auto get_key(account_num this_contract) const
    {
-      auto k = eosio::convert_to_key(this_contract);
+      auto k = psio::convert_to_key(this_contract);
       k.insert(k.end(), key.begin(), key.end());
       return k;
    }
@@ -62,7 +61,7 @@ void test(account_num this_contract)
    for (const auto& item : items)
       if (item.add)
          kv_put_raw(kv_map::contract, item.get_key(this_contract),
-                    eosio::convert_to_bin(item.value));
+                    psio::convert_to_bin(item.value));
 
    if (enable_print)
       print("kv_remove\n");
@@ -88,7 +87,7 @@ void test(account_num this_contract)
       }
       check(!!result, "missing result");
       check(!!expected, "result exists");
-      auto val = eosio::convert_from_bin<uint8_t>(*result);
+      auto val = psio::convert_from_bin<uint8_t>(*result);
       if (val != *expected)
       {
          if (enable_print)
@@ -153,7 +152,7 @@ void test(account_num this_contract)
          fflush(stdout);
       }
       run(0, item.max, key,
-          [](kv_map map, eosio::input_stream key, size_t) { return kv_max_raw(map, key); });
+          [](kv_map map, psio::input_stream key, size_t) { return kv_max_raw(map, key); });
       if (enable_print)
          print("\n");
    }  // kv_max

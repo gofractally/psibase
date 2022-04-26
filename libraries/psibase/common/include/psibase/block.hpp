@@ -1,7 +1,5 @@
 #pragma once
 
-#include <eosio/crypto.hpp>
-#include <eosio/time.hpp>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/crypto.hpp>

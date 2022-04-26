@@ -11,7 +11,7 @@ namespace table_test
       int                         value;
       friend std::strong_ordering operator<=>(const S0&, const S0&) = default;
    };
-   EOSIO_REFLECT(S0, key, value)
+   PSIO_REFLECT(S0, key, value)
    using table0 = table<S0, &S0::key>;
 
    struct S1
@@ -21,7 +21,7 @@ namespace table_test
       int                         value;
       friend std::strong_ordering operator<=>(const S1&, const S1&) = default;
    };
-   EOSIO_REFLECT(S1, key1, key2, value);
+   PSIO_REFLECT(S1, key1, key2, value);
    using table1 = table<S1, &S1::key1, &S1::key2>;
 
    struct S2
@@ -32,7 +32,7 @@ namespace table_test
       auto                        compound_key() const { return std::tie(key2, key1); }
       friend std::strong_ordering operator<=>(const S2&, const S2&) = default;
    };
-   EOSIO_REFLECT(S2, key1, key2, value, compound_key);
+   PSIO_REFLECT(S2, key1, key2, value, method(compound_key));
    using table2 = table<S2, &S2::key1, &S2::compound_key>;
 
    using test_tables = contract_tables<table0, table1, table2>;

@@ -269,8 +269,8 @@ void psibase::test_chain::start_block(int64_t skip_miliseconds)
 void psibase::test_chain::start_block(std::string_view time)
 {
    uint64_t value;
-   eosio::check(eosio::string_to_utc_microseconds(value, time.data(), time.data() + time.size()),
-                "bad time");
+   auto     data = time.data();
+   eosio::check(string_to_utc_microseconds(value, data, data + time.size(), true), "bad time");
    start_block(TimePointSec{.seconds = uint32_t(value / 1000)});
 }
 

@@ -221,18 +221,18 @@ namespace psibase
          impl->block_log_transaction.reset();
    }
 
-   void database::kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
+   void database::kv_put_raw(kv_map map, psio::input_stream key, psio::input_stream value)
    {
       impl->get_trx(map).upsert(impl->shared.impl->get_map(map), {key.pos, key.remaining()},
                                 {value.pos, value.remaining()});
    }
 
-   void database::kv_remove_raw(kv_map map, eosio::input_stream key)
+   void database::kv_remove_raw(kv_map map, psio::input_stream key)
    {
       impl->get_trx(map).erase(impl->shared.impl->get_map(map), {key.pos, key.remaining()});
    }
 
-   std::optional<eosio::input_stream> database::kv_get_raw(kv_map map, eosio::input_stream key)
+   std::optional<psio::input_stream> database::kv_get_raw(kv_map map, psio::input_stream key)
    {
       mdbx::slice k{key.pos, key.remaining()};
       mdbx::slice v;
@@ -240,11 +240,11 @@ namespace psibase
       if (stat == MDBX_NOTFOUND)
          return std::nullopt;
       mdbx::error::success_or_throw(stat);
-      return eosio::input_stream{(const char*)v.data(), v.size()};
+      return psio::input_stream{(const char*)v.data(), v.size()};
    }
 
-   std::optional<database::kv_result> database::kv_greater_equal_raw(kv_map              map,
-                                                                     eosio::input_stream key,
+   std::optional<database::kv_result> database::kv_greater_equal_raw(kv_map             map,
+                                                                     psio::input_stream key,
                                                                      size_t match_key_size)
    {
       mdbx::slice k{key.pos, key.remaining()};
@@ -255,14 +255,14 @@ namespace psibase
       if (result.key.size() < match_key_size || memcmp(result.key.data(), key.pos, match_key_size))
          return std::nullopt;
       return database::kv_result{
-          eosio::input_stream{(const char*)result.key.data(), result.key.size()},
-          eosio::input_stream{(const char*)result.value.data(), result.value.size()},
+          psio::input_stream{(const char*)result.key.data(), result.key.size()},
+          psio::input_stream{(const char*)result.value.data(), result.value.size()},
       };
    }
 
-   std::optional<database::kv_result> database::kv_less_than_raw(kv_map              map,
-                                                                 eosio::input_stream key,
-                                                                 size_t              match_key_size)
+   std::optional<database::kv_result> database::kv_less_than_raw(kv_map             map,
+                                                                 psio::input_stream key,
+                                                                 size_t             match_key_size)
    {
       mdbx::slice k{key.pos, key.remaining()};
       impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
@@ -276,12 +276,12 @@ namespace psibase
       if (result.key.size() < match_key_size || memcmp(result.key.data(), key.pos, match_key_size))
          return std::nullopt;
       return database::kv_result{
-          eosio::input_stream{(const char*)result.key.data(), result.key.size()},
-          eosio::input_stream{(const char*)result.value.data(), result.value.size()},
+          psio::input_stream{(const char*)result.key.data(), result.key.size()},
+          psio::input_stream{(const char*)result.value.data(), result.value.size()},
       };
    }
 
-   std::optional<database::kv_result> database::kv_max_raw(kv_map map, eosio::input_stream key)
+   std::optional<database::kv_result> database::kv_max_raw(kv_map map, psio::input_stream key)
    {
       std::vector<unsigned char> next(reinterpret_cast<const unsigned char*>(key.pos),
                                       reinterpret_cast<const unsigned char*>(key.end));
@@ -311,8 +311,8 @@ namespace psibase
           memcmp(result->key.data(), key.pos, key.remaining()))
          return std::nullopt;
       return database::kv_result{
-          eosio::input_stream{(const char*)result->key.data(), result->key.size()},
-          eosio::input_stream{(const char*)result->value.data(), result->value.size()},
+          psio::input_stream{(const char*)result->key.data(), result->key.size()},
+          psio::input_stream{(const char*)result->value.data(), result->value.size()},
       };
    }
 

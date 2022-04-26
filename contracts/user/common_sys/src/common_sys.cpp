@@ -2,9 +2,9 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/proxy_sys.hpp>
-#include <eosio/to_json.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
+#include <psio/to_json.hpp>
 
 static constexpr bool enable_print = false;
 
@@ -33,7 +33,7 @@ namespace psibase
    {
       auto to_json = [](const auto& obj)
       {
-         auto json = eosio::convert_to_json(obj);
+         auto json = psio::convert_to_json(obj);
          return rpc_reply_data{
              .contentType = "application/json",
              .reply       = {json.begin(), json.end()},
@@ -87,9 +87,9 @@ namespace psibase
          if (request.target == "/common/pack/signed_transaction")
          {
             request.body.push_back(0);
-            eosio::json_token_stream jstream{request.body.data()};
-            signed_transaction       trx;
-            eosio::from_json(trx, jstream);
+            psio::json_token_stream jstream{request.body.data()};
+            signed_transaction      trx;
+            psio::from_json(trx, jstream);
             return rpc_reply_data{
                 .contentType = "application/octet-stream",
                 .reply       = psio::convert_to_frac(trx),

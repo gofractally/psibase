@@ -1,10 +1,10 @@
 #pragma once
 
-#include <eosio/to_key.hpp>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 #include <psio/fracpack.hpp>
+#include <psio/to_key.hpp>
 
 #if defined(COMPILING_CONTRACT) || defined(COMPILING_TESTS)
 #define PSIBASE_INTRINSIC(x) [[clang::import_name(#x)]]
@@ -144,7 +144,7 @@ namespace psibase
    std::vector<char> call(const char* action, uint32_t len);
 
    // Call a contract and return its result
-   std::vector<char> call(eosio::input_stream action);
+   std::vector<char> call(psio::input_stream action);
 
    // Call a contract and return its result
    std::vector<char> call(const action& action);
@@ -178,13 +178,13 @@ namespace psibase
    }
 
    // Set the return value of the currently-executing action
-   inline void set_retval_bytes(eosio::input_stream s)
+   inline void set_retval_bytes(psio::input_stream s)
    {
       raw::set_retval(s.pos, s.remaining());
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
-   inline void kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value)
+   inline void kv_put_raw(kv_map map, psio::input_stream key, psio::input_stream value)
    {
       raw::kv_put(map, key.pos, key.remaining(), value.pos, value.remaining());
    }
@@ -192,33 +192,31 @@ namespace psibase
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, typename V>
    auto kv_put(kv_map map, const K& key, const V& value)
-       -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+       -> std::enable_if_t<!psio::is_std_optional<V>(), void>
    {
-      kv_put_raw(map, eosio::convert_to_key(key), psio::convert_to_frac(value));
+      kv_put_raw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, typename V>
-   auto kv_put(const K& key, const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+   auto kv_put(const K& key, const V& value) -> std::enable_if_t<!psio::is_std_optional<V>(), void>
    {
       kv_put(kv_map::contract, key, value);
    }
 
    // Add a sequentially-numbered record. Returns the id.
-   inline uint64_t kv_put_sequential_raw(kv_map map, eosio::input_stream value)
+   inline uint64_t kv_put_sequential_raw(kv_map map, psio::input_stream value)
    {
       return raw::kv_put_sequential(map, value.pos, value.remaining());
    }
 
    // Add a sequentially-numbered record. Returns the id.
    template <typename Type, typename V>
-   auto kv_put_sequential(kv_map        map,
-                          AccountNumber contract,
-                          Type          type,
-                          const V& value) -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+   auto kv_put_sequential(kv_map map, AccountNumber contract, Type type, const V& value)
+       -> std::enable_if_t<!psio::is_std_optional<V>(), void>
    {
-      std::vector<char>     packed(psio::fracpack_size(contract) +
-                                   psio::fracpack_size(type) + psio::fracpack_size(value));
+      std::vector<char>     packed(psio::fracpack_size(contract) + psio::fracpack_size(type) +
+                                   psio::fracpack_size(value));
       psio::fast_buf_stream stream(packed.data(), packed.size());
       psio::fracpack(contract, stream);
       psio::fracpack(type, stream);
@@ -227,7 +225,7 @@ namespace psibase
    }
 
    // Remove a key-value pair if it exists
-   inline void kv_remove_raw(kv_map map, eosio::input_stream key)
+   inline void kv_remove_raw(kv_map map, psio::input_stream key)
    {
       raw::kv_remove(map, key.pos, key.remaining());
    }
@@ -236,7 +234,7 @@ namespace psibase
    template <typename K>
    void kv_remove(kv_map map, const K& key)
    {
-      kv_remove_raw(map, eosio::convert_to_key(key));
+      kv_remove_raw(map, psio::convert_to_key(key));
    }
 
    // Remove a key-value pair if it exists
@@ -247,7 +245,7 @@ namespace psibase
    }
 
    // Size of key-value pair, if any
-   inline std::optional<uint32_t> kv_get_size_raw(kv_map map, eosio::input_stream key)
+   inline std::optional<uint32_t> kv_get_size_raw(kv_map map, psio::input_stream key)
    {
       auto size = raw::kv_get(map, key.pos, key.remaining());
       if (size == -1)
@@ -259,7 +257,7 @@ namespace psibase
    template <typename K>
    inline std::optional<uint32_t> kv_get_size(kv_map map, const K& key)
    {
-      return kv_get_size_raw(map, eosio::convert_to_key(key));
+      return kv_get_size_raw(map, psio::convert_to_key(key));
    }
 
    // Size of key-value pair, if any
@@ -270,7 +268,7 @@ namespace psibase
    }
 
    // Get a key-value pair, if any
-   inline std::optional<std::vector<char>> kv_get_raw(kv_map map, eosio::input_stream key)
+   inline std::optional<std::vector<char>> kv_get_raw(kv_map map, psio::input_stream key)
    {
       auto size = raw::kv_get(map, key.pos, key.remaining());
       if (size == -1)
@@ -282,7 +280,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kv_get(kv_map map, const K& key)
    {
-      auto v = kv_get_raw(map, eosio::convert_to_key(key));
+      auto v = kv_get_raw(map, psio::convert_to_key(key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -368,9 +366,9 @@ namespace psibase
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
    // returns the value. Also sets key (use get_key). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kv_greater_equal_raw(kv_map              map,
-                                                                eosio::input_stream key,
-                                                                uint32_t            match_key_size)
+   inline std::optional<std::vector<char>> kv_greater_equal_raw(kv_map             map,
+                                                                psio::input_stream key,
+                                                                uint32_t           match_key_size)
    {
       auto size = raw::kv_greater_equal(map, key.pos, key.remaining(), match_key_size);
       if (size == -1)
@@ -384,7 +382,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kv_greater_equal(kv_map map, const K& key, uint32_t match_key_size)
    {
-      auto v = kv_greater_equal_raw(map, eosio::convert_to_key(key), match_key_size);
+      auto v = kv_greater_equal_raw(map, psio::convert_to_key(key), match_key_size);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -403,9 +401,9 @@ namespace psibase
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // match_key_size bytes of the found key matches the provided key, then returns the value.
    // Also sets key (use get_key). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kv_less_than_raw(kv_map              map,
-                                                            eosio::input_stream key,
-                                                            uint32_t            match_key_size)
+   inline std::optional<std::vector<char>> kv_less_than_raw(kv_map             map,
+                                                            psio::input_stream key,
+                                                            uint32_t           match_key_size)
    {
       auto size = raw::kv_less_than(map, key.pos, key.remaining(), match_key_size);
       if (size == -1)
@@ -419,7 +417,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kv_less_than(kv_map map, const K& key, uint32_t match_key_size)
    {
-      auto v = kv_less_than_raw(map, eosio::convert_to_key(key), match_key_size);
+      auto v = kv_less_than_raw(map, psio::convert_to_key(key), match_key_size);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -437,7 +435,7 @@ namespace psibase
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
    // value. Also sets key (use get_key). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kv_max_raw(kv_map map, eosio::input_stream key)
+   inline std::optional<std::vector<char>> kv_max_raw(kv_map map, psio::input_stream key)
    {
       auto size = raw::kv_max(map, key.pos, key.remaining());
       if (size == -1)
@@ -450,7 +448,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kv_max(kv_map map, const K& key)
    {
-      auto v = kv_max_raw(map, eosio::convert_to_key(key));
+      auto v = kv_max_raw(map, psio::convert_to_key(key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)

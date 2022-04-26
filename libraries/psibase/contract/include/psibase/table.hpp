@@ -5,11 +5,11 @@
 #include <compare>
 #include <concepts>
 #include <cstdint>
-#include <eosio/from_bin.hpp>
-#include <eosio/to_bin.hpp>
-#include <eosio/to_key.hpp>
 #include <functional>
 #include <psibase/intrinsic.hpp>
+#include <psio/from_bin.hpp>
+#include <psio/to_bin.hpp>
+#include <psio/to_key.hpp>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -158,7 +158,7 @@ namespace psibase
          --*this;
          return result;
       }
-      T                         operator*() const { return eosio::convert_from_bin<T>(*base); }
+      T                         operator*() const { return psio::convert_from_bin<T>(*base); }
       friend std::weak_ordering operator<=>(const kv_iterator& lhs,
                                             const kv_iterator& rhs) = default;
 
@@ -214,7 +214,8 @@ namespace psibase
    };
 
    template <typename T, typename U>
-   concept compatible_key_prefix_unqual = std::same_as<T, U> || compatible_tuple_prefix<T, U>::value;
+   concept compatible_key_prefix_unqual =
+       std::same_as<T, U> || compatible_tuple_prefix<T, U>::value;
    template <typename T, typename U>
    concept compatible_key_prefix =
        compatible_key_prefix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
@@ -263,7 +264,7 @@ namespace psibase
       kv_iterator<T> lower_bound(compatible_key_prefix<K> auto&& k) const
       {
          key_view       key_base{{prefix.data(), prefix.size()}};
-         auto           key = eosio::convert_to_key(std::tie(key_base, k));
+         auto           key = psio::convert_to_key(std::tie(key_base, k));
          result_handle  res = {raw::kv_greater_equal(key.data(), key.size(), prefix.size())};
          kv_iterator<T> result(std::move(key), prefix.size(), is_secondary());
          result.move_to(res);
@@ -272,7 +273,7 @@ namespace psibase
       kv_iterator<T> upper_bound(compatible_key_prefix<K> auto&& k) const
       {
          key_view key_base{{prefix.data(), prefix.size()}};
-         auto     key = eosio::convert_to_key(std::tie(key_base, k));
+         auto     key = psio::convert_to_key(std::tie(key_base, k));
          while (true)
          {
             if (key.size() <= prefix.size())
@@ -293,13 +294,13 @@ namespace psibase
       index<T, key_suffix<K2, K>> subindex(K2&& k)
       {
          key_view key_base{{prefix.data(), prefix.size()}};
-         auto     key = eosio::convert_to_key(std::tie(key_base, k));
+         auto     key = psio::convert_to_key(std::tie(key_base, k));
          return index<T, key_suffix<K2, K>>(std::move(key));
       }
       std::optional<T> get(compatible_key<K> auto&& k) const
       {
          key_view key_base{{prefix.data(), prefix.size()}};
-         auto     buffer = eosio::convert_to_key(std::tie(key_base, k));
+         auto     buffer = psio::convert_to_key(std::tie(key_base, k));
          int      res    = raw::kv_get(map, buffer.data(), buffer.size());
          if (res < 0)
          {
@@ -313,7 +314,7 @@ namespace psibase
             buffer.resize(res);
             raw::get_result(buffer.data(), buffer.size(), 0);
          }
-         return eosio::convert_from_bin<T>(buffer);
+         return psio::convert_from_bin<T>(buffer);
       }
 
      private:
@@ -360,17 +361,18 @@ namespace psibase
             {
                std::vector<char> buffer(sz);
                raw::get_result(buffer.data(), buffer.size(), 0);
-               auto data              = eosio::convert_from_bin<T>(std::move(buffer));
-               auto replace_secondary = [&](uint8_t& idx, auto wrapped) {
+               auto data              = psio::convert_from_bin<T>(std::move(buffer));
+               auto replace_secondary = [&](uint8_t& idx, auto wrapped)
+               {
                   auto old_key = std::invoke(decltype(wrapped)::value, data);
                   auto new_key = std::invoke(decltype(wrapped)::value, arg);
                   if (old_key != new_key)
                   {
                      key_buffer.back() = idx;
-                     eosio::convert_to_key(old_key, key_buffer);
+                     psio::convert_to_key(old_key, key_buffer);
                      raw::kv_remove(map, key_buffer.data(), key_buffer.size());
                      key_buffer.resize(prefix.size() + 1);
-                     eosio::convert_to_key(new_key, key_buffer);
+                     psio::convert_to_key(new_key, key_buffer);
                      kv_insert(map, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
                      key_buffer.resize(prefix.size() + 1);
                   }
@@ -381,10 +383,11 @@ namespace psibase
             }
             else
             {
-               auto write_secondary = [&](uint8_t idx, auto wrapped) {
+               auto write_secondary = [&](uint8_t idx, auto wrapped)
+               {
                   auto key          = std::invoke(decltype(wrapped)::value, arg);
                   key_buffer.back() = idx;
-                  eosio::convert_to_key(key, key_buffer);
+                  psio::convert_to_key(key, key_buffer);
                   kv_insert(map, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
                   key_buffer.resize(prefix.size() + 1);
                   ++idx;
@@ -393,7 +396,7 @@ namespace psibase
                (write_secondary(idx, wrap<Secondary>()), ...);
             }
          }
-         auto serialized = eosio::convert_to_bin(arg);
+         auto serialized = psio::convert_to_bin(arg);
          raw::kv_put(map, pk.data(), pk.size(), serialized.data(), serialized.size());
       }
       // TODO: get index by name
@@ -413,7 +416,7 @@ namespace psibase
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
       {
          key_view key_base{{prefix.data(), prefix.size()}};
-         return eosio::convert_to_key(std::tie(key_base, idx, k));
+         return psio::convert_to_key(std::tie(key_base, idx, k));
       }
       static constexpr kv_map map = kv_map::contract;
       std::vector<char>       prefix;
@@ -428,7 +431,7 @@ namespace psibase
       template <std::uint32_t Table>
       auto open()
       {
-         std::vector<char> key_prefix = eosio::convert_to_key(std::tuple(account, Table));
+         std::vector<char> key_prefix = psio::convert_to_key(std::tuple(account, Table));
          return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(std::move(key_prefix));
       }
       template <typename T>

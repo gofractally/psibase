@@ -3,6 +3,7 @@
 #include <compare>
 #include <psibase/Contract.hpp>
 #include <psibase/table.hpp>
+#include <psibase/time.hpp>
 #include <string_view>
 
 #include "nft_sys.hpp"
@@ -23,7 +24,7 @@ namespace tokens_sys
       int64_t           avg_daily_inflation;
       int64_t           avg_yearly_inflation;
 
-      eosio::time_point_sec last_update;
+      psibase::TimePointSec last_update;
 
       uint64_t primary_key() const { return key; }
    };

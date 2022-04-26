@@ -8,10 +8,10 @@
 #pragma GCC diagnostic ignored "-Wunused-local-typedef"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic push
-#include <eosio/from_json.hpp>
 #include <psibase/block.hpp>
 #include <psio/bytes.hpp>
 #include <psio/fracpack.hpp>
+#include <psio/from_json.hpp>
 #pragma GCC diagnostic pop
 
 struct NewAccount
@@ -21,7 +21,6 @@ struct NewAccount
    bool                   allow_sudo;
 };
 PSIO_REFLECT(NewAccount, account, auth_contract, allow_sudo)
-EOSIO_REFLECT(NewAccount, account, auth_contract, allow_sudo)
 
 struct SetCode
 {
@@ -31,14 +30,12 @@ struct SetCode
    std::vector<char>      code;
 };
 PSIO_REFLECT(SetCode, contract, vm_type, vm_version, code)
-EOSIO_REFLECT(SetCode, contract, vm_type, vm_version, code)
 
 struct Startup
 {
    std::vector<psibase::AccountNumber> existing_accounts;
 };
 PSIO_REFLECT(Startup, existing_accounts)
-EOSIO_REFLECT(Startup, existing_accounts)
 
 struct RegisterServer
 {
@@ -46,7 +43,6 @@ struct RegisterServer
    psibase::AccountNumber rpc_contract;
 };
 PSIO_REFLECT(RegisterServer, contract, rpc_contract);
-EOSIO_REFLECT(RegisterServer, contract, rpc_contract);
 
 struct UploadSys
 {
@@ -55,16 +51,15 @@ struct UploadSys
    std::vector<char> content;
 };
 PSIO_REFLECT(UploadSys, path, contentType, content)
-EOSIO_REFLECT(UploadSys, path, contentType, content)
 
 template <typename T>
 std::unique_ptr<std::vector<uint8_t>> pack(const rust::Str& json)
 {
    std::vector<char> v(json.data(), json.data() + json.size());
    v.push_back(0);
-   eosio::json_token_stream jstream{v.data()};
-   T                        obj;
-   eosio::from_json(obj, jstream);
+   psio::json_token_stream jstream{v.data()};
+   T                       obj;
+   psio::from_json(obj, jstream);
    auto packed = psio::convert_to_frac(obj);
    auto result = std::make_unique<std::vector<uint8_t>>(packed.size());
    memcpy(result->data(), packed.data(), packed.size());
