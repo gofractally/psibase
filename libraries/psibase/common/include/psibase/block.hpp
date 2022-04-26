@@ -20,7 +20,6 @@ namespace psibase
    };
    using action = Action;
    PSIO_REFLECT(Action, sender, contract, method, raw_data)
-   EOSIO_REFLECT(action, sender, contract, method, raw_data)
 
    struct genesis_contract
    {
@@ -32,7 +31,6 @@ namespace psibase
       std::vector<char> code       = {};
    };
    PSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
-   EOSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
 
    // The genesis action is the first action of the first transaction of
    // the first block. The action struct's fields are ignored, except
@@ -42,7 +40,6 @@ namespace psibase
       std::string                   memo;
       std::vector<genesis_contract> contracts;
    };
-   EOSIO_REFLECT(genesis_action_data, memo, contracts)
    PSIO_REFLECT(genesis_action_data, memo, contracts)
 
    struct Claim
@@ -50,7 +47,6 @@ namespace psibase
       AccountNumber     contract;
       std::vector<char> raw_data;
    };
-   EOSIO_REFLECT(Claim, contract, raw_data)
    PSIO_REFLECT(Claim, contract, raw_data)
 
    /* mark this as final and put it in memory order that
@@ -71,7 +67,6 @@ namespace psibase
       uint16_t     ref_block_num    = 0;
    };
    PSIO_REFLECT(Tapos, expiration, flags, ref_block_prefix, ref_block_num)
-   EOSIO_REFLECT(Tapos, expiration, flags, ref_block_prefix, ref_block_num)
 
    // TODO: separate native-defined fields from contract-defined fields
    struct transaction
@@ -80,7 +75,6 @@ namespace psibase
       std::vector<Action> actions;
       std::vector<Claim>  claims;  // TODO: Is there standard terminology that we could use?
    };
-   EOSIO_REFLECT(transaction, tapos, actions, claims)
    PSIO_REFLECT(transaction, tapos, actions, claims)
 
    // TODO: pruning proofs?
@@ -93,7 +87,6 @@ namespace psibase
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
    };
-   EOSIO_REFLECT(signed_transaction, trx, proofs)
    PSIO_REFLECT(signed_transaction, trx, proofs)
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
@@ -108,7 +101,6 @@ namespace psibase
       block_num    num      = 0;  // TODO: pack into previous instead?
       TimePointSec time;          // TODO: switch to microseconds
    };
-   EOSIO_REFLECT(BlockHeader, previous, num, time)
    PSIO_REFLECT(BlockHeader, previous, num, time)
 
    struct Block
@@ -116,7 +108,6 @@ namespace psibase
       BlockHeader                     header;
       std::vector<signed_transaction> transactions;  // TODO: move inside receipts
    };
-   EOSIO_REFLECT(Block, header, transactions)
    PSIO_REFLECT(Block, header, transactions)
 
    /// TODO: you have signed block headers, not signed blocks
@@ -125,7 +116,6 @@ namespace psibase
       Block block;
       Claim signature;  // TODO: switch to proofs?
    };
-   EOSIO_REFLECT(signed_block, block, signature)
    PSIO_REFLECT(signed_block, block, signature)
 
    struct BlockInfo
@@ -140,7 +130,6 @@ namespace psibase
       // TODO: don't repack to compute sha
       BlockInfo(const Block& b) : header{b.header}, id{sha256(b)} {}
    };
-   EOSIO_REFLECT(BlockInfo, header, id)
    PSIO_REFLECT(BlockInfo, header, id)
 
    // TODO: remove dependency on these

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <eosio/crypto.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
 

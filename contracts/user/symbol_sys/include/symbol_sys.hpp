@@ -16,7 +16,6 @@ namespace symbol_sys
 
       friend std::strong_ordering operator<=>(const symbol_row&, const symbol_row&) = default;
    };
-   EOSIO_REFLECT(symbol_row, symbol_name, nft_id);
    PSIO_REFLECT(symbol_row, symbol_name, nft_id);
 
    using symbol_table_t = psibase::table<symbol_row, &symbol_row::nft_id>;

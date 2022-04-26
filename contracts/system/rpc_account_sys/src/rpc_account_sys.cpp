@@ -36,7 +36,6 @@ struct CreateAccount
    psibase::AccountNumber authContract = {};
    bool                   allowSudo    = false;
 };
-EOSIO_REFLECT(CreateAccount, account, authContract, allowSudo)
 PSIO_REFLECT(CreateAccount, account, authContract, allowSudo)
 
 namespace system_contract

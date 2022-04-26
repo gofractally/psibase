@@ -2,7 +2,6 @@
 
 #include_next <psibase/db.hpp>
 
-#include <eosio/types.hpp>
 #include <psibase/blob.hpp>
 #include <psibase/native_tables.hpp>
 #include <psio/fracpack.hpp>
@@ -95,7 +94,7 @@ namespace psibase
 
       template <typename K, typename V>
       auto kv_put(kv_map map, const K& key, const V& value)
-          -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+          -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
          kv_put_raw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
       }

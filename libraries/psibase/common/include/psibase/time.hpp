@@ -2,7 +2,6 @@
 #include <compare>
 
 #include <eosio/check.hpp>
-#include <eosio/reflection.hpp>
 #include <psio/reflect.hpp>
 
 namespace psibase
@@ -24,7 +23,6 @@ namespace psibase
       auto     operator<=>(const TimePointSec&) const = default;
    };
    PSIO_REFLECT(TimePointSec, seconds);
-   EOSIO_REFLECT(TimePointSec, seconds);
 
    template <typename S>
    void from_json(TimePointSec& obj, S& stream)

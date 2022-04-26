@@ -21,7 +21,6 @@ namespace UserContract
 
       friend std::strong_ordering operator<=>(const AdRecord&, const AdRecord&) = default;
    };
-   EOSIO_REFLECT(AdRecord, user, autodebit);
    PSIO_REFLECT(AdRecord, user, autodebit);
 
    using AdTable_t = psibase::table<AdRecord, &AdRecord::user>;
@@ -43,7 +42,6 @@ namespace UserContract
 
       friend std::strong_ordering operator<=>(const NftRecord&, const NftRecord&) = default;
    };
-   EOSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
    PSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
 
    using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;

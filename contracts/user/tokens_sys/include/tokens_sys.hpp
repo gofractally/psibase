@@ -28,17 +28,6 @@ namespace tokens_sys
 
       uint64_t primary_key() const { return key; }
    };
-   EOSIO_REFLECT(token_row,
-                 nft_id,
-                 key,
-                 authorize,
-                 recall,
-                 daily_inf_per_limit,
-                 yearly_inf_per_limit,
-                 allowed_daily_inflation,
-                 avg_daily_inflation,
-                 avg_yearly_inflation,
-                 last_update);
    PSIO_REFLECT(token_row,
                 nft_id,
                 key,

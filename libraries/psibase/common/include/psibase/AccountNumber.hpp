@@ -1,12 +1,8 @@
 #pragma once
 #include <compare>
-#include <eosio/reflection.hpp>
 #include <psibase/name.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
-
-// Todo - remove when kv table uses PSIO
-#include <eosio/reflection.hpp>
 
 namespace psibase
 {
@@ -20,7 +16,6 @@ namespace psibase
       auto        operator<=>(const AccountNumber&) const = default;
    };
    PSIO_REFLECT(AccountNumber, value)
-   EOSIO_REFLECT(AccountNumber, value)  //Todo - remove when kv table uses PSIO
 
    // TODO: remove
    using account_num = AccountNumber;
@@ -37,7 +32,10 @@ namespace psibase
       result = AccountNumber{stream.get_string()};
    }
 
-   inline constexpr bool use_json_string_for_gql(AccountNumber*) { return true; }
+   inline constexpr bool use_json_string_for_gql(AccountNumber*)
+   {
+      return true;
+   }
 }  // namespace psibase
 
 // TODO: move to psibase::literals (inline namespace)
