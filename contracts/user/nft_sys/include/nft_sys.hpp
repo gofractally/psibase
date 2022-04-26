@@ -75,7 +75,8 @@ namespace UserContract
       method(minted, nftId, issuer),
       method(burned, nftId),
       method(disabledAutodeb, account),
-      method(enabledAutodeb, account));
+      method(enabledAutodeb, account)
+   );
 
    PSIBASE_REFLECT_UI_EVENTS(NftSys, 
       method(credited, nftId, sender, receiver, memo),

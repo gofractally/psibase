@@ -33,6 +33,7 @@ namespace
 
 /* Todo:
  *    Implement inflation limits
+ *    Implement state management classes, or helpers that assert if objects don't exist.
  *    Templatize psibase::Bitset
  *    Test Precision and Quantity types
  *    Code review psibase::Bitset and psibase::String
@@ -180,20 +181,26 @@ SCENARIO("Recalling tokens")
       }
       THEN("Alice can recall Bob's tokens")
       {
-         auto recall = a.recall(tokenId, bob, 1000, "recall memo");
+         auto recall = a.recall(tokenId, bob, alice, 1000, memo);
          CHECK(recall.succeeded());
+         auto debit = a.debit(tokenId, bob, 1000, memo);
+         CHECK(debit.succeeded());
+
+         AND_THEN("Alice owns Bob's tokens")
+         {
+            CHECK(a.getBalance(tokenId, bob).returnVal() == 0);
+            CHECK(a.getBalance(tokenId, alice).returnVal() == 1000);
+         }
       }
       THEN("The token issuer may turn off recallability")
       {
-         auto set = a.set(tokenId, FlagType::unrecallable);
-         CHECK(set.succeeded());
+         CHECK(a.set(tokenId, FlagType::unrecallable).succeeded());
          auto unrecallable = a.getToken(tokenId).returnVal()->flags.get(FlagType::unrecallable);
          CHECK(true == unrecallable);
 
          AND_THEN("Alice may not recall Bob's tokens")
          {
-            auto recall = a.recall(tokenId, bob, 1000, "recall memo");
-            CHECK(recall.failed(tokenUnrecallable));
+            CHECK(a.recall(tokenId, bob, alice, 1000, memo).failed(tokenUnrecallable));
          }
       }
    }
@@ -243,12 +250,12 @@ SCENARIO("Interactions with the Issuer NFT")
          THEN("Alice may not recall Bob's tokens")
          {
             b.mint(tokenId, 1000, bob);
-            CHECK(a.recall(tokenId, bob, 1000, memo).failed(missingRequiredAuth));
+            CHECK(a.recall(tokenId, bob, alice, 1000, memo).failed(missingRequiredAuth));
          }
          THEN("Bob may recall Alice's tokens")
          {
             b.mint(tokenId, 1000, alice);
-            CHECK(b.recall(tokenId, alice, 1000, memo).succeeded());
+            CHECK(b.recall(tokenId, alice, bob, 1000, memo).succeeded());
          }
       }
       WHEN("Alice burns the issuer NFT")
@@ -266,7 +273,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, 1000, memo).failed(missingRequiredAuth));
+            CHECK(a.recall(tokenId, bob, alice, 1000, memo).failed(missingRequiredAuth));
          }
          THEN("Alice may not update the token inflation")
          {  //

@@ -32,8 +32,8 @@ namespace UserContract
 
       void set(TID tokenId, uint8_t flag);
 
-      void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
-      void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
+      //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
+      //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
 
       void burn(TID tokenId, Quantity amount);
       void autodebit(bool enable);
@@ -51,20 +51,72 @@ namespace UserContract
                  psio::const_view<psibase::String> memo);
       void recall(TID                               tokenId,
                   psibase::AccountNumber            from,
+                  psibase::AccountNumber            to,
                   Quantity                          amount,
                   psio::const_view<psibase::String> memo);
 
-      std::optional<TokenRecord> getToken(TID tokenId);
-      Quantity                   getBalance(TID tokenId, psibase::AccountNumber account);
+      // Read-only interface:
+      std::optional<TokenRecord> getToken(TID tokenId) const;
+      Quantity                   getBalance(TID tokenId, psibase::AccountNumber account) const;
       Quantity                   getSharedBal(TID                    tokenId,
                                               psibase::AccountNumber creditor,
-                                              psibase::AccountNumber debitor);
-      bool                       isAutodebit(psibase::AccountNumber account);
+                                              psibase::AccountNumber debitor) const;
+      bool                       isAutodebit(psibase::AccountNumber account) const;
 
      private:
       tables db{contract};
 
       bool _exists(TID tokenId);
+
+     public:
+      struct Events
+      {
+         using Account    = psibase::AccountNumber;
+         using StringView = psio::const_view<psibase::String>;
+
+         struct History
+         {
+            void created(TID tokenId, Account creator, Precision precision, Quantity max_supply) {}
+            void minted(TID tokenId, Account minter, Quantity amount, Account receiver) {}
+            void set(TID tokenId, Account setter, uint8_t flag) {}
+            void burned(TID tokenId, Account burner, Quantity amount) {}
+
+            void disabledAutodeb(Account account) {}
+            void enabledAutodeb(Account account) {}
+         };
+
+         struct Ui
+         {
+            void credited(TID        tokenId,
+                          Account    sender,
+                          Account    receiver,
+                          Quantity   amount,
+                          StringView memo)
+            {
+            }
+            void uncredited(TID        tokenId,
+                            Account    sender,
+                            Account    receiver,
+                            Quantity   amount,
+                            StringView memo)
+            {
+            }
+         };
+
+         struct Merkle
+         {
+            void transferred(TID        tokenId,
+                             Account    sender,
+                             Account    receiver,
+                             Quantity   amount,
+                             StringView memo)
+            {
+            }
+            void recalled(TID tokenId, Account from, Account to, Quantity amount, StringView memo)
+            {
+            }
+         };
+      };
    };
 
    // clang-format off
@@ -78,12 +130,28 @@ namespace UserContract
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, amount, memo),
       method(debit, tokenId, sender, amount, memo),
-      method(recall, tokenId, from, amount, memo),
+      method(recall, tokenId, from, to, amount, memo),
       method(getToken, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(isAutodebit)
     );
+   PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys, 
+      method(created, tokenId, creator, precision, max_supply),
+      method(minted, tokenId, minter, amount, receiver),
+      method(set, tokenId, setter, flag),
+      method(burned, tokenId, burner, amount),
+      method(disabledAutodeb, account),
+      method(enabledAutodeb, account)
+   );
+   PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
+      method(credited, tokenId, sender, receiver, amount, memo),
+      method(uncredited, tokenId, sender, receiver, amount, memo)
+   );
+   PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys, 
+      method(transferred, tokenId, sender, receiver, amount, memo),
+      method(recalled, tokenId, from, to, amount, memo)
+   );
    // clang-format on
 
 }  // namespace UserContract

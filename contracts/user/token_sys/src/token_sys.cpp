@@ -50,30 +50,34 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    // NOP
 }
 
-void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
+void TokenSys::recall(TID                tokenId,
+                      AccountNumber      from,
+                      AccountNumber      to,
+                      Quantity           amount,
+                      const_view<String> memo)
 {
    // NOP
 }
 
-std::optional<TokenRecord> TokenSys::getToken(TID tokenId)
+std::optional<TokenRecord> TokenSys::getToken(TID tokenId) const
 {
    // NOP
    return std::nullopt;
 }
 
-Quantity TokenSys::getBalance(TID tokenId, AccountNumber account)
+Quantity TokenSys::getBalance(TID tokenId, AccountNumber account) const
 {
    // NOP
    return 0;
 }
 
-Quantity TokenSys::getSharedBal(TID tokenId, AccountNumber creditor, AccountNumber debitor)
+Quantity TokenSys::getSharedBal(TID tokenId, AccountNumber creditor, AccountNumber debitor) const
 {
    // NOP
    return 0;
 }
 
-bool TokenSys::isAutodebit(AccountNumber account)
+bool TokenSys::isAutodebit(AccountNumber account) const
 {
    // NOP
    return false;
