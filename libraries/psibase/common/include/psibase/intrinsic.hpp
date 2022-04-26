@@ -2,11 +2,12 @@
 
 #include <psibase/AccountNumber.hpp>
 #include <psibase/block.hpp>
+#include <psibase/check.hpp>
 #include <psibase/db.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/to_key.hpp>
 
-#if defined(COMPILING_CONTRACT) || defined(COMPILING_TESTS)
+#ifdef COMPILING_WASM
 #define PSIBASE_INTRINSIC(x) [[clang::import_name(#x)]]
 #else
 #define PSIBASE_INTRINSIC(x)
@@ -33,13 +34,6 @@ namespace psibase
 
       // Write message to console. Message should be UTF8.
       PSIBASE_INTRINSIC(write_console) void write_console(const char* message, uint32_t len);
-
-      // Abort with message. Message should be UTF8.
-
-#ifndef PSIBASE_ABORT_MESSAGE
-      PSIBASE_INTRINSIC(abort_message)
-      [[noreturn]] void abort_message(const char* message, uint32_t len);
-#endif
 
       // Store the currently-executing action into result and return the result size.
       //
@@ -113,19 +107,6 @@ namespace psibase
 
    // Get key
    std::vector<char> get_key();
-
-   // Abort with message. Message should be UTF8.
-   [[noreturn]] inline void abort_message_str(std::string_view msg)
-   {
-      raw::abort_message(msg.data(), msg.size());
-   }
-
-   // Abort with message if !cond. Message should be UTF8.
-   inline void check(bool cond, std::string_view message)
-   {
-      if (!cond)
-         abort_message_str(message);
-   }
 
    // Get the currently-executing action.
    //
@@ -469,3 +450,5 @@ namespace psibase
    }
 
 }  // namespace psibase
+
+#undef PSIBASE_INTRINSIC

@@ -151,7 +151,7 @@ std::vector<char> psibase::read_whole_file(std::string_view filename)
                              result.resize(size);
                              return result.data();
                           }))
-      eosio::check(false, "read " + std::string(filename) + " failed");
+      check(false, "read " + std::string(filename) + " failed");
    return result;
 }
 
@@ -169,9 +169,9 @@ void psibase::expect(transaction_trace t, const std::string& expected, bool alwa
    if (bad)
    {
       if (expected.empty())
-         eosio::check(false, "transaction failed");
+         check(false, "transaction failed");
       else
-         eosio::check(false, "transaction was expected to fail with " + expected);
+         check(false, "transaction was expected to fail with " + expected);
    }
 }
 
@@ -179,17 +179,16 @@ psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& diges
 {
    static auto context = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
    auto*       k1      = std::get_if<0>(&key);
-   eosio::check(k1, "only k1 currently supported");
+   check(k1, "only k1 currently supported");
 
    secp256k1_ecdsa_signature sig;
-   eosio::check(
-       secp256k1_ecdsa_sign(context, &sig, reinterpret_cast<const unsigned char*>(digest.data()),
-                            k1->data(), nullptr, nullptr) == 1,
-       "sign failed");
+   check(secp256k1_ecdsa_sign(context, &sig, reinterpret_cast<const unsigned char*>(digest.data()),
+                              k1->data(), nullptr, nullptr) == 1,
+         "sign failed");
 
    EccSignature sigdata;
-   eosio::check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
-                "serialize signature failed");
+   check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
+         "serialize signature failed");
    return Signature{std::in_place_index<0>, sigdata};
 }
 
@@ -270,7 +269,7 @@ void psibase::test_chain::start_block(std::string_view time)
 {
    uint64_t value;
    auto     data = time.data();
-   eosio::check(string_to_utc_microseconds(value, data, data + time.size(), true), "bad time");
+   check(string_to_utc_microseconds(value, data, data + time.size(), true), "bad time");
    start_block(TimePointSec{.seconds = uint32_t(value / 1000)});
 }
 

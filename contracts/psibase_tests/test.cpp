@@ -3,7 +3,6 @@
 #include <psibase/DefaultTestChain.hpp>
 #include "test-cntr.hpp"
 
-using namespace eosio;
 using namespace psibase;
 
 TEST_CASE("recursion")

@@ -1,5 +1,5 @@
 #pragma once
-#include <psio/error.hpp>
+#include <psio/check.hpp>
 #include <psio/get_type_name.hpp>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
@@ -1064,7 +1064,7 @@ namespace psio
             pos(startptr)
       {
       }
-      check_stream(const check_stream&) = default;
+      check_stream(const check_stream&)            = default;
       check_stream& operator=(const check_stream&) = default;
 
       bool valid;    ///< no errors detected
@@ -1583,12 +1583,14 @@ namespace psio
       const_frac_proxy_view(const char* c) : buffer(c) {}
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[]( T&& k ) const {
-         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      auto operator[](T&& k) const
+      {
+         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
       }
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[]( T&& k ) {
-         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      auto operator[](T&& k)
+      {
+         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
       }
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
@@ -1637,12 +1639,14 @@ namespace psio
       frac_proxy_view(char* c) : buffer(c) {}
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[]( T&& k ) const {
-         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      auto operator[](T&& k) const
+      {
+         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
       }
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[]( T&& k ) {
-         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      auto operator[](T&& k)
+      {
+         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
       }
 
       /** This method is called by the reflection library to get the field */
@@ -2490,7 +2494,6 @@ namespace psio
          return false;
       }
 
-
       T unpack() const
       {
          T            tmp;
@@ -2547,4 +2550,3 @@ namespace psio
    }
 
 }  // namespace psio
-

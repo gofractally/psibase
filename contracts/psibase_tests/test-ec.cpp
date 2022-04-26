@@ -8,7 +8,6 @@
 
 #include "test-cntr.hpp"
 
-using namespace eosio;
 using namespace psibase;
 
 static auto priv_key1 =

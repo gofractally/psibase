@@ -8,7 +8,6 @@
 
 #include "nft_sys.hpp"
 
-using namespace eosio;
 using namespace UserContract;
 using namespace UserContract::Errors;
 using namespace psibase;
@@ -253,7 +252,10 @@ SCENARIO("Transferring NFTs")
                {
                   auto debit = b.debit(nft.id);
 
-                  THEN("Bob owns the NFT") { CHECK(bob.id == b.getNft(nft.id).returnVal()->owner); }
+                  THEN("Bob owns the NFT")
+                  {
+                     CHECK(bob.id == b.getNft(nft.id).returnVal()->owner);
+                  }
                   THEN("Alice and Charlie may not uncredit or debit the NFT")
                   {
                      CHECK(a.uncredit(nft.id).failed(uncreditRequiresCredit));

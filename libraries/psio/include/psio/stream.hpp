@@ -2,7 +2,7 @@
 
 #include <string.h>
 #include <algorithm>
-#include <psio/error.hpp>
+#include <psio/check.hpp>
 #include <string>
 #include <string_view>
 #include <system_error>

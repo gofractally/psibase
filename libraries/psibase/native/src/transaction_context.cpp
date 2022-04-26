@@ -2,7 +2,6 @@
 
 #include <psibase/action_context.hpp>
 #include <psibase/contract_entry.hpp>
-#include <psibase/from_bin.hpp>
 #include <psio/from_bin.hpp>
 
 namespace psibase
@@ -30,8 +29,7 @@ namespace psibase
 
       if (block_context.need_genesis_action)
       {
-         eosio::check(trx.trx.actions.size() == 1,
-                      "genesis transaction must have exactly 1 action");
+         check(trx.trx.actions.size() == 1, "genesis transaction must have exactly 1 action");
          exec_genesis_action(*this, trx.trx.actions[0]);
          block_context.need_genesis_action = false;
       }
@@ -60,10 +58,9 @@ namespace psibase
              {act.raw_data.data(), act.raw_data.size()});
          for (auto& contract : data.contracts)
          {
-            eosio::check(contract.contract.value, "account 0 is reserved");
-            eosio::check(
-                !db.kv_get<account_row>(account_row::kv_map, account_key(contract.contract)),
-                "account already created");
+            check(contract.contract.value, "account 0 is reserved");
+            check(!db.kv_get<account_row>(account_row::kv_map, account_key(contract.contract)),
+                  "account already created");
             account_row account{
                 .num           = contract.contract,
                 .auth_contract = contract.auth_contract,
@@ -104,8 +101,8 @@ namespace psibase
    // TODO: time limit
    static void exec_verify_proofs(transaction_context& self)
    {
-      eosio::check(self.trx.proofs.size() == self.trx.trx.claims.size(),
-                   "proofs and claims must have same size");
+      check(self.trx.proofs.size() == self.trx.trx.claims.size(),
+            "proofs and claims must have same size");
       // TODO: don't pack trx twice
       auto packed_trx = psio::convert_to_frac(self.trx.trx);
       auto id         = sha256(packed_trx.data(), packed_trx.size());
@@ -158,9 +155,8 @@ namespace psibase
       auto it = execution_contexts.find(contract);
       if (it != execution_contexts.end())
          return it->second;
-      eosio::check(
-          execution_contexts.size() < block_context.system_context.execution_memories.size(),
-          "exceeded maximum number of running contracts");
+      check(execution_contexts.size() < block_context.system_context.execution_memories.size(),
+            "exceeded maximum number of running contracts");
       auto& memory = block_context.system_context.execution_memories[execution_contexts.size()];
       return execution_contexts.insert({contract, execution_context{*this, memory, contract}})
           .first->second;

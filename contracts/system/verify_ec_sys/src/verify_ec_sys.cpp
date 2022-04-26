@@ -1,7 +1,8 @@
 #include <secp256k1_preallocated.h>
 #include <contracts/system/verify_ec_sys.hpp>
+#include <psibase/check.hpp>
 #include <psibase/contract_entry.hpp>
-#include <psibase/from_bin.hpp>
+#include <psio/from_bin.hpp>
 
 using namespace psibase;
 
@@ -30,22 +31,22 @@ extern "C" [[clang::export_name("verify")]] void verify()
 
    auto* k1_pub_key = std::get_if<0>(&pub_key);
    auto* k1_sig     = std::get_if<0>(&sig);
-   eosio::check(k1_pub_key && k1_sig, "only k1 currently supported");
+   check(k1_pub_key && k1_sig, "only k1 currently supported");
 
    secp256k1_pubkey parsed_pub_key;
-   eosio::check(secp256k1_ec_pubkey_parse(context, &parsed_pub_key, k1_pub_key->data(),
-                                          k1_pub_key->size()) == 1,
-                "pubkey parse failed");
+   check(secp256k1_ec_pubkey_parse(context, &parsed_pub_key, k1_pub_key->data(),
+                                   k1_pub_key->size()) == 1,
+         "pubkey parse failed");
 
    secp256k1_ecdsa_signature parsed_sig;
-   eosio::check(secp256k1_ecdsa_signature_parse_compact(context, &parsed_sig, k1_sig->data()) == 1,
-                "signature parse failed");
+   check(secp256k1_ecdsa_signature_parse_compact(context, &parsed_sig, k1_sig->data()) == 1,
+         "signature parse failed");
 
    // secp256k1_ecdsa_verify requires normalized, but we don't
    secp256k1_ecdsa_signature normalized;
    secp256k1_ecdsa_signature_normalize(context, &normalized, &parsed_sig);
 
-   eosio::check(
+   check(
        secp256k1_ecdsa_verify(context, &normalized,
                               reinterpret_cast<const unsigned char*>(data.transaction_hash.data()),
                               &parsed_pub_key) == 1,

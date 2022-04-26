@@ -42,14 +42,14 @@ namespace psibase
       //        check_auth
       //        action 1
       //        ...
-      eosio::check(!t.action_traces.empty(), "transaction_trace has no actions");
+      check(!t.action_traces.empty(), "transaction_trace has no actions");
       auto&                            root = t.action_traces.back();
       std::vector<const action_trace*> top_traces;
       for (auto& inner : root.inner_traces)
          if (std::holds_alternative<action_trace>(inner.inner))
             top_traces.push_back(&std::get<action_trace>(inner.inner));
-      eosio::check(!(top_traces.size() & 1), "unexpected number of action traces");
-      eosio::check(2 * num + 1 < top_traces.size(), "trace not found");
+      check(!(top_traces.size() & 1), "unexpected number of action traces");
+      check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];
    }
 
@@ -106,7 +106,7 @@ namespace psibase
          else
          {
             show(true, _t);
-            eosio::check(false, "Action aborted, no return value");
+            check(false, "Action aborted, no return value");
             return ReturnType();  // Silence compiler warning
          }
       }

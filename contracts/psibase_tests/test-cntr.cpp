@@ -2,8 +2,8 @@
 
 #include <stdio.h>
 #include <psibase/block.hpp>
-#include <psibase/from_bin.hpp>
 #include <psibase/intrinsic.hpp>
+#include <psio/from_bin.hpp>
 #include <psio/to_json.hpp>
 
 using namespace psibase;

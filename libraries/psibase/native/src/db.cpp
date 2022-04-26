@@ -106,7 +106,7 @@ namespace psibase
 
       mdbx::txn_managed& get_trx(kv_map map)
       {
-         eosio::check(transactions_available(), "no active database transactions");
+         check(transactions_available(), "no active database transactions");
          if (map == kv_map::subjective)
             return *subjective_transaction;
          else if (map == kv_map::block_log)
@@ -131,7 +131,7 @@ namespace psibase
 
    database::session database::start_read()
    {
-      eosio::check(impl->transactions_ok(), "database transactions mismatch");
+      check(impl->transactions_ok(), "database transactions mismatch");
       impl->transactions.push_back(impl->shared.impl->state_env->start_read());
       impl->write_only_transactions.push_back(impl->shared.impl->write_only_env->start_read());
       if (!impl->subjective_transaction)
@@ -143,7 +143,7 @@ namespace psibase
 
    database::session database::start_write()
    {
-      eosio::check(impl->transactions_ok(), "database transactions mismatch");
+      check(impl->transactions_ok(), "database transactions mismatch");
       if (impl->transactions.empty())
       {
          impl->transactions.push_back(impl->shared.impl->state_env->start_write());
@@ -164,7 +164,7 @@ namespace psibase
    //       transactions.size() falls to 0.
    void database::commit(database::session&)
    {
-      eosio::check(impl->transactions_available(), "no active database transactions during commit");
+      check(impl->transactions_available(), "no active database transactions during commit");
       if (impl->transactions.size() == 1)
       {
          // Commit first to prevent consensus state from getting ahead of block

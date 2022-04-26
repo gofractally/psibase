@@ -9,7 +9,7 @@ target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/fpconv.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/powers.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/compress.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/error.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/check.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/reflect.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/schema.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/translator.hpp

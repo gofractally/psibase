@@ -1,7 +1,6 @@
 #pragma once
 #include <compare>
-
-#include <eosio/check.hpp>
+#include <psibase/check.hpp>
 #include <psio/reflect.hpp>
 
 namespace psibase
@@ -31,7 +30,7 @@ namespace psibase
       const char* p = s.data();
       if (!string_to_utc_seconds(obj.seconds, p, s.data() + s.size(), true, true))
       {
-         eosio::check(false, "Expected TimePointSec");
+         check(false, "Expected TimePointSec");
       }
    }
 

@@ -9,9 +9,9 @@
 #include <psibase/contract_entry.hpp>
 #include <psibase/http.hpp>
 #include <psibase/transaction_context.hpp>
+#include <psio/finally.hpp>
 #include <psio/to_json.hpp>
 
-#include <eosio/finally.hpp>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -23,7 +23,7 @@ std::vector<char> read_whole_file(const char* filename)
    FILE* f = fopen(filename, "r");
    if (!f)
       throw std::runtime_error("error reading file " + std::string(filename));
-   eosio::finally fin{[&] { fclose(f); }};
+   psio::finally fin{[&] { fclose(f); }};
 
    if (fseek(f, 0, SEEK_END))
       throw std::runtime_error("error reading file " + std::string(filename));
@@ -77,7 +77,7 @@ void bootstrap_chain(system_context& system)
 
    block_context bc{system, true, true};
    bc.start();
-   eosio::check(bc.is_genesis_block, "can not bootstrap non-empty chain");
+   check(bc.is_genesis_block, "can not bootstrap non-empty chain");
    push(bc, AccountNumber(), AccountNumber(),
         genesis_action_data{
             .contracts =

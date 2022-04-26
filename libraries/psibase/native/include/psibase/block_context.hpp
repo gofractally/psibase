@@ -27,7 +27,7 @@ namespace psibase
       block_context(psibase::system_context& system_context, bool is_producing, bool enable_undo);
       block_context(psibase::system_context& system_context, read_only);
 
-      void check_active() { eosio::check(active, "block is not active"); }
+      void check_active() { check(active, "block is not active"); }
 
       void start(std::optional<TimePointSec> time = {});
       void start(block&& src);

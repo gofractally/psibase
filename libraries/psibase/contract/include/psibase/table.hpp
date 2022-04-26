@@ -337,7 +337,7 @@ namespace psibase
    {
       if (raw::kv_get(map, key, key_len) != -1)
       {
-         eosio::check(false, "key already exists");
+         check(false, "key already exists");
       }
       raw::kv_put(map, key, key_len, value, value_len);
    }

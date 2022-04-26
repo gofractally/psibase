@@ -3,10 +3,6 @@
 #include <utility>
 #include <vector>
 
-// Not sure which of these I need //////
-#include <secp256k1.h>
-////////////////////////////////////////
-
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/auth_ec_sys.hpp>
 #include <contracts/system/auth_fake_sys.hpp>
@@ -84,7 +80,7 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
             }),
         }}));
 
-   eosio::check(psibase::show(show, trace) == "", "Failed to install genesis contracts");
+   check(psibase::show(show, trace) == "", "Failed to install genesis contracts");
 }
 
 void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
@@ -102,7 +98,7 @@ void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
            system_contract::verify_ec_sys::contract,
        })}));
 
-   eosio::check(psibase::show(show, trace) == "", "Failed to create system contract accounts");
+   check(psibase::show(show, trace) == "", "Failed to create system contract accounts");
 }
 
 AccountNumber DefaultTestChain::add_account(
@@ -116,7 +112,7 @@ AccountNumber DefaultTestChain::add_account(
    auto trace = push_transaction(  //
        make_transaction({asys.newAccount(acc, auth_contract, false)}));
 
-   eosio::check(psibase::show(show, trace) == "", "Failed to add account");
+   check(psibase::show(show, trace) == "", "Failed to add account");
 
    return acc;
 }
@@ -145,7 +141,7 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                    }}),
            }}));
 
-   eosio::check(psibase::show(show, trace) == "", "Failed to add ec account");
+   check(psibase::show(show, trace) == "", "Failed to add ec account");
    auto& at = get_top_action(trace, 0);
    return psio::convert_from_frac<AccountNumber>(at.raw_retval);
 }  // add_ec_account()
@@ -168,7 +164,7 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
    auto trace =
        push_transaction(make_transaction({{tsys.setCode(acc, 0, 0, read_whole_file(filename))}}));
 
-   eosio::check(psibase::show(show, trace) == "", "Failed to create contract");
+   check(psibase::show(show, trace) == "", "Failed to create contract");
 
    return acc;
 }  // add_contract()

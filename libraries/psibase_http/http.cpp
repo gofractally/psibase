@@ -20,7 +20,7 @@
 #include <boost/make_unique.hpp>
 #include <boost/optional.hpp>
 
-#include <eosio/finally.hpp>
+#include <psio/finally.hpp>
 #include <psio/to_json.hpp>
 
 #include <algorithm>
@@ -276,9 +276,9 @@ namespace psibase::http
             data.body      = std::move(req.body());
 
             // TODO: time limit
-            auto           system = server.shared_state->get_system_context();
-            eosio::finally f{[&]() { server.shared_state->add_system_context(std::move(system)); }};
-            block_context  bc{*system, read_only{}};
+            auto          system = server.shared_state->get_system_context();
+            psio::finally f{[&]() { server.shared_state->add_system_context(std::move(system)); }};
+            block_context bc{*system, read_only{}};
             bc.start();
             if (bc.need_genesis_action)
                return send(error(bhttp::status::internal_server_error,
@@ -747,13 +747,12 @@ namespace psibase::http
 
             //looks like a service is already running on that socket, don't touch it... fail out
             if (test_ec == boost::system::errc::success)
-               eosio::check(false, "wasmql http unix socket is in use");
+               check(false, "wasmql http unix socket is in use");
             //socket exists but no one home, go ahead and remove it and continue on
             else if (test_ec == boost::system::errc::connection_refused)
                ::unlink(server.http_config->unix_path.c_str());
             else if (test_ec != boost::system::errc::no_such_file_or_directory)
-               eosio::check(false,
-                            "unexpected failure when probing existing wasmql http unix socket: " +
+               check(false, "unexpected failure when probing existing wasmql http unix socket: " +
                                 test_ec.message());
 
             start_listen(unix_acceptor, unixs::endpoint(server.http_config->unix_path));
@@ -772,7 +771,7 @@ namespace psibase::http
             if (!ec)
                return;
             // TODO: elog("${w}: ${m}", ("w", what)("m", ec.message()));
-            eosio::check(false, "unable to open listen socket");
+            check(false, "unable to open listen socket");
          };
 
          // Open the acceptor
@@ -862,7 +861,7 @@ namespace psibase::http
    std::shared_ptr<server> server::create(const std::shared_ptr<const http_config>& http_config,
                                           const std::shared_ptr<shared_state>&      shared_state)
    {
-      eosio::check(http_config->num_threads > 0, "too few threads");
+      check(http_config->num_threads > 0, "too few threads");
       auto server = std::make_shared<server_impl>(http_config, shared_state);
       if (server->start())
          return server;

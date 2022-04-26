@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <functional>
 #include <optional>
-#include <psio/error.hpp>
+#include <psio/check.hpp>
 #include <psio/reflect.hpp>
 #include <system_error>
 #include <tuple>

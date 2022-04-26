@@ -10,7 +10,7 @@ namespace psibase
          session{db.start_write()},
          is_producing{is_producing}
    {
-      eosio::check(enable_undo, "TODO: revisit enable_undo option");
+      check(enable_undo, "TODO: revisit enable_undo option");
    }
 
    block_context::block_context(psibase::system_context& system_context, read_only)
@@ -25,7 +25,7 @@ namespace psibase
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold
    void block_context::start(std::optional<TimePointSec> time)
    {
-      eosio::check(!started, "block has already been started");
+      check(!started, "block has already been started");
       auto status = db.kv_get<status_row>(status_row::kv_map, status_key());
       if (!status)
       {
@@ -48,7 +48,7 @@ namespace psibase
          current.header.num      = status->head->header.num + 1;
          if (time)
          {
-            eosio::check(time->seconds > status->head->header.time.seconds, "block is in the past");
+            check(time->seconds > status->head->header.time.seconds, "block is in the past");
             current.header.time = *time;
          }
          else
@@ -73,9 +73,9 @@ namespace psibase
    {
       start(src.header.time);
       active = false;
-      eosio::check(src.header.previous == current.header.previous,
-                   "block previous does not match expected");
-      eosio::check(src.header.num == current.header.num, "block num does not match expected");
+      check(src.header.previous == current.header.previous,
+            "block previous does not match expected");
+      check(src.header.num == current.header.num, "block num does not match expected");
       current = std::move(src);
       active  = true;
    }
@@ -83,11 +83,11 @@ namespace psibase
    void block_context::commit()
    {
       check_active();
-      eosio::check(!need_genesis_action, "missing genesis action in block");
+      check(!need_genesis_action, "missing genesis action in block");
       active = false;
 
       auto status = db.kv_get<status_row>(status_row::kv_map, status_key());
-      eosio::check(status.has_value(), "missing status record");
+      check(status.has_value(), "missing status record");
       status->head = current;
       if (is_genesis_block)
          status->chain_id = status->head->id;
@@ -129,7 +129,7 @@ namespace psibase
       try
       {
          check_active();
-         eosio::check(enable_undo || commit, "neither enable_undo or commit is set");
+         check(enable_undo || commit, "neither enable_undo or commit is set");
 
          // if !enable_undo then block_context becomes unusable if transaction
          // fails. This will cascade to a busy lock (database corruption) if
@@ -143,8 +143,8 @@ namespace psibase
          if (commit)
          {
             // TODO: limit billed time in block
-            eosio::check(!(trx.trx.tapos.flags & Tapos::do_not_broadcast),
-                         "cannot commit a do_not_broadcast transaction");
+            check(!(trx.trx.tapos.flags & Tapos::do_not_broadcast),
+                  "cannot commit a do_not_broadcast transaction");
             t.session.commit();
             active = true;
          }
