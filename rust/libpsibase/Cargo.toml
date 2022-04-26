@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+seahash = "2.0.0"
 custom_error = "1.9"
 fracpack = { version = "0.1.0", path = "../fracpack" }
 fasthash = "0.4"

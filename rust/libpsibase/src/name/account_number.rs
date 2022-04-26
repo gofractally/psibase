@@ -1,8 +1,24 @@
-use super::account_to_number_converter::AccountToNumberConverter;
 use super::constants::*;
-use super::number_to_account_converter::NumberToAccountConverter;
+use super::{
+    account_to_number_converter::AccountToNumberConverter,
+    number_to_string_converter::NumberToStringConverter,
+};
 use std::{num::ParseIntError, str::FromStr};
 
+/// An account number.
+///
+/// The `AccountNumber` is used to reference accounts in psibase. This type
+/// is a convenient handler to allow consumers to parse and convert their readable
+/// names.
+///
+/// # Examples
+///
+/// You can create an `AccountNumber` from [a literal string][`&str`] with [`AccountNumber::from`]:
+///
+/// ```
+/// use libpsibase::AccountNumber;
+/// let hello = AccountNumber::from("hello");
+/// ```
 #[derive(Debug, Default, PartialEq)]
 pub struct AccountNumber {
     pub value: u64,
@@ -57,13 +73,21 @@ impl FromStr for AccountNumber {
     }
 }
 
+impl From<&str> for AccountNumber {
+    fn from(s: &str) -> Self {
+        AccountNumber::from_str(s).unwrap()
+    }
+}
+
 impl std::fmt::Display for AccountNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.value == 0 {
             return f.write_str(""); // TODO: review impl empty string
         }
 
-        f.write_str(NumberToAccountConverter::convert(self.value).as_str())
+        f.write_str(
+            NumberToStringConverter::convert(self.value, &MODEL_CF, &SYMBOL_TO_CHAR).as_str(),
+        )
     }
 }
 

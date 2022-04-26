@@ -2,33 +2,40 @@ use super::constants::*;
 use super::frequency::NameFrequency;
 
 #[derive(Debug)]
-pub struct NumberToAccountConverter {
+pub struct NumberToStringConverter {
     current_byte: i32,
     last_mask: u8,
     not_eof: i32,
     input: u64,
 }
 
-impl NumberToAccountConverter {
-    pub fn convert(num: u64) -> String {
-        let extractor = NumberToAccountConverter {
+impl NumberToStringConverter {
+    pub fn convert<const CHARS: usize, const WIDTH: usize>(
+        num: u64,
+        model_cf: &[[u16; CHARS]; WIDTH],
+        symbol_to_char: &[u8],
+    ) -> String {
+        let converter = NumberToStringConverter {
             current_byte: 0,
             last_mask: 1,
             not_eof: 64 + 16,
             input: num,
         };
-        extractor.to_string()
+        converter.to_string(model_cf, symbol_to_char)
     }
 
-    fn to_string(mut self) -> String {
-        let mut out = String::new();
-        out.reserve(15);
+    fn to_string<const CHARS: usize, const WIDTH: usize>(
+        mut self,
+        model_cf: &[[u16; CHARS]; WIDTH],
+        symbol_to_char: &[u8],
+    ) -> String {
+        let mut out = String::with_capacity(15);
 
         let mut high: u32 = MAX_CODE;
         let mut low: u32 = 0;
         let mut value: u32 = 0;
 
-        let mut name_model = NameFrequency::new(&MODEL_CF);
+        let mut name_model = NameFrequency::new(model_cf);
 
         for _ in 0..CODE_VALUE_BITS {
             value <<= 1;
@@ -50,7 +57,7 @@ impl NumberToAccountConverter {
                 break;
             }
 
-            out.push(SYMBOL_TO_CHAR[c as usize] as char);
+            out.push(symbol_to_char[c as usize] as char);
 
             if p.count == 0 {
                 return String::from("RUNTIME LOGIC ERROR");

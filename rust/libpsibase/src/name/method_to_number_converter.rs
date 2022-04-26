@@ -1,6 +1,5 @@
 use super::constants::*;
 use super::frequency::NameFrequency;
-use fasthash::{city::Hash64, FastHash};
 
 #[derive(Debug)]
 pub struct MethodToNumberConverter {
@@ -8,8 +7,7 @@ pub struct MethodToNumberConverter {
     next_byte: u8,
     mask: u8,
     output: u64,
-    seed: u64,
-    bitc: i32,
+    bitc: u8,
 }
 
 impl MethodToNumberConverter {
@@ -19,7 +17,6 @@ impl MethodToNumberConverter {
             next_byte: 0,
             mask: 0x80,
             output: 0,
-            seed: 0xbadd00d00b00b569,
             bitc: 0,
         };
         converter.to_u64(s)
@@ -101,16 +98,8 @@ impl MethodToNumberConverter {
         }
 
         if self.output == 0 {
-            self.output = Hash64::hash_with_seed(method, self.seed);
-            println!(
-                "hashing stuf!! >> {}, seed: {}, {:?}",
-                self.output,
-                self.seed,
-                method.as_bytes()
-            );
-
-            self.output |= ((0x01 as u64) << ((64 - 8) as u64));
-            println!("final output >> {}", self.output,);
+            self.output = seahash::hash(method.as_bytes());
+            self.output |= (0x01 as u64) << ((64 - 8) as u64);
         }
 
         self.output
@@ -128,7 +117,6 @@ impl MethodToNumberConverter {
 
     fn put_bit(&mut self, bit: bool) {
         if bit && self.bitc == 63 {
-            self.seed = self.output;
             self.output = 0;
             self.bit = 64;
         } else {
