@@ -39,7 +39,7 @@ impl AccountNumber {
 
         let mut char_ascii = first_char as usize;
         loop {
-            if char_ascii >= CHAR_TO_SYMBOL.len() || CHAR_TO_SYMBOL[char_ascii] == 0 {
+            if CHAR_TO_SYMBOL[char_ascii] == 0 {
                 return false;
             }
 

@@ -28,10 +28,18 @@ impl MethodNumber {
         MethodNumber { value }
     }
 
+    fn has_valid_chars(s: &str) -> bool {
+        for c in s.bytes() {
+            if CHAR_TO_SYMBOL_METHOD[c as usize] == 0 {
+                return false;
+            }
+        }
+
+        true
+    }
+
     fn is_hash(&self) -> bool {
-        let x = self.value & ((0x01 as u64) << (64 - 8)) > 0;
-        println!("is_hash_method h({}) -> {}", self.value, x);
-        x
+        self.value & ((0x01 as u64) << (64 - 8)) > 0
     }
 
     pub fn to_hash(&self) -> String {
@@ -84,8 +92,13 @@ impl FromStr for MethodNumber {
             return Ok(MethodNumber::default());
         }
 
-        let value =
-            MethodNumber::parse_hash(s).unwrap_or_else(|| MethodToNumberConverter::convert(s));
+        let value = MethodNumber::parse_hash(s).unwrap_or_else(|| {
+            if MethodNumber::has_valid_chars(s) {
+                MethodToNumberConverter::convert(s)
+            } else {
+                0
+            }
+        });
         Ok(MethodNumber { value })
     }
 }

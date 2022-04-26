@@ -102,6 +102,6 @@ TEST_CASE("convert-method-names-back-to-string")
    REQUIRE(psibase::MethodNumber(311625498215).str() == "spiderman");
    REQUIRE(psibase::MethodNumber(56488722015273161).str() == "brucewayne");
    REQUIRE(psibase::MethodNumber(50913722085663764).str() == "anthonystark");
-   // REQUIRE(psibase::MethodNumber(13346021867974402139).str() == "natasharomanoff"); // TODO: str is actually equals to `#hneunophpilcroch`
+   REQUIRE(psibase::MethodNumber(13346021867974402139).str() == "#hneunophpilcroch");
    REQUIRE(psibase::MethodNumber(0).str() == "");
 }
