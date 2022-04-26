@@ -22,6 +22,7 @@ namespace psibase
    }  // namespace raw
 
    // Abort with message. Message should be UTF8.
+   // TODO: rename back to abort_message after fixing build issues
    [[noreturn]] inline void abort_message_str(std::string_view message)
    {
 #ifdef COMPILING_WASM

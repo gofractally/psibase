@@ -144,6 +144,25 @@ fn signed_transaction_json(trx: &str) -> Result<String, anyhow::Error> {
     ))
 }
 
+fn reg_rpc(contract: &str, rpc_contract: &str) -> Result<String, anyhow::Error> {
+    action_json(
+        contract,
+        "proxy-sys",
+        "registerServer",
+        &to_hex(
+            bridge::ffi::pack_register_server(&format!(
+                r#"{{
+                    "contract": {},
+                    "rpc_contract": {}
+                }}"#,
+                serde_json::to_string(contract)?,
+                serde_json::to_string(rpc_contract)?,
+            ))
+            .as_slice(),
+        ),
+    )
+}
+
 async fn push_transaction_impl(
     args: &Args,
     client: reqwest::Client,
@@ -210,7 +229,7 @@ async fn install(
         "setCode",
         &set_code(account, &to_hex(&wasm))?,
     )?);
-    // TODO register_proxy
+    actions.push(reg_rpc(account, account)?);
     let signed_json = signed_transaction_json(&transaction_json(
         &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
         &actions,

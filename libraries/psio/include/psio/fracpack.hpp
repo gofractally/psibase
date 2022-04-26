@@ -2135,6 +2135,8 @@ namespace psio
          fracunpack<T>(tmp, in);
          return tmp;
       }
+
+      T get() const { return (T)(*this); }
    };
 
    template <typename T>

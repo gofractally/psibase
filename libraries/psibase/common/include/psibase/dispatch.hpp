@@ -38,7 +38,9 @@ namespace psibase
       auto act = get_current_action_view();  /// action view...
 
       bool called = psio::reflect<Contract>::get_by_name(
-          act->method()->value(), [&](auto meta, auto member_func) {
+          act->method()->value(),
+          [&](auto meta, auto member_func)
+          {
              using result_type = decltype(psio::result_of(member_func));
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
@@ -50,19 +52,23 @@ namespace psibase
                  "invalid argument encoding");
              psio::const_view<param_tuple> param_view(param_data);
 
-             param_view->call([&](auto... args) {
-                if constexpr (std::is_same_v<void, result_type>)
-                {
-                   (contract.*member_func)(std::forward<decltype(args)>(args)...);
-                }
-                else
-                {
-                   call_method<result_type, Contract, decltype(member_func), decltype(args)...>(
-                       contract, member_func, std::forward<decltype(args)>(args)...);
-                }
-             });  // param_view::call
-          });     // reflect::get
-      check(called, "unknown contract action");
+             param_view->call(
+                 [&](auto... args)
+                 {
+                    if constexpr (std::is_same_v<void, result_type>)
+                    {
+                       (contract.*member_func)(std::forward<decltype(args)>(args)...);
+                    }
+                    else
+                    {
+                       call_method<result_type, Contract, decltype(member_func), decltype(args)...>(
+                           contract, member_func, std::forward<decltype(args)>(args)...);
+                    }
+                 });  // param_view::call
+          });         // reflect::get
+      if (!called)
+         abort_message_str("unknown contract action: " + act->method()->get().str());
+      // psio::member_proxy
    }  // dispatch
 
 }  // namespace psibase
@@ -74,5 +80,8 @@ namespace psibase
       psibase::dispatch<CONTRACT>(sender, receiver);                                      \
    }                                                                                      \
    extern "C" void __wasm_call_ctors();                                                   \
-   extern "C" void start(psibase::AccountNumber this_contract) { __wasm_call_ctors(); }
+   extern "C" void start(psibase::AccountNumber this_contract)                            \
+   {                                                                                      \
+      __wasm_call_ctors();                                                                \
+   }
 \

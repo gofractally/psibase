@@ -156,25 +156,6 @@ fn boot_trx() -> Result<String, anyhow::Error> {
     )?)
 } // boot_trx
 
-fn reg_rpc(contract: &str, rpc_contract: &str) -> Result<String, anyhow::Error> {
-    action_json(
-        contract,
-        "proxy-sys",
-        "registerServer",
-        &to_hex(
-            bridge::ffi::pack_register_server(&format!(
-                r#"{{
-                    "contract": {},
-                    "rpc_contract": {}
-                }}"#,
-                serde_json::to_string(contract)?,
-                serde_json::to_string(rpc_contract)?,
-            ))
-            .as_slice(),
-        ),
-    )
-}
-
 fn upload_sys(
     contract: &str,
     path: &str,

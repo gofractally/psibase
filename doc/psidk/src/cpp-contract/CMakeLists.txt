@@ -10,3 +10,4 @@ function(build_example name)
 endfunction()
 
 build_example(basic)
+build_example(minimal-ui)
