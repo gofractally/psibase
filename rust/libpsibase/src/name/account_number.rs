@@ -32,6 +32,10 @@ impl AccountNumber {
     pub fn has_valid_format(s: &str) -> bool {
         let mut chars = s.bytes();
 
+        if chars.len() == 0 {
+            return true;
+        }
+
         let first_char = chars.next().unwrap();
         if first_char <= b'9' {
             return false;

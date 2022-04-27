@@ -11,16 +11,16 @@ pub struct AccountToNumberConverter {
 
 impl AccountToNumberConverter {
     pub fn convert(s: &str) -> u64 {
-        let converter = AccountToNumberConverter {
+        AccountToNumberConverter {
             bit: 0,
             next_byte: 0,
             mask: 0x80,
             output: 0,
-        };
-        converter.to_u64(s)
+        }
+        .execute_conversion(s)
     }
 
-    fn to_u64(mut self, account: &str) -> u64 {
+    fn execute_conversion(&mut self, account: &str) -> u64 {
         let mut high: u32 = MAX_CODE;
         let mut low: u32 = 0;
         let mut pending_bits = 0;
@@ -45,7 +45,7 @@ impl AccountToNumberConverter {
 
             let range = high - low + 1;
             high = low + (range * p.high / p.count) - 1;
-            low = low + (range * p.low / p.count);
+            low += range * p.low / p.count;
 
             loop {
                 if self.bit >= 64 {

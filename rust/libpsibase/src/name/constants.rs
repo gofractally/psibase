@@ -1,8 +1,8 @@
 pub const CODE_VALUE_BITS: u32 = ((u32::BITS + 3) / 2) as u32;
 
-pub const MAX_CODE: u32 = ((1 as u32) << CODE_VALUE_BITS) - 1;
+pub const MAX_CODE: u32 = (1_u32 << CODE_VALUE_BITS) - 1;
 
-pub const ONE_FOURTH: u32 = (1 as u32) << (CODE_VALUE_BITS - 2);
+pub const ONE_FOURTH: u32 = 1_u32 << (CODE_VALUE_BITS - 2);
 
 pub const ONE_HALF: u32 = 2 * ONE_FOURTH;
 

@@ -15,17 +15,17 @@ impl NumberToStringConverter {
         model_cf: &[[u16; CHARS]; WIDTH],
         symbol_to_char: &[u8],
     ) -> String {
-        let converter = NumberToStringConverter {
+        NumberToStringConverter {
             current_byte: 0,
             last_mask: 1,
             not_eof: 64 + 16,
             input: num,
-        };
-        converter.to_string(model_cf, symbol_to_char)
+        }
+        .execute_conversion(model_cf, symbol_to_char)
     }
 
-    fn to_string<const CHARS: usize, const WIDTH: usize>(
-        mut self,
+    fn execute_conversion<const CHARS: usize, const WIDTH: usize>(
+        &mut self,
         model_cf: &[[u16; CHARS]; WIDTH],
         symbol_to_char: &[u8],
     ) -> String {
@@ -64,7 +64,7 @@ impl NumberToStringConverter {
             }
 
             high = low + (range * p.high) / p.count - 1;
-            low = low + (range * p.low) / p.count;
+            low += (range * p.low) / p.count;
 
             while self.not_eof > 0 {
                 if high < ONE_HALF {

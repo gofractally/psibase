@@ -39,7 +39,7 @@ impl MethodNumber {
     }
 
     fn is_hash(&self) -> bool {
-        self.value & ((0x01 as u64) << (64 - 8)) > 0
+        self.value & (0x01_u64 << (64 - 8)) > 0
     }
 
     pub fn to_hash(&self) -> String {
@@ -67,14 +67,14 @@ impl MethodNumber {
 
         let mut i = 1;
 
-        while let Some(c) = chars.next() {
+        for c in chars {
             let mut sym = (CHAR_TO_SYMBOL_METHOD[c as usize] - 1) as u64;
             sym <<= 4 * (i - 1);
             output |= sym;
             i += 1;
         }
 
-        return Some(output);
+        Some(output)
     }
 }
 

@@ -12,17 +12,17 @@ pub struct MethodToNumberConverter {
 
 impl MethodToNumberConverter {
     pub fn convert(s: &str) -> u64 {
-        let converter = MethodToNumberConverter {
+        MethodToNumberConverter {
             bit: 0,
             next_byte: 0,
             mask: 0x80,
             output: 0,
             bitc: 0,
-        };
-        converter.to_u64(s)
+        }
+        .execute_conversion(s)
     }
 
-    fn to_u64(mut self, method: &str) -> u64 {
+    fn execute_conversion(&mut self, method: &str) -> u64 {
         let mut high: u32 = MAX_CODE;
         let mut low: u32 = 0;
         let mut pending_bits = 0;
@@ -55,7 +55,7 @@ impl MethodToNumberConverter {
 
             let range = high - low + 1;
             high = low + (range * p.high / p.count) - 1;
-            low = low + (range * p.low / p.count);
+            low += range * p.low / p.count;
 
             loop {
                 if self.bit >= 64 {
@@ -99,7 +99,7 @@ impl MethodToNumberConverter {
 
         if self.output == 0 {
             self.output = seahash::hash(method.as_bytes());
-            self.output |= (0x01 as u64) << ((64 - 8) as u64);
+            self.output |= 0x01_u64 << ((64 - 8) as u64);
         }
 
         self.output
