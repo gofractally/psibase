@@ -1,5 +1,6 @@
 #pragma once
 
+#include <compare>
 #include "from_bin.hpp"
 #include "from_json.hpp"
 #include "to_bin.hpp"
