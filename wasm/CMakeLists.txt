@@ -53,8 +53,9 @@ function(copy_headers from to)
     file(GLOB foo
         ${CMAKE_CURRENT_SOURCE_DIR}/${from}/*.h
         ${CMAKE_CURRENT_SOURCE_DIR}/${from}/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/${from}/*.hxx
     )
-    file(COPY ${foo} DESTINATION ${ROOT_BINARY_DIR}/clsdk/${to})
+    file(COPY ${foo} DESTINATION ${ROOT_BINARY_DIR}/psidk/${to})
 endfunction()
 
 macro(conditional_add)
@@ -66,31 +67,31 @@ macro(conditional_add)
     endif()
 endmacro()
 
-file(COPY ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${ROOT_BINARY_DIR}/clsdk/licenses)
+file(COPY ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${ROOT_BINARY_DIR}/psidk/licenses)
 
 add_library(wasm-base INTERFACE)
-target_compile_options(wasm-base INTERFACE -fno-exceptions -D__eosio_cdt__ -mthread-model single -O3)
+target_compile_options(wasm-base INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
 target_link_options(wasm-base INTERFACE -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 add_library(wasm-base-debug INTERFACE)
-target_compile_options(wasm-base-debug INTERFACE -fno-exceptions -D__eosio_cdt__ -mthread-model single -ggdb)
+target_compile_options(wasm-base-debug INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
 target_link_options(wasm-base-debug INTERFACE -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
-# -clsdk variant of build targets need paths converted
-function(add_clsdk_base_lib suffix)
-    add_library(wasm-base${suffix}-clsdk INTERFACE)
-    target_link_libraries(wasm-base${suffix}-clsdk INTERFACE wasm-base${suffix})
-    target_compile_options(wasm-base${suffix}-clsdk INTERFACE
-            -ffile-prefix-map=${ROOT_BINARY_DIR}/wasm/boost/=clsdk:/boost/
-            -ffile-prefix-map=${ROOT_BINARY_DIR}/wasm/catch2/=clsdk:/catch2/
-            -ffile-prefix-map=${ROOT_SOURCE_DIR}/contracts/=clsdk:/contracts/
-            -ffile-prefix-map=${ROOT_SOURCE_DIR}/external/=clsdk:/
-            -ffile-prefix-map=${ROOT_SOURCE_DIR}/libraries/=clsdk:/
-            -ffile-prefix-map=${WASI_SDK_PREFIX}/=clsdk-wasi-sdk:/
+# -psidk variant of build targets need paths converted
+function(add_psidk_base_lib suffix)
+    add_library(wasm-base${suffix}-psidk INTERFACE)
+    target_link_libraries(wasm-base${suffix}-psidk INTERFACE wasm-base${suffix})
+    target_compile_options(wasm-base${suffix}-psidk INTERFACE
+            -ffile-prefix-map=${ROOT_BINARY_DIR}/wasm/boost/=psidk:/boost/
+            -ffile-prefix-map=${ROOT_BINARY_DIR}/wasm/catch2/=psidk:/catch2/
+            -ffile-prefix-map=${ROOT_SOURCE_DIR}/contracts/=psidk:/contracts/
+            -ffile-prefix-map=${ROOT_SOURCE_DIR}/external/=psidk:/
+            -ffile-prefix-map=${ROOT_SOURCE_DIR}/libraries/=psidk:/
+            -ffile-prefix-map=${WASI_SDK_PREFIX}/=psidk-wasi-sdk:/
     )
 endfunction()
-add_clsdk_base_lib("")
-add_clsdk_base_lib("-debug")
+add_psidk_base_lib("")
+add_psidk_base_lib("-debug")
 
 set(DEP_URL https://github.com/eoscommunity/Eden/releases/download/deps)
 set(GMP_ARCHIVE gmp-6.2.1.tar.zst)
@@ -211,6 +212,5 @@ endif()
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../contracts contracts)
-add_subdirectory(../doc/psidk/src/cpp-contract doc-examples)
 add_subdirectory(../programs programs)
 add_subdirectory(boost)

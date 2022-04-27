@@ -8,43 +8,18 @@ namespace psio
       no_error,
       invalid_tuple_index
    };  // tuple_error
-}  // namespace psio
 
-namespace std
-{
-   template <>
-   struct is_error_code_enum<psio::tuple_error> : true_type
+   constexpr inline std::string_view error_to_str(tuple_error e)
    {
-   };
-}  // namespace std
-
-namespace psio
-{
-
-   class tuple_error_category_type : public std::error_category
-   {
-     public:
-      const char* name() const noexcept override final { return "ConversionError"; }
-
-      std::string message(int c) const override final
+      switch (e)
       {
-         switch (static_cast<tuple_error>(c))
-         {
-               // clang-format off
-         case tuple_error::no_error:                 return "No error";
-         case tuple_error::invalid_tuple_index:      return "invalid tuple index";
-         default: return "unknown";
-      };
+            // clang-format off
+         case tuple_error::no_error:                  return "No error";
+         case tuple_error::invalid_tuple_index:       return "invalid tuple index";
+         default:                                     return "unknown";
+            // clang-format on
+      }
    }
-};
-
-inline const tuple_error_category_type& tuple_error_category() {
-   static tuple_error_category_type c;
-   return c;
-}
-
-inline std::error_code make_error_code(tuple_error e) { return { static_cast<int>(e), tuple_error_category() }; }
-
 
     template <int N, typename T, typename L>
     void tuple_get(T& obj, int pos, L&& lambda) {
@@ -54,7 +29,7 @@ inline std::error_code make_error_code(tuple_error e) { return { static_cast<int
           }
           else tuple_get<N + 1>(obj, pos, std::forward<L>(lambda) );
        } else {
-          throw_error(tuple_error::invalid_tuple_index);
+          abort_error(tuple_error::invalid_tuple_index);
        }
     }
 

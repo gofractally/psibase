@@ -12,7 +12,7 @@ if(IS_WASM)
     copy_headers(rapidjson/include/rapidjson rapidjson/include/rapidjson)
     copy_headers(rapidjson/include/rapidjson/error rapidjson/include/rapidjson/error)
     copy_headers(rapidjson/include/rapidjson/internal rapidjson/include/rapidjson/internal)
-    configure_file(rapidjson/license.txt ${ROOT_BINARY_DIR}/clsdk/licenses/LICENSE.rapidjson COPYONLY)
+    configure_file(rapidjson/license.txt ${ROOT_BINARY_DIR}/psidk/licenses/LICENSE.rapidjson COPYONLY)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -59,13 +59,13 @@ if(IS_WASM)
     set(CATCH2_INSTALL_COMMAND
         INSTALL_COMMAND sh -c "                                     \
             cmake --install . &&                                    \
-            mkdir -p ${ROOT_BINARY_DIR}/clsdk/catch2 &&             \
+            mkdir -p ${ROOT_BINARY_DIR}/psidk/catch2 &&             \
             cp -a                                                   \
                 ${CMAKE_BINARY_DIR}/catch2/include                  \
-                ${ROOT_BINARY_DIR}/clsdk/catch2 &&                  \
+                ${ROOT_BINARY_DIR}/psidk/catch2 &&                  \
             cp                                                      \
                 ${CMAKE_CURRENT_SOURCE_DIR}/Catch2/LICENSE.txt      \
-                ${ROOT_BINARY_DIR}/clsdk/licenses/LICENSE.catch2"
+                ${ROOT_BINARY_DIR}/psidk/licenses/LICENSE.catch2"
     )
 endif()
 
@@ -91,4 +91,9 @@ add_dependencies(catch2 catch2-ext)
 
 if(IS_WASM)
     target_compile_options(catch2 INTERFACE -DCATCH_CONFIG_NO_POSIX_SIGNALS -DCATCH_CONFIG_DISABLE_EXCEPTIONS)
+
+    # TODO: copy simdjson license to clsdk/licenses
+    # TODO: debug vs release builds
+    copy_headers(simdjson/include simdjson/include)
+    set_target_properties(simdjson PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
 endif()

@@ -8,7 +8,7 @@
 #include <mutex>
 #include <psibase/action_context.hpp>
 #include <psibase/db.hpp>
-#include <psibase/from_bin.hpp>
+#include <psio/from_bin.hpp>
 
 namespace bmi = boost::multi_index;
 
@@ -35,18 +35,18 @@ namespace psibase
    }
 
    // Only useful for genesis
-   void set_code(database&           db,
-                 account_num         contract,
-                 uint8_t             vm_type,
-                 uint8_t             vm_version,
-                 eosio::input_stream code)
+   void set_code(database&          db,
+                 account_num        contract,
+                 uint8_t            vm_type,
+                 uint8_t            vm_version,
+                 psio::input_stream code)
    {
-      eosio::check(code.remaining(), "native set_code can't clear code");
+      check(code.remaining(), "native set_code can't clear code");
       auto code_hash = sha256(code.pos, code.remaining());
 
       auto account = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
-      eosio::check(account.has_value(), "set_code: unknown contract account");
-      eosio::check(account->code_hash == Checksum256{}, "native set_code can't replace code");
+      check(account.has_value(), "set_code: unknown contract account");
+      check(account->code_hash == Checksum256{}, "native set_code can't replace code");
       account->code_hash  = code_hash;
       account->vm_type    = vm_type;
       account->vm_version = vm_version;
@@ -155,15 +155,15 @@ namespace psibase
           : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
          auto ca = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
-         eosio::check(ca.has_value(), "unknown contract account");
-         eosio::check(ca->code_hash != Checksum256{}, "account has no code");
+         check(ca.has_value(), "unknown contract account");
+         check(ca->code_hash != Checksum256{}, "account has no code");
          contract_account = std::move(*ca);
          auto code        = db.kv_get<code_row>(
              code_row::kv_map, code_key(contract_account.code_hash, contract_account.vm_type,
                                                contract_account.vm_version));
-         eosio::check(code.has_value(), "code record is missing");
-         eosio::check(code->vm_type == 0, "vm_type is not 0");
-         eosio::check(code->vm_version == 0, "vm_version is not 0");
+         check(code.has_value(), "code record is missing");
+         check(code->vm_type == 0, "vm_type is not 0");
+         check(code->vm_version == 0, "vm_version is not 0");
          rethrow_vm_except(
              [&]
              {
@@ -244,29 +244,24 @@ namespace psibase
 
       bool key_has_contract_prefix(uint32_t map) { return map == uint32_t(kv_map::contract); }
 
-      kv_map get_map_write(uint32_t map, eosio::input_stream key)
+      kv_map get_map_write(uint32_t map, psio::input_stream key)
       {
-         eosio::check(!trx_context.block_context.is_read_only, "writes disabled during query");
+         check(!trx_context.block_context.is_read_only, "writes disabled during query");
 
          if (map == uint32_t(kv_map::subjective) &&
              (contract_account.flags & account_row::is_subjective))
             return (kv_map)map;
 
          // Prevent poison block; subjective contracts skip execution while not in production
-         eosio::check(!(contract_account.flags & account_row::is_subjective),
-                      "subjective contracts may only write to kv_map::subjective");
+         check(!(contract_account.flags & account_row::is_subjective),
+               "subjective contracts may only write to kv_map::subjective");
 
          if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
          {
             uint64_t prefix = contract_account.num.value;
-            // TODO DAN: remove this later...
-            // TODO TODD: Commenting this out and adding the special overload to_key(AccountNumber)
-            //            causes kv sort order and AccountNumber::operator<=>() to disagree. This will
-            //            cause nasty headaches for someone.
-            //std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
-            eosio::check(
-                key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
-                "key prefix must match contract during write");
+            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
+            check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
+                  "key prefix must match contract during write");
             return (kv_map)map;
          }
          if (map == uint32_t(kv_map::native_constrained) &&
@@ -280,7 +275,7 @@ namespace psibase
 
       kv_map get_map_write_sequential(uint32_t map)
       {
-         eosio::check(!trx_context.block_context.is_read_only, "writes disabled during query");
+         check(!trx_context.block_context.is_read_only, "writes disabled during query");
 
          if (map == uint32_t(kv_map::event))
             return (kv_map)map;
@@ -289,7 +284,7 @@ namespace psibase
          throw std::runtime_error("contract may not write this map, or must use another intrinsic");
       }
 
-      void verify_write_constrained(eosio::input_stream key, eosio::input_stream value)
+      void verify_write_constrained(psio::input_stream key, psio::input_stream value)
       {
          // Currently, code is the only table which lives in native_constrained
          // which is writable by contracts. The other tables aren't writable by
@@ -299,11 +294,11 @@ namespace psibase
          // TODO: verify fracpack; no unknown
          auto code = psio::convert_from_frac<code_row>(psio::input_stream(value.pos, value.end));
          auto code_hash = sha256(code.code.data(), code.code.size());
-         eosio::check(code.code_hash == code_hash, "code_row has incorrect code_hash");
-         auto expected_key = eosio::convert_to_key(code.key());
-         eosio::check(key.remaining() == expected_key.size() &&
-                          !memcmp(key.pos, expected_key.data(), key.remaining()),
-                      "code_row has incorrect key");
+         check(code.code_hash == code_hash, "code_row has incorrect code_hash");
+         auto expected_key = psio::convert_to_key(code.key());
+         check(key.remaining() == expected_key.size() &&
+                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+               "code_row has incorrect key");
       }
 
       std::vector<char> result_key;
@@ -323,7 +318,7 @@ namespace psibase
          return result_value.size();
       }
 
-      uint32_t set_result(const std::optional<eosio::input_stream>& o)
+      uint32_t set_result(const std::optional<psio::input_stream>& o)
       {
          if (!o)
             return clear_result();
@@ -385,15 +380,15 @@ namespace psibase
       {
          // TODO: replace temporary rule
          if (++current_act_context->transaction_context.call_depth > 6)
-            eosio::check(false, "call depth exceeded (temporary rule)");
+            check(false, "call depth exceeded (temporary rule)");
 
          // TODO: don't unpack raw_data
-         eosio::check(psio::fracvalidate<action>(data.data(), data.end()).valid_and_known(),
-                      "call: invalid data format");
+         check(psio::fracvalidate<action>(data.data(), data.end()).valid_and_known(),
+               "call: invalid data format");
          auto act = psio::convert_from_frac<action>({data.data(), data.size()});
-         eosio::check(act.sender == contract_account.num ||
-                          (contract_account.flags & account_row::allow_sudo),
-                      "contract is not authorized to call as another sender");
+         check(act.sender == contract_account.num ||
+                   (contract_account.flags & account_row::allow_sudo),
+               "contract is not authorized to call as another sender");
 
          current_act_context->action_trace.inner_traces.push_back({action_trace{}});
          auto& inner_action_trace =
@@ -410,8 +405,8 @@ namespace psibase
       void set_retval(span<const char> data)
       {
          // TODO: record return values of top-most subjective calls in block
-         eosio::check(!(contract_account.flags & account_row::is_subjective),
-                      "set_retval not implemented for subjective contracts");
+         check(!(contract_account.flags & account_row::is_subjective),
+               "set_retval not implemented for subjective contracts");
          current_act_context->action_trace.raw_retval.assign(data.begin(), data.end());
          clear_result();
       }
@@ -436,12 +431,11 @@ namespace psibase
       {
          auto m = get_map_write_sequential(map);
 
-         eosio::input_stream v{value.data(), value.size()};
-         eosio::check(v.remaining() >= sizeof(AccountNumber::value),
-                      "value prefix must match contract during write");
-         auto contract = eosio::from_bin<AccountNumber>(v);
-         eosio::check(contract == contract_account.num,
-                      "value prefix must match contract during write");
+         psio::input_stream v{value.data(), value.size()};
+         check(v.remaining() >= sizeof(AccountNumber::value),
+               "value prefix must match contract during write");
+         auto contract = psio::from_bin<AccountNumber>(v);
+         check(contract == contract_account.num, "value prefix must match contract during write");
 
          auto&    dbStatus = trx_context.block_context.databaseStatus;
          uint64_t indexNumber;
@@ -450,10 +444,10 @@ namespace psibase
          else if (map == uint32_t(kv_map::ui_event))
             indexNumber = dbStatus.nextUIEventNumber++;
          else
-            eosio::check(false, "kv_put_sequential: unsupported map");
+            check(false, "kv_put_sequential: unsupported map");
          db.kv_put(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
 
-         db.kv_put_raw(m, eosio::convert_to_key(indexNumber), {value.data(), value.size()});
+         db.kv_put_raw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
          return indexNumber;
       }  // kv_put_sequential()
 
@@ -475,16 +469,16 @@ namespace psibase
       uint32_t kv_get_sequential(uint32_t map, uint64_t indexNumber)
       {
          auto m = get_map_read_sequential(map);
-         return set_result(db.kv_get_raw(m, eosio::convert_to_key(indexNumber)));
+         return set_result(db.kv_get_raw(m, psio::convert_to_key(indexNumber)));
       }
 
       // TODO: don't let timer abort db operation
       uint32_t kv_greater_equal(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
-         eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
+         check(match_key_size <= key.size(), "match_key_size is larger than key");
          if (key_has_contract_prefix(map))
-            eosio::check(match_key_size >= sizeof(AccountNumber::value),
-                         "match_key_size is smaller than 8 bytes");
+            check(match_key_size >= sizeof(AccountNumber::value),
+                  "match_key_size is smaller than 8 bytes");
          return set_result(
              db.kv_greater_equal_raw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
@@ -492,10 +486,10 @@ namespace psibase
       // TODO: don't let timer abort db operation
       uint32_t kv_less_than(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
-         eosio::check(match_key_size <= key.size(), "match_key_size is larger than key");
+         check(match_key_size <= key.size(), "match_key_size is larger than key");
          if (key_has_contract_prefix(map))
-            eosio::check(match_key_size >= sizeof(AccountNumber::value),
-                         "match_key_size is smaller than 8 bytes");
+            check(match_key_size >= sizeof(AccountNumber::value),
+                  "match_key_size is smaller than 8 bytes");
          return set_result(
              db.kv_less_than_raw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
@@ -504,7 +498,7 @@ namespace psibase
       uint32_t kv_max(uint32_t map, span<const char> key)
       {
          if (key_has_contract_prefix(map))
-            eosio::check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
+            check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
          return set_result(db.kv_max_raw(get_map_read(map), {key.data(), key.size()}));
       }
    };  // execution_context_impl
@@ -552,8 +546,8 @@ namespace psibase
    {
       // Prevents a poison block
       if (!(impl->contract_account.flags & account_row::is_subjective))
-         eosio::check(!(caller_flags & account_row::is_subjective),
-                      "subjective contracts may not call non-subjective ones");
+         check(!(caller_flags & account_row::is_subjective),
+               "subjective contracts may not call non-subjective ones");
 
       impl->exec(act_context, [&] {  //
          (*impl->backend)(*impl, "env", "called", act_context.action.contract.value,

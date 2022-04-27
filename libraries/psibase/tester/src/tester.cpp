@@ -2,9 +2,6 @@
 
 #include <secp256k1.h>
 #include <contracts/system/verify_ec_sys.hpp>
-#include <eosio/abi.hpp>
-#include <eosio/authority.hpp>
-#include <eosio/from_string.hpp>
 
 namespace
 {
@@ -34,7 +31,8 @@ namespace
                                Alloc_fn    alloc_fn)
    {
       return tester_read_whole_file(filename_begin, filename_size, &alloc_fn,
-                                    [](void* cb_alloc_data, size_t size) -> void* {  //
+                                    [](void* cb_alloc_data, size_t size) -> void*
+                                    {  //
                                        return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
                                     });
    }
@@ -43,7 +41,8 @@ namespace
    inline void get_head_block_info(uint32_t chain, Alloc_fn alloc_fn)
    {
       tester_get_head_block_info(chain, &alloc_fn,
-                                 [](void* cb_alloc_data, size_t size) -> void* {  //
+                                 [](void* cb_alloc_data, size_t size) -> void*
+                                 {  //
                                     return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
                                  });
    }
@@ -55,7 +54,8 @@ namespace
                                 Alloc_fn    alloc_fn)
    {
       tester_push_transaction(chain, args_begin, args_size, &alloc_fn,
-                              [](void* cb_alloc_data, size_t size) -> void* {  //
+                              [](void* cb_alloc_data, size_t size) -> void*
+                              {  //
                                  return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
                               });
    }
@@ -64,7 +64,8 @@ namespace
    inline bool exec_deferred(uint32_t chain, Alloc_fn alloc_fn)
    {
       return tester_exec_deferred(chain, &alloc_fn,
-                                  [](void* cb_alloc_data, size_t size) -> void* {  //
+                                  [](void* cb_alloc_data, size_t size) -> void*
+                                  {  //
                                      return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
                                   });
    }
@@ -144,22 +145,19 @@ bool psibase::TraceResult::diskConsumed(
 std::vector<char> psibase::read_whole_file(std::string_view filename)
 {
    std::vector<char> result;
-   if (!::read_whole_file(filename.data(), filename.size(), [&](size_t size) {
-          result.resize(size);
-          return result.data();
-       }))
-      eosio::check(false, "read " + std::string(filename) + " failed");
+   if (!::read_whole_file(filename.data(), filename.size(),
+                          [&](size_t size)
+                          {
+                             result.resize(size);
+                             return result.data();
+                          }))
+      check(false, "read " + std::string(filename) + " failed");
    return result;
 }
 
 int32_t psibase::execute(std::string_view command)
 {
    return ::tester_execute(command.data(), command.size());
-}
-
-eosio::asset psibase::string_to_asset(const char* s)
-{
-   return eosio::convert_from_string<eosio::asset>(s);
 }
 
 void psibase::expect(transaction_trace t, const std::string& expected, bool always_show)
@@ -171,9 +169,9 @@ void psibase::expect(transaction_trace t, const std::string& expected, bool alwa
    if (bad)
    {
       if (expected.empty())
-         eosio::check(false, "transaction failed");
+         check(false, "transaction failed");
       else
-         eosio::check(false, "transaction was expected to fail with " + expected);
+         check(false, "transaction was expected to fail with " + expected);
    }
 }
 
@@ -181,17 +179,16 @@ psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& diges
 {
    static auto context = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
    auto*       k1      = std::get_if<0>(&key);
-   eosio::check(k1, "only k1 currently supported");
+   check(k1, "only k1 currently supported");
 
    secp256k1_ecdsa_signature sig;
-   eosio::check(
-       secp256k1_ecdsa_sign(context, &sig, reinterpret_cast<const unsigned char*>(digest.data()),
-                            k1->data(), nullptr, nullptr) == 1,
-       "sign failed");
+   check(secp256k1_ecdsa_sign(context, &sig, reinterpret_cast<const unsigned char*>(digest.data()),
+                              k1->data(), nullptr, nullptr) == 1,
+         "sign failed");
 
    EccSignature sigdata;
-   eosio::check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
-                "serialize signature failed");
+   check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
+         "serialize signature failed");
    return Signature{std::in_place_index<0>, sigdata};
 }
 
@@ -200,7 +197,8 @@ void psibase::internal_use_do_not_use::hex(const uint8_t* begin,
                                            std::ostream&  os)
 {
    std::ostreambuf_iterator<char> dest(os.rdbuf());
-   auto                           nibble = [&dest](uint8_t i) {
+   auto                           nibble = [&dest](uint8_t i)
+   {
       if (i <= 9)
          *dest++ = '0' + i;
       else
@@ -270,8 +268,8 @@ void psibase::test_chain::start_block(int64_t skip_miliseconds)
 void psibase::test_chain::start_block(std::string_view time)
 {
    uint64_t value;
-   eosio::check(eosio::string_to_utc_microseconds(value, time.data(), time.data() + time.size()),
-                "bad time");
+   auto     data = time.data();
+   check(string_to_utc_microseconds(value, data, data + time.size(), true), "bad time");
    start_block(TimePointSec{.seconds = uint32_t(value / 1000)});
 }
 
@@ -295,10 +293,12 @@ const psibase::block_info& psibase::test_chain::get_head_block_info()
    if (!head_block_info)
    {
       std::vector<char> bin;
-      ::get_head_block_info(id, [&](size_t size) {
-         bin.resize(size);
-         return bin.data();
-      });
+      ::get_head_block_info(id,
+                            [&](size_t size)
+                            {
+                               bin.resize(size);
+                               return bin.data();
+                            });
       head_block_info = psio::convert_from_frac<block_info>(bin);
    }
    return *head_block_info;
@@ -325,10 +325,12 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
 {
    std::vector<char> packed_trx = psio::convert_to_frac(signed_trx);
    std::vector<char> bin;
-   ::push_transaction(id, packed_trx.data(), packed_trx.size(), [&](size_t size) {
-      bin.resize(size);
-      return bin.data();
-   });
+   ::push_transaction(id, packed_trx.data(), packed_trx.size(),
+                      [&](size_t size)
+                      {
+                         bin.resize(size);
+                         return bin.data();
+                      });
    return psio::convert_from_frac<transaction_trace>(bin);
 }
 
@@ -365,19 +367,4 @@ psibase::transaction_trace psibase::test_chain::transact(std::vector<action>&& a
                                                          const char*           expected_except)
 {
    return transact(std::move(actions), {{default_pub_key, default_priv_key}}, expected_except);
-}
-
-std::ostream& eosio::operator<<(std::ostream& os, const eosio::time_point_sec& obj)
-{
-   return os << eosio::microseconds_to_str(uint64_t(obj.utc_seconds) * 1'000'000);
-}
-
-std::ostream& eosio::operator<<(std::ostream& os, const eosio::name& obj)
-{
-   return os << obj.to_string();
-}
-
-std::ostream& eosio::operator<<(std::ostream& os, const eosio::asset& obj)
-{
-   return os << obj.to_string();
 }

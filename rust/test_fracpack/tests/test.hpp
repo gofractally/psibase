@@ -9,7 +9,7 @@
 #pragma GCC diagnostic ignored "-Wunused-local-typedef"
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #pragma GCC diagnostic ignored "-Wambiguous-reversed-operator"
-#include <psio/bytes/to_json.hpp>
+#include <psio/bytes.hpp>
 #include <psio/fracpack.hpp>
 #pragma GCC diagnostic pop
 

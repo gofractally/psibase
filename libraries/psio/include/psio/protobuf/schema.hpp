@@ -10,7 +10,7 @@ namespace psio
    template <typename S>
    void to_protobuf_schema(const schema& sch, S& stream)
    {
-      stream.write("syntax = \"proto3\";\n");
+      write_str("syntax = \"proto3\";\n", stream);
 
       auto convert_variant_name = [](string name)
       {
@@ -115,29 +115,29 @@ namespace psio
              {
                 if constexpr (std::is_same_v<object_type, decltype(i)>)
                 {
-                   stream.write("message ", 8);
-                   stream.write(item.first);
-                   stream.write(" {\n");
+                   write_str("message ", stream);
+                   write_str(item.first, stream);
+                   write_str(" {\n", stream);
                    for (auto mem : i.members)
                    {
                       bool is_repeated = false;
                       bool is_prim     = false;
                       auto pbt         = convert_to_pb_type(mem.type, is_repeated, is_prim);
-                      stream.write("    ");
+                      write_str("    ", stream);
                       if (is_repeated)
                       {
-                         stream.write("repeated ");
+                         write_str("repeated ", stream);
                       }
-                      stream.write(pbt);
-                      stream.write(" ");
-                      stream.write(mem.name.c_str());
-                      stream.write(" = ");
-                      stream.write(std::to_string(mem.number).c_str());
+                      write_str(pbt, stream);
+                      write_str(" ", stream);
+                      write_str(mem.name.c_str(), stream);
+                      write_str(" = ", stream);
+                      write_str(std::to_string(mem.number).c_str(), stream);
                       if (is_repeated && is_prim)
                       {
-                         stream.write(" [packed=true]");
+                         write_str(" [packed=true]", stream);
                       }
-                      stream.write(";\n");
+                      write_str(";\n", stream);
                    }
                    /*
                     for( auto mem : i.methods ) {
@@ -153,22 +153,22 @@ namespace psio
                        stream.write( std::to_string( mem.number ).c_str()  );
                        stream.write( ";\n" );
                     }*/
-                   stream.write("}\n");
+                   write_str("}\n", stream);
                 }
                 else if constexpr (std::is_same_v<variant_type, decltype(i)>)
                 {
-                   stream.write("message ");
+                   write_str("message ", stream);
                    if (item.first.back() == '|')
                    {
-                      stream.write(convert_variant_name(item.first));
+                      write_str(convert_variant_name(item.first), stream);
                    }
                    else
                    {
-                      stream.write(item.first);
+                      write_str(item.first, stream);
                    }
 
-                   stream.write(" {\n");
-                   stream.write("   oneof which {\n");
+                   write_str(" {\n", stream);
+                   write_str("   oneof which {\n", stream);
 
                    for (uint32_t idx = 0; idx < i.types.size(); ++idx)
                    {
@@ -176,53 +176,53 @@ namespace psio
                       bool is_prim     = false;
                       auto pbt         = convert_to_pb_type(i.types[idx], is_repeated, is_prim);
 
-                      stream.write("       ");
-                      stream.write(pbt);
-                      stream.write("  ");
-                      stream.write(pbt);
-                      stream.write("_value = ");
-                      stream.write(std::to_string(idx + 1));
-                      stream.write(";\n");
+                      write_str("       ", stream);
+                      write_str(pbt, stream);
+                      write_str("  ", stream);
+                      write_str(pbt, stream);
+                      write_str("_value = ", stream);
+                      write_str(std::to_string(idx + 1), stream);
+                      write_str(";\n", stream);
                    }
-                   stream.write("   }\n");
-                   stream.write("}\n");
+                   write_str("   }\n", stream);
+                   write_str("}\n", stream);
                 }
                 else if constexpr (std::is_same_v<tuple_type, decltype(i)>)
                 {
-                   stream.write("message ");
+                   write_str("message ", stream);
 
                    if (item.first.back() == '&')
                    {
-                      stream.write(convert_tuple_name(item.first));
+                      write_str(convert_tuple_name(item.first), stream);
                    }
                    else
                    {
-                      stream.write(item.first);
+                      write_str(item.first, stream);
                    }
 
-                   stream.write(" {\n");
+                   write_str(" {\n", stream);
                    for (uint32_t idx = 0; idx < i.types.size(); ++idx)
                    {
-                      stream.write("   ");
+                      write_str("   ", stream);
                       bool is_repeated = false;
                       bool is_prim     = false;
                       auto pbt         = convert_to_pb_type(i.types[idx], is_repeated, is_prim);
                       if (is_repeated)
                       {
-                         stream.write("repeated ");
+                         write_str("repeated ", stream);
                       }
-                      stream.write(pbt);
-                      stream.write(" _");
-                      stream.write(std::to_string(idx + 1));
-                      stream.write(" = ");
-                      stream.write(std::to_string(idx + 1));
+                      write_str(pbt, stream);
+                      write_str(" _", stream);
+                      write_str(std::to_string(idx + 1), stream);
+                      write_str(" = ", stream);
+                      write_str(std::to_string(idx + 1), stream);
                       if (is_repeated && is_prim)
                       {
-                         stream.write(" [packed=true]");
+                         write_str(" [packed=true]", stream);
                       }
-                      stream.write(";\n");
+                      write_str(";\n", stream);
                    }
-                   stream.write("}\n");
+                   write_str("}\n", stream);
                 }
              },
              item.second);
@@ -238,7 +238,7 @@ namespace psio
       to_protobuf_schema(s, fbs);
 
       if (fbs.pos != fbs.end)
-         throw_error(stream_error::underrun);
+         abort_error(stream_error::underrun);
 
       return result;
    }

@@ -3,14 +3,10 @@
 #include <iostream>
 
 #include <psio/compress.hpp>
-#include <psio/from_bin/varint.hpp>
-#include <psio/from_json/varint.hpp>
+#include <psio/varint.hpp>
 #include <psio/json/any.hpp>
-#include <psio/to_bin/varint.hpp>
-#include <psio/to_json/varint.hpp>
 
-#include <psio/bytes/from_json.hpp>
-#include <psio/bytes/to_json.hpp>
+#include <psio/bytes.hpp>
 #include <psio/to_json/map.hpp>
 #include <psio/translator.hpp>
 #include <fstream>

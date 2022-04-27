@@ -3,6 +3,7 @@
 namespace psio
 {
 
+// TODO: rename; this is incredibly dangerous; the name should reflect that.
 #define FRACPACK __attribute__((packed, aligned(1)))
 
    /**
@@ -10,6 +11,7 @@ namespace psio
      *  through this type to warn the compiler that unaligned_type::val 
      *  might be unaligned.
      */
+   // TODO: rename; this is incredibly dangerous; the name should reflect that.
    template <typename T>
    struct FRACPACK unaligned_type
    {

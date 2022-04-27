@@ -63,4 +63,23 @@ else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
 
+# TODO: switch default to on
+option(BUILD_RUST "Build rust" OFF)
+if(BUILD_RUST)
+    ExternalProject_Add(
+        rust
+        DEPENDS wasm
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+        INSTALL_COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
+        COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
+    )
+endif()
+
+option(BUILD_EXAMPLES "Build examples" ON)
+if(BUILD_EXAMPLES)
+    add_subdirectory(doc/psidk/src/cpp-contract doc-examples)
+endif()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

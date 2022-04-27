@@ -1,8 +1,8 @@
 #pragma once
 
 #include <compare>
-#include <eosio/check.hpp>
 #include <limits>
+#include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
 
 #include "tables.hpp"
@@ -25,15 +25,12 @@ namespace UserContract
 
       static void fracpack_validate(Precision p)
       {
-         eosio::check(PRECISION_MIN <= p.value && p.value >= PRECISION_MAX, error_invalid);
+         psibase::check(PRECISION_MIN <= p.value && p.value >= PRECISION_MAX, error_invalid);
       }
 
       friend std::strong_ordering operator<=>(const Precision&, const Precision&) = default;
    };
-   // clang-format off
    PSIO_REFLECT(Precision, value);
-   EOSIO_REFLECT(Precision, value);
-   // clang-format on
 
    struct Quantity
    {
@@ -50,26 +47,26 @@ namespace UserContract
 
       Quantity operator+(const Quantity& q2)
       {
-         eosio::check(value <= std::numeric_limits<Quantity_t>::max() - q2.value, error_overflow);
+         psibase::check(value <= std::numeric_limits<Quantity_t>::max() - q2.value, error_overflow);
          return Quantity{value + q2.value};
       }
 
       Quantity operator-(const Quantity& q2)
       {
-         eosio::check(value >= q2.value, error_underflow);
+         psibase::check(value >= q2.value, error_underflow);
          return Quantity{value - q2.value};
       }
 
       Quantity& operator+=(const Quantity& q2)
       {
-         eosio::check(value <= std::numeric_limits<Quantity_t>::max() - q2.value, error_overflow);
+         psibase::check(value <= std::numeric_limits<Quantity_t>::max() - q2.value, error_overflow);
          value += q2.value;
          return *this;
       }
 
       Quantity& operator-=(const Quantity& q2)
       {
-         eosio::check(value >= q2.value, error_underflow);
+         psibase::check(value >= q2.value, error_underflow);
          value -= q2.value;
          return *this;
       }
@@ -79,11 +76,5 @@ namespace UserContract
       bool operator==(int otherValue) const { return static_cast<Quantity_t>(otherValue) == value; }
    };
    PSIO_REFLECT(Quantity, value);
-   EOSIO_REFLECT(Quantity, value);
-
-   // class Token
-   // {
-   //    Token(TID tokenId);
-   // };
 
 }  // namespace UserContract

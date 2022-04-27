@@ -40,7 +40,7 @@ namespace eosio
       }
    }  // namespace internal_use_do_not_use
 }  // namespace eosio
-#elif defined(__eosio_cdt__)
+#elif defined(COMPILING_WASM)
 #include <cstdint>
 namespace eosio
 {
@@ -80,7 +80,7 @@ namespace eosio
    {
       [[noreturn]] inline void assert_or_throw(std::string_view msg)
       {
-#ifdef __eosio_cdt__
+#ifdef COMPILING_WASM
          internal_use_do_not_use::eosio_assert_message(false, msg.data(), msg.size());
 #else
          throw std::runtime_error(std::string(msg));
@@ -88,7 +88,7 @@ namespace eosio
       }
       [[noreturn]] inline void assert_or_throw(const char* msg)
       {
-#ifdef __eosio_cdt__
+#ifdef COMPILING_WASM
          internal_use_do_not_use::eosio_assert(false, msg);
 #else
          throw std::runtime_error(msg);
@@ -96,7 +96,7 @@ namespace eosio
       }
       [[noreturn]] inline void assert_or_throw(std::string&& msg)
       {
-#ifdef __eosio_cdt__
+#ifdef COMPILING_WASM
          internal_use_do_not_use::eosio_assert_message(false, msg.c_str(), msg.size());
 #else
          throw std::runtime_error(std::move(msg));
@@ -104,7 +104,7 @@ namespace eosio
       }
       [[noreturn]] inline void assert_or_throw(uint64_t code)
       {
-#ifdef __eosio_cdt__
+#ifdef COMPILING_WASM
          internal_use_do_not_use::eosio_assert_code(false, code);
 #else
          throw std::runtime_error(std::to_string(code));

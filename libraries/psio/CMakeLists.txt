@@ -9,7 +9,7 @@ target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/fpconv.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/powers.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/compress.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/error.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/check.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/reflect.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/schema.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/translator.hpp
@@ -22,7 +22,6 @@ target_sources( psio INTERFACE
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_json.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_json/map.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_json/varint.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/json/any.hpp
 
@@ -31,20 +30,13 @@ target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin/set.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin/list.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin/deque.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin/varint.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_bin.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_json.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/varint.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_bin/varint.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_json/varint.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes.hpp
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes/from_json.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes/to_json.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes/to_bin.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_protobuf.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_protobuf.hpp
@@ -57,3 +49,13 @@ target_sources( psio INTERFACE
 
 add_subdirectory( consthash )
 add_subdirectory(tests)
+
+if(IS_WASM)
+    copy_headers(consthash/include/consthash consthash/include/consthash)
+    copy_headers(include/psio psio/include/psio)
+    copy_headers(include/psio/bytes psio/include/psio/bytes)
+    copy_headers(include/psio/json psio/include/psio/json)
+    copy_headers(include/psio/to_bin psio/include/psio/to_bin)
+    copy_headers(include/psio/to_json psio/include/psio/to_json)
+    configure_file(consthash/LICENSE ${ROOT_BINARY_DIR}/psidk/licenses/LICENSE.consthash COPYONLY)
+endif()

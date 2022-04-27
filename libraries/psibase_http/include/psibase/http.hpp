@@ -5,6 +5,11 @@
 
 namespace psibase::http
 {
+   using push_boot_result   = std::optional<std::string>;
+   using push_boot_callback = std::function<void(push_boot_result)>;
+   using push_boot_t =
+       std::function<void(std::vector<char> packed_signed_transactions, push_boot_callback)>;
+
    using push_transaction_result   = std::variant<transaction_trace, std::string>;
    using push_transaction_callback = std::function<void(push_transaction_result)>;
    using push_transaction_t =
@@ -21,6 +26,7 @@ namespace psibase::http
       unsigned short            port                   = {};
       std::string               unix_path              = {};
       std::string               host                   = {};
+      push_boot_t               push_boot_async        = {};
       push_transaction_t        push_transaction_async = {};
    };
 

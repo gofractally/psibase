@@ -2,6 +2,7 @@
 
 #include <compare>
 #include <limits>
+#include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
@@ -32,13 +33,12 @@ namespace psibase
 
       void _check(std::size_t pos) const
       {
-         eosio::check(pos >= 0 && pos < std::numeric_limits<bitset_t>::digits,
-                      "out-of-bounds access in bitset");
+         psibase::check(pos >= 0 && pos < std::numeric_limits<bitset_t>::digits,
+                        "out-of-bounds access in bitset");
       }
 
       friend std::strong_ordering operator<=>(const Bitset&, const Bitset&) = default;
    };
-   EOSIO_REFLECT(Bitset, bits);
    PSIO_REFLECT(Bitset, bits);
 
 }  // namespace psibase

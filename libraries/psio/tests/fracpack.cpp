@@ -13,14 +13,10 @@
 #include <psio/fracpack.hpp>
 #include <psio/schema.hpp>
 
-#include <psio/from_bin/varint.hpp>
-#include <psio/from_json/varint.hpp>
+#include <psio/varint.hpp>
 #include <psio/json/any.hpp>
-#include <psio/to_bin/varint.hpp>
-#include <psio/to_json/varint.hpp>
 
-#include <psio/bytes/from_json.hpp>
-#include <psio/bytes/to_json.hpp>
+#include <psio/bytes.hpp>
 #include <psio/to_json/map.hpp>
 #include <psio/translator.hpp>
 
@@ -1758,7 +1754,7 @@ TEST_CASE("translate")
    std::cout << "================\n" << psio::format_json(tests1_data[0]);
    std::cout << "================\n" << psio::format_json(tests1_data[1]);
    std::cout << "================\n" << psio::format_json(tests1_data[2]);
-   auto t1d2_json  = psio::to_json(tests1_data[2]);
+   auto t1d2_json  = psio::convert_to_json(tests1_data[2]);
    auto t1d2_frac  = tr.json_to_frac(tr.get_type_num("OuterStruct"), t1d2_json);
    auto t1d2_json2 = tr.frac_to_json(tr.get_type_num("OuterStruct"), t1d2_frac);
 

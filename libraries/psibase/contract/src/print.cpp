@@ -1,4 +1,3 @@
-#include <eosio/name.hpp>
 #include <psibase/intrinsic.hpp>
 
 extern "C" void prints_l(const char* str, uint32_t len)
@@ -9,12 +8,6 @@ extern "C" void prints_l(const char* str, uint32_t len)
 extern "C" void prints(const char* cstr)
 {
    prints_l(cstr, strlen(cstr));
-}
-
-extern "C" void printn(uint64_t n)
-{
-   std::string s = eosio::name_to_string(n);
-   prints_l(s.data(), s.size());
 }
 
 extern "C" void printui(uint64_t value)

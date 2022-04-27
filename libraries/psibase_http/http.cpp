@@ -20,8 +20,8 @@
 #include <boost/make_unique.hpp>
 #include <boost/optional.hpp>
 
-#include <eosio/finally.hpp>
-#include <eosio/to_json.hpp>
+#include <psio/finally.hpp>
+#include <psio/to_json.hpp>
 
 #include <algorithm>
 #include <cstdlib>
@@ -48,8 +48,7 @@ struct error_info
    std::string      what    = {};
    std::vector<int> details = {};
 };
-
-EOSIO_REFLECT(error_info, code, name, what, details)
+PSIO_REFLECT(error_info, code, name, what, details)
 
 struct error_results
 {
@@ -57,8 +56,7 @@ struct error_results
    std::string message = {};
    error_info  error   = {};
 };
-
-EOSIO_REFLECT(error_results, code, message, error)
+PSIO_REFLECT(error_results, code, message, error)
 
 namespace psibase::http
 {
@@ -278,10 +276,13 @@ namespace psibase::http
             data.body      = std::move(req.body());
 
             // TODO: time limit
-            auto           system = server.shared_state->get_system_context();
-            eosio::finally f{[&]() { server.shared_state->add_system_context(std::move(system)); }};
-            block_context  bc{*system, read_only{}};
+            auto          system = server.shared_state->get_system_context();
+            psio::finally f{[&]() { server.shared_state->add_system_context(std::move(system)); }};
+            block_context bc{*system, read_only{}};
             bc.start();
+            if (bc.need_genesis_action)
+               return send(error(bhttp::status::internal_server_error,
+                                 "Need genesis block; use 'psibase boot' to boot chain"));
             signed_transaction trx;
             action             act{
                             .sender   = AccountNumber(),
@@ -294,8 +295,48 @@ namespace psibase::http
             tc.exec_rpc(act, atrace);
             // TODO: option to print this
             // printf("%s\n", pretty_trace(atrace).c_str());
-            auto result = psio::convert_from_frac<rpc_reply_data>(atrace.raw_retval);
-            return send(ok(std::move(result.reply), result.contentType.c_str()));
+            auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.raw_retval);
+            if (!result)
+               return send(
+                   error(bhttp::status::not_found,
+                         "The resource '" + req.target().to_string() + "' was not found.\n"));
+            return send(ok(std::move(result->reply), result->contentType.c_str()));
+         }
+         else if (req.target() == "/native/push_boot" && req.method() == bhttp::verb::post &&
+                  server.http_config->push_boot_async)
+         {
+            server.http_config->push_boot_async(
+                std::move(req.body()),
+                [error, ok, session = send.self.derived_session().shared_from_this(),
+                 server = send.self.server.shared_from_this()](push_boot_result result)
+                {
+                   // inside foreign thread; the server capture above keeps ioc alive.
+                   net::post(
+                       session->stream.socket().get_executor(),
+                       [error, ok, session = std::move(session), result = std::move(result)]
+                       {
+                          // inside http thread pool. If we reached here, then the server
+                          // and ioc are still alive. This lambda doesn't capture server since
+                          // that would leak memory (circular) if the ioc threads were shut down.
+                          try
+                          {
+                             session->queue_.pause_read = false;
+                             if (!result)
+                                session->queue_(ok({'t', 'r', 'u', 'e'}, "application/json"));
+                             else
+                                session->queue_(
+                                    error(bhttp::status::internal_server_error, *result));
+                             if (session->queue_.can_read())
+                                session->do_read();
+                          }
+                          catch (...)
+                          {
+                             session->do_close();
+                          }
+                       });
+                });
+            send.pause_read = true;
+            return;
          }
          else if (req.target() == "/native/push_transaction" && req.method() == bhttp::verb::post &&
                   server.http_config->push_transaction_async)
@@ -415,7 +456,7 @@ namespace psibase::http
             err.message    = "Internal Service Error";
             err.error.name = "exception";
             err.error.what = e.what();
-            return send(error(bhttp::status::internal_server_error, eosio::convert_to_json(err),
+            return send(error(bhttp::status::internal_server_error, psio::convert_to_json(err),
                               "application/json"));
          }
          catch (...)
@@ -710,13 +751,12 @@ namespace psibase::http
 
             //looks like a service is already running on that socket, don't touch it... fail out
             if (test_ec == boost::system::errc::success)
-               eosio::check(false, "wasmql http unix socket is in use");
+               check(false, "wasmql http unix socket is in use");
             //socket exists but no one home, go ahead and remove it and continue on
             else if (test_ec == boost::system::errc::connection_refused)
                ::unlink(server.http_config->unix_path.c_str());
             else if (test_ec != boost::system::errc::no_such_file_or_directory)
-               eosio::check(false,
-                            "unexpected failure when probing existing wasmql http unix socket: " +
+               check(false, "unexpected failure when probing existing wasmql http unix socket: " +
                                 test_ec.message());
 
             start_listen(unix_acceptor, unixs::endpoint(server.http_config->unix_path));
@@ -735,7 +775,7 @@ namespace psibase::http
             if (!ec)
                return;
             // TODO: elog("${w}: ${m}", ("w", what)("m", ec.message()));
-            eosio::check(false, "unable to open listen socket");
+            check(false, "unable to open listen socket");
          };
 
          // Open the acceptor
@@ -825,7 +865,7 @@ namespace psibase::http
    std::shared_ptr<server> server::create(const std::shared_ptr<const http_config>& http_config,
                                           const std::shared_ptr<shared_state>&      shared_state)
    {
-      eosio::check(http_config->num_threads > 0, "too few threads");
+      check(http_config->num_threads > 0, "too few threads");
       auto server = std::make_shared<server_impl>(http_config, shared_state);
       if (server->start())
          return server;

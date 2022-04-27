@@ -15,7 +15,6 @@ namespace name_sys
       friend std::strong_ordering operator<=>(const display_name_row&,
                                               const display_name_row&) = default;
    };
-   EOSIO_REFLECT(display_name_row, acc, display_name);
    PSIO_REFLECT(display_name_row, acc, display_name);
 
    using display_name_table_t = psibase::table<display_name_row, &display_name_row::acc>;

@@ -15,7 +15,6 @@ namespace UserContract
       friend std::strong_ordering operator<=>(const AutodebitRecord&,
                                               const AutodebitRecord&) = default;
    };
-   EOSIO_REFLECT(AutodebitRecord, user, autodebit);
    PSIO_REFLECT(AutodebitRecord, user, autodebit);
    using AdTable_t = psibase::table<AutodebitRecord, &AutodebitRecord::user>;
 
@@ -30,7 +29,6 @@ namespace UserContract
 
       friend std::strong_ordering operator<=>(const NftRecord&, const NftRecord&) = default;
    };
-   EOSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
    PSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
    // Todo: Also index by issuer and owner when additional indices are possible
    using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;

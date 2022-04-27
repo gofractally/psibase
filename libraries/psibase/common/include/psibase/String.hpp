@@ -1,12 +1,9 @@
 #pragma once
 
+#include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
 #include <string>
 #include <string_view>
-
-// Todo - remove
-#include <eosio/check.hpp>
-#include <eosio/reflection.hpp>
 
 namespace psibase
 {
@@ -24,10 +21,9 @@ namespace psibase
 
       static void fracpack_validate(const String& str)
       {
-         eosio::check(str.contents.size() <= MAX_BYTES, error_invalid.data());
+         psibase::check(str.contents.size() <= MAX_BYTES, error_invalid.data());
       }
    };
-   EOSIO_REFLECT(String, contents);  //Todo - remove when kv table uses PSIO
    PSIO_REFLECT(String, contents);
 
 }  // namespace psibase

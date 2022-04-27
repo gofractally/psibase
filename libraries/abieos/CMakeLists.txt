@@ -19,16 +19,16 @@ add_abieos("")
 
 if(IS_WASM)
     add_abieos("-debug")
-    add_abieos("-clsdk")
-    add_abieos("-debug-clsdk")
+    add_abieos("-psidk")
+    add_abieos("-debug-psidk")
 
-    set_target_properties(abieos-clsdk PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/clsdk/lib-wasm)
-    set_target_properties(abieos-clsdk PROPERTIES ARCHIVE_OUTPUT_NAME abieos)
-    set_target_properties(abieos-debug-clsdk PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/clsdk/lib-wasm)
-    set_target_properties(abieos-debug-clsdk PROPERTIES ARCHIVE_OUTPUT_NAME abieos-debug)
+    set_target_properties(abieos-psidk PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
+    set_target_properties(abieos-psidk PROPERTIES ARCHIVE_OUTPUT_NAME abieos)
+    set_target_properties(abieos-debug-psidk PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
+    set_target_properties(abieos-debug-psidk PROPERTIES ARCHIVE_OUTPUT_NAME abieos-debug)
 
     copy_headers(include/eosio abieos/include/eosio)
-    configure_file(include/eosio/fpconv.license ${ROOT_BINARY_DIR}/clsdk/licenses/LICENSE.fpconv COPYONLY)
+    configure_file(include/eosio/fpconv.license ${ROOT_BINARY_DIR}/psidk/licenses/LICENSE.fpconv COPYONLY)
 endif()
 
 if(IS_NATIVE)

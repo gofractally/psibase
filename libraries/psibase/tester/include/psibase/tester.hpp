@@ -1,6 +1,5 @@
 #pragma once
 #include <catch2/catch.hpp>
-#include <eosio/asset.hpp>
 #include <iostream>
 #include <psibase/actor.hpp>
 #include <psibase/trace.hpp>
@@ -43,24 +42,20 @@ namespace psibase
       //        check_auth
       //        action 1
       //        ...
-      eosio::check(!t.action_traces.empty(), "transaction_trace has no actions");
+      check(!t.action_traces.empty(), "transaction_trace has no actions");
       auto&                            root = t.action_traces.back();
       std::vector<const action_trace*> top_traces;
       for (auto& inner : root.inner_traces)
          if (std::holds_alternative<action_trace>(inner.inner))
             top_traces.push_back(&std::get<action_trace>(inner.inner));
-      eosio::check(!(top_traces.size() & 1), "unexpected number of action traces");
-      eosio::check(2 * num + 1 < top_traces.size(), "trace not found");
+      check(!(top_traces.size() & 1), "unexpected number of action traces");
+      check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];
    }
 
    std::vector<char> read_whole_file(std::string_view filename);
 
    int32_t execute(std::string_view command);
-
-   eosio::asset string_to_asset(const char* s);
-
-   inline eosio::asset s2a(const char* s) { return string_to_asset(s); }
 
    /**
     * Validates the status of a transaction.  If expected_except is "", then the
@@ -111,7 +106,7 @@ namespace psibase
          else
          {
             show(true, _t);
-            eosio::check(false, "Action aborted, no return value");
+            check(false, "Action aborted, no return value");
             return ReturnType();  // Silence compiler warning
          }
       }
@@ -292,18 +287,3 @@ namespace psibase
    };  // test_chain
 
 }  // namespace psibase
-
-namespace eosio
-{
-   template <std::size_t Size>
-   std::ostream& operator<<(std::ostream& os, const fixed_bytes<Size>& d)
-   {
-      auto arr = d.extract_as_byte_array();
-      psibase::internal_use_do_not_use::hex(arr.begin(), arr.end(), os);
-      return os;
-   }
-
-   std::ostream& operator<<(std::ostream& os, const time_point_sec& obj);
-   std::ostream& operator<<(std::ostream& os, const name& obj);
-   std::ostream& operator<<(std::ostream& os, const asset& obj);
-}  // namespace eosio

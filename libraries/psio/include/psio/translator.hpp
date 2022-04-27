@@ -57,32 +57,32 @@ namespace psio
 
       virtual std::vector<char> json_to_frac(std::string json) const override 
       {
-         auto t = from_json<T>(json);
+         auto t = convert_from_json<T>(json);
          return to_frac(t);
       }
 
       virtual std::vector<char> json_to_protobuf(std::string json) const override 
       {
-         auto t = from_json<T>(json);
+         auto t = convert_from_json<T>(json);
          return to_protobuf(t);
       }
 
       virtual std::vector<char> json_to_bin(std::string json) const override
       {
-         auto t = from_json<T>(json);
-         return to_bin(t);
+         auto t = convert_from_json<T>(json);
+         return convert_to_bin(t);
       }
 
       virtual std::string protobuf_to_json(const std::vector<char>& b) const override
       {
          auto t = from_protobuf<T>(b);
-         return to_json(t);
+         return convert_to_json(t);
       }
 
       virtual std::vector<char> protobuf_to_bin(const std::vector<char>& b) const override
       {
          auto t = from_protobuf<T>(b);
-         return to_bin(t);
+         return convert_to_bin(t);
       }
       virtual std::vector<char> protobuf_to_frac(const std::vector<char>& b) const override
       {
@@ -93,13 +93,13 @@ namespace psio
       virtual std::string frac_to_json(const std::vector<char>& b) const override
       {
          auto t = from_frac<T>(b);
-         return to_json(t);
+         return convert_to_json(t);
       }
 
       virtual std::vector<char> frac_to_bin(const std::vector<char>& b) const override
       {
          auto t = from_frac<T>(b);
-         return to_bin(t);
+         return convert_to_bin(t);
       }
 
       virtual std::vector<char> frac_to_protobuf(const std::vector<char>& b) const override
@@ -112,21 +112,21 @@ namespace psio
 
       virtual std::vector<char> bin_to_protobuf(const std::vector<char>& b) const override
       {
-         auto t = from_bin<T>(b);
+         auto t = convert_from_bin<T>(b);
          return to_protobuf(t);
       }
 
       virtual std::vector<char> bin_to_frac(const std::vector<char>& b) const override
       {
-         auto t = from_bin<T>(b);
+         auto t = convert_from_bin<T>(b);
          return to_frac(t);
       }
 
 
       virtual std::string bin_to_json(const std::vector<char>& b) const override
       {
-         auto t = from_bin<T>(b);
-         return to_json(t);
+         auto t = convert_from_bin<T>(b);
+         return convert_to_json(t);
       }
    };
 
@@ -247,7 +247,7 @@ namespace psio
 
       std::vector<char> query_json_to_protobuf(string json_query) const
       {
-         auto jq  = from_json<psio::protobuf::json_query>(std::move(json_query));
+         auto jq  = convert_from_json<psio::protobuf::json_query>(std::move(json_query));
          auto pbq = psio::protobuf::from_json_query<T>(jq);
          return to_protobuf(pbq);
       }

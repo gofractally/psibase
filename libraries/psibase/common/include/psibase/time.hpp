@@ -1,8 +1,6 @@
 #pragma once
 #include <compare>
-
-#include <eosio/check.hpp>
-#include <eosio/reflection.hpp>
+#include <psibase/check.hpp>
 #include <psio/reflect.hpp>
 
 namespace psibase
@@ -24,7 +22,6 @@ namespace psibase
       auto     operator<=>(const TimePointSec&) const = default;
    };
    PSIO_REFLECT(TimePointSec, seconds);
-   EOSIO_REFLECT(TimePointSec, seconds);
 
    template <typename S>
    void from_json(TimePointSec& obj, S& stream)
@@ -33,7 +30,7 @@ namespace psibase
       const char* p = s.data();
       if (!string_to_utc_seconds(obj.seconds, p, s.data() + s.size(), true, true))
       {
-         eosio::check(false, "Expected TimePointSec");
+         check(false, "Expected TimePointSec");
       }
    }
 

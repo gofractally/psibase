@@ -1,9 +1,9 @@
 #include <psibase/crypto.hpp>
 
 #include <openssl/sha.h>
-#include <eosio/abieos_ripemd160.hpp>
-#include <eosio/check.hpp>
+#include <psibase/check.hpp>
 #include <psio/from_bin.hpp>
+#include <psio/psio_ripemd160.hpp>
 #include <psio/to_bin.hpp>
 
 namespace
@@ -35,7 +35,7 @@ namespace
       for (auto& src_digit : s)
       {
          int carry = base58Map[static_cast<uint8_t>(src_digit)];
-         eosio::check(carry >= 0, "Invalid key or signature");
+         psibase::check(carry >= 0, "Invalid key or signature");
          for (std::size_t i = offset; i < result.size(); ++i)
          {
             auto& result_byte = result[i];
@@ -86,12 +86,12 @@ namespace
    template <typename... Container>
    std::array<unsigned char, 20> digestSuffixRipemd160(const Container&... data)
    {
-      std::array<unsigned char, 20>     digest;
-      abieos_ripemd160::ripemd160_state self;
-      abieos_ripemd160::ripemd160_init(&self);
-      (abieos_ripemd160::ripemd160_update(&self, data.data(), data.size()), ...);
-      eosio::check(abieos_ripemd160::ripemd160_digest(&self, digest.data()),
-                   "Invalid key or signature");
+      std::array<unsigned char, 20>   digest;
+      psio_ripemd160::ripemd160_state self;
+      psio_ripemd160::ripemd160_init(&self);
+      (psio_ripemd160::ripemd160_update(&self, data.data(), data.size()), ...);
+      psibase::check(psio_ripemd160::ripemd160_digest(&self, digest.data()),
+                     "Invalid key or signature");
       return digest;
    }
 
@@ -101,19 +101,19 @@ namespace
       std::vector<char> whole;
       whole.push_back(uint8_t{type});
       base58ToBinary(whole, s);
-      eosio::check(whole.size() > 5, "Invalid key or signature");
+      psibase::check(whole.size() > 5, "Invalid key or signature");
       auto ripe_digest =
           digestSuffixRipemd160(std::string_view(whole.data() + 1, whole.size() - 5), suffix);
-      eosio::check(memcmp(ripe_digest.data(), whole.data() + whole.size() - 4, 4) == 0,
-                   "Invalid key or signature");
+      psibase::check(memcmp(ripe_digest.data(), whole.data() + whole.size() - 4, 4) == 0,
+                     "Invalid key or signature");
       whole.erase(whole.end() - 4, whole.end());
-      return psio::from_bin<Key>(whole);
+      return psio::convert_from_bin<Key>(whole);
    }
 
    template <typename Key>
    std::string keyToString(const Key& key, std::string_view suffix, const char* prefix)
    {
-      auto whole = psio::to_bin(key);
+      auto whole = psio::convert_to_bin(key);
       auto ripe_digest =
           digestSuffixRipemd160(std::string_view(whole.data() + 1, whole.size() - 1), suffix);
       whole.insert(whole.end(), ripe_digest.data(), ripe_digest.data() + 4);
@@ -143,7 +143,7 @@ namespace psibase
       }
       else
       {
-         eosio::check(false, "Expected public key");
+         check(false, "Expected public key");
          __builtin_unreachable();
       }
    }
@@ -166,7 +166,7 @@ namespace psibase
       }
       else
       {
-         eosio::check(false, "Expected public key");
+         check(false, "Expected public key");
          __builtin_unreachable();
       }
    }
@@ -179,7 +179,7 @@ namespace psibase
          return keyToString(private_key, "R1", "PVT_R1_");
       else
       {
-         eosio::check(false, "Expected private key");
+         check(false, "Expected private key");
          __builtin_unreachable();
       }
    }
@@ -192,17 +192,17 @@ namespace psibase
          return stringToKey<PrivateKey>(s.substr(7), KeyType::r1, "R1");
       else if (s.substr(0, 4) == "PVT_")
       {
-         eosio::check(false, "Expected private key");
+         check(false, "Expected private key");
          __builtin_unreachable();
       }
       else
       {
          std::vector<char> whole;
          base58ToBinary(whole, s);
-         eosio::check(whole.size() >= 5, "Expected private key");
+         check(whole.size() >= 5, "Expected private key");
          whole[0] = KeyType::k1;
          whole.erase(whole.end() - 4, whole.end());
-         return psio::from_bin<PrivateKey>(whole);
+         return psio::convert_from_bin<PrivateKey>(whole);
       }
    }
 
@@ -214,7 +214,7 @@ namespace psibase
          return keyToString(signature, "R1", "SIG_R1_");
       else
       {
-         eosio::check(false, "Expected signature");
+         check(false, "Expected signature");
          __builtin_unreachable();
       }
    }
@@ -227,7 +227,7 @@ namespace psibase
          return stringToKey<Signature>(s.substr(7), KeyType::r1, "R1");
       else
       {
-         eosio::check(false, "Expected signature");
+         check(false, "Expected signature");
          __builtin_unreachable();
       }
    }

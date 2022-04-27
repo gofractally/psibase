@@ -1,9 +1,10 @@
 #pragma once
+
 #include <deque>
 #include <list>
 #include <map>
 #include <optional>
-#include <psio/bytes.hpp>
+#include <psio/reflect.hpp>
 #include <psio/stream.hpp>
 #include <set>
 #include <string_view>
@@ -17,37 +18,52 @@ namespace psio
    void from_bin(T& obj, S& stream);
 
    template <typename S>
-   void varuint32_from_bin(uint32_t& dest, S& stream)
+   uint32_t varuint32_from_bin(S& stream)
    {
-      dest          = 0;
-      int     shift = 0;
-      uint8_t b     = 0;
+      uint32_t result = 0;
+      int      shift  = 0;
+      uint8_t  b      = 0;
       do
       {
          if (shift >= 35)
-            throw_error(stream_error::invalid_varuint_encoding);
+            abort_error(stream_error::invalid_varuint_encoding);
          from_bin(b, stream);
-         dest |= uint32_t(b & 0x7f) << shift;
+         result |= uint32_t(b & 0x7f) << shift;
          shift += 7;
       } while (b & 0x80);
+      return result;
+   }
+
+   template <typename S>
+   void varuint32_from_bin(uint32_t& dest, S& stream)
+   {
+      dest = varuint32_from_bin(stream);
+   }
+
+   template <typename S>
+   uint64_t varuint64_from_bin(S& stream)
+   {
+      uint64_t result = 0;
+      int      shift  = 0;
+      uint8_t  b      = 0;
+      do
+      {
+         if (shift >= 70)
+            abort_error(stream_error::invalid_varuint_encoding);
+         from_bin(b, stream);
+         result |= uint64_t(b & 0x7f) << shift;
+         shift += 7;
+      } while (b & 0x80);
+      return result;
    }
 
    template <typename S>
    void varuint64_from_bin(uint64_t& dest, S& stream)
    {
-      dest          = 0;
-      int     shift = 0;
-      uint8_t b     = 0;
-      do
-      {
-         if (shift >= 70)
-            throw_error(stream_error::invalid_varuint_encoding);
-         from_bin(b, stream);
-         dest |= uint64_t(b & 0x7f) << shift;
-         shift += 7;
-      } while (b & 0x80);
+      dest = varuint64_from_bin(stream);
    }
 
+   // zig-zag encoding
    template <typename S>
    void varint32_from_bin(int32_t& result, S& stream)
    {
@@ -57,6 +73,40 @@ namespace psio
          result = ((~v) >> 1) | 0x8000'0000;
       else
          result = v >> 1;
+   }
+
+   // signed leb128 encoding
+   template <typename Signed, typename S>
+   Signed sleb_from_bin(S& stream)
+   {
+      using Unsigned  = std::make_unsigned_t<Signed>;
+      Unsigned result = 0;
+      int      shift  = 0;
+      uint8_t  b      = 0;
+      do
+      {
+         check(shift < sizeof(Unsigned) * 8, stream_error::invalid_varuint_encoding);
+         from_bin(b, stream);
+         result |= Unsigned(b & 0x7f) << shift;
+         shift += 7;
+      } while (b & 0x80);
+      if (shift < sizeof(Unsigned) * 8 && (b & 0x40))
+         result |= -(Unsigned(1) << shift);
+      return result;
+   }
+
+   // signed leb128 encoding
+   template <typename S>
+   int64_t sleb64_from_bin(S& stream)
+   {
+      return sleb_from_bin<int64_t>(stream);
+   }
+
+   // signed leb128 encoding
+   template <typename S>
+   int64_t sleb32_from_bin(S& stream)
+   {
+      return sleb_from_bin<int32_t>(stream);
    }
 
    template <typename T, typename S>
@@ -90,7 +140,7 @@ namespace psio
       uint32_t size;
       varuint32_from_bin(size, stream);
       if (size != N)
-         throw_error(stream_error::array_size_mismatch);
+         abort_error(stream_error::array_size_mismatch);
       if constexpr (has_bitwise_serialization<T>())
       {
          stream.read(reinterpret_cast<char*>(v), size * sizeof(T));
@@ -99,7 +149,7 @@ namespace psio
       {
          for (size_t i = 0; i < size; ++i)
          {
-            OUTCOME_TRY(from_bin(v[i], stream));
+            from_bin(v[i], stream);
          }
       }
    }
@@ -246,7 +296,7 @@ namespace psio
       }
       else
       {
-         throw_error(stream_error::bad_variant_index);
+         abort_error(stream_error::bad_variant_index);
       }
    }
 
@@ -291,7 +341,7 @@ namespace psio
          stream.read(reinterpret_cast<char*>(&obj), sizeof(T));
       }
       else
-      {  //if constexpr (std::is_same_v<serialization_type<T>, void>) {
+      {
          reflect<T>::for_each(
              [&](const psio::meta&, auto m)
              {
@@ -300,53 +350,7 @@ namespace psio
                    from_bin(obj.*m, stream);
                 }
              });
-      } /*else {
-      // TODO: This can operate in place for standard serializers
-      decltype(serialize_as(obj)) temp;
-      OUTCOME_TRY(from_bin(temp, stream));
-      convert(temp, obj, choose_first);
-      return outcome::success();
-   } */
-   }
-
-   template <typename T>
-   void from_bin_vec(T& obj, const std::vector<char>& bin)
-   {
-      input_stream stream{bin};
-      from_bin(obj, stream);
-   }
-   template <typename T>
-   void from_bin_vec(T& obj, std::vector<char>& bin)
-   {
-      input_stream stream{bin};
-      from_bin(obj, stream);
-   }
-
-   template <typename T>
-   void from_bin_vec(T& obj, const bytes& bin)
-   {
-      from_bin_vec(obj, bin.data);
-   }
-   template <typename T>
-   void from_bin_vec(T& obj, bytes& bin)
-   {
-      from_bin_vec(obj, bin.data);
-   }
-
-   template <typename T>
-   T from_bin(const std::vector<char>& bin)
-   {
-      T obj;
-      from_bin_vec(obj, bin);
-      return obj;
-   }
-
-   template <typename T>
-   T from_bin(std::vector<char>& bin)
-   {
-      T obj;
-      from_bin_vec(obj, bin);
-      return obj;
+      }
    }
 
    template <typename T, typename S>
@@ -354,6 +358,21 @@ namespace psio
    {
       T obj;
       from_bin(obj, stream);
+      return obj;
+   }
+
+   template <typename T>
+   void convert_from_bin(T& obj, const std::vector<char>& bin)
+   {
+      input_stream stream{bin};
+      return from_bin(obj, stream);
+   }
+
+   template <typename T>
+   T convert_from_bin(const std::vector<char>& bin)
+   {
+      T obj;
+      convert_from_bin(obj, bin);
       return obj;
    }
 

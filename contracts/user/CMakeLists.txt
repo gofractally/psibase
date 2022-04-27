@@ -35,7 +35,7 @@ function(add_user_test suffix name)
       ../../../system/transaction_sys/include
       ../../../system/verify_ec_sys/include
      ${CMAKE_CURRENT_LIST_DIR})
-    target_link_libraries(${TARGET} contracts_system${suffix} nctestlib)
+    target_link_libraries(${TARGET} contracts_system${suffix} psitestlib)
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add_user_test)
 

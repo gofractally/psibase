@@ -67,6 +67,26 @@ namespace psio
             {
                stream.write("\\\\", 2);
             }
+            else if (*begin == '\b')
+            {
+               stream.write("\\b", 2);
+            }
+            else if (*begin == '\f')
+            {
+               stream.write("\\f", 2);
+            }
+            else if (*begin == '\n')
+            {
+               stream.write("\\n", 2);
+            }
+            else if (*begin == '\r')
+            {
+               stream.write("\\r", 2);
+            }
+            else if (*begin == '\t')
+            {
+               stream.write("\\t", 2);
+            }
             else
             {
                stream.write("\\u00", 4);
@@ -142,24 +162,26 @@ namespace psio
       small_buffer<24> b;  // fpconv_dtoa generates at most 24 characters
       int              n = fpconv_dtoa(value, b.pos);
       if (n <= 0)
-         throw_error(stream_error::float_error);
+         abort_error(stream_error::float_error);
       b.pos += n;
       stream.write(b.data, b.pos - b.data);
    }
 
    // clang-format off
-template <typename S> void to_json(uint8_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> void to_json(uint16_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> void to_json(uint32_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> void to_json(uint64_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> void to_json(unsigned __int128 value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> void to_json(int8_t value, S& stream)    { return int_to_json(value, stream); }
-template <typename S> void to_json(int16_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> void to_json(int32_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> void to_json(int64_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> void to_json(__int128 value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> void to_json(double value, S& stream)    { return fp_to_json(value, stream); }
-template <typename S> void to_json(float value, S& stream)     { return fp_to_json(value, stream); }
+template <typename S> void to_json(unsigned char value, S& stream)      { return int_to_json(value, stream); }
+template <typename S> void to_json(uint16_t value, S& stream)           { return int_to_json(value, stream); }
+template <typename S> void to_json(uint32_t value, S& stream)           { return int_to_json(value, stream); }
+template <typename S> void to_json(uint64_t value, S& stream)           { return int_to_json(value, stream); }
+template <typename S> void to_json(unsigned __int128 value, S& stream)  { return int_to_json(value, stream); }
+template <typename S> void to_json(char value, S& stream)               { return int_to_json(value, stream); }
+template <typename S> void to_json(signed char value, S& stream)        { return int_to_json(value, stream); }
+template <typename S> void to_json(int16_t value, S& stream)            { return int_to_json(value, stream); }
+template <typename S> void to_json(int32_t value, S& stream)            { return int_to_json(value, stream); }
+template <typename S> void to_json(int64_t value, S& stream)            { return int_to_json(value, stream); }
+template <typename S> void to_json(__int128 value, S& stream)           { return int_to_json(value, stream); }
+template <typename S> void to_json(double value, S& stream)             { return fp_to_json(value, stream); }
+template <typename S> void to_json(float value, S& stream)              { return fp_to_json(value, stream); }
+
    // clang-format on
 
    template <typename T, typename S>
@@ -206,10 +228,15 @@ template <typename S> void to_json(float value, S& stream)     { return fp_to_js
    void to_json(const std::variant<T...>& obj, S& stream)
    {
       stream.write('[');
+      increase_indent(stream);
+      write_newline(stream);
       std::visit(
           [&](const auto& t) { to_json(get_type_name<std::decay_t<decltype(t)>>(), stream); }, obj);
       stream.write(',');
+      write_newline(stream);
       std::visit([&](auto& x) { return to_json(x, stream); }, obj);
+      decrease_indent(stream);
+      write_newline(stream);
       stream.write(']');
    }
 
@@ -239,58 +266,48 @@ template <typename S> void to_json(float value, S& stream)     { return fp_to_js
    template <typename T, typename S>
    void to_json(const T& t, S& stream)
    {
-      if constexpr (not reflect<T>::is_defined)
-      {
-         stream.write('"');
-         std::string str(t);
-         stream.write(str.data(), str.size());
-         stream.write('"');
-      }
-      else
-      {
-         bool first = true;
-         stream.write('{');
-         reflect<T>::for_each(
-             [&](const psio::meta& ref, auto&& member)
+      bool first = true;
+      stream.write('{');
+      reflect<T>::for_each(
+          [&](const psio::meta& ref, auto&& member)
+          {
+             if constexpr (not std::is_member_function_pointer_v<std::decay_t<decltype(member)>>)
              {
-                if constexpr (not std::is_member_function_pointer_v<std::decay_t<decltype(member)>>)
+                auto addfield = [&]()
                 {
-                   auto addfield = [&]()
+                   if (first)
                    {
-                      if (first)
-                      {
-                         increase_indent(stream);
-                         first = false;
-                      }
-                      else
-                      {
-                         stream.write(',');
-                      }
-                      write_newline(stream);
-                      to_json(ref.name, stream);
-                      write_colon(stream);
-                      to_json(t.*member, stream);
-                   };
-
-                   using member_type = std::decay_t<decltype(t.*member)>;
-                   if constexpr (not is_std_optional<member_type>::value)
-                   {
-                      addfield();
+                      increase_indent(stream);
+                      first = false;
                    }
                    else
                    {
-                      if (!!(t.*member))
-                         addfield();
+                      stream.write(',');
                    }
+                   write_newline(stream);
+                   to_json(ref.name, stream);
+                   write_colon(stream);
+                   to_json(t.*member, stream);
+                };
+
+                using member_type = std::decay_t<decltype(t.*member)>;
+                if constexpr (not is_std_optional<member_type>::value)
+                {
+                   addfield();
                 }
-             });
-         if (!first)
-         {
-            decrease_indent(stream);
-            write_newline(stream);
-         }
-         stream.write('}');
+                else
+                {
+                   if (!!(t.*member))
+                      addfield();
+                }
+             }
+          });
+      if (!first)
+      {
+         decrease_indent(stream);
+         write_newline(stream);
       }
+      stream.write('}');
    }
 
    template <typename S>
@@ -307,13 +324,43 @@ template <typename S> void to_json(float value, S& stream)     { return fp_to_js
    }
 
    template <typename S>
+   void to_json(const input_stream& data, S& stream)
+   {
+      to_json_hex(data.pos, data.end - data.pos, stream);
+   }
+
+   template <typename S>
    void to_json(const std::vector<char>& obj, S& stream)
    {
       to_json_hex(obj.data(), obj.size(), stream);
    }
 
+   template <typename S>
+   void to_json(const std::vector<unsigned char>& v, S& stream)
+   {
+      to_json_hex(reinterpret_cast<const char*>(v.data()), v.size(), stream);
+   }
+
+   template <typename S>
+   void to_json(const std::vector<signed char>& v, S& stream)
+   {
+      to_json_hex(reinterpret_cast<const char*>(v.data()), v.size(), stream);
+   }
+
    template <size_t N, typename S>
-   void to_json(const std::array<uint8_t, N>& obj, S& stream)
+   void to_json(const std::array<unsigned char, N>& obj, S& stream)
+   {
+      to_json_hex(reinterpret_cast<const char*>(obj.data()), obj.size(), stream);
+   }
+
+   template <size_t N, typename S>
+   void to_json(const std::array<signed char, N>& obj, S& stream)
+   {
+      to_json_hex(reinterpret_cast<const char*>(obj.data()), obj.size(), stream);
+   }
+
+   template <size_t N, typename S>
+   void to_json(const std::array<char, N>& obj, S& stream)
    {
       to_json_hex(reinterpret_cast<const char*>(obj.data()), obj.size(), stream);
    }
@@ -331,13 +378,7 @@ template <typename S> void to_json(float value, S& stream)     { return fp_to_js
       if (fbs.pos == fbs.end)
          return result;
       else
-         throw_error(stream_error::underrun);
-   }
-
-   template <typename T>
-   std::string to_json(const T& t)
-   {
-      return convert_to_json(t);
+         abort_error(stream_error::underrun);
    }
 
    template <typename T>
@@ -349,7 +390,7 @@ template <typename S> void to_json(float value, S& stream)     { return fp_to_js
       pretty_stream<fixed_buf_stream> fbs(result.data(), result.size());
       to_json(t, fbs);
       if (fbs.pos != fbs.end)
-         throw_error(stream_error::underrun);
+         abort_error(stream_error::underrun);
       return result;
    }
 

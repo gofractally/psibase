@@ -224,7 +224,7 @@ namespace psio
                case json_token_type::type_key:
                default:
                   stream.eat_token();
-                  throw_error(psio::from_json_error::value_invalid);
+                  abort_error(psio::from_json_error::value_invalid);
             };
          }
       }

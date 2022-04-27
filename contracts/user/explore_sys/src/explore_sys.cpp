@@ -65,14 +65,14 @@ PSIO_REFLECT(  //
 
 namespace system_contract
 {
-   psibase::rpc_reply_data explore_sys::serveSys(psibase::rpc_request_data request)
+   std::optional<psibase::rpc_reply_data> explore_sys::serveSys(psibase::rpc_request_data request)
    {
       if (request.method == "GET")
       {
          auto content = kv_get<WebContentRow>(webContentKey(get_receiver(), request.target));
          if (!!content)
          {
-            return {
+            return psibase::rpc_reply_data{
                 .contentType = content->contentType,
                 .reply       = content->content,
             };
@@ -92,7 +92,7 @@ namespace system_contract
          }
       }
 
-      psibase::abort_message_str("not found");
+      return std::nullopt;
    }  // explore_sys::proxy_sys
 
    void explore_sys::uploadSys(psio::const_view<std::string>       path,

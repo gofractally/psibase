@@ -1,8 +1,8 @@
 #include <psibase/intrinsic.hpp>
-
-#include <eosio/asset.hpp>
-#include <eosio/from_bin.hpp>
-#include <eosio/to_bin.hpp>
+#include <psibase/print.hpp>
+#include <psio/from_bin.hpp>
+#include <psio/to_bin.hpp>
+#include <psio/to_key.hpp>
 
 using namespace psibase;
 
@@ -27,7 +27,7 @@ struct item
 
    auto get_key(account_num this_contract) const
    {
-      auto k = eosio::convert_to_key(this_contract);
+      auto k = psio::convert_to_key(this_contract);
       k.insert(k.end(), key.begin(), key.end());
       return k;
    }
@@ -57,14 +57,14 @@ std::vector<item> items = {
 void test(account_num this_contract)
 {
    if (enable_print)
-      eosio::print("kv_put\n");
+      print("kv_put\n");
    for (const auto& item : items)
       if (item.add)
          kv_put_raw(kv_map::contract, item.get_key(this_contract),
-                    eosio::convert_to_bin(item.value));
+                    psio::convert_to_bin(item.value));
 
    if (enable_print)
-      eosio::print("kv_remove\n");
+      print("kv_remove\n");
    for (const auto& item : items)
       if (!item.keep)
          kv_remove_raw(kv_map::contract, item.get_key(this_contract));
@@ -74,7 +74,7 @@ void test(account_num this_contract)
       if (expected == skip)
       {
          if (enable_print)
-            eosio::print("skip ");
+            print("skip ");
          return;
       }
       auto result = f(kv_map::contract, key, match_key_size + 4);
@@ -82,12 +82,12 @@ void test(account_num this_contract)
       {
          check(get_key().empty(), "get_key() not empty");
          if (enable_print)
-            eosio::print("ok   ");
+            print("ok   ");
          return;
       }
       check(!!result, "missing result");
       check(!!expected, "result exists");
-      auto val = eosio::convert_from_bin<uint8_t>(*result);
+      auto val = psio::convert_from_bin<uint8_t>(*result);
       if (val != *expected)
       {
          if (enable_print)
@@ -104,11 +104,11 @@ void test(account_num this_contract)
       }
       check(found, "matching value missing in items");
       if (enable_print)
-         eosio::print("ok   ");
+         print("ok   ");
    };
 
    if (enable_print)
-      eosio::print("kv_less_than\n");
+      print("kv_less_than\n");
    for (const auto& item : items)
    {
       auto key = item.get_key(this_contract);
@@ -121,11 +121,11 @@ void test(account_num this_contract)
       run(5, item.lt5, key, kv_less_than_raw);
       run(6, item.lt6, key, kv_less_than_raw);
       if (enable_print)
-         eosio::print("\n");
+         print("\n");
    }  // kv_less_than
 
    if (enable_print)
-      eosio::print("kv_greater_equal\n");
+      print("kv_greater_equal\n");
    for (const auto& item : items)
    {
       auto key = item.get_key(this_contract);
@@ -138,11 +138,11 @@ void test(account_num this_contract)
       run(5, item.ge5, key, kv_greater_equal_raw);
       run(6, item.ge6, key, kv_greater_equal_raw);
       if (enable_print)
-         eosio::print("\n");
+         print("\n");
    }  // kv_greater_equal
 
    if (enable_print)
-      eosio::print("kv_max\n");
+      print("kv_max\n");
    for (const auto& item : items)
    {
       auto key = item.get_key(this_contract);
@@ -152,9 +152,9 @@ void test(account_num this_contract)
          fflush(stdout);
       }
       run(0, item.max, key,
-          [](kv_map map, eosio::input_stream key, size_t) { return kv_max_raw(map, key); });
+          [](kv_map map, psio::input_stream key, size_t) { return kv_max_raw(map, key); });
       if (enable_print)
-         eosio::print("\n");
+         print("\n");
    }  // kv_max
 
 }  // test()

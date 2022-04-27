@@ -19,7 +19,6 @@ namespace UserContract
       friend std::strong_ordering operator<=>(const InfSettingsRecord&,
                                               const InfSettingsRecord&) = default;
    };
-   EOSIO_REFLECT(InfSettingsRecord, daily_limit_pct, daily_limit_qty, yearly_limit_pct);
    PSIO_REFLECT(InfSettingsRecord, daily_limit_pct, daily_limit_qty, yearly_limit_pct);
 
    struct InfStatsRecord
@@ -30,7 +29,6 @@ namespace UserContract
       friend std::strong_ordering operator<=>(const InfStatsRecord&,
                                               const InfStatsRecord&) = default;
    };
-   EOSIO_REFLECT(InfStatsRecord, avg_daily, avg_yearly);
    PSIO_REFLECT(InfStatsRecord, avg_daily, avg_yearly);
 
    struct InflationRecord
@@ -41,7 +39,6 @@ namespace UserContract
       friend std::strong_ordering operator<=>(const InflationRecord&,
                                               const InflationRecord&) = default;
    };
-   EOSIO_REFLECT(InflationRecord, settings, stats);
    PSIO_REFLECT(InflationRecord, settings, stats);
 
    struct Flags
@@ -60,7 +57,6 @@ namespace UserContract
 
       friend std::strong_ordering operator<=>(const Flags&, const Flags&) = default;
    };
-   EOSIO_REFLECT(Flags, bits);
    PSIO_REFLECT(Flags, bits);
 
    struct TokenRecord
@@ -72,7 +68,6 @@ namespace UserContract
 
       friend std::strong_ordering operator<=>(const TokenRecord&, const TokenRecord&) = default;
    };
-   EOSIO_REFLECT(TokenRecord, tokenId, ownerNft, inflation, flags);
    PSIO_REFLECT(TokenRecord, tokenId, ownerNft, inflation, flags);
    using TokenTable_t = psibase::table<TokenRecord, &TokenRecord::tokenId>;
 
@@ -82,7 +77,6 @@ namespace UserContract
       TID                    tokenId;
       uint64_t               balance;
    };
-   EOSIO_REFLECT(BalanceRecord, account, tokenId, balance);
    PSIO_REFLECT(BalanceRecord, account, tokenId, balance);
    using BalanceTable_t = psibase::table<BalanceRecord, &BalanceRecord::account>;
    // Todo - additional index when available on tokenId
@@ -95,7 +89,6 @@ namespace UserContract
       TID      tokenId;
       uint64_t balance;
    };
-   EOSIO_REFLECT(SharedBalanceRecord, creditor, debitor, tokenId, balance);
    PSIO_REFLECT(SharedBalanceRecord, creditor, debitor, tokenId, balance);
    using SharedBalanceTable_t = psibase::table<SharedBalanceRecord, &SharedBalanceRecord::creditor>;
    // Todo - additional indices when available

@@ -2,7 +2,6 @@
 
 #include <cctype>
 #include <charconv>
-#include <psio/name.hpp>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
 #include <psio/to_json.hpp>
@@ -221,7 +220,7 @@ namespace psio
       std::string             result(ss.size, 0);
       eosio::fixed_buf_stream fbs(result.data(), result.size());
       fill_gql_schema((T*)nullptr, fbs);
-      eosio::check(fbs.pos == fbs.end, eosio::convert_stream_error(eosio::stream_error::underrun));
+      eosio::check(fbs.pos == fbs.end, eosio::error_to_str(eosio::stream_error::underrun));
       return result;
    }
 */
@@ -867,7 +866,7 @@ namespace psio
       {
          from_string(arg, input_stream.current_value);
          // TODO: prevent abort
-         //arg = eosio::convert_from_string<T>(input_stream.current_value);
+         //arg = psio::convert_from_string<T>(input_stream.current_value);
          input_stream.skip();
          return true;
       }

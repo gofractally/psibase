@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:23fd6d904ef2a67a9d2cb3b89d82ad5b60cf5f7a"
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:7d2db9589be0e1b18fba09f8d0a94a5293796aa2"
   LIBMDBX_MIRROR_PRIVATE_KEY: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
 
 jobs:
@@ -31,10 +31,10 @@ jobs:
       - name: Preserve ccache
         uses: actions/cache@v1.1.0
         with:
-          path: .ccache
-          key: $ubuntu-20.04-ccache_make-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
+          path: .caches
+          key: $ubuntu-20.04-caches-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            $ubuntu-20.04-ccache_make-
+            $ubuntu-20.04-caches-
       - name: Build
         run: |
           set -e
@@ -47,18 +47,23 @@ jobs:
           GIT_SSH_COMMAND="ssh -i $HOME/.ssh/libmdbx-mirror.key" git submodule add git@github.com:gofractally/libmdbx-mirror.git external/libmdbx/
           git submodule update --init --recursive
           echo =====
-          export CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache
+          export CCACHE_DIR=${GITHUB_WORKSPACE}/.caches/ccache
+          export SCCACHE_DIR=${GITHUB_WORKSPACE}/.caches/sccache
           export CCACHE_CONFIGPATH=${GITHUB_WORKSPACE}/ccache.conf
           echo max_size = 600M >${GITHUB_WORKSPACE}/ccache.conf
           echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
-          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
-          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH ${UBUNTU_2004_IMAGE}"
+          export SCCACHE_CACHE_SIZE=200M
+          export RUSTC_WRAPPER=sccache
+          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
+          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER ${UBUNTU_2004_IMAGE}"
           docker pull ${UBUNTU_2004_IMAGE}
           echo =====
           ${DOCKER} ccache -s
           echo =====
+          ${DOCKER} sccache -s
+          echo =====
           mkdir build
-          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
+          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DBUILD_RUST=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
           echo =====
@@ -67,4 +72,6 @@ jobs:
           ls -la ${GITHUB_WORKSPACE}
           echo =====
           ${DOCKER} ccache -s
+          echo =====
+          ${DOCKER} sccache -s
           echo =====

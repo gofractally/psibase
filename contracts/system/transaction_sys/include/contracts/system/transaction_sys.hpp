@@ -1,10 +1,10 @@
 #pragma once
 
-#include <eosio/from_bin.hpp>
-#include <eosio/to_bin.hpp>
 #include <psibase/Contract.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psibase/native_tables.hpp>
+#include <psio/from_bin.hpp>
+#include <psio/to_bin.hpp>
 
 namespace system_contract
 {

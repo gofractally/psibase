@@ -36,12 +36,11 @@ struct CreateAccount
    psibase::AccountNumber authContract = {};
    bool                   allowSudo    = false;
 };
-EOSIO_REFLECT(CreateAccount, account, authContract, allowSudo)
 PSIO_REFLECT(CreateAccount, account, authContract, allowSudo)
 
 namespace system_contract
 {
-   rpc_reply_data rpc_account_sys::serveSys(rpc_request_data request)
+   std::optional<rpc_reply_data> rpc_account_sys::serveSys(rpc_request_data request)
    {
       auto to_json = [](const auto& obj)
       {
@@ -57,7 +56,7 @@ namespace system_contract
          auto content = kv_get<WebContentRow>(webContentKey(get_receiver(), request.target));
          if (!!content)
          {
-            return {
+            return rpc_reply_data{
                 .contentType = content->contentType,
                 .reply       = content->content,
             };
@@ -66,7 +65,7 @@ namespace system_contract
          if (request.target == "/accounts")
          {
             std::vector<account_row> rows;
-            auto                     key     = eosio::convert_to_key(account_key({}));
+            auto                     key     = psio::convert_to_key(account_key({}));
             auto                     keySize = sizeof(account_table);
             while (true)
             {
@@ -88,9 +87,9 @@ namespace system_contract
          if (request.target == "/pack/create_account")
          {
             request.body.push_back(0);
-            eosio::json_token_stream jstream{request.body.data()};
-            CreateAccount            args;
-            eosio::from_json(args, jstream);
+            psio::json_token_stream jstream{request.body.data()};
+            CreateAccount           args;
+            psio::from_json(args, jstream);
             check(args.account.value, "Invalid or missing name");
             check(args.authContract.value, "Invalid or missing authContract");
             action act{
@@ -103,7 +102,7 @@ namespace system_contract
          }
       }
 
-      abort_message_str("not found");
+      return std::nullopt;
    }  // rpc_account_sys::proxy_sys
 
    void rpc_account_sys::uploadSys(psio::const_view<std::string>       path,

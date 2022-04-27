@@ -5,11 +5,10 @@
 #include <psibase/blob.hpp>
 #include <psibase/native_tables.hpp>
 #include <psio/fracpack.hpp>
+#include <psio/from_bin.hpp>
+#include <psio/to_key.hpp>
 
 #include <boost/filesystem/path.hpp>
-#include <eosio/from_bin.hpp>
-#include <eosio/to_key.hpp>
-#include <eosio/types.hpp>
 
 namespace psibase
 {
@@ -24,7 +23,7 @@ namespace psibase
       shared_database(shared_database&&)      = default;
 
       shared_database& operator=(const shared_database&) = default;
-      shared_database& operator=(shared_database&&) = default;
+      shared_database& operator=(shared_database&&)      = default;
    };
 
    struct database_impl;
@@ -34,8 +33,8 @@ namespace psibase
 
       struct kv_result
       {
-         eosio::input_stream key;
-         eosio::input_stream value;
+         psio::input_stream key;
+         psio::input_stream value;
       };
 
       struct session
@@ -82,28 +81,28 @@ namespace psibase
       void    commit(session&);
       void    abort(session&);
 
-      void kv_put_raw(kv_map map, eosio::input_stream key, eosio::input_stream value);
-      void kv_remove_raw(kv_map map, eosio::input_stream key);
-      std::optional<eosio::input_stream> kv_get_raw(kv_map map, eosio::input_stream key);
-      std::optional<kv_result>           kv_greater_equal_raw(kv_map              map,
-                                                              eosio::input_stream key,
-                                                              size_t              match_key_size);
-      std::optional<kv_result>           kv_less_than_raw(kv_map              map,
-                                                          eosio::input_stream key,
-                                                          size_t              match_key_size);
-      std::optional<kv_result>           kv_max_raw(kv_map map, eosio::input_stream key);
+      void kv_put_raw(kv_map map, psio::input_stream key, psio::input_stream value);
+      void kv_remove_raw(kv_map map, psio::input_stream key);
+      std::optional<psio::input_stream> kv_get_raw(kv_map map, psio::input_stream key);
+      std::optional<kv_result>          kv_greater_equal_raw(kv_map             map,
+                                                             psio::input_stream key,
+                                                             size_t             match_key_size);
+      std::optional<kv_result>          kv_less_than_raw(kv_map             map,
+                                                         psio::input_stream key,
+                                                         size_t             match_key_size);
+      std::optional<kv_result>          kv_max_raw(kv_map map, psio::input_stream key);
 
       template <typename K, typename V>
       auto kv_put(kv_map map, const K& key, const V& value)
-          -> std::enable_if_t<!eosio::is_std_optional<V>(), void>
+          -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
-         kv_put_raw(map, eosio::convert_to_key(key), psio::convert_to_frac(value));
+         kv_put_raw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
       }
 
       template <typename V, typename K>
       std::optional<V> kv_get(kv_map map, const K& key)
       {
-         auto s = kv_get_raw(map, eosio::convert_to_key(key));
+         auto s = kv_get_raw(map, psio::convert_to_key(key));
          if (!s)
             return std::nullopt;
          return psio::convert_from_frac<V>(psio::input_stream(s->pos, s->end));

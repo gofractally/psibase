@@ -1,7 +1,7 @@
 #pragma once
-#include <psio/error.hpp>
+#include <psio/check.hpp>
 #include <psio/get_type_name.hpp>
-#include <psio/name.hpp>
+#include <psio/reflect.hpp>
 #include <psio/stream.hpp>
 #include <psio/unaligned_type.hpp>
 
@@ -561,7 +561,7 @@ namespace psio
          {
             if (member.size() == 0)
             {
-               throw_error("shared_view_ptr is not allowed to be null");
+               abort_error("shared_view_ptr is not allowed to be null");
                /*
                uint32_t offset = 0;
                stream.write(&offset, sizeof(offset));
@@ -1033,7 +1033,7 @@ namespace psio
                memcpy(&vec_str_size, stream.pos + offset, sizeof(vec_str_size));
 
                if (vec_str_size == 0)
-                  throw_error(stream_error::empty_vec_used_offset);
+                  abort_error(stream_error::empty_vec_used_offset);
 
                stream.add_total_read(insubstream.get_total_read());
             }
@@ -1064,7 +1064,7 @@ namespace psio
             pos(startptr)
       {
       }
-      check_stream(const check_stream&) = default;
+      check_stream(const check_stream&)            = default;
       check_stream& operator=(const check_stream&) = default;
 
       bool valid;    ///< no errors detected
@@ -1319,7 +1319,7 @@ namespace psio
          }
          else
          {
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          }
          return stream;
       }
@@ -1583,12 +1583,14 @@ namespace psio
       const_frac_proxy_view(const char* c) : buffer(c) {}
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[]( T&& k ) const {
-         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      auto operator[](T&& k) const
+      {
+         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
       }
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[]( T&& k ) {
-         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      auto operator[](T&& k)
+      {
+         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
       }
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
@@ -1637,12 +1639,14 @@ namespace psio
       frac_proxy_view(char* c) : buffer(c) {}
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[]( T&& k ) const {
-         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      auto operator[](T&& k) const
+      {
+         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
       }
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[]( T&& k ) {
-         return get<idx,Name,MemberPtr>()[std::forward<T>(k)];
+      auto operator[](T&& k)
+      {
+         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
       }
 
       /** This method is called by the reflection library to get the field */
@@ -2131,6 +2135,8 @@ namespace psio
          fracunpack<T>(tmp, in);
          return tmp;
       }
+
+      T get() const { return (T)(*this); }
    };
 
    template <typename T>
@@ -2490,7 +2496,6 @@ namespace psio
          return false;
       }
 
-
       T unpack() const
       {
          T            tmp;
@@ -2535,7 +2540,7 @@ namespace psio
    {
       if (fracvalidate<T>(b.data(), b.data() + b.size()).valid)
          return convert_from_frac<T>(b);
-      throw_error(stream_error::invalid_frac_encoding);
+      abort_error(stream_error::invalid_frac_encoding);
    }
 
    template <typename T>
@@ -2547,4 +2552,3 @@ namespace psio
    }
 
 }  // namespace psio
-

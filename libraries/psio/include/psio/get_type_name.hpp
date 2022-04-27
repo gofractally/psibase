@@ -14,11 +14,17 @@
 namespace psio
 {
 
-#define PSIO_REFLECT_TYPENAME(T) \
-   constexpr const char* get_type_name(const T*) { return BOOST_PP_STRINGIZE(T); }
+#define PSIO_REFLECT_TYPENAME(T)                 \
+   constexpr const char* get_type_name(const T*) \
+   {                                             \
+      return BOOST_PP_STRINGIZE(T);              \
+   }
 
-#define PSIO_REFLECT_TYPENAME_CUSTOM(T, CUSTOM) \
-   constexpr const char* get_type_name(const T*) { return BOOST_PP_STRINGIZE(CUSTOM); }
+#define PSIO_REFLECT_TYPENAME_CUSTOM(T, CUSTOM)  \
+   constexpr const char* get_type_name(const T*) \
+   {                                             \
+      return BOOST_PP_STRINGIZE(CUSTOM);         \
+   }
 
    template <typename T>
    constexpr const char* get_type_name(const std::optional<T>*);
@@ -31,6 +37,7 @@ namespace psio
    template <typename... T>
    constexpr const char* get_type_name(const std::variant<T...>*);
 
+   // clang-format off
    constexpr const char* get_type_name(const bool*) { return "bool"; }
    constexpr const char* get_type_name(const int8_t*) { return "int8"; }
    constexpr const char* get_type_name(const uint8_t*) { return "uint8"; }
@@ -46,6 +53,7 @@ namespace psio
    constexpr const char* get_type_name(const std::string*) { return "string"; }
    constexpr const char* get_type_name(const __int128*) { return "int128"; }
    constexpr const char* get_type_name(const unsigned __int128*) { return "uint128"; }
+   // clang-format on
 
    template <std::size_t N, std::size_t M>
    constexpr std::array<char, N + M> array_cat(std::array<char, N> lhs, std::array<char, M> rhs)
@@ -162,88 +170,36 @@ namespace psio
       return get_type_name((const T*)nullptr);
    }
 
-   [[nodiscard]] inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result)
+   inline constexpr uint64_t city_hash_name(std::string_view str)
    {
-      if (c >= 'a' && c <= 'z')
-      {
-         result = (c - 'a') + 6;
-         return true;
-      }
-      if (c >= '1' && c <= '5')
-      {
-         result = (c - '1') + 1;
-         return true;
-      }
-      if (c == '.')
-      {
-         result = 0;
-         return true;
-      }
-      return false;
-   }
-
-   [[nodiscard]] inline constexpr bool string_to_name_strict(uint64_t& name, std::string_view str)
-   {
-      name       = 0;
-      unsigned i = 0;
-      for (; i < str.size() && i < 12; ++i)
-      {
-         uint64_t x = 0;
-         // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
-         auto r = char_to_name_digit_strict(str[i], x);
-         if (!r)
-            return false;
-         name |= (x & 0x1f) << (64 - 5 * (i + 1));
-      }
-      if (i < str.size() && i == 12)
-      {
-         uint64_t x = 0;
-         // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
-         auto r = char_to_name_digit_strict(str[i], x);
-         if (!r)
-            return false;
-
-         if (x != (x & 0xf))
-            return false;
-         name |= x;
-         ++i;
-      }
-      if (i < str.size())
-         return false;
-      return true;
-   }
-
-   /*
-   inline constexpr uint64_t hash_name(std::string_view str)
-   {
-      uint64_t r = 0;
-      if (not string_to_name_strict(r, str))
-         return murmur64(str.data(), str.size());
-      return r;
-   }
-   */
-   inline constexpr uint64_t city_hash_name( std::string_view str ) {
       return consthash::city64(str.data(), str.size()) | (uint64_t(0x01) << (64 - 8));
    }
 
+   // TODO: rename. "hash_name" implies it's always a hash and
+   //       doesn't indicate which name format
    inline constexpr uint64_t hash_name(std::string_view str)
    {
       uint64_t n = detail::method_to_number(str);
       if (n)
       {
          return n;
-      } else {
+      }
+      else
+      {
          return city_hash_name(str);
       }
    }
-   inline constexpr bool is_compressed_name( uint64_t c ) {
+
+   // TODO: rename; doesn't indicate which name format
+   inline constexpr bool is_compressed_name(uint64_t c)
+   {
       return not detail::is_hash_name(c);
    }
 
+   // TODO: rename; doesn't indicate which name format
    template <typename T>
    constexpr uint64_t get_type_hashname()
    {
       return hash_name(get_type_name<T>());
    }
-
 }  // namespace psio

@@ -6,10 +6,6 @@
 
 namespace psio
 {
-
-   template <typename T>
-   std::vector<char> to_bin(const T& t);
-
    template <typename S>
    void to_bin(std::string_view sv, S& stream);
 
@@ -34,11 +30,7 @@ namespace psio
    template <typename S>
    void varuint32_to_bin(uint64_t val, S& stream)
    {
-      if (val >> 32)
-      {
-         /// TODO throw error   return stream_error::varuint_too_big;
-         return;
-      }
+      check(!(val >> 32), stream_error::varuint_too_big);
       do
       {
          uint8_t b = val & 0x7f;
@@ -48,7 +40,21 @@ namespace psio
       } while (val);
    }
 
-   // !!! temp
+   // signed leb128 encoding
+   template <typename S>
+   void sleb64_to_bin(int64_t val, S& stream)
+   {
+      bool done = false;
+      while (!done)
+      {
+         uint8_t b = val & 0x7f;
+         done      = (val >> 6) == (val >> 7);
+         val >>= 7;
+         b |= (!done << 7);
+         stream.write(b);
+      }
+   }
+
    inline void push_varuint32(std::vector<char>& bin, uint32_t v)
    {
       vector_stream st{bin};
@@ -196,15 +202,11 @@ namespace psio
       bin.resize(orig_size + ss.size);
       fixed_buf_stream fbs(bin.data() + orig_size, ss.size);
       to_bin(t, fbs);
-
-      /** TODO maybe throw 
-   if (fbs.pos != fbs.end)
-      return stream_error::underrun;
-   */
+      check(fbs.pos == fbs.end, stream_error::underrun);
    }
 
    template <typename T>
-   std::vector<char> to_bin(const T& t)
+   std::vector<char> convert_to_bin(const T& t)
    {
       std::vector<char> result;
       convert_to_bin(t, result);

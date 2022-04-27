@@ -1,6 +1,6 @@
 #pragma once
-#include <eosio/check.hpp>
 #include <psibase/block.hpp>
+#include <psibase/check.hpp>
 #include <psibase/db.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psio/fracpack.hpp>

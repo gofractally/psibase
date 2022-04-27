@@ -1,9 +1,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <debug_eos_vm/debug_eos_vm.hpp>
-#include <eosio/chain_types.hpp>
-#include <eosio/fixed_bytes.hpp>
-#include <eosio/to_bin.hpp>
 #include <psibase/block_context.hpp>
+#include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 
 #include <stdio.h>
@@ -13,8 +11,8 @@
 
 using namespace std::literals;
 
-using eosio::convert_to_bin;
 using eosio::vm::span;
+using psio::convert_to_bin;
 
 struct callbacks;
 using rhf_t = eosio::vm::registered_host_functions<callbacks>;
@@ -131,13 +129,13 @@ struct test_chain
 
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
-      eosio::check(snapshot.empty(), "snapshots not implemented");
+      psibase::check(snapshot.empty(), "snapshots not implemented");
       dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
       db  = {dir};
       sys = std::make_unique<psibase::system_context>(psibase::system_context{db, {128}});
    }
 
-   test_chain(const test_chain&) = delete;
+   test_chain(const test_chain&)            = delete;
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
@@ -353,9 +351,8 @@ struct callbacks
    {
       auto* memory   = state.backend.get_context().linear_memory();
       auto  get_argv = [&]() -> uint32_t& { return *reinterpret_cast<uint32_t*>(memory + argv); };
-      auto  get_argv_buf = [&]() -> uint8_t& {
-         return *reinterpret_cast<uint8_t*>(memory + argv_buf);
-      };
+      auto  get_argv_buf = [&]() -> uint8_t&
+      { return *reinterpret_cast<uint8_t*>(memory + argv_buf); };
 
       for (auto& a : state.args)
       {
@@ -634,9 +631,9 @@ struct callbacks
                                 uint32_t         cb_alloc_data,
                                 uint32_t         cb_alloc)
    {
-      auto&               chain = assert_chain(chain_index);
-      eosio::input_stream s     = {args_packed.data(), args_packed.size()};
-      auto                signed_trx =
+      auto&              chain = assert_chain(chain_index);
+      psio::input_stream s     = {args_packed.data(), args_packed.size()};
+      auto               signed_trx =
           psio::convert_from_frac<psibase::signed_transaction>(psio::input_stream{s.pos, s.end});
 
       chain.start_if_needed();

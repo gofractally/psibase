@@ -5,6 +5,7 @@ use custom_error::custom_error;
 use reqwest::Url;
 use serde_json::Value;
 
+mod boot;
 mod bridge;
 
 custom_error! { Error
@@ -30,6 +31,9 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Boot a development chain
+    Boot {},
+
     /// Install a contract
     Install {
         /// Account to install contract on
@@ -140,20 +144,45 @@ fn signed_transaction_json(trx: &str) -> Result<String, anyhow::Error> {
     ))
 }
 
+fn reg_rpc(contract: &str, rpc_contract: &str) -> Result<String, anyhow::Error> {
+    action_json(
+        contract,
+        "proxy-sys",
+        "registerServer",
+        &to_hex(
+            bridge::ffi::pack_register_server(&format!(
+                r#"{{
+                    "contract": {},
+                    "rpc_contract": {}
+                }}"#,
+                serde_json::to_string(contract)?,
+                serde_json::to_string(rpc_contract)?,
+            ))
+            .as_slice(),
+        ),
+    )
+}
+
 async fn push_transaction_impl(
     args: &Args,
     client: reqwest::Client,
     packed: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
-    let resp = client
+    let mut response = client
         .post(Url::parse(&args.api)?.join("native/push_transaction")?)
         .body(packed)
         .send()
-        .await?
-        .error_for_status()?
-        .text()
         .await?;
-    let json: Value = serde_json::de::from_str(&resp)?;
+    if response.status().is_client_error() {
+        response = response.error_for_status()?;
+    }
+    if response.status().is_server_error() {
+        return Err(anyhow::Error::new(Error::Msg {
+            s: response.text().await?,
+        }));
+    }
+    let text = response.text().await?;
+    let json: Value = serde_json::de::from_str(&text)?;
     // println!("{:#?}", json);
     let err = json.get("error").and_then(|v| v.as_str());
     if let Some(e) = err {
@@ -200,7 +229,7 @@ async fn install(
         "setCode",
         &set_code(account, &to_hex(&wasm))?,
     )?);
-    // TODO register_proxy
+    actions.push(reg_rpc(account, account)?);
     let signed_json = signed_transaction_json(&transaction_json(
         &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
         &actions,
@@ -219,6 +248,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let client = reqwest::Client::new();
     // TODO: environment variable for url
     match &args.command {
+        Commands::Boot {} => boot::boot(&args, client).await?,
         Commands::Install {
             account,
             filename,

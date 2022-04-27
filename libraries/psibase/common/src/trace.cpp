@@ -12,7 +12,7 @@ namespace psibase
          std::visit(
              [max](auto& obj)
              {
-                if constexpr (std::is_same_v<eosio::remove_cvref_t<decltype(obj)>, action_trace>)
+                if constexpr (std::is_same_v<psio::remove_cvref_t<decltype(obj)>, action_trace>)
                    trim_raw_data(obj, max);
              },
              inner.inner);

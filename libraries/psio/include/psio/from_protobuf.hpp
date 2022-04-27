@@ -102,7 +102,7 @@ namespace psio
             uint32_t size = 0;
             varuint32_from_bin(size, stream);
             if (size > stream.remaining())
-               throw_error(stream_error::overrun);
+               abort_error(stream_error::overrun);
             obj.resize(size / sizeof(T));
             stream.read((char*)obj.data(), size);
          }
@@ -159,7 +159,7 @@ namespace psio
          uint32_t size = 0;
          varuint32_from_bin(size, stream);
          if (size > stream.remaining())
-            throw_error(stream_error::overrun);
+            abort_error(stream_error::overrun);
          input_stream objstream(stream.pos, size);
          stream.skip(size);
          from_protobuf_object(obj, objstream);
