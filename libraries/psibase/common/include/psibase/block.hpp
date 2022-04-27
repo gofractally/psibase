@@ -57,6 +57,10 @@ namespace psibase
     *
     *   Tapos = Transactions as Proof of Stake
     */
+   // TODO Dan: __attribute__((packed, aligned(1))) causes UB in to_json, from_json,
+   //           the TimePointSec comparison operator, fracpack if the memcpy
+   //           optimization ever gets disabled (e.g. its condition for enabling fails
+   //           to trigger), to_bin, from_bin, and more; see Todd for details
    struct FRACPACK Tapos final
    {
       static constexpr uint16_t do_not_broadcast = 1u << 0;
