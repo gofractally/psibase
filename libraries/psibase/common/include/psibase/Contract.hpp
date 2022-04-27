@@ -1,15 +1,14 @@
 #pragma once
 
+#include <concepts>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/actor.hpp>
 
 namespace psibase
 {
    template <typename T>
-   concept HasContractName = requires(T)
-   {
-      {T::contract};
-   };
+   concept DefinesContract =
+       std::same_as<std::decay_t<decltype(T::contract)>, psibase::AccountNumber>;
 
    /** all contracts should derive from psibase::Contract */
    template <typename DerivedContract>
@@ -35,8 +34,8 @@ namespace psibase
          return actor<T>(_receiver, callee);
       }
 
-      template <typename T = DerivedContract>
-      requires HasContractName<T> actor<T> at()
+      template <DefinesContract T = DerivedContract>
+      actor<T> at()
       {
          return at<T>(T::contract);
       }
