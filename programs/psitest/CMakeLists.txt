@@ -12,4 +12,4 @@ add_custom_command(TARGET psitest POST_BUILD
 # psitest, when compiled with gcc, produces
 # "longjmp causes uninitialized stack frame"
 # when the --subst option is used.
-target_compile_options(psitest PRIVATE -D_FORTIFY_SOURCE=0)
+# target_compile_options(psitest PRIVATE -D_FORTIFY_SOURCE=0)

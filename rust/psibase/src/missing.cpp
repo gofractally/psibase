@@ -1,13 +1,14 @@
 #include "psibase/src/missing.hpp"
 
 // TODO: fix warnings
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wambiguous-reversed-operator"
 #pragma GCC diagnostic ignored "-Wchar-subscripts"
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
 #pragma GCC diagnostic ignored "-Wunused-local-typedef"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic push
 #include <psibase/block.hpp>
 #include <psio/bytes.hpp>
 #include <psio/fracpack.hpp>

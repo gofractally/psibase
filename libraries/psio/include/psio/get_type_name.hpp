@@ -59,11 +59,11 @@ namespace psio
    constexpr std::array<char, N + M> array_cat(std::array<char, N> lhs, std::array<char, M> rhs)
    {
       std::array<char, N + M> result{};
-      for (int i = 0; i < N; ++i)
+      for (std::size_t i = 0; i < N; ++i)
       {
          result[i] = lhs[i];
       }
-      for (int i = 0; i < M; ++i)
+      for (std::size_t i = 0; i < M; ++i)
       {
          result[i + N] = rhs[i];
       }
@@ -74,7 +74,7 @@ namespace psio
    constexpr std::array<char, N> to_array(std::string_view s)
    {
       std::array<char, N> result{};
-      for (int i = 0; i < N; ++i)
+      for (std::size_t i = 0; i < N; ++i)
       {
          result[i] = s[i];
       }

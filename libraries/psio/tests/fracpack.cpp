@@ -20,6 +20,9 @@
 #include <psio/to_json/map.hpp>
 #include <psio/translator.hpp>
 
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
 /**  
  
   # Types of Data

@@ -116,9 +116,9 @@ namespace psio
    struct meta
    {
       const char*                        name;
-      uint64_t                           offset = 0;
-      std::initializer_list<const char*> param_names;
-      int32_t                            number;
+      uint64_t                           offset      = ~uint64_t(0);
+      std::initializer_list<const char*> param_names = {};
+      int32_t                            number      = 0;
    };
 
    template <typename QueryClass>

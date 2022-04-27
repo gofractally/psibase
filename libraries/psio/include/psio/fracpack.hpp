@@ -1363,7 +1363,7 @@ namespace psio
       {
          //         std::cout << "root validate optional " << get_type_name<T>() <<"\n";
          stream.heap = stream.pos + 4;
-         if (not bool(stream.valid = (stream.end - stream.pos < sizeof(uint32_t))))
+         if (not bool(stream.valid = (stream.end - stream.pos < (ssize_t)sizeof(uint32_t))))
          {
             uint32_t offset;
             memcpy(&offset, stream.pos, sizeof(offset));
@@ -2259,8 +2259,6 @@ namespace psio
       const auto& operator*() const { return *this; }
 
      private:
-      friend struct const_view<std::tuple<Ts...>>;
-
       template <typename Function, size_t... I>
       auto _call(Function&& f, std::index_sequence<I...>) const
       {
