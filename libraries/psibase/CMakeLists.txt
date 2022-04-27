@@ -159,6 +159,8 @@ function(add suffix)
             native/src/system_context.cpp
             native/src/transaction_context.cpp
         )
+
+        add_subdirectory(common/tests)
     endif()
 endfunction()
 

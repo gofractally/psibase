@@ -8,4 +8,5 @@ publish = false
 custom_error = "1.9"
 fracpack = { version = "0.1.0", path = "../fracpack" }
 psi_macros = { version = "0.1.0", path = "../psi_macros" }
+seahash = "2.0.0"
 serde = { version = "1.0", features = ["derive"] }
