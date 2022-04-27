@@ -428,7 +428,8 @@ namespace std
 
 #define PSIO_FOR_EACH_MEMBER(r, STRUCT, i, elem)                                                  \
    {                                                                                              \
-      auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem));                                \
+      /* TODO: fix or remove: auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem)); */     \
+      auto off = ~uint64_t(0);                                                                    \
       (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .offset = off,    \
                                                          .number = PSIO_NUMBER_OR_AUTO(i, elem)}, \
                               &STRUCT::PSIO_GET_IDENT(elem));                                     \
