@@ -77,7 +77,7 @@ jobs:
           echo =====
           bash -c "cd build && tar czf ../psidk-linux.tar.gz psidk"
           echo =====
-          bash -c "cd doc/psidk && mdbook build && mv book psidk-book && tar czf ../../psidk-book.tar.gz psidk-book"
+          ${DOCKER} bash -c "cd doc/psidk && mdbook build && mv book psidk-book && tar czf ../../psidk-book.tar.gz psidk-book"
       - name: Upload psidk-linux
         uses: actions/upload-artifact@v1
         with:
