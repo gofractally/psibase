@@ -1,15 +1,15 @@
 #pragma once
 
 #include <compare>
+#include <limits>
 #include <psibase/Bitset.hpp>
 #include <psibase/table.hpp>
 
 #include "nft_sys.hpp"
+#include "types.hpp"
 
 namespace UserContract
 {
-   using TID = uint32_t;
-
    struct InfSettingsRecord
    {
       uint64_t daily_limit_pct;
@@ -61,21 +61,31 @@ namespace UserContract
 
    struct TokenRecord
    {
-      TID             tokenId;
+      TID             id;
       NID             ownerNft;
       InflationRecord inflation;
       Flags           flags;
+      Precision       precision;
+      Quantity        currentSupply;
+      Quantity        maxSupply;
+
+      static bool isValidKey(TID tokenId)
+      {
+         return tokenId > 0 && tokenId <= std::numeric_limits<uint32_t>::max() / 2;
+      }
 
       friend std::strong_ordering operator<=>(const TokenRecord&, const TokenRecord&) = default;
    };
-   PSIO_REFLECT(TokenRecord, tokenId, ownerNft, inflation, flags);
-   using TokenTable_t = psibase::table<TokenRecord, &TokenRecord::tokenId>;
+   PSIO_REFLECT(TokenRecord, id, ownerNft, inflation, flags, precision, currentSupply, maxSupply);
+   using TokenTable_t = psibase::table<TokenRecord, &TokenRecord::id>;
 
    struct BalanceRecord
    {
       psibase::AccountNumber account;
       TID                    tokenId;
       uint64_t               balance;
+
+      friend std::strong_ordering operator<=>(const BalanceRecord&, const BalanceRecord&) = default;
    };
    PSIO_REFLECT(BalanceRecord, account, tokenId, balance);
    using BalanceTable_t = psibase::table<BalanceRecord, &BalanceRecord::account>;
@@ -88,6 +98,9 @@ namespace UserContract
 
       TID      tokenId;
       uint64_t balance;
+
+      friend std::strong_ordering operator<=>(const SharedBalanceRecord&,
+                                              const SharedBalanceRecord&) = default;
    };
    PSIO_REFLECT(SharedBalanceRecord, creditor, debitor, tokenId, balance);
    using SharedBalanceTable_t = psibase::table<SharedBalanceRecord, &SharedBalanceRecord::creditor>;

@@ -5,10 +5,10 @@
 #include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
 
-#include "tables.hpp"
-
 namespace UserContract
 {
+   using TID = uint32_t;
+
    struct Precision
    {
       static constexpr uint8_t          PRECISION_MIN = 0;
@@ -74,6 +74,7 @@ namespace UserContract
       friend std::strong_ordering operator<=>(const Quantity&, const Quantity&) = default;
 
       bool operator==(int otherValue) const { return static_cast<Quantity_t>(otherValue) == value; }
+      bool operator==(Quantity otherValue) const { return otherValue.value == value; }
    };
    PSIO_REFLECT(Quantity, value);
 

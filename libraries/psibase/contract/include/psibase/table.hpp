@@ -362,8 +362,7 @@ namespace psibase
                std::vector<char> buffer(sz);
                raw::get_result(buffer.data(), buffer.size(), 0);
                auto data              = psio::convert_from_bin<T>(std::move(buffer));
-               auto replace_secondary = [&](uint8_t& idx, auto wrapped)
-               {
+               auto replace_secondary = [&](uint8_t& idx, auto wrapped) {
                   auto old_key = std::invoke(decltype(wrapped)::value, data);
                   auto new_key = std::invoke(decltype(wrapped)::value, arg);
                   if (old_key != new_key)
@@ -383,8 +382,7 @@ namespace psibase
             }
             else
             {
-               auto write_secondary = [&](uint8_t idx, auto wrapped)
-               {
+               auto write_secondary = [&](uint8_t idx, auto wrapped) {
                   auto key          = std::invoke(decltype(wrapped)::value, arg);
                   key_buffer.back() = idx;
                   psio::convert_to_key(key, key_buffer);
@@ -429,13 +427,13 @@ namespace psibase
    {
       explicit constexpr contract_tables(account_num account) : account(account) {}
       template <std::uint32_t Table>
-      auto open()
+      auto open() const
       {
          std::vector<char> key_prefix = psio::convert_to_key(std::tuple(account, Table));
          return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(std::move(key_prefix));
       }
       template <typename T>
-      auto open()
+      auto open() const
       {
          return open<boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>::value>();
       }

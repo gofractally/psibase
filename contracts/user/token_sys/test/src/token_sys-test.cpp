@@ -58,10 +58,8 @@ SCENARIO("Creating a token")
 
          AND_THEN("The token exists")
          {
-            auto tokenId     = create.returnVal();
-            auto tokenRecord = a.getToken(tokenId).returnVal();
-
-            CHECK(tokenRecord.has_value());
+            auto tokenId = create.returnVal();
+            CHECK(a.getToken(tokenId).succeeded());
          }
       }
       WHEN("Alice creates a token")
@@ -76,13 +74,15 @@ SCENARIO("Creating a token")
             auto create = a.create(8, 1'000'000'000);
             CHECK(create.succeeded());
 
-            auto tokenId = create.returnVal();
-            auto token2  = a.getToken(tokenId).returnVal();
-            CHECK(token2.has_value());
+            auto tokenId   = create.returnVal();
+            auto getToken2 = a.getToken(tokenId);
+            CHECK(getToken2.succeeded());
+
+            auto token2 = getToken2.returnVal();
 
             AND_THEN("The owner NFT is different from the first token owner NFT")
             {
-               CHECK(token1->ownerNft != token2->ownerNft);
+               CHECK(token1.ownerNft != token2.ownerNft);
             }
          }
       }
@@ -101,27 +101,30 @@ SCENARIO("Minting tokens")
       auto b     = bob.at<TokenSys>();
 
       auto tokenId = a.create(8, 1'000'000'000).returnVal();
-      auto token   = a.getToken(tokenId).returnVal();
 
       THEN("Bob may not mint them")
       {
-         auto mint = b.mint(tokenId, 1000, bob);
+         auto mint = b.mint(tokenId, 1000, bob, memo);
          CHECK(mint.failed(missingRequiredAuth));
       }
       THEN("Alice may not mint them with an invalid token ID")
       {
-         auto mint = a.mint(999, 1000, alice);
+         auto mint = a.mint(999, 1000, alice, memo);
          CHECK(mint.failed(invalidTokenId));
       }
       THEN("Alice may not mint them to an invalid Account")
       {
-         auto mint = a.mint(tokenId, 1000, "notreal"_a);
+         auto mint = a.mint(tokenId, 1000, "notreal"_a, memo);
          CHECK(mint.failed(invalidAccount));
+      }
+      THEN("Alice may not mint more tokens than are allowed by the specified max supply")
+      {
+         CHECK(false);
       }
       THEN("Alice may mint new tokens")
       {
-         auto mint1 = a.mint(tokenId, 1000, alice);
-         auto mint2 = a.mint(tokenId, 1000, bob);
+         auto mint1 = a.mint(tokenId, 1000, alice, memo);
+         auto mint2 = a.mint(tokenId, 1000, bob, memo);
          CHECK(mint1.succeeded());
          CHECK(mint2.succeeded());
 
@@ -173,11 +176,11 @@ SCENARIO("Recalling tokens")
 
       auto tokenId = a.create(8, 1'000'000'000).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      a.mint(tokenId, 1000, bob);
+      a.mint(tokenId, 1000, bob, memo);
 
       THEN("The token is recallable by default")
       {
-         CHECK((token.has_value() && false == (*token).flags.get(FlagType::unrecallable)));
+         CHECK(false == token.flags.get(FlagType::unrecallable));
       }
       THEN("Alice can recall Bob's tokens")
       {
@@ -195,7 +198,7 @@ SCENARIO("Recalling tokens")
       THEN("The token issuer may turn off recallability")
       {
          CHECK(a.set(tokenId, FlagType::unrecallable).succeeded());
-         auto unrecallable = a.getToken(tokenId).returnVal()->flags.get(FlagType::unrecallable);
+         auto unrecallable = a.getToken(tokenId).returnVal().flags.get(FlagType::unrecallable);
          CHECK(true == unrecallable);
 
          AND_THEN("Alice may not recall Bob's tokens")
@@ -219,20 +222,17 @@ SCENARIO("Interactions with the Issuer NFT")
 
       auto tokenId = a.create(8, 1'000'000'000).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto nft     = alice.at<NftSys>().getNft(token->ownerNft).returnVal();
+      auto nft     = alice.at<NftSys>().getNft(token.ownerNft).returnVal();
 
-      THEN("The Issuer NFT is owned by Alice")
-      {
-         CHECK((nft.has_value() && nft->owner == alice.id));
-      }
+      THEN("The Issuer NFT is owned by Alice") { CHECK(nft.owner == alice.id); }
       WHEN("Alice credits the issuer NFT to Bob")
       {
-         alice.at<NftSys>().credit(nft->id, bob, memo);
+         alice.at<NftSys>().credit(nft.id, bob, memo);
 
          THEN("The NFT is owned by Bob")
          {
-            auto newNft = alice.at<NftSys>().getNft(token->ownerNft).returnVal();
-            nft->owner  = bob.id;
+            auto newNft = alice.at<NftSys>().getNft(token.ownerNft).returnVal();
+            nft.owner   = bob.id;
             CHECK(newNft == nft);
          }
          THEN("The token record is identical")
@@ -241,35 +241,35 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Bob may mint new tokens")
          {  //
-            CHECK(b.mint(tokenId, 1000, bob).succeeded());
+            CHECK(b.mint(tokenId, 1000, bob, memo).succeeded());
          }
          THEN("Alice may not mint new tokens")
          {
-            CHECK(a.mint(tokenId, 1000, alice).failed(missingRequiredAuth));
+            CHECK(a.mint(tokenId, 1000, alice, memo).failed(missingRequiredAuth));
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            b.mint(tokenId, 1000, bob);
+            b.mint(tokenId, 1000, bob, memo);
             CHECK(a.recall(tokenId, bob, alice, 1000, memo).failed(missingRequiredAuth));
          }
          THEN("Bob may recall Alice's tokens")
          {
-            b.mint(tokenId, 1000, alice);
+            b.mint(tokenId, 1000, alice, memo);
             CHECK(b.recall(tokenId, alice, bob, 1000, memo).succeeded());
          }
       }
       WHEN("Alice burns the issuer NFT")
       {
-         a.mint(tokenId, 1000, bob);
-         alice.at<NftSys>().burn(nft->id);
+         a.mint(tokenId, 1000, bob, memo);
+         alice.at<NftSys>().burn(nft.id);
 
          THEN("Alice may not mint new tokens")
          {
-            CHECK(a.mint(tokenId, 1000, alice).failed(missingRequiredAuth));
+            CHECK(a.mint(tokenId, 1000, alice, memo).failed(missingRequiredAuth));
          }
          THEN("Alice may not credit the issuer NFT to anyone")
          {
-            CHECK(alice.at<NftSys>().credit(nft->id, bob, memo).failed(missingRequiredAuth));
+            CHECK(alice.at<NftSys>().credit(nft.id, bob, memo).failed(missingRequiredAuth));
          }
          THEN("Alice may not recall Bob's tokens")
          {
@@ -300,8 +300,8 @@ SCENARIO("Burning tokens")
 
       auto tokenId = a.create(8, 1'000'000'000).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto mint    = a.mint(tokenId, 100, alice);
-      auto mint2   = a.mint(tokenId, 100, bob);
+      auto mint    = a.mint(tokenId, 100, alice, memo);
+      auto mint2   = a.mint(tokenId, 100, bob, memo);
 
       THEN("Alice may not burn 101 tokens")
       {
@@ -446,8 +446,8 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
 
       auto tokenId = a.create(8, 1'000'000'000).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto mint    = a.mint(tokenId, 100, alice);
-      auto mint2   = a.mint(tokenId, 100, bob);
+      auto mint    = a.mint(tokenId, 100, alice, memo);
+      auto mint2   = a.mint(tokenId, 100, bob, memo);
 
       THEN("Alice may not credit Bob 101 tokens")
       {
@@ -515,8 +515,8 @@ SCENARIO("Crediting/uncrediting/debiting tokens, without auto-debit")
 
       auto tokenId = a.create(8, 1'000'000'000).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto mint    = a.mint(tokenId, 100, alice);
-      auto mint2   = a.mint(tokenId, 100, bob);
+      auto mint    = a.mint(tokenId, 100, alice, memo);
+      auto mint2   = a.mint(tokenId, 100, bob, memo);
 
       AND_GIVEN("Alice turned off autodebit")
       {

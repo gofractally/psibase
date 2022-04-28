@@ -7,6 +7,7 @@ namespace UserContract
    namespace Errors
    {
       constexpr std::string_view invalidTokenId      = "Invalid token ID";
+      constexpr std::string_view tokenDNE            = "Token DNE";
       constexpr std::string_view invalidAccount      = "Invalid account";
       constexpr std::string_view tokenUnrecallable   = "Token unrecallable";
       constexpr std::string_view insufficientBalance = "Insufficient balance";

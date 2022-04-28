@@ -63,13 +63,13 @@ SCENARIO("Minting & burning nfts")
             };
 
             auto nft = a.getNft(mint.returnVal()).returnVal();
-            CHECK((nft != std::nullopt && (*nft) == expectedNft));
+            CHECK(nft == expectedNft);
          }
       }
       WHEN("Alice mints an NFT")
       {
          auto mint = a.mint();
-         auto nft1 = *(a.getNft(mint.returnVal()).returnVal());
+         auto nft1 = a.getNft(mint.returnVal()).returnVal();
 
          t.start_block();
          THEN("Alice consumes storage space as expected")
@@ -95,7 +95,7 @@ SCENARIO("Minting & burning nfts")
 
             THEN("The NFT no longer exists")
             {  //
-               CHECK(a.getNft(nft1.id).returnVal() != std::nullopt);
+               CHECK(a.getNft(nft1.id).failed(nftDNE));
             }
          }
          AND_WHEN("Alice mints a second NFT")
@@ -105,7 +105,7 @@ SCENARIO("Minting & burning nfts")
 
             THEN("The NFT is identical in every way, except the ID is incremented")
             {
-               auto      nft2        = *(a.getNft(mint2.returnVal()).returnVal());
+               auto      nft2        = a.getNft(mint2.returnVal()).returnVal();
                NftRecord expectedNft = nft1;
                expectedNft.id++;
                CHECK(nft2 == expectedNft);
@@ -170,7 +170,7 @@ SCENARIO("Transferring NFTs")
       AND_GIVEN("Alice has minted an NFT")
       {
          auto mint = a.mint();
-         auto nft  = *(a.getNft(mint.returnVal()).returnVal());
+         auto nft  = a.getNft(mint.returnVal()).returnVal();
 
          THEN("No one can debit or uncredit the NFT")
          {
@@ -218,7 +218,7 @@ SCENARIO("Transferring NFTs")
 
             THEN("Bob immediately owns the NFT")
             {
-               auto newNft = *(b.getNft(nft.id).returnVal());
+               auto newNft = b.getNft(nft.id).returnVal();
                CHECK(newNft.owner == bob.id);
             }
             THEN("The payer for storage costs of the NFT are updated accordingly")
@@ -242,7 +242,7 @@ SCENARIO("Transferring NFTs")
 
                THEN("The NFT is not yet owned by Bob")
                {
-                  CHECK(bob.id != b.getNft(nft.id).returnVal()->owner);
+                  CHECK(bob.id != b.getNft(nft.id).returnVal().owner);
                }
                THEN("The payer for storage costs of the NFT do not change")
                {
@@ -288,10 +288,7 @@ SCENARIO("Transferring NFTs")
                {
                   auto debit = b.debit(nft.id, "memo");
 
-                  THEN("Bob owns the NFT")
-                  {
-                     CHECK(bob.id == b.getNft(nft.id).returnVal()->owner);
-                  }
+                  THEN("Bob owns the NFT") { CHECK(bob.id == b.getNft(nft.id).returnVal().owner); }
                   THEN("Alice and Charlie may not uncredit or debit the NFT")
                   {
                      CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));

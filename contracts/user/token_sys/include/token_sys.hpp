@@ -2,6 +2,7 @@
 
 #include <psibase/Contract.hpp>
 #include <psibase/String.hpp>
+#include <psibase/check.hpp>
 #include <string>
 #include "errors.hpp"
 #include "tables.hpp"
@@ -27,8 +28,11 @@ namespace UserContract
       using tables = psibase::contract_tables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t>;
       static constexpr psibase::AccountNumber contract = "token-sys"_a;
 
-      TID  create(Precision precision, Quantity max_supply);
-      void mint(TID tokenId, Quantity amount, psibase::AccountNumber receiver);
+      TID  create(Precision precision, Quantity maxSupply);
+      void mint(TID                               tokenId,
+                Quantity                          amount,
+                psibase::AccountNumber            receiver,
+                psio::const_view<psibase::String> memo);
 
       void set(TID tokenId, uint8_t flag);
 
@@ -56,17 +60,15 @@ namespace UserContract
                   psio::const_view<psibase::String> memo);
 
       // Read-only interface:
-      std::optional<TokenRecord> getToken(TID tokenId) const;
-      Quantity                   getBalance(TID tokenId, psibase::AccountNumber account) const;
-      Quantity                   getSharedBal(TID                    tokenId,
-                                              psibase::AccountNumber creditor,
-                                              psibase::AccountNumber debitor) const;
-      bool                       isAutodebit(psibase::AccountNumber account) const;
+      TokenRecord getToken(TID tokenId) const;
+      Quantity    getBalance(TID tokenId, psibase::AccountNumber account) const;
+      Quantity    getSharedBal(TID                    tokenId,
+                               psibase::AccountNumber creditor,
+                               psibase::AccountNumber debitor) const;
+      bool        isAutodebit(psibase::AccountNumber account) const;
 
      private:
       tables db{contract};
-
-      bool _exists(TID tokenId);
 
      public:
       struct Events
@@ -74,19 +76,25 @@ namespace UserContract
          using Account    = psibase::AccountNumber;
          using StringView = psio::const_view<psibase::String>;
 
-         struct History
+         struct Ui  // History <-- Todo - Change back to History
          {
-            void created(TID tokenId, Account creator, Precision precision, Quantity max_supply) {}
-            void minted(TID tokenId, Account minter, Quantity amount, Account receiver) {}
+            void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
+            void minted(TID        tokenId,
+                        Account    minter,
+                        Quantity   amount,
+                        Account    receiver,
+                        StringView memo)
+            {
+            }
             void set(TID tokenId, Account setter, uint8_t flag) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
 
             void disabledAutodeb(Account account) {}
             void enabledAutodeb(Account account) {}
-         };
+            //};
 
-         struct Ui
-         {
+            //struct Ui
+            //{
             void credited(TID        tokenId,
                           Account    sender,
                           Account    receiver,
@@ -101,10 +109,10 @@ namespace UserContract
                             StringView memo)
             {
             }
-         };
+            //};
 
-         struct Merkle
-         {
+            //struct Merkle
+            //{
             void transferred(TID        tokenId,
                              Account    sender,
                              Account    receiver,
@@ -121,8 +129,8 @@ namespace UserContract
 
    // clang-format off
    PSIO_REFLECT(TokenSys,
-      method(create, precision, max_supply),
-      method(mint, tokenId, amount, receiver),
+      method(create, precision, maxSupply),
+      method(mint, tokenId, amount, receiver, memo),
       method(set, tokenId, flag),
 
       method(burn, tokenId, amount),
@@ -136,19 +144,19 @@ namespace UserContract
       method(getSharedBal, tokenId, creditor, debitor),
       method(isAutodebit)
     );
-   PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys, 
-      method(created, tokenId, creator, precision, max_supply),
-      method(minted, tokenId, minter, amount, receiver),
+   PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
+      method(created, tokenId, creator, precision, maxSupply),
+      method(minted, tokenId, minter, amount, receiver, memo),
       method(set, tokenId, setter, flag),
       method(burned, tokenId, burner, amount),
       method(disabledAutodeb, account),
-      method(enabledAutodeb, account)
-   );
-   PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
+      method(enabledAutodeb, account),
+   //);
+   //PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
       method(credited, tokenId, sender, receiver, amount, memo),
-      method(uncredited, tokenId, sender, receiver, amount, memo)
-   );
-   PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys, 
+      method(uncredited, tokenId, sender, receiver, amount, memo),
+   //);
+   //PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys, 
       method(transferred, tokenId, sender, receiver, amount, memo),
       method(recalled, tokenId, from, to, amount, memo)
    );

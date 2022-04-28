@@ -23,13 +23,11 @@ namespace UserContract
       void autodebit(bool enable);
 
       // Read-only:
-      std::optional<NftRecord> getNft(NID nftId);
-      bool                     isAutodebit(psibase::AccountNumber account);
+      NftRecord getNft(NID nftId);
+      bool      isAutodebit(psibase::AccountNumber account);
 
      private:
       tables db{contract};
-
-      bool _exists(NID nftId);
 
      public:
       struct Events
@@ -37,22 +35,22 @@ namespace UserContract
          using Account    = psibase::AccountNumber;
          using StringView = psio::const_view<psibase::String>;
 
-         struct History
+         struct Ui  // Todo - change to History, once more than UI events are supported
          {
             void minted(NID nftId, Account issuer) {}
             void burned(NID nftId) {}
             void disabledAutodeb(Account account) {}
             void enabledAutodeb(Account account) {}
-         };
+            //};
 
-         struct Ui
-         {
+            //struct Ui
+            //{
             void credited(NID nftId, Account sender, Account receiver, StringView memo) {}
             void uncredited(NID nftId, Account sender, Account receiver, StringView memo) {}
-         };
+            //};
 
-         struct Merkle
-         {
+            //struct Merkle
+            //{
             void transferred(NID nftId, Account sender, Account receiver, StringView memo) {}
          };
       };
@@ -71,19 +69,19 @@ namespace UserContract
       method(isAutodebit, account)
    );
 
-   PSIBASE_REFLECT_HISTORY_EVENTS(NftSys,
+   PSIBASE_REFLECT_UI_EVENTS(NftSys, // Todo - change to _HISTORY_ once more than UI events are supported
       method(minted, nftId, issuer),
       method(burned, nftId),
       method(disabledAutodeb, account),
-      method(enabledAutodeb, account)
-   );
+      method(enabledAutodeb, account),
+   //);
 
-   PSIBASE_REFLECT_UI_EVENTS(NftSys, 
+   //PSIBASE_REFLECT_UI_EVENTS(NftSys, 
       method(credited, nftId, sender, receiver, memo),
-      method(uncredited, nftId, sender, receiver, memo)
-   );
+      method(uncredited, nftId, sender, receiver, memo),
+   //);
 
-   PSIBASE_REFLECT_MERKLE_EVENTS(NftSys, 
+   //PSIBASE_REFLECT_MERKLE_EVENTS(NftSys, 
       method(transferred, nftId, sender, receiver, memo)
    );
    // clang-format on

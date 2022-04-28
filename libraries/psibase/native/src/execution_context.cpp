@@ -128,14 +128,8 @@ namespace psibase
 
    std::unique_ptr<execution_memory_impl> impl;
 
-   execution_memory::execution_memory()
-   {
-      impl = std::make_unique<execution_memory_impl>();
-   }
-   execution_memory::execution_memory(execution_memory&& src)
-   {
-      impl = std::move(src.impl);
-   }
+   execution_memory::execution_memory() { impl = std::make_unique<execution_memory_impl>(); }
+   execution_memory::execution_memory(execution_memory&& src) { impl = std::move(src.impl); }
    execution_memory::~execution_memory() {}
 
    // TODO: debugger
@@ -160,18 +154,16 @@ namespace psibase
          contract_account = std::move(*ca);
          auto code        = db.kv_get<code_row>(
              code_row::kv_map, code_key(contract_account.code_hash, contract_account.vm_type,
-                                               contract_account.vm_version));
+                                        contract_account.vm_version));
          check(code.has_value(), "code record is missing");
          check(code->vm_type == 0, "vm_type is not 0");
          check(code->vm_version == 0, "vm_version is not 0");
-         rethrow_vm_except(
-             [&]
-             {
-                backend = trx_context.block_context.system_context.wasm_cache.impl->get(
-                    contract_account.code_hash);
-                if (!backend)
-                   backend = std::make_unique<backend_t>(code->code, nullptr);
-             });
+         rethrow_vm_except([&] {
+            backend = trx_context.block_context.system_context.wasm_cache.impl->get(
+                contract_account.code_hash);
+            if (!backend)
+               backend = std::make_unique<backend_t>(code->code, nullptr);
+         });
       }
 
       ~execution_context_impl()
@@ -183,18 +175,16 @@ namespace psibase
       // TODO: configurable wasm limits
       void init()
       {
-         rethrow_vm_except(
-             [&]
-             {
-                // auto start_time = std::chrono::steady_clock::now();
-                backend->set_wasm_allocator(&wa);
-                backend->initialize(this);
-                (*backend)(*this, "env", "start", current_act_context->action.contract.value);
-                initialized = true;
-                // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
-                //     std::chrono::steady_clock::now() - start_time);
-                // std::cout << "init:   " << us.count() << " us\n";
-             });
+         rethrow_vm_except([&] {
+            // auto start_time = std::chrono::steady_clock::now();
+            backend->set_wasm_allocator(&wa);
+            backend->initialize(this);
+            (*backend)(*this, "env", "start", current_act_context->action.contract.value);
+            initialized = true;
+            // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
+            //     std::chrono::steady_clock::now() - start_time);
+            // std::cout << "init:   " << us.count() << " us\n";
+         });
       }
 
       template <typename F>
@@ -270,7 +260,9 @@ namespace psibase
          if (map == uint32_t(kv_map::native_unconstrained) &&
              (contract_account.flags & account_row::allow_write_native))
             return (kv_map)map;
-         throw std::runtime_error("contract may not write this map, or must use another intrinsic");
+
+         throw std::runtime_error("contract may not write this map (" + std::to_string(map) +
+                                  "), or must use another intrinsic");
       }
 
       kv_map get_map_write_sequential(uint32_t map)
@@ -281,7 +273,8 @@ namespace psibase
             return (kv_map)map;
          if (map == uint32_t(kv_map::ui_event))
             return (kv_map)map;
-         throw std::runtime_error("contract may not write this map, or must use another intrinsic");
+         throw std::runtime_error("contract may not write this map (" + std::to_string(map) +
+                                  "), or must use another intrinsic");
       }
 
       void verify_write_constrained(psio::input_stream key, psio::input_stream value)
@@ -510,10 +503,7 @@ namespace psibase
       impl = std::make_unique<execution_context_impl>(trx_context, memory, contract);
    }
 
-   execution_context::execution_context(execution_context&& src)
-   {
-      impl = std::move(src.impl);
-   }
+   execution_context::execution_context(execution_context&& src) { impl = std::move(src.impl); }
    execution_context::~execution_context() {}
 
    void execution_context::register_host_functions()
