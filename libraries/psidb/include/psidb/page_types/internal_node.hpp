@@ -2,9 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <psidb/node_ptr.hpp>
 #include <psidb/page_header.hpp>
 #include <psidb/sync/shared_value.hpp>
+#include <span>
 
 namespace psidb
 {
@@ -45,6 +47,7 @@ namespace psidb
       // Keys are 16-byte aligned and padded to a multiple of 16 bytes
       struct key_storage
       {
+         constexpr key_storage() = default;
          constexpr key_storage(std::size_t offset, std::size_t size)
              : shifted_offset(offset / 16), shifted_size(size / 16)
          {
@@ -165,6 +168,8 @@ namespace psidb
       std::string_view get_key(node_ptr pos) const { return get_key(get_offset(pos)); }
       node_ptr         child(uint16_t idx) { return {this, &_children[idx]}; }
       uint16_t         get_offset(node_ptr pos) const { return pos.get() - _children; }
+
+      std::span<std::atomic<page_id>> get_children() { return {_children, _children + _size + 1}; }
 
       // internal modifiers
       void append(std::string_view k, page_id rhs) { insert_unchecked(_size, k, rhs); }
