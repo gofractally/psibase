@@ -39,13 +39,7 @@ fn genesis_action_data_json(contracts: &[String]) -> String {
 
 // TODO: replace with struct
 fn startup() -> Result<String, anyhow::Error> {
-    Ok(to_hex(
-        bridge::ffi::pack_startup(&format!(
-            r#"{{
-            }}"#
-        ))
-        .as_slice(),
-    ))
+    Ok(to_hex(bridge::ffi::pack_startup("{}").as_slice()))
 }
 
 async fn push_boot_impl(
@@ -72,7 +66,7 @@ async fn push_boot_impl(
     let err = json.get("error").and_then(|v| v.as_str());
     if let Some(e) = err {
         if !e.is_empty() {
-            Err(Error::Msg { s: e.to_string() })?;
+            return Err(Error::Msg { s: e.to_string() }.into());
         }
     }
     Ok(())
@@ -182,6 +176,7 @@ fn upload_sys(
     )
 }
 
+#[allow(clippy::vec_init_then_push)]
 pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), anyhow::Error> {
     let mut signed_transactions: Vec<String> = Vec::new();
 
@@ -250,7 +245,7 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
 
     let mut signed_transactions_json: String = "[".to_owned();
     signed_transactions_json.push_str(&signed_transactions.join(","));
-    signed_transactions_json.push_str("]");
+    signed_transactions_json.push(']');
     let packed_signed_transactions =
         bridge::ffi::pack_signed_transactions(&signed_transactions_json);
     push_boot(args, client, packed_signed_transactions.as_slice().into()).await?;

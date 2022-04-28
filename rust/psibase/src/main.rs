@@ -187,7 +187,7 @@ async fn push_transaction_impl(
     let err = json.get("error").and_then(|v| v.as_str());
     if let Some(e) = err {
         if !e.is_empty() {
-            Err(Error::Msg { s: e.to_string() })?;
+            return Err(Error::Msg { s: e.to_string() }.into());
         }
     }
     Ok(())
