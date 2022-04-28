@@ -333,16 +333,14 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 
    if (host)
    {
-      // TODO: config file
+      // TODO: command-line options
       auto http_config = std::make_shared<http::http_config>(http::http_config{
           .num_threads      = 4,
           .max_request_size = 10 * 1024 * 1024,
           .idle_timeout_ms  = std::chrono::milliseconds{4000},
           .allow_origin     = "*",
-          .static_dir       = "",
           .address          = "0.0.0.0",
           .port             = 8080,
-          .unix_path        = "",
           .host             = host,
       });
 
@@ -426,7 +424,7 @@ OPTIONS:
             Produce blocks
 
       -o, --host <name>
-            Enable API server
+            Host http server
 
       -h, --help
             Show this message

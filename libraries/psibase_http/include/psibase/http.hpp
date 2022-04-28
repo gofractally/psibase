@@ -21,10 +21,10 @@ namespace psibase::http
       uint32_t                  max_request_size       = {};
       std::chrono::milliseconds idle_timeout_ms        = {};
       std::string               allow_origin           = {};
-      std::string               static_dir             = {};
+      std::string               static_dir             = {};  // TODO: remove?
       std::string               address                = {};
       unsigned short            port                   = {};
-      std::string               unix_path              = {};
+      std::string               unix_path              = {};  // TODO: remove? rename?
       std::string               host                   = {};
       push_boot_t               push_boot_async        = {};
       push_transaction_t        push_transaction_async = {};

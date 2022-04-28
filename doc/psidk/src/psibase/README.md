@@ -1,0 +1,65 @@
+# Psinode and Psibase
+
+psidk comes with two executables for working with chains:
+
+- `psinode` runs a chain. It can optionally be a producer or a non-producer node on a chain. It also optionally hosts an http interface which provides RPC services, GraphQL services, and hosts web UIs. On-chain contracts define most of the http interface.
+- `psibase` is a command-line client for interacting with the chain. It connects to the http interface on a running node.
+
+psinode has an explicit interface; it won't boot a new chain or connect to an existing chain unless you instruct it to. It also won't open any ports you didn't request or store its database at a location you didn't tell it about.
+
+## psinode
+
+psinode has the following command-line interface:
+
+```
+psinode [OPTIONS] <DATABASE>
+```
+
+`<DATABASE>`, which is required, is a path to the psibase database. psinode creates it if it does not already exist.
+
+If you don't give it any other options, psinode will just sit there with nothing to do. There are two important options for creating and running a local test chain:
+
+- `-p` or `--produce` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below).
+- `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on port `8080` with address `0.0.0.0` (TODO).
+
+psinode does not include https hosting; use a reverse proxy to add that when hosting a public node.
+
+## psibase
+
+psibase provides commands for booting a chain, creating accounts, installing contracts, and more. Notable options and commands for contract development:
+
+- `-a` or `--api` tells it which api endpoint to connect to. This defaults to `http://psibase.127.0.0.1.sslip.io:8080/`.
+- `boot` boots an empty chain; see below
+- `install` installs a contract; see [Basic Contract](../cpp-contract/basic/index.html)
+
+## Booting a chain
+
+A chain doesn't exist until it's booted. This procedure boots a chain suitable for local development.
+
+### Start psinode
+
+```
+psinode -p -o psibase.127.0.0.1.sslip.io my_psinode_db
+```
+
+This will:
+
+- Open a database named `my_psinode_db` in the current directory; it will create it if it does not already exist.
+- Host a web UI and an RPC interface at [http://psibase.127.0.0.1.sslip.io:8080/](http://psibase.127.0.0.1.sslip.io:8080/).
+- Produce blocks once the chain is booted.
+
+### Boot the chain
+
+```
+psibase boot
+```
+
+This will create a new chain which has:
+
+- A set of system contracts suitable for development
+- A set of web-based user interfaces suitable for development
+
+You may now interact with the chain using:
+
+- The web UI at [http://psibase.127.0.0.1.sslip.io:8080/](http://psibase.127.0.0.1.sslip.io:8080/)
+- Additional psibase commands
