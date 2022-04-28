@@ -36,6 +36,7 @@ function(native_and_wasm_test N)
     )
 endfunction()
 
+set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.72 REQUIRED)
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${Boost_INCLUDE_DIR})
