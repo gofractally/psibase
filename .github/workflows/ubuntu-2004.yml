@@ -75,3 +75,9 @@ jobs:
           echo =====
           ${DOCKER} sccache -s
           echo =====
+          bash -c "cd build && tar czf ../psidk-ubuntu-20-04.tar.gz psidk"
+      - name: Upload build
+        uses: actions/upload-artifact@v1
+        with:
+          name: ubuntu-2004-build
+          path: psidk-ubuntu-20-04.tar.gz
