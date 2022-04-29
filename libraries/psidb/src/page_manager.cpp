@@ -17,13 +17,13 @@ static constexpr page_id backup_header_page = header_page + 1;
 
 psidb::page_manager::page_manager() {}
 
-psidb::page_manager::page_manager(const char* filename, std::size_t num_pages) : page_manager()
+psidb::page_manager::page_manager(int fd, std::size_t num_pages) : page_manager()
 {
    _num_pages = num_pages;
    pages      = ::mmap(nullptr, page_size * num_pages, PROT_READ | PROT_WRITE,
                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-   // initialize the root
-   fd = ::open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+   // FIXME: inconsistent behavior W.R.T. cleanup of fd on exception.
+   this->fd = fd;
    if (fd == -1)
    {
       throw std::system_error(errno, std::system_category(), "open");
@@ -53,11 +53,23 @@ psidb::page_manager::page_manager(const char* filename, std::size_t num_pages) :
    }
 }
 
+psidb::page_manager::page_manager(const char* filename, std::size_t num_pages)
+    : page_manager(::open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR), num_pages)
+{
+}
+
 psidb::page_manager::~page_manager()
 {
-   ::munmap(pages, _num_pages * page_size);
    _write_queue.interrupt();
    _write_worker.join();
+   if (fd != -1)
+   {
+      ::close(fd);
+   }
+   if (pages)
+   {
+      ::munmap(pages, _num_pages * page_size);
+   }
 }
 
 static off_t get_file_offset(page_id id)

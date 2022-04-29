@@ -192,6 +192,19 @@ namespace psidb
          _children[0] = lhs;
          append(k, rhs);
       }
+      void copy(page_internal_node* other)
+      {
+         relink_record tmp_buffer[capacity + 1];
+         other->init();
+         other->start_transaction(tmp_buffer);
+         insert_after(other);
+         other->set(_children[0]);
+         for (std::uint32_t i = 0; i < _size; ++i)
+         {
+            other->append(get_key(i), _children[i + 1].load(std::memory_order_relaxed));
+         }
+         other->end_transaction(tmp_buffer);
+      }
       // \return the key corresponding to the midpoint.  The result points to
       // memory owned by one of the nodes and is invalidated by any modification to
       // either node.

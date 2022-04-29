@@ -62,6 +62,8 @@ namespace psidb
       std::string_view get_key(uint16_t idx) const { return get_key(key_values[idx]); }
       std::string_view get_value(uint16_t idx) const { return get_value(key_values[idx]); }
 
+      leaf_ptr child(std::uint16_t idx) { return {this, key_values + idx}; }
+
       std::uint32_t get_offset(leaf_ptr pos) const
       {
          return static_cast<kv_storage*>(pos.loc) - key_values;
@@ -91,6 +93,16 @@ namespace psidb
          ++size;
          append_to_buf(key);
          append_to_buf(value);
+      }
+      void copy(page_leaf* other)
+      {
+         other->size        = 0;
+         other->total_words = 0;
+         other->type        = page_type::leaf;
+         for (std::size_t i = 0; i < size; ++i)
+         {
+            other->append_internal(get_key(i), get_value(i));
+         }
       }
       std::string_view split(page_leaf*       other,
                              std::uint16_t    idx,

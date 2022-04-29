@@ -17,7 +17,8 @@ namespace psidb
    class page_manager
    {
      public:
-      explicit page_manager(const char* path, std::size_t num_pages);
+      page_manager(int fd, std::size_t num_pages);
+      page_manager(const char* path, std::size_t num_pages);
       ~page_manager();
 
       bool         is_memory_page(page_id id) { return id < max_memory_pages; }
