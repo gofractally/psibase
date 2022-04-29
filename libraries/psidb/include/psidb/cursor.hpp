@@ -30,7 +30,37 @@ namespace psidb
       cursor(page_manager* db, checkpoint c) : db(db), c(c) { version = db->get_version(c); }
       // FIXME: figure out actual bound.  64 is definitely safe
       static constexpr std::size_t max_depth = 64;
-      void                         lower_bound(std::string_view key)
+
+      void lower_bound(std::string_view key)
+      {
+         lower_bound_impl(key);
+         if (!valid())
+         {
+            for (std::size_t i = depth; i > 0; --i)
+            {
+               auto p      = stack[i - 1].get_parent<page_internal_node>();
+               auto offset = p->get_offset(stack[i - 1]);
+               if (offset < p->_size)
+               {
+                  stack[i - 1] = p->child(offset + 1);
+                  front(i, get_page(stack[i - 1]));
+                  break;
+               }
+            }
+         }
+      }
+      void front(std::size_t i, page_header* parent)
+      {
+         for (; i < depth; ++i)
+         {
+            stack[i] = static_cast<page_internal_node*>(parent)->child(0);
+            parent   = get_page(stack[i]);
+         }
+         leaf = static_cast<page_leaf*>(parent)->child(0);
+      }
+      // This may point to the end of a leaf which is the appropriate point
+      // for insertion but needs to be fixed up in lower_bound.
+      void lower_bound_impl(std::string_view key)
       {
          page_header* p = db->root(c, 0);
          depth          = 0;
@@ -44,7 +74,7 @@ namespace psidb
       }
       void insert(std::string_view key, std::string_view value)
       {
-         lower_bound(key);
+         lower_bound_impl(key);
          // TODO: This isn't quite right as it dirties even nodes that we're going to make a copy of
          touch();
          std::uint32_t child;
