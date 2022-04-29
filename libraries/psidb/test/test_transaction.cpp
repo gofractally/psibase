@@ -1,6 +1,9 @@
 #include <psidb/cursor.hpp>
 #include <psidb/database.hpp>
 
+#define CATCH_CONFIG_MAIN
+#include <catch2/catch.hpp>
+
 #include <fcntl.h>
 #include <filesystem>
 
@@ -18,7 +21,7 @@ class tmp_file
    int _fd;
 };
 
-int main()
+TEST_CASE("transaction")
 {
    tmp_file file;
 
@@ -38,5 +41,5 @@ int main()
 
    // verify that original cursor shows no changes
    cursor.lower_bound("a");
-   assert(cursor.get_value() == "v1");
+   CHECK(cursor.get_value() == "v1");
 }

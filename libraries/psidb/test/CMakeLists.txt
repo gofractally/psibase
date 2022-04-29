@@ -1,0 +1,2 @@
+add_executable(test_transaction test_transaction.cpp)
+target_link_libraries(test_transaction psidb catch2)
