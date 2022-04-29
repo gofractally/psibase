@@ -210,7 +210,7 @@ async fn install(
     account: &str,
     filename: &str,
     create_insecure_account: bool,
-    _register_proxy: bool,
+    register_proxy: bool,
 ) -> Result<(), anyhow::Error> {
     let wasm = std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?;
     let mut actions: Vec<String> = Vec::new();
@@ -229,7 +229,9 @@ async fn install(
         "setCode",
         &set_code(account, &to_hex(&wasm))?,
     )?);
-    actions.push(reg_rpc(account, account)?);
+    if register_proxy {
+        actions.push(reg_rpc(account, account)?);
+    }
     let signed_json = signed_transaction_json(&transaction_json(
         &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
         &actions,
