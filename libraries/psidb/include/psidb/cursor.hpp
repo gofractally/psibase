@@ -63,7 +63,7 @@ namespace psidb
          // Insert into internal nodes
          for (std::size_t i = depth; i > 0; --i)
          {
-            auto p   = maybe_clone<page_internal_node>(stack[i - 1], i);
+            auto p   = maybe_clone<page_internal_node>(stack[i - 1], i - 1);
             auto pos = stack[i - 1];
             if (p->insert(pos, key, child))
             {
@@ -88,12 +88,17 @@ namespace psidb
       {
          for (std::size_t i = 0; i < depth; ++i)
          {
-            auto p = stack[i - 1].get_parent<page_internal_node>();
+            auto p = stack[i].get_parent<page_internal_node>();
             db->touch_page(p, version);
          }
          {
             db->touch_page(leaf.get_parent<page_leaf>(), version);
          }
+      }
+      bool valid() const
+      {
+         auto p = leaf.get_parent<page_leaf>();
+         return p->get_offset(leaf) < p->size;
       }
       std::string_view get_key() const
       {
