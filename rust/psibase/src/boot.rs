@@ -150,32 +150,6 @@ fn boot_trx() -> Result<String, anyhow::Error> {
     )?)
 } // boot_trx
 
-fn upload_sys(
-    contract: &str,
-    path: &str,
-    content_type: &str,
-    content: &[u8],
-) -> Result<String, anyhow::Error> {
-    action_json(
-        contract,
-        contract,
-        "uploadSys",
-        &to_hex(
-            bridge::ffi::pack_upload_sys(&format!(
-                r#"{{
-                    "path": {},
-                    "contentType": {},
-                    "content": {}
-                }}"#,
-                serde_json::to_string(path)?,
-                serde_json::to_string(content_type)?,
-                serde_json::to_string(&to_hex(content))?
-            ))
-            .as_slice(),
-        ),
-    )
-}
-
 #[allow(clippy::vec_init_then_push)]
 pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), anyhow::Error> {
     let mut signed_transactions: Vec<String> = Vec::new();

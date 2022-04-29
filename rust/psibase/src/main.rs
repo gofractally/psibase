@@ -53,6 +53,21 @@ enum Commands {
         #[clap(short = 'p', long)]
         register_proxy: bool,
     },
+
+    /// Upload a file to a contract
+    Upload {
+        /// Contract to upload to
+        contract: String,
+
+        /// Path to store within contract
+        path: String,
+
+        /// MIME content type of file
+        content_type: String,
+
+        /// Filename to upload
+        filename: String,
+    },
 }
 
 // TODO: move to lib
@@ -204,6 +219,32 @@ async fn push_transaction(
     Ok(())
 }
 
+fn upload_sys(
+    contract: &str,
+    path: &str,
+    content_type: &str,
+    content: &[u8],
+) -> Result<String, anyhow::Error> {
+    action_json(
+        contract,
+        contract,
+        "uploadSys",
+        &to_hex(
+            bridge::ffi::pack_upload_sys(&format!(
+                r#"{{
+                    "path": {},
+                    "contentType": {},
+                    "content": {}
+                }}"#,
+                serde_json::to_string(path)?,
+                serde_json::to_string(content_type)?,
+                serde_json::to_string(&to_hex(content))?
+            ))
+            .as_slice(),
+        ),
+    )
+}
+
 async fn install(
     args: &Args,
     client: reqwest::Client,
@@ -244,6 +285,31 @@ async fn install(
     Ok(())
 }
 
+async fn upload(
+    args: &Args,
+    client: reqwest::Client,
+    contract: &str,
+    path: &str,
+    content_type: &str,
+    filename: &str,
+) -> Result<(), anyhow::Error> {
+    let signed_json = signed_transaction_json(&transaction_json(
+        &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
+        &[upload_sys(
+            contract,
+            path,
+            content_type,
+            &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
+        )?],
+    )?)?;
+    let packed_signed = bridge::ffi::pack_signed_transaction(&signed_json);
+    push_transaction(args, client, packed_signed.as_slice().into()).await?;
+    println!("Ok");
+    Ok(())
+}
+
+/// Upload a file to a contract
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
@@ -267,6 +333,12 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .await?
         }
+        Commands::Upload {
+            contract,
+            path,
+            content_type,
+            filename,
+        } => upload(&args, client, contract, path, content_type, filename).await?,
     }
 
     Ok(())
