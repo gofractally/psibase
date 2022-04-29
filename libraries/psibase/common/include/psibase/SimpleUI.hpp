@@ -5,7 +5,8 @@
 
 namespace psibase
 {
-   constexpr const char simpleUIMainPage[] = R"(<html>Hello</html>)";
+   constexpr const char simpleUIMainPage[] =
+       R"(<html><div id="root"></div><script src="/common/SimpleUI.mjs" type="module"></script></html>)";
 
    template <typename Derived>
    struct SimpleUI

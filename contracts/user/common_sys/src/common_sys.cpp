@@ -50,7 +50,18 @@ namespace psibase
                 .reply       = content->content,
             };
          }
-
+         if (request.target == "/common/thiscontract")
+         {
+            std::string contractName;
+            if (request.host.size() > request.root_host.size() + 1 &&
+                request.host.ends_with(request.root_host) &&
+                request.host[request.host.size() - request.root_host.size() - 1] == '.')
+               contractName.assign(request.host.begin(),
+                                   request.host.end() - request.root_host.size() - 1);
+            else
+               contractName = "common-sys";
+            return to_json(contractName);
+         }
          if (request.target == "/common/rootdomain")
             return to_json(request.root_host);
          if (request.target == "/common/rootdomain.js")
