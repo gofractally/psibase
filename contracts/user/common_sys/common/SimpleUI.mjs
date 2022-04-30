@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson } from './rpc.mjs';
+import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex } from './rpc.mjs';
 
 await import('https://unpkg.com/react@18/umd/react.production.min.js');
 await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
@@ -8,10 +8,17 @@ const html = htm.bind(React.createElement);
 const contract = await getJson('/common/thiscontract');
 const actionTemplates = await getJson('/action_templates');
 
-function pushTransaction(trx, addMsg, clearMsg) {
+async function pushTransaction(trx, addMsg, clearMsg) {
     try {
         clearMsg();
-        addMsg('todo...');
+        const t = JSON.parse(trx);
+        for (let action of t.actions) {
+            console.log(action);
+            addMsg(`packing ${action.method}...`);
+            action.raw_data = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
+                '/pack_action/' + action.method, action.data)));
+            addMsg('raw_data: ' + action.raw_data);
+        }
     } catch (e) {
         console.error(e);
         addMsg(e.message);
@@ -65,10 +72,9 @@ function App() {
             <button onClick=${e => pushTransaction(trx, addMsg, clearMsg)}>Push Transaction</button>
         </div>
         <h2>Messages</h2>
-        <pre><code style=${{ border: '1px solid' }}>${msg}</code></pre>
+        <pre style=${{ border: '1px solid' }}><code>${msg}</code></pre>
     </div>`;
 }
 
-const container = document.getElementById('root');
-const root = ReactDOM.createRoot(container);
+const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(html`<${App}/>`);

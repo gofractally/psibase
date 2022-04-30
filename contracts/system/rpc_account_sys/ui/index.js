@@ -35,7 +35,9 @@ async function createAccount() {
             // TODO: TAPOS
             // TODO: Sign
             trx: {
-                expiration: new Date(Date.now() + 10_000),
+                tapos: {
+                    expiration: new Date(Date.now() + 10_000),
+                },
                 actions: [action],
             },
         };

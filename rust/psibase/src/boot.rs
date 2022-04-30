@@ -182,6 +182,12 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
             )?,
             upload_sys(
                 "common-sys",
+                "/common/SimpleUI.mjs",
+                "text/javascript",
+                include_bytes!("../../../contracts/user/common_sys/common/SimpleUI.mjs"),
+            )?,
+            upload_sys(
+                "common-sys",
                 "/ui/index.js",
                 "text/javascript",
                 include_bytes!("../../../contracts/user/common_sys/ui/index.js"),

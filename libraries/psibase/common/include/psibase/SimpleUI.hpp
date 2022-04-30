@@ -2,6 +2,7 @@
 
 #include <psibase/actionJsonTemplate.hpp>
 #include <psibase/contract_entry.hpp>
+#include <psibase/fracpackActionFromJson.hpp>
 
 namespace psibase
 {
@@ -28,6 +29,20 @@ namespace psibase
                    .contentType = "application/json",
                    .reply       = generateActionJsonTemplate<Derived>(),
                };
+            }
+         }
+         if (request.method == "POST")
+         {
+            if (request.target.starts_with("/pack_action/"))
+            {
+               if (auto result = fracpackActionFromJson<Derived>(
+                       std::string_view{request.target}.substr(13), request.body))
+               {
+                  return rpc_reply_data{
+                      .contentType = "application/octet-stream",
+                      .reply       = std::move(*result),
+                  };
+               }
             }
          }
          return std::nullopt;
