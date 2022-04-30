@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex } from './rpc.mjs';
+import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex, pushedSignedTransaction } from './rpc.mjs';
 
 await import('https://unpkg.com/react@18/umd/react.production.min.js');
 await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
@@ -11,19 +11,24 @@ const actionTemplates = await getJson('/action_templates');
 async function pushTransaction(trx, addMsg, clearMsg) {
     try {
         clearMsg();
-        const t = JSON.parse(trx);
-        for (let action of t.actions) {
+        for (let action of trx.actions) {
             console.log(action);
             addMsg(`packing ${action.method}...`);
             action.raw_data = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
                 '/pack_action/' + action.method, action.data)));
             addMsg('raw_data: ' + action.raw_data);
         }
+        const trace = await pushedSignedTransaction({ trx });
+        addMsg('\nPushed\n');
+        addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {
         console.error(e);
+        addMsg('');
         addMsg(e.message);
-        if (e.trace)
+        if (e.trace) {
+            addMsg('');
             addMsg('trace: ' + JSON.stringify(e.trace, null, 4));
+        }
     }
 }
 
@@ -69,7 +74,7 @@ function App() {
         <div><${ActionButtons} setTrx=${setTrx}/></div>
         <textarea rows=20 cols=80 value=${trx} onChange=${e => setTrx(e.target.value)}></textarea>
         <div>
-            <button onClick=${e => pushTransaction(trx, addMsg, clearMsg)}>Push Transaction</button>
+            <button onClick=${e => pushTransaction(JSON.parse(trx), addMsg, clearMsg)}>Push Transaction</button>
         </div>
         <h2>Messages</h2>
         <pre style=${{ border: '1px solid' }}><code>${msg}</code></pre>
