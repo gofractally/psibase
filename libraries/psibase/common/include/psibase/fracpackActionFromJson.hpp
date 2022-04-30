@@ -28,6 +28,7 @@ namespace psibase
       return false;
    }
 
+   // TODO: detect missing non-optional args
    template <typename T>
    std::optional<std::vector<char>> fracpackActionFromJson(std::string_view   name,
                                                            std::vector<char>& json)
