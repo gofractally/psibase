@@ -34,7 +34,7 @@ namespace system_contract
       kv_put(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
    }
 
-   void account_sys::newAccount(AccountNumber acc, AccountNumber auth_contract, bool allow_sudo)
+   void account_sys::newAccount(AccountNumber acc, AccountNumber auth_contract, bool require_new)
    {
       auto status = kv_get<account_sys_status_row>(account_sys_status_key());
       check(status.has_value(), "not started");
@@ -48,21 +48,19 @@ namespace system_contract
       }
 
       check(acc.value, "empty account name");
-      check(!exists(acc), "account already exists");
+      if (exists(acc))
+      {
+         if (require_new)
+            abort_message_str("account already exists");
+         return;
+      }
       check(exists(auth_contract), "unknown auth contract");
-
-      uint32_t flags = 0;
-
-      // TODO: restrict ability to set this flag
-      // TODO: support entire set of flags
-      if (allow_sudo)
-         flags |= account_row::allow_sudo;
 
       status->total_accounts++;
       account_row account{
           .num           = acc,
           .auth_contract = auth_contract,
-          .flags         = flags,
+          .flags         = 0,
       };
       kv_put(status->key(), *status);
       kv_put(account.kv_map, account.key(), account);

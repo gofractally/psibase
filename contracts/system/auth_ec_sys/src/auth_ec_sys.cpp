@@ -52,11 +52,8 @@ namespace system_contract::auth_ec_sys
    account_num exec(account_num this_contract, account_num sender, create_account& args)
    {
       write_console("account_sys::create_account");
-      // TODO: restrict ability to set allow_sudo
-      // TODO: support entire set of flags
-
       psibase::actor<account_sys> asys(this_contract, account_sys::contract);
-      asys.newAccount(args.name, this_contract, args.allow_sudo);
+      asys.newAccount(args.name, this_contract, true);
       auth_row row{AccountNumber{args.name}, args.public_key};
       kv_put(row.key(), row);
       return args.name;

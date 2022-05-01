@@ -16,7 +16,7 @@ namespace system_contract
       void startup(psio::const_view<std::vector<psibase::AccountNumber>> existing_accounts);
       void newAccount(psibase::AccountNumber account,
                       psibase::AccountNumber auth_contract,
-                      bool                   allow_sudo);
+                      bool                   require_new);
       bool exists(psibase::AccountNumber num);
 
 
@@ -33,10 +33,9 @@ namespace system_contract
 //      using Database = Tables<>
    };
 
-
    PSIO_REFLECT(account_sys,
                 method(startup, existing_accounts),
-                method(newAccount, name, auth_contract, allow_sudo),
+                method(newAccount, name, auth_contract, require_new),
                 method(exists, num))
 
 }  // namespace system_contract

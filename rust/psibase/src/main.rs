@@ -82,16 +82,21 @@ fn to_hex(bytes: &[u8]) -> String {
 }
 
 // TODO: replace
-fn new_account(account: &str, auth_contract: &str) -> Result<String, anyhow::Error> {
+fn new_account(
+    account: &str,
+    auth_contract: &str,
+    require_new: bool,
+) -> Result<String, anyhow::Error> {
     Ok(to_hex(
         bridge::ffi::pack_new_account(&format!(
             r#"{{
                 "account": {},
                 "auth_contract": {},
-                "allow_sudo": false
+                "require_new": {}
             }}"#,
             serde_json::to_string(account)?,
-            serde_json::to_string(auth_contract)?
+            serde_json::to_string(auth_contract)?,
+            if require_new { "true" } else { "false" }
         ))
         .as_slice(),
     ))
@@ -256,12 +261,11 @@ async fn install(
     let wasm = std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?;
     let mut actions: Vec<String> = Vec::new();
     if create_insecure_account {
-        // TODO: check if account exists
         actions.push(action_json(
             "account-sys",
             "account-sys",
             "newAccount",
-            &new_account(account, "auth-fake-sys")?,
+            &new_account(account, "auth-fake-sys", false)?,
         )?);
     }
     actions.push(action_json(

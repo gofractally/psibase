@@ -28,9 +28,8 @@ namespace system_contract::auth_ec_sys
 
       psibase::AccountNumber name       = {};
       psibase::PublicKey     public_key = {};
-      bool                   allow_sudo = {};
    };
-   PSIO_REFLECT(create_account, name, public_key, allow_sudo)
+   PSIO_REFLECT(create_account, name, public_key)
 
    using action = std::variant<auth_check, set_key, create_account>;
 

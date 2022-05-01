@@ -110,7 +110,7 @@ AccountNumber DefaultTestChain::add_account(
                                                  system_contract::account_sys::contract);
 
    auto trace = push_transaction(  //
-       make_transaction({asys.newAccount(acc, auth_contract, false)}));
+       make_transaction({asys.newAccount(acc, auth_contract, true)}));
 
    check(psibase::show(show, trace) == "", "Failed to add account");
 

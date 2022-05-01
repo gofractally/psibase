@@ -19,9 +19,9 @@ struct NewAccount
 {
    psibase::AccountNumber account;
    psibase::AccountNumber auth_contract;
-   bool                   allow_sudo;
+   bool                   require_new;
 };
-PSIO_REFLECT(NewAccount, account, auth_contract, allow_sudo)
+PSIO_REFLECT(NewAccount, account, auth_contract, require_new)
 
 struct SetCode
 {
