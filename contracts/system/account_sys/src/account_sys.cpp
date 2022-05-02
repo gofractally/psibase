@@ -28,15 +28,15 @@ namespace system_contract
    // TODO: scan native table to get total_accounts
    void account_sys::startup(psio::const_view<std::vector<AccountNumber>> existing_accounts)
    {
-      check(!kv_get<account_sys_status_row>(account_sys_status_key()), "already started");
+      check(!kvGet<account_sys_status_row>(account_sys_status_key()), "already started");
       auto s = existing_accounts->size();
 
-      kv_put(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
+      kvPut(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
    }
 
    void account_sys::newAccount(AccountNumber name, AccountNumber authContract, bool requireNew)
    {
-      auto status = kv_get<account_sys_status_row>(account_sys_status_key());
+      auto status = kvGet<account_sys_status_row>(account_sys_status_key());
       check(status.has_value(), "not started");
 
       if (enable_print)
@@ -62,13 +62,13 @@ namespace system_contract
           .authContract = authContract,
           .flags        = 0,
       };
-      kv_put(status->key(), *status);
-      kv_put(account.kv_map, account.key(), account);
+      kvPut(status->key(), *status);
+      kvPut(account.kv_map, account.key(), account);
    }
 
    bool account_sys::exists(AccountNumber num)
    {
-      return !!kv_get<account_row>(account_row::kv_map, account_key(num));
+      return !!kvGet<account_row>(account_row::kv_map, account_key(num));
    }
 
 }  // namespace system_contract

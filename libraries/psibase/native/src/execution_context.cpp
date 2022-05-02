@@ -44,15 +44,15 @@ namespace psibase
       check(code.remaining(), "native set_code can't clear code");
       auto code_hash = sha256(code.pos, code.remaining());
 
-      auto account = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
+      auto account = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
       check(account.has_value(), "set_code: unknown contract account");
       check(account->code_hash == Checksum256{}, "native set_code can't replace code");
       account->code_hash = code_hash;
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
-      db.kv_put(account_row::kv_map, account->key(), *account);
+      db.kvPut(account_row::kv_map, account->key(), *account);
 
-      auto code_obj = db.kv_get<code_row>(code_row::kv_map, code_key(code_hash, vmType, vmVersion));
+      auto code_obj = db.kvGet<code_row>(code_row::kv_map, code_key(code_hash, vmType, vmVersion));
       if (!code_obj)
       {
          code_obj.emplace();
@@ -62,7 +62,7 @@ namespace psibase
          code_obj->code.assign(code.pos, code.end);
       }
       ++code_obj->ref_count;
-      db.kv_put(code_row::kv_map, code_obj->key(), *code_obj);
+      db.kvPut(code_row::kv_map, code_obj->key(), *code_obj);
    }  // set_code
 
    struct backend_entry
@@ -153,11 +153,11 @@ namespace psibase
                              AccountNumber        contract)
           : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
-         auto ca = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
+         auto ca = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
          check(ca.has_value(), "unknown contract account");
          check(ca->code_hash != Checksum256{}, "account has no code");
          contract_account = std::move(*ca);
-         auto code        = db.kv_get<code_row>(
+         auto code        = db.kvGet<code_row>(
              code_row::kv_map, code_key(contract_account.code_hash, contract_account.vmType,
                                                contract_account.vmVersion));
          check(code.has_value(), "code record is missing");
@@ -414,7 +414,7 @@ namespace psibase
       // TODO: restrict key size
       // TODO: restrict value size
       // TODO: don't let timer abort db operation
-      void kv_put(uint32_t map, span<const char> key, span<const char> value)
+      void kvPut(uint32_t map, span<const char> key, span<const char> value)
       {
          if (map == uint32_t(kv_map::native_constrained))
             verify_write_constrained({key.data(), key.size()}, {value.data(), value.size()});
@@ -426,7 +426,7 @@ namespace psibase
       // TODO: track consumption
       // TODO: restrict value size
       // TODO: don't let timer abort db operation
-      uint64_t kv_put_sequential(uint32_t map, span<const char> value)
+      uint64_t kvPutSequential(uint32_t map, span<const char> value)
       {
          auto m = get_map_write_sequential(map);
 
@@ -443,29 +443,29 @@ namespace psibase
          else if (map == uint32_t(kv_map::ui_event))
             indexNumber = dbStatus.nextUIEventNumber++;
          else
-            check(false, "kv_put_sequential: unsupported map");
-         db.kv_put(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
+            check(false, "kvPutSequential: unsupported map");
+         db.kvPut(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
 
          db.kv_put_raw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
          return indexNumber;
-      }  // kv_put_sequential()
+      }  // kvPutSequential()
 
       // TODO: track consumption
       // TODO: don't let timer abort db operation
-      void kv_remove(uint32_t map, span<const char> key)
+      void kvRemove(uint32_t map, span<const char> key)
       {
          clear_result();
          db.kv_remove_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()});
       }
 
       // TODO: don't let timer abort db operation
-      uint32_t kv_get(uint32_t map, span<const char> key)
+      uint32_t kvGet(uint32_t map, span<const char> key)
       {
          return set_result(db.kv_get_raw(get_map_read(map), {key.data(), key.size()}));
       }
 
       // TODO: don't let timer abort db operation
-      uint32_t kv_get_sequential(uint32_t map, uint64_t indexNumber)
+      uint32_t kvGetSequential(uint32_t map, uint64_t indexNumber)
       {
          auto m = get_map_read_sequential(map);
          return set_result(db.kv_get_raw(m, psio::convert_to_key(indexNumber)));
@@ -524,11 +524,11 @@ namespace psibase
       rhf_t::add<&execution_context_impl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::setRetval>("env", "setRetval");
-      rhf_t::add<&execution_context_impl::kv_put>("env", "kv_put");
-      rhf_t::add<&execution_context_impl::kv_put_sequential>("env", "kv_put_sequential");
-      rhf_t::add<&execution_context_impl::kv_remove>("env", "kv_remove");
-      rhf_t::add<&execution_context_impl::kv_get>("env", "kv_get");
-      rhf_t::add<&execution_context_impl::kv_get_sequential>("env", "kv_get_sequential");
+      rhf_t::add<&execution_context_impl::kvPut>("env", "kvPut");
+      rhf_t::add<&execution_context_impl::kvPutSequential>("env", "kvPutSequential");
+      rhf_t::add<&execution_context_impl::kvRemove>("env", "kvRemove");
+      rhf_t::add<&execution_context_impl::kvGet>("env", "kvGet");
+      rhf_t::add<&execution_context_impl::kvGetSequential>("env", "kvGetSequential");
       rhf_t::add<&execution_context_impl::kv_greater_equal>("env", "kv_greater_equal");
       rhf_t::add<&execution_context_impl::kv_less_than>("env", "kv_less_than");
       rhf_t::add<&execution_context_impl::kv_max>("env", "kv_max");

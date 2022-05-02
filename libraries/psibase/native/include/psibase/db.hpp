@@ -93,14 +93,14 @@ namespace psibase
       std::optional<kv_result>          kv_max_raw(kv_map map, psio::input_stream key);
 
       template <typename K, typename V>
-      auto kv_put(kv_map map, const K& key, const V& value)
+      auto kvPut(kv_map map, const K& key, const V& value)
           -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
          kv_put_raw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
       }
 
       template <typename V, typename K>
-      std::optional<V> kv_get(kv_map map, const K& key)
+      std::optional<V> kvGet(kv_map map, const K& key)
       {
          auto s = kv_get_raw(map, psio::convert_to_key(key));
          if (!s)
@@ -111,7 +111,7 @@ namespace psibase
       template <typename V, typename K>
       V kv_get_or_default(kv_map map, const K& key)
       {
-         auto obj = kv_get<V>(map, key);
+         auto obj = kvGet<V>(map, key);
          if (obj)
             return std::move(*obj);
          return {};

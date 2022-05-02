@@ -59,14 +59,14 @@ namespace psibase
          for (auto& contract : data.contracts)
          {
             check(contract.contract.value, "account 0 is reserved");
-            check(!db.kv_get<account_row>(account_row::kv_map, account_key(contract.contract)),
+            check(!db.kvGet<account_row>(account_row::kv_map, account_key(contract.contract)),
                   "account already created");
             account_row account{
                 .num          = contract.contract,
                 .authContract = contract.authContract,
                 .flags        = contract.flags,
             };
-            db.kv_put(account_row::kv_map, account.key(), account);
+            db.kvPut(account_row::kv_map, account.key(), account);
             set_code(db, contract.contract, contract.vmType, contract.vmVersion,
                      {contract.code.data(), contract.code.size()});
          }

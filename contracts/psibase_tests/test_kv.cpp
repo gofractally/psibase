@@ -57,13 +57,13 @@ std::vector<item> items = {
 void test(AccountNumber this_contract)
 {
    if (enable_print)
-      print("kv_put\n");
+      print("kvPut\n");
    for (const auto& item : items)
       if (item.add)
          kv_put_raw(kv_map::contract, item.getKey(this_contract), psio::convert_to_bin(item.value));
 
    if (enable_print)
-      print("kv_remove\n");
+      print("kvRemove\n");
    for (const auto& item : items)
       if (!item.keep)
          kv_remove_raw(kv_map::contract, item.getKey(this_contract));

@@ -26,19 +26,19 @@ namespace psibase
    void block_context::start(std::optional<TimePointSec> time)
    {
       check(!started, "block has already been started");
-      auto status = db.kv_get<status_row>(status_row::kv_map, status_key());
+      auto status = db.kvGet<status_row>(status_row::kv_map, status_key());
       if (!status)
       {
          status.emplace();
          if (!is_read_only)
-            db.kv_put(status_row::kv_map, status->key(), *status);
+            db.kvPut(status_row::kv_map, status->key(), *status);
       }
-      auto dbStatus = db.kv_get<DatabaseStatusRow>(DatabaseStatusRow::kv_map, databaseStatusKey());
+      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::kv_map, databaseStatusKey());
       if (!dbStatus)
       {
          dbStatus.emplace();
          if (!is_read_only)
-            db.kv_put(DatabaseStatusRow::kv_map, dbStatus->key(), *dbStatus);
+            db.kvPut(DatabaseStatusRow::kv_map, dbStatus->key(), *dbStatus);
       }
       databaseStatus = *dbStatus;
 
@@ -86,17 +86,17 @@ namespace psibase
       check(!need_genesis_action, "missing genesis action in block");
       active = false;
 
-      auto status = db.kv_get<status_row>(status_row::kv_map, status_key());
+      auto status = db.kvGet<status_row>(status_row::kv_map, status_key());
       check(status.has_value(), "missing status record");
       status->head = current;
       if (is_genesis_block)
          status->chain_id = status->head->blockId;
-      db.kv_put(status_row::kv_map, status->key(), *status);
+      db.kvPut(status_row::kv_map, status->key(), *status);
 
       // TODO: store block IDs somewhere?
       // TODO: store block proofs somewhere
       // TODO: avoid repacking
-      db.kv_put(kv_map::block_log, current.header.blockNum, current);
+      db.kvPut(kv_map::block_log, current.header.blockNum, current);
 
       session.commit();
    }

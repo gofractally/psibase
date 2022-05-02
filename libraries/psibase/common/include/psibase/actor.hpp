@@ -101,8 +101,8 @@ namespace psibase
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
                        "insufficient arguments passed to method");
 
-         return psibase::kv_put_sequential(event_log, sender, Name,
-                                           param_tuple(std::forward<Args>(args)...));
+         return psibase::kvPutSequential(event_log, sender, Name,
+                                         param_tuple(std::forward<Args>(args)...));
       }
    };
 
@@ -119,7 +119,7 @@ namespace psibase
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
       auto call(EventNumber n) const
       {
-         auto size         = raw::kv_get_sequential(event_log, n);
+         auto size         = raw::kvGetSequential(event_log, n);
          using param_tuple = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
          struct EventHeader
          {

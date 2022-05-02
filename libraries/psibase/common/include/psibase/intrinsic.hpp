@@ -54,27 +54,27 @@ namespace psibase
       PSIBASE_INTRINSIC(setRetval) void setRetval(const char* retval, uint32_t len);
 
       // Set a key-value pair. If key already exists, then replace the existing value.
-      PSIBASE_INTRINSIC(kv_put)
-      void kv_put(kv_map      map,
-                  const char* key,
-                  uint32_t    key_len,
-                  const char* value,
-                  uint32_t    value_len);
+      PSIBASE_INTRINSIC(kvPut)
+      void kvPut(kv_map      map,
+                 const char* key,
+                 uint32_t    key_len,
+                 const char* value,
+                 uint32_t    value_len);
 
       // Add a sequentially-numbered record. Returns the id.
-      PSIBASE_INTRINSIC(kv_put_sequential)
-      EventNumber kv_put_sequential(kv_map map, const char* value, uint32_t value_len);
+      PSIBASE_INTRINSIC(kvPutSequential)
+      EventNumber kvPutSequential(kv_map map, const char* value, uint32_t value_len);
 
       // Remove a key-value pair if it exists
-      PSIBASE_INTRINSIC(kv_remove) void kv_remove(kv_map map, const char* key, uint32_t key_len);
+      PSIBASE_INTRINSIC(kvRemove) void kvRemove(kv_map map, const char* key, uint32_t key_len);
 
       // Get a key-value pair, if any. If key exists, then sets result to value and
       // returns size. If key does not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kv_get) uint32_t kv_get(kv_map map, const char* key, uint32_t key_len);
+      PSIBASE_INTRINSIC(kvGet) uint32_t kvGet(kv_map map, const char* key, uint32_t key_len);
 
       // Get a sequentially-numbered record. If id is available, then sets result to value and
       // returns size. If id does not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kv_get_sequential) uint32_t kv_get_sequential(kv_map map, EventNumber id);
+      PSIBASE_INTRINSIC(kvGetSequential) uint32_t kvGetSequential(kv_map map, EventNumber id);
 
       // Get the first key-value pair which is greater than or equal to the provided
       // key. If one is found, and the first match_key_size bytes of the found key
@@ -167,12 +167,12 @@ namespace psibase
    // Set a key-value pair. If key already exists, then replace the existing value.
    inline void kv_put_raw(kv_map map, psio::input_stream key, psio::input_stream value)
    {
-      raw::kv_put(map, key.pos, key.remaining(), value.pos, value.remaining());
+      raw::kvPut(map, key.pos, key.remaining(), value.pos, value.remaining());
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, typename V>
-   auto kv_put(kv_map map, const K& key, const V& value)
+   auto kvPut(kv_map map, const K& key, const V& value)
        -> std::enable_if_t<!psio::is_std_optional<V>(), void>
    {
       kv_put_raw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
@@ -180,20 +180,20 @@ namespace psibase
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, typename V>
-   auto kv_put(const K& key, const V& value) -> std::enable_if_t<!psio::is_std_optional<V>(), void>
+   auto kvPut(const K& key, const V& value) -> std::enable_if_t<!psio::is_std_optional<V>(), void>
    {
-      kv_put(kv_map::contract, key, value);
+      kvPut(kv_map::contract, key, value);
    }
 
    // Add a sequentially-numbered record. Returns the id.
    inline uint64_t kv_put_sequential_raw(kv_map map, psio::input_stream value)
    {
-      return raw::kv_put_sequential(map, value.pos, value.remaining());
+      return raw::kvPutSequential(map, value.pos, value.remaining());
    }
 
    // Add a sequentially-numbered record. Returns the id.
    template <typename Type, typename V>
-   auto kv_put_sequential(kv_map map, AccountNumber contract, Type type, const V& value)
+   auto kvPutSequential(kv_map map, AccountNumber contract, Type type, const V& value)
        -> std::enable_if_t<!psio::is_std_optional<V>(), void>
    {
       std::vector<char>     packed(psio::fracpack_size(contract) + psio::fracpack_size(type) +
@@ -208,27 +208,27 @@ namespace psibase
    // Remove a key-value pair if it exists
    inline void kv_remove_raw(kv_map map, psio::input_stream key)
    {
-      raw::kv_remove(map, key.pos, key.remaining());
+      raw::kvRemove(map, key.pos, key.remaining());
    }
 
    // Remove a key-value pair if it exists
    template <typename K>
-   void kv_remove(kv_map map, const K& key)
+   void kvRemove(kv_map map, const K& key)
    {
       kv_remove_raw(map, psio::convert_to_key(key));
    }
 
    // Remove a key-value pair if it exists
    template <typename K>
-   void kv_remove(const K& key)
+   void kvRemove(const K& key)
    {
-      kv_remove(kv_map::contract, key);
+      kvRemove(kv_map::contract, key);
    }
 
    // Size of key-value pair, if any
    inline std::optional<uint32_t> kv_get_size_raw(kv_map map, psio::input_stream key)
    {
-      auto size = raw::kv_get(map, key.pos, key.remaining());
+      auto size = raw::kvGet(map, key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
       return size;
@@ -251,7 +251,7 @@ namespace psibase
    // Get a key-value pair, if any
    inline std::optional<std::vector<char>> kv_get_raw(kv_map map, psio::input_stream key)
    {
-      auto size = raw::kv_get(map, key.pos, key.remaining());
+      auto size = raw::kvGet(map, key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -259,7 +259,7 @@ namespace psibase
 
    // Get a key-value pair, if any
    template <typename V, typename K>
-   inline std::optional<V> kv_get(kv_map map, const K& key)
+   inline std::optional<V> kvGet(kv_map map, const K& key)
    {
       auto v = kv_get_raw(map, psio::convert_to_key(key));
       if (!v)
@@ -270,16 +270,16 @@ namespace psibase
 
    // Get a key-value pair, if any
    template <typename V, typename K>
-   inline std::optional<V> kv_get(const K& key)
+   inline std::optional<V> kvGet(const K& key)
    {
-      return kv_get<V>(kv_map::contract, key);
+      return kvGet<V>(kv_map::contract, key);
    }
 
    // Get a value, or the default if not found
    template <typename V, typename K>
    inline V kv_get_or_default(kv_map map, const K& key)
    {
-      auto obj = kv_get<V>(map, key);
+      auto obj = kvGet<V>(map, key);
       if (obj)
          return std::move(*obj);
       return {};
@@ -295,7 +295,7 @@ namespace psibase
    // Get a sequentially-numbered record, if available
    inline std::optional<std::vector<char>> kv_get_sequential_raw(kv_map map, uint64_t id)
    {
-      auto size = raw::kv_get_sequential(map, id);
+      auto size = raw::kvGetSequential(map, id);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -311,12 +311,12 @@ namespace psibase
    // * If type is non-null, then it receives the record type. It is left untouched if either the record
    //   is not available or if matchContract is not null but doesn't match.
    template <typename V, typename Type>
-   inline std::optional<V> kv_get_sequential(kv_map               map,
-                                             uint64_t             id,
-                                             const AccountNumber* matchContract = nullptr,
-                                             const Type*          matchType     = nullptr,
-                                             AccountNumber*       contract      = nullptr,
-                                             Type*                type          = nullptr)
+   inline std::optional<V> kvGetSequential(kv_map               map,
+                                           uint64_t             id,
+                                           const AccountNumber* matchContract = nullptr,
+                                           const Type*          matchType     = nullptr,
+                                           AccountNumber*       contract      = nullptr,
+                                           Type*                type          = nullptr)
    {
       std::optional<V> result;
       auto             v = kv_get_sequential_raw(map, id);

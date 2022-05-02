@@ -36,7 +36,7 @@ namespace psibase
           .contract    = contract,
           .rpcContract = rpcContract,
       };
-      kv_put(row.key(get_receiver()), row);
+      kvPut(row.key(get_receiver()), row);
    }
 
    extern "C" [[clang::export_name("serve")]] void serve()
@@ -61,7 +61,7 @@ namespace psibase
          contractName = "common-sys";
 
       auto contract = AccountNumber(contractName);
-      auto reg      = kv_get<RegisteredContractRow>(registeredContractKey(act.contract, contract));
+      auto reg      = kvGet<RegisteredContractRow>(registeredContractKey(act.contract, contract));
       if (!reg)
          abortMessage("contract not registered: " + contract.str());
 

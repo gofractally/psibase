@@ -33,7 +33,7 @@ namespace system_contract::auth_ec_sys
    {
       if (enable_print)
          print("auth_check\n");
-      auto row = kv_get<auth_row>(auth_key(args.action.sender));
+      auto row = kvGet<auth_row>(auth_key(args.action.sender));
       check(!!row, "sender does not have a public key");
       auto expected = psio::convert_to_frac(row->pubkey);
       for (auto& claim : args.claims)
@@ -46,7 +46,7 @@ namespace system_contract::auth_ec_sys
    {
       check(sender == args.account, "wrong sender");
       auth_row row{args.account, args.key};
-      kv_put(row.key(), row);
+      kvPut(row.key(), row);
    }
 
    AccountNumber exec(AccountNumber this_contract, AccountNumber sender, create_account& args)
@@ -55,7 +55,7 @@ namespace system_contract::auth_ec_sys
       psibase::actor<account_sys> asys(this_contract, account_sys::contract);
       asys.newAccount(args.name, this_contract, true);
       auth_row row{AccountNumber{args.name}, args.public_key};
-      kv_put(row.key(), row);
+      kvPut(row.key(), row);
       return args.name;
    }
 

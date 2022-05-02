@@ -42,7 +42,7 @@ namespace psibase
 
       if (request.method == "GET")
       {
-         auto content = kv_get<WebContentRow>(webContentKey(get_receiver(), request.target));
+         auto content = kvGet<WebContentRow>(webContentKey(get_receiver(), request.target));
          if (!!content)
          {
             return rpc_reply_data{
@@ -129,7 +129,7 @@ namespace psibase
           .contentType = contentType,
           .content     = std::move(c),
       };
-      kv_put(row.key(get_receiver()), row);
+      kvPut(row.key(get_receiver()), row);
    }
 
 }  // namespace psibase

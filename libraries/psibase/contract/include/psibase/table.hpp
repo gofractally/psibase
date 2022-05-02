@@ -72,13 +72,13 @@ namespace psibase
       void read(C& c) const
       {
          //static_assert(C::value_type is char, unsigned char, or std::byte);
-         int sz = raw::kv_get(map, key.data(), key.size());
+         int sz = raw::kvGet(map, key.data(), key.size());
          check(sz >= 0, "no such key");
          c.resize(sz);
          raw::getResult(c.data(), c.size(), 0);
          if (is_secondary)
          {
-            int sz = raw::kv_get(map, c.data(), c.size());
+            int sz = raw::kvGet(map, c.data(), c.size());
             check(sz >= 0, "primary key not found");
             c.resize(sz);
             raw::getResult(c.data(), c.size(), 0);
@@ -301,7 +301,7 @@ namespace psibase
       {
          key_view key_base{{prefix.data(), prefix.size()}};
          auto     buffer = psio::convert_to_key(std::tie(key_base, k));
-         int      res    = raw::kv_get(map, buffer.data(), buffer.size());
+         int      res    = raw::kvGet(map, buffer.data(), buffer.size());
          if (res < 0)
          {
             return {};
@@ -310,7 +310,7 @@ namespace psibase
          raw::getResult(buffer.data(), buffer.size(), 0);
          if (is_secondary())
          {
-            res = raw::kv_get(map, buffer.data(), buffer.size());
+            res = raw::kvGet(map, buffer.data(), buffer.size());
             buffer.resize(res);
             raw::getResult(buffer.data(), buffer.size(), 0);
          }
@@ -335,11 +335,11 @@ namespace psibase
                          const char* value,
                          std::size_t value_len)
    {
-      if (raw::kv_get(map, key, key_len) != -1)
+      if (raw::kvGet(map, key, key_len) != -1)
       {
          check(false, "key already exists");
       }
-      raw::kv_put(map, key, key_len, value, value_len);
+      raw::kvPut(map, key, key_len, value, value_len);
    }
 
    template <typename T, auto Primary, auto... Secondary>
@@ -354,7 +354,7 @@ namespace psibase
          auto pk = serialize_key(0, std::invoke(Primary, arg));
          if constexpr (sizeof...(Secondary) > 0)
          {
-            int               sz         = raw::kv_get(map, pk.data(), pk.size());
+            int               sz         = raw::kvGet(map, pk.data(), pk.size());
             std::vector<char> key_buffer = prefix;
             key_buffer.push_back(0);
             if (sz != -1)
@@ -370,7 +370,7 @@ namespace psibase
                   {
                      key_buffer.back() = idx;
                      psio::convert_to_key(old_key, key_buffer);
-                     raw::kv_remove(map, key_buffer.data(), key_buffer.size());
+                     raw::kvRemove(map, key_buffer.data(), key_buffer.size());
                      key_buffer.resize(prefix.size() + 1);
                      psio::convert_to_key(new_key, key_buffer);
                      kv_insert(map, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
@@ -397,7 +397,7 @@ namespace psibase
             }
          }
          auto serialized = psio::convert_to_bin(arg);
-         raw::kv_put(map, pk.data(), pk.size(), serialized.data(), serialized.size());
+         raw::kvPut(map, pk.data(), pk.size(), serialized.data(), serialized.size());
       }
       // TODO: get index by name
       template <int Idx>
