@@ -34,7 +34,7 @@ namespace system_contract
       kv_put(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
    }
 
-   void account_sys::newAccount(AccountNumber acc, AccountNumber auth_contract, bool require_new)
+   void account_sys::newAccount(AccountNumber name, AccountNumber authContract, bool requireNew)
    {
       auto status = kv_get<account_sys_status_row>(account_sys_status_key());
       check(status.has_value(), "not started");
@@ -42,24 +42,24 @@ namespace system_contract
       if (enable_print)
       {
          write_console("new acc: ");
-         write_console(acc.str());
+         write_console(name.str());
          write_console("auth con: ");
-         write_console(auth_contract.str());
+         write_console(authContract.str());
       }
 
-      check(acc.value, "empty account name");
-      if (exists(acc))
+      check(name.value, "empty account name");
+      if (exists(name))
       {
-         if (require_new)
+         if (requireNew)
             abort_message_str("account already exists");
          return;
       }
-      check(exists(auth_contract), "unknown auth contract");
+      check(exists(authContract), "unknown auth contract");
 
       status->total_accounts++;
       account_row account{
-          .num           = acc,
-          .auth_contract = auth_contract,
+          .num           = name,
+          .auth_contract = authContract,
           .flags         = 0,
       };
       kv_put(status->key(), *status);

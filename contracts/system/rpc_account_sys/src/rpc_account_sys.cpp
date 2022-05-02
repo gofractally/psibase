@@ -2,6 +2,7 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/proxy_sys.hpp>
+#include <psibase/SimpleUI.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
 #include <psio/from_json.hpp>
@@ -27,16 +28,6 @@ struct WebContentRow
    auto key(AccountNumber thisContract) { return webContentKey(thisContract, path); }
 };
 PSIO_REFLECT(WebContentRow, path, contentType, content)
-
-// TODO: automate defining the struct in reflection macro?
-// TODO: out of date
-struct CreateAccount
-{
-   psibase::AccountNumber account      = {};
-   psibase::AccountNumber authContract = {};
-   bool                   allowSudo    = false;
-};
-PSIO_REFLECT(CreateAccount, account, authContract, allowSudo)
 
 namespace system_contract
 {
@@ -81,29 +72,8 @@ namespace system_contract
          }
       }
 
-      if (request.method == "POST")
-      {
-         // TODO: move to an ABI wasm?
-         if (request.target == "/pack/create_account")
-         {
-            request.body.push_back(0);
-            psio::json_token_stream jstream{request.body.data()};
-            CreateAccount           args;
-            psio::from_json(args, jstream);
-            check(args.account.value, "Invalid or missing name");
-            check(args.authContract.value, "Invalid or missing authContract");
-            action act{
-                .sender   = account_sys::contract,
-                .contract = account_sys::contract,
-                .method   = "newAccount"_m,
-                .raw_data = psio::convert_to_frac(args),
-            };
-            return to_json(act);
-         }
-      }
-
-      return std::nullopt;
-   }  // rpc_account_sys::proxy_sys
+      return psibase::serveSimpleUI<account_sys_iface, false>(request);
+   }  // serveSys
 
    void rpc_account_sys::uploadSys(psio::const_view<std::string>       path,
                                    psio::const_view<std::string>       contentType,
@@ -124,7 +94,7 @@ namespace system_contract
           .content     = std::move(c),
       };
       kv_put(row.key(get_receiver()), row);
-   }
+   }  // uploadSys
 
 }  // namespace system_contract
 

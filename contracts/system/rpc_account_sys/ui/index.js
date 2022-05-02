@@ -1,4 +1,4 @@
-import { postJsonGetJson, pushedSignedTransaction } from '/common/rpc.mjs';
+import { postJsonGetArrayBuffer, pushedSignedTransaction, uint8ArrayToHex } from '/common/rpc.mjs';
 
 const table = document.getElementById('accounts');
 const tbody = table.getElementsByTagName('tbody')[0];
@@ -22,13 +22,21 @@ function msg(m) {
     document.getElementById('messages').innerText += m + '\n';
 }
 
-async function createAccount() {
+async function newAccount() {
     try {
         clearMsg();
         msg("Packing action...");
-        const account = document.getElementById('account').value;
+        const name = document.getElementById('account').value;
         const authContract = document.getElementById('authContract').value;
-        const action = await postJsonGetJson('/pack/create_account', { account, authContract, allowSudo: false });
+        const action = {
+            sender: 'account-sys',
+            contract: 'account-sys',
+            method: 'newAccount',
+            raw_data: uint8ArrayToHex(new Uint8Array(
+                await postJsonGetArrayBuffer('/pack_action/newAccount', {
+                    name, authContract, requireNew: true
+                }))),
+        };
 
         msg("Pushing transaction...");
         const signedTrx = {
@@ -52,4 +60,4 @@ async function createAccount() {
     }
 }
 
-document.querySelector('#createAccount').addEventListener('click', createAccount)
+document.querySelector('#createAccount').addEventListener('click', newAccount)
