@@ -30,7 +30,7 @@ namespace psibase
       void check_active() { check(active, "block is not active"); }
 
       void start(std::optional<TimePointSec> time = {});
-      void start(block&& src);
+      void start(Block&& src);
       void commit();
 
       void push_transaction(const signed_transaction& trx,

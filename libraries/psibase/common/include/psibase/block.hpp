@@ -135,10 +135,4 @@ namespace psibase
       BlockInfo(const Block& b) : header{b.header}, id{sha256(b)} {}
    };
    PSIO_REFLECT(BlockInfo, header, id)
-
-   // TODO: remove dependency on these
-   using block      = Block;
-   using block_info = BlockInfo;
-   using claim      = Claim;
-
 }  // namespace psibase

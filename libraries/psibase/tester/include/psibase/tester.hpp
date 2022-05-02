@@ -130,8 +130,8 @@ namespace psibase
    class test_chain
    {
      private:
-      uint32_t                  id;
-      std::optional<block_info> head_block_info;
+      uint32_t                 id;
+      std::optional<BlockInfo> head_block_info;
 
      public:
       static const PublicKey  default_pub_key;
@@ -172,7 +172,7 @@ namespace psibase
        */
       void finish_block();
 
-      const block_info& get_head_block_info();
+      const BlockInfo& get_head_block_info();
 
       /*
        * Set the reference block of the transaction to the head block.

@@ -12,7 +12,7 @@ namespace system_contract::auth_fake_sys
    struct auth_check
    {
       psibase::action             action;
-      std::vector<psibase::claim> claims;
+      std::vector<psibase::Claim> claims;
    };
    PSIO_REFLECT(auth_check, action, claims)
 

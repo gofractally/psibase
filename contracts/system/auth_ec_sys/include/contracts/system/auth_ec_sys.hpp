@@ -10,14 +10,14 @@ namespace system_contract::auth_ec_sys
    struct auth_check
    {
       psibase::action             action;
-      std::vector<psibase::claim> claims;
+      std::vector<psibase::Claim> claims;
    };
    PSIO_REFLECT(auth_check, action, claims)
 
    struct set_key
    {
       psibase::AccountNumber account;
-      psibase::PublicKey   key;
+      psibase::PublicKey     key;
    };
    PSIO_REFLECT(set_key, account, key)
 

@@ -617,7 +617,7 @@ struct callbacks
       auto        status = chain.block->db.kv_get<psibase::status_row>(psibase::status_row::kv_map,
                                                                 psibase::status_key());
 
-      psibase::block_info bi;
+      psibase::BlockInfo bi;
       if (status && status->head)
       {
          bi = *(status->head);

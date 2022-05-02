@@ -69,7 +69,7 @@ namespace psibase
    }
 
    // TODO: (or elsewhere) check block signature
-   void block_context::start(block&& src)
+   void block_context::start(Block&& src)
    {
       start(src.header.time);
       active = false;

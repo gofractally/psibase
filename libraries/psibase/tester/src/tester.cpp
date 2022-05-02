@@ -288,7 +288,7 @@ void psibase::test_chain::finish_block()
    ::tester_finish_block(id);
 }
 
-const psibase::block_info& psibase::test_chain::get_head_block_info()
+const psibase::BlockInfo& psibase::test_chain::get_head_block_info()
 {
    if (!head_block_info)
    {
@@ -299,7 +299,7 @@ const psibase::block_info& psibase::test_chain::get_head_block_info()
                                bin.resize(size);
                                return bin.data();
                             });
-      head_block_info = psio::convert_from_frac<block_info>(bin);
+      head_block_info = psio::convert_from_frac<BlockInfo>(bin);
    }
    return *head_block_info;
 }
