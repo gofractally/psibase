@@ -8,7 +8,7 @@ namespace psibase
    {
       if (t.action.rawData.size() > max)
          t.action.rawData.resize(max);
-      for (auto& inner : t.inner_traces)
+      for (auto& inner : t.innerTraces)
          std::visit(
              [max](auto& obj)
              {
@@ -20,10 +20,7 @@ namespace psibase
 
    TransactionTrace trim_raw_data(TransactionTrace t, size_t max)
    {
-      for (auto& a : t.trx.transaction.actions)
-         if (a.rawData.size() > max)
-            a.rawData.resize(max);
-      for (auto& at : t.action_traces)
+      for (auto& at : t.actionTraces)
          trim_raw_data(at, max);
       return t;
    }
@@ -61,15 +58,15 @@ namespace psibase
       dest += indent + "    " + atrace.action.sender.str() + " => " + atrace.action.contract.str() +
               "::" + atrace.action.method.str() + "\n";
       dest += indent + "    " + psio::convert_to_json(atrace.action.rawData) + "\n";
-      for (auto& inner : atrace.inner_traces)
+      for (auto& inner : atrace.innerTraces)
          std::visit([&](auto& inner) { pretty_trace(dest, inner, indent + "    "); }, inner.inner);
-      if (!atrace.raw_retval.empty())
-         dest += indent + "    raw_retval: " + psio::convert_to_json(atrace.raw_retval) + "\n";
+      if (!atrace.rawRetval.empty())
+         dest += indent + "    rawRetval: " + psio::convert_to_json(atrace.rawRetval) + "\n";
    }
 
    void pretty_trace(std::string& dest, const TransactionTrace& ttrace, const std::string& indent)
    {
-      for (auto& a : ttrace.action_traces)
+      for (auto& a : ttrace.actionTraces)
          pretty_trace(dest, a, indent);
       if (!!ttrace.error)
       {

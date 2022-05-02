@@ -295,7 +295,7 @@ namespace psibase::http
             tc.exec_rpc(action, atrace);
             // TODO: option to print this
             // printf("%s\n", pretty_trace(atrace).c_str());
-            auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.raw_retval);
+            auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.rawRetval);
             if (!result)
                return send(
                    error(bhttp::status::not_found,

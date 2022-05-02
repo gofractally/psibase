@@ -42,10 +42,10 @@ namespace psibase
       //        check_auth
       //        action 1
       //        ...
-      check(!t.action_traces.empty(), "transaction_trace has no actions");
-      auto&                           root = t.action_traces.back();
+      check(!t.actionTraces.empty(), "transaction_trace has no actions");
+      auto&                           root = t.actionTraces.back();
       std::vector<const ActionTrace*> top_traces;
-      for (auto& inner : root.inner_traces)
+      for (auto& inner : root.innerTraces)
          if (std::holds_alternative<ActionTrace>(inner.inner))
             top_traces.push_back(&std::get<ActionTrace>(inner.inner));
       check(!(top_traces.size() & 1), "unexpected number of action traces");
@@ -91,9 +91,9 @@ namespace psibase
           : TraceResult(std::forward<TransactionTrace>(t)), _return(std::nullopt)
       {
          auto actionTrace = get_top_action(t, 0);
-         if (actionTrace.raw_retval.size() != 0)
+         if (actionTrace.rawRetval.size() != 0)
          {
-            _return = psio::convert_from_frac<ReturnType>(actionTrace.raw_retval);
+            _return = psio::convert_from_frac<ReturnType>(actionTrace.rawRetval);
          }
       }
 

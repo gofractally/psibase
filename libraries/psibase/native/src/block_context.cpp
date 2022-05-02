@@ -136,7 +136,6 @@ namespace psibase
          // block_context::enable_undo is also false.
          active = enable_undo;
 
-         trace.trx = trx;
          transaction_context t{*this, trx, trace, enable_undo};
          t.exec_transaction();
 

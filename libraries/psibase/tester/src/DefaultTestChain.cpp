@@ -143,7 +143,7 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
    auto& at = get_top_action(trace, 0);
-   return psio::convert_from_frac<AccountNumber>(at.raw_retval);
+   return psio::convert_from_frac<AccountNumber>(at.rawRetval);
 }  // add_ec_account()
 
 AccountNumber DefaultTestChain::add_ec_account(const char*      name,

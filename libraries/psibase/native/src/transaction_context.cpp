@@ -48,7 +48,7 @@ namespace psibase
 
    static void exec_genesis_action(transaction_context& self, const Action& action)
    {
-      auto& atrace  = self.transaction_trace.action_traces.emplace_back();
+      auto& atrace  = self.transaction_trace.actionTraces.emplace_back();
       atrace.action = action;
       try
       {
@@ -87,9 +87,9 @@ namespace psibase
                                   .contract = trxsys,
                                   .rawData  = psio::convert_to_frac(self.trx.transaction),
       };
-      auto& atrace  = self.transaction_trace.action_traces.emplace_back();
+      auto& atrace  = self.transaction_trace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
-      action_context ac = {self, action, self.transaction_trace.action_traces.back()};
+      action_context ac = {self, action, self.transaction_trace.actionTraces.back()};
       auto&          ec = self.get_execution_context(trxsys);
       ec.exec_process_transaction(ac);
    }
@@ -120,7 +120,7 @@ namespace psibase
              .contract = claim.contract,
              .rawData  = psio::convert_to_frac(data),
          };
-         auto& atrace      = self.transaction_trace.action_traces.emplace_back();
+         auto& atrace      = self.transaction_trace.actionTraces.emplace_back();
          atrace.action     = action;
          action_context ac = {self, action, atrace};
          auto&          ec = self.get_execution_context(claim.contract);

@@ -353,12 +353,12 @@ namespace psibase
       void write_console(span<const char> str)
       {
          // TODO: limit total console size across all executions within transaction
-         if (current_act_context->action_trace.inner_traces.empty() ||
+         if (current_act_context->action_trace.innerTraces.empty() ||
              !std::holds_alternative<ConsoleTrace>(
-                 current_act_context->action_trace.inner_traces.back().inner))
-            current_act_context->action_trace.inner_traces.push_back({ConsoleTrace{}});
+                 current_act_context->action_trace.innerTraces.back().inner))
+            current_act_context->action_trace.innerTraces.push_back({ConsoleTrace{}});
          auto& console =
-             std::get<ConsoleTrace>(current_act_context->action_trace.inner_traces.back().inner)
+             std::get<ConsoleTrace>(current_act_context->action_trace.innerTraces.back().inner)
                  .console;
          console.append(str.begin(), str.end());
          clear_result();
@@ -389,13 +389,13 @@ namespace psibase
                    (contract_account.flags & account_row::allow_sudo),
                "contract is not authorized to call as another sender");
 
-         current_act_context->action_trace.inner_traces.push_back({ActionTrace{}});
+         current_act_context->action_trace.innerTraces.push_back({ActionTrace{}});
          auto& inner_action_trace =
-             std::get<ActionTrace>(current_act_context->action_trace.inner_traces.back().inner);
+             std::get<ActionTrace>(current_act_context->action_trace.innerTraces.back().inner);
          // TODO: avoid reserialization
          current_act_context->transaction_context.exec_called_action(contract_account.flags, act,
                                                                      inner_action_trace);
-         set_result(inner_action_trace.raw_retval);
+         set_result(inner_action_trace.rawRetval);
 
          --current_act_context->transaction_context.call_depth;
          return result_value.size();
@@ -406,7 +406,7 @@ namespace psibase
          // TODO: record return values of top-most subjective calls in block
          check(!(contract_account.flags & account_row::is_subjective),
                "set_retval not implemented for subjective contracts");
-         current_act_context->action_trace.raw_retval.assign(data.begin(), data.end());
+         current_act_context->action_trace.rawRetval.assign(data.begin(), data.end());
          clear_result();
       }
 

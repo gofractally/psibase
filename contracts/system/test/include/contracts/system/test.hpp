@@ -38,10 +38,10 @@ namespace psibase
       //        check_auth
       //        action 1
       //        ...
-      eosio::check(!t.action_traces.empty(), "transaction_trace has no actions");
-      auto&                           root = t.action_traces.back();
+      eosio::check(!t.actionTraces.empty(), "transaction_trace has no actions");
+      auto&                           root = t.actionTraces.back();
       std::vector<const ActionTrace*> top_traces;
-      for (auto& inner : root.inner_traces)
+      for (auto& inner : root.innerTraces)
          if (std::holds_alternative<ActionTrace>(inner.inner))
             top_traces.push_back(&std::get<ActionTrace>(inner.inner));
       eosio::check(!(top_traces.size() & 1), "unexpected number of action traces");
@@ -165,7 +165,7 @@ namespace psibase
               }}));
       REQUIRE(psibase::show(show, trace) == "");
       auto& at = get_top_action(trace, 0);
-      return psio::convert_from_frac<AccountNumber>(at.raw_retval);
+      return psio::convert_from_frac<AccountNumber>(at.rawRetval);
    }  // add_ec_account()
    inline AccountNumber add_ec_account(test_chain&      t,
                                        const char*      name,
