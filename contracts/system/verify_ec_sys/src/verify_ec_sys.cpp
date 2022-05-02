@@ -24,7 +24,7 @@ extern "C" [[clang::export_name("verify")]] void verify()
 {
    check(context, "verify_ec_sys not fully built");
 
-   auto act     = get_current_action();
+   auto act     = getCurrentAction();
    auto data    = psio::convert_from_frac<verify_data>(act.rawData);
    auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.rawData);  // TODO: verify no extra
    auto sig     = psio::convert_from_frac<Signature>(data.proof);          // TODO: verify no extra

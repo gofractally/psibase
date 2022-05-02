@@ -51,7 +51,7 @@ namespace system_contract::auth_ec_sys
 
    AccountNumber exec(AccountNumber this_contract, AccountNumber sender, create_account& args)
    {
-      write_console("account_sys::create_account");
+      writeConsole("account_sys::create_account");
       psibase::actor<account_sys> asys(this_contract, account_sys::contract);
       asys.newAccount(args.name, this_contract, true);
       auth_row row{AccountNumber{args.name}, args.public_key};
@@ -62,7 +62,7 @@ namespace system_contract::auth_ec_sys
    extern "C" void called(AccountNumber this_contract, AccountNumber sender)
    {
       // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
-      auto act  = get_current_action();
+      auto act  = getCurrentAction();
       auto data = psio::convert_from_frac<action>(act.rawData);
       std::visit(
           [&](auto& x)
@@ -70,7 +70,7 @@ namespace system_contract::auth_ec_sys
              if constexpr (std::is_same_v<decltype(exec(this_contract, sender, x)), void>)
                 exec(this_contract, sender, x);
              else
-                set_retval(exec(this_contract, sender, x));
+                setRetval(exec(this_contract, sender, x));
           },
           data);
    }

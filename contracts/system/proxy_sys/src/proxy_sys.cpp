@@ -41,7 +41,7 @@ namespace psibase
 
    extern "C" [[clang::export_name("serve")]] void serve()
    {
-      auto act = get_current_action();
+      auto act = getCurrentAction();
       // TODO: use a view
       auto req = psio::convert_from_frac<rpc_request_data>(act.rawData);
 
@@ -67,7 +67,7 @@ namespace psibase
 
       // TODO: avoid repacking (both directions)
       psibase::actor<ServerInterface> iface(act.contract, reg->rpcContract);
-      set_retval(iface.serveSys(req).unpack());
+      setRetval(iface.serveSys(req).unpack());
    }  // serve()
 
 }  // namespace psibase

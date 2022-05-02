@@ -64,7 +64,7 @@ namespace system_contract
                if (!raw)
                   break;
                auto acc = psio::convert_from_frac<account_row>(*raw);
-               key      = get_key();
+               key      = getKey();
                key.push_back(0);
                rows.push_back(std::move(acc));
             }

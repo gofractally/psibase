@@ -25,7 +25,7 @@ struct item
 
    std::optional<uint8_t> max;
 
-   auto get_key(AccountNumber this_contract) const
+   auto getKey(AccountNumber this_contract) const
    {
       auto k = psio::convert_to_key(this_contract);
       k.insert(k.end(), key.begin(), key.end());
@@ -60,14 +60,13 @@ void test(AccountNumber this_contract)
       print("kv_put\n");
    for (const auto& item : items)
       if (item.add)
-         kv_put_raw(kv_map::contract, item.get_key(this_contract),
-                    psio::convert_to_bin(item.value));
+         kv_put_raw(kv_map::contract, item.getKey(this_contract), psio::convert_to_bin(item.value));
 
    if (enable_print)
       print("kv_remove\n");
    for (const auto& item : items)
       if (!item.keep)
-         kv_remove_raw(kv_map::contract, item.get_key(this_contract));
+         kv_remove_raw(kv_map::contract, item.getKey(this_contract));
 
    auto run = [&](auto match_key_size, auto expected, const auto& key, auto f)
    {
@@ -80,7 +79,7 @@ void test(AccountNumber this_contract)
       auto result = f(kv_map::contract, key, match_key_size + 4);
       if (!result && !expected)
       {
-         check(get_key().empty(), "get_key() not empty");
+         check(getKey().empty(), "getKey() not empty");
          if (enable_print)
             print("ok   ");
          return;
@@ -99,7 +98,7 @@ void test(AccountNumber this_contract)
       {
          if (item.value != *expected)
             continue;
-         check(item.get_key(this_contract) == get_key(), "get_key() does not match");
+         check(item.getKey(this_contract) == getKey(), "getKey() does not match");
          found = true;
       }
       check(found, "matching value missing in items");
@@ -111,7 +110,7 @@ void test(AccountNumber this_contract)
       print("kv_less_than\n");
    for (const auto& item : items)
    {
-      auto key = item.get_key(this_contract);
+      auto key = item.getKey(this_contract);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
@@ -128,7 +127,7 @@ void test(AccountNumber this_contract)
       print("kv_greater_equal\n");
    for (const auto& item : items)
    {
-      auto key = item.get_key(this_contract);
+      auto key = item.getKey(this_contract);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
@@ -145,7 +144,7 @@ void test(AccountNumber this_contract)
       print("kv_max\n");
    for (const auto& item : items)
    {
-      auto key = item.get_key(this_contract);
+      auto key = item.getKey(this_contract);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);

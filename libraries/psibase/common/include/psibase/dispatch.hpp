@@ -22,7 +22,7 @@ namespace psibase
    void call_method(T& contract, MemberPtr method, Args&&... args)
    {
       psio::shared_view_ptr<R> p((contract.*method)(std::forward<decltype(args)>(args)...));
-      raw::set_retval(p.data(), p.size());
+      raw::setRetval(p.data(), p.size());
    }
 
    /**

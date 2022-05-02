@@ -25,7 +25,7 @@ extern "C" void start(AccountNumber this_contract)
 extern "C" void called(AccountNumber this_contract, AccountNumber sender)
 {
    // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
-   auto act = get_current_action();
+   auto act = getCurrentAction();
    auto pl  = psio::convert_from_frac<payload>(act.rawData);
    printf("payload: %s\n", psio::convert_to_json(pl).c_str());
    if (pl.number)
@@ -41,5 +41,5 @@ extern "C" void called(AccountNumber this_contract, AccountNumber sender)
       printf("Child returned %d\n", r);
       printf("Back to %d\n", pl.number);
    }
-   set_retval(pl.number);
+   setRetval(pl.number);
 }

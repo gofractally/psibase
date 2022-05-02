@@ -41,10 +41,10 @@ namespace system_contract
 
       if (enable_print)
       {
-         write_console("new acc: ");
-         write_console(name.str());
-         write_console("auth con: ");
-         write_console(authContract.str());
+         writeConsole("new acc: ");
+         writeConsole(name.str());
+         writeConsole("auth con: ");
+         writeConsole(authContract.str());
       }
 
       check(name.value, "empty account name");

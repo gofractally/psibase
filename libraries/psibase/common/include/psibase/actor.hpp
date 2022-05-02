@@ -47,7 +47,7 @@ namespace psibase
       if constexpr (not std::is_same_v<void, T>)
       {
          psio::shared_view_ptr<T> result(psio::size_tag{result_size});
-         raw::get_result(result.data(), result_size, 0);
+         raw::getResult(result.data(), result_size, 0);
          check(result.validate(), "value returned was not serialized as expected");
          return result;
       }
@@ -128,12 +128,12 @@ namespace psibase
          };
 
          EventHeader header;
-         raw::get_result(&header, sizeof(header));
+         raw::getResult(&header, sizeof(header));
          psibase::check(header.event_type == Name, "unexpected event type");
          psibase::check(header.sender == sender, "unexpected event sender");
 
          std::vector<char> tmp(size);
-         raw::get_result(tmp.data(), tmp.size(), 0);
+         raw::getResult(tmp.data(), tmp.size(), 0);
 
          psio::shared_view_ptr<param_tuple> ptr(psio::size_tag{size - 8});
          memcpy(ptr.data(), tmp.data() + 8, ptr.size());

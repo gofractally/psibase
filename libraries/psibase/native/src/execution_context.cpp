@@ -335,7 +335,7 @@ namespace psibase
          return result_value.size();
       }
 
-      uint32_t get_result(span<char> dest, uint32_t offset)
+      uint32_t getResult(span<char> dest, uint32_t offset)
       {
          if (offset < result_value.size() && dest.size())
             memcpy(dest.data(), result_value.data() + offset,
@@ -343,14 +343,14 @@ namespace psibase
          return result_value.size();
       }
 
-      uint32_t get_key(span<char> dest)
+      uint32_t getKey(span<char> dest)
       {
          if (!result_key.empty())
             memcpy(dest.data(), result_key.data(), std::min(result_key.size(), dest.size()));
          return result_key.size();
       }
 
-      void write_console(span<const char> str)
+      void writeConsole(span<const char> str)
       {
          // TODO: limit total console size across all executions within transaction
          if (current_act_context->action_trace.innerTraces.empty() ||
@@ -370,7 +370,7 @@ namespace psibase
                                   "' aborted with message: " + std::string(str.data(), str.size()));
       }
 
-      uint32_t get_current_action()
+      uint32_t getCurrentAction()
       {
          return set_result(psio::convert_to_frac(current_act_context->action));
       }
@@ -401,11 +401,11 @@ namespace psibase
          return result_value.size();
       }
 
-      void set_retval(span<const char> data)
+      void setRetval(span<const char> data)
       {
          // TODO: record return values of top-most subjective calls in block
          check(!(contract_account.flags & account_row::is_subjective),
-               "set_retval not implemented for subjective contracts");
+               "setRetval not implemented for subjective contracts");
          current_act_context->action_trace.rawRetval.assign(data.begin(), data.end());
          clear_result();
       }
@@ -517,13 +517,13 @@ namespace psibase
 
    void execution_context::register_host_functions()
    {
-      rhf_t::add<&execution_context_impl::get_result>("env", "get_result");
-      rhf_t::add<&execution_context_impl::get_key>("env", "get_key");
-      rhf_t::add<&execution_context_impl::write_console>("env", "write_console");
+      rhf_t::add<&execution_context_impl::getResult>("env", "getResult");
+      rhf_t::add<&execution_context_impl::getKey>("env", "getKey");
+      rhf_t::add<&execution_context_impl::writeConsole>("env", "writeConsole");
       rhf_t::add<&execution_context_impl::abortMessage>("env", "abortMessage");
-      rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
+      rhf_t::add<&execution_context_impl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&execution_context_impl::call>("env", "call");
-      rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
+      rhf_t::add<&execution_context_impl::setRetval>("env", "setRetval");
       rhf_t::add<&execution_context_impl::kv_put>("env", "kv_put");
       rhf_t::add<&execution_context_impl::kv_put_sequential>("env", "kv_put_sequential");
       rhf_t::add<&execution_context_impl::kv_remove>("env", "kv_remove");

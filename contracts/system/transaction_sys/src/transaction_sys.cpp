@@ -97,7 +97,7 @@ namespace system_contract
       // TODO: resource billing
       // TODO: subjective mitigation hooks
       // TODO: limit execution time
-      auto top_act = get_current_action();
+      auto top_act = getCurrentAction();
       // TODO: avoid copying inner rawData during unpack
       auto trx = psio::convert_from_frac<Transaction>(top_act.rawData);
 

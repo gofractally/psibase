@@ -22,36 +22,36 @@ namespace psibase
    namespace raw
    {
       // Intrinsics which return data do it by storing it in a result buffer.
-      // get_result copies min(dest_size, result_size - offset) bytes from
+      // getResult copies min(dest_size, result_size - offset) bytes from
       // result + offset into dest and returns result_size. If offset >= result_size,
       // then it skips the copy.
-      PSIBASE_INTRINSIC(get_result)
-      uint32_t get_result(const char* dest, uint32_t dest_size, uint32_t offset);
+      PSIBASE_INTRINSIC(getResult)
+      uint32_t getResult(const char* dest, uint32_t dest_size, uint32_t offset);
 
       // Intrinsics which return keys do it by storing it in a key buffer.
-      // get_key copies min(dest_size, key_size) bytes into dest and returns key_size.
-      PSIBASE_INTRINSIC(get_key) uint32_t get_key(const char* dest, uint32_t dest_size);
+      // getKey copies min(dest_size, key_size) bytes into dest and returns key_size.
+      PSIBASE_INTRINSIC(getKey) uint32_t getKey(const char* dest, uint32_t dest_size);
 
       // Write message to console. Message should be UTF8.
-      PSIBASE_INTRINSIC(write_console) void write_console(const char* message, uint32_t len);
+      PSIBASE_INTRINSIC(writeConsole) void writeConsole(const char* message, uint32_t len);
 
       // Store the currently-executing action into result and return the result size.
       //
       // If the contract, while handling action A, calls itself with action B:
-      //    * Before the call to B, get_current_action() returns A.
-      //    * After the call to B, get_current_action() returns B.
-      //    * After B returns, get_current_action() returns A.
+      //    * Before the call to B, getCurrentAction() returns A.
+      //    * After the call to B, getCurrentAction() returns B.
+      //    * After B returns, getCurrentAction() returns A.
       //
       // Note: The above only applies if the contract uses the call() intrinsic.
       //       The call() function and the action wrappers use the call() intrinsic.
       //       Calling a contract function directly does NOT use the call() intrinsic.
-      PSIBASE_INTRINSIC(get_current_action) uint32_t get_current_action();
+      PSIBASE_INTRINSIC(getCurrentAction) uint32_t getCurrentAction();
 
       // Call a contract, store the return value into result, and return the result size.
       PSIBASE_INTRINSIC(call) uint32_t call(const char* action, uint32_t len);
 
       // Set the return value of the currently-executing action
-      PSIBASE_INTRINSIC(set_retval) void set_retval(const char* retval, uint32_t len);
+      PSIBASE_INTRINSIC(setRetval) void setRetval(const char* retval, uint32_t len);
 
       // Set a key-value pair. If key already exists, then replace the existing value.
       PSIBASE_INTRINSIC(kv_put)
@@ -79,7 +79,7 @@ namespace psibase
       // Get the first key-value pair which is greater than or equal to the provided
       // key. If one is found, and the first match_key_size bytes of the found key
       // matches the provided key, then sets result to value and returns size. Also
-      // sets key (use get_key). Otherwise returns -1 and clears result.
+      // sets key (use getKey). Otherwise returns -1 and clears result.
       PSIBASE_INTRINSIC(kv_greater_equal)
       uint32_t kv_greater_equal(kv_map      map,
                                 const char* key,
@@ -88,37 +88,37 @@ namespace psibase
 
       // Get the key-value pair immediately-before provided key. If one is found,
       // and the first match_key_size bytes of the found key matches the provided
-      // key, then sets result to value and returns size. Also sets key (use get_key).
+      // key, then sets result to value and returns size. Also sets key (use getKey).
       // Otherwise returns -1 and clears result.
       PSIBASE_INTRINSIC(kv_less_than)
       uint32_t kv_less_than(kv_map map, const char* key, uint32_t key_len, uint32_t match_key_size);
 
       // Get the maximum key-value pair which has key as a prefix. If one is found,
-      // then sets result to value and returns size. Also sets key (use get_key).
+      // then sets result to value and returns size. Also sets key (use getKey).
       // Otherwise returns -1 and clears result.
       PSIBASE_INTRINSIC(kv_max) uint32_t kv_max(kv_map map, const char* key, uint32_t key_len);
    }  // namespace raw
 
    // Get result when size is known. Caution: this does not verify size.
-   std::vector<char> get_result(uint32_t size);
+   std::vector<char> getResult(uint32_t size);
 
    // Get result when size is unknown
-   std::vector<char> get_result();
+   std::vector<char> getResult();
 
    // Get key
-   std::vector<char> get_key();
+   std::vector<char> getKey();
 
    // Get the currently-executing action.
    //
    // If the contract, while handling action A, calls itself with action B:
-   //    * Before the call to B, get_current_action() returns A.
-   //    * After the call to B, get_current_action() returns B.
-   //    * After B returns, get_current_action() returns A.
+   //    * Before the call to B, getCurrentAction() returns A.
+   //    * After the call to B, getCurrentAction() returns B.
+   //    * After B returns, getCurrentAction() returns A.
    //
    // Note: The above only applies if the contract uses the call() intrinsic.
    //       The call() function and the action wrappers use the call() intrinsic.
    //       Calling a contract function directly does NOT use the call() intrinsic.
-   Action                        get_current_action();
+   Action                        getCurrentAction();
    psio::shared_view_ptr<Action> get_current_action_view();
 
    // Call a contract and return its result
@@ -132,10 +132,10 @@ namespace psibase
 
    // Set the return value of the currently-executing action
    template <typename T>
-   void set_retval(const T& retval)
+   void setRetval(const T& retval)
    {
       auto data = psio::convert_to_frac(retval);
-      raw::set_retval(data.data(), data.size());
+      raw::setRetval(data.data(), data.size());
    }
 
    template <typename T>
@@ -147,21 +147,21 @@ namespace psibase
          char*                  buffer = (char*)alloca(s);
          psio::fixed_buf_stream stream(buffer, s);
          psio::fracpack(retval, stream);
-         raw::set_retval(buffer, s);
+         raw::setRetval(buffer, s);
       }
       else
       {
          std::vector<char>      buffer(s);
          psio::fixed_buf_stream stream(buffer.data(), s);
          psio::fracpack(retval, stream);
-         raw::set_retval(buffer.data(), s);
+         raw::setRetval(buffer.data(), s);
       }
    }
 
    // Set the return value of the currently-executing action
    inline void set_retval_bytes(psio::input_stream s)
    {
-      raw::set_retval(s.pos, s.remaining());
+      raw::setRetval(s.pos, s.remaining());
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
@@ -254,7 +254,7 @@ namespace psibase
       auto size = raw::kv_get(map, key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
-      return get_result(size);
+      return getResult(size);
    }
 
    // Get a key-value pair, if any
@@ -298,7 +298,7 @@ namespace psibase
       auto size = raw::kv_get_sequential(map, id);
       if (size == -1)
          return std::nullopt;
-      return get_result(size);
+      return getResult(size);
    }
 
    // Get a sequentially-numbered record, if available.
@@ -346,7 +346,7 @@ namespace psibase
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
-   // returns the value. Also sets key (use get_key). Otherwise returns nullopt.
+   // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
    inline std::optional<std::vector<char>> kv_greater_equal_raw(kv_map             map,
                                                                 psio::input_stream key,
                                                                 uint32_t           match_key_size)
@@ -354,12 +354,12 @@ namespace psibase
       auto size = raw::kv_greater_equal(map, key.pos, key.remaining(), match_key_size);
       if (size == -1)
          return std::nullopt;
-      return get_result(size);
+      return getResult(size);
    }
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
-   // returns the value. Also sets key (use get_key). Otherwise returns nullopt.
+   // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_greater_equal(kv_map map, const K& key, uint32_t match_key_size)
    {
@@ -372,7 +372,7 @@ namespace psibase
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
-   // returns the value. Also sets key (use get_key). Otherwise returns nullopt.
+   // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_greater_equal(const K& key, uint32_t match_key_size)
    {
@@ -381,7 +381,7 @@ namespace psibase
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // match_key_size bytes of the found key matches the provided key, then returns the value.
-   // Also sets key (use get_key). Otherwise returns nullopt.
+   // Also sets key (use getKey). Otherwise returns nullopt.
    inline std::optional<std::vector<char>> kv_less_than_raw(kv_map             map,
                                                             psio::input_stream key,
                                                             uint32_t           match_key_size)
@@ -389,12 +389,12 @@ namespace psibase
       auto size = raw::kv_less_than(map, key.pos, key.remaining(), match_key_size);
       if (size == -1)
          return std::nullopt;
-      return get_result(size);
+      return getResult(size);
    }
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // match_key_size bytes of the found key matches the provided key, then returns the value.
-   // Also sets key (use get_key). Otherwise returns nullopt.
+   // Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_less_than(kv_map map, const K& key, uint32_t match_key_size)
    {
@@ -407,7 +407,7 @@ namespace psibase
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // match_key_size bytes of the found key matches the provided key, then returns the value.
-   // Also sets key (use get_key). Otherwise returns nullopt.
+   // Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_less_than(const K& key, uint32_t match_key_size)
    {
@@ -415,17 +415,17 @@ namespace psibase
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Also sets key (use get_key). Otherwise returns nullopt.
+   // value. Also sets key (use getKey). Otherwise returns nullopt.
    inline std::optional<std::vector<char>> kv_max_raw(kv_map map, psio::input_stream key)
    {
       auto size = raw::kv_max(map, key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
-      return get_result(size);
+      return getResult(size);
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Also sets key (use get_key). Otherwise returns nullopt.
+   // value. Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_max(kv_map map, const K& key)
    {
@@ -437,16 +437,16 @@ namespace psibase
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Also sets key (use get_key). Otherwise returns nullopt.
+   // value. Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
    inline std::optional<V> kv_max(const K& key)
    {
       return kv_max<V>(kv_map::contract, key);
    }
 
-   inline void write_console(const std::string_view& sv)
+   inline void writeConsole(const std::string_view& sv)
    {
-      raw::write_console(sv.data(), sv.size());
+      raw::writeConsole(sv.data(), sv.size());
    }
 
 }  // namespace psibase

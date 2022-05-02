@@ -9,7 +9,7 @@ namespace company
    {
      public:
       static constexpr psibase::account_id_type id = psibase::name_to_number("mincon");  //_a;
-      void                                      hello() { psibase::write_console("hello world"); }
+      void                                      hello() { psibase::writeConsole("hello world"); }
    };
 
    PSIO_REFLECT(min_contract, method(hello))
