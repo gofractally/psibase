@@ -7,7 +7,7 @@
 namespace psibase
 {
    transaction_context::transaction_context(psibase::block_context&     block_context,
-                                            const signed_transaction&   trx,
+                                            const SignedTransaction&    trx,
                                             psibase::transaction_trace& transaction_trace,
                                             bool                        enable_undo)
        : block_context{block_context}, trx{trx}, transaction_trace{transaction_trace}
@@ -52,9 +52,8 @@ namespace psibase
       try
       {
          auto& db = self.block_context.db;
-         //auto  data = unpack_all<genesis_action_data>({action.raw_data.data(), action.raw_data.size()},
-         //"extra data in genesis payload");
-         auto data = psio::convert_from_frac<genesis_action_data>(
+         // TODO: verify, no extra data
+         auto data = psio::convert_from_frac<GenesisActionData>(
              {action.raw_data.data(), action.raw_data.size()});
          for (auto& contract : data.contracts)
          {

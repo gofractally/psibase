@@ -63,7 +63,7 @@ namespace psibase
                               .sender   = AccountNumber{"foo"},  // ignored
                               .contract = AccountNumber{"bar"},  // ignored
                               .method   = {},
-                              .raw_data = psio::convert_to_frac(genesis_action_data{
+                              .raw_data = psio::convert_to_frac(GenesisActionData{
                                   .contracts =  // g.a.d--^ is config file for gen
                                   {
                                       {

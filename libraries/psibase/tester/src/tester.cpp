@@ -304,7 +304,7 @@ const psibase::BlockInfo& psibase::test_chain::get_head_block_info()
    return *head_block_info;
 }
 
-void psibase::test_chain::fill_tapos(transaction& t, uint32_t expire_sec)
+void psibase::test_chain::fill_tapos(Transaction& t, uint32_t expire_sec)
 {
    auto& info                 = get_head_block_info();
    t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
@@ -312,16 +312,16 @@ void psibase::test_chain::fill_tapos(transaction& t, uint32_t expire_sec)
    memcpy(&t.tapos.ref_block_prefix, (char*)info.id.data() + 8, sizeof(t.tapos.ref_block_prefix));
 }
 
-psibase::transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)
+psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)
 {
-   transaction t;
+   Transaction t;
    fill_tapos(t);
    t.actions = std::move(actions);
    return t;
 }
 
 [[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
-    const signed_transaction& signed_trx)
+    const SignedTransaction& signed_trx)
 {
    std::vector<char> packed_trx = psio::convert_to_frac(signed_trx);
    std::vector<char> bin;
@@ -335,10 +335,10 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<Action>&&
 }
 
 [[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
-    const transaction&                                   trx,
+    const Transaction&                                   trx,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
-   signed_transaction signed_trx;
+   SignedTransaction signed_trx;
    signed_trx.trx = trx;
    for (auto& [pub, priv] : keys)
       signed_trx.trx.claims.push_back({

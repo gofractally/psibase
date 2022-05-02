@@ -79,17 +79,17 @@ std::unique_ptr<std::vector<uint8_t>> pack_set_code(rust::Str json)
 
 std::unique_ptr<std::vector<uint8_t>> pack_signed_transaction(rust::Str json)
 {
-   return pack<psibase::signed_transaction>(json);
+   return pack<psibase::SignedTransaction>(json);
 }
 
 std::unique_ptr<std::vector<uint8_t>> pack_signed_transactions(rust::Str json)
 {
-   return pack<std::vector<psibase::signed_transaction>>(json);
+   return pack<std::vector<psibase::SignedTransaction>>(json);
 }
 
 std::unique_ptr<std::vector<uint8_t>> pack_genesis_action_data(rust::Str json)
 {
-   return pack<psibase::genesis_action_data>(json);
+   return pack<psibase::GenesisActionData>(json);
 }
 
 std::unique_ptr<std::vector<uint8_t>> pack_startup(rust::Str json)

@@ -18,7 +18,7 @@ namespace psibase
    };
    PSIO_REFLECT(Action, sender, contract, method, raw_data)
 
-   struct genesis_contract
+   struct GenesisContract
    {
       AccountNumber     contract;
       AccountNumber     auth_contract;
@@ -27,17 +27,17 @@ namespace psibase
       uint8_t           vm_version = 0;
       std::vector<char> code       = {};
    };
-   PSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
+   PSIO_REFLECT(GenesisContract, contract, auth_contract, flags, vm_type, vm_version, code)
 
    // The genesis action is the first action of the first transaction of
    // the first block. The action struct's fields are ignored, except
    // raw_data, which contains this struct.
-   struct genesis_action_data
+   struct GenesisActionData
    {
-      std::string                   memo;
-      std::vector<genesis_contract> contracts;
+      std::string                  memo;
+      std::vector<GenesisContract> contracts;
    };
-   PSIO_REFLECT(genesis_action_data, memo, contracts)
+   PSIO_REFLECT(GenesisActionData, memo, contracts)
 
    struct Claim
    {
@@ -70,25 +70,25 @@ namespace psibase
    PSIO_REFLECT(Tapos, expiration, flags, ref_block_prefix, ref_block_num)
 
    // TODO: separate native-defined fields from contract-defined fields
-   struct transaction
+   struct Transaction
    {
       Tapos               tapos;
       std::vector<Action> actions;
       std::vector<Claim>  claims;  // TODO: Is there standard terminology that we could use?
    };
-   PSIO_REFLECT(transaction, tapos, actions, claims)
+   PSIO_REFLECT(Transaction, tapos, actions, claims)
 
    // TODO: pruning proofs?
    // TODO: compression? There's a time/space tradeoff and it complicates client libraries.
    //       e.g. complication: there are at least 2 different header formats for gzip.
-   struct signed_transaction
+   struct SignedTransaction
    {
-      transaction trx;
+      Transaction trx;
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
    };
-   PSIO_REFLECT(signed_transaction, trx, proofs)
+   PSIO_REFLECT(SignedTransaction, trx, proofs)
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Producer & Rotation
@@ -106,18 +106,18 @@ namespace psibase
 
    struct Block
    {
-      BlockHeader                     header;
-      std::vector<signed_transaction> transactions;  // TODO: move inside receipts
+      BlockHeader                    header;
+      std::vector<SignedTransaction> transactions;  // TODO: move inside receipts
    };
    PSIO_REFLECT(Block, header, transactions)
 
    /// TODO: you have signed block headers, not signed blocks
-   struct signed_block
+   struct SignedBlock
    {
       Block block;
       Claim signature;  // TODO: switch to proofs?
    };
-   PSIO_REFLECT(signed_block, block, signature)
+   PSIO_REFLECT(SignedBlock, block, signature)
 
    struct BlockInfo
    {

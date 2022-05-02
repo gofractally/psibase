@@ -80,7 +80,7 @@ export async function postArrayBufferGetJson(url, arrayBuffer) {
 }
 
 export async function packSignedTransaction(signedTransaction) {
-    return await postJsonGetArrayBuffer('/common/pack/signed_transaction', signedTransaction);
+    return await postJsonGetArrayBuffer('/common/pack/SignedTransaction', signedTransaction);
 }
 
 export async function pushPackedTransaction(packed) {

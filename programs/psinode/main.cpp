@@ -43,7 +43,7 @@ void bootstrap_chain(system_context& system)
 {
    auto push = [&](auto& bc, AccountNumber sender, AccountNumber contract, const auto& data)
    {
-      signed_transaction t;
+      SignedTransaction t;
       t.trx.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
       t.trx.actions.push_back({
           .sender   = sender,
@@ -55,7 +55,7 @@ void bootstrap_chain(system_context& system)
 
    auto push_action = [&](auto& bc, Action a)
    {
-      signed_transaction t;
+      SignedTransaction t;
       t.trx.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
       t.trx.actions.push_back({a});
       bc.push_transaction(t);
@@ -79,7 +79,7 @@ void bootstrap_chain(system_context& system)
    bc.start();
    check(bc.is_genesis_block, "can not bootstrap non-empty chain");
    push(bc, AccountNumber(), AccountNumber(),
-        genesis_action_data{
+        GenesisActionData{
             .contracts =
                 {
                     {
@@ -206,7 +206,7 @@ bool push_boot(block_context& bc, transaction_queue::entry& entry)
       // TODO: verify no extra data
       // TODO: view
       auto transactions =
-          psio::convert_from_frac<std::vector<signed_transaction>>(entry.packed_signed_trx);
+          psio::convert_from_frac<std::vector<SignedTransaction>>(entry.packed_signed_trx);
       transaction_trace trace;
 
       try
@@ -275,7 +275,7 @@ void push_transaction(block_context& bc, transaction_queue::entry& entry)
    {
       // TODO: verify no extra data
       // TODO: view
-      auto              trx = psio::convert_from_frac<signed_transaction>(entry.packed_signed_trx);
+      auto              trx = psio::convert_from_frac<SignedTransaction>(entry.packed_signed_trx);
       transaction_trace trace;
 
       try

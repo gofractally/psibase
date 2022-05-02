@@ -95,11 +95,11 @@ namespace psibase
       if (request.method == "POST")
       {
          // TODO: move to an ABI wasm?
-         if (request.target == "/common/pack/signed_transaction")
+         if (request.target == "/common/pack/SignedTransaction")
          {
             request.body.push_back(0);
             psio::json_token_stream jstream{request.body.data()};
-            signed_transaction      trx;
+            SignedTransaction       trx;
             psio::from_json(trx, jstream);
             return rpc_reply_data{
                 .contentType = "application/octet-stream",

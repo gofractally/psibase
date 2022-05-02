@@ -39,7 +39,7 @@ namespace psibase
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct transaction_trace
    {
-      signed_transaction         trx;
+      SignedTransaction          trx;
       std::vector<action_trace>  action_traces;
       std::optional<std::string> error;
    };

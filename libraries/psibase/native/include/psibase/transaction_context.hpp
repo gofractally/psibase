@@ -8,13 +8,13 @@ namespace psibase
    {
       psibase::block_context&                    block_context;
       database::session                          session;
-      const signed_transaction&                  trx;
+      const SignedTransaction&                   trx;
       psibase::transaction_trace&                transaction_trace;
       std::map<AccountNumber, execution_context> execution_contexts;
       int                                        call_depth = 0;
 
       transaction_context(psibase::block_context&     block_context,
-                          const signed_transaction&   trx,
+                          const SignedTransaction&    trx,
                           psibase::transaction_trace& transaction_trace,
                           bool                        enable_undo);
 

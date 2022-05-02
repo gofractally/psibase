@@ -283,11 +283,11 @@ namespace psibase::http
             if (bc.need_genesis_action)
                return send(error(bhttp::status::internal_server_error,
                                  "Need genesis block; use 'psibase boot' to boot chain"));
-            signed_transaction trx;
-            Action             action{
-                            .sender   = AccountNumber(),
-                            .contract = proxyContractNum,
-                            .raw_data = psio::convert_to_frac(data),
+            SignedTransaction trx;
+            Action            action{
+                           .sender   = AccountNumber(),
+                           .contract = proxyContractNum,
+                           .raw_data = psio::convert_to_frac(data),
             };
             transaction_trace   trace;
             transaction_context tc{bc, trx, trace, false};

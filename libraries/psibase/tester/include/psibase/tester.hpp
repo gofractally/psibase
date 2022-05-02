@@ -177,23 +177,23 @@ namespace psibase
       /*
        * Set the reference block of the transaction to the head block.
        */
-      void fill_tapos(transaction& t, uint32_t expire_sec = 2);
+      void fill_tapos(Transaction& t, uint32_t expire_sec = 2);
 
       /*
        * Creates a transaction.
        */
-      transaction make_transaction(std::vector<Action>&& actions = {});
+      Transaction make_transaction(std::vector<Action>&& actions = {});
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] transaction_trace push_transaction(const signed_transaction& signed_trx);
+      [[nodiscard]] transaction_trace push_transaction(const SignedTransaction& signed_trx);
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] transaction_trace push_transaction(
-          const transaction&                                   trx,
+          const Transaction&                                   trx,
           const std::vector<std::pair<PublicKey, PrivateKey>>& keys = {
               {default_pub_key, default_priv_key}});
 
@@ -234,8 +234,8 @@ namespace psibase
       }
 
       /**
-    *  This will push a transaction and return the trace and return value
-    */
+       *  This will push a transaction and return the trace and return value
+       */
       struct push_transaction_proxy
       {
          push_transaction_proxy(test_chain& t, AccountNumber s, AccountNumber r)

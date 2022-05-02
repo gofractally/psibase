@@ -634,7 +634,7 @@ struct callbacks
       auto&              chain = assert_chain(chain_index);
       psio::input_stream s     = {args_packed.data(), args_packed.size()};
       auto               signed_trx =
-          psio::convert_from_frac<psibase::signed_transaction>(psio::input_stream{s.pos, s.end});
+          psio::convert_from_frac<psibase::SignedTransaction>(psio::input_stream{s.pos, s.end});
 
       chain.start_if_needed();
       psibase::transaction_trace trace;

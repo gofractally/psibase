@@ -99,7 +99,7 @@ namespace system_contract
       // TODO: limit execution time
       auto top_act = get_current_action();
       // TODO: avoid copying inner raw_data during unpack
-      auto trx = psio::convert_from_frac<transaction>(top_act.raw_data);
+      auto trx = psio::convert_from_frac<Transaction>(top_act.raw_data);
 
       check(trx.actions.size() > 0, "transaction has no actions");
 

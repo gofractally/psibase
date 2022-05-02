@@ -101,10 +101,10 @@ namespace psibase
       session.commit();
    }
 
-   void block_context::push_transaction(const signed_transaction& trx,
-                                        transaction_trace&        trace,
-                                        bool                      enable_undo,
-                                        bool                      commit)
+   void block_context::push_transaction(const SignedTransaction& trx,
+                                        transaction_trace&       trace,
+                                        bool                     enable_undo,
+                                        bool                     commit)
    {
       exec(trx, trace, enable_undo, commit);
       current.transactions.push_back(std::move(trx));
@@ -121,10 +121,10 @@ namespace psibase
 
    // TODO: limit charged CPU & NET which can go into a block
    // TODO: duplicate detection
-   void block_context::exec(const signed_transaction& trx,
-                            transaction_trace&        trace,
-                            bool                      enable_undo,
-                            bool                      commit)
+   void block_context::exec(const SignedTransaction& trx,
+                            transaction_trace&       trace,
+                            bool                     enable_undo,
+                            bool                     commit)
    {
       try
       {
