@@ -47,7 +47,7 @@ namespace psibase
       {
          if (!is_end)
             key.push_back(0);
-         set(raw::kv_greater_equal(map, key.data(), key.size(), prefix_size));
+         set(raw::kvGreaterEqual(map, key.data(), key.size(), prefix_size));
          return *this;
       }
       kv_raw_iterator operator++(int)
@@ -58,8 +58,8 @@ namespace psibase
       }
       kv_raw_iterator& operator--()
       {
-         set(is_end ? raw::kv_max(map, key.data(), key.size())
-                    : raw::kv_less_than(map, key.data(), key.size(), prefix_size));
+         set(is_end ? raw::kvMax(map, key.data(), key.size())
+                    : raw::kvLessThan(map, key.data(), key.size(), prefix_size));
          return *this;
       }
       kv_raw_iterator operator--(int)
@@ -265,7 +265,7 @@ namespace psibase
       {
          key_view       key_base{{prefix.data(), prefix.size()}};
          auto           key = psio::convert_to_key(std::tie(key_base, k));
-         result_handle  res = {raw::kv_greater_equal(key.data(), key.size(), prefix.size())};
+         result_handle  res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
          kv_iterator<T> result(std::move(key), prefix.size(), is_secondary());
          result.move_to(res);
          return result;
@@ -285,7 +285,7 @@ namespace psibase
             }
             key.pop_back();
          }
-         result_handle  res = {raw::kv_greater_equal(key.data(), key.size(), prefix.size())};
+         result_handle  res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
          kv_iterator<T> result(std::move(key), prefix.size(), is_secondary());
          result.move_to(res);
          return result;

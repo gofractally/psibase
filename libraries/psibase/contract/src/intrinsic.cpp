@@ -36,7 +36,7 @@ namespace psibase
       return psio::convert_from_frac<Action>(data);
    }
 
-   psio::shared_view_ptr<Action> get_current_action_view()
+   psio::shared_view_ptr<Action> getCurrentActionView()
    {
       psio::shared_view_ptr<Action> ptr(psio::size_tag{raw::getCurrentAction()});
       raw::getResult(ptr.data(), ptr.size(), 0);

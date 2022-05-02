@@ -35,7 +35,7 @@ namespace psibase
    {
       Contract contract;  // TODO: Make this static?
       contract.dispatch_set_sender_receiver(sender, receiver);
-      auto act = get_current_action_view();  /// action view...
+      auto act = getCurrentActionView();
 
       bool called = psio::reflect<Contract>::get_by_name(
           act->method()->value(),

@@ -107,7 +107,7 @@ void test(AccountNumber this_contract)
    };
 
    if (enable_print)
-      print("kv_less_than\n");
+      print("kvLessThan\n");
    for (const auto& item : items)
    {
       auto key = item.getKey(this_contract);
@@ -121,10 +121,10 @@ void test(AccountNumber this_contract)
       run(6, item.lt6, key, kv_less_than_raw);
       if (enable_print)
          print("\n");
-   }  // kv_less_than
+   }  // kvLessThan
 
    if (enable_print)
-      print("kv_greater_equal\n");
+      print("kvGreaterEqual\n");
    for (const auto& item : items)
    {
       auto key = item.getKey(this_contract);
@@ -138,10 +138,10 @@ void test(AccountNumber this_contract)
       run(6, item.ge6, key, kv_greater_equal_raw);
       if (enable_print)
          print("\n");
-   }  // kv_greater_equal
+   }  // kvGreaterEqual
 
    if (enable_print)
-      print("kv_max\n");
+      print("kvMax\n");
    for (const auto& item : items)
    {
       auto key = item.getKey(this_contract);
@@ -154,7 +154,7 @@ void test(AccountNumber this_contract)
           [](kv_map map, psio::input_stream key, size_t) { return kv_max_raw(map, key); });
       if (enable_print)
          print("\n");
-   }  // kv_max
+   }  // kvMax
 
 }  // test()
 

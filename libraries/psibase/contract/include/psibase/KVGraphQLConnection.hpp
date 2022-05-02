@@ -59,7 +59,7 @@ namespace psibase
       auto lowerBound = [&](const Key& key) -> Iter
       {
          // eosio::print("lowerBound ", key, "\n");
-         if (auto b = kv_greater_equal<Value>(map, key, keyPrefixSize))
+         if (auto b = kvGreaterEqual<Value>(map, key, keyPrefixSize))
             return toIter(std::move(*b));
          else
             return {};
@@ -105,7 +105,7 @@ namespace psibase
       };
 
       Iter begin, end;
-      if (auto b = kv_greater_equal<Value>(map, minKey, keyPrefixSize))
+      if (auto b = kvGreaterEqual<Value>(map, minKey, keyPrefixSize))
          begin = toIter(std::move(*b));
 
       return psio::makeConnection<Connection, Key>(  //

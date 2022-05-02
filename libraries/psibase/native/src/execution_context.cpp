@@ -472,7 +472,7 @@ namespace psibase
       }
 
       // TODO: don't let timer abort db operation
-      uint32_t kv_greater_equal(uint32_t map, span<const char> key, uint32_t match_key_size)
+      uint32_t kvGreaterEqual(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          check(match_key_size <= key.size(), "match_key_size is larger than key");
          if (key_has_contract_prefix(map))
@@ -483,7 +483,7 @@ namespace psibase
       }
 
       // TODO: don't let timer abort db operation
-      uint32_t kv_less_than(uint32_t map, span<const char> key, uint32_t match_key_size)
+      uint32_t kvLessThan(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          check(match_key_size <= key.size(), "match_key_size is larger than key");
          if (key_has_contract_prefix(map))
@@ -494,7 +494,7 @@ namespace psibase
       }
 
       // TODO: don't let timer abort db operation
-      uint32_t kv_max(uint32_t map, span<const char> key)
+      uint32_t kvMax(uint32_t map, span<const char> key)
       {
          if (key_has_contract_prefix(map))
             check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
@@ -529,9 +529,9 @@ namespace psibase
       rhf_t::add<&execution_context_impl::kvRemove>("env", "kvRemove");
       rhf_t::add<&execution_context_impl::kvGet>("env", "kvGet");
       rhf_t::add<&execution_context_impl::kvGetSequential>("env", "kvGetSequential");
-      rhf_t::add<&execution_context_impl::kv_greater_equal>("env", "kv_greater_equal");
-      rhf_t::add<&execution_context_impl::kv_less_than>("env", "kv_less_than");
-      rhf_t::add<&execution_context_impl::kv_max>("env", "kv_max");
+      rhf_t::add<&execution_context_impl::kvGreaterEqual>("env", "kvGreaterEqual");
+      rhf_t::add<&execution_context_impl::kvLessThan>("env", "kvLessThan");
+      rhf_t::add<&execution_context_impl::kvMax>("env", "kvMax");
    }
 
    void execution_context::exec_process_transaction(action_context& act_context)
