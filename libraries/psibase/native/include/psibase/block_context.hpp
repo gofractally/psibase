@@ -34,13 +34,13 @@ namespace psibase
       void commit();
 
       void push_transaction(const SignedTransaction& trx,
-                            transaction_trace&       trace,
+                            TransactionTrace&        trace,
                             bool                     enable_undo = true,
                             bool                     commit      = true);
 
-      transaction_trace push_transaction(const SignedTransaction& trx)
+      TransactionTrace push_transaction(const SignedTransaction& trx)
       {
-         transaction_trace trace;
+         TransactionTrace trace;
          push_transaction(trx, trace);
          return trace;
       }
@@ -48,7 +48,7 @@ namespace psibase
       void exec_all_in_block();
 
       void exec(const SignedTransaction& trx,
-                transaction_trace&       trace,
+                TransactionTrace&        trace,
                 bool                     enable_undo,
                 bool                     commit);
    };  // block_context

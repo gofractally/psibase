@@ -16,7 +16,7 @@
 
 namespace psibase
 {
-   inline std::string show(bool include, transaction_trace t)
+   inline std::string show(bool include, TransactionTrace t)
    {
       if (include || t.error)
          std::cout << pretty_trace(trim_raw_data(t)) << "\n";
@@ -25,7 +25,7 @@ namespace psibase
       return {};
    }
 
-   inline const ActionTrace& get_top_action(transaction_trace& t, size_t num)
+   inline const ActionTrace& get_top_action(TransactionTrace& t, size_t num)
    {
       // TODO: redesign transaction_trace to make this easier
       // Current layout:

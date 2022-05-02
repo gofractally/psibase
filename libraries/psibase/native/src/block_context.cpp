@@ -102,7 +102,7 @@ namespace psibase
    }
 
    void block_context::push_transaction(const SignedTransaction& trx,
-                                        transaction_trace&       trace,
+                                        TransactionTrace&        trace,
                                         bool                     enable_undo,
                                         bool                     commit)
    {
@@ -114,7 +114,7 @@ namespace psibase
    {
       for (auto& trx : current.transactions)
       {
-         transaction_trace trace;
+         TransactionTrace trace;
          exec(trx, trace, false, true);
       }
    }
@@ -122,7 +122,7 @@ namespace psibase
    // TODO: limit charged CPU & NET which can go into a block
    // TODO: duplicate detection
    void block_context::exec(const SignedTransaction& trx,
-                            transaction_trace&       trace,
+                            TransactionTrace&        trace,
                             bool                     enable_undo,
                             bool                     commit)
    {

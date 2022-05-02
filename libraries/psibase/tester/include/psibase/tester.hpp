@@ -20,7 +20,7 @@ namespace psibase
       std::cout << "\n" << prefix << " DebugCounter " << ++i << "\n\n";
    };
 
-   inline std::string show(bool include, transaction_trace t)
+   inline std::string show(bool include, TransactionTrace t)
    {
       if (include || t.error)
          std::cout << pretty_trace(trim_raw_data(t)) << "\n";
@@ -29,9 +29,9 @@ namespace psibase
       return {};
    }
 
-   inline const ActionTrace& get_top_action(transaction_trace& t, size_t num)
+   inline const ActionTrace& get_top_action(TransactionTrace& t, size_t num)
    {
-      // TODO: redesign transaction_trace to make this easier
+      // TODO: redesign TransactionTrace to make this easier
       // Current layout:
       //    verify proof 0
       //    verify proof 1
@@ -62,7 +62,7 @@ namespace psibase
     * transaction should succeed.  Otherwise it represents a string which should be
     * part of the error message.
     */
-   void expect(transaction_trace t, const std::string& expected = "", bool always_show = false);
+   void expect(TransactionTrace t, const std::string& expected = "", bool always_show = false);
 
    /**
     * Sign a digest
@@ -72,23 +72,23 @@ namespace psibase
    class TraceResult
    {
      public:
-      TraceResult(transaction_trace&& t);
+      TraceResult(TransactionTrace&& t);
       bool succeeded();
       bool failed(std::string_view expected);
       bool diskConsumed(const std::vector<std::pair<AccountNumber, int64_t>>& consumption);
 
-      const transaction_trace& trace() { return _t; }
+      const TransactionTrace& trace() { return _t; }
 
      protected:
-      transaction_trace _t;
+      TransactionTrace _t;
    };
 
    template <typename ReturnType>
    class Result : public TraceResult
    {
      public:
-      Result(transaction_trace&& t)
-          : TraceResult(std::forward<transaction_trace>(t)), _return(std::nullopt)
+      Result(TransactionTrace&& t)
+          : TraceResult(std::forward<TransactionTrace>(t)), _return(std::nullopt)
       {
          auto actionTrace = get_top_action(t, 0);
          if (actionTrace.raw_retval.size() != 0)
@@ -119,7 +119,7 @@ namespace psibase
    class Result<void> : public TraceResult
    {
      public:
-      Result(transaction_trace&& t) : TraceResult(std::forward<transaction_trace>(t)) {}
+      Result(TransactionTrace&& t) : TraceResult(std::forward<TransactionTrace>(t)) {}
    };
 
    /**
@@ -187,12 +187,12 @@ namespace psibase
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] transaction_trace push_transaction(const SignedTransaction& signed_trx);
+      [[nodiscard]] TransactionTrace push_transaction(const SignedTransaction& signed_trx);
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] transaction_trace push_transaction(
+      [[nodiscard]] TransactionTrace push_transaction(
           const Transaction&                                   trx,
           const std::vector<std::pair<PublicKey, PrivateKey>>& keys = {
               {default_pub_key, default_priv_key}});
@@ -202,11 +202,11 @@ namespace psibase
        *
        * Validates the transaction status according to @ref eosio::expect.
        */
-      transaction_trace transact(std::vector<Action>&&                                actions,
-                                 const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
-                                 const char* expected_except = nullptr);
-      transaction_trace transact(std::vector<Action>&& actions,
-                                 const char*           expected_except = nullptr);
+      TransactionTrace transact(std::vector<Action>&&                                actions,
+                                const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
+                                const char* expected_except = nullptr);
+      TransactionTrace transact(std::vector<Action>&& actions,
+                                const char*           expected_except = nullptr);
 
       template <typename Action, typename... Args>
       auto trace(const std::optional<std::vector<std::vector<char>>>& cfd,

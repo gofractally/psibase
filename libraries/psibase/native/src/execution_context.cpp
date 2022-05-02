@@ -354,11 +354,11 @@ namespace psibase
       {
          // TODO: limit total console size across all executions within transaction
          if (current_act_context->action_trace.inner_traces.empty() ||
-             !std::holds_alternative<console_trace>(
+             !std::holds_alternative<ConsoleTrace>(
                  current_act_context->action_trace.inner_traces.back().inner))
-            current_act_context->action_trace.inner_traces.push_back({console_trace{}});
+            current_act_context->action_trace.inner_traces.push_back({ConsoleTrace{}});
          auto& console =
-             std::get<console_trace>(current_act_context->action_trace.inner_traces.back().inner)
+             std::get<ConsoleTrace>(current_act_context->action_trace.inner_traces.back().inner)
                  .console;
          console.append(str.begin(), str.end());
          clear_result();

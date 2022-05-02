@@ -6,10 +6,10 @@
 
 namespace psibase
 {
-   transaction_context::transaction_context(psibase::block_context&     block_context,
-                                            const SignedTransaction&    trx,
-                                            psibase::transaction_trace& transaction_trace,
-                                            bool                        enable_undo)
+   transaction_context::transaction_context(psibase::block_context&    block_context,
+                                            const SignedTransaction&   trx,
+                                            psibase::TransactionTrace& transaction_trace,
+                                            bool                       enable_undo)
        : block_context{block_context}, trx{trx}, transaction_trace{transaction_trace}
    {
       if (enable_undo)

@@ -9,14 +9,14 @@ namespace psibase
       psibase::block_context&                    block_context;
       database::session                          session;
       const SignedTransaction&                   trx;
-      psibase::transaction_trace&                transaction_trace;
+      TransactionTrace&                          transaction_trace;
       std::map<AccountNumber, execution_context> execution_contexts;
       int                                        call_depth = 0;
 
-      transaction_context(psibase::block_context&     block_context,
-                          const SignedTransaction&    trx,
-                          psibase::transaction_trace& transaction_trace,
-                          bool                        enable_undo);
+      transaction_context(psibase::block_context&  block_context,
+                          const SignedTransaction& trx,
+                          TransactionTrace&        transaction_trace,
+                          bool                     enable_undo);
 
       void exec_transaction();
       void exec_called_action(uint64_t caller_flags, const Action& act, ActionTrace& atrace);
