@@ -207,7 +207,7 @@ bool push_boot(block_context& bc, transaction_queue::entry& entry)
       // TODO: view
       auto transactions =
           psio::convert_from_frac<std::vector<SignedTransaction>>(entry.packed_signed_trx);
-      transaction_trace trace;
+      TransactionTrace trace;
 
       try
       {
@@ -275,8 +275,8 @@ void push_transaction(block_context& bc, transaction_queue::entry& entry)
    {
       // TODO: verify no extra data
       // TODO: view
-      auto              trx = psio::convert_from_frac<SignedTransaction>(entry.packed_signed_trx);
-      transaction_trace trace;
+      auto             trx = psio::convert_from_frac<SignedTransaction>(entry.packed_signed_trx);
+      TransactionTrace trace;
 
       try
       {

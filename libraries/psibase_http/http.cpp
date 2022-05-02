@@ -289,7 +289,7 @@ namespace psibase::http
                            .contract = proxyContractNum,
                            .rawData  = psio::convert_to_frac(data),
             };
-            transaction_trace   trace;
+            TransactionTrace    trace;
             transaction_context tc{bc, trx, trace, false};
             ActionTrace         atrace;
             tc.exec_rpc(action, atrace);
@@ -357,7 +357,7 @@ namespace psibase::http
                           try
                           {
                              session->queue_.pause_read = false;
-                             if (auto* trace = std::get_if<transaction_trace>(&result))
+                             if (auto* trace = std::get_if<TransactionTrace>(&result))
                              {
                                 std::vector<char>   data;
                                 psio::vector_stream stream{data};

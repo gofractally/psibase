@@ -10,7 +10,7 @@ namespace psibase::http
    using push_boot_t =
        std::function<void(std::vector<char> packed_signed_transactions, push_boot_callback)>;
 
-   using push_transaction_result   = std::variant<transaction_trace, std::string>;
+   using push_transaction_result   = std::variant<TransactionTrace, std::string>;
    using push_transaction_callback = std::function<void(push_transaction_result)>;
    using push_transaction_t =
        std::function<void(std::vector<char> packed_signed_trx, push_transaction_callback)>;

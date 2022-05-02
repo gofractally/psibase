@@ -71,7 +71,7 @@ namespace
    }
 }  // namespace
 
-psibase::TraceResult::TraceResult(transaction_trace&& t) : _t(t) {}
+psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
 
 bool psibase::TraceResult::succeeded()
 {
@@ -160,7 +160,7 @@ int32_t psibase::execute(std::string_view command)
    return ::tester_execute(command.data(), command.size());
 }
 
-void psibase::expect(transaction_trace t, const std::string& expected, bool always_show)
+void psibase::expect(TransactionTrace t, const std::string& expected, bool always_show)
 {
    std::string error = t.error ? *t.error : "";
    bool bad = (expected.empty() && !error.empty()) || error.find(expected) == std::string::npos;
@@ -320,7 +320,7 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
    return t;
 }
 
-[[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
+[[nodiscard]] psibase::TransactionTrace psibase::test_chain::push_transaction(
     const SignedTransaction& signed_trx)
 {
    std::vector<char> packed_trx = psio::convert_to_frac(signed_trx);
@@ -331,10 +331,10 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
                          bin.resize(size);
                          return bin.data();
                       });
-   return psio::convert_from_frac<transaction_trace>(bin);
+   return psio::convert_from_frac<TransactionTrace>(bin);
 }
 
-[[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
+[[nodiscard]] psibase::TransactionTrace psibase::test_chain::push_transaction(
     const Transaction&                                   trx,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
@@ -353,7 +353,7 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
    return push_transaction(signed_trx);
 }
 
-psibase::transaction_trace psibase::test_chain::transact(
+psibase::TransactionTrace psibase::test_chain::transact(
     std::vector<Action>&&                                actions,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
     const char*                                          expected_except)
@@ -363,8 +363,8 @@ psibase::transaction_trace psibase::test_chain::transact(
    return trace;
 }
 
-psibase::transaction_trace psibase::test_chain::transact(std::vector<Action>&& actions,
-                                                         const char*           expected_except)
+psibase::TransactionTrace psibase::test_chain::transact(std::vector<Action>&& actions,
+                                                        const char*           expected_except)
 {
    return transact(std::move(actions), {{default_pub_key, default_priv_key}}, expected_except);
 }

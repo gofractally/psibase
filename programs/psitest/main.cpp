@@ -637,8 +637,8 @@ struct callbacks
           psio::convert_from_frac<psibase::SignedTransaction>(psio::input_stream{s.pos, s.end});
 
       chain.start_if_needed();
-      psibase::transaction_trace trace;
-      auto                       start_time = std::chrono::steady_clock::now();
+      psibase::TransactionTrace trace;
+      auto                      start_time = std::chrono::steady_clock::now();
       try
       {
          // TODO: undo and commit control
