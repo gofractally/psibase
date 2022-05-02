@@ -23,7 +23,7 @@ namespace system_contract::auth_ec_sys
    struct auth_row
    {
       AccountNumber account;
-      PublicKey   pubkey;
+      PublicKey     pubkey;
 
       auto key() { return auth_key(account); }
    };
@@ -37,7 +37,7 @@ namespace system_contract::auth_ec_sys
       check(!!row, "sender does not have a public key");
       auto expected = psio::convert_to_frac(row->pubkey);
       for (auto& claim : args.claims)
-         if (claim.contract == verify_ec_sys::contract && claim.raw_data == expected)
+         if (claim.contract == verify_ec_sys::contract && claim.rawData == expected)
             return;
       abort_message_str("no matching claim found");
    }
@@ -63,7 +63,7 @@ namespace system_contract::auth_ec_sys
    {
       // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
       auto act  = get_current_action();
-      auto data = psio::convert_from_frac<action>(act.raw_data);
+      auto data = psio::convert_from_frac<action>(act.rawData);
       std::visit(
           [&](auto& x)
           {

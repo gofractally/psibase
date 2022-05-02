@@ -54,19 +54,19 @@ namespace psibase
          auto& db = self.block_context.db;
          // TODO: verify, no extra data
          auto data = psio::convert_from_frac<GenesisActionData>(
-             {action.raw_data.data(), action.raw_data.size()});
+             {action.rawData.data(), action.rawData.size()});
          for (auto& contract : data.contracts)
          {
             check(contract.contract.value, "account 0 is reserved");
             check(!db.kv_get<account_row>(account_row::kv_map, account_key(contract.contract)),
                   "account already created");
             account_row account{
-                .num           = contract.contract,
-                .auth_contract = contract.auth_contract,
-                .flags         = contract.flags,
+                .num          = contract.contract,
+                .authContract = contract.authContract,
+                .flags        = contract.flags,
             };
             db.kv_put(account_row::kv_map, account.key(), account);
-            set_code(db, contract.contract, contract.vm_type, contract.vm_version,
+            set_code(db, contract.contract, contract.vmType, contract.vmVersion,
                      {contract.code.data(), contract.code.size()});
          }
       }
@@ -84,7 +84,7 @@ namespace psibase
       Action                         action{
                                   .sender   = AccountNumber(),
                                   .contract = trxsys,
-                                  .raw_data = psio::convert_to_frac(self.trx.trx),
+                                  .rawData  = psio::convert_to_frac(self.trx.trx),
       };
       auto& atrace  = self.transaction_trace.action_traces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
@@ -117,7 +117,7 @@ namespace psibase
          Action action{
              .sender   = {},
              .contract = claim.contract,
-             .raw_data = psio::convert_to_frac(data),
+             .rawData  = psio::convert_to_frac(data),
          };
          auto& atrace      = self.transaction_trace.action_traces.emplace_back();
          atrace.action     = action;

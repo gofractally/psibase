@@ -7,16 +7,16 @@
 namespace psibase
 {
    /**
- *  When an action is called it returns 
- *
- *  psibase::Action {
- *    .sender,
- *    .contract,
- *    .raw_data = actionnum, packed_parameters
- *  }
- *
- *  This is useful for tester
- */
+    *  When an action is called it returns 
+    *
+    *  psibase::Action {
+    *    .sender,
+    *    .contract,
+    *    .rawData = actionnum, packed_parameters
+    *  }
+    *
+    *  This is useful for tester
+    */
    struct action_builder_proxy
    {
       action_builder_proxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}

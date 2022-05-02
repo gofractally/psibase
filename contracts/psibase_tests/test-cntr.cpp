@@ -26,16 +26,16 @@ extern "C" void called(AccountNumber this_contract, AccountNumber sender)
 {
    // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
    auto act = get_current_action();
-   auto pl  = psio::convert_from_frac<payload>(act.raw_data);
+   auto pl  = psio::convert_from_frac<payload>(act.rawData);
    printf("payload: %s\n", psio::convert_to_json(pl).c_str());
    if (pl.number)
    {
       auto r = psio::convert_from_frac<int>(call({
           .sender   = this_contract,
           .contract = this_contract,
-          .raw_data = psio::convert_to_frac(payload{
-              .number = pl.number - 1,
-              .memo   = pl.memo,
+          .rawData  = psio::convert_to_frac(payload{
+               .number = pl.number - 1,
+               .memo   = pl.memo,
           }),
       }));
       printf("Child returned %d\n", r);

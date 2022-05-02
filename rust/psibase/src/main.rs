@@ -91,7 +91,7 @@ fn new_account(
         bridge::ffi::pack_new_account(&format!(
             r#"{{
                 "account": {},
-                "auth_contract": {},
+                "authContract": {},
                 "require_new": {}
             }}"#,
             serde_json::to_string(account)?,
@@ -108,8 +108,8 @@ fn set_code(contract: &str, code: &str) -> Result<String, anyhow::Error> {
         bridge::ffi::pack_set_code(&format!(
             r#"{{
                 "contract": {},
-                "vm_type": 0,
-                "vm_version": 0,
+                "vmType": 0,
+                "vmVersion": 0,
                 "code": {}
             }}"#,
             serde_json::to_string(contract)?,
@@ -131,7 +131,7 @@ fn action_json(
             "sender": {},
             "contract": {},
             "method": {},
-            "raw_data": {}
+            "rawData": {}
         }}"#,
         serde_json::to_string(sender)?,
         serde_json::to_string(contract)?,

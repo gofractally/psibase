@@ -25,7 +25,7 @@ namespace system_contract::auth_fake_sys
       auto result = psibase::call(psibase::Action{
           .sender   = sender,
           .contract = contract,
-          .raw_data = psio::convert_to_frac(psibase::Action{std::move(args)}),
+          .rawData  = psio::convert_to_frac(psibase::Action{std::move(args)}),
       });
       if constexpr (!std::is_same_v<R, void>)
          return psio::convert_from_frac<R>(result);

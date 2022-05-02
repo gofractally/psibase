@@ -14,24 +14,24 @@ namespace psibase
       AccountNumber     sender;
       AccountNumber     contract;
       MethodNumber      method;
-      std::vector<char> raw_data;
+      std::vector<char> rawData;
    };
-   PSIO_REFLECT(Action, sender, contract, method, raw_data)
+   PSIO_REFLECT(Action, sender, contract, method, rawData)
 
    struct GenesisContract
    {
       AccountNumber     contract;
-      AccountNumber     auth_contract;
-      uint64_t          flags      = 0;
-      uint8_t           vm_type    = 0;
-      uint8_t           vm_version = 0;
-      std::vector<char> code       = {};
+      AccountNumber     authContract;
+      uint64_t          flags     = 0;
+      uint8_t           vmType    = 0;
+      uint8_t           vmVersion = 0;
+      std::vector<char> code      = {};
    };
-   PSIO_REFLECT(GenesisContract, contract, auth_contract, flags, vm_type, vm_version, code)
+   PSIO_REFLECT(GenesisContract, contract, authContract, flags, vmType, vmVersion, code)
 
    // The genesis action is the first action of the first transaction of
    // the first block. The action struct's fields are ignored, except
-   // raw_data, which contains this struct.
+   // rawData, which contains this struct.
    struct GenesisActionData
    {
       std::string                  memo;
@@ -42,9 +42,9 @@ namespace psibase
    struct Claim
    {
       AccountNumber     contract;
-      std::vector<char> raw_data;
+      std::vector<char> rawData;
    };
-   PSIO_REFLECT(Claim, contract, raw_data)
+   PSIO_REFLECT(Claim, contract, rawData)
 
    /* mark this as final and put it in memory order that
     * has no padding nor alignment requirements so these fields

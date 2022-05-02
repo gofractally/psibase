@@ -43,7 +43,7 @@ namespace psibase
    {
       auto act = get_current_action();
       // TODO: use a view
-      auto req = psio::convert_from_frac<rpc_request_data>(act.raw_data);
+      auto req = psio::convert_from_frac<rpc_request_data>(act.rawData);
 
       std::string contractName;
 

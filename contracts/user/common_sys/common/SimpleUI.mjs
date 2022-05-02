@@ -14,9 +14,9 @@ async function pushTransaction(trx, addMsg, clearMsg) {
         for (let action of trx.actions) {
             console.log(action);
             addMsg(`packing ${action.method}...`);
-            action.raw_data = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
+            action.rawData = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
                 '/pack_action/' + action.method, action.data)));
-            addMsg('raw_data: ' + action.raw_data);
+            addMsg('rawData: ' + action.rawData);
         }
         const trace = await pushedSignedTransaction({ trx });
         addMsg('\nPushed\n');

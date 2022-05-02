@@ -63,44 +63,44 @@ namespace psibase
                               .sender   = AccountNumber{"foo"},  // ignored
                               .contract = AccountNumber{"bar"},  // ignored
                               .method   = {},
-                              .raw_data = psio::convert_to_frac(GenesisActionData{
-                                  .contracts =  // g.a.d--^ is config file for gen
+                              .rawData  = psio::convert_to_frac(GenesisActionData{
+                                   .contracts =  // g.a.d--^ is config file for gen
                                   {
-                                      {
-                                          .contract = system_contract::transaction_sys::contract,
-                                          .auth_contract = system_contract::auth_fake_sys::contract,
-                                          .flags = system_contract::transaction_sys::contract_flags,
-                                          .code  = read_whole_file("transaction_sys.wasm"),
+                                       {
+                                           .contract = system_contract::transaction_sys::contract,
+                                           .authContract = system_contract::auth_fake_sys::contract,
+                                           .flags = system_contract::transaction_sys::contract_flags,
+                                           .code  = read_whole_file("transaction_sys.wasm"),
                                       },
-                                      {
-                                          .contract      = system_contract::account_sys::contract,
-                                          .auth_contract = system_contract::auth_fake_sys::contract,
-                                          .flags = system_contract::account_sys::contract_flags,
-                                          .code  = read_whole_file("account_sys.wasm"),
+                                       {
+                                           .contract     = system_contract::account_sys::contract,
+                                           .authContract = system_contract::auth_fake_sys::contract,
+                                           .flags = system_contract::account_sys::contract_flags,
+                                           .code  = read_whole_file("account_sys.wasm"),
                                       },
-                                      {
-                                          .contract      = proxyContractNum,
-                                          .auth_contract = system_contract::auth_fake_sys::contract,
-                                          .flags         = 0,
-                                          .code          = read_whole_file("proxy_sys.wasm"),
+                                       {
+                                           .contract     = proxyContractNum,
+                                           .authContract = system_contract::auth_fake_sys::contract,
+                                           .flags        = 0,
+                                           .code         = read_whole_file("proxy_sys.wasm"),
                                       },
-                                      {
-                                          .contract      = system_contract::auth_fake_sys::contract,
-                                          .auth_contract = system_contract::auth_fake_sys::contract,
-                                          .flags         = 0,
-                                          .code          = read_whole_file("auth_fake_sys.wasm"),
+                                       {
+                                           .contract     = system_contract::auth_fake_sys::contract,
+                                           .authContract = system_contract::auth_fake_sys::contract,
+                                           .flags        = 0,
+                                           .code         = read_whole_file("auth_fake_sys.wasm"),
                                       },
-                                      {
-                                          .contract      = system_contract::auth_ec_sys::contract,
-                                          .auth_contract = system_contract::auth_fake_sys::contract,
-                                          .flags         = 0,
-                                          .code          = read_whole_file("auth_ec_sys.wasm"),
+                                       {
+                                           .contract     = system_contract::auth_ec_sys::contract,
+                                           .authContract = system_contract::auth_fake_sys::contract,
+                                           .flags        = 0,
+                                           .code         = read_whole_file("auth_ec_sys.wasm"),
                                       },
-                                      {
-                                          .contract      = system_contract::verify_ec_sys::contract,
-                                          .auth_contract = system_contract::auth_fake_sys::contract,
-                                          .flags         = 0,
-                                          .code          = read_whole_file("verify_ec_sys.wasm"),
+                                       {
+                                           .contract     = system_contract::verify_ec_sys::contract,
+                                           .authContract = system_contract::auth_fake_sys::contract,
+                                           .flags        = 0,
+                                           .code         = read_whole_file("verify_ec_sys.wasm"),
                                       },
                                   },
                               }),
@@ -127,24 +127,24 @@ namespace psibase
 
    inline AccountNumber add_account(test_chain&   t,
                                     AccountNumber acc,
-                                    AccountNumber auth_contract = AccountNumber("auth-fake-sys"),
-                                    bool          show          = false)
+                                    AccountNumber authContract = AccountNumber("auth-fake-sys"),
+                                    bool          show         = false)
    {
       transactor<system_contract::account_sys> asys(system_contract::transaction_sys::contract,
                                                     system_contract::account_sys::contract);
 
       auto trace = t.push_transaction(  //
-          t.make_transaction({asys.newAccount(acc, auth_contract, true)}));
+          t.make_transaction({asys.newAccount(acc, authContract, true)}));
       REQUIRE(psibase::show(true, trace) == "");
       return acc;
    }  // add_account()
 
    inline AccountNumber add_account(test_chain&   t,
                                     const char*   acc,
-                                    AccountNumber auth_contract = AccountNumber("auth-fake-sys"),
-                                    bool          show          = false)
+                                    AccountNumber authContract = AccountNumber("auth-fake-sys"),
+                                    bool          show         = false)
    {
-      return add_account(t, AccountNumber(acc), auth_contract, show);
+      return add_account(t, AccountNumber(acc), authContract, show);
    }
 
    inline AccountNumber add_ec_account(test_chain&      t,
@@ -157,10 +157,10 @@ namespace psibase
               {{
                   .sender   = system_contract::transaction_sys::contract,
                   .contract = system_contract::auth_ec_sys::contract,
-                  .raw_data = psio::convert_to_frac(system_contract::auth_ec_sys::action{
+                  .rawData  = psio::convert_to_frac(system_contract::auth_ec_sys::action{
                       system_contract::auth_ec_sys::create_account{
-                          .name       = name,
-                          .public_key = public_key,
+                           .name       = name,
+                           .public_key = public_key,
                       }}),
               }}));
       REQUIRE(psibase::show(show, trace) == "");

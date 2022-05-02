@@ -343,7 +343,7 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
    for (auto& [pub, priv] : keys)
       signed_trx.trx.claims.push_back({
           .contract = system_contract::verify_ec_sys::contract,
-          .raw_data = psio::convert_to_frac(pub),
+          .rawData  = psio::convert_to_frac(pub),
       });
    // TODO: don't pack twice
    std::vector<char> packed_trx = psio::convert_to_frac(signed_trx.trx);

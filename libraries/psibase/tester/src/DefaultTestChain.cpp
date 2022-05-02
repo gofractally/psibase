@@ -37,44 +37,44 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
             .sender   = AccountNumber{"foo"},  // ignored
             .contract = AccountNumber{"bar"},  // ignored
             .method   = {},
-            .raw_data = psio::convert_to_frac(GenesisActionData{
-                .contracts =  // g.a.d--^ is config file for gen
+            .rawData  = psio::convert_to_frac(GenesisActionData{
+                 .contracts =  // g.a.d--^ is config file for gen
                 {
-                    {
-                        .contract      = system_contract::transaction_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = system_contract::transaction_sys::contract_flags,
-                        .code          = read_whole_file("transaction_sys.wasm"),
+                     {
+                         .contract     = system_contract::transaction_sys::contract,
+                         .authContract = system_contract::auth_fake_sys::contract,
+                         .flags        = system_contract::transaction_sys::contract_flags,
+                         .code         = read_whole_file("transaction_sys.wasm"),
                     },
-                    {
-                        .contract      = system_contract::account_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = system_contract::account_sys::contract_flags,
-                        .code          = read_whole_file("account_sys.wasm"),
+                     {
+                         .contract     = system_contract::account_sys::contract,
+                         .authContract = system_contract::auth_fake_sys::contract,
+                         .flags        = system_contract::account_sys::contract_flags,
+                         .code         = read_whole_file("account_sys.wasm"),
                     },
-                    {
-                        .contract      = proxyContractNum,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("proxy_sys.wasm"),
+                     {
+                         .contract     = proxyContractNum,
+                         .authContract = system_contract::auth_fake_sys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("proxy_sys.wasm"),
                     },
-                    {
-                        .contract      = system_contract::auth_fake_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("auth_fake_sys.wasm"),
+                     {
+                         .contract     = system_contract::auth_fake_sys::contract,
+                         .authContract = system_contract::auth_fake_sys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("auth_fake_sys.wasm"),
                     },
-                    {
-                        .contract      = system_contract::auth_ec_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("auth_ec_sys.wasm"),
+                     {
+                         .contract     = system_contract::auth_ec_sys::contract,
+                         .authContract = system_contract::auth_fake_sys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("auth_ec_sys.wasm"),
                     },
-                    {
-                        .contract      = system_contract::verify_ec_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("verify_ec_sys.wasm"),
+                     {
+                         .contract     = system_contract::verify_ec_sys::contract,
+                         .authContract = system_contract::auth_fake_sys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("verify_ec_sys.wasm"),
                     },
                 },
             }),
@@ -103,14 +103,14 @@ void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
 
 AccountNumber DefaultTestChain::add_account(
     AccountNumber acc,
-    AccountNumber auth_contract /* = AccountNumber("auth-fake-sys") */,
+    AccountNumber authContract /* = AccountNumber("auth-fake-sys") */,
     bool          show /* = false */)
 {
    transactor<system_contract::account_sys> asys(system_contract::transaction_sys::contract,
                                                  system_contract::account_sys::contract);
 
    auto trace = push_transaction(  //
-       make_transaction({asys.newAccount(acc, auth_contract, true)}));
+       make_transaction({asys.newAccount(acc, authContract, true)}));
 
    check(psibase::show(show, trace) == "", "Failed to add account");
 
@@ -119,10 +119,10 @@ AccountNumber DefaultTestChain::add_account(
 
 AccountNumber DefaultTestChain::add_account(
     const char*   acc,
-    AccountNumber auth_contract /* = AccountNumber("auth-fake-sys")*/,
+    AccountNumber authContract /* = AccountNumber("auth-fake-sys")*/,
     bool          show /* = false */)
 {
-   return add_account(AccountNumber(acc), auth_contract, show);
+   return add_account(AccountNumber(acc), authContract, show);
 }
 
 AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
@@ -134,10 +134,10 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
            {{
                .sender   = system_contract::transaction_sys::contract,
                .contract = system_contract::auth_ec_sys::contract,
-               .raw_data = psio::convert_to_frac(system_contract::auth_ec_sys::action{
+               .rawData  = psio::convert_to_frac(system_contract::auth_ec_sys::action{
                    system_contract::auth_ec_sys::create_account{
-                       .name       = name,
-                       .public_key = public_key,
+                        .name       = name,
+                        .public_key = public_key,
                    }}),
            }}));
 

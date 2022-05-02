@@ -48,7 +48,7 @@ void bootstrap_chain(system_context& system)
       t.trx.actions.push_back({
           .sender   = sender,
           .contract = contract,
-          .raw_data = psio::convert_to_frac(data),
+          .rawData  = psio::convert_to_frac(data),
       });
       bc.push_transaction(t);
    };
@@ -83,58 +83,58 @@ void bootstrap_chain(system_context& system)
             .contracts =
                 {
                     {
-                        .contract      = system_contract::transaction_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = system_contract::transaction_sys::contract_flags,
-                        .code          = read_whole_file("transaction_sys.wasm"),
+                        .contract     = system_contract::transaction_sys::contract,
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = system_contract::transaction_sys::contract_flags,
+                        .code         = read_whole_file("transaction_sys.wasm"),
                     },
                     {
-                        .contract      = system_contract::account_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = system_contract::account_sys::contract_flags,
-                        .code          = read_whole_file("account_sys.wasm"),
+                        .contract     = system_contract::account_sys::contract,
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = system_contract::account_sys::contract_flags,
+                        .code         = read_whole_file("account_sys.wasm"),
                     },
                     {
-                        .contract      = proxyContractNum,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("proxy_sys.wasm"),
+                        .contract     = proxyContractNum,
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = 0,
+                        .code         = read_whole_file("proxy_sys.wasm"),
                     },
                     {
-                        .contract      = system_contract::auth_fake_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("auth_fake_sys.wasm"),
+                        .contract     = system_contract::auth_fake_sys::contract,
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = 0,
+                        .code         = read_whole_file("auth_fake_sys.wasm"),
                     },
                     {
-                        .contract      = system_contract::auth_ec_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("auth_ec_sys.wasm"),
+                        .contract     = system_contract::auth_ec_sys::contract,
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = 0,
+                        .code         = read_whole_file("auth_ec_sys.wasm"),
                     },
                     {
-                        .contract      = system_contract::verify_ec_sys::contract,
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("verify_ec_sys.wasm"),
+                        .contract     = system_contract::verify_ec_sys::contract,
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = 0,
+                        .code         = read_whole_file("verify_ec_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber("common-sys"),
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("common_sys.wasm"),
+                        .contract     = AccountNumber("common-sys"),
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = 0,
+                        .code         = read_whole_file("common_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber("account-rpc"),  // TODO: need -sys suffix
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("rpc_account_sys.wasm"),
+                        .contract     = AccountNumber("account-rpc"),  // TODO: need -sys suffix
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = 0,
+                        .code         = read_whole_file("rpc_account_sys.wasm"),
                     },
                     {
-                        .contract      = AccountNumber("explore-sys"),
-                        .auth_contract = system_contract::auth_fake_sys::contract,
-                        .flags         = 0,
-                        .code          = read_whole_file("explore_sys.wasm"),
+                        .contract     = AccountNumber("explore-sys"),
+                        .authContract = system_contract::auth_fake_sys::contract,
+                        .flags        = 0,
+                        .code         = read_whole_file("explore_sys.wasm"),
                     },
                 },
         });

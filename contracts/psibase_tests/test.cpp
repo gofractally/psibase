@@ -17,9 +17,9 @@ TEST_CASE("recursion")
                     {{
                         .sender   = AccountNumber("test-cntr"),
                         .contract = AccountNumber("test-cntr"),
-                        .raw_data = psio::convert_to_frac(test_cntr::payload{
-                            .number = 3,
-                            .memo   = "Counting down",
+                        .rawData  = psio::convert_to_frac(test_cntr::payload{
+                             .number = 3,
+                             .memo   = "Counting down",
                         }),
                     }}))) == "");
 }  // recursion

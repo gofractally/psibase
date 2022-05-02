@@ -14,8 +14,8 @@ namespace psibase
    // Only useful for genesis
    void set_code(database&          db,
                  AccountNumber      contract,
-                 uint8_t            vm_type,
-                 uint8_t            vm_version,
+                 uint8_t            vmType,
+                 uint8_t            vmVersion,
                  psio::input_stream code);
 
    struct wasm_cache_impl;

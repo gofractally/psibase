@@ -12,7 +12,7 @@ namespace system_contract::auth_fake_sys
 {
    void exec(AccountNumber this_contract, AccountNumber sender, auth_check& act)
    {
-      // TODO: avoid copying inner raw_data (occurs in "called()" dispatcher below)
+      // TODO: avoid copying inner rawData (occurs in "called()" dispatcher below)
       if (enable_print)
          print("auth_check\n");
    }
@@ -21,7 +21,7 @@ namespace system_contract::auth_fake_sys
    {
       // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
       auto act  = get_current_action();
-      auto data = psio::convert_from_frac<action>(act.raw_data);
+      auto data = psio::convert_from_frac<action>(act.rawData);
       std::visit(
           [&](auto& x)
           {

@@ -58,9 +58,9 @@ namespace system_contract
 
       status->total_accounts++;
       account_row account{
-          .num           = name,
-          .auth_contract = authContract,
-          .flags         = 0,
+          .num          = name,
+          .authContract = authContract,
+          .flags        = 0,
       };
       kv_put(status->key(), *status);
       kv_put(account.kv_map, account.key(), account);

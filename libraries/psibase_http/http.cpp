@@ -287,7 +287,7 @@ namespace psibase::http
             Action            action{
                            .sender   = AccountNumber(),
                            .contract = proxyContractNum,
-                           .raw_data = psio::convert_to_frac(data),
+                           .rawData  = psio::convert_to_frac(data),
             };
             transaction_trace   trace;
             transaction_context tc{bc, trx, trace, false};

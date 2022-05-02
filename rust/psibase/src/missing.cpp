@@ -18,19 +18,19 @@
 struct NewAccount
 {
    psibase::AccountNumber account;
-   psibase::AccountNumber auth_contract;
+   psibase::AccountNumber authContract;
    bool                   require_new;
 };
-PSIO_REFLECT(NewAccount, account, auth_contract, require_new)
+PSIO_REFLECT(NewAccount, account, authContract, require_new)
 
 struct SetCode
 {
    psibase::AccountNumber contract;
-   int8_t                 vm_type;
-   int8_t                 vm_version;
+   int8_t                 vmType;
+   int8_t                 vmVersion;
    std::vector<char>      code;
 };
-PSIO_REFLECT(SetCode, contract, vm_type, vm_version, code)
+PSIO_REFLECT(SetCode, contract, vmType, vmVersion, code)
 
 struct Startup
 {

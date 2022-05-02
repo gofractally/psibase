@@ -10,10 +10,10 @@ fn genesis_contract_json(
     Ok(format!(
         r#"{{
             "contract": {},
-            "auth_contract": {},
+            "authContract": {},
             "flags": {},
-            "vm_type": 0,
-            "vm_version": 0,
+            "vmType": 0,
+            "vmVersion": 0,
             "code": {}
         }}"#,
         serde_json::to_string(contract)?,

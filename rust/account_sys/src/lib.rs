@@ -34,7 +34,7 @@ mod example_impl {
         write_console(
             serde_json::to_string(&json!({
                 "name": name,
-                "auth_contract": auth_contract,
+                "authContract": auth_contract,
                 "allow_sudo": allow_sudo,
             }))
             .unwrap()

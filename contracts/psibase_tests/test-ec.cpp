@@ -39,9 +39,9 @@ TEST_CASE("ec")
    expect(t.push_transaction(t.make_transaction({{
               .sender   = alice,
               .contract = system_contract::auth_ec_sys::contract,
-              .raw_data = psio::convert_to_frac(
-                  system_contract::auth_ec_sys::action{system_contract::auth_ec_sys::set_key{
-                      .account = bob,
+              .rawData  = psio::convert_to_frac(
+                   system_contract::auth_ec_sys::action{system_contract::auth_ec_sys::set_key{
+                       .account = bob,
                   }}),
           }})),
           "wrong sender");
@@ -54,11 +54,11 @@ TEST_CASE("ec")
    auto ec_trx = t.make_transaction({{
        .sender   = sue,
        .contract = test_contract,
-       .raw_data = psio::convert_to_frac(test_cntr::payload{}),
+       .rawData  = psio::convert_to_frac(test_cntr::payload{}),
    }});
    ec_trx.claims.push_back({
        .contract = system_contract::verify_ec_sys::contract,
-       .raw_data = psio::convert_to_frac(pub_key1),
+       .rawData  = psio::convert_to_frac(pub_key1),
    });
    expect(t.push_transaction(ec_trx), "proofs and claims must have same size");
 
@@ -78,14 +78,14 @@ TEST_CASE("ec")
    expect(t.push_transaction(t.make_transaction({{
                                  .sender   = sue,
                                  .contract = test_contract,
-                                 .raw_data = psio::convert_to_frac(test_cntr::payload{}),
+                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
                              }}),
                              {{pub_key1, priv_key1}}));
 
    expect(t.push_transaction(t.make_transaction({{
                                  .sender   = sue,
                                  .contract = test_contract,
-                                 .raw_data = psio::convert_to_frac(test_cntr::payload{}),
+                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
                              }}),
                              {{pub_key2, priv_key2}}),
           "no matching claim found");
@@ -93,7 +93,7 @@ TEST_CASE("ec")
    expect(t.push_transaction(t.make_transaction({{
                                  .sender   = sue,
                                  .contract = test_contract,
-                                 .raw_data = psio::convert_to_frac(test_cntr::payload{}),
+                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
                              }}),
                              {{pub_key1, priv_key2}}),
           "incorrect signature", true);

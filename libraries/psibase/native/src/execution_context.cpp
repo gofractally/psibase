@@ -37,8 +37,8 @@ namespace psibase
    // Only useful for genesis
    void set_code(database&          db,
                  AccountNumber      contract,
-                 uint8_t            vm_type,
-                 uint8_t            vm_version,
+                 uint8_t            vmType,
+                 uint8_t            vmVersion,
                  psio::input_stream code)
    {
       check(code.remaining(), "native set_code can't clear code");
@@ -47,19 +47,18 @@ namespace psibase
       auto account = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
       check(account.has_value(), "set_code: unknown contract account");
       check(account->code_hash == Checksum256{}, "native set_code can't replace code");
-      account->code_hash  = code_hash;
-      account->vm_type    = vm_type;
-      account->vm_version = vm_version;
+      account->code_hash = code_hash;
+      account->vmType    = vmType;
+      account->vmVersion = vmVersion;
       db.kv_put(account_row::kv_map, account->key(), *account);
 
-      auto code_obj =
-          db.kv_get<code_row>(code_row::kv_map, code_key(code_hash, vm_type, vm_version));
+      auto code_obj = db.kv_get<code_row>(code_row::kv_map, code_key(code_hash, vmType, vmVersion));
       if (!code_obj)
       {
          code_obj.emplace();
-         code_obj->code_hash  = code_hash;
-         code_obj->vm_type    = vm_type;
-         code_obj->vm_version = vm_version;
+         code_obj->code_hash = code_hash;
+         code_obj->vmType    = vmType;
+         code_obj->vmVersion = vmVersion;
          code_obj->code.assign(code.pos, code.end);
       }
       ++code_obj->ref_count;
@@ -159,11 +158,11 @@ namespace psibase
          check(ca->code_hash != Checksum256{}, "account has no code");
          contract_account = std::move(*ca);
          auto code        = db.kv_get<code_row>(
-             code_row::kv_map, code_key(contract_account.code_hash, contract_account.vm_type,
-                                               contract_account.vm_version));
+             code_row::kv_map, code_key(contract_account.code_hash, contract_account.vmType,
+                                               contract_account.vmVersion));
          check(code.has_value(), "code record is missing");
-         check(code->vm_type == 0, "vm_type is not 0");
-         check(code->vm_version == 0, "vm_version is not 0");
+         check(code->vmType == 0, "vmType is not 0");
+         check(code->vmVersion == 0, "vmVersion is not 0");
          rethrow_vm_except(
              [&]
              {
@@ -382,7 +381,7 @@ namespace psibase
          if (++current_act_context->transaction_context.call_depth > 6)
             check(false, "call depth exceeded (temporary rule)");
 
-         // TODO: don't unpack raw_data
+         // TODO: don't unpack rawData
          check(psio::fracvalidate<Action>(data.data(), data.end()).valid_and_known(),
                "call: invalid data format");
          auto act = psio::convert_from_frac<Action>({data.data(), data.size()});
