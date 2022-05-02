@@ -33,7 +33,7 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
 {
    auto trace = push_transaction(make_transaction(  //
        {                                            //
-        action{
+        Action{
             .sender   = AccountNumber{"foo"},  // ignored
             .contract = AccountNumber{"bar"},  // ignored
             .method   = {},

@@ -124,7 +124,7 @@ namespace system_contract
          //       Otherwise, it may misunderstand the action, and worse,
          //       sender = 1, which provides transaction.sys's authorization
          //       for a potentially-unknown action.
-         psibase::action outer = {
+         psibase::Action outer = {
              .sender   = system_contract::transaction_sys::contract,
              .contract = account->auth_contract,
              // TODO: auth_contract will have to register action #

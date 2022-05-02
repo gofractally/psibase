@@ -312,7 +312,7 @@ void psibase::test_chain::fill_tapos(transaction& t, uint32_t expire_sec)
    memcpy(&t.tapos.ref_block_prefix, (char*)info.id.data() + 8, sizeof(t.tapos.ref_block_prefix));
 }
 
-psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&& actions)
+psibase::transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)
 {
    transaction t;
    fill_tapos(t);
@@ -354,7 +354,7 @@ psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&&
 }
 
 psibase::transaction_trace psibase::test_chain::transact(
-    std::vector<action>&&                                actions,
+    std::vector<Action>&&                                actions,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
     const char*                                          expected_except)
 {
@@ -363,7 +363,7 @@ psibase::transaction_trace psibase::test_chain::transact(
    return trace;
 }
 
-psibase::transaction_trace psibase::test_chain::transact(std::vector<action>&& actions,
+psibase::transaction_trace psibase::test_chain::transact(std::vector<Action>&& actions,
                                                          const char*           expected_except)
 {
    return transact(std::move(actions), {{default_pub_key, default_priv_key}}, expected_except);

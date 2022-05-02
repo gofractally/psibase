@@ -182,7 +182,7 @@ namespace psibase
       /*
        * Creates a transaction.
        */
-      transaction make_transaction(std::vector<action>&& actions = {});
+      transaction make_transaction(std::vector<Action>&& actions = {});
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
@@ -202,10 +202,10 @@ namespace psibase
        *
        * Validates the transaction status according to @ref eosio::expect.
        */
-      transaction_trace transact(std::vector<action>&&                                actions,
+      transaction_trace transact(std::vector<Action>&&                                actions,
                                  const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
                                  const char* expected_except = nullptr);
-      transaction_trace transact(std::vector<action>&& actions,
+      transaction_trace transact(std::vector<Action>&& actions,
                                  const char*           expected_except = nullptr);
 
       template <typename Action, typename... Args>

@@ -9,7 +9,7 @@ namespace psibase
    /**
  *  When an action is called it returns 
  *
- *  psibase::action {
+ *  psibase::Action {
  *    .sender,
  *    .contract,
  *    .raw_data = actionnum, packed_parameters
@@ -40,7 +40,7 @@ namespace psibase
 
    //#ifdef __wasm__
    template <typename T>
-   psio::shared_view_ptr<T> fraccall(const action& a)
+   psio::shared_view_ptr<T> fraccall(const Action& a)
    {
       auto packed_action = psio::convert_to_frac(a);  /// TODO: avoid double copy of action data
       auto result_size   = raw::call(packed_action.data(), packed_action.size());

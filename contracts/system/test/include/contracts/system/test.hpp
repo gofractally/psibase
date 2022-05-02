@@ -59,7 +59,7 @@ namespace psibase
               t.push_transaction(      //
                   t.make_transaction(  //
                       {
-                          action{
+                          Action{
                               .sender   = AccountNumber{"foo"},  // ignored
                               .contract = AccountNumber{"bar"},  // ignored
                               .method   = {},

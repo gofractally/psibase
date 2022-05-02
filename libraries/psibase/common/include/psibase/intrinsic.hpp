@@ -128,7 +128,7 @@ namespace psibase
    std::vector<char> call(psio::input_stream action);
 
    // Call a contract and return its result
-   std::vector<char> call(const action& action);
+   std::vector<char> call(const Action& action);
 
    // Set the return value of the currently-executing action
    template <typename T>

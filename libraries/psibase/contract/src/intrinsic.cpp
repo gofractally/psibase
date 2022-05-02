@@ -33,7 +33,7 @@ namespace psibase
    Action get_current_action()
    {
       auto data = get_result(raw::get_current_action());
-      return psio::convert_from_frac<action>(data);
+      return psio::convert_from_frac<Action>(data);
    }
 
    psio::shared_view_ptr<Action> get_current_action_view()
@@ -54,7 +54,7 @@ namespace psibase
       return get_result(raw::call(action.pos, action.remaining()));
    }
 
-   std::vector<char> call(const action& action)
+   std::vector<char> call(const Action& action)
    {
       return call(psio::convert_to_frac(action));
    }

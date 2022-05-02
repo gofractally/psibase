@@ -16,7 +16,7 @@ namespace psibase
          session = block_context.db.start_write();
    }
 
-   static void exec_genesis_action(transaction_context& self, const action& act);
+   static void exec_genesis_action(transaction_context& self, const Action& action);
    static void exec_process_transaction(transaction_context& self);
    static void exec_verify_proofs(transaction_context& self);
 
@@ -45,17 +45,17 @@ namespace psibase
       block_context.system_context.set_num_memories(status.num_execution_memories);
    }
 
-   static void exec_genesis_action(transaction_context& self, const action& act)
+   static void exec_genesis_action(transaction_context& self, const Action& action)
    {
-      auto& atrace = self.transaction_trace.action_traces.emplace_back();
-      atrace.act   = act;
+      auto& atrace  = self.transaction_trace.action_traces.emplace_back();
+      atrace.action = action;
       try
       {
          auto& db = self.block_context.db;
-         //auto  data = unpack_all<genesis_action_data>({act.raw_data.data(), act.raw_data.size()},
+         //auto  data = unpack_all<genesis_action_data>({action.raw_data.data(), action.raw_data.size()},
          //"extra data in genesis payload");
          auto data = psio::convert_from_frac<genesis_action_data>(
-             {act.raw_data.data(), act.raw_data.size()});
+             {action.raw_data.data(), action.raw_data.size()});
          for (auto& contract : data.contracts)
          {
             check(contract.contract.value, "account 0 is reserved");
@@ -82,14 +82,14 @@ namespace psibase
    {
       /// TODO: move this to a common header
       static constexpr AccountNumber trxsys = AccountNumber("transact-sys");
-      action                         act{
+      Action                         action{
                                   .sender   = AccountNumber(),
                                   .contract = trxsys,
                                   .raw_data = psio::convert_to_frac(self.trx.trx),
       };
-      auto& atrace      = self.transaction_trace.action_traces.emplace_back();
-      atrace.act        = act;  // TODO: avoid copy and redundancy between act and atrace.act
-      action_context ac = {self, act, self.transaction_trace.action_traces.back()};
+      auto& atrace  = self.transaction_trace.action_traces.emplace_back();
+      atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
+      action_context ac = {self, action, self.transaction_trace.action_traces.back()};
       auto&          ec = self.get_execution_context(trxsys);
       ec.exec_process_transaction(ac);
    }
@@ -115,38 +115,38 @@ namespace psibase
              .claim            = claim,
              .proof            = proof,
          };
-         action act{
+         Action action{
              .sender   = {},
              .contract = claim.contract,
              .raw_data = psio::convert_to_frac(data),
          };
          auto& atrace      = self.transaction_trace.action_traces.emplace_back();
-         atrace.act        = act;
-         action_context ac = {self, act, atrace};
+         atrace.action     = action;
+         action_context ac = {self, action, atrace};
          auto&          ec = self.get_execution_context(claim.contract);
          ec.exec_verify(ac);
       }
    }
 
    void transaction_context::exec_called_action(uint64_t      caller_flags,
-                                                const action& act,
+                                                const Action& action,
                                                 action_trace& atrace)
    {
-      atrace.act        = act;
-      action_context ac = {*this, act, atrace};
-      auto&          ec = get_execution_context(act.contract);
+      atrace.action     = action;
+      action_context ac = {*this, action, atrace};
+      auto&          ec = get_execution_context(action.contract);
       ec.exec_called(caller_flags, ac);
    }
 
-   void transaction_context::exec_rpc(const action& act, action_trace& atrace)
+   void transaction_context::exec_rpc(const Action& action, action_trace& atrace)
    {
       auto& db     = block_context.db;
       auto  status = db.kv_get_or_default<status_row>(status_row::kv_map, status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
 
-      atrace.act        = act;
-      action_context ac = {*this, act, atrace};
-      auto&          ec = get_execution_context(act.contract);
+      atrace.action     = action;
+      action_context ac = {*this, action, atrace};
+      auto&          ec = get_execution_context(action.contract);
       ec.exec_rpc(ac);
    }
 

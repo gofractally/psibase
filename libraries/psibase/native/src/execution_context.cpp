@@ -383,9 +383,9 @@ namespace psibase
             check(false, "call depth exceeded (temporary rule)");
 
          // TODO: don't unpack raw_data
-         check(psio::fracvalidate<action>(data.data(), data.end()).valid_and_known(),
+         check(psio::fracvalidate<Action>(data.data(), data.end()).valid_and_known(),
                "call: invalid data format");
-         auto act = psio::convert_from_frac<action>({data.data(), data.size()});
+         auto act = psio::convert_from_frac<Action>({data.data(), data.size()});
          check(act.sender == contract_account.num ||
                    (contract_account.flags & account_row::allow_sudo),
                "contract is not authorized to call as another sender");

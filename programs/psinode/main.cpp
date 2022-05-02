@@ -53,7 +53,7 @@ void bootstrap_chain(system_context& system)
       bc.push_transaction(t);
    };
 
-   auto push_action = [&](auto& bc, action a)
+   auto push_action = [&](auto& bc, Action a)
    {
       signed_transaction t;
       t.trx.tapos.expiration.seconds = bc.current.header.time.seconds + 1;

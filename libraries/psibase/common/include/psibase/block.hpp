@@ -7,9 +7,7 @@
 
 namespace psibase
 {
-   using String    = std::string;
-   using BlockNum  = uint32_t;
-   using block_num = BlockNum;
+   using BlockNum = uint32_t;
 
    struct Action
    {
@@ -18,7 +16,6 @@ namespace psibase
       MethodNumber      method;
       std::vector<char> raw_data;
    };
-   using action = Action;
    PSIO_REFLECT(Action, sender, contract, method, raw_data)
 
    struct genesis_contract
@@ -102,7 +99,7 @@ namespace psibase
    struct BlockHeader
    {
       Checksum256  previous = {};
-      block_num    num      = 0;  // TODO: pack into previous instead?
+      BlockNum     num      = 0;  // TODO: pack into previous instead?
       TimePointSec time;          // TODO: switch to microseconds
    };
    PSIO_REFLECT(BlockHeader, previous, num, time)

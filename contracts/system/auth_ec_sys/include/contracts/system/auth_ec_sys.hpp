@@ -9,7 +9,7 @@ namespace system_contract::auth_ec_sys
 
    struct auth_check
    {
-      psibase::action             action;
+      psibase::Action             action;
       std::vector<psibase::Claim> claims;
    };
    PSIO_REFLECT(auth_check, action, claims)
@@ -37,7 +37,7 @@ namespace system_contract::auth_ec_sys
    template <typename T, typename R = typename T::return_type>
    R call(psibase::AccountNumber sender, T args)
    {
-      auto result = psibase::call(psibase::action{
+      auto result = psibase::call(psibase::Action{
           .sender   = sender,
           .contract = contract,
           .raw_data = psio::convert_to_frac(action{std::move(args)}),

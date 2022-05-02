@@ -284,7 +284,7 @@ namespace psibase::http
                return send(error(bhttp::status::internal_server_error,
                                  "Need genesis block; use 'psibase boot' to boot chain"));
             signed_transaction trx;
-            action             act{
+            Action             action{
                             .sender   = AccountNumber(),
                             .contract = proxyContractNum,
                             .raw_data = psio::convert_to_frac(data),
@@ -292,7 +292,7 @@ namespace psibase::http
             transaction_trace   trace;
             transaction_context tc{bc, trx, trace, false};
             action_trace        atrace;
-            tc.exec_rpc(act, atrace);
+            tc.exec_rpc(action, atrace);
             // TODO: option to print this
             // printf("%s\n", pretty_trace(atrace).c_str());
             auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.raw_retval);

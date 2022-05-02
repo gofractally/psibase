@@ -9,12 +9,12 @@ namespace psibase
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct action_trace
    {
-      action                     act;
+      Action                     action;
       std::vector<char>          raw_retval;  // TODO: Move to receipt?
       std::vector<inner_trace>   inner_traces;
       std::optional<std::string> error;
    };
-   PSIO_REFLECT(action_trace, act, raw_retval, inner_traces, error)
+   PSIO_REFLECT(action_trace, action, raw_retval, inner_traces, error)
 
    // TODO: need event definitions in ABI
    struct event_trace
