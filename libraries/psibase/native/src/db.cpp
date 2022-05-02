@@ -243,9 +243,9 @@ namespace psibase
       return psio::input_stream{(const char*)v.data(), v.size()};
    }
 
-   std::optional<database::kv_result> database::kv_greater_equal_raw(kv_map             map,
-                                                                     psio::input_stream key,
-                                                                     size_t match_key_size)
+   std::optional<database::kv_result> database::kvGreaterEqualRaw(kv_map             map,
+                                                                  psio::input_stream key,
+                                                                  size_t             match_key_size)
    {
       mdbx::slice k{key.pos, key.remaining()};
       impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
@@ -260,9 +260,9 @@ namespace psibase
       };
    }
 
-   std::optional<database::kv_result> database::kv_less_than_raw(kv_map             map,
-                                                                 psio::input_stream key,
-                                                                 size_t             match_key_size)
+   std::optional<database::kv_result> database::kvLessThanRaw(kv_map             map,
+                                                              psio::input_stream key,
+                                                              size_t             match_key_size)
    {
       mdbx::slice k{key.pos, key.remaining()};
       impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
@@ -281,7 +281,7 @@ namespace psibase
       };
    }
 
-   std::optional<database::kv_result> database::kv_max_raw(kv_map map, psio::input_stream key)
+   std::optional<database::kv_result> database::kvMaxRaw(kv_map map, psio::input_stream key)
    {
       std::vector<unsigned char> next(reinterpret_cast<const unsigned char*>(key.pos),
                                       reinterpret_cast<const unsigned char*>(key.end));

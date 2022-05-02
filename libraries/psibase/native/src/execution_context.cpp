@@ -479,7 +479,7 @@ namespace psibase
             check(match_key_size >= sizeof(AccountNumber::value),
                   "match_key_size is smaller than 8 bytes");
          return set_result(
-             db.kv_greater_equal_raw(get_map_read(map), {key.data(), key.size()}, match_key_size));
+             db.kvGreaterEqualRaw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
 
       // TODO: don't let timer abort db operation
@@ -490,7 +490,7 @@ namespace psibase
             check(match_key_size >= sizeof(AccountNumber::value),
                   "match_key_size is smaller than 8 bytes");
          return set_result(
-             db.kv_less_than_raw(get_map_read(map), {key.data(), key.size()}, match_key_size));
+             db.kvLessThanRaw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
 
       // TODO: don't let timer abort db operation
@@ -498,7 +498,7 @@ namespace psibase
       {
          if (key_has_contract_prefix(map))
             check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
-         return set_result(db.kv_max_raw(get_map_read(map), {key.data(), key.size()}));
+         return set_result(db.kvMaxRaw(get_map_read(map), {key.data(), key.size()}));
       }
    };  // execution_context_impl
 

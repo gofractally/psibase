@@ -84,13 +84,13 @@ namespace psibase
       void kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value);
       void kvRemoveRaw(kv_map map, psio::input_stream key);
       std::optional<psio::input_stream> kvGetRaw(kv_map map, psio::input_stream key);
-      std::optional<kv_result>          kv_greater_equal_raw(kv_map             map,
-                                                             psio::input_stream key,
-                                                             size_t             match_key_size);
-      std::optional<kv_result>          kv_less_than_raw(kv_map             map,
-                                                         psio::input_stream key,
-                                                         size_t             match_key_size);
-      std::optional<kv_result>          kv_max_raw(kv_map map, psio::input_stream key);
+      std::optional<kv_result>          kvGreaterEqualRaw(kv_map             map,
+                                                          psio::input_stream key,
+                                                          size_t             match_key_size);
+      std::optional<kv_result>          kvLessThanRaw(kv_map             map,
+                                                      psio::input_stream key,
+                                                      size_t             match_key_size);
+      std::optional<kv_result>          kvMaxRaw(kv_map map, psio::input_stream key);
 
       template <typename K, typename V>
       auto kvPut(kv_map map, const K& key, const V& value)

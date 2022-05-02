@@ -116,9 +116,9 @@ void test(AccountNumber this_contract)
          printf("    0x%02x ", item.value);
          fflush(stdout);
       }
-      run(4, item.lt4, key, kv_less_than_raw);
-      run(5, item.lt5, key, kv_less_than_raw);
-      run(6, item.lt6, key, kv_less_than_raw);
+      run(4, item.lt4, key, kvLessThanRaw);
+      run(5, item.lt5, key, kvLessThanRaw);
+      run(6, item.lt6, key, kvLessThanRaw);
       if (enable_print)
          print("\n");
    }  // kvLessThan
@@ -133,9 +133,9 @@ void test(AccountNumber this_contract)
          printf("    0x%02x ", item.value);
          fflush(stdout);
       }
-      run(4, item.ge4, key, kv_greater_equal_raw);
-      run(5, item.ge5, key, kv_greater_equal_raw);
-      run(6, item.ge6, key, kv_greater_equal_raw);
+      run(4, item.ge4, key, kvGreaterEqualRaw);
+      run(5, item.ge5, key, kvGreaterEqualRaw);
+      run(6, item.ge6, key, kvGreaterEqualRaw);
       if (enable_print)
          print("\n");
    }  // kvGreaterEqual
@@ -151,7 +151,7 @@ void test(AccountNumber this_contract)
          fflush(stdout);
       }
       run(0, item.max, key,
-          [](kv_map map, psio::input_stream key, size_t) { return kv_max_raw(map, key); });
+          [](kv_map map, psio::input_stream key, size_t) { return kvMaxRaw(map, key); });
       if (enable_print)
          print("\n");
    }  // kvMax

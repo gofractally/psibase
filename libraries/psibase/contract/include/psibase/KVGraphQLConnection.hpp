@@ -70,7 +70,7 @@ namespace psibase
          // eosio::print("upperBound ", key, "\n");
          auto k = psio::convert_to_key(key);
          k.push_back(0);
-         if (auto v = kv_greater_equal_raw(map, k, keyPrefixSize))
+         if (auto v = kvGreaterEqualRaw(map, k, keyPrefixSize))
             return toIter(psio::convert_from_frac<Value>(*v));
          else
             return {};
@@ -96,7 +96,7 @@ namespace psibase
             key = psio::convert_to_key(maxKey);
             key.push_back(0);
          }
-         if (auto b = kv_less_than_raw(map, key, keyPrefixSize))
+         if (auto b = kvLessThanRaw(map, key, keyPrefixSize))
          {
             it = toIter(psio::convert_from_frac<Value>(*b));
          }

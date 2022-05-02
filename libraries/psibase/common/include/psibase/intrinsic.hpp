@@ -327,9 +327,9 @@ namespace psibase
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first match_key_size bytes of the found key matches the provided key, then
    // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kv_greater_equal_raw(kv_map             map,
-                                                                psio::input_stream key,
-                                                                uint32_t           match_key_size)
+   inline std::optional<std::vector<char>> kvGreaterEqualRaw(kv_map             map,
+                                                             psio::input_stream key,
+                                                             uint32_t           match_key_size)
    {
       auto size = raw::kvGreaterEqual(map, key.pos, key.remaining(), match_key_size);
       if (size == -1)
@@ -343,7 +343,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGreaterEqual(kv_map map, const K& key, uint32_t match_key_size)
    {
-      auto v = kv_greater_equal_raw(map, psio::convert_to_key(key), match_key_size);
+      auto v = kvGreaterEqualRaw(map, psio::convert_to_key(key), match_key_size);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -362,9 +362,9 @@ namespace psibase
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // match_key_size bytes of the found key matches the provided key, then returns the value.
    // Also sets key (use getKey). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kv_less_than_raw(kv_map             map,
-                                                            psio::input_stream key,
-                                                            uint32_t           match_key_size)
+   inline std::optional<std::vector<char>> kvLessThanRaw(kv_map             map,
+                                                         psio::input_stream key,
+                                                         uint32_t           match_key_size)
    {
       auto size = raw::kvLessThan(map, key.pos, key.remaining(), match_key_size);
       if (size == -1)
@@ -378,7 +378,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvLessThan(kv_map map, const K& key, uint32_t match_key_size)
    {
-      auto v = kv_less_than_raw(map, psio::convert_to_key(key), match_key_size);
+      auto v = kvLessThanRaw(map, psio::convert_to_key(key), match_key_size);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -396,7 +396,7 @@ namespace psibase
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
    // value. Also sets key (use getKey). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kv_max_raw(kv_map map, psio::input_stream key)
+   inline std::optional<std::vector<char>> kvMaxRaw(kv_map map, psio::input_stream key)
    {
       auto size = raw::kvMax(map, key.pos, key.remaining());
       if (size == -1)
@@ -409,7 +409,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvMax(kv_map map, const K& key)
    {
-      auto v = kv_max_raw(map, psio::convert_to_key(key));
+      auto v = kvMaxRaw(map, psio::convert_to_key(key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)

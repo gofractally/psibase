@@ -60,7 +60,7 @@ namespace system_contract
             auto                     keySize = sizeof(account_table);
             while (true)
             {
-               auto raw = kv_greater_equal_raw(account_row::kv_map, key, keySize);
+               auto raw = kvGreaterEqualRaw(account_row::kv_map, key, keySize);
                if (!raw)
                   break;
                auto acc = psio::convert_from_frac<account_row>(*raw);
