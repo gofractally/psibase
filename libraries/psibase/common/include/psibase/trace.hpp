@@ -4,14 +4,14 @@
 
 namespace psibase
 {
-   struct inner_trace;
+   struct InnerTrace;
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct ActionTrace
    {
       Action                     action;
       std::vector<char>          rawRetval;  // TODO: Move to receipt?
-      std::vector<inner_trace>   innerTraces;
+      std::vector<InnerTrace>    innerTraces;
       std::optional<std::string> error;
    };
    PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, error)
@@ -30,11 +30,11 @@ namespace psibase
    };
    PSIO_REFLECT(ConsoleTrace, console)
 
-   struct inner_trace
+   struct InnerTrace
    {
       std::variant<ConsoleTrace, EventTrace, ActionTrace> inner;
    };
-   PSIO_REFLECT(inner_trace, inner)
+   PSIO_REFLECT(InnerTrace, inner)
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct TransactionTrace
@@ -44,16 +44,16 @@ namespace psibase
    };
    PSIO_REFLECT(TransactionTrace, actionTraces, error)
 
-   void             trim_raw_data(ActionTrace& t, size_t max = 32);
-   TransactionTrace trim_raw_data(TransactionTrace t, size_t max = 32);
+   void             trimRawData(ActionTrace& t, size_t max = 32);
+   TransactionTrace trimRawData(TransactionTrace t, size_t max = 32);
 
-   void pretty_trace(std::string& dest, const std::string& s, const std::string& indent = "");
-   void pretty_trace(std::string& dest, const ConsoleTrace& t, const std::string& indent = "");
-   void pretty_trace(std::string& dest, const EventTrace& t, const std::string& indent = "");
-   void pretty_trace(std::string& dest, const ActionTrace& atrace, const std::string& indent = "");
-   void pretty_trace(std::string&            dest,
-                     const TransactionTrace& ttrace,
-                     const std::string&      indent = "");
-   std::string pretty_trace(const ActionTrace& atrace, const std::string& indent = "");
-   std::string pretty_trace(const TransactionTrace& ttrace, const std::string& indent = "");
+   void prettyTrace(std::string& dest, const std::string& s, const std::string& indent = "");
+   void prettyTrace(std::string& dest, const ConsoleTrace& t, const std::string& indent = "");
+   void prettyTrace(std::string& dest, const EventTrace& t, const std::string& indent = "");
+   void prettyTrace(std::string& dest, const ActionTrace& atrace, const std::string& indent = "");
+   void prettyTrace(std::string&            dest,
+                    const TransactionTrace& ttrace,
+                    const std::string&      indent = "");
+   std::string prettyTrace(const ActionTrace& atrace, const std::string& indent = "");
+   std::string prettyTrace(const TransactionTrace& ttrace, const std::string& indent = "");
 }  // namespace psibase

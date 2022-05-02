@@ -294,7 +294,7 @@ namespace psibase::http
             ActionTrace         atrace;
             tc.exec_rpc(action, atrace);
             // TODO: option to print this
-            // printf("%s\n", pretty_trace(atrace).c_str());
+            // printf("%s\n", prettyTrace(atrace).c_str());
             auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.rawRetval);
             if (!result)
                return send(

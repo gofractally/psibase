@@ -165,7 +165,7 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    std::string error = t.error ? *t.error : "";
    bool bad = (expected.empty() && !error.empty()) || error.find(expected) == std::string::npos;
    if (bad || always_show)
-      std::cout << pretty_trace(trim_raw_data(std::move(t))) << "\n";
+      std::cout << prettyTrace(trimRawData(std::move(t))) << "\n";
    if (bad)
    {
       if (expected.empty())
