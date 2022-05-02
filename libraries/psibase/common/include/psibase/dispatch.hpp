@@ -67,7 +67,7 @@ namespace psibase
                  });  // param_view::call
           });         // reflect::get
       if (!called)
-         abort_message_str("unknown contract action: " + act->method()->get().str());
+         abortMessage("unknown contract action: " + act->method()->get().str());
       // psio::member_proxy
    }  // dispatch
 

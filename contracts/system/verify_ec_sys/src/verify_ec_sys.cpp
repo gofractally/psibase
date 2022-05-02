@@ -55,7 +55,7 @@ extern "C" [[clang::export_name("verify")]] void verify()
 
 extern "C" void called(AccountNumber this_contract, AccountNumber sender)
 {
-   abort_message_str("this contract has no actions");
+   abortMessage("this contract has no actions");
 }
 
 // Caution! Don't replace with version in dispatcher!

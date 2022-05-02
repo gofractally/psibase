@@ -63,7 +63,7 @@ namespace psibase
       auto contract = AccountNumber(contractName);
       auto reg      = kv_get<RegisteredContractRow>(registeredContractKey(act.contract, contract));
       if (!reg)
-         abort_message_str("contract not registered: " + contract.str());
+         abortMessage("contract not registered: " + contract.str());
 
       // TODO: avoid repacking (both directions)
       psibase::actor<ServerInterface> iface(act.contract, reg->rpcContract);

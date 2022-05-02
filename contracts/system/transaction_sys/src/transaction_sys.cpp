@@ -112,7 +112,7 @@ namespace system_contract
       {
          auto account = kv_get<account_row>(account_row::kv_map, account_key(act.sender));
          if (!account)
-            abort_message_str("unknown sender \"" + act.sender.str() + "\"");
+            abortMessage("unknown sender \"" + act.sender.str() + "\"");
 
          // actor<system_contract::auth_fake_sys> auth(system_contract::transaction_sys::contract,
          //                                            account->authContract);

@@ -20,7 +20,7 @@ namespace psio
 #ifdef __cpp_exceptions
       throw std::runtime_error((std::string)error_to_str(msg));
 #else
-      psibase::abort_message_str(error_to_str(msg));
+      psibase::abortMessage(error_to_str(msg));
 #endif
    }
 

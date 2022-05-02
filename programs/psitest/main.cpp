@@ -323,16 +323,10 @@ struct callbacks
       throw std::runtime_error("called eosio_exit");
    }
 
-   void abort_message(span<const char> msg)
+   void abortMessage(span<const char> msg)
    {
       backtrace();
       throw ::assert_exception(span_str(msg));
-   }
-
-   void eosio_assert_message(bool condition, span<const char> msg)
-   {
-      if (!condition)
-         abort_message(msg);
    }
 
    void prints_l(span<const char> str) { std::cout.write(str.data(), str.size()); }
@@ -688,8 +682,7 @@ void register_callbacks()
 {
    rhf_t::add<&callbacks::tester_abort>("env", "tester_abort");
    rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");
-   rhf_t::add<&callbacks::abort_message>("env", "abort_message");
-   rhf_t::add<&callbacks::eosio_assert_message>("env", "eosio_assert_message");
+   rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
    rhf_t::add<&callbacks::prints_l>("env", "prints_l");
    rhf_t::add<&callbacks::tester_get_arg_counts>("env", "tester_get_arg_counts");
    rhf_t::add<&callbacks::tester_get_args>("env", "tester_get_args");

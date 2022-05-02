@@ -51,7 +51,7 @@ namespace system_contract
       if (exists(name))
       {
          if (requireNew)
-            abort_message_str("account already exists");
+            abortMessage("account already exists");
          return;
       }
       check(exists(authContract), "unknown auth contract");

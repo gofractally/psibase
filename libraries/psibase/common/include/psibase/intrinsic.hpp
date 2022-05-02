@@ -18,7 +18,7 @@ namespace psibase
    using EventNumber = uint64_t;
 
    // These use mangled names instead of extern "C" to prevent collisions
-   // with other libraries. e.g. libc++'s abort_message
+   // with other libraries.
    namespace raw
    {
       // Intrinsics which return data do it by storing it in a result buffer.

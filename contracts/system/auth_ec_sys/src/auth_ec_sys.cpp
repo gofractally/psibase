@@ -39,7 +39,7 @@ namespace system_contract::auth_ec_sys
       for (auto& claim : args.claims)
          if (claim.contract == verify_ec_sys::contract && claim.rawData == expected)
             return;
-      abort_message_str("no matching claim found");
+      abortMessage("no matching claim found");
    }
 
    void exec(AccountNumber this_contract, AccountNumber sender, set_key& args)

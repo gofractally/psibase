@@ -13,20 +13,19 @@
 namespace psibase
 {
    // These use mangled names instead of extern "C" to prevent collisions
-   // with other libraries. e.g. libc++'s abort_message
+   // with other libraries.
    namespace raw
    {
       // Abort with message. Message should be UTF8.
-      PSIBASE_INTRINSIC(abort_message)
-      [[noreturn]] void abort_message(const char* message, uint32_t len);
+      PSIBASE_INTRINSIC(abortMessage)
+      [[noreturn]] void abortMessage(const char* message, uint32_t len);
    }  // namespace raw
 
    // Abort with message. Message should be UTF8.
-   // TODO: rename back to abort_message after fixing build issues
-   [[noreturn]] inline void abort_message_str(std::string_view message)
+   [[noreturn]] inline void abortMessage(std::string_view message)
    {
 #ifdef COMPILING_WASM
-      raw::abort_message(message.data(), message.size());
+      raw::abortMessage(message.data(), message.size());
 #else
       throw std::runtime_error((std::string)message);
 #endif
@@ -36,7 +35,7 @@ namespace psibase
    inline void check(bool cond, std::string_view message)
    {
       if (!cond)
-         abort_message_str(message);
+         abortMessage(message);
    }
 }  // namespace psibase
 

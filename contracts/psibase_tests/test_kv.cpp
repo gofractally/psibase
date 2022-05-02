@@ -92,7 +92,7 @@ void test(AccountNumber this_contract)
       {
          if (enable_print)
             printf("0x%02x\n", val);
-         abort_message_str("mismatched result");
+         abortMessage("mismatched result");
       }
       bool found = false;
       for (auto& item : items)

@@ -51,8 +51,8 @@ namespace psibase
                        [&](std::string_view k)
                        {
                           if (!fracpackActionFromJsonImpl<0>(stream, k, meta, params))
-                             abort_message_str("action '" + std::string(name) +
-                                               "' does not have argument '" + std::string(k) + "'");
+                             abortMessage("action '" + std::string(name) +
+                                          "' does not have argument '" + std::string(k) + "'");
                        });
                    result = psio::convert_to_frac(params);
                 }

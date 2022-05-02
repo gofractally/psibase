@@ -364,7 +364,7 @@ namespace psibase
          clear_result();
       }
 
-      void abort_message(span<const char> str)
+      void abortMessage(span<const char> str)
       {
          throw std::runtime_error("contract '" + contract_account.num.str() +
                                   "' aborted with message: " + std::string(str.data(), str.size()));
@@ -520,7 +520,7 @@ namespace psibase
       rhf_t::add<&execution_context_impl::get_result>("env", "get_result");
       rhf_t::add<&execution_context_impl::get_key>("env", "get_key");
       rhf_t::add<&execution_context_impl::write_console>("env", "write_console");
-      rhf_t::add<&execution_context_impl::abort_message>("env", "abort_message");
+      rhf_t::add<&execution_context_impl::abortMessage>("env", "abortMessage");
       rhf_t::add<&execution_context_impl::get_current_action>("env", "get_current_action");
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::set_retval>("env", "set_retval");
