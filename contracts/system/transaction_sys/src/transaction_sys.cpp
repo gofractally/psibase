@@ -92,7 +92,7 @@ namespace system_contract
          print("process_transaction\n");
 
       // TODO: expiration
-      // TODO: check ref_block_num, ref_block_prefix
+      // TODO: check refBlockNum, refBlockPrefix
       // TODO: check max_net_usage_words, max_cpu_usage_ms
       // TODO: resource billing
       // TODO: subjective mitigation hooks

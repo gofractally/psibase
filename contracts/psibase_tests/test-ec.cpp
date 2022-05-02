@@ -65,9 +65,9 @@ TEST_CASE("ec")
    auto packed_ec_trx = psio::convert_to_frac(ec_trx);
 
    SignedTransaction ec_signed = {
-       .trx    = ec_trx,
-       .proofs = {psio::convert_to_frac(
-           sign(priv_key2, sha256(packed_ec_trx.data(), packed_ec_trx.size())))},
+       .transaction = ec_trx,
+       .proofs      = {psio::convert_to_frac(
+                sign(priv_key2, sha256(packed_ec_trx.data(), packed_ec_trx.size())))},
    };
    expect(t.push_transaction(ec_signed), "incorrect signature");
 

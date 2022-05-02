@@ -29,8 +29,9 @@ namespace psibase
 
       if (block_context.need_genesis_action)
       {
-         check(trx.trx.actions.size() == 1, "genesis transaction must have exactly 1 action");
-         exec_genesis_action(*this, trx.trx.actions[0]);
+         check(trx.transaction.actions.size() == 1,
+               "genesis transaction must have exactly 1 action");
+         exec_genesis_action(*this, trx.transaction.actions[0]);
          block_context.need_genesis_action = false;
       }
       else
@@ -84,7 +85,7 @@ namespace psibase
       Action                         action{
                                   .sender   = AccountNumber(),
                                   .contract = trxsys,
-                                  .rawData  = psio::convert_to_frac(self.trx.trx),
+                                  .rawData  = psio::convert_to_frac(self.trx.transaction),
       };
       auto& atrace  = self.transaction_trace.action_traces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
@@ -100,14 +101,14 @@ namespace psibase
    // TODO: time limit
    static void exec_verify_proofs(transaction_context& self)
    {
-      check(self.trx.proofs.size() == self.trx.trx.claims.size(),
+      check(self.trx.proofs.size() == self.trx.transaction.claims.size(),
             "proofs and claims must have same size");
       // TODO: don't pack trx twice
-      auto packed_trx = psio::convert_to_frac(self.trx.trx);
+      auto packed_trx = psio::convert_to_frac(self.trx.transaction);
       auto id         = sha256(packed_trx.data(), packed_trx.size());
       for (size_t i = 0; i < self.trx.proofs.size(); ++i)
       {
-         auto&       claim = self.trx.trx.claims[i];
+         auto&       claim = self.trx.transaction.claims[i];
          auto&       proof = self.trx.proofs[i];
          verify_data data{
              .transaction_hash = id,

@@ -42,7 +42,7 @@ async function newAccount() {
         const signedTrx = {
             // TODO: TAPOS
             // TODO: Sign
-            trx: {
+            transaction: {
                 tapos: {
                     expiration: new Date(Date.now() + 10_000),
                 },

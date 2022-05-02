@@ -158,7 +158,7 @@ fn transaction_json(expiration: &str, actions: &[String]) -> Result<String, anyh
 fn signed_transaction_json(trx: &str) -> Result<String, anyhow::Error> {
     Ok(format!(
         r#"{{
-            "trx": {}
+            "transaction": {}
         }}"#,
         trx
     ))

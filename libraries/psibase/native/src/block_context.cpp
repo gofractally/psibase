@@ -143,7 +143,7 @@ namespace psibase
          if (commit)
          {
             // TODO: limit billed time in block
-            check(!(trx.trx.tapos.flags & Tapos::do_not_broadcast),
+            check(!(trx.transaction.tapos.flags & Tapos::do_not_broadcast),
                   "cannot commit a do_not_broadcast transaction");
             t.session.commit();
             active = true;

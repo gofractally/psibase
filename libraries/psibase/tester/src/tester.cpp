@@ -308,8 +308,8 @@ void psibase::test_chain::fill_tapos(Transaction& t, uint32_t expire_sec)
 {
    auto& info                 = get_head_block_info();
    t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
-   t.tapos.ref_block_num      = info.header.num;
-   memcpy(&t.tapos.ref_block_prefix, (char*)info.id.data() + 8, sizeof(t.tapos.ref_block_prefix));
+   t.tapos.refBlockNum        = info.header.num;
+   memcpy(&t.tapos.refBlockPrefix, (char*)info.id.data() + 8, sizeof(t.tapos.refBlockPrefix));
 }
 
 psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)
@@ -339,14 +339,14 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
    SignedTransaction signed_trx;
-   signed_trx.trx = trx;
+   signed_trx.transaction = trx;
    for (auto& [pub, priv] : keys)
-      signed_trx.trx.claims.push_back({
+      signed_trx.transaction.claims.push_back({
           .contract = system_contract::verify_ec_sys::contract,
           .rawData  = psio::convert_to_frac(pub),
       });
    // TODO: don't pack twice
-   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx.trx);
+   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx.transaction);
    auto              hash       = sha256(packed_trx.data(), packed_trx.size());
    for (auto& [pub, priv] : keys)
       signed_trx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));

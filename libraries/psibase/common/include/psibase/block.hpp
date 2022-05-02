@@ -63,11 +63,11 @@ namespace psibase
       static constexpr uint16_t do_not_broadcast = 1u << 0;
 
       TimePointSec expiration;
-      uint16_t     flags            = 0;
-      uint32_t     ref_block_prefix = 0;
-      uint16_t     ref_block_num    = 0;
+      uint16_t     flags          = 0;
+      uint32_t     refBlockPrefix = 0;
+      uint16_t     refBlockNum    = 0;
    };
-   PSIO_REFLECT(Tapos, expiration, flags, ref_block_prefix, ref_block_num)
+   PSIO_REFLECT(Tapos, expiration, flags, refBlockPrefix, refBlockNum)
 
    // TODO: separate native-defined fields from contract-defined fields
    struct Transaction
@@ -83,12 +83,12 @@ namespace psibase
    //       e.g. complication: there are at least 2 different header formats for gzip.
    struct SignedTransaction
    {
-      Transaction trx;
+      Transaction transaction;
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
    };
-   PSIO_REFLECT(SignedTransaction, trx, proofs)
+   PSIO_REFLECT(SignedTransaction, transaction, proofs)
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Producer & Rotation

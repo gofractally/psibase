@@ -8,17 +8,17 @@ const html = htm.bind(React.createElement);
 const contract = await getJson('/common/thiscontract');
 const actionTemplates = await getJson('/action_templates');
 
-async function pushTransaction(trx, addMsg, clearMsg) {
+async function pushTransaction(transaction, addMsg, clearMsg) {
     try {
         clearMsg();
-        for (let action of trx.actions) {
+        for (let action of transaction.actions) {
             console.log(action);
             addMsg(`packing ${action.method}...`);
             action.rawData = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
                 '/pack_action/' + action.method, action.data)));
             addMsg('rawData: ' + action.rawData);
         }
-        const trace = await pushedSignedTransaction({ trx });
+        const trace = await pushedSignedTransaction({ transaction });
         addMsg('\nPushed\n');
         addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {

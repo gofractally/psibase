@@ -44,8 +44,8 @@ void bootstrap_chain(system_context& system)
    auto push = [&](auto& bc, AccountNumber sender, AccountNumber contract, const auto& data)
    {
       SignedTransaction t;
-      t.trx.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
-      t.trx.actions.push_back({
+      t.transaction.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
+      t.transaction.actions.push_back({
           .sender   = sender,
           .contract = contract,
           .rawData  = psio::convert_to_frac(data),
@@ -56,8 +56,8 @@ void bootstrap_chain(system_context& system)
    auto push_action = [&](auto& bc, Action a)
    {
       SignedTransaction t;
-      t.trx.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
-      t.trx.actions.push_back({a});
+      t.transaction.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
+      t.transaction.actions.push_back({a});
       bc.push_transaction(t);
    };
 
