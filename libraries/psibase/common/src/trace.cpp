@@ -4,7 +4,7 @@
 
 namespace psibase
 {
-   void trim_raw_data(action_trace& t, size_t max)
+   void trim_raw_data(ActionTrace& t, size_t max)
    {
       if (t.action.rawData.size() > max)
          t.action.rawData.resize(max);
@@ -12,7 +12,7 @@ namespace psibase
          std::visit(
              [max](auto& obj)
              {
-                if constexpr (std::is_same_v<psio::remove_cvref_t<decltype(obj)>, action_trace>)
+                if constexpr (std::is_same_v<psio::remove_cvref_t<decltype(obj)>, ActionTrace>)
                    trim_raw_data(obj, max);
              },
              inner.inner);
@@ -55,7 +55,7 @@ namespace psibase
       dest += indent + "event\n";
    }
 
-   void pretty_trace(std::string& dest, const action_trace& atrace, const std::string& indent)
+   void pretty_trace(std::string& dest, const ActionTrace& atrace, const std::string& indent)
    {
       dest += indent + "action:\n";
       dest += indent + "    " + atrace.action.sender.str() + " => " + atrace.action.contract.str() +
@@ -78,7 +78,7 @@ namespace psibase
       }
    }
 
-   std::string pretty_trace(const action_trace& atrace, const std::string& indent)
+   std::string pretty_trace(const ActionTrace& atrace, const std::string& indent)
    {
       std::string result;
       pretty_trace(result, atrace, indent);

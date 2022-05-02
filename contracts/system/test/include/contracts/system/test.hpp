@@ -25,7 +25,7 @@ namespace psibase
       return {};
    }
 
-   inline const action_trace& get_top_action(transaction_trace& t, size_t num)
+   inline const ActionTrace& get_top_action(transaction_trace& t, size_t num)
    {
       // TODO: redesign transaction_trace to make this easier
       // Current layout:
@@ -39,11 +39,11 @@ namespace psibase
       //        action 1
       //        ...
       eosio::check(!t.action_traces.empty(), "transaction_trace has no actions");
-      auto&                            root = t.action_traces.back();
-      std::vector<const action_trace*> top_traces;
+      auto&                           root = t.action_traces.back();
+      std::vector<const ActionTrace*> top_traces;
       for (auto& inner : root.inner_traces)
-         if (std::holds_alternative<action_trace>(inner.inner))
-            top_traces.push_back(&std::get<action_trace>(inner.inner));
+         if (std::holds_alternative<ActionTrace>(inner.inner))
+            top_traces.push_back(&std::get<ActionTrace>(inner.inner));
       eosio::check(!(top_traces.size() & 1), "unexpected number of action traces");
       eosio::check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];

@@ -291,7 +291,7 @@ namespace psibase::http
             };
             transaction_trace   trace;
             transaction_context tc{bc, trx, trace, false};
-            action_trace        atrace;
+            ActionTrace         atrace;
             tc.exec_rpc(action, atrace);
             // TODO: option to print this
             // printf("%s\n", pretty_trace(atrace).c_str());

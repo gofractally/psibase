@@ -389,9 +389,9 @@ namespace psibase
                    (contract_account.flags & account_row::allow_sudo),
                "contract is not authorized to call as another sender");
 
-         current_act_context->action_trace.inner_traces.push_back({action_trace{}});
+         current_act_context->action_trace.inner_traces.push_back({ActionTrace{}});
          auto& inner_action_trace =
-             std::get<action_trace>(current_act_context->action_trace.inner_traces.back().inner);
+             std::get<ActionTrace>(current_act_context->action_trace.inner_traces.back().inner);
          // TODO: avoid reserialization
          current_act_context->transaction_context.exec_called_action(contract_account.flags, act,
                                                                      inner_action_trace);

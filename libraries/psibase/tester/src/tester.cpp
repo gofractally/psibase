@@ -114,7 +114,7 @@ bool psibase::TraceResult::failed(std::string_view expected)
 bool psibase::TraceResult::diskConsumed(
     const std::vector<std::pair<AccountNumber, int64_t>>& consumption)
 {
-   //const vector<action_trace>& actions = trace.action_traces;
+   //const vector<ActionTrace>& actions = trace.action_traces;
    //const auto& ram_deltas = actions.at(0).account_ram_deltas;
 
    {

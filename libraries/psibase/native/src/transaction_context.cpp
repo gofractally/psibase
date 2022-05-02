@@ -130,7 +130,7 @@ namespace psibase
 
    void transaction_context::exec_called_action(uint64_t      caller_flags,
                                                 const Action& action,
-                                                action_trace& atrace)
+                                                ActionTrace&  atrace)
    {
       atrace.action     = action;
       action_context ac = {*this, action, atrace};
@@ -138,7 +138,7 @@ namespace psibase
       ec.exec_called(caller_flags, ac);
    }
 
-   void transaction_context::exec_rpc(const Action& action, action_trace& atrace)
+   void transaction_context::exec_rpc(const Action& action, ActionTrace& atrace)
    {
       auto& db     = block_context.db;
       auto  status = db.kv_get_or_default<status_row>(status_row::kv_map, status_key());

@@ -8,7 +8,7 @@ namespace psibase
    {
       psibase::transaction_context& transaction_context;
       const psibase::Action&        action;
-      psibase::action_trace&        action_trace;
+      psibase::ActionTrace&         action_trace;
    };  // action_context
 
 }  // namespace psibase
