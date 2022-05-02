@@ -24,7 +24,7 @@ namespace psibase
    {
       // Prepare for execution
       auto& db     = block_context.db;
-      auto  status = db.kv_get_or_default<status_row>(status_row::kv_map, status_key());
+      auto  status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
 
       if (block_context.need_genesis_action)
@@ -42,7 +42,7 @@ namespace psibase
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
-      status = db.kv_get_or_default<status_row>(status_row::kv_map, status_key());
+      status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
    }
 
@@ -141,7 +141,7 @@ namespace psibase
    void transaction_context::exec_rpc(const Action& action, ActionTrace& atrace)
    {
       auto& db     = block_context.db;
-      auto  status = db.kv_get_or_default<status_row>(status_row::kv_map, status_key());
+      auto  status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
       block_context.system_context.set_num_memories(status.num_execution_memories);
 
       atrace.action     = action;

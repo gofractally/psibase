@@ -81,9 +81,9 @@ namespace psibase
       void    commit(session&);
       void    abort(session&);
 
-      void kv_put_raw(kv_map map, psio::input_stream key, psio::input_stream value);
-      void kv_remove_raw(kv_map map, psio::input_stream key);
-      std::optional<psio::input_stream> kv_get_raw(kv_map map, psio::input_stream key);
+      void kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value);
+      void kvRemoveRaw(kv_map map, psio::input_stream key);
+      std::optional<psio::input_stream> kvGetRaw(kv_map map, psio::input_stream key);
       std::optional<kv_result>          kv_greater_equal_raw(kv_map             map,
                                                              psio::input_stream key,
                                                              size_t             match_key_size);
@@ -96,20 +96,20 @@ namespace psibase
       auto kvPut(kv_map map, const K& key, const V& value)
           -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
-         kv_put_raw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
+         kvPutRaw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
       }
 
       template <typename V, typename K>
       std::optional<V> kvGet(kv_map map, const K& key)
       {
-         auto s = kv_get_raw(map, psio::convert_to_key(key));
+         auto s = kvGetRaw(map, psio::convert_to_key(key));
          if (!s)
             return std::nullopt;
          return psio::convert_from_frac<V>(psio::input_stream(s->pos, s->end));
       }
 
       template <typename V, typename K>
-      V kv_get_or_default(kv_map map, const K& key)
+      V kvGetOrDefault(kv_map map, const K& key)
       {
          auto obj = kvGet<V>(map, key);
          if (obj)

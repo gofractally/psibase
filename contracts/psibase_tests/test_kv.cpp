@@ -60,13 +60,13 @@ void test(AccountNumber this_contract)
       print("kvPut\n");
    for (const auto& item : items)
       if (item.add)
-         kv_put_raw(kv_map::contract, item.getKey(this_contract), psio::convert_to_bin(item.value));
+         kvPutRaw(kv_map::contract, item.getKey(this_contract), psio::convert_to_bin(item.value));
 
    if (enable_print)
       print("kvRemove\n");
    for (const auto& item : items)
       if (!item.keep)
-         kv_remove_raw(kv_map::contract, item.getKey(this_contract));
+         kvRemoveRaw(kv_map::contract, item.getKey(this_contract));
 
    auto run = [&](auto match_key_size, auto expected, const auto& key, auto f)
    {

@@ -419,8 +419,8 @@ namespace psibase
          if (map == uint32_t(kv_map::native_constrained))
             verify_write_constrained({key.data(), key.size()}, {value.data(), value.size()});
          clear_result();
-         db.kv_put_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()},
-                       {value.data(), value.size()});
+         db.kvPutRaw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()},
+                     {value.data(), value.size()});
       }
 
       // TODO: track consumption
@@ -446,7 +446,7 @@ namespace psibase
             check(false, "kvPutSequential: unsupported map");
          db.kvPut(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
 
-         db.kv_put_raw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
+         db.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
          return indexNumber;
       }  // kvPutSequential()
 
@@ -455,20 +455,20 @@ namespace psibase
       void kvRemove(uint32_t map, span<const char> key)
       {
          clear_result();
-         db.kv_remove_raw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()});
+         db.kvRemoveRaw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()});
       }
 
       // TODO: don't let timer abort db operation
       uint32_t kvGet(uint32_t map, span<const char> key)
       {
-         return set_result(db.kv_get_raw(get_map_read(map), {key.data(), key.size()}));
+         return set_result(db.kvGetRaw(get_map_read(map), {key.data(), key.size()}));
       }
 
       // TODO: don't let timer abort db operation
       uint32_t kvGetSequential(uint32_t map, uint64_t indexNumber)
       {
          auto m = get_map_read_sequential(map);
-         return set_result(db.kv_get_raw(m, psio::convert_to_key(indexNumber)));
+         return set_result(db.kvGetRaw(m, psio::convert_to_key(indexNumber)));
       }
 
       // TODO: don't let timer abort db operation

@@ -221,18 +221,18 @@ namespace psibase
          impl->block_log_transaction.reset();
    }
 
-   void database::kv_put_raw(kv_map map, psio::input_stream key, psio::input_stream value)
+   void database::kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value)
    {
       impl->get_trx(map).upsert(impl->shared.impl->get_map(map), {key.pos, key.remaining()},
                                 {value.pos, value.remaining()});
    }
 
-   void database::kv_remove_raw(kv_map map, psio::input_stream key)
+   void database::kvRemoveRaw(kv_map map, psio::input_stream key)
    {
       impl->get_trx(map).erase(impl->shared.impl->get_map(map), {key.pos, key.remaining()});
    }
 
-   std::optional<psio::input_stream> database::kv_get_raw(kv_map map, psio::input_stream key)
+   std::optional<psio::input_stream> database::kvGetRaw(kv_map map, psio::input_stream key)
    {
       mdbx::slice k{key.pos, key.remaining()};
       mdbx::slice v;
