@@ -15,7 +15,7 @@ const App = () => {
             edges {
                 node {
                     header {
-                        num
+                        blockNum
                         previous
                         time
                     }
@@ -42,7 +42,7 @@ const App = () => {
                         <th style=${tdStyle}>Time</th>
                     </tr>
                     ${pagedResult.result.data?.blocks.edges.map?.(e => html`<tr>
-                        <td style=${tdStyle}>${e.node.header.num}</td>
+                        <td style=${tdStyle}>${e.node.header.blockNum}</td>
                         <td style=${tdStyle}>
                             <pre>${e.node.header.previous}</pre>
                         </td>

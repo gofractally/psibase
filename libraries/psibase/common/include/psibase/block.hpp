@@ -99,10 +99,10 @@ namespace psibase
    struct BlockHeader
    {
       Checksum256  previous = {};
-      BlockNum     num      = 0;  // TODO: pack into previous instead?
+      BlockNum     blockNum = 0;  // TODO: pack into previous instead?
       TimePointSec time;          // TODO: switch to microseconds
    };
-   PSIO_REFLECT(BlockHeader, previous, num, time)
+   PSIO_REFLECT(BlockHeader, previous, blockNum, time)
 
    struct Block
    {
@@ -122,14 +122,14 @@ namespace psibase
    struct BlockInfo
    {
       BlockHeader header;
-      Checksum256 id;
+      Checksum256 blockId;
 
       BlockInfo()                 = default;
       BlockInfo(const BlockInfo&) = default;
 
       // TODO: switch to fracpack for sha
       // TODO: don't repack to compute sha
-      BlockInfo(const Block& b) : header{b.header}, id{sha256(b)} {}
+      BlockInfo(const Block& b) : header{b.header}, blockId{sha256(b)} {}
    };
-   PSIO_REFLECT(BlockInfo, header, id)
+   PSIO_REFLECT(BlockInfo, header, blockId)
 }  // namespace psibase

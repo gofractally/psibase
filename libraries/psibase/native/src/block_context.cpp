@@ -44,8 +44,8 @@ namespace psibase
 
       if (status->head)
       {
-         current.header.previous = status->head->id;
-         current.header.num      = status->head->header.num + 1;
+         current.header.previous = status->head->blockId;
+         current.header.blockNum = status->head->header.blockNum + 1;
          if (time)
          {
             check(time->seconds > status->head->header.time.seconds, "block is in the past");
@@ -58,9 +58,9 @@ namespace psibase
       }
       else
       {
-         is_genesis_block    = true;
-         need_genesis_action = true;
-         current.header.num  = 2;
+         is_genesis_block        = true;
+         need_genesis_action     = true;
+         current.header.blockNum = 2;
          if (time)
             current.header.time = *time;
       }
@@ -75,7 +75,7 @@ namespace psibase
       active = false;
       check(src.header.previous == current.header.previous,
             "block previous does not match expected");
-      check(src.header.num == current.header.num, "block num does not match expected");
+      check(src.header.blockNum == current.header.blockNum, "block num does not match expected");
       current = std::move(src);
       active  = true;
    }
@@ -90,13 +90,13 @@ namespace psibase
       check(status.has_value(), "missing status record");
       status->head = current;
       if (is_genesis_block)
-         status->chain_id = status->head->id;
+         status->chain_id = status->head->blockId;
       db.kv_put(status_row::kv_map, status->key(), *status);
 
       // TODO: store block IDs somewhere?
       // TODO: store block proofs somewhere
       // TODO: avoid repacking
-      db.kv_put(kv_map::block_log, current.header.num, current);
+      db.kv_put(kv_map::block_log, current.header.blockNum, current);
 
       session.commit();
    }

@@ -22,7 +22,7 @@ namespace system_contract
    {
       auto& stat = getStatus();
       if (stat && stat->head)
-         return stat->head->header.num;
+         return stat->head->header.blockNum;
       return 1;  // next block (currently being produced) is 2 (genesis)
    }
    psibase::TimePointSec transaction_sys::blockTime() const

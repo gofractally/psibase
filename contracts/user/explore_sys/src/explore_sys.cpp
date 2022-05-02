@@ -52,7 +52,7 @@ struct QueryRoot
           gt, ge, lt, le, first, last, before, after, psibase::kv_map::block_log,
           psibase::BlockNum(0), ~psibase::BlockNum(0), 0,
           [](auto& block) {  //
-             return block.header.num;
+             return block.header.blockNum;
           },
           [](auto& p) {  //
              return Block{p};
