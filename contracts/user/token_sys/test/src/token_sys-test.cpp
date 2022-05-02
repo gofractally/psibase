@@ -8,7 +8,6 @@ using namespace psibase;
 using UserContract::TokenSys;
 using namespace UserContract::Errors;
 using namespace UserContract;
-using FlagType = Flags::FlagType;
 
 namespace
 {
@@ -36,9 +35,13 @@ namespace
  *    Implement state management classes, or helpers that assert if objects don't exist.
  *    Templatize psibase::Bitset
  *    Test Precision and Quantity types
- *    Code review psibase::Bitset and psibase::String
+ *    Code review psibase::Bitset/Flags and psibase::String
  *    Code review token tables
  *    Code review UserContext class in Tester
+ *    Consider if stake/unstake should be native token actions, and if there should be a stake recipient field.
+ *    Flag type should be used for the autodebit flag in NFT contract as well
+ *    Flag should be changed to manualDebit in NFT contract as well
+ *    We should allow users to configure a management contract to be notified when they debit from their account.
 */
 
 SCENARIO("Creating a token")
@@ -180,7 +183,7 @@ SCENARIO("Recalling tokens")
 
       THEN("The token is recallable by default")
       {
-         CHECK(false == token.flags.get(FlagType::unrecallable));
+         CHECK(false == token.flags.get(TokenRecord::unrecallable));
       }
       THEN("Alice can recall Bob's tokens")
       {
@@ -197,8 +200,8 @@ SCENARIO("Recalling tokens")
       }
       THEN("The token issuer may turn off recallability")
       {
-         CHECK(a.set(tokenId, FlagType::unrecallable).succeeded());
-         auto unrecallable = a.getToken(tokenId).returnVal().flags.get(FlagType::unrecallable);
+         CHECK(a.set(tokenId, TokenRecord::unrecallable).succeeded());
+         auto unrecallable = a.getToken(tokenId).returnVal().flags.get(TokenRecord::unrecallable);
          CHECK(true == unrecallable);
 
          AND_THEN("Alice may not recall Bob's tokens")
@@ -281,7 +284,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not update the token recallability")
          {
-            CHECK(a.set(tokenId, FlagType::unrecallable).failed(missingRequiredAuth));
+            CHECK(a.set(tokenId, TokenRecord::unrecallable).failed(missingRequiredAuth));
          }
       }
    }
@@ -366,7 +369,7 @@ SCENARIO("Burning tokens")
    }
 }
 
-SCENARIO("Toggling auto-debit")
+SCENARIO("Toggling manual-debit")
 {
    GIVEN("A chain with users Alice and Bob")
    {
@@ -377,63 +380,63 @@ SCENARIO("Toggling auto-debit")
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<TokenSys>();
 
-      THEN("Alice and Bob both have autodebit enabled")
+      THEN("Alice and Bob both have manualDebit disabled")
       {
-         auto isAutodebit1 = a.isAutodebit(alice);
-         REQUIRE(isAutodebit1.succeeded());
-         CHECK(isAutodebit1.returnVal() == true);
+         auto isManualDebit1 = a.isManualDebit(alice);
+         REQUIRE(isManualDebit1.succeeded());
+         CHECK(isManualDebit1.returnVal() == false);
 
-         auto isAutodebit2 = a.isAutodebit(bob);
-         REQUIRE(isAutodebit2.succeeded());
-         CHECK(isAutodebit2.returnVal() == true);
+         auto isManualDebit2 = a.isManualDebit(bob);
+         REQUIRE(isManualDebit2.succeeded());
+         CHECK(isManualDebit2.returnVal() == false);
       }
-      THEN("Alice may disable autodebit")
+      THEN("Alice may enable manual-debit")
       {  //
-         CHECK(a.autodebit(false).succeeded());
+         CHECK(a.manualDebit(true).succeeded());
       }
-      WHEN("Alice disables autodebit")
+      WHEN("Alice enabled manual-debit")
       {
-         a.autodebit(false);
+         a.manualDebit(true);
 
-         THEN("Alice has autodebit disabled")
+         THEN("Alice has manual-debit enabled")
          {  //
-            CHECK(a.isAutodebit(alice).returnVal() == false);
+            CHECK(a.isManualDebit(alice).returnVal() == true);
          }
-         THEN("Bob still has autodebit enabled")
+         THEN("Bob still has manual-debit disabled")
          {  //
-            CHECK(a.isAutodebit(bob).returnVal() == true);
+            CHECK(a.isManualDebit(bob).returnVal() == false);
          }
-         THEN("Alice may not disable autodebit again")
+         THEN("Alice may not enable manual-debit again")
          {
-            CHECK(a.autodebit(false).failed(autodebitDisabled));
+            CHECK(a.manualDebit(true).failed(manualDebitEnabled));
 
-            AND_THEN("But Bob may disable autodebit")
+            AND_THEN("But Bob may enable manual-debit")
             {  //
-               CHECK(b.autodebit(false).succeeded());
+               CHECK(b.manualDebit(true).succeeded());
             }
          }
-         THEN("Alice may re-enable autodebit")
+         THEN("Alice may disable manual-debit")
          {  //
-            CHECK(a.autodebit(true).succeeded());
+            CHECK(a.manualDebit(false).succeeded());
          }
-         WHEN("Alice re-enables autodebit")
+         WHEN("Alice disabled manual-debit")
          {
-            a.autodebit(true);
+            a.manualDebit(false);
 
-            THEN("Alice has autodebit enabled")
+            THEN("Alice has manual-debit disabled")
             {  //
-               CHECK(a.isAutodebit(alice).returnVal() == true);
+               CHECK(a.isManualDebit(alice).returnVal() == false);
             }
-            THEN("Bob still has autodebit enabled")
+            THEN("Bob still has manual-debit disabled")
             {
-               CHECK(a.isAutodebit(bob).returnVal() == true);
+               CHECK(a.isManualDebit(bob).returnVal() == false);
             }
          }
       }
    }
 }
 
-SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
+SCENARIO("Crediting/uncrediting/debiting tokens")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
@@ -502,7 +505,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
    }
 }
 
-SCENARIO("Crediting/uncrediting/debiting tokens, without auto-debit")
+SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
@@ -518,9 +521,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens, without auto-debit")
       auto mint    = a.mint(tokenId, 100, alice, memo);
       auto mint2   = a.mint(tokenId, 100, bob, memo);
 
-      AND_GIVEN("Alice turned off autodebit")
+      AND_GIVEN("Alice turns on manual-debit")
       {
-         a.autodebit(false);
+         a.manualDebit(true);
 
          THEN("Alice may credit Bob 50 tokens")
          {
@@ -534,12 +537,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens, without auto-debit")
          {
             a.credit(tokenId, bob, 50, memo);
 
-            THEN("Bob immediately owns 150 tokens")
-            {  //
+            THEN("The transfer happens immediately")
+            {
                CHECK(150 == b.getBalance(tokenId, bob).returnVal());
-            }
-            THEN("Alice immediately owns 50 tokens")
-            {  //
                CHECK(50 == a.getBalance(tokenId, alice).returnVal());
             }
             THEN("Alice and Bob may not uncredit any tokens")

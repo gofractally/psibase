@@ -33,11 +33,11 @@ namespace psibase
 
       void _check(std::size_t pos) const
       {
-         psibase::check(pos >= 0 && pos < std::numeric_limits<bitset_t>::digits,
-                        "out-of-bounds access in bitset");
+         psibase::check(pos >= 0 && pos < MAX_BITS, "out-of-bounds access in bitset");
       }
 
       friend std::strong_ordering operator<=>(const Bitset&, const Bitset&) = default;
+      static constexpr size_t     MAX_BITS = std::numeric_limits<bitset_t>::digits;
    };
    PSIO_REFLECT(Bitset, bits);
 

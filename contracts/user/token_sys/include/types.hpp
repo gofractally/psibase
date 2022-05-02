@@ -2,6 +2,7 @@
 
 #include <compare>
 #include <limits>
+#include <psibase/Bitset.hpp>
 #include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
 
@@ -77,5 +78,25 @@ namespace UserContract
       bool operator==(Quantity otherValue) const { return otherValue.value == value; }
    };
    PSIO_REFLECT(Quantity, value);
+
+   struct FlagType
+   {
+      uint8_t value;
+
+      FlagType() : value(0) {}
+      FlagType(uint8_t v) : value(v) {}
+   };
+   PSIO_REFLECT(FlagType, value);
+
+   struct Flags
+   {
+      psibase::Bitset bits;
+
+      bool get(FlagType flag) { return bits.get((size_t)flag.value); }
+      void set(FlagType flag, bool value = true) { bits.set((size_t)flag.value, value); }
+
+      friend std::strong_ordering operator<=>(const Flags&, const Flags&) = default;
+   };
+   PSIO_REFLECT(Flags, bits);
 
 }  // namespace UserContract

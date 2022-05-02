@@ -2,7 +2,6 @@
 
 #include <compare>
 #include <limits>
-#include <psibase/Bitset.hpp>
 #include <psibase/table.hpp>
 
 #include "nft_sys.hpp"
@@ -41,24 +40,6 @@ namespace UserContract
    };
    PSIO_REFLECT(InflationRecord, settings, stats);
 
-   struct Flags
-   {
-      psibase::Bitset bits;
-
-      enum FlagType
-      {
-         unrecallable = 0,
-         // ... space for 15 more
-         invalid = 16
-      };
-
-      bool get(FlagType flag) { return bits.get((size_t)flag); }
-      void set(FlagType flag, bool value = true) { bits.set((size_t)flag, value); }
-
-      friend std::strong_ordering operator<=>(const Flags&, const Flags&) = default;
-   };
-   PSIO_REFLECT(Flags, bits);
-
    struct TokenRecord
    {
       TID             id;
@@ -74,36 +55,73 @@ namespace UserContract
          return tokenId > 0 && tokenId <= std::numeric_limits<uint32_t>::max() / 2;
       }
 
+      // Possible flags
+      static constexpr uint8_t unrecallable = 0;
+
       friend std::strong_ordering operator<=>(const TokenRecord&, const TokenRecord&) = default;
    };
    PSIO_REFLECT(TokenRecord, id, ownerNft, inflation, flags, precision, currentSupply, maxSupply);
    using TokenTable_t = psibase::table<TokenRecord, &TokenRecord::id>;
 
+   struct BalanceKey_t
+   {
+      TID                    tokenId;
+      psibase::AccountNumber account;
+
+      friend std::strong_ordering operator<=>(const BalanceKey_t&, const BalanceKey_t&) = default;
+   };
+   PSIO_REFLECT(BalanceKey_t, tokenId, account);
+
    struct BalanceRecord
    {
-      psibase::AccountNumber account;
-      TID                    tokenId;
-      uint64_t               balance;
+      BalanceKey_t key;
+      uint64_t     balance;
+
+      operator uint64_t() const { return balance; }
+      operator Quantity() const { return Quantity{balance}; }
 
       friend std::strong_ordering operator<=>(const BalanceRecord&, const BalanceRecord&) = default;
    };
-   PSIO_REFLECT(BalanceRecord, account, tokenId, balance);
-   using BalanceTable_t = psibase::table<BalanceRecord, &BalanceRecord::account>;
-   // Todo - additional index when available on tokenId
+   PSIO_REFLECT(BalanceRecord, key, balance);
+   using BalanceTable_t = psibase::table<BalanceRecord, &BalanceRecord::key>;
 
-   struct SharedBalanceRecord
+   struct SharedBalanceKey_t
    {
+      TID                    tokenId;
       psibase::AccountNumber creditor;
       psibase::AccountNumber debitor;
 
-      TID      tokenId;
-      uint64_t balance;
+      friend std::strong_ordering operator<=>(const SharedBalanceKey_t&,
+                                              const SharedBalanceKey_t&) = default;
+   };
+   PSIO_REFLECT(SharedBalanceKey_t, tokenId, creditor, debitor);
+   struct SharedBalanceRecord
+   {
+      SharedBalanceKey_t key;
+      uint64_t           balance;
+
+      operator uint64_t() const { return balance; }
+      operator Quantity() const { return Quantity{balance}; }
 
       friend std::strong_ordering operator<=>(const SharedBalanceRecord&,
                                               const SharedBalanceRecord&) = default;
    };
-   PSIO_REFLECT(SharedBalanceRecord, creditor, debitor, tokenId, balance);
-   using SharedBalanceTable_t = psibase::table<SharedBalanceRecord, &SharedBalanceRecord::creditor>;
-   // Todo - additional indices when available
+   PSIO_REFLECT(SharedBalanceRecord, key, balance);
+   using SharedBalanceTable_t = psibase::table<SharedBalanceRecord, &SharedBalanceRecord::key>;
+
+   struct TokenHolderRecord
+   {
+      psibase::AccountNumber account;
+      Flags                  config;
+
+      static constexpr uint8_t manualDebit = 0;
+
+      operator psibase::AccountNumber() const { return account; }
+
+      friend std::strong_ordering operator<=>(const TokenHolderRecord&,
+                                              const TokenHolderRecord&) = default;
+   };
+   PSIO_REFLECT(TokenHolderRecord, account, config);
+   using TokenHolderTable_t = psibase::table<TokenHolderRecord, &TokenHolderRecord::account>;
 
 }  // namespace UserContract

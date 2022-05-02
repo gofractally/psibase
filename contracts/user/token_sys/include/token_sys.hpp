@@ -25,7 +25,8 @@ namespace UserContract
    class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
-      using tables = psibase::contract_tables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t>;
+      using tables = psibase::
+          contract_tables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t, TokenHolderTable_t>;
       static constexpr psibase::AccountNumber contract = "token-sys"_a;
 
       TID  create(Precision precision, Quantity maxSupply);
@@ -34,13 +35,13 @@ namespace UserContract
                 psibase::AccountNumber            receiver,
                 psio::const_view<psibase::String> memo);
 
-      void set(TID tokenId, uint8_t flag);
+      void set(TID tokenId, FlagType flag);
 
       //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
       //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
 
       void burn(TID tokenId, Quantity amount);
-      void autodebit(bool enable);
+      void manualDebit(bool enable);
       void credit(TID                               tokenId,
                   psibase::AccountNumber            receiver,
                   Quantity                          amount,
@@ -60,15 +61,18 @@ namespace UserContract
                   psio::const_view<psibase::String> memo);
 
       // Read-only interface:
-      TokenRecord getToken(TID tokenId) const;
-      Quantity    getBalance(TID tokenId, psibase::AccountNumber account) const;
-      Quantity    getSharedBal(TID                    tokenId,
-                               psibase::AccountNumber creditor,
-                               psibase::AccountNumber debitor) const;
-      bool        isAutodebit(psibase::AccountNumber account) const;
+      TokenRecord         getToken(TID tokenId);
+      BalanceRecord       getBalance(TID tokenId, psibase::AccountNumber account);
+      SharedBalanceRecord getSharedBal(TID                    tokenId,
+                                       psibase::AccountNumber creditor,
+                                       psibase::AccountNumber debitor);
+      TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
+      bool                isManualDebit(psibase::AccountNumber account);
 
      private:
       tables db{contract};
+
+      void _checkAccountValid(psibase::AccountNumber account);
 
      public:
       struct Events
@@ -86,11 +90,11 @@ namespace UserContract
                         StringView memo)
             {
             }
-            void set(TID tokenId, Account setter, uint8_t flag) {}
+            void set(TID tokenId, Account setter, FlagType flag) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
 
-            void disabledAutodeb(Account account) {}
-            void enabledAutodeb(Account account) {}
+            void enabledManDeb(Account account) {}
+            void disabledManDeb(Account account) {}
             //};
 
             //struct Ui
@@ -134,7 +138,7 @@ namespace UserContract
       method(set, tokenId, flag),
 
       method(burn, tokenId, amount),
-      method(autodebit, enable),
+      method(manualDebit, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, amount, memo),
       method(debit, tokenId, sender, amount, memo),
@@ -142,15 +146,15 @@ namespace UserContract
       method(getToken, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
-      method(isAutodebit)
+      method(isManualDebit)
     );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
       method(created, tokenId, creator, precision, maxSupply),
       method(minted, tokenId, minter, amount, receiver, memo),
       method(set, tokenId, setter, flag),
       method(burned, tokenId, burner, amount),
-      method(disabledAutodeb, account),
-      method(enabledAutodeb, account),
+      method(enabledManDeb, account),
+      method(disabledManDeb, account),
    //);
    //PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
       method(credited, tokenId, sender, receiver, amount, memo),
