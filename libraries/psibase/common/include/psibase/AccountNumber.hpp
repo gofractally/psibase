@@ -17,9 +17,6 @@ namespace psibase
    };
    PSIO_REFLECT(AccountNumber, value)
 
-   // TODO: remove
-   using account_num = AccountNumber;
-
    template <typename S>
    void to_json(const AccountNumber& n, S& s)
    {

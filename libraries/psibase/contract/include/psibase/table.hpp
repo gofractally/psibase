@@ -427,7 +427,7 @@ namespace psibase
    template <typename... Tables>
    struct contract_tables
    {
-      explicit constexpr contract_tables(account_num account) : account(account) {}
+      explicit constexpr contract_tables(AccountNumber account) : account(account) {}
       template <std::uint32_t Table>
       auto open()
       {
@@ -439,6 +439,6 @@ namespace psibase
       {
          return open<boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>::value>();
       }
-      account_num account;
+      AccountNumber account;
    };
 }  // namespace psibase

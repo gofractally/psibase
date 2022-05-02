@@ -16,13 +16,13 @@ struct startup
 startup s;
 
 extern "C" void __wasm_call_ctors();
-extern "C" void start(account_num this_contract)
+extern "C" void start(AccountNumber this_contract)
 {
    __wasm_call_ctors();
    printf("This is contract %s\n", this_contract.str().c_str());
 }
 
-extern "C" void called(account_num this_contract, account_num sender)
+extern "C" void called(AccountNumber this_contract, AccountNumber sender)
 {
    // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
    auto act = get_current_action();

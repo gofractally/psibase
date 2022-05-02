@@ -150,7 +150,7 @@ namespace psibase
       ec.exec_rpc(ac);
    }
 
-   execution_context& transaction_context::get_execution_context(account_num contract)
+   execution_context& transaction_context::get_execution_context(AccountNumber contract)
    {
       auto it = execution_contexts.find(contract);
       if (it != execution_contexts.end())

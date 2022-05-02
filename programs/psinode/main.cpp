@@ -61,14 +61,14 @@ void bootstrap_chain(system_context& system)
       bc.push_transaction(t);
    };
 
-   auto reg_rpc = [&](auto& bc, account_num contract, account_num rpc_contract)
+   auto reg_rpc = [&](auto& bc, AccountNumber contract, AccountNumber rpc_contract)
    {
       push_action(
           bc,
           transactor<proxy_sys>(contract, proxyContractNum).registerServer(contract, rpc_contract));
    };
 
-   auto upload = [&](auto& bc, account_num contract, const char* path, const char* contentType,
+   auto upload = [&](auto& bc, AccountNumber contract, const char* path, const char* contentType,
                      const char* filename)
    {
       transactor<system_contract::rpc_account_sys> rasys(contract, contract);

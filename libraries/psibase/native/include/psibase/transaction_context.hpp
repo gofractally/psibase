@@ -6,12 +6,12 @@ namespace psibase
 {
    struct transaction_context
    {
-      psibase::block_context&                  block_context;
-      database::session                        session;
-      const signed_transaction&                trx;
-      psibase::transaction_trace&              transaction_trace;
-      std::map<account_num, execution_context> execution_contexts;
-      int                                      call_depth = 0;
+      psibase::block_context&                    block_context;
+      database::session                          session;
+      const signed_transaction&                  trx;
+      psibase::transaction_trace&                transaction_trace;
+      std::map<AccountNumber, execution_context> execution_contexts;
+      int                                        call_depth = 0;
 
       transaction_context(psibase::block_context&     block_context,
                           const signed_transaction&   trx,
@@ -22,7 +22,7 @@ namespace psibase
       void exec_called_action(uint64_t caller_flags, const action& act, action_trace& atrace);
       void exec_rpc(const action& act, action_trace& atrace);
 
-      execution_context& get_execution_context(account_num contract);
+      execution_context& get_execution_context(AccountNumber contract);
    };  // transaction_context
 
 }  // namespace psibase

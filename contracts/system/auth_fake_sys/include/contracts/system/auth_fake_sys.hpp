@@ -20,7 +20,7 @@ namespace system_contract::auth_fake_sys
 
 #ifdef __wasm__
    template <typename T, typename R = typename T::return_type>
-   R call(psibase::account_num sender, T args)
+   R call(psibase::AccountNumber sender, T args)
    {
       auto result = psibase::call(psibase::action{
           .sender   = sender,

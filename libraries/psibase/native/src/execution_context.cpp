@@ -36,7 +36,7 @@ namespace psibase
 
    // Only useful for genesis
    void set_code(database&          db,
-                 account_num        contract,
+                 AccountNumber      contract,
                  uint8_t            vm_type,
                  uint8_t            vm_version,
                  psio::input_stream code)
@@ -151,7 +151,7 @@ namespace psibase
 
       execution_context_impl(transaction_context& trx_context,
                              execution_memory&    memory,
-                             account_num          contract)
+                             AccountNumber        contract)
           : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
          auto ca = db.kv_get<account_row>(account_row::kv_map, account_key(contract));
@@ -505,7 +505,7 @@ namespace psibase
 
    execution_context::execution_context(transaction_context& trx_context,
                                         execution_memory&    memory,
-                                        account_num          contract)
+                                        AccountNumber        contract)
    {
       impl = std::make_unique<execution_context_impl>(trx_context, memory, contract);
    }

@@ -53,10 +53,10 @@ extern "C" [[clang::export_name("verify")]] void verify()
        "incorrect signature");
 }
 
-extern "C" void called(account_num this_contract, account_num sender)
+extern "C" void called(AccountNumber this_contract, AccountNumber sender)
 {
    abort_message_str("this contract has no actions");
 }
 
 // Caution! Don't replace with version in dispatcher!
-extern "C" void start(account_num this_contract) {}
+extern "C" void start(AccountNumber this_contract) {}

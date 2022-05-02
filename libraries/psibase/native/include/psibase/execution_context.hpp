@@ -13,7 +13,7 @@ namespace psibase
 
    // Only useful for genesis
    void set_code(database&          db,
-                 account_num        contract,
+                 AccountNumber      contract,
                  uint8_t            vm_type,
                  uint8_t            vm_version,
                  psio::input_stream code);
@@ -49,7 +49,7 @@ namespace psibase
 
       execution_context(transaction_context& trx_context,
                         execution_memory&    memory,
-                        account_num          contract);
+                        AccountNumber        contract);
       execution_context(execution_context&&);
       ~execution_context();
 

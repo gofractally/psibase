@@ -25,7 +25,7 @@ struct item
 
    std::optional<uint8_t> max;
 
-   auto get_key(account_num this_contract) const
+   auto get_key(AccountNumber this_contract) const
    {
       auto k = psio::convert_to_key(this_contract);
       k.insert(k.end(), key.begin(), key.end());
@@ -54,7 +54,7 @@ std::vector<item> items = {
 };
 // clang-format on
 
-void test(account_num this_contract)
+void test(AccountNumber this_contract)
 {
    if (enable_print)
       print("kv_put\n");
@@ -159,13 +159,13 @@ void test(account_num this_contract)
 
 }  // test()
 
-extern "C" void called(account_num this_contract, account_num sender)
+extern "C" void called(AccountNumber this_contract, AccountNumber sender)
 {
    test(this_contract);
 }
 
 extern "C" void __wasm_call_ctors();
-extern "C" void start(account_num this_contract)
+extern "C" void start(AccountNumber this_contract)
 {
    __wasm_call_ctors();
 }

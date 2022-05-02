@@ -16,20 +16,20 @@ namespace system_contract::auth_ec_sys
    using table_num                       = uint32_t;
    static constexpr table_num auth_table = 1;
 
-   inline auto auth_key(account_num account)
+   inline auto auth_key(AccountNumber account)
    {
       return std::tuple{contract, auth_table, account};
    }
    struct auth_row
    {
-      account_num account;
+      AccountNumber account;
       PublicKey   pubkey;
 
       auto key() { return auth_key(account); }
    };
    PSIO_REFLECT(auth_row, account, pubkey)
 
-   void exec(account_num this_contract, account_num sender, auth_check& args)
+   void exec(AccountNumber this_contract, AccountNumber sender, auth_check& args)
    {
       if (enable_print)
          print("auth_check\n");
@@ -42,14 +42,14 @@ namespace system_contract::auth_ec_sys
       abort_message_str("no matching claim found");
    }
 
-   void exec(account_num this_contract, account_num sender, set_key& args)
+   void exec(AccountNumber this_contract, AccountNumber sender, set_key& args)
    {
       check(sender == args.account, "wrong sender");
       auth_row row{args.account, args.key};
       kv_put(row.key(), row);
    }
 
-   account_num exec(account_num this_contract, account_num sender, create_account& args)
+   AccountNumber exec(AccountNumber this_contract, AccountNumber sender, create_account& args)
    {
       write_console("account_sys::create_account");
       psibase::actor<account_sys> asys(this_contract, account_sys::contract);
@@ -59,7 +59,7 @@ namespace system_contract::auth_ec_sys
       return args.name;
    }
 
-   extern "C" void called(account_num this_contract, account_num sender)
+   extern "C" void called(AccountNumber this_contract, AccountNumber sender)
    {
       // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
       auto act  = get_current_action();
@@ -76,7 +76,7 @@ namespace system_contract::auth_ec_sys
    }
 
    extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract)
+   extern "C" void start(AccountNumber this_contract)
    {
       __wasm_call_ctors();
    }

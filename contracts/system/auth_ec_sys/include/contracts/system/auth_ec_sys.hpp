@@ -16,7 +16,7 @@ namespace system_contract::auth_ec_sys
 
    struct set_key
    {
-      psibase::account_num account;
+      psibase::AccountNumber account;
       psibase::PublicKey   key;
    };
    PSIO_REFLECT(set_key, account, key)
@@ -24,7 +24,7 @@ namespace system_contract::auth_ec_sys
    // TODO: remove. This is just a temporary approach for creating an account with a key.
    struct create_account
    {
-      using return_type = psibase::account_num;
+      using return_type = psibase::AccountNumber;
 
       psibase::AccountNumber name       = {};
       psibase::PublicKey     public_key = {};
@@ -35,7 +35,7 @@ namespace system_contract::auth_ec_sys
 
 #ifdef __wasm__
    template <typename T, typename R = typename T::return_type>
-   R call(psibase::account_num sender, T args)
+   R call(psibase::AccountNumber sender, T args)
    {
       auto result = psibase::call(psibase::action{
           .sender   = sender,
