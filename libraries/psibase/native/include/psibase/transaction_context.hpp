@@ -2,8 +2,15 @@
 
 #include <psibase/block_context.hpp>
 
+#include <boost/container/flat_map.hpp>
+
 namespace psibase
 {
+   using KvResourceMap = boost::container::flat_map<KvResourceKey,
+                                                    KvResourceDelta,
+                                                    std::less<KvResourceKey>,
+                                                    std::vector<KvResourcePair>>;
+
    struct transaction_context
    {
       psibase::block_context&                    block_context;
@@ -11,6 +18,7 @@ namespace psibase
       const SignedTransaction&                   trx;
       TransactionTrace&                          transaction_trace;
       std::map<AccountNumber, execution_context> execution_contexts;
+      KvResourceMap                              kvResourceDeltas;
       int                                        call_depth = 0;
 
       transaction_context(psibase::block_context&  block_context,

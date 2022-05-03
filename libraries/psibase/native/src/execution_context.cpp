@@ -243,13 +243,19 @@ namespace psibase
 
       bool key_has_contract_prefix(uint32_t map) { return map == uint32_t(kv_map::contract); }
 
-      kv_map get_map_write(uint32_t map, psio::input_stream key)
+      struct Writable
+      {
+         kv_map map;
+         bool   readable;
+      };
+
+      Writable get_map_write(uint32_t map, psio::input_stream key)
       {
          check(!trx_context.block_context.is_read_only, "writes disabled during query");
 
          if (map == uint32_t(kv_map::subjective) &&
              (contract_account.flags & account_row::is_subjective))
-            return (kv_map)map;
+            return {(kv_map)map, true};
 
          // Prevent poison block; subjective contracts skip execution while not in production
          check(!(contract_account.flags & account_row::is_subjective),
@@ -261,14 +267,14 @@ namespace psibase
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
                   "key prefix must match contract during write");
-            return (kv_map)map;
+            return {(kv_map)map, false};
          }
          if (map == uint32_t(kv_map::native_constrained) &&
              (contract_account.flags & account_row::allow_write_native))
-            return (kv_map)map;
+            return {(kv_map)map, true};
          if (map == uint32_t(kv_map::native_unconstrained) &&
              (contract_account.flags & account_row::allow_write_native))
-            return (kv_map)map;
+            return {(kv_map)map, true};
          throw std::runtime_error("contract may not write this map, or must use another intrinsic");
       }
 
@@ -410,7 +416,6 @@ namespace psibase
          clear_result();
       }
 
-      // TODO: track consumption
       // TODO: restrict key size
       // TODO: restrict value size
       // TODO: don't let timer abort db operation
@@ -419,16 +424,32 @@ namespace psibase
          if (map == uint32_t(kv_map::native_constrained))
             verify_write_constrained({key.data(), key.size()}, {value.data(), value.size()});
          clear_result();
-         db.kvPutRaw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()},
-                     {value.data(), value.size()});
+         auto [m, readable] = get_map_write(map, {key.data(), key.size()});
+         auto& delta = trx_context.kvResourceDeltas[KvResourceKey{contract_account.num, map}];
+         delta.records += 1;
+         delta.keyBytes += key.size();
+         delta.valueBytes += value.size();
+         if (readable)
+         {
+            if (auto existing = db.kvGetRaw(m, {key.data(), key.size()}))
+            {
+               delta.records -= 1;
+               delta.keyBytes -= key.size();
+               delta.valueBytes -= existing->remaining();
+            }
+         }
+         db.kvPutRaw(m, {key.data(), key.size()}, {value.data(), value.size()});
       }
 
-      // TODO: track consumption
       // TODO: restrict value size
       // TODO: don't let timer abort db operation
       uint64_t kvPutSequential(uint32_t map, span<const char> value)
       {
-         auto m = get_map_write_sequential(map);
+         auto  m     = get_map_write_sequential(map);
+         auto& delta = trx_context.kvResourceDeltas[KvResourceKey{contract_account.num, map}];
+         delta.records += 1;
+         delta.keyBytes += sizeof(uint64_t);
+         delta.valueBytes += value.size();
 
          psio::input_stream v{value.data(), value.size()};
          check(v.remaining() >= sizeof(AccountNumber::value),
@@ -450,12 +471,22 @@ namespace psibase
          return indexNumber;
       }  // kvPutSequential()
 
-      // TODO: track consumption
       // TODO: don't let timer abort db operation
       void kvRemove(uint32_t map, span<const char> key)
       {
          clear_result();
-         db.kvRemoveRaw(get_map_write(map, {key.data(), key.size()}), {key.data(), key.size()});
+         auto [m, readable] = get_map_write(map, {key.data(), key.size()});
+         if (readable)
+         {
+            if (auto existing = db.kvGetRaw(m, {key.data(), key.size()}))
+            {
+               auto& delta = trx_context.kvResourceDeltas[KvResourceKey{contract_account.num, map}];
+               delta.records -= 1;
+               delta.keyBytes -= key.size();
+               delta.valueBytes -= existing->remaining();
+            }
+         }
+         db.kvRemoveRaw(m, {key.data(), key.size()});
       }
 
       // TODO: don't let timer abort db operation
@@ -500,6 +531,15 @@ namespace psibase
             check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
          return set_result(db.kvMaxRaw(get_map_read(map), {key.data(), key.size()}));
       }
+
+      uint32_t kvGetTransactionUsage()
+      {
+         auto seq  = trx_context.kvResourceDeltas.extract_sequence();
+         auto size = set_result(psio::convert_to_frac(seq));
+         trx_context.kvResourceDeltas.adopt_sequence(boost::container::ordered_unique_range,
+                                                     std::move(seq));
+         return size;
+      }
    };  // execution_context_impl
 
    execution_context::execution_context(transaction_context& trx_context,
@@ -532,6 +572,7 @@ namespace psibase
       rhf_t::add<&execution_context_impl::kvGreaterEqual>("env", "kvGreaterEqual");
       rhf_t::add<&execution_context_impl::kvLessThan>("env", "kvLessThan");
       rhf_t::add<&execution_context_impl::kvMax>("env", "kvMax");
+      rhf_t::add<&execution_context_impl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
    }
 
    void execution_context::exec_process_transaction(action_context& act_context)
