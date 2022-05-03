@@ -91,6 +91,7 @@ function(add suffix)
         target_sources(psitestlib${suffix} PRIVATE
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
+            tester/src/testUtils.cpp
             contract/src/intrinsic.cpp
             tester/src/tester_intrinsics.cpp
             tester/src/wasi_polyfill/__wasi_args_get.cpp
