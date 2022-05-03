@@ -12,6 +12,7 @@ namespace psibase
                                             bool                       enable_undo)
        : block_context{block_context}, trx{trx}, transaction_trace{transaction_trace}
    {
+      start_time = std::chrono::steady_clock::now();
       if (enable_undo)
          session = block_context.db.start_write();
    }

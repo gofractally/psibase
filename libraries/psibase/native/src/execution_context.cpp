@@ -156,7 +156,8 @@ namespace psibase
                              AccountNumber        contract)
           : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
-         auto ca = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
+         auto load_start = std::chrono::steady_clock::now();
+         auto ca         = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
          check(ca.has_value(), "unknown contract account");
          check(ca->code_hash != Checksum256{}, "account has no code");
          contract_account = std::move(*ca);
@@ -174,6 +175,7 @@ namespace psibase
                 if (!backend)
                    backend = std::make_unique<backend_t>(code->code, nullptr);
              });
+         trx_context.contract_load_time += std::chrono::steady_clock::now() - load_start;
       }
 
       ~execution_context_impl()
@@ -265,20 +267,28 @@ namespace psibase
       {
          check(!trx_context.block_context.is_read_only, "writes disabled during query");
 
-         if (map == uint32_t(kv_map::subjective) &&
-             (contract_account.flags & account_row::is_subjective))
-            return {(kv_map)map, true};
-
-         // Prevent poison block; subjective contracts skip execution while not in production
-         check(!(contract_account.flags & account_row::is_subjective),
-               "subjective contracts may only write to kv_map::subjective");
-
-         if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
+         auto check_prefix = [&]
          {
             uint64_t prefix = contract_account.num.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
                   "key prefix must match contract during write");
+         };
+
+         if (map == uint32_t(kv_map::subjective) &&
+             (contract_account.flags & account_row::is_subjective))
+         {
+            check_prefix();
+            return {(kv_map)map, true};
+         }
+
+         // Prevent poison block; subjective contracts skip execution during replay
+         check(!(contract_account.flags & account_row::is_subjective),
+               "subjective contracts may only write to kv_map::subjective");
+
+         if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
+         {
+            check_prefix();
             return {(kv_map)map, false};
          }
          if (map == uint32_t(kv_map::native_constrained) &&
@@ -293,6 +303,10 @@ namespace psibase
       kv_map get_map_write_sequential(uint32_t map)
       {
          check(!trx_context.block_context.is_read_only, "writes disabled during query");
+
+         // Prevent poison block; subjective contracts skip execution during replay
+         check(!(contract_account.flags & account_row::is_subjective),
+               "contract may not write this map, or must use another intrinsic");
 
          if (map == uint32_t(kv_map::event))
             return (kv_map)map;
@@ -386,6 +400,16 @@ namespace psibase
       {
          throw std::runtime_error("contract '" + contract_account.num.str() +
                                   "' aborted with message: " + std::string(str.data(), str.size()));
+      }
+
+      uint64_t getExecutionTime()
+      {
+         check(contract_account.flags & account_row::is_subjective,
+               "only subjective contracts may call getExecutionTime");
+         return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - trx_context.start_time -
+                    trx_context.contract_load_time)
+             .count();
       }
 
       uint32_t getCurrentAction()
@@ -565,6 +589,7 @@ namespace psibase
       rhf_t::add<&execution_context_impl::getKey>("env", "getKey");
       rhf_t::add<&execution_context_impl::writeConsole>("env", "writeConsole");
       rhf_t::add<&execution_context_impl::abortMessage>("env", "abortMessage");
+      rhf_t::add<&execution_context_impl::getExecutionTime>("env", "getExecutionTime");
       rhf_t::add<&execution_context_impl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::setRetval>("env", "setRetval");
@@ -619,6 +644,8 @@ namespace psibase
 
    void execution_context::async_timeout()
    {
+      if (impl->contract_account.flags & account_row::can_not_time_out)
+         return;
       impl->timed_out = true;
       impl->backend->get_module().allocator.disable_code();
    }

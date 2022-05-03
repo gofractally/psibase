@@ -3,6 +3,7 @@
 #include <psibase/block_context.hpp>
 
 #include <boost/container/flat_map.hpp>
+#include <chrono>
 #include <mutex>
 
 namespace psibase
@@ -14,12 +15,14 @@ namespace psibase
 
    struct transaction_context
    {
-      psibase::block_context&  block_context;
-      database::session        session;
-      const SignedTransaction& trx;
-      TransactionTrace&        transaction_trace;
-      KvResourceMap            kvResourceDeltas;
-      int                      call_depth = 0;
+      psibase::block_context&               block_context;
+      database::session                     session;
+      const SignedTransaction&              trx;
+      TransactionTrace&                     transaction_trace;
+      KvResourceMap                         kvResourceDeltas;
+      int                                   call_depth = 0;
+      std::chrono::steady_clock::time_point start_time;
+      std::chrono::steady_clock::duration   contract_load_time{0};
 
       transaction_context(psibase::block_context&  block_context,
                           const SignedTransaction& trx,
