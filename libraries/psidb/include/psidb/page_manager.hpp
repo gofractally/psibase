@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <map>
+#include <psidb/allocator.hpp>
 #include <psidb/checkpoint.hpp>
 #include <psidb/node_ptr.hpp>
 #include <psidb/page_header.hpp>
@@ -24,11 +25,13 @@ namespace psidb
       bool         is_memory_page(page_id id) { return id < max_memory_pages; }
       page_header* translate_page_address(page_id id)
       {
-         return reinterpret_cast<page_header*>((char*)pages + id * page_size);
+         return reinterpret_cast<page_header*>(reinterpret_cast<char*>(_allocator.base()) +
+                                               id * page_size);
       }
       page_id get_id(const page_header* page)
       {
-         return (reinterpret_cast<const char*>(page) - reinterpret_cast<const char*>(pages)) /
+         return (reinterpret_cast<const char*>(page) -
+                 reinterpret_cast<const char*>(_allocator.base())) /
                 page_size;
       }
       page_header* get_page(node_ptr ptr)
@@ -79,8 +82,8 @@ namespace psidb
       }
       std::pair<page_header*, page_id> allocate_page()
       {
-         auto id = next_page++;
-         return {translate_page_address(id), id};
+         page_header* result = static_cast<page_header*>(_allocator.allocate(page_size));
+         return {result, get_id(result)};
       }
       void set_root(const checkpoint& c, int db, page_id new_root)
       {
@@ -149,8 +152,6 @@ namespace psidb
      private:
       page_manager(const page_manager&) = delete;
 
-      page_manager();
-
       page_flags switch_dirty_flag(page_flags f)
       {
          if (f == page_flags::dirty0)
@@ -205,16 +206,14 @@ namespace psidb
          std::atomic<int>* counter;
       };
 
-      std::size_t                       _num_pages  = 0;
-      void*                             pages       = nullptr;
+      allocator                         _allocator;
       int                               fd          = -1;
       page_flags                        _dirty_flag = page_flags::dirty0;
       bool                              _flush_pending;
       version_type                      _flush_version;
       shared_queue<write_queue_element> _write_queue;
       // TODO: use a real allocation algorithm
-      std::size_t next_page      = 0;
-      page_id     next_file_page = max_memory_pages;
+      page_id next_file_page = max_memory_pages;
 
       checkpoint_root* stable_checkpoint = nullptr;
       checkpoint_root* last_commit       = nullptr;

@@ -15,13 +15,8 @@ using namespace psidb;
 static constexpr page_id header_page        = max_memory_pages;
 static constexpr page_id backup_header_page = header_page + 1;
 
-psidb::page_manager::page_manager() {}
-
-psidb::page_manager::page_manager(int fd, std::size_t num_pages) : page_manager()
+psidb::page_manager::page_manager(int fd, std::size_t num_pages) : _allocator(num_pages * page_size)
 {
-   _num_pages = num_pages;
-   pages      = ::mmap(nullptr, page_size * num_pages, PROT_READ | PROT_WRITE,
-                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
    // FIXME: inconsistent behavior W.R.T. cleanup of fd on exception.
    this->fd = fd;
    if (fd == -1)
@@ -65,10 +60,6 @@ psidb::page_manager::~page_manager()
    if (fd != -1)
    {
       ::close(fd);
-   }
-   if (pages)
-   {
-      ::munmap(pages, _num_pages * page_size);
    }
 }
 

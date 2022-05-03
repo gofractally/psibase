@@ -37,6 +37,17 @@ auto make_kv(int i)
       }                                    \
    } while (false)
 
+TEST_CASE("lower_bound empty", "[lower_bound]")
+{
+   tmp_file file;
+
+   psidb::database db(file.native_handle(), 1024);
+   auto            trx    = db.start_transaction();
+   auto            cursor = trx.get_cursor();
+   cursor.lower_bound("a");
+   CHECK(!cursor.valid());
+}
+
 TEST_CASE("lower_bound simple", "[lower_bound]")
 {
    tmp_file file;
