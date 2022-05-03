@@ -42,6 +42,11 @@ namespace psibase
    struct transaction_context;
    struct action_context;
 
+   struct timeout_exception : std::exception
+   {
+      const char* what() const noexcept override { return "transaction timed out"; }
+   };
+
    struct execution_context_impl;
    struct execution_context
    {
@@ -59,6 +64,9 @@ namespace psibase
       void exec_called(uint64_t caller_flags, action_context& act_context);
       void exec_verify(action_context& act_context);
       void exec_rpc(action_context& act_context);
+
+      // Cancel execution because of timeout; may be called from another thread
+      void async_timeout();
    };
 
 }  // namespace psibase

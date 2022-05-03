@@ -152,6 +152,9 @@ namespace psibase
 
    execution_context& transaction_context::get_execution_context(AccountNumber contract)
    {
+      std::lock_guard<std::mutex> guard{ec_mutex};
+      if (ec_canceled)
+         throw timeout_exception{};
       auto it = execution_contexts.find(contract);
       if (it != execution_contexts.end())
          return it->second;
@@ -160,5 +163,13 @@ namespace psibase
       auto& memory = block_context.system_context.execution_memories[execution_contexts.size()];
       return execution_contexts.insert({contract, execution_context{*this, memory, contract}})
           .first->second;
+   }
+
+   void transaction_context::async_timeout()
+   {
+      std::lock_guard<std::mutex> guard{ec_mutex};
+      ec_canceled = true;
+      for (auto& [_, ec] : execution_contexts)
+         ec.async_timeout();
    }
 }  // namespace psibase

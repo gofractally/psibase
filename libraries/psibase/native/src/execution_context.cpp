@@ -1,5 +1,6 @@
 #include <psibase/execution_context.hpp>
 
+#include <atomic>
 #include <boost/multi_index/key.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
@@ -106,6 +107,7 @@ namespace psibase
             return result;
          ind.modify(it, [&](auto& x) { result = std::move(x.backend); });
          ind.erase(it);
+         result->get_module().allocator.enable_code(true);
          return result;
       }
    };
@@ -144,6 +146,7 @@ namespace psibase
       transaction_context&       trx_context;
       eosio::vm::wasm_allocator& wa;
       std::unique_ptr<backend_t> backend;
+      std::atomic<bool>          timed_out = false;
       account_row                contract_account;
       bool                       initialized         = false;
       action_context*            current_act_context = nullptr;  // Changes during recursion
@@ -201,9 +204,18 @@ namespace psibase
       {
          auto prev           = current_act_context;
          current_act_context = &act_context;
-         if (!initialized)
-            init();
-         rethrow_vm_except(f);
+         try
+         {
+            if (!initialized)
+               init();
+            rethrow_vm_except(f);
+         }
+         catch (...)
+         {
+            if (timed_out)
+               throw timeout_exception{};
+            throw;
+         }
          current_act_context = prev;
       }
 
@@ -418,7 +430,6 @@ namespace psibase
 
       // TODO: restrict key size
       // TODO: restrict value size
-      // TODO: don't let timer abort db operation
       void kvPut(uint32_t map, span<const char> key, span<const char> value)
       {
          if (map == uint32_t(kv_map::native_constrained))
@@ -442,7 +453,6 @@ namespace psibase
       }
 
       // TODO: restrict value size
-      // TODO: don't let timer abort db operation
       uint64_t kvPutSequential(uint32_t map, span<const char> value)
       {
          auto  m     = get_map_write_sequential(map);
@@ -471,7 +481,6 @@ namespace psibase
          return indexNumber;
       }  // kvPutSequential()
 
-      // TODO: don't let timer abort db operation
       void kvRemove(uint32_t map, span<const char> key)
       {
          clear_result();
@@ -489,20 +498,17 @@ namespace psibase
          db.kvRemoveRaw(m, {key.data(), key.size()});
       }
 
-      // TODO: don't let timer abort db operation
       uint32_t kvGet(uint32_t map, span<const char> key)
       {
          return set_result(db.kvGetRaw(get_map_read(map), {key.data(), key.size()}));
       }
 
-      // TODO: don't let timer abort db operation
       uint32_t kvGetSequential(uint32_t map, uint64_t indexNumber)
       {
          auto m = get_map_read_sequential(map);
          return set_result(db.kvGetRaw(m, psio::convert_to_key(indexNumber)));
       }
 
-      // TODO: don't let timer abort db operation
       uint32_t kvGreaterEqual(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          check(match_key_size <= key.size(), "match_key_size is larger than key");
@@ -513,7 +519,6 @@ namespace psibase
              db.kvGreaterEqualRaw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
 
-      // TODO: don't let timer abort db operation
       uint32_t kvLessThan(uint32_t map, span<const char> key, uint32_t match_key_size)
       {
          check(match_key_size <= key.size(), "match_key_size is larger than key");
@@ -524,7 +529,6 @@ namespace psibase
              db.kvLessThanRaw(get_map_read(map), {key.data(), key.size()}, match_key_size));
       }
 
-      // TODO: don't let timer abort db operation
       uint32_t kvMax(uint32_t map, span<const char> key)
       {
          if (key_has_contract_prefix(map))
@@ -611,5 +615,11 @@ namespace psibase
       impl->exec(act_context, [&] {  //
          (*impl->backend)(*impl, "env", "serve");
       });
+   }
+
+   void execution_context::async_timeout()
+   {
+      impl->timed_out = true;
+      impl->backend->get_module().allocator.disable_code();
    }
 }  // namespace psibase
