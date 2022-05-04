@@ -15,7 +15,6 @@ namespace stubs
 {
    // Replace with auth calls when available
    bool require_auth(AccountNumber acc) { return true; }
-   void burnNFT() { check(false, "DB missing ability to delete records"); }
 }  // namespace stubs
 
 NID NftSys::mint()
@@ -43,16 +42,13 @@ NID NftSys::mint()
 
 void NftSys::burn(NID nftId)
 {
-   auto nftTable = db.open<NftTable_t>();
-   auto nftIdx   = nftTable.get_index<0>();
-   auto nft      = nftIdx.get(nftId);
+   auto record = getNft(nftId);
 
-   check(nft.has_value(), Errors::nftDNE);
-   check(nft->owner == get_sender(), Errors::missingRequiredAuth);
+   check(record.owner == get_sender(), Errors::missingRequiredAuth);
 
-   stubs::burnNFT();
+   db.open<NftTable_t>().erase(nftId);
 
-   emit().ui().burned(nft->id);
+   emit().ui().burned(nftId);
 }
 
 void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<String> memo)
@@ -141,6 +137,11 @@ NftRecord NftSys::getNft(NID nftId)
    check(nftRecord.has_value(), Errors::nftDNE);
 
    return *nftRecord;
+}
+
+bool NftSys::exists(NID nftId)
+{
+   return db.open<NftTable_t>().get_index<0>().get(nftId).has_value();
 }
 
 bool NftSys::isAutodebit(psibase::AccountNumber account)

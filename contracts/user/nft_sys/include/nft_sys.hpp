@@ -24,6 +24,7 @@ namespace UserContract
 
       // Read-only:
       NftRecord getNft(NID nftId);
+      bool      exists(NID nftId);
       bool      isAutodebit(psibase::AccountNumber account);
 
      private:
@@ -66,6 +67,7 @@ namespace UserContract
       method(autodebit, enable),
 
       method(getNft, nftId),
+      method(exists, nftId),
       method(isAutodebit, account)
    );
 
