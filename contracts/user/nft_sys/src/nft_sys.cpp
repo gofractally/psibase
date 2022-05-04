@@ -30,10 +30,9 @@ NID NftSys::mint()
    check(NftRecord::isValidKey(newId), "Nft ID invalid");
 
    nftTable.put(NftRecord{
-       .id         = newId,                     //
-       .issuer     = issuer,                    //
-       .owner      = issuer,                    //
-       .creditedTo = account_sys::null_account  //
+       .id     = newId,   //
+       .issuer = issuer,  //
+       .owner  = issuer   //
    });
 
    emit().ui().minted(newId, issuer);
@@ -54,28 +53,29 @@ void NftSys::burn(NID nftId)
 
 void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<String> memo)
 {
-   auto                   record = getNft(nftId);
-   psibase::AccountNumber sender = get_sender();
+   auto                   record       = getNft(nftId);
+   psibase::AccountNumber sender       = get_sender();
+   CreditRecord           creditRecord = getCredRecord(nftId);
+   auto isTransfer = not getNftHolder(receiver).config.get(NftHolderRecord::Flags::manualDebit);
+
    check(record.owner == sender, Errors::missingRequiredAuth);
    check(receiver != record.owner, Errors::creditorIsDebitor);
-   check(record.creditedTo == account_sys::null_account, Errors::alreadyCredited);
+   check(creditRecord.debitor == account_sys::nullAccount, Errors::alreadyCredited);
 
-   check(at<account_sys>().exists(receiver), Errors::receiverDNE);
-   bool transferred = (not getNftHolder(receiver).config.get(NftHolderRecord::Flags::manualDebit));
-
-   if (transferred)
+   if (isTransfer)
    {
       record.owner = receiver;
+      db.open<NftTable_t>().put(record);
    }
    else
    {
-      record.creditedTo = receiver;
+      creditRecord.debitor = receiver;
+      db.open<CreditTable_t>().put(creditRecord);
    }
-   db.open<NftTable_t>().put(record);
 
    emit().ui().credited(nftId, sender, receiver, memo);
 
-   if (transferred)
+   if (isTransfer)
    {
       emit().ui().transferred(nftId, sender, receiver, memo);
    }
@@ -83,33 +83,32 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
 
 void NftSys::uncredit(NID nftId, const_view<String> memo)
 {
-   auto                   record   = getNft(nftId);
-   psibase::AccountNumber sender   = get_sender();
-   psibase::AccountNumber receiver = record.creditedTo;
+   auto                   record       = getNft(nftId);
+   psibase::AccountNumber sender       = get_sender();
+   auto                   creditRecord = getCredRecord(nftId);
 
-   check(record.creditedTo != account_sys::null_account, Errors::uncreditRequiresCredit);
+   check(creditRecord.debitor != account_sys::nullAccount, Errors::uncreditRequiresCredit);
    check(record.owner == sender, Errors::creditorAction);
 
-   record.creditedTo = account_sys::null_account;
-   db.open<NftTable_t>().put(record);
+   db.open<CreditTable_t>().erase(nftId);
 
-   emit().ui().uncredited(nftId, sender, receiver, memo);
+   emit().ui().uncredited(nftId, sender, creditRecord.debitor, memo);
 }
 
 void NftSys::debit(NID nftId, const_view<String> memo)
 {
-   auto record   = getNft(nftId);
-   auto debiter  = get_sender();
-   auto creditor = record.owner;
+   auto record       = getNft(nftId);
+   auto debiter      = get_sender();
+   auto creditor     = record.owner;
+   auto creditRecord = getCredRecord(nftId);
 
-   auto creditedTo = record.creditedTo;
-   check(creditedTo != account_sys::null_account, Errors::debitRequiresCredit);
-   check(creditedTo == debiter, Errors::missingRequiredAuth);
+   check(creditRecord.debitor != account_sys::nullAccount, Errors::debitRequiresCredit);
+   check(creditRecord.debitor == debiter, Errors::missingRequiredAuth);
 
-   record.owner      = debiter;
-   record.creditedTo = account_sys::null_account;
+   record.owner = debiter;
 
    db.open<NftTable_t>().put(record);
+   db.open<CreditTable_t>().erase(nftId);
 
    emit().ui().transferred(nftId, creditor, debiter, memo);
 }
@@ -152,7 +151,26 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
    }
    else
    {
+      check(account != account_sys::nullAccount, Errors::invalidAccount);
+      check(at<account_sys>().exists(account), Errors::invalidAccount);
+
       return NftHolderRecord{account, Bitset()};
+   }
+}
+
+CreditRecord NftSys::getCredRecord(NID nftId)
+{
+   auto creditRecord = db.open<CreditTable_t>().get_index<0>().get(nftId);
+
+   if (creditRecord.has_value())
+   {
+      return *creditRecord;
+   }
+   else
+   {
+      check(exists(nftId), Errors::nftDNE);
+
+      return CreditRecord{nftId, account_sys::nullAccount};
    }
 }
 

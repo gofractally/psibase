@@ -9,17 +9,6 @@
 #include "token_sys.hpp"
 #include "types.hpp"
 
-/* 04/18/2022
- * James and Dan call notes:
- * Token IDs are auto-increment only. Reserve the first bit, so there's only 31 bits used for token ID.
- *    This is so that in the future we have a bit to play with if we want to add some capabilities to token IDs, such as 
- *    the ability to store them in a separate namespace as human readable IDs that roundtrip our compression algo.
- * Symbols are still handled by symbol table, 32 bit symbols, only uppercase, no numbers
- * Symbols are mapped to NIDs, which can be burned in the NFT contract, but the symbol table will always hold on to Symbol->NID mapping
- * Symbol IDs can be specified in a separate action on the token contract to permanently map the symbol to the token (burns underlying NFT)
- * 
-*/
-
 namespace UserContract
 {
    class TokenSys : public psibase::Contract<TokenSys>
@@ -81,55 +70,30 @@ namespace UserContract
          using Account    = psibase::AccountNumber;
          using StringView = psio::const_view<psibase::String>;
 
+         // clang-format off
          struct Ui  // History <-- Todo - Change back to History
          {
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
-            void minted(TID        tokenId,
-                        Account    minter,
-                        Quantity   amount,
-                        Account    receiver,
-                        StringView memo)
-            {
-            }
+            void minted(TID tokenId, Account minter, Quantity amount, Account receiver, StringView memo) {}
             void set(TID tokenId, Account setter, uint8_t flag) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
-
             void enabledManDeb(Account account) {}
             void disabledManDeb(Account account) {}
             //};
 
             //struct Ui
             //{
-            void credited(TID        tokenId,
-                          Account    sender,
-                          Account    receiver,
-                          Quantity   amount,
-                          StringView memo)
-            {
-            }
-            void uncredited(TID        tokenId,
-                            Account    sender,
-                            Account    receiver,
-                            Quantity   amount,
-                            StringView memo)
-            {
-            }
+            void credited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
+            void uncredited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
             //};
 
             //struct Merkle
             //{
-            void transferred(TID        tokenId,
-                             Account    sender,
-                             Account    receiver,
-                             Quantity   amount,
-                             StringView memo)
-            {
-            }
-            void recalled(TID tokenId, Account from, Account to, Quantity amount, StringView memo)
-            {
-            }
+            void transferred(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
+            void recalled(TID tokenId, Account from, Account to, Quantity amount, StringView memo) {}
          };
       };
+      // clang-format on
    };
 
    // clang-format off

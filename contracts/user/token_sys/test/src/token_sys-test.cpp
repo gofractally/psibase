@@ -33,7 +33,6 @@ namespace
 }  // namespace
 
 /* Todo:
- *    Implement inflation limits
  *    Templatize psibase::Bitset
  *    Test Precision and Quantity types
  *    Code review psibase::Bitset and psibase::String
@@ -42,11 +41,13 @@ namespace
  *    Consider if stake/unstake should be native token actions, and if there should be a stake recipient field.
  *    Update NFT flags
  *    We should allow users to configure a management contract to be notified when they debit from their account.
+ *    Add test cases for verifying events were emitted properly in this and nft tests
 */
 
 /* Questions
  * How does billing work, if Bob has auto-debit enabled, then a token issuer could issue him a new token, and 
    his balance would increase. Who pays for the billing of that storage?
+ * Best practices on when to emit events, do they need to come after the database modification actually happens? Or anywhere within the action?
 */
 
 SCENARIO("Creating a token")

@@ -10,7 +10,7 @@ namespace UserContract
    class NftSys : public psibase::Contract<NftSys>
    {
      public:
-      using tables = psibase::contract_tables<NftTable_t, NftHolderTable_t>;
+      using tables = psibase::contract_tables<NftTable_t, NftHolderTable_t, CreditTable_t>;
       static constexpr psibase::AccountNumber contract = "nft-sys"_a;
 
       NID  mint();
@@ -25,6 +25,7 @@ namespace UserContract
       // Read-only:
       NftRecord       getNft(NID nftId);
       NftHolderRecord getNftHolder(psibase::AccountNumber account);
+      CreditRecord    getCredRecord(NID nftId);
       bool            exists(NID nftId);
 
      private:
@@ -68,6 +69,7 @@ namespace UserContract
 
       method(getNft, nftId),
       method(getNftHolder, account),
+      method(getCredRecord, nftid),
       method(exists, nftId)
    );
 

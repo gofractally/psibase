@@ -7,6 +7,14 @@
 
 #include "nft_sys.hpp"
 
+/* 04/18/2022
+ * James and Dan call notes:
+ * Symbols are still handled by symbol table, 32 bit symbols, only uppercase, no numbers
+ * Symbols are mapped to NIDs, which can be burned in the NFT contract, but the symbol table will always hold on to Symbol->NID mapping
+ * Symbol IDs can be specified in a separate action on the token contract to permanently map the symbol to the token (burns underlying NFT)
+ * 
+*/
+
 namespace symbol_sys
 {
    struct symbol_row

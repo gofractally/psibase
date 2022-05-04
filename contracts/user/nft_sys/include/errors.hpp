@@ -14,6 +14,7 @@ namespace UserContract
       constexpr std::string_view receiverDNE     = "Receiver DNE";
       constexpr std::string_view alreadyCredited = "NFT already credited to an account";
       constexpr std::string_view redundantUpdate = "Specified update is redundant";
+      constexpr std::string_view invalidAccount  = "Invalid account";
 
       // Todo: Move to somewhere common
       constexpr std::string_view missingRequiredAuth = "Missing required authority";

@@ -19,7 +19,8 @@ using UserContract::NftRecord;
 
 namespace
 {
-   constexpr bool storageBillingImplemented = false;
+   constexpr bool storageBillingImplemented        = false;
+   constexpr bool contextFreeValidationImplemented = false;
 
    struct DiskUsage_NftRecord
    {
@@ -49,10 +50,9 @@ SCENARIO("Minting & burning nfts")
          AND_THEN("The NFT exists")
          {
             NftRecord expectedNft{
-                .id         = 1,         // First minted NFT (skipping 0)
-                .issuer     = alice.id,  //
-                .owner      = alice.id,  //
-                .creditedTo = system_contract::account_sys::null_account  //
+                .id     = 1,         // First minted NFT (skipping 0)
+                .issuer = alice.id,  //
+                .owner  = alice.id   //
             };
 
             auto nft = a.getNft(mint.returnVal()).returnVal();
@@ -151,6 +151,11 @@ SCENARIO("Transferring NFTs")
          auto isManualDebit =
              b.getNftHolder(bob).returnVal().config.get(NftHolderRecord::Flags::manualDebit);
          CHECK(isManualDebit);
+
+         AND_THEN("Storage billing is updated correctly")
+         {  //
+            CHECK(storageBillingImplemented);
+         }
       }
 
       THEN("Alice is unable to credit, uncredit, or debit a non-existent NFT")
@@ -183,6 +188,11 @@ SCENARIO("Transferring NFTs")
          THEN("Alice may credit the NFT to Bob")
          {
             CHECK(a.credit(nft.id, bob, "memo").succeeded());
+
+            AND_THEN("Storage billing is updated correctly")
+            {  //
+               CHECK(storageBillingImplemented);
+            }
          }
          THEN("Alice may credit the NFT to Bob with an acceptably long memo")
          {
@@ -203,7 +213,8 @@ SCENARIO("Transferring NFTs")
                 "0123456789ABCDEF"
                 "0123456789ABCDEF"
                 "1";
-            CHECK(a.credit(nft.id, bob, invalidMemo).failed(String::error_invalid));
+            //CHECK(a.credit(nft.id, bob, invalidMemo).failed(String::error_invalid));
+            CHECK(contextFreeValidationImplemented);
          }
          WHEN("Alice credits the NFT to Bob")
          {
@@ -237,9 +248,8 @@ SCENARIO("Transferring NFTs")
                {
                   CHECK(bob.id != b.getNft(nft.id).returnVal().owner);
                }
-               THEN("The payer for storage costs of the NFT do not change")
-               {
-                  CHECK(credit.diskConsumed({{}}));
+               THEN("Storage billing is updated correctly")
+               {  //
                   CHECK(storageBillingImplemented);
                }
                THEN("Alice and Charlie may not debit the NFT")
@@ -267,9 +277,9 @@ SCENARIO("Transferring NFTs")
                   auto uncredit = a.uncredit(nft.id, "memo");
                   CHECK(uncredit.succeeded());
 
-                  AND_THEN("The payer for storage costs of the NFT do not change")
-                  {
-                     CHECK(uncredit.diskConsumed({{}}));
+                  AND_THEN("The storage costs for the entry in the credit table is refunded.")
+                  {  //
+                     CHECK(storageBillingImplemented);
                   }
                }
                THEN("Alice may not credit the NFT to someone else")

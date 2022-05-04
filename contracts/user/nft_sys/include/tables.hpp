@@ -31,16 +31,32 @@ namespace UserContract
       NID                    id;
       psibase::AccountNumber issuer;
       psibase::AccountNumber owner;
-      psibase::AccountNumber creditedTo;
 
       static bool isValidKey(const NID& id) { return id != 0; }
 
       friend std::strong_ordering operator<=>(const NftRecord&, const NftRecord&) = default;
    };
-   PSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
-   // Todo: Also index by issuer and owner when additional indices are possible
+   PSIO_REFLECT(NftRecord, id, issuer, owner);
    using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;
 
-   // Todo: separate creditedTo into its own table
+   // struct CreditTableKey_t
+   // {
+   //    psibase::AccountNumber creditor;
+   //    NID                    nftId;
+
+   //    friend std::strong_ordering operator<=>(const CreditTableKey_t&,
+   //                                            const CreditTableKey_t&) = default;
+   // };
+   // PSIO_REFLECT(CreditTableKey_t, creditor, nftId);
+
+   struct CreditRecord
+   {
+      NID                    nftId;
+      psibase::AccountNumber debitor;
+
+      friend std::strong_ordering operator<=>(const CreditRecord&, const CreditRecord&) = default;
+   };
+   PSIO_REFLECT(CreditRecord, nftId, debitor);
+   using CreditTable_t = psibase::table<CreditRecord, &CreditRecord::nftId>;
 
 }  // namespace UserContract
