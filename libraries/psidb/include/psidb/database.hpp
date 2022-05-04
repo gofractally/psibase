@@ -19,6 +19,7 @@ namespace psidb
       {
       }
       transaction start_transaction() { return {&_storage, _storage.start_transaction()}; }
+      void        async_flush() { _storage.async_flush(); }
 
      private:
       page_manager _storage;

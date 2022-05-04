@@ -137,11 +137,20 @@ namespace psidb
       // WARNING: does NOT synchronize with for_each.
       // After a page is unlinked it cannot be reused safely
       // until the next gc cycle.
+      // This node may not be copied in parallel with unlink.
+      // Only one unlink can run at a time
       void unlink() {
-         page_internal_nav* prev = this;
-         page_internal_nav* current  = prev->next;
-         if(current == this) {
-            prev->next = current->next;
+         page_internal_node* prev = this;
+         while(true) {
+            page_internal_node* current  = prev->next.load(std::memory_order_acquire);
+            if(current == this) {
+               // The previous node might have been copied
+               if(prev->next.compare_exchange_strong(current, _next.load(std::memory_order_relaxed), std::memory_order::relaxed)) {
+                  return;
+               }
+            } else {
+               prev = current;
+            }
          }
       }
 #endif

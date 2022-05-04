@@ -64,7 +64,7 @@ TEST_CASE("lower_bound simple", "[lower_bound]")
    CHECK_CURSOR(cursor, "a", "v1");
 }
 
-TEST_CASE("lower_bound large", "[lower_bound]")
+TEST_CASE("lower_bound many", "[lower_bound]")
 {
    tmp_file file;
 
@@ -94,6 +94,66 @@ TEST_CASE("lower_bound large", "[lower_bound]")
       {
          CHECK(!cursor.valid());
       }
+   }
+}
+
+TEST_CASE("lower bound large value", "[lower_bound]")
+{
+   tmp_file file;
+
+   psidb::database db(file.native_handle(), 1024);
+
+   auto        trx    = db.start_transaction();
+   auto        cursor = trx.get_cursor();
+   std::string value(65536, static_cast<char>(0xCC));
+   cursor.insert("a", value);
+   cursor.lower_bound("a");
+   CHECK_CURSOR(cursor, "a", value);
+}
+
+TEST_CASE("persistence simple", "[persistence]")
+{
+   tmp_file file;
+
+   std::string value = "v1";
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+
+      auto trx    = db.start_transaction();
+      auto cursor = trx.get_cursor();
+      cursor.insert("a", value);
+      trx.commit();
+      db.async_flush();
+   }
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+      auto            trx    = db.start_transaction();
+      auto            cursor = trx.get_cursor();
+      cursor.lower_bound("a");
+      CHECK_CURSOR(cursor, "a", value);
+   }
+}
+
+TEST_CASE("persistence large value", "[persistence]")
+{
+   tmp_file file;
+
+   std::string value(65536, static_cast<char>(0xCC));
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+
+      auto trx    = db.start_transaction();
+      auto cursor = trx.get_cursor();
+      cursor.insert("a", value);
+      trx.commit();
+      db.async_flush();
+   }
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+      auto            trx    = db.start_transaction();
+      auto            cursor = trx.get_cursor();
+      cursor.lower_bound("a");
+      CHECK_CURSOR(cursor, "a", value);
    }
 }
 

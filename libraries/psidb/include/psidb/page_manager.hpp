@@ -8,6 +8,7 @@
 #include <psidb/page_header.hpp>
 #include <psidb/sync/mutex_set.hpp>
 #include <psidb/sync/shared_queue.hpp>
+#include <stdexcept>
 #include <utility>
 
 namespace psidb
@@ -80,6 +81,17 @@ namespace psidb
             return read_page(id);
          }
       }
+      void* get_pages(page_id& id, std::size_t count)
+      {
+         if (is_memory_page(id))
+         {
+            return translate_page_address(id);
+         }
+         else
+         {
+            return read_pages(id, count);
+         }
+      }
       std::pair<page_header*, page_id> allocate_page()
       {
          page_header* result = static_cast<page_header*>(_allocator.allocate(page_size));
@@ -148,6 +160,33 @@ namespace psidb
             page->set_dirty(switch_dirty_flag(_dirty_flag), true);
          }
       }
+      enum value_reference_flags : std::uint16_t
+      {
+         file,
+         memory
+      };
+      struct value_reference
+      {
+         value_reference_flags flags;
+         std::uint16_t         offset;
+         std::uint32_t         size;
+         union
+         {
+            const char* data;
+            page_id     page;
+         };
+      };
+      value_reference clone_value(std::string_view data)
+      {
+         if (data.size() > UINT32_MAX)
+         {
+            throw std::invalid_argument("value too large");
+         }
+         void* copy = _allocator.allocate(data.size());
+         std::memcpy(copy, data.data(), data.size());
+         return {value_reference_flags::memory, 0, static_cast<std::uint32_t>(data.size()),
+                 static_cast<const char*>(copy)};
+      }
 
      private:
       page_manager(const page_manager&) = delete;
@@ -170,8 +209,10 @@ namespace psidb
 
       void    queue_gc(page_header* node);
       page_id allocate_file_page();
+      page_id allocate_file_pages(std::size_t count);
 
       // Manage the in memory page cache
+      void*        read_pages(page_id& id, std::size_t count);
       page_header* read_page(page_id& id);
       page_header* read_page(node_ptr ptr, page_id id);
       void         evict_page(node_ptr ptr);
@@ -179,6 +220,10 @@ namespace psidb
       // Write dirty pages back to the filesystem
       void write_worker();
       void queue_write(page_id dest, page_header* src, std::atomic<int>* refcount);
+      void write_pages(page_id           dest,
+                       const void*       src,
+                       std::size_t       count,
+                       std::atomic<int>* refcount);
       void write_page(page_header* page, page_flags dirty_flag, std::atomic<int>* refcount);
       bool write_tree(page_id           page,
                       version_type      version,
@@ -187,7 +232,7 @@ namespace psidb
       void start_flush(checkpoint_root* c);
 
       // Raw file io
-      void read_page(void* out, page_id id);
+      void read_page(void* out, page_id id, std::size_t count = 1);
       void write_page(const void* in, page_id id);
 
       // Database header ops
@@ -200,17 +245,17 @@ namespace psidb
       struct write_queue_element
       {
          std::int64_t dest;
-         void*        src;
+         const void*  src;
          std::size_t  size;
          // completion handler
          std::atomic<int>* counter;
       };
 
       allocator                         _allocator;
-      int                               fd          = -1;
-      page_flags                        _dirty_flag = page_flags::dirty0;
-      bool                              _flush_pending;
-      version_type                      _flush_version;
+      int                               fd             = -1;
+      page_flags                        _dirty_flag    = page_flags::dirty0;
+      bool                              _flush_pending = false;
+      version_type                      _flush_version = 0;
       shared_queue<write_queue_element> _write_queue;
       // TODO: use a real allocation algorithm
       page_id next_file_page = max_memory_pages;

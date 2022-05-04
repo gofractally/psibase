@@ -80,13 +80,24 @@ namespace psidb
          std::uint32_t child;
          // Insert into the leaf
          {
+            char         buf[16];
+            std::uint8_t flags = 0;
+            if (value.size() > page_leaf::max_inline_value_size)
+            {
+               page_manager::value_reference ref = db->clone_value(value);
+               std::memcpy(&buf, &ref, sizeof(buf));
+               static_assert(sizeof(buf) == sizeof(ref));
+               flags = 1;
+               value = {buf, buf + sizeof(buf)};
+            }
             auto p = maybe_clone<page_leaf>(leaf, depth);
-            if (p->insert(leaf, key, value))
+            if (p->insert(leaf, key, value, flags))
             {
                return;
             }
             auto [new_page, new_page_id] = db->allocate_page();
-            key   = p->split(static_cast<page_leaf*>(new_page), p->get_offset(leaf), key, value);
+            key =
+                p->split(static_cast<page_leaf*>(new_page), p->get_offset(leaf), key, value, flags);
             child = new_page_id;
             db->touch_page(new_page, version);
          }
@@ -137,8 +148,27 @@ namespace psidb
       }
       std::string_view get_value() const
       {
-         auto p = leaf.get_parent<page_leaf>();
-         return page_leaf::unpad(p->get_value(p->get_offset(leaf)));
+         auto p              = leaf.get_parent<page_leaf>();
+         auto [value, flags] = p->get_value(p->get_offset(leaf));
+         if (flags)
+         {
+            page_manager::value_reference data;
+            assert(value.size() == sizeof(data));
+            std::memcpy(&data, value.data(), sizeof(data));
+            if (data.flags == page_manager::value_reference_flags::memory)
+            {
+               return {data.data, data.size};
+            }
+            else
+            {
+               void* page_base = db->get_pages(data.page, (data.size + page_size - 1) / page_size);
+               return {reinterpret_cast<const char*>(page_base) + data.offset, data.size};
+            }
+         }
+         else
+         {
+            return page_leaf::unpad(value);
+         }
       }
 
      private:

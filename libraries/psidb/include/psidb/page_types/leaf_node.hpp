@@ -26,6 +26,7 @@ namespace psidb
    struct page_leaf : page_header
    {
       static constexpr std::size_t capacity = (page_size - sizeof(page_header) - 2) / 36;
+      static constexpr std::size_t max_inline_value_size = 16;
       // each kv pair is at least 32-bytes
       std::uint8_t size;
       std::uint8_t total_words;
@@ -54,13 +55,17 @@ namespace psidb
       {
          return {buf + kv.offset * 16, buf + kv.offset * 16 + kv.key_size * 16};
       }
-      std::string_view get_value(kv_storage kv) const
+      std::pair<std::string_view, std::uint8_t> get_value(kv_storage kv) const
       {
-         return {buf + kv.offset * 16 + kv.key_size * 16,
-                 buf + kv.offset * 16 + kv.key_size * 16 + kv.value_size * 16};
+         return {{buf + kv.offset * 16 + kv.key_size * 16,
+                  buf + kv.offset * 16 + kv.key_size * 16 + kv.value_size * 16},
+                 kv.flags};
       }
       std::string_view get_key(uint16_t idx) const { return get_key(key_values[idx]); }
-      std::string_view get_value(uint16_t idx) const { return get_value(key_values[idx]); }
+      std::pair<std::string_view, std::uint8_t> get_value(uint16_t idx) const
+      {
+         return get_value(key_values[idx]);
+      }
 
       leaf_ptr child(std::uint16_t idx) { return {this, key_values + idx}; }
 
@@ -85,11 +90,11 @@ namespace psidb
       }
       // \pre the key must be greater than any key currently in the node
       // \pre key and value must be correctly padded
-      void append_internal(std::string_view key, std::string_view value)
+      void append_internal(std::string_view key, std::string_view value, std::uint8_t flags)
       {
          assert(size < capacity);
          key_values[size] = {total_words, static_cast<std::uint8_t>(key.size() / 16),
-                             static_cast<std::uint8_t>(value.size() / 16), 0};
+                             static_cast<std::uint8_t>(value.size() / 16), flags};
          ++size;
          append_to_buf(key);
          append_to_buf(value);
@@ -101,13 +106,15 @@ namespace psidb
          other->type        = page_type::leaf;
          for (std::size_t i = 0; i < size; ++i)
          {
-            other->append_internal(get_key(i), get_value(i));
+            auto [value, flags] = get_value(i);
+            other->append_internal(get_key(i), value, flags);
          }
       }
       std::string_view split(page_leaf*       other,
                              std::uint16_t    idx,
                              key_type         key,
-                             std::string_view value)
+                             std::string_view value,
+                             std::uint8_t     flags)
       {
          std::uint32_t total_kv_size = 0;
          other->size                 = 0;
@@ -117,7 +124,8 @@ namespace psidb
          {
             for (; start != end; ++start)
             {
-               other->append_internal(get_key(start), get_value(start));
+               auto [value, flags] = get_value(start);
+               other->append_internal(get_key(start), value, flags);
             }
          };
          for (std::uint32_t i = 0; i < idx; ++i)
@@ -126,7 +134,7 @@ namespace psidb
             if (total_kv_size > sizeof(buf) / 2)
             {
                copy_some(i, idx);
-               other->insert_unchecked(other->size, key, value);
+               other->insert_unchecked(other->size, key, value, flags);
                copy_some(idx, size);
                truncate(i);
                return other->get_key(0);
@@ -136,7 +144,7 @@ namespace psidb
             total_kv_size += key.size() + value.size();
             if (total_kv_size > sizeof(buf) / 2)
             {
-               other->append_internal(key, value);
+               other->insert_unchecked(other->size, key, value, flags);
                copy_some(idx, size);
                truncate(idx);
                return other->get_key(0);
@@ -150,7 +158,7 @@ namespace psidb
                copy_some(i, size);
                // OPT: truncate and insert can be merged
                truncate(i);
-               insert_unchecked(idx, key, value);
+               insert_unchecked(idx, key, value, flags);
                return other->get_key(0);
             }
          }
@@ -174,31 +182,44 @@ namespace psidb
             auto& kv          = key_values[i];
             auto  prev_offset = offset;
             append_string(get_key(kv));
-            append_string(get_value(kv));
+            append_string(get_value(kv).first);
             kv.offset = prev_offset / 16;
          }
          std::memcpy(buf, tmp, offset);
          size        = pos;
          total_words = offset / 16;
       }
-      bool insert_unchecked(std::uint16_t pos, key_type key, std::string_view value)
+      bool insert_unchecked(std::uint16_t    pos,
+                            key_type         key,
+                            std::string_view value,
+                            std::uint8_t     flags)
       {
          assert(size < capacity);
          shift_array(key_values + pos, key_values + size);
          ++size;
-         key_values[pos] = {total_words, static_cast<std::uint8_t>(key.size() / 16 + 1),
-                            static_cast<std::uint8_t>(value.size() / 16 + 1), 0};
-         append_padded(key);
-         append_padded(value);
+         if (flags)
+         {
+            key_values[pos] = {total_words, static_cast<std::uint8_t>(key.size() / 16 + 1),
+                               static_cast<std::uint8_t>(value.size() / 16), flags};
+            append_padded(key);
+            append_to_buf(value);
+         }
+         else
+         {
+            key_values[pos] = {total_words, static_cast<std::uint8_t>(key.size() / 16 + 1),
+                               static_cast<std::uint8_t>(value.size() / 16 + 1), flags};
+            append_padded(key);
+            append_padded(value);
+         }
          return true;
       }
-      bool insert(leaf_ptr pos, key_type key, std::string_view value)
+      bool insert(leaf_ptr pos, key_type key, std::string_view value, std::uint8_t flags)
       {
          if (total_words * 16 + ((key.size() / 16) + (value.size() / 16) + 2) * 16 > sizeof(buf))
          {
             return false;
          }
-         insert_unchecked(get_offset(pos), key, value);
+         insert_unchecked(get_offset(pos), key, value, flags);
          return true;
       }
       leaf_ptr lower_bound(std::string_view key)

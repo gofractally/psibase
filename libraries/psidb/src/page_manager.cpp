@@ -33,14 +33,17 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages) : _allocator(nu
       // initialize new database
       auto [page, id] = allocate_page();
       page->type      = page_type::leaf;
-      page->version   = 0;
+      page->version   = 1;
+      touch_page(page, page->version);
       static_cast<page_leaf*>(page)->clear();
       next_file_page += 2;
 
       checkpoint_root h     = {};
+      h.version             = page->version;
       h.table_roots[0]      = id;
-      auto [iter, inserted] = active_checkpoints.emplace(0, h);
-      stable_checkpoint = last_commit = head = &iter->second;
+      auto [iter, inserted] = active_checkpoints.emplace(page->version, h);
+      stable_checkpoint     = nullptr;
+      last_commit = head = &iter->second;
    }
    else
    {
@@ -66,6 +69,24 @@ psidb::page_manager::~page_manager()
 static off_t get_file_offset(page_id id)
 {
    return static_cast<off_t>(id - max_memory_pages) * page_size;
+}
+
+void* psidb::page_manager::read_pages(page_id& id, std::size_t count)
+{
+   auto            mutex = _page_load_mutex[id];
+   std::lock_guard l{mutex};
+
+   if (is_memory_page(id))
+   {
+      return translate_page_address(id);
+   }
+
+   void* result = _allocator.allocate(count * page_size);
+
+   read_page(result, id, count);
+
+   id = get_id(static_cast<page_header*>(result));
+   return result;
 }
 
 psidb::page_header* psidb::page_manager::read_page(page_id& id)
@@ -119,6 +140,13 @@ page_id psidb::page_manager::allocate_file_page()
    return next_file_page++;
 }
 
+page_id psidb::page_manager::allocate_file_pages(std::size_t count)
+{
+   page_id result = next_file_page;
+   next_file_page += count;
+   return result;
+}
+
 // TODO: implement
 void page_manager::queue_gc(page_header* node) {}
 
@@ -153,7 +181,7 @@ void psidb::page_manager::write_worker()
          else
          {
             size -= res;
-            src = static_cast<char*>(src) + res;
+            src = static_cast<const char*>(src) + res;
             dest += res;
          }
       } while (size != 0);
@@ -175,6 +203,45 @@ void psidb::page_manager::evict_page(node_ptr ptr) {
 }
 #endif
 
+#if 0
+/*
+Managing the free list:
+
+A page has a live range, which is [version created, version removed)
+A page can be reused when there is no checkpoint in that range
+
+Every checkpoint holds a list of pages that are used by it, but not
+by any later checkpoint.  When a checkpoint is deleted, this list is
+merged into the previous checkpoint.
+*/
+
+struct freelist {
+   // Optimized for few large transactions.
+   // A mergeable priority queue would be faster for many small transactions.
+   std::vector<std::vector<page_header*>> free_pages;
+   // Free all pages more recent than version
+   template<typename Disposer>
+   void free(version_type version, Disposer&& dispose) {
+      for(auto& v : other.free_pages) {
+         while(!v.empty() && v.back()->version > version) {
+            dispose(v.back());
+            v.pop_back();
+         }
+      }
+   }
+   void splice(freelist& other) {
+      for(auto& v : other.free_pages) {
+         while(!v.empty() && v.back()->version > version) {
+            v.pop_back();
+         }
+         if(!v.empty()) {
+            free_pages.push_back(std::move(v));
+         }
+      }
+   }
+};
+#endif
+
 void psidb::page_manager::write_page(page_header*      page,
                                      page_flags        dirty_flag,
                                      std::atomic<int>* refcount)
@@ -184,6 +251,28 @@ void psidb::page_manager::write_page(page_header*      page,
    page->set_dirty(dirty_flag, false);
    queue_write(dest, page, refcount);
    refcount->fetch_add(1, std::memory_order_relaxed);
+}
+
+void psidb::page_manager::write_pages(page_id           dest,
+                                      const void*       src,
+                                      std::size_t       count,
+                                      std::atomic<int>* refcount)
+{
+   _write_queue.push({get_file_offset(dest), src, page_size * count, refcount});
+   refcount->fetch_add(1, std::memory_order_relaxed);
+}
+
+static void fix_data_reference(std::string_view value,
+                               page_id          page,
+                               std::uint16_t    offset,
+                               std::uint32_t    size)
+{
+   page_manager::value_reference result{.flags  = page_manager::value_reference_flags::file,
+                                        .offset = offset,
+                                        .size   = size,
+                                        .page   = page};
+   // FIXME: This probably needs to be an atomic store -- which means that reads also need to be atomic
+   std::memcpy(const_cast<char*>(value.data()), &result, sizeof(result));
 }
 
 bool psidb::page_manager::write_tree(page_id           page,
@@ -228,7 +317,84 @@ bool psidb::page_manager::write_tree(page_id           page,
       }
       else
       {
-         write_page(header, dirty_flag, refcount);
+         auto*       leaf              = static_cast<page_leaf*>(header);
+         std::size_t current_page_size = page_size;
+         std::size_t pages             = 0;
+         for (std::size_t i = 0; i < leaf->size; ++i)
+         {
+            auto [value, flags] = leaf->get_value(i);
+            if (flags)
+            {
+               value_reference ref;
+               assert(value.size() == sizeof(ref));
+               std::memcpy(&ref, value.data(), sizeof(ref));
+               if (ref.size > page_size)
+               {
+                  // pages += (ref.size + page_size - 1)/page_size;
+                  current_page_size = page_size;
+                  auto page         = allocate_file_pages((ref.size + page_size - 1) / page_size);
+                  write_pages(page, ref.data, (ref.size + page_size - 1) / page_size, refcount);
+                  fix_data_reference(value, page, 0, ref.size);
+               }
+               else if (ref.size + current_page_size > page_size)
+               {
+                  ++pages;
+                  current_page_size = ref.size;
+               }
+               else
+               {
+                  current_page_size += ref.size;
+               }
+            }
+         }
+         if (pages != 0)
+         {
+            void* data_pages           = _allocator.allocate(pages * page_size);
+            current_page_size          = page_size;
+            std::size_t page_num       = 0;
+            page_id     data_base_page = allocate_file_pages(pages);
+            for (std::size_t i = 0; i < leaf->size; ++i)
+            {
+               auto [value, flags] = leaf->get_value(i);
+               if (flags)
+               {
+                  // TODO: handle values that are already stored in the file
+                  value_reference ref;
+                  assert(value.size() == sizeof(ref));
+                  std::memcpy(&ref, value.data(), sizeof(ref));
+                  if (ref.size > page_size)
+                  {
+                     // pages += (ref.size + page_size - 1)/page_size;
+                     current_page_size = page_size;
+                  }
+                  else if (ref.size + current_page_size > page_size)
+                  {
+                     // TODO: should we zero the rest of the current_page?
+                     std::memcpy(reinterpret_cast<char*>(data_pages) + page_num * page_size,
+                                 ref.data, ref.size);
+                     // TODO: this probably needs to run after the I/O has been queued
+                     fix_data_reference(value, data_base_page + page_num * page_size, 0, ref.size);
+                     ++page_num;
+                     current_page_size = ref.size;
+                  }
+                  else
+                  {
+                     std::memcpy(reinterpret_cast<char*>(data_pages) + page_num * page_size +
+                                     current_page_size,
+                                 ref.data, ref.size);
+                     fix_data_reference(value, data_base_page + page_num * page_size,
+                                        current_page_size, ref.size);
+                     current_page_size += ref.size;
+                  }
+               }
+            }
+            write_pages(data_base_page, data_pages, pages, refcount);
+            write_page(header, dirty_flag, refcount);
+         }
+         else
+         {
+            write_page(header, dirty_flag, refcount);
+         }
          return true;
       }
    }
@@ -239,17 +405,17 @@ void psidb::page_manager::start_flush(checkpoint_root* c)
    std::atomic<int>* refcount = new std::atomic<int>(1);
    // TODO: flush all tables
    write_tree(c->table_roots[0], c->version, switch_dirty_flag(_dirty_flag), refcount);
-   if (refcount->fetch_add(-1, std::memory_order_relaxed))
+   if (refcount->fetch_add(-1, std::memory_order_relaxed) == 1)
    {
       delete refcount;
       write_header();
    }
 }
 
-void psidb::page_manager::read_page(void* out, page_id id)
+void psidb::page_manager::read_page(void* out, page_id id, std::size_t count)
 {
    char*       dest      = reinterpret_cast<char*>(out);
-   std::size_t remaining = sizeof(database_header);
+   std::size_t remaining = page_size * count;
    off_t       offset    = get_file_offset(id);
    do
    {
@@ -357,9 +523,15 @@ void psidb::page_manager::prepare_flush(page_id& root)
 
 void psidb::page_manager::prepare_header(database_header* header)
 {
+   if (stable_checkpoint == nullptr)
+   {
+      stable_checkpoint = head;
+   }
    header->checkpoints[0] = *stable_checkpoint;
+   header->checkpoints[1] = *head;
    prepare_flush(header->checkpoints[0].table_roots[0]);
-   header->num_checkpoints = 1;
+   prepare_flush(header->checkpoints[1].table_roots[0]);
+   header->num_checkpoints = 2;
    header->set_checksum();
 }
 
