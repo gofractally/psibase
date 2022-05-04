@@ -410,6 +410,12 @@ namespace psibase
          return index<T, key_type>(std::move(index_prefix));
       }
 
+      void erase(auto key)
+      {
+         auto pk = serialize_key(0, key);
+         raw::kv_remove(map, pk.data(), pk.size());
+      }
+
      private:
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
       {
