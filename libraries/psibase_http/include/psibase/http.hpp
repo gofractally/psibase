@@ -35,7 +35,7 @@ namespace psibase::http
       virtual ~server() {}
 
       static std::shared_ptr<server> create(const std::shared_ptr<const http_config>& http_config,
-                                            const std::shared_ptr<shared_state>&      shared_state);
+                                            const std::shared_ptr<SharedState>&       sharedState);
 
       virtual void stop() = 0;
    };

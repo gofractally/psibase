@@ -5,13 +5,13 @@
 
 namespace psibase
 {
-   struct system_context
+   struct SystemContext
    {
       SharedDatabase               sharedDatabase;
-      psibase::WasmCache           wasmCache;
+      WasmCache                    wasmCache;
       std::vector<ExecutionMemory> executionMemories;
 
-      void set_num_memories(size_t n)
+      void setNumMemories(size_t n)
       {
          if (n < executionMemories.size())
             executionMemories.resize(n);
@@ -19,17 +19,17 @@ namespace psibase
          while (n > executionMemories.size())
             executionMemories.push_back({});
       }
-   };  // system_context
+   };  // SystemContext
 
-   struct shared_state_impl;
-   struct shared_state
+   struct SharedStateImpl;
+   struct SharedState
    {
-      const std::unique_ptr<shared_state_impl> impl;
+      const std::unique_ptr<SharedStateImpl> impl;
 
-      shared_state(SharedDatabase db, psibase::WasmCache wasmCache);
-      ~shared_state();
+      SharedState(SharedDatabase db, psibase::WasmCache wasmCache);
+      ~SharedState();
 
-      std::unique_ptr<system_context> get_system_context();
-      void                            add_system_context(std::unique_ptr<system_context> context);
+      std::unique_ptr<SystemContext> getSystemContext();
+      void                           addSystemContext(std::unique_ptr<SystemContext> context);
    };
 }  // namespace psibase

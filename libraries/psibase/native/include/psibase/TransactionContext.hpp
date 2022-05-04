@@ -15,7 +15,7 @@ namespace psibase
 
    struct transaction_context
    {
-      psibase::BlockContext&                blockContext;
+      BlockContext&                         blockContext;
       Database::Session                     session;
       const SignedTransaction&              trx;
       TransactionTrace&                     transaction_trace;
@@ -24,7 +24,7 @@ namespace psibase
       std::chrono::steady_clock::time_point start_time;
       std::chrono::steady_clock::duration   contract_load_time{0};
 
-      transaction_context(psibase::BlockContext&   blockContext,
+      transaction_context(BlockContext&            blockContext,
                           const SignedTransaction& trx,
                           TransactionTrace&        transaction_trace,
                           bool                     enableUndo);

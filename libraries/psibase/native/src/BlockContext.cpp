@@ -2,20 +2,20 @@
 
 namespace psibase
 {
-   BlockContext::BlockContext(psibase::system_context& system_context,
-                              bool                     isProducing,
-                              bool                     enableUndo)
-       : system_context{system_context},
-         db{system_context.sharedDatabase},
+   BlockContext::BlockContext(psibase::SystemContext& systemContext,
+                              bool                    isProducing,
+                              bool                    enableUndo)
+       : systemContext{systemContext},
+         db{systemContext.sharedDatabase},
          session{db.startWrite()},
          isProducing{isProducing}
    {
       check(enableUndo, "TODO: revisit enableUndo option");
    }
 
-   BlockContext::BlockContext(psibase::system_context& system_context, ReadOnly)
-       : system_context{system_context},
-         db{system_context.sharedDatabase},
+   BlockContext::BlockContext(psibase::SystemContext& systemContext, ReadOnly)
+       : systemContext{systemContext},
+         db{systemContext.sharedDatabase},
          session{db.startRead()},
          isProducing{true},  // a read_only block is never replayed
          isReadOnly{true}

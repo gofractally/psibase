@@ -151,13 +151,13 @@ namespace psibase::http
    struct server_impl : server, std::enable_shared_from_this<server_impl>
    {
       net::io_service                          ioc;
-      std::shared_ptr<const http::http_config> http_config  = {};
-      std::shared_ptr<psibase::shared_state>   shared_state = {};
-      std::vector<std::thread>                 threads      = {};
+      std::shared_ptr<const http::http_config> http_config = {};
+      std::shared_ptr<psibase::SharedState>    sharedState = {};
+      std::vector<std::thread>                 threads     = {};
 
       server_impl(const std::shared_ptr<const http::http_config>& http_config,
-                  const std::shared_ptr<psibase::shared_state>&   shared_state)
-          : http_config{http_config}, shared_state{shared_state}
+                  const std::shared_ptr<psibase::SharedState>&    sharedState)
+          : http_config{http_config}, sharedState{sharedState}
       {
       }
 
@@ -276,8 +276,8 @@ namespace psibase::http
             data.body      = std::move(req.body());
 
             // TODO: time limit
-            auto          system = server.shared_state->get_system_context();
-            psio::finally f{[&]() { server.shared_state->add_system_context(std::move(system)); }};
+            auto          system = server.sharedState->getSystemContext();
+            psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
             BlockContext  bc{*system, ReadOnly{}};
             bc.start();
             if (bc.needGenesisAction)
@@ -863,10 +863,10 @@ namespace psibase::http
    }
 
    std::shared_ptr<server> server::create(const std::shared_ptr<const http_config>& http_config,
-                                          const std::shared_ptr<shared_state>&      shared_state)
+                                          const std::shared_ptr<SharedState>&       sharedState)
    {
       check(http_config->num_threads > 0, "too few threads");
-      auto server = std::make_shared<server_impl>(http_config, shared_state);
+      auto server = std::make_shared<server_impl>(http_config, sharedState);
       if (server->start())
          return server;
       else

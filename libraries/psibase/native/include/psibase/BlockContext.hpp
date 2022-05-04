@@ -12,21 +12,21 @@ namespace psibase
    // Note: forking must occur before a BlockContext is created
    struct BlockContext
    {
-      psibase::system_context& system_context;
-      Database                 db;
-      Database::Session        session;
-      Block                    current;
-      DatabaseStatusRow        databaseStatus;
-      size_t                   nextSubjectiveRead = 0;
-      bool                     isProducing        = false;
-      bool                     isReadOnly         = false;
-      bool                     isGenesisBlock     = false;
-      bool                     needGenesisAction  = false;
-      bool                     started            = false;
-      bool                     active             = false;
+      SystemContext&    systemContext;
+      Database          db;
+      Database::Session session;
+      Block             current;
+      DatabaseStatusRow databaseStatus;
+      size_t            nextSubjectiveRead = 0;
+      bool              isProducing        = false;
+      bool              isReadOnly         = false;
+      bool              isGenesisBlock     = false;
+      bool              needGenesisAction  = false;
+      bool              started            = false;
+      bool              active             = false;
 
-      BlockContext(psibase::system_context& system_context, bool isProducing, bool enableUndo);
-      BlockContext(psibase::system_context& system_context, ReadOnly);
+      BlockContext(SystemContext& systemContext, bool isProducing, bool enableUndo);
+      BlockContext(SystemContext& systemContext, ReadOnly);
 
       void checkActive() { check(active, "block is not active"); }
 

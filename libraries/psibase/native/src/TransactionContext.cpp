@@ -6,10 +6,10 @@
 
 namespace psibase
 {
-   transaction_context::transaction_context(psibase::BlockContext&     blockContext,
-                                            const SignedTransaction&   trx,
-                                            psibase::TransactionTrace& transaction_trace,
-                                            bool                       enableUndo)
+   transaction_context::transaction_context(BlockContext&            blockContext,
+                                            const SignedTransaction& trx,
+                                            TransactionTrace&        transaction_trace,
+                                            bool                     enableUndo)
        : blockContext{blockContext}, trx{trx}, transaction_trace{transaction_trace}
    {
       start_time = std::chrono::steady_clock::now();
@@ -26,7 +26,7 @@ namespace psibase
       // Prepare for execution
       auto& db     = blockContext.db;
       auto  status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
-      blockContext.system_context.set_num_memories(status.num_execution_memories);
+      blockContext.systemContext.setNumMemories(status.num_execution_memories);
 
       if (blockContext.needGenesisAction)
       {
@@ -44,7 +44,7 @@ namespace psibase
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
       status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
-      blockContext.system_context.set_num_memories(status.num_execution_memories);
+      blockContext.systemContext.setNumMemories(status.num_execution_memories);
    }
 
    static void exec_genesis_action(transaction_context& self, const Action& action)
@@ -144,7 +144,7 @@ namespace psibase
    {
       auto& db     = blockContext.db;
       auto  status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
-      blockContext.system_context.set_num_memories(status.num_execution_memories);
+      blockContext.systemContext.setNumMemories(status.num_execution_memories);
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
@@ -160,9 +160,9 @@ namespace psibase
       auto it = execution_contexts.find(contract);
       if (it != execution_contexts.end())
          return it->second;
-      check(execution_contexts.size() < blockContext.system_context.executionMemories.size(),
+      check(execution_contexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running contracts");
-      auto& memory = blockContext.system_context.executionMemories[execution_contexts.size()];
+      auto& memory = blockContext.systemContext.executionMemories[execution_contexts.size()];
       return execution_contexts.insert({contract, ExecutionContext{*this, memory, contract}})
           .first->second;
    }

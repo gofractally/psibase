@@ -120,19 +120,19 @@ struct test_chain_ref
 
 struct test_chain
 {
-   ::state&                                 state;
-   std::set<test_chain_ref*>                refs;
-   boost::filesystem::path                  dir;
-   psibase::SharedDatabase                  db;
-   std::unique_ptr<psibase::system_context> sys;
-   std::unique_ptr<psibase::BlockContext>   blockContext;
+   ::state&                                state;
+   std::set<test_chain_ref*>               refs;
+   boost::filesystem::path                 dir;
+   psibase::SharedDatabase                 db;
+   std::unique_ptr<psibase::SystemContext> sys;
+   std::unique_ptr<psibase::BlockContext>  blockContext;
 
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
       psibase::check(snapshot.empty(), "snapshots not implemented");
       dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
       db  = {dir};
-      sys = std::make_unique<psibase::system_context>(psibase::system_context{db, {128}});
+      sys = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
    test_chain(const test_chain&)            = delete;

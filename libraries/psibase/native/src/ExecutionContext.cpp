@@ -170,7 +170,7 @@ namespace psibase
          rethrowVMExcept(
              [&]
              {
-                backend = transactionContext.blockContext.system_context.wasmCache.impl->get(
+                backend = transactionContext.blockContext.systemContext.wasmCache.impl->get(
                     contractAccount.code_hash);
                 if (!backend)
                    backend = std::make_unique<backend_t>(code->code, nullptr);
@@ -180,7 +180,7 @@ namespace psibase
 
       ~ExecutionContextImpl()
       {
-         transactionContext.blockContext.system_context.wasmCache.impl->add(
+         transactionContext.blockContext.systemContext.wasmCache.impl->add(
              {contractAccount.code_hash, std::move(backend)});
       }
 

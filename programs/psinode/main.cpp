@@ -39,7 +39,7 @@ std::vector<char> read_whole_file(const char* filename)
 }
 
 // TODO: remove; now lives in rust/psibase
-void bootstrap_chain(system_context& system)
+void bootstrap_chain(SystemContext& system)
 {
    auto push = [&](auto& bc, AccountNumber sender, AccountNumber contract, const auto& data)
    {
@@ -326,9 +326,9 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
    ExecutionContext::registerHostFunctions();
 
    // TODO: configurable WasmCache size
-   auto shared_state =
-       std::make_shared<psibase::shared_state>(SharedDatabase{db_path}, WasmCache{128});
-   auto system = shared_state->get_system_context();
+   auto sharedState =
+       std::make_shared<psibase::SharedState>(SharedDatabase{db_path}, WasmCache{128});
+   auto system = sharedState->getSystemContext();
    auto queue  = std::make_shared<transaction_queue>();
 
    if (host)
@@ -364,7 +364,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
          };
       }
 
-      auto server = http::server::create(http_config, shared_state);
+      auto server = http::server::create(http_config, sharedState);
    }
 
    if (bootstrap)

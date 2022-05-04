@@ -36,9 +36,9 @@ namespace psibase
 
    inline namespace literals
    {
-      inline constexpr psibase::AccountNumber operator""_a(const char* s, unsigned long)
+      inline constexpr AccountNumber operator""_a(const char* s, unsigned long)
       {
-         auto num = psibase::AccountNumber(s);
+         auto num = AccountNumber(s);
          if (not num.value)
          {
             std::abort();  // failed_to_compress_name

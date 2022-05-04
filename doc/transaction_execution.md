@@ -6,15 +6,15 @@ Several threads are used in running node-related processes. E.g. block productio
 
 ## Shared State
 
-All threads share shared_state. When a thread needs access to a system_context, it asks shared_state for one, and then returns it back to shared_state when it’s done.
+All threads share SharedState. When a thread needs access to a SystemContext, it asks SharedState for one, and then returns it back to SharedState when it’s done.
 
 ## System Context
 
-A system_context provides access to the SharedDatabase, a WasmCache (a cache of compiled wasms), and some execution memory.
+A SystemContext provides access to the SharedDatabase, a WasmCache (a cache of compiled wasms), and some execution memory.
 
 ## Block Context
 
-A thread creates a BlockContext when it’s either producing or replaying a block, and passes a reference to the system_context to it. A block context also contains the database.
+A thread creates a BlockContext when it’s either producing or replaying a block, and passes a reference to the SystemContext to it. A block context also contains the database.
 
 For example, a producing node would be creating block_contexts at the block interval, and then when a transaction is received, the node would call pushTransaction on it.
 
