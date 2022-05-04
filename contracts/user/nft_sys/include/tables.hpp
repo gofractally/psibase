@@ -1,48 +1,52 @@
 #pragma once
 #include <compare>
 #include <psibase/AccountNumber.hpp>
+#include <psibase/Bitset.hpp>
 #include <psibase/table.hpp>
 
 namespace UserContract
 {
    using NID = uint32_t;
 
-   struct AdRecord
+   struct NftHolderRecord
    {
-      psibase::AccountNumber user;
-      bool                   autodebit;
+      psibase::AccountNumber account;
+      psibase::Bitset        config;
 
-      struct DiskUsage
+      operator psibase::AccountNumber() const { return account; }
+
+      enum Flags : uint8_t
       {
-         static constexpr int64_t firstEmplace      = 100;
-         static constexpr int64_t subsequentEmplace = 100;
-         static constexpr int64_t update            = 100;
+         manualDebit
       };
 
-      friend std::strong_ordering operator<=>(const AdRecord&, const AdRecord&) = default;
+      friend std::strong_ordering operator<=>(const NftHolderRecord&,
+                                              const NftHolderRecord&) = default;
    };
-   PSIO_REFLECT(AdRecord, user, autodebit);
+   PSIO_REFLECT(NftHolderRecord, account, config);
+   using NftHolderTable_t = psibase::table<NftHolderRecord, &NftHolderRecord::account>;
 
-   using AdTable_t = psibase::table<AdRecord, &AdRecord::user>;
    struct NftRecord
    {
       NID                    id;
       psibase::AccountNumber issuer;
       psibase::AccountNumber owner;
-      psibase::AccountNumber creditedTo;
 
       static bool isValidKey(const NID& id) { return id != 0; }
 
-      struct DiskUsage
-      {
-         static constexpr int64_t firstEmplace      = 100;
-         static constexpr int64_t subsequentEmplace = 100;
-         static constexpr int64_t update            = 100;
-      };
-
       friend std::strong_ordering operator<=>(const NftRecord&, const NftRecord&) = default;
    };
-   PSIO_REFLECT(NftRecord, id, issuer, owner, creditedTo);
-
+   PSIO_REFLECT(NftRecord, id, issuer, owner);
    using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;
+
+   struct CreditRecord
+   {
+      NID                    nftId;
+      psibase::AccountNumber debitor;
+
+      friend std::strong_ordering operator<=>(const CreditRecord&, const CreditRecord&) = default;
+   };
+   PSIO_REFLECT(CreditRecord, nftId, debitor);
+   using CreditTable_t = psibase::table<CreditRecord, &CreditRecord::nftId>;
+
 }  // namespace UserContract

@@ -1,5 +1,6 @@
 #pragma once
 #include <psibase/block.hpp>
+#include <psibase/check.hpp>
 #include <psibase/db.hpp>
 #include <psibase/intrinsic.hpp>
 #include <psio/fracpack.hpp>
@@ -149,18 +150,20 @@ namespace psibase
 
       auto ui() const
       {
-         return EventEmitter<typename T::UiEvents>(this->sender, psibase::kv_map::ui_event);
+         return EventEmitter<typename T::Events::Ui>(this->psio_get_proxy().sender,
+                                                     psibase::kv_map::ui_event);
       }
       auto history() const
       {
-         return EventEmitter<typename T::HistoryEvents>(this->sender,
-                                                        psibase::kv_map::history_event);
+         return EventEmitter<typename T::Events::History>(this->psio_get_proxy().sender,
+                                                          psibase::kv_map::history_event);
       }
-      auto merkel() const
+      auto merkle() const
       {
-         return EventEmitter<typename T::MerkelEvents>(this->sender, psibase::kv_map::merkel_event);
+         return EventEmitter<typename T::Events::Merkle>(this->psio_get_proxy().sender,
+                                                         psibase::kv_map::merkle_event);
       }
-      auto at(AccountNumber n) { return EventEmitter(n, this->event_log); }
+      auto at(AccountNumber n) { return EventEmitter(n, this->psio_get_proxy().event_log); }
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
@@ -174,18 +177,20 @@ namespace psibase
 
       auto ui() const
       {
-         return EventReader<typename T::UiEvents>(this->sender, psibase::kv_map::ui_event);
+         return EventReader<typename T::Events::Ui>(this->psio_get_proxy().sender,
+                                                    psibase::kv_map::ui_event);
       }
       auto history() const
       {
-         return EventReader<typename T::HistoryEvents>(this->sender,
-                                                       psibase::kv_map::history_event);
+         return EventReader<typename T::Events::History>(this->psio_get_proxy().sender,
+                                                         psibase::kv_map::history_event);
       }
-      auto merkel() const
+      auto merkle() const
       {
-         return EventReader<typename T::MerkelEvents>(this->sender, psibase::kv_map::merkel_event);
+         return EventReader<typename T::Events::Merkle>(this->psio_get_proxy().sender,
+                                                        psibase::kv_map::merkle_event);
       }
-      auto at(AccountNumber n) { return EventReader(n, this->event_log); }
+      auto at(AccountNumber n) { return EventReader(n, this->psio_get_proxy().event_log); }
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }

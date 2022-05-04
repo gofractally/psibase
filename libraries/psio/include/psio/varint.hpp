@@ -5,6 +5,7 @@
 #include "from_json.hpp"
 #include "to_bin.hpp"
 #include "to_json.hpp"
+#include <compare>
 
 namespace psio
 {

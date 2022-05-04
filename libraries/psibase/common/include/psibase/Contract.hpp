@@ -1,10 +1,15 @@
 #pragma once
 
+#include <concepts>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/actor.hpp>
 
 namespace psibase
 {
+   template <typename T>
+   concept DefinesContract =
+       std::same_as<std::decay_t<decltype(T::contract)>, psibase::AccountNumber>;
+
    /** all contracts should derive from psibase::Contract */
    template <typename DerivedContract>
    class Contract
@@ -29,9 +34,11 @@ namespace psibase
          return actor<T>(_receiver, callee);
       }
 
-      //typename DerivedContract::Database& db(){ static table<...> t; return t; }
-      // events().ui().credited(N) -> tuple
-      // emit().ui().credited(...)
+      template <DefinesContract T = DerivedContract>
+      actor<T> at()
+      {
+         return at<T>(T::contract);
+      }
 
      private:
       template <typename Contract>
@@ -50,14 +57,14 @@ namespace psibase
 
 };  // namespace psibase
 
-#define PSIBASE_REFLECT_HISTOY_EVENTS(CONTRACT, ...)            \
+#define PSIBASE_REFLECT_HISTORY_EVENTS(CONTRACT, ...)           \
    using CONTRACT##_EventsHistory = CONTRACT ::Events::History; \
-   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsHistory), __VA_ARGS__)
+   PSIO_REFLECT(CONTRACT##_EventsHistory, __VA_ARGS__)
 
 #define PSIBASE_REFLECT_UI_EVENTS(CONTRACT, ...)      \
    using CONTRACT##_EventsUi = CONTRACT ::Events::Ui; \
-   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsUi), __VA_ARGS__)
+   PSIO_REFLECT(CONTRACT##_EventsUi, __VA_ARGS__)
 
-#define PSIBASE_REFLECT_MERKEL_EVENTS(CONTRACT, ...)          \
-   using CONTRACT##_EventsMerkle = CONTRACT ::Events::Merkel; \
-   PSIO_REFLECT(BOOST_PP_CAT(CONTRACT, _EventsMerkle), __VA_ARGS__)
+#define PSIBASE_REFLECT_MERKLE_EVENTS(CONTRACT, ...)          \
+   using CONTRACT##_EventsMerkle = CONTRACT ::Events::Merkle; \
+   PSIO_REFLECT(CONTRACT##_EventsMerkle, __VA_ARGS__)
