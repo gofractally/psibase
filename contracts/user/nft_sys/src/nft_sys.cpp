@@ -1,6 +1,7 @@
 #include "nft_sys.hpp"
 
 #include <contracts/system/account_sys.hpp>
+#include <psibase/Bitset.hpp>
 #include <psibase/actor.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/fracpack.hpp>
@@ -60,7 +61,7 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
    check(record.creditedTo == account_sys::null_account, Errors::alreadyCredited);
 
    check(at<account_sys>().exists(receiver), Errors::receiverDNE);
-   bool transferred = isAutodebit(receiver);
+   bool transferred = (not getNftHolder(receiver).config.get(NftHolderRecord::Flags::manualDebit));
 
    if (transferred)
    {
@@ -113,41 +114,51 @@ void NftSys::debit(NID nftId, const_view<String> memo)
    emit().ui().transferred(nftId, creditor, debiter, memo);
 }
 
-void NftSys::autodebit(bool enable)
+void NftSys::manualDebit(bool enable)
 {
-   auto record = AutodebitRecord{.user = get_sender(), .autodebit = enable};
-   db.open<AdTable_t>().put(record);
+   auto record = getNftHolder(get_sender());
+
+   check(record.config.get(NftHolderRecord::Flags::manualDebit) != enable, Errors::redundantUpdate);
+
+   record.config.set(NftHolderRecord::Flags::manualDebit);
+   db.open<NftHolderTable_t>().put(record);
 
    if (enable)
    {
-      emit().ui().enabledAutodeb(get_sender());
+      emit().ui().enabledManDeb(get_sender());
    }
    else
    {
-      emit().ui().disabledAutodeb(get_sender());
+      emit().ui().disabledManDeb(get_sender());
    }
 }
 
 NftRecord NftSys::getNft(NID nftId)
 {
-   auto nftTable  = db.open<NftTable_t>();
-   auto nftIdx    = nftTable.get_index<0>();
-   auto nftRecord = nftIdx.get(nftId);
+   auto nftRecord = db.open<NftTable_t>().get_index<0>().get(nftId);
 
    check(nftRecord.has_value(), Errors::nftDNE);
 
    return *nftRecord;
 }
 
+NftHolderRecord NftSys::getNftHolder(AccountNumber account)
+{
+   auto nftHodler = db.open<NftHolderTable_t>().get_index<0>().get(account);
+
+   if (nftHodler.has_value())
+   {
+      return *nftHodler;
+   }
+   else
+   {
+      return NftHolderRecord{account, Bitset()};
+   }
+}
+
 bool NftSys::exists(NID nftId)
 {
    return db.open<NftTable_t>().get_index<0>().get(nftId).has_value();
-}
-
-bool NftSys::isAutodebit(psibase::AccountNumber account)
-{
-   auto ad_record = db.open<AdTable_t>().get_index<0>().get(account);
-   return (!ad_record.has_value()) || (ad_record->autodebit);
 }
 
 PSIBASE_DISPATCH(UserContract::NftSys)

@@ -44,6 +44,11 @@ namespace
  *    We should allow users to configure a management contract to be notified when they debit from their account.
 */
 
+/* Questions
+ * How does billing work, if Bob has auto-debit enabled, then a token issuer could issue him a new token, and 
+   his balance would increase. Who pays for the billing of that storage?
+*/
+
 SCENARIO("Creating a token")
 {
    GIVEN("An empty chain with user Alice")
@@ -63,6 +68,10 @@ SCENARIO("Creating a token")
          {
             auto tokenId = create.returnVal();
             CHECK(a.getToken(tokenId).succeeded());
+         }
+         AND_THEN("Billing is correct")
+         {  //
+            CHECK(storageBillingImplemented);
          }
       }
       WHEN("Alice creates a token")
@@ -142,6 +151,10 @@ SCENARIO("Minting tokens")
             CHECK(getBalanceBob.succeeded());
             CHECK(getBalanceBob.returnVal() == 1000);
          }
+         AND_THEN("Storage was billed correctly")
+         {  //
+            CHECK(storageBillingImplemented);
+         }
       }
    }
 
@@ -158,12 +171,6 @@ SCENARIO("Minting tokens")
          CHECK(inflationLimitsImplemented);
       }
    }
-}
-
-SCENARIO("Setting flags")
-{
-   // Todo - test setting invalid flags fails
-   // Should flags be defineable by child contracts? Or do we define all token flags?
 }
 
 SCENARIO("Recalling tokens")

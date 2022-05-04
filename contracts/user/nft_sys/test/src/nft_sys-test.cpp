@@ -21,13 +21,6 @@ namespace
 {
    constexpr bool storageBillingImplemented = false;
 
-   struct DiskUsage_AutodebitRecord
-   {
-      static constexpr int64_t firstEmplace      = 100;
-      static constexpr int64_t subsequentEmplace = 100;
-      static constexpr int64_t update            = 100;
-   };
-
    struct DiskUsage_NftRecord
    {
       static constexpr int64_t firstEmplace      = 100;
@@ -80,6 +73,15 @@ SCENARIO("Minting & burning nfts")
          THEN("Alice can burn the NFT")
          {  //
             CHECK(a.burn(nft1.id).succeeded());
+
+            AND_THEN("The NFT no longer exists")
+            {  //
+               CHECK(a.getNft(nft1.id).failed(nftDNE));
+            }
+            AND_THEN("Storage billing was correctly updated")
+            {  //
+               CHECK(storageBillingImplemented);
+            }
          }
          THEN("Alice cannot burn a nonexistent NFT")
          {  //
@@ -88,15 +90,6 @@ SCENARIO("Minting & burning nfts")
          THEN("Bob cannot burn the NFT")
          {  //
             CHECK(b.burn(nft1.id).failed(missingRequiredAuth));
-         }
-         AND_WHEN("Alice burns the NFT")
-         {
-            a.burn(nft1.id);
-
-            THEN("The NFT no longer exists")
-            {  //
-               CHECK(a.getNft(nft1.id).failed(nftDNE));
-            }
          }
          AND_WHEN("Alice mints a second NFT")
          {
@@ -143,21 +136,21 @@ SCENARIO("Transferring NFTs")
 
       THEN("Bob is configured to use auto-debit by default")
       {
-         auto isAutodebit = b.isAutodebit(bob);
+         auto getNftHolder = b.getNftHolder(bob);
+         CHECK(getNftHolder.succeeded());
 
-         CHECK(isAutodebit.succeeded());
-         CHECK(true == isAutodebit.returnVal());
+         auto isManualDebit =
+             getNftHolder.returnVal().config.get(NftHolderRecord::Flags::manualDebit);
+         CHECK(not isManualDebit);
       }
-      THEN("Bob is able to opt out of auto-debit")
+      THEN("Bob is able to opt in to manual-debit")
       {
-         bool isAutodebit = b.isAutodebit(bob).returnVal();
-         CHECK(isAutodebit);
+         auto manualDebit = b.manualDebit(true);
+         CHECK(manualDebit.succeeded());
 
-         auto autodebit = b.autodebit(false);
-         CHECK(autodebit.succeeded());
-
-         isAutodebit = b.isAutodebit(bob).returnVal();
-         CHECK(!isAutodebit);
+         auto isManualDebit =
+             b.getNftHolder(bob).returnVal().config.get(NftHolderRecord::Flags::manualDebit);
+         CHECK(isManualDebit);
       }
 
       THEN("Alice is unable to credit, uncredit, or debit a non-existent NFT")
@@ -232,9 +225,9 @@ SCENARIO("Transferring NFTs")
                CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
             }
          }
-         WHEN("Bob opts out of auto-debit")
+         WHEN("Bob opts in to manual-debit")
          {
-            b.autodebit(false);
+            b.manualDebit(true);
 
             AND_WHEN("Alice credits the NFT to Bob")
             {

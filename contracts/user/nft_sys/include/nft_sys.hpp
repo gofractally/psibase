@@ -10,7 +10,7 @@ namespace UserContract
    class NftSys : public psibase::Contract<NftSys>
    {
      public:
-      using tables = psibase::contract_tables<NftTable_t, AdTable_t>;
+      using tables = psibase::contract_tables<NftTable_t, NftHolderTable_t>;
       static constexpr psibase::AccountNumber contract = "nft-sys"_a;
 
       NID  mint();
@@ -20,12 +20,12 @@ namespace UserContract
                   psio::const_view<psibase::String> memo);
       void uncredit(NID nftId, psio::const_view<psibase::String> memo);
       void debit(NID nftId, psio::const_view<psibase::String> memo);
-      void autodebit(bool enable);
+      void manualDebit(bool enable);
 
       // Read-only:
-      NftRecord getNft(NID nftId);
-      bool      exists(NID nftId);
-      bool      isAutodebit(psibase::AccountNumber account);
+      NftRecord       getNft(NID nftId);
+      NftHolderRecord getNftHolder(psibase::AccountNumber account);
+      bool            exists(NID nftId);
 
      private:
       tables db{contract};
@@ -40,8 +40,8 @@ namespace UserContract
          {
             void minted(NID nftId, Account issuer) {}
             void burned(NID nftId) {}
-            void disabledAutodeb(Account account) {}
-            void enabledAutodeb(Account account) {}
+            void disabledManDeb(Account account) {}
+            void enabledManDeb(Account account) {}
             //};
 
             //struct Ui
@@ -64,18 +64,18 @@ namespace UserContract
       method(credit, nftId, receiver, memo),
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
-      method(autodebit, enable),
+      method(manualDebit, enable),
 
       method(getNft, nftId),
-      method(exists, nftId),
-      method(isAutodebit, account)
+      method(getNftHolder, account),
+      method(exists, nftId)
    );
 
    PSIBASE_REFLECT_UI_EVENTS(NftSys, // Todo - change to _HISTORY_ once more than UI events are supported
       method(minted, nftId, issuer),
       method(burned, nftId),
-      method(disabledAutodeb, account),
-      method(enabledAutodeb, account),
+      method(disabledManDeb, account),
+      method(enabledManDeb, account),
    //);
 
    //PSIBASE_REFLECT_UI_EVENTS(NftSys, 

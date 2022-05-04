@@ -1,22 +1,30 @@
 #pragma once
 #include <compare>
 #include <psibase/AccountNumber.hpp>
+#include <psibase/Bitset.hpp>
 #include <psibase/table.hpp>
 
 namespace UserContract
 {
    using NID = uint32_t;
 
-   struct AutodebitRecord
+   struct NftHolderRecord
    {
-      psibase::AccountNumber user;
-      bool                   autodebit;
+      psibase::AccountNumber account;
+      psibase::Bitset        config;
 
-      friend std::strong_ordering operator<=>(const AutodebitRecord&,
-                                              const AutodebitRecord&) = default;
+      operator psibase::AccountNumber() const { return account; }
+
+      enum Flags : uint8_t
+      {
+         manualDebit
+      };
+
+      friend std::strong_ordering operator<=>(const NftHolderRecord&,
+                                              const NftHolderRecord&) = default;
    };
-   PSIO_REFLECT(AutodebitRecord, user, autodebit);
-   using AdTable_t = psibase::table<AutodebitRecord, &AutodebitRecord::user>;
+   PSIO_REFLECT(NftHolderRecord, account, config);
+   using NftHolderTable_t = psibase::table<NftHolderRecord, &NftHolderRecord::account>;
 
    struct NftRecord
    {
