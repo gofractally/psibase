@@ -2,42 +2,42 @@
 
 namespace psibase
 {
-   block_context::block_context(psibase::system_context& system_context,
-                                bool                     is_producing,
-                                bool                     enable_undo)
+   BlockContext::BlockContext(psibase::system_context& system_context,
+                              bool                     isProducing,
+                              bool                     enableUndo)
        : system_context{system_context},
-         db{system_context.shared_db},
-         session{db.start_write()},
-         is_producing{is_producing}
+         db{system_context.sharedDatabase},
+         session{db.startWrite()},
+         isProducing{isProducing}
    {
-      check(enable_undo, "TODO: revisit enable_undo option");
+      check(enableUndo, "TODO: revisit enableUndo option");
    }
 
-   block_context::block_context(psibase::system_context& system_context, read_only)
+   BlockContext::BlockContext(psibase::system_context& system_context, ReadOnly)
        : system_context{system_context},
-         db{system_context.shared_db},
-         session{db.start_read()},
-         is_producing{true},  // a read_only block is never replayed
-         is_read_only{true}
+         db{system_context.sharedDatabase},
+         session{db.startRead()},
+         isProducing{true},  // a read_only block is never replayed
+         isReadOnly{true}
    {
    }
 
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold
-   void block_context::start(std::optional<TimePointSec> time)
+   void BlockContext::start(std::optional<TimePointSec> time)
    {
       check(!started, "block has already been started");
       auto status = db.kvGet<status_row>(status_row::kv_map, status_key());
       if (!status)
       {
          status.emplace();
-         if (!is_read_only)
+         if (!isReadOnly)
             db.kvPut(status_row::kv_map, status->key(), *status);
       }
       auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::kv_map, databaseStatusKey());
       if (!dbStatus)
       {
          dbStatus.emplace();
-         if (!is_read_only)
+         if (!isReadOnly)
             db.kvPut(DatabaseStatusRow::kv_map, dbStatus->key(), *dbStatus);
       }
       databaseStatus = *dbStatus;
@@ -58,8 +58,8 @@ namespace psibase
       }
       else
       {
-         is_genesis_block        = true;
-         need_genesis_action     = true;
+         isGenesisBlock          = true;
+         needGenesisAction       = true;
          current.header.blockNum = 2;
          if (time)
             current.header.time = *time;
@@ -69,7 +69,7 @@ namespace psibase
    }
 
    // TODO: (or elsewhere) check block signature
-   void block_context::start(Block&& src)
+   void BlockContext::start(Block&& src)
    {
       start(src.header.time);
       active = false;
@@ -80,16 +80,16 @@ namespace psibase
       active  = true;
    }
 
-   void block_context::commit()
+   void BlockContext::commit()
    {
-      check_active();
-      check(!need_genesis_action, "missing genesis action in block");
+      checkActive();
+      check(!needGenesisAction, "missing genesis action in block");
       active = false;
 
       auto status = db.kvGet<status_row>(status_row::kv_map, status_key());
       check(status.has_value(), "missing status record");
       status->head = current;
-      if (is_genesis_block)
+      if (isGenesisBlock)
          status->chain_id = status->head->blockId;
       db.kvPut(status_row::kv_map, status->key(), *status);
 
@@ -101,15 +101,15 @@ namespace psibase
       session.commit();
    }
 
-   void block_context::push_transaction(const SignedTransaction& trx,
-                                        TransactionTrace&        trace,
-                                        bool                     enable_undo,
-                                        bool                     commit)
+   void BlockContext::pushTransaction(const SignedTransaction& trx,
+                                      TransactionTrace&        trace,
+                                      bool                     enableUndo,
+                                      bool                     commit)
    {
       auto subjectiveSize = current.subjectiveData.size();
       try
       {
-         exec(trx, trace, enable_undo, commit);
+         exec(trx, trace, enableUndo, commit);
          current.transactions.push_back(std::move(trx));
       }
       catch (...)
@@ -119,7 +119,7 @@ namespace psibase
       }
    }
 
-   void block_context::exec_all_in_block()
+   void BlockContext::execAllInBlock()
    {
       for (auto& trx : current.transactions)
       {
@@ -132,22 +132,22 @@ namespace psibase
 
    // TODO: limit charged CPU & NET which can go into a block
    // TODO: duplicate detection
-   void block_context::exec(const SignedTransaction& trx,
-                            TransactionTrace&        trace,
-                            bool                     enable_undo,
-                            bool                     commit)
+   void BlockContext::exec(const SignedTransaction& trx,
+                           TransactionTrace&        trace,
+                           bool                     enableUndo,
+                           bool                     commit)
    {
       try
       {
-         check_active();
-         check(enable_undo || commit, "neither enable_undo or commit is set");
+         checkActive();
+         check(enableUndo || commit, "neither enableUndo or commit is set");
 
-         // if !enable_undo then block_context becomes unusable if transaction
+         // if !enableUndo then BlockContext becomes unusable if transaction
          // fails. This will cascade to a busy lock (database corruption) if
-         // block_context::enable_undo is also false.
-         active = enable_undo;
+         // BlockContext::enableUndo is also false.
+         active = enableUndo;
 
-         transaction_context t{*this, trx, trace, enable_undo};
+         transaction_context t{*this, trx, trace, enableUndo};
          t.exec_transaction();
 
          if (commit)

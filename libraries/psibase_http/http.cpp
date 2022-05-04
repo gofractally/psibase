@@ -278,9 +278,9 @@ namespace psibase::http
             // TODO: time limit
             auto          system = server.shared_state->get_system_context();
             psio::finally f{[&]() { server.shared_state->add_system_context(std::move(system)); }};
-            block_context bc{*system, read_only{}};
+            BlockContext  bc{*system, ReadOnly{}};
             bc.start();
-            if (bc.need_genesis_action)
+            if (bc.needGenesisAction)
                return send(error(bhttp::status::internal_server_error,
                                  "Need genesis block; use 'psibase boot' to boot chain"));
             SignedTransaction trx;

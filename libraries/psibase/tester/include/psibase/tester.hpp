@@ -187,12 +187,12 @@ namespace psibase
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] TransactionTrace push_transaction(const SignedTransaction& signed_trx);
+      [[nodiscard]] TransactionTrace pushTransaction(const SignedTransaction& signed_trx);
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] TransactionTrace push_transaction(
+      [[nodiscard]] TransactionTrace pushTransaction(
           const Transaction&                                   trx,
           const std::vector<std::pair<PublicKey, PrivateKey>>& keys = {
               {default_pub_key, default_priv_key}});
@@ -215,13 +215,13 @@ namespace psibase
       {
          if (!cfd)
          {
-            return push_transaction(
+            return pushTransaction(
                 make_transaction({action.to_action(std::forward<Args>(args)...)}),
                 {default_priv_key});
          }
          else
          {
-            return push_transaction(
+            return pushTransaction(
                 make_transaction({}, {action.to_action(std::forward<Args>(args)...)}),
                 {default_priv_key}, *cfd);
          }
@@ -230,7 +230,7 @@ namespace psibase
       template <typename Action>
       auto trace(Action&& a)
       {
-         return push_transaction(make_transaction({a}));
+         return pushTransaction(make_transaction({a}));
       }
 
       /**

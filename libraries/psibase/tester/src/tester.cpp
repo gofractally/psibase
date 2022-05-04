@@ -48,10 +48,10 @@ namespace
    }
 
    template <typename Alloc_fn>
-   inline void push_transaction(uint32_t    chain,
-                                const char* args_begin,
-                                uint32_t    args_size,
-                                Alloc_fn    alloc_fn)
+   inline void pushTransaction(uint32_t    chain,
+                               const char* args_begin,
+                               uint32_t    args_size,
+                               Alloc_fn    alloc_fn)
    {
       tester_push_transaction(chain, args_begin, args_size, &alloc_fn,
                               [](void* cb_alloc_data, size_t size) -> void*
@@ -320,21 +320,21 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
    return t;
 }
 
-[[nodiscard]] psibase::TransactionTrace psibase::test_chain::push_transaction(
+[[nodiscard]] psibase::TransactionTrace psibase::test_chain::pushTransaction(
     const SignedTransaction& signed_trx)
 {
    std::vector<char> packed_trx = psio::convert_to_frac(signed_trx);
    std::vector<char> bin;
-   ::push_transaction(id, packed_trx.data(), packed_trx.size(),
-                      [&](size_t size)
-                      {
-                         bin.resize(size);
-                         return bin.data();
-                      });
+   ::pushTransaction(id, packed_trx.data(), packed_trx.size(),
+                     [&](size_t size)
+                     {
+                        bin.resize(size);
+                        return bin.data();
+                     });
    return psio::convert_from_frac<TransactionTrace>(bin);
 }
 
-[[nodiscard]] psibase::TransactionTrace psibase::test_chain::push_transaction(
+[[nodiscard]] psibase::TransactionTrace psibase::test_chain::pushTransaction(
     const Transaction&                                   trx,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
@@ -350,7 +350,7 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
    auto              hash       = sha256(packed_trx.data(), packed_trx.size());
    for (auto& [pub, priv] : keys)
       signed_trx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
-   return push_transaction(signed_trx);
+   return pushTransaction(signed_trx);
 }
 
 psibase::TransactionTrace psibase::test_chain::transact(
@@ -358,7 +358,7 @@ psibase::TransactionTrace psibase::test_chain::transact(
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
     const char*                                          expected_except)
 {
-   auto trace = push_transaction(make_transaction(std::move(actions)), keys);
+   auto trace = pushTransaction(make_transaction(std::move(actions)), keys);
    expect(trace, expected_except);
    return trace;
 }

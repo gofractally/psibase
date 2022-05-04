@@ -7,7 +7,7 @@ namespace psibase
 {
    struct system_context
    {
-      shared_database               shared_db;
+      SharedDatabase                sharedDatabase;
       psibase::wasm_cache           wasm_cache;
       std::vector<execution_memory> execution_memories;
 
@@ -26,7 +26,7 @@ namespace psibase
    {
       const std::unique_ptr<shared_state_impl> impl;
 
-      shared_state(shared_database db, psibase::wasm_cache wasm_cache);
+      shared_state(SharedDatabase db, psibase::wasm_cache wasm_cache);
       ~shared_state();
 
       std::unique_ptr<system_context> get_system_context();

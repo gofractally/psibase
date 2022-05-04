@@ -36,7 +36,7 @@ namespace psibase
    }
 
    // Only useful for genesis
-   void set_code(database&          db,
+   void set_code(Database&          db,
                  AccountNumber      contract,
                  uint8_t            vmType,
                  uint8_t            vmVersion,
@@ -142,19 +142,19 @@ namespace psibase
    // TODO: debugger
    struct execution_context_impl
    {
-      database&                  db;
+      Database&                  db;
       transaction_context&       trx_context;
       eosio::vm::wasm_allocator& wa;
       std::unique_ptr<backend_t> backend;
       std::atomic<bool>          timed_out = false;
       account_row                contract_account;
       bool                       initialized         = false;
-      action_context*            current_act_context = nullptr;  // Changes during recursion
+      ActionContext*             current_act_context = nullptr;  // Changes during recursion
 
       execution_context_impl(transaction_context& trx_context,
                              execution_memory&    memory,
                              AccountNumber        contract)
-          : db{trx_context.block_context.db}, trx_context{trx_context}, wa{memory.impl->wa}
+          : db{trx_context.blockContext.db}, trx_context{trx_context}, wa{memory.impl->wa}
       {
          auto load_start = std::chrono::steady_clock::now();
          auto ca         = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
@@ -170,7 +170,7 @@ namespace psibase
          rethrow_vm_except(
              [&]
              {
-                backend = trx_context.block_context.system_context.wasm_cache.impl->get(
+                backend = trx_context.blockContext.system_context.wasm_cache.impl->get(
                     contract_account.code_hash);
                 if (!backend)
                    backend = std::make_unique<backend_t>(code->code, nullptr);
@@ -180,7 +180,7 @@ namespace psibase
 
       ~execution_context_impl()
       {
-         trx_context.block_context.system_context.wasm_cache.impl->add(
+         trx_context.blockContext.system_context.wasm_cache.impl->add(
              {contract_account.code_hash, std::move(backend)});
       }
 
@@ -202,10 +202,10 @@ namespace psibase
       }
 
       template <typename F>
-      void exec(action_context& act_context, F f)
+      void exec(ActionContext& actionContext, F f)
       {
          auto prev           = current_act_context;
-         current_act_context = &act_context;
+         current_act_context = &actionContext;
          try
          {
             if (!initialized)
@@ -236,21 +236,21 @@ namespace psibase
             //       Make this capability a node configuration toggle? Allow node config to whitelist
             //       contracts for this?
             if ((contract_account.flags & account_row::is_subjective) ||
-                trx_context.block_context.is_read_only)
+                trx_context.blockContext.isReadOnly)
                return (kv_map)map;
          }
-         if (map == uint32_t(kv_map::write_only) && trx_context.block_context.is_read_only)
+         if (map == uint32_t(kv_map::write_only) && trx_context.blockContext.isReadOnly)
             return (kv_map)map;
-         if (map == uint32_t(kv_map::block_log) && trx_context.block_context.is_read_only)
+         if (map == uint32_t(kv_map::block_log) && trx_context.blockContext.isReadOnly)
             return (kv_map)map;
          throw std::runtime_error("contract may not read this map, or must use another intrinsic");
       }
 
       kv_map get_map_read_sequential(uint32_t map)
       {
-         if (map == uint32_t(kv_map::event) && trx_context.block_context.is_read_only)
+         if (map == uint32_t(kv_map::event) && trx_context.blockContext.isReadOnly)
             return (kv_map)map;
-         if (map == uint32_t(kv_map::ui_event) && trx_context.block_context.is_read_only)
+         if (map == uint32_t(kv_map::ui_event) && trx_context.blockContext.isReadOnly)
             return (kv_map)map;
          throw std::runtime_error("contract may not read this map, or must use another intrinsic");
       }
@@ -265,7 +265,7 @@ namespace psibase
 
       Writable get_map_write(uint32_t map, psio::input_stream key)
       {
-         check(!trx_context.block_context.is_read_only, "writes disabled during query");
+         check(!trx_context.blockContext.isReadOnly, "writes disabled during query");
 
          auto check_prefix = [&]
          {
@@ -302,7 +302,7 @@ namespace psibase
 
       kv_map get_map_write_sequential(uint32_t map)
       {
-         check(!trx_context.block_context.is_read_only, "writes disabled during query");
+         check(!trx_context.blockContext.isReadOnly, "writes disabled during query");
 
          // Prevent poison block; subjective contracts skip execution during replay
          check(!(contract_account.flags & account_row::is_subjective),
@@ -358,7 +358,7 @@ namespace psibase
          return result_value.size();
       }
 
-      uint32_t set_result(const std::optional<database::kv_result>& o)
+      uint32_t set_result(const std::optional<Database::KVResult>& o)
       {
          if (!o)
             return clear_result();
@@ -385,12 +385,12 @@ namespace psibase
       void writeConsole(span<const char> str)
       {
          // TODO: limit total console size across all executions within transaction
-         if (current_act_context->action_trace.innerTraces.empty() ||
+         if (current_act_context->actionTrace.innerTraces.empty() ||
              !std::holds_alternative<ConsoleTrace>(
-                 current_act_context->action_trace.innerTraces.back().inner))
-            current_act_context->action_trace.innerTraces.push_back({ConsoleTrace{}});
+                 current_act_context->actionTrace.innerTraces.back().inner))
+            current_act_context->actionTrace.innerTraces.push_back({ConsoleTrace{}});
          auto& console =
-             std::get<ConsoleTrace>(current_act_context->action_trace.innerTraces.back().inner)
+             std::get<ConsoleTrace>(current_act_context->actionTrace.innerTraces.back().inner)
                  .console;
          console.append(str.begin(), str.end());
          clear_result();
@@ -424,7 +424,7 @@ namespace psibase
       uint32_t call(span<const char> data)
       {
          // TODO: replace temporary rule
-         if (++current_act_context->transaction_context.call_depth > 6)
+         if (++current_act_context->transactionContext.call_depth > 6)
             check(false, "call depth exceeded (temporary rule)");
 
          // TODO: don't unpack rawData
@@ -435,21 +435,21 @@ namespace psibase
                    (contract_account.flags & account_row::allow_sudo),
                "contract is not authorized to call as another sender");
 
-         current_act_context->action_trace.innerTraces.push_back({ActionTrace{}});
+         current_act_context->actionTrace.innerTraces.push_back({ActionTrace{}});
          auto& inner_action_trace =
-             std::get<ActionTrace>(current_act_context->action_trace.innerTraces.back().inner);
+             std::get<ActionTrace>(current_act_context->actionTrace.innerTraces.back().inner);
          // TODO: avoid reserialization
-         current_act_context->transaction_context.exec_called_action(contract_account.flags, act,
-                                                                     inner_action_trace);
+         current_act_context->transactionContext.exec_called_action(contract_account.flags, act,
+                                                                    inner_action_trace);
          set_result(inner_action_trace.rawRetval);
 
-         --current_act_context->transaction_context.call_depth;
+         --current_act_context->transactionContext.call_depth;
          return result_value.size();
       }
 
       void setRetval(span<const char> data)
       {
-         current_act_context->action_trace.rawRetval.assign(data.begin(), data.end());
+         current_act_context->actionTrace.rawRetval.assign(data.begin(), data.end());
          clear_result();
       }
 
@@ -492,7 +492,7 @@ namespace psibase
          auto contract = psio::from_bin<AccountNumber>(v);
          check(contract == contract_account.num, "value prefix must match contract during write");
 
-         auto&    dbStatus = trx_context.block_context.databaseStatus;
+         auto&    dbStatus = trx_context.blockContext.databaseStatus;
          uint64_t indexNumber;
          if (map == uint32_t(kv_map::event))
             indexNumber = dbStatus.nextEventNumber++;
@@ -534,24 +534,24 @@ namespace psibase
          return set_result(db.kvGetRaw(m, psio::convert_to_key(indexNumber)));
       }
 
-      uint32_t kvGreaterEqual(uint32_t map, span<const char> key, uint32_t match_key_size)
+      uint32_t kvGreaterEqual(uint32_t map, span<const char> key, uint32_t matchKeySize)
       {
-         check(match_key_size <= key.size(), "match_key_size is larger than key");
+         check(matchKeySize <= key.size(), "matchKeySize is larger than key");
          if (key_has_contract_prefix(map))
-            check(match_key_size >= sizeof(AccountNumber::value),
-                  "match_key_size is smaller than 8 bytes");
+            check(matchKeySize >= sizeof(AccountNumber::value),
+                  "matchKeySize is smaller than 8 bytes");
          return set_result(
-             db.kvGreaterEqualRaw(get_map_read(map), {key.data(), key.size()}, match_key_size));
+             db.kvGreaterEqualRaw(get_map_read(map), {key.data(), key.size()}, matchKeySize));
       }
 
-      uint32_t kvLessThan(uint32_t map, span<const char> key, uint32_t match_key_size)
+      uint32_t kvLessThan(uint32_t map, span<const char> key, uint32_t matchKeySize)
       {
-         check(match_key_size <= key.size(), "match_key_size is larger than key");
+         check(matchKeySize <= key.size(), "matchKeySize is larger than key");
          if (key_has_contract_prefix(map))
-            check(match_key_size >= sizeof(AccountNumber::value),
-                  "match_key_size is smaller than 8 bytes");
+            check(matchKeySize >= sizeof(AccountNumber::value),
+                  "matchKeySize is smaller than 8 bytes");
          return set_result(
-             db.kvLessThanRaw(get_map_read(map), {key.data(), key.size()}, match_key_size));
+             db.kvLessThanRaw(get_map_read(map), {key.data(), key.size()}, matchKeySize));
       }
 
       uint32_t kvMax(uint32_t map, span<const char> key)
@@ -605,42 +605,42 @@ namespace psibase
       rhf_t::add<&execution_context_impl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
    }
 
-   void execution_context::exec_process_transaction(action_context& act_context)
+   void execution_context::exec_process_transaction(ActionContext& actionContext)
    {
-      impl->exec(act_context, [&] {  //
+      impl->exec(actionContext, [&] {  //
          (*impl->backend)(*impl, "env", "process_transaction");
       });
    }
 
-   void execution_context::exec_called(uint64_t caller_flags, action_context& act_context)
+   void execution_context::exec_called(uint64_t caller_flags, ActionContext& actionContext)
    {
       // Prevents a poison block
       if (!(impl->contract_account.flags & account_row::is_subjective))
          check(!(caller_flags & account_row::is_subjective),
                "subjective contracts may not call non-subjective ones");
 
-      auto& bc = impl->trx_context.block_context;
-      if ((impl->contract_account.flags & account_row::is_subjective) && !bc.is_producing)
+      auto& bc = impl->trx_context.blockContext;
+      if ((impl->contract_account.flags & account_row::is_subjective) && !bc.isProducing)
       {
          check(bc.nextSubjectiveRead < bc.current.subjectiveData.size(), "missing subjective data");
-         impl->current_act_context->action_trace.rawRetval =
+         impl->current_act_context->actionTrace.rawRetval =
              bc.current.subjectiveData[bc.nextSubjectiveRead++];
          return;
       }
 
-      impl->exec(act_context, [&] {  //
-         (*impl->backend)(*impl, "env", "called", act_context.action.contract.value,
-                          act_context.action.sender.value);
+      impl->exec(actionContext, [&] {  //
+         (*impl->backend)(*impl, "env", "called", actionContext.action.contract.value,
+                          actionContext.action.sender.value);
       });
 
       if ((impl->contract_account.flags & account_row::is_subjective) &&
           !(caller_flags & account_row::is_subjective))
-         bc.current.subjectiveData.push_back(impl->current_act_context->action_trace.rawRetval);
+         bc.current.subjectiveData.push_back(impl->current_act_context->actionTrace.rawRetval);
    }
 
-   void execution_context::exec_verify(action_context& act_context)
+   void execution_context::exec_verify(ActionContext& actionContext)
    {
-      impl->exec(act_context, [&] {  //
+      impl->exec(actionContext, [&] {  //
          // auto start_time = std::chrono::steady_clock::now();
          (*impl->backend)(*impl, "env", "verify");
          // auto us = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -649,9 +649,9 @@ namespace psibase
       });
    }
 
-   void execution_context::exec_rpc(action_context& act_context)
+   void execution_context::exec_rpc(ActionContext& actionContext)
    {
-      impl->exec(act_context, [&] {  //
+      impl->exec(actionContext, [&] {  //
          (*impl->backend)(*impl, "env", "serve");
       });
    }

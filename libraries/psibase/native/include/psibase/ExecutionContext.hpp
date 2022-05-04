@@ -9,10 +9,10 @@ namespace mdbx
 
 namespace psibase
 {
-   struct database;
+   struct Database;
 
    // Only useful for genesis
-   void set_code(database&          db,
+   void set_code(Database&          db,
                  AccountNumber      contract,
                  uint8_t            vmType,
                  uint8_t            vmVersion,
@@ -40,7 +40,7 @@ namespace psibase
    };
 
    struct transaction_context;
-   struct action_context;
+   struct ActionContext;
 
    struct timeout_exception : std::exception
    {
@@ -60,10 +60,10 @@ namespace psibase
 
       static void register_host_functions();
 
-      void exec_process_transaction(action_context& act_context);
-      void exec_called(uint64_t caller_flags, action_context& act_context);
-      void exec_verify(action_context& act_context);
-      void exec_rpc(action_context& act_context);
+      void exec_process_transaction(ActionContext& actionContext);
+      void exec_called(uint64_t caller_flags, ActionContext& actionContext);
+      void exec_verify(ActionContext& actionContext);
+      void exec_rpc(ActionContext& actionContext);
 
       // Cancel execution because of timeout; may be called from another thread
       void async_timeout();

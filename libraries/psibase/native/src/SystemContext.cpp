@@ -7,17 +7,17 @@ namespace psibase
    struct shared_state_impl
    {
       std::mutex                                   mutex;
-      shared_database                              db;
+      SharedDatabase                               db;
       psibase::wasm_cache                          wasm_cache;
       std::vector<std::unique_ptr<system_context>> system_context_cache;
 
-      shared_state_impl(shared_database db, psibase::wasm_cache wasm_cache)
+      shared_state_impl(SharedDatabase db, psibase::wasm_cache wasm_cache)
           : db{std::move(db)}, wasm_cache{std::move(wasm_cache)}
       {
       }
    };
 
-   shared_state::shared_state(shared_database db, psibase::wasm_cache wasm_cache)
+   shared_state::shared_state(SharedDatabase db, psibase::wasm_cache wasm_cache)
        : impl{std::make_unique<shared_state_impl>(std::move(db), std::move(wasm_cache))}
    {
    }

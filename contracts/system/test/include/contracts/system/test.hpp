@@ -56,7 +56,7 @@ namespace psibase
       REQUIRE(                         //
           psibase::show(               //
               show,                    //
-              t.push_transaction(      //
+              t.pushTransaction(       //
                   t.make_transaction(  //
                       {
                           Action{
@@ -113,7 +113,7 @@ namespace psibase
       REQUIRE(                         //
           psibase::show(               //
               true || show,            //
-              t.push_transaction(      //
+              t.pushTransaction(       //
                   t.make_transaction(  //
                       {asys.startup(std::vector<AccountNumber>{
                           system_contract::transaction_sys::contract,
@@ -133,7 +133,7 @@ namespace psibase
       transactor<system_contract::account_sys> asys(system_contract::transaction_sys::contract,
                                                     system_contract::account_sys::contract);
 
-      auto trace = t.push_transaction(  //
+      auto trace = t.pushTransaction(  //
           t.make_transaction({asys.newAccount(acc, authContract, true)}));
       REQUIRE(psibase::show(true, trace) == "");
       return acc;
@@ -152,8 +152,8 @@ namespace psibase
                                        const PublicKey& public_key,
                                        bool             show = false)
    {
-      auto trace = t.push_transaction(  //
-          t.make_transaction(           //
+      auto trace = t.pushTransaction(  //
+          t.make_transaction(          //
               {{
                   .sender   = system_contract::transaction_sys::contract,
                   .contract = system_contract::auth_ec_sys::contract,
@@ -186,7 +186,7 @@ namespace psibase
       REQUIRE(                         //
           psibase::show(               //
               show,                    //
-              t.push_transaction(      //
+              t.pushTransaction(       //
                   t.make_transaction(  //
                       {{tsys.setCode(acc, 0, 0, read_whole_file(filename))}}))) == "");
       return acc;

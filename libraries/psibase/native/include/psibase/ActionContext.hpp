@@ -4,11 +4,11 @@
 
 namespace psibase
 {
-   struct action_context
+   struct ActionContext
    {
-      psibase::transaction_context& transaction_context;
+      psibase::transaction_context& transactionContext;
       const psibase::Action&        action;
-      psibase::ActionTrace&         action_trace;
-   };  // action_context
+      psibase::ActionTrace&         actionTrace;
+   };
 
 }  // namespace psibase

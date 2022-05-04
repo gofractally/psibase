@@ -6,15 +6,15 @@
 
 namespace psibase
 {
-   transaction_context::transaction_context(psibase::block_context&    block_context,
+   transaction_context::transaction_context(psibase::BlockContext&     blockContext,
                                             const SignedTransaction&   trx,
                                             psibase::TransactionTrace& transaction_trace,
-                                            bool                       enable_undo)
-       : block_context{block_context}, trx{trx}, transaction_trace{transaction_trace}
+                                            bool                       enableUndo)
+       : blockContext{blockContext}, trx{trx}, transaction_trace{transaction_trace}
    {
       start_time = std::chrono::steady_clock::now();
-      if (enable_undo)
-         session = block_context.db.start_write();
+      if (enableUndo)
+         session = blockContext.db.startWrite();
    }
 
    static void exec_genesis_action(transaction_context& self, const Action& action);
@@ -24,16 +24,16 @@ namespace psibase
    void transaction_context::exec_transaction()
    {
       // Prepare for execution
-      auto& db     = block_context.db;
+      auto& db     = blockContext.db;
       auto  status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
-      block_context.system_context.set_num_memories(status.num_execution_memories);
+      blockContext.system_context.set_num_memories(status.num_execution_memories);
 
-      if (block_context.need_genesis_action)
+      if (blockContext.needGenesisAction)
       {
          check(trx.transaction.actions.size() == 1,
                "genesis transaction must have exactly 1 action");
          exec_genesis_action(*this, trx.transaction.actions[0]);
-         block_context.need_genesis_action = false;
+         blockContext.needGenesisAction = false;
       }
       else
       {
@@ -44,7 +44,7 @@ namespace psibase
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
       status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
-      block_context.system_context.set_num_memories(status.num_execution_memories);
+      blockContext.system_context.set_num_memories(status.num_execution_memories);
    }
 
    static void exec_genesis_action(transaction_context& self, const Action& action)
@@ -53,7 +53,7 @@ namespace psibase
       atrace.action = action;
       try
       {
-         auto& db = self.block_context.db;
+         auto& db = self.blockContext.db;
          // TODO: verify, no extra data
          auto data = psio::convert_from_frac<GenesisActionData>(
              {action.rawData.data(), action.rawData.size()});
@@ -90,8 +90,8 @@ namespace psibase
       };
       auto& atrace  = self.transaction_trace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
-      action_context ac = {self, action, self.transaction_trace.actionTraces.back()};
-      auto&          ec = self.get_execution_context(trxsys);
+      ActionContext ac = {self, action, self.transaction_trace.actionTraces.back()};
+      auto&         ec = self.get_execution_context(trxsys);
       ec.exec_process_transaction(ac);
    }
 
@@ -122,10 +122,10 @@ namespace psibase
              .contract = claim.contract,
              .rawData  = psio::convert_to_frac(data),
          };
-         auto& atrace      = self.transaction_trace.actionTraces.emplace_back();
-         atrace.action     = action;
-         action_context ac = {self, action, atrace};
-         auto&          ec = self.get_execution_context(claim.contract);
+         auto& atrace     = self.transaction_trace.actionTraces.emplace_back();
+         atrace.action    = action;
+         ActionContext ac = {self, action, atrace};
+         auto&         ec = self.get_execution_context(claim.contract);
          ec.exec_verify(ac);
       }
    }
@@ -134,21 +134,21 @@ namespace psibase
                                                 const Action& action,
                                                 ActionTrace&  atrace)
    {
-      atrace.action     = action;
-      action_context ac = {*this, action, atrace};
-      auto&          ec = get_execution_context(action.contract);
+      atrace.action    = action;
+      ActionContext ac = {*this, action, atrace};
+      auto&         ec = get_execution_context(action.contract);
       ec.exec_called(caller_flags, ac);
    }
 
    void transaction_context::exec_rpc(const Action& action, ActionTrace& atrace)
    {
-      auto& db     = block_context.db;
+      auto& db     = blockContext.db;
       auto  status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
-      block_context.system_context.set_num_memories(status.num_execution_memories);
+      blockContext.system_context.set_num_memories(status.num_execution_memories);
 
-      atrace.action     = action;
-      action_context ac = {*this, action, atrace};
-      auto&          ec = get_execution_context(action.contract);
+      atrace.action    = action;
+      ActionContext ac = {*this, action, atrace};
+      auto&         ec = get_execution_context(action.contract);
       ec.exec_rpc(ac);
    }
 
@@ -160,9 +160,9 @@ namespace psibase
       auto it = execution_contexts.find(contract);
       if (it != execution_contexts.end())
          return it->second;
-      check(execution_contexts.size() < block_context.system_context.execution_memories.size(),
+      check(execution_contexts.size() < blockContext.system_context.execution_memories.size(),
             "exceeded maximum number of running contracts");
-      auto& memory = block_context.system_context.execution_memories[execution_contexts.size()];
+      auto& memory = blockContext.system_context.execution_memories[execution_contexts.size()];
       return execution_contexts.insert({contract, execution_context{*this, memory, contract}})
           .first->second;
    }

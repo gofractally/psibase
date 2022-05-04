@@ -31,8 +31,8 @@ DefaultTestChain::DefaultTestChain(
 
 void DefaultTestChain::installSystemContracts(bool show /* = false */)
 {
-   auto trace = push_transaction(make_transaction(  //
-       {                                            //
+   auto trace = pushTransaction(make_transaction(  //
+       {                                           //
         Action{
             .sender   = AccountNumber{"foo"},  // ignored
             .contract = AccountNumber{"bar"},  // ignored
@@ -88,7 +88,7 @@ void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
    transactor<system_contract::account_sys> asys{system_contract::transaction_sys::contract,
                                                  system_contract::account_sys::contract};
 
-   auto trace = push_transaction(make_transaction(  //
+   auto trace = pushTransaction(make_transaction(  //
        {asys.startup(std::vector<AccountNumber>{
            system_contract::transaction_sys::contract,
            system_contract::account_sys::contract,
@@ -109,7 +109,7 @@ AccountNumber DefaultTestChain::add_account(
    transactor<system_contract::account_sys> asys(system_contract::transaction_sys::contract,
                                                  system_contract::account_sys::contract);
 
-   auto trace = push_transaction(  //
+   auto trace = pushTransaction(  //
        make_transaction({asys.newAccount(acc, authContract, true)}));
 
    check(psibase::show(show, trace) == "", "Failed to add account");
@@ -129,8 +129,8 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                                                const PublicKey& public_key,
                                                bool             show /* = false */)
 {
-   auto trace = push_transaction(  //
-       make_transaction(           //
+   auto trace = pushTransaction(  //
+       make_transaction(          //
            {{
                .sender   = system_contract::transaction_sys::contract,
                .contract = system_contract::auth_ec_sys::contract,
@@ -162,7 +162,7 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
                                                      system_contract::transaction_sys::contract};
 
    auto trace =
-       push_transaction(make_transaction({{tsys.setCode(acc, 0, 0, read_whole_file(filename))}}));
+       pushTransaction(make_transaction({{tsys.setCode(acc, 0, 0, read_whole_file(filename))}}));
 
    check(psibase::show(show, trace) == "", "Failed to create contract");
 

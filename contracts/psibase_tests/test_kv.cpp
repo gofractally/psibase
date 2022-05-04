@@ -68,7 +68,7 @@ void test(AccountNumber this_contract)
       if (!item.keep)
          kvRemoveRaw(kv_map::contract, item.getKey(this_contract));
 
-   auto run = [&](auto match_key_size, auto expected, const auto& key, auto f)
+   auto run = [&](auto matchKeySize, auto expected, const auto& key, auto f)
    {
       if (expected == skip)
       {
@@ -76,7 +76,7 @@ void test(AccountNumber this_contract)
             print("skip ");
          return;
       }
-      auto result = f(kv_map::contract, key, match_key_size + 4);
+      auto result = f(kv_map::contract, key, matchKeySize + 4);
       if (!result && !expected)
       {
          check(getKey().empty(), "getKey() not empty");

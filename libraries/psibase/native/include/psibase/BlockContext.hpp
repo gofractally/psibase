@@ -5,53 +5,52 @@
 
 namespace psibase
 {
-   struct read_only
+   struct ReadOnly
    {
    };
 
-   // Note: forking must occur before a block_context is created
-   struct block_context
+   // Note: forking must occur before a BlockContext is created
+   struct BlockContext
    {
       psibase::system_context& system_context;
-      database                 db;
-      database::session        session;
+      Database                 db;
+      Database::Session        session;
       Block                    current;
       DatabaseStatusRow        databaseStatus;
-      size_t                   nextSubjectiveRead  = 0;
-      bool                     is_producing        = false;
-      bool                     is_read_only        = false;
-      bool                     is_genesis_block    = false;
-      bool                     need_genesis_action = false;
-      bool                     started             = false;
-      bool                     active              = false;
+      size_t                   nextSubjectiveRead = 0;
+      bool                     isProducing        = false;
+      bool                     isReadOnly         = false;
+      bool                     isGenesisBlock     = false;
+      bool                     needGenesisAction  = false;
+      bool                     started            = false;
+      bool                     active             = false;
 
-      block_context(psibase::system_context& system_context, bool is_producing, bool enable_undo);
-      block_context(psibase::system_context& system_context, read_only);
+      BlockContext(psibase::system_context& system_context, bool isProducing, bool enableUndo);
+      BlockContext(psibase::system_context& system_context, ReadOnly);
 
-      void check_active() { check(active, "block is not active"); }
+      void checkActive() { check(active, "block is not active"); }
 
       void start(std::optional<TimePointSec> time = {});
       void start(Block&& src);
       void commit();
 
-      void push_transaction(const SignedTransaction& trx,
-                            TransactionTrace&        trace,
-                            bool                     enable_undo = true,
-                            bool                     commit      = true);
+      void pushTransaction(const SignedTransaction& trx,
+                           TransactionTrace&        trace,
+                           bool                     enableUndo = true,
+                           bool                     commit     = true);
 
-      TransactionTrace push_transaction(const SignedTransaction& trx)
+      TransactionTrace pushTransaction(const SignedTransaction& trx)
       {
          TransactionTrace trace;
-         push_transaction(trx, trace);
+         pushTransaction(trx, trace);
          return trace;
       }
 
-      void exec_all_in_block();
+      void execAllInBlock();
 
       void exec(const SignedTransaction& trx,
                 TransactionTrace&        trace,
-                bool                     enable_undo,
+                bool                     enableUndo,
                 bool                     commit);
-   };  // block_context
-
+   };  // BlockContext
 }  // namespace psibase

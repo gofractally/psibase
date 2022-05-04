@@ -10,15 +10,15 @@ All threads share shared_state. When a thread needs access to a system_context, 
 
 ## System Context
 
-A system_context provides access to the shared_db, a wasm_cache (a cache of compiled wasms), and some execution memory.
+A system_context provides access to the SharedDatabase, a wasm_cache (a cache of compiled wasms), and some execution memory.
 
 ## Block Context
 
-A thread creates a block_context when it’s either producing or replaying a block, and passes a reference to the system_context to it. A block context also contains the database.
+A thread creates a BlockContext when it’s either producing or replaying a block, and passes a reference to the system_context to it. A block context also contains the database.
 
-For example, a producing node would be creating block_contexts at the block interval, and then when a transaction is received, the node would call push_transaction on it.
+For example, a producing node would be creating block_contexts at the block interval, and then when a transaction is received, the node would call pushTransaction on it.
 
-In push_transaction, a block context will create a transaction_context for the signed transaction, passing in a reference to itself, and call execute_transaction on it.
+In pushTransaction, a block context will create a transaction_context for the signed transaction, passing in a reference to itself, and call execute_transaction on it.
 
 At the end of the block_contexts life, it’s either committed, or destroyed.
 
@@ -38,10 +38,10 @@ A transaction context contains a cache of execution contexts. That way if sync c
 An execution context represents an executing contract. This object is basically responsible for communicating across the native/wasm boundary with contracts. It defines the interface of functions that a wasm is allowed to call back into native code, and it knows about the four wasm entry points. 
 
 It has a function that exposes the four wasm entry points to the outside world:
-1. exec_process_transaction(action_context& act_context) - Only called once per transaction. Executes process_transaction on the transaction.sys wasm.
-2. exec_called(uint64_t caller_flags, action_context& act_context) - Calls the “called” wasm entry point whenever a particular action is called. This is the action dispatcher.
-3. exec_verify(action_context& act_context);
-4. exec_rpc(action_context& act_context);
+1. exec_process_transaction(ActionContext& actionContext) - Only called once per transaction. Executes process_transaction on the transaction.sys wasm.
+2. exec_called(uint64_t caller_flags, ActionContext& actionContext) - Calls the “called” wasm entry point whenever a particular action is called. This is the action dispatcher.
+3. exec_verify(ActionContext& actionContext);
+4. exec_rpc(ActionContext& actionContext);
 
 ## Transaction.sys wasm
 
@@ -54,17 +54,17 @@ process_transaction - For each action in the transaction, call an auth_check for
 sequenceDiagram
     actor Alice
     participant ProducerThread
-    participant block_context
+    participant BlockContext
     participant transaction_context
     participant execution_context
     participant transaction.sys (wasm)
 
-    note right of ProducerThread: new block_context
+    note right of ProducerThread: new BlockContext
     Alice->>ProducerThread: push signed transaction
-    ProducerThread->>block_context: push_transaction
-    note right of block_context: new transaction_context
-    block_context->>transaction_context: exec_transaction
-    note right of transaction_context: new action_context(new action(transaction))
+    ProducerThread->>BlockContext: pushTransaction
+    note right of BlockContext: new transaction_context
+    BlockContext->>transaction_context: exec_transaction
+    note right of transaction_context: new ActionContext(new action(transaction))
     note right of transaction_context: new execution_context(transaction.sys)
     transaction_context->>execution_context: exec_process_transaction
     execution_context->>transaction.sys (wasm): process_transaction

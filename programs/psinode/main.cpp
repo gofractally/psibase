@@ -50,7 +50,7 @@ void bootstrap_chain(system_context& system)
           .contract = contract,
           .rawData  = psio::convert_to_frac(data),
       });
-      bc.push_transaction(t);
+      bc.pushTransaction(t);
    };
 
    auto push_action = [&](auto& bc, Action a)
@@ -58,7 +58,7 @@ void bootstrap_chain(system_context& system)
       SignedTransaction t;
       t.transaction.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
       t.transaction.actions.push_back({a});
-      bc.push_transaction(t);
+      bc.pushTransaction(t);
    };
 
    auto reg_rpc = [&](auto& bc, AccountNumber contract, AccountNumber rpc_contract)
@@ -75,9 +75,9 @@ void bootstrap_chain(system_context& system)
       push_action(bc, rasys.uploadSys(path, contentType, read_whole_file(filename)));
    };
 
-   block_context bc{system, true, true};
+   BlockContext bc{system, true, true};
    bc.start();
-   check(bc.is_genesis_block, "can not bootstrap non-empty chain");
+   check(bc.isGenesisBlock, "can not bootstrap non-empty chain");
    push(bc, AccountNumber(), AccountNumber(),
         GenesisActionData{
             .contracts =
@@ -199,7 +199,7 @@ struct transaction_queue
 #define CATCH_IGNORE \
    catch (...) {}
 
-bool push_boot(block_context& bc, transaction_queue::entry& entry)
+bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 {
    try
    {
@@ -211,7 +211,7 @@ bool push_boot(block_context& bc, transaction_queue::entry& entry)
 
       try
       {
-         if (!bc.need_genesis_action)
+         if (!bc.needGenesisAction)
          {
             trace.error = "chain is already booted";
          }
@@ -220,7 +220,7 @@ bool push_boot(block_context& bc, transaction_queue::entry& entry)
             for (auto& trx : transactions)
             {
                trace = {};
-               bc.push_transaction(trx, trace);
+               bc.pushTransaction(trx, trace);
             }
          }
       }
@@ -269,7 +269,7 @@ bool push_boot(block_context& bc, transaction_queue::entry& entry)
    return false;
 }  // push_boot
 
-void push_transaction(block_context& bc, transaction_queue::entry& entry)
+void pushTransaction(BlockContext& bc, transaction_queue::entry& entry)
 {
    try
    {
@@ -280,10 +280,10 @@ void push_transaction(block_context& bc, transaction_queue::entry& entry)
 
       try
       {
-         if (bc.need_genesis_action)
+         if (bc.needGenesisAction)
             trace.error = "Need genesis block; use 'psibase boot' to boot chain";
          else
-            bc.push_transaction(trx, trace);
+            bc.pushTransaction(trx, trace);
       }
       RETHROW_BAD_ALLOC
       catch (...)
@@ -319,7 +319,7 @@ void push_transaction(block_context& bc, transaction_queue::entry& entry)
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
    }
-}  // push_transaction
+}  // pushTransaction
 
 void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 {
@@ -327,7 +327,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 
    // TODO: configurable wasm_cache size
    auto shared_state =
-       std::make_shared<psibase::shared_state>(shared_database{db_path}, wasm_cache{128});
+       std::make_shared<psibase::shared_state>(SharedDatabase{db_path}, wasm_cache{128});
    auto system = shared_state->get_system_context();
    auto queue  = std::make_shared<transaction_queue>();
 
@@ -385,7 +385,7 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
             std::swap(entries, queue->entries);
          }
 
-         block_context bc{*system, true, true};
+         BlockContext bc{*system, true, true};
          bc.start();
 
          bool abort_boot = false;
@@ -394,12 +394,12 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
             if (entry.is_boot)
                abort_boot = !push_boot(bc, entry);
             else
-               push_transaction(bc, entry);
+               pushTransaction(bc, entry);
          }
          if (abort_boot)
             continue;
 
-         if (bc.need_genesis_action)
+         if (bc.needGenesisAction)
          {
             if (!showedBootMsg)
             {

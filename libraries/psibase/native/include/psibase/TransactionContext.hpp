@@ -15,8 +15,8 @@ namespace psibase
 
    struct transaction_context
    {
-      psibase::block_context&               block_context;
-      database::session                     session;
+      psibase::BlockContext&                blockContext;
+      Database::Session                     session;
       const SignedTransaction&              trx;
       TransactionTrace&                     transaction_trace;
       KvResourceMap                         kvResourceDeltas;
@@ -24,10 +24,10 @@ namespace psibase
       std::chrono::steady_clock::time_point start_time;
       std::chrono::steady_clock::duration   contract_load_time{0};
 
-      transaction_context(psibase::block_context&  block_context,
+      transaction_context(psibase::BlockContext&   blockContext,
                           const SignedTransaction& trx,
                           TransactionTrace&        transaction_trace,
-                          bool                     enable_undo);
+                          bool                     enableUndo);
 
       void exec_transaction();
       void exec_called_action(uint64_t caller_flags, const Action& act, ActionTrace& atrace);

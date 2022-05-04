@@ -123,9 +123,9 @@ struct test_chain
    ::state&                                 state;
    std::set<test_chain_ref*>                refs;
    boost::filesystem::path                  dir;
-   psibase::shared_database                 db;
+   psibase::SharedDatabase                  db;
    std::unique_ptr<psibase::system_context> sys;
-   std::unique_ptr<psibase::block_context>  block;
+   std::unique_ptr<psibase::BlockContext>   blockContext;
 
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
@@ -142,7 +142,7 @@ struct test_chain
    {
       for (auto* ref : refs)
          ref->chain = nullptr;
-      block.reset();
+      blockContext.reset();
       sys.reset();
       db = {};
       boost::filesystem::remove_all(dir);
@@ -153,22 +153,22 @@ struct test_chain
       // TODO: time control
       // TODO: undo control
       finish_block();
-      block = std::make_unique<psibase::block_context>(*sys, true, true);
-      block->start();
+      blockContext = std::make_unique<psibase::BlockContext>(*sys, true, true);
+      blockContext->start();
    }
 
    void start_if_needed()
    {
-      if (!block)
+      if (!blockContext)
          start_block();
    }
 
    void finish_block()
    {
-      if (block)
+      if (blockContext)
       {
-         block->commit();
-         block.reset();
+         blockContext->commit();
+         blockContext.reset();
       }
    }
 };  // test_chain
@@ -585,7 +585,7 @@ struct callbacks
    void tester_shutdown_chain(uint32_t chain)
    {
       auto& c = assert_chain(chain);
-      c.block.reset();
+      c.blockContext.reset();
       c.sys.reset();
       c.db = {};
    }
@@ -607,9 +607,9 @@ struct callbacks
    // TODO: drop this and add general kv access
    void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
-      test_chain& chain  = assert_chain(chain_index);
-      auto        status = chain.block->db.kvGet<psibase::status_row>(psibase::status_row::kv_map,
-                                                               psibase::status_key());
+      test_chain& chain = assert_chain(chain_index);
+      auto status = chain.blockContext->db.kvGet<psibase::status_row>(psibase::status_row::kv_map,
+                                                                      psibase::status_key());
 
       psibase::BlockInfo bi;
       if (status && status->head)
@@ -636,7 +636,7 @@ struct callbacks
       try
       {
          // TODO: undo and commit control
-         chain.block->push_transaction(signed_trx, trace);
+         chain.blockContext->pushTransaction(signed_trx, trace);
       }
       catch (const std::exception& e)
       {

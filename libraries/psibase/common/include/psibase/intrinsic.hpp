@@ -77,21 +77,18 @@ namespace psibase
       PSIBASE_INTRINSIC(kvGetSequential) uint32_t kvGetSequential(kv_map map, EventNumber id);
 
       // Get the first key-value pair which is greater than or equal to the provided
-      // key. If one is found, and the first match_key_size bytes of the found key
+      // key. If one is found, and the first matchKeySize bytes of the found key
       // matches the provided key, then sets result to value and returns size. Also
       // sets key (use getKey). Otherwise returns -1 and clears result.
       PSIBASE_INTRINSIC(kvGreaterEqual)
-      uint32_t kvGreaterEqual(kv_map      map,
-                              const char* key,
-                              uint32_t    key_len,
-                              uint32_t    match_key_size);
+      uint32_t kvGreaterEqual(kv_map map, const char* key, uint32_t key_len, uint32_t matchKeySize);
 
       // Get the key-value pair immediately-before provided key. If one is found,
-      // and the first match_key_size bytes of the found key matches the provided
+      // and the first matchKeySize bytes of the found key matches the provided
       // key, then sets result to value and returns size. Also sets key (use getKey).
       // Otherwise returns -1 and clears result.
       PSIBASE_INTRINSIC(kvLessThan)
-      uint32_t kvLessThan(kv_map map, const char* key, uint32_t key_len, uint32_t match_key_size);
+      uint32_t kvLessThan(kv_map map, const char* key, uint32_t key_len, uint32_t matchKeySize);
 
       // Get the maximum key-value pair which has key as a prefix. If one is found,
       // then sets result to value and returns size. Also sets key (use getKey).
@@ -325,25 +322,25 @@ namespace psibase
    }
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
-   // found, and the first match_key_size bytes of the found key matches the provided key, then
+   // found, and the first matchKeySize bytes of the found key matches the provided key, then
    // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
    inline std::optional<std::vector<char>> kvGreaterEqualRaw(kv_map             map,
                                                              psio::input_stream key,
-                                                             uint32_t           match_key_size)
+                                                             uint32_t           matchKeySize)
    {
-      auto size = raw::kvGreaterEqual(map, key.pos, key.remaining(), match_key_size);
+      auto size = raw::kvGreaterEqual(map, key.pos, key.remaining(), matchKeySize);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
    }
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
-   // found, and the first match_key_size bytes of the found key matches the provided key, then
+   // found, and the first matchKeySize bytes of the found key matches the provided key, then
    // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
-   inline std::optional<V> kvGreaterEqual(kv_map map, const K& key, uint32_t match_key_size)
+   inline std::optional<V> kvGreaterEqual(kv_map map, const K& key, uint32_t matchKeySize)
    {
-      auto v = kvGreaterEqualRaw(map, psio::convert_to_key(key), match_key_size);
+      auto v = kvGreaterEqualRaw(map, psio::convert_to_key(key), matchKeySize);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -351,34 +348,34 @@ namespace psibase
    }
 
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
-   // found, and the first match_key_size bytes of the found key matches the provided key, then
+   // found, and the first matchKeySize bytes of the found key matches the provided key, then
    // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
-   inline std::optional<V> kvGreaterEqual(const K& key, uint32_t match_key_size)
+   inline std::optional<V> kvGreaterEqual(const K& key, uint32_t matchKeySize)
    {
-      return kvGreaterEqual<V>(kv_map::contract, key, match_key_size);
+      return kvGreaterEqual<V>(kv_map::contract, key, matchKeySize);
    }
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
-   // match_key_size bytes of the found key matches the provided key, then returns the value.
+   // matchKeySize bytes of the found key matches the provided key, then returns the value.
    // Also sets key (use getKey). Otherwise returns nullopt.
    inline std::optional<std::vector<char>> kvLessThanRaw(kv_map             map,
                                                          psio::input_stream key,
-                                                         uint32_t           match_key_size)
+                                                         uint32_t           matchKeySize)
    {
-      auto size = raw::kvLessThan(map, key.pos, key.remaining(), match_key_size);
+      auto size = raw::kvLessThan(map, key.pos, key.remaining(), matchKeySize);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
    }
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
-   // match_key_size bytes of the found key matches the provided key, then returns the value.
+   // matchKeySize bytes of the found key matches the provided key, then returns the value.
    // Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
-   inline std::optional<V> kvLessThan(kv_map map, const K& key, uint32_t match_key_size)
+   inline std::optional<V> kvLessThan(kv_map map, const K& key, uint32_t matchKeySize)
    {
-      auto v = kvLessThanRaw(map, psio::convert_to_key(key), match_key_size);
+      auto v = kvLessThanRaw(map, psio::convert_to_key(key), matchKeySize);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -386,12 +383,12 @@ namespace psibase
    }
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
-   // match_key_size bytes of the found key matches the provided key, then returns the value.
+   // matchKeySize bytes of the found key matches the provided key, then returns the value.
    // Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
-   inline std::optional<V> kvLessThan(const K& key, uint32_t match_key_size)
+   inline std::optional<V> kvLessThan(const K& key, uint32_t matchKeySize)
    {
-      return kvLessThan<V>(kv_map::contract, key, match_key_size);
+      return kvLessThan<V>(kv_map::contract, key, matchKeySize);
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
