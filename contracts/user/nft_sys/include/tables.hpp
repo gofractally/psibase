@@ -39,16 +39,6 @@ namespace UserContract
    PSIO_REFLECT(NftRecord, id, issuer, owner);
    using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;
 
-   // struct CreditTableKey_t
-   // {
-   //    psibase::AccountNumber creditor;
-   //    NID                    nftId;
-
-   //    friend std::strong_ordering operator<=>(const CreditTableKey_t&,
-   //                                            const CreditTableKey_t&) = default;
-   // };
-   // PSIO_REFLECT(CreditTableKey_t, creditor, nftId);
-
    struct CreditRecord
    {
       NID                    nftId;
