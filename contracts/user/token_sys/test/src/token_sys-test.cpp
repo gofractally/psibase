@@ -3,8 +3,10 @@
 #include "token_sys.hpp"
 
 #include <psibase/DefaultTestChain.hpp>
+#include <psibase/testUtils.hpp>
 
 using namespace psibase;
+using namespace psibase::benchmarking;
 using UserContract::TokenSys;
 using namespace UserContract::Errors;
 using namespace UserContract;
@@ -32,15 +34,13 @@ namespace
 
 /* Todo:
  *    Implement inflation limits
- *    Implement state management classes, or helpers that assert if objects don't exist.
  *    Templatize psibase::Bitset
  *    Test Precision and Quantity types
- *    Code review psibase::Bitset/Flags and psibase::String
+ *    Code review psibase::Bitset and psibase::String
  *    Code review token tables
  *    Code review UserContext class in Tester
  *    Consider if stake/unstake should be native token actions, and if there should be a stake recipient field.
- *    Flag type should be used for the autodebit flag in NFT contract as well
- *    Flag should be changed to manualDebit in NFT contract as well
+ *    Update NFT flags
  *    We should allow users to configure a management contract to be notified when they debit from their account.
 */
 
@@ -122,7 +122,7 @@ SCENARIO("Minting tokens")
       }
       THEN("Alice may not mint more tokens than are allowed by the specified max supply")
       {
-         CHECK(false);
+         CHECK(a.mint(tokenId, 1'000'000'001, alice, memo).failed(maxSupplyExceeded));
       }
       THEN("Alice may mint new tokens")
       {
@@ -183,14 +183,12 @@ SCENARIO("Recalling tokens")
 
       THEN("The token is recallable by default")
       {
-         CHECK(false == token.flags.get(TokenRecord::unrecallable));
+         CHECK(false == token.flags.get(TokenRecord::Flags::unrecallable));
       }
       THEN("Alice can recall Bob's tokens")
       {
          auto recall = a.recall(tokenId, bob, alice, 1000, memo);
          CHECK(recall.succeeded());
-         auto debit = a.debit(tokenId, bob, 1000, memo);
-         CHECK(debit.succeeded());
 
          AND_THEN("Alice owns Bob's tokens")
          {
@@ -200,9 +198,8 @@ SCENARIO("Recalling tokens")
       }
       THEN("The token issuer may turn off recallability")
       {
-         CHECK(a.set(tokenId, TokenRecord::unrecallable).succeeded());
-         auto unrecallable = a.getToken(tokenId).returnVal().flags.get(TokenRecord::unrecallable);
-         CHECK(true == unrecallable);
+         CHECK(a.setUnrecallable(tokenId).succeeded());
+         CHECK(a.getToken(tokenId).returnVal().flags.get(TokenRecord::Flags::unrecallable));
 
          AND_THEN("Alice may not recall Bob's tokens")
          {
@@ -272,7 +269,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not credit the issuer NFT to anyone")
          {
-            CHECK(alice.at<NftSys>().credit(nft.id, bob, memo).failed(missingRequiredAuth));
+            CHECK(alice.at<NftSys>().credit(nft.id, bob, memo).failed(nftDNE));
          }
          THEN("Alice may not recall Bob's tokens")
          {
@@ -284,7 +281,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not update the token recallability")
          {
-            CHECK(a.set(tokenId, TokenRecord::unrecallable).failed(missingRequiredAuth));
+            CHECK(a.setUnrecallable(tokenId).failed(missingRequiredAuth));
          }
       }
    }
@@ -408,7 +405,7 @@ SCENARIO("Toggling manual-debit")
          }
          THEN("Alice may not enable manual-debit again")
          {
-            CHECK(a.manualDebit(true).failed(manualDebitEnabled));
+            CHECK(a.manualDebit(true).failed(redundantUpdate));
 
             AND_THEN("But Bob may enable manual-debit")
             {  //
@@ -478,11 +475,11 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
          }
          THEN("Bob may not debit any tokens")
          {
-            CHECK(b.debit(tokenId, alice, 1, memo).failed(debitRequiresCredit));
+            CHECK(b.debit(tokenId, alice, 1, memo).failed(insufficientBalance));
          }
          THEN("Alice may not uncredit any tokens")
          {
-            CHECK(a.uncredit(tokenId, bob, 1, memo).failed(uncreditRequiresCredit));
+            CHECK(a.uncredit(tokenId, bob, 1, memo).failed(insufficientBalance));
          }
          THEN("Bob may credit Alice 10 tokens")
          {
@@ -544,13 +541,13 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
             }
             THEN("Alice and Bob may not uncredit any tokens")
             {
-               CHECK(a.uncredit(tokenId, bob, 50, memo).failed(uncreditRequiresCredit));
-               CHECK(b.uncredit(tokenId, alice, 50, memo).failed(uncreditRequiresCredit));
+               CHECK(a.uncredit(tokenId, bob, 50, memo).failed(insufficientBalance));
+               CHECK(b.uncredit(tokenId, alice, 50, memo).failed(insufficientBalance));
             }
             THEN("Alice and Bob may not debit any tokens")
             {
-               CHECK(a.debit(tokenId, bob, 50, memo).failed(debitRequiresCredit));
-               CHECK(b.debit(tokenId, alice, 50, memo).failed(debitRequiresCredit));
+               CHECK(a.debit(tokenId, bob, 50, memo).failed(insufficientBalance));
+               CHECK(b.debit(tokenId, alice, 50, memo).failed(insufficientBalance));
             }
          }
          WHEN("Bob credits Alice 50 tokens")
@@ -572,6 +569,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
             THEN("Bob may uncredit 25 tokens")
             {
                CHECK(b.uncredit(tokenId, alice, 25, memo).succeeded());
+               t.start_block();
                AND_THEN("Bob may not uncredit 26 tokens")
                {
                   CHECK(b.uncredit(tokenId, alice, 26, memo).failed(insufficientBalance));

@@ -45,7 +45,7 @@ namespace UserContract
       TID             id;
       NID             ownerNft;
       InflationRecord inflation;
-      Flags           flags;
+      psibase::Bitset flags;
       Precision       precision;
       Quantity        currentSupply;
       Quantity        maxSupply;
@@ -55,8 +55,10 @@ namespace UserContract
          return tokenId > 0 && tokenId <= std::numeric_limits<uint32_t>::max() / 2;
       }
 
-      // Possible flags
-      static constexpr uint8_t unrecallable = 0;
+      enum Flags : uint8_t
+      {
+         unrecallable
+      };
 
       friend std::strong_ordering operator<=>(const TokenRecord&, const TokenRecord&) = default;
    };
@@ -112,11 +114,14 @@ namespace UserContract
    struct TokenHolderRecord
    {
       psibase::AccountNumber account;
-      Flags                  config;
-
-      static constexpr uint8_t manualDebit = 0;
+      psibase::Bitset        config;
 
       operator psibase::AccountNumber() const { return account; }
+
+      enum Flags : uint8_t
+      {
+         manualDebit
+      };
 
       friend std::strong_ordering operator<=>(const TokenHolderRecord&,
                                               const TokenHolderRecord&) = default;

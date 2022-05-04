@@ -35,7 +35,7 @@ namespace UserContract
                 psibase::AccountNumber            receiver,
                 psio::const_view<psibase::String> memo);
 
-      void set(TID tokenId, FlagType flag);
+      void setUnrecallable(TID tokenId);
 
       //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
       //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
@@ -62,6 +62,7 @@ namespace UserContract
 
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
+      bool                exists(TID tokenId);
       BalanceRecord       getBalance(TID tokenId, psibase::AccountNumber account);
       SharedBalanceRecord getSharedBal(TID                    tokenId,
                                        psibase::AccountNumber creditor,
@@ -90,7 +91,7 @@ namespace UserContract
                         StringView memo)
             {
             }
-            void set(TID tokenId, Account setter, FlagType flag) {}
+            void set(TID tokenId, Account setter, uint8_t flag) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
 
             void enabledManDeb(Account account) {}
@@ -135,8 +136,8 @@ namespace UserContract
    PSIO_REFLECT(TokenSys,
       method(create, precision, maxSupply),
       method(mint, tokenId, amount, receiver, memo),
-      method(set, tokenId, flag),
-
+      method(setUnrecallable, tokenId, flag),
+      
       method(burn, tokenId, amount),
       method(manualDebit, enable),
       method(credit, tokenId, receiver, amount, memo),
@@ -144,6 +145,7 @@ namespace UserContract
       method(debit, tokenId, sender, amount, memo),
       method(recall, tokenId, from, to, amount, memo),
       method(getToken, tokenId),
+      method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(isManualDebit)
