@@ -1,7 +1,7 @@
 #pragma once
 
+#include <psibase/ExecutionContext.hpp>
 #include <psibase/db.hpp>
-#include <psibase/execution_context.hpp>
 
 namespace psibase
 {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/transaction_context.hpp>
+#include <psibase/TransactionContext.hpp>
 
 namespace psibase
 {

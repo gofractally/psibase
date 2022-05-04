@@ -1,4 +1,4 @@
-#include <psibase/execution_context.hpp>
+#include <psibase/ExecutionContext.hpp>
 
 #include <atomic>
 #include <boost/multi_index/key.hpp>
@@ -7,7 +7,7 @@
 #include <boost/multi_index_container.hpp>
 #include <eosio/vm/backend.hpp>
 #include <mutex>
-#include <psibase/action_context.hpp>
+#include <psibase/ActionContext.hpp>
 #include <psibase/db.hpp>
 #include <psio/from_bin.hpp>
 

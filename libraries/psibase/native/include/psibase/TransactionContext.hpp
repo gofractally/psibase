@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/block_context.hpp>
+#include <psibase/BlockContext.hpp>
 
 #include <boost/container/flat_map.hpp>
 #include <chrono>

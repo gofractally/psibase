@@ -1,6 +1,6 @@
 #include <boost/filesystem/operations.hpp>
 #include <debug_eos_vm/debug_eos_vm.hpp>
-#include <psibase/block_context.hpp>
+#include <psibase/BlockContext.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 

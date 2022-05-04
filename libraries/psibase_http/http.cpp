@@ -6,8 +6,8 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include "psibase/http.hpp"
+#include "psibase/TransactionContext.hpp"
 #include "psibase/contract_entry.hpp"
-#include "psibase/transaction_context.hpp"
 
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/io_service.hpp>

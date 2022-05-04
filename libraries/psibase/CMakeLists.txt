@@ -154,11 +154,11 @@ function(add suffix)
             common/include
             ../../external/libmdbx)
         target_sources(psibase${suffix} PRIVATE
-            native/src/block_context.cpp
+            native/src/BlockContext.cpp
             native/src/db.cpp
-            native/src/execution_context.cpp
-            native/src/system_context.cpp
-            native/src/transaction_context.cpp
+            native/src/ExecutionContext.cpp
+            native/src/SystemContext.cpp
+            native/src/TransactionContext.cpp
         )
 
         add_subdirectory(common/tests)

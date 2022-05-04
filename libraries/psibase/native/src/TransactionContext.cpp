@@ -1,6 +1,6 @@
-#include <psibase/transaction_context.hpp>
+#include <psibase/TransactionContext.hpp>
 
-#include <psibase/action_context.hpp>
+#include <psibase/ActionContext.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psio/from_bin.hpp>
 

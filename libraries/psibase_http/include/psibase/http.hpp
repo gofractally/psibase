@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/system_context.hpp>
+#include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
 
 namespace psibase::http
