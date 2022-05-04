@@ -48,10 +48,10 @@ namespace
    }
 
    template <typename Alloc_fn>
-   inline void push_transaction(uint32_t    chain,
-                                const char* args_begin,
-                                uint32_t    args_size,
-                                Alloc_fn    alloc_fn)
+   inline void pushTransaction(uint32_t    chain,
+                               const char* args_begin,
+                               uint32_t    args_size,
+                               Alloc_fn    alloc_fn)
    {
       tester_push_transaction(chain, args_begin, args_size, &alloc_fn,
                               [](void* cb_alloc_data, size_t size) -> void*
@@ -71,7 +71,7 @@ namespace
    }
 }  // namespace
 
-psibase::TraceResult::TraceResult(transaction_trace&& t) : _t(t) {}
+psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
 
 bool psibase::TraceResult::succeeded()
 {
@@ -114,7 +114,7 @@ bool psibase::TraceResult::failed(std::string_view expected)
 bool psibase::TraceResult::diskConsumed(
     const std::vector<std::pair<AccountNumber, int64_t>>& consumption)
 {
-   //const vector<action_trace>& actions = trace.action_traces;
+   //const vector<ActionTrace>& actions = trace.actionTraces;
    //const auto& ram_deltas = actions.at(0).account_ram_deltas;
 
    {
@@ -160,12 +160,12 @@ int32_t psibase::execute(std::string_view command)
    return ::tester_execute(command.data(), command.size());
 }
 
-void psibase::expect(transaction_trace t, const std::string& expected, bool always_show)
+void psibase::expect(TransactionTrace t, const std::string& expected, bool always_show)
 {
    std::string error = t.error ? *t.error : "";
    bool bad = (expected.empty() && !error.empty()) || error.find(expected) == std::string::npos;
    if (bad || always_show)
-      std::cout << pretty_trace(trim_raw_data(std::move(t))) << "\n";
+      std::cout << prettyTrace(trimRawData(std::move(t))) << "\n";
    if (bad)
    {
       if (expected.empty())
@@ -288,7 +288,7 @@ void psibase::test_chain::finish_block()
    ::tester_finish_block(id);
 }
 
-const psibase::block_info& psibase::test_chain::get_head_block_info()
+const psibase::BlockInfo& psibase::test_chain::get_head_block_info()
 {
    if (!head_block_info)
    {
@@ -299,72 +299,72 @@ const psibase::block_info& psibase::test_chain::get_head_block_info()
                                bin.resize(size);
                                return bin.data();
                             });
-      head_block_info = psio::convert_from_frac<block_info>(bin);
+      head_block_info = psio::convert_from_frac<BlockInfo>(bin);
    }
    return *head_block_info;
 }
 
-void psibase::test_chain::fill_tapos(transaction& t, uint32_t expire_sec)
+void psibase::test_chain::fill_tapos(Transaction& t, uint32_t expire_sec)
 {
    auto& info                 = get_head_block_info();
    t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
-   t.tapos.ref_block_num      = info.header.num;
-   memcpy(&t.tapos.ref_block_prefix, (char*)info.id.data() + 8, sizeof(t.tapos.ref_block_prefix));
+   t.tapos.refBlockNum        = info.header.blockNum;
+   memcpy(&t.tapos.refBlockPrefix, (char*)info.blockId.data() + 8, sizeof(t.tapos.refBlockPrefix));
 }
 
-psibase::transaction psibase::test_chain::make_transaction(std::vector<action>&& actions)
+psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)
 {
-   transaction t;
+   Transaction t;
    fill_tapos(t);
    t.actions = std::move(actions);
    return t;
 }
 
-[[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
-    const signed_transaction& signed_trx)
+[[nodiscard]] psibase::TransactionTrace psibase::test_chain::pushTransaction(
+    const SignedTransaction& signed_trx)
 {
    std::vector<char> packed_trx = psio::convert_to_frac(signed_trx);
    std::vector<char> bin;
-   ::push_transaction(id, packed_trx.data(), packed_trx.size(),
-                      [&](size_t size)
-                      {
-                         bin.resize(size);
-                         return bin.data();
-                      });
-   return psio::convert_from_frac<transaction_trace>(bin);
+   ::pushTransaction(id, packed_trx.data(), packed_trx.size(),
+                     [&](size_t size)
+                     {
+                        bin.resize(size);
+                        return bin.data();
+                     });
+   return psio::convert_from_frac<TransactionTrace>(bin);
 }
 
-[[nodiscard]] psibase::transaction_trace psibase::test_chain::push_transaction(
-    const transaction&                                   trx,
+[[nodiscard]] psibase::TransactionTrace psibase::test_chain::pushTransaction(
+    const Transaction&                                   trx,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
-   signed_transaction signed_trx;
-   signed_trx.trx = trx;
+   SignedTransaction signed_trx;
+   signed_trx.transaction = trx;
    for (auto& [pub, priv] : keys)
-      signed_trx.trx.claims.push_back({
+      signed_trx.transaction.claims.push_back({
           .contract = system_contract::verify_ec_sys::contract,
-          .raw_data = psio::convert_to_frac(pub),
+          .rawData  = psio::convert_to_frac(pub),
       });
    // TODO: don't pack twice
-   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx.trx);
+   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx.transaction);
    auto              hash       = sha256(packed_trx.data(), packed_trx.size());
    for (auto& [pub, priv] : keys)
       signed_trx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
-   return push_transaction(signed_trx);
+   return pushTransaction(signed_trx);
 }
 
-psibase::transaction_trace psibase::test_chain::transact(
-    std::vector<action>&&                                actions,
+psibase::TransactionTrace psibase::test_chain::transact(
+    std::vector<Action>&&                                actions,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
     const char*                                          expected_except)
 {
-   auto trace = push_transaction(make_transaction(std::move(actions)), keys);
+   auto trace = pushTransaction(make_transaction(std::move(actions)), keys);
    expect(trace, expected_except);
    return trace;
 }
 
-psibase::transaction_trace psibase::test_chain::transact(std::vector<action>&& actions,
-                                                         const char*           expected_except)
+psibase::TransactionTrace psibase::test_chain::transact(std::vector<Action>&& actions,
+                                                        const char*           expected_except)
 {
    return transact(std::move(actions), {{default_pub_key, default_priv_key}}, expected_except);
 }

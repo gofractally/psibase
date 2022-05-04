@@ -21,6 +21,10 @@ export async function throwIfError(response) {
     return response;
 }
 
+export async function get(url, text) {
+    return await throwIfError(await fetch(url, { method: 'GET' }));
+}
+
 export async function postText(url, text) {
     return await throwIfError(await fetch(url, {
         method: 'POST',
@@ -51,12 +55,20 @@ export async function postArrayBuffer(url, arrayBuffer) {
     }));
 }
 
-export async function postTextGetJson(url, json) {
-    return await (await postText(url, json)).json();
+export async function getJson(url) {
+    return await (await get(url)).json();
+}
+
+export async function postTextGetJson(url, text) {
+    return await (await postText(url, text)).json();
 }
 
 export async function postJsonGetJson(url, json) {
     return await (await postJson(url, json)).json();
+}
+
+export async function postJsonGetText(url, json) {
+    return await (await postJson(url, json)).text();
 }
 
 export async function postJsonGetArrayBuffer(url, json) {
@@ -68,7 +80,7 @@ export async function postArrayBufferGetJson(url, arrayBuffer) {
 }
 
 export async function packSignedTransaction(signedTransaction) {
-    return await postJsonGetArrayBuffer('/common/pack/signed_transaction', signedTransaction);
+    return await postJsonGetArrayBuffer('/common/pack/SignedTransaction', signedTransaction);
 }
 
 export async function pushPackedTransaction(packed) {
@@ -81,3 +93,30 @@ export async function pushPackedTransaction(packed) {
 export async function pushedSignedTransaction(signedTransaction) {
     return await pushPackedTransaction(await packSignedTransaction(signedTransaction));
 }
+
+export function uint8ArrayToHex(data) {
+    let result = '';
+    for (const x of data) {
+        result += ('00' + x.toString(16)).slice(-2);
+    }
+    return result.toUpperCase();
+};
+
+export function hexToUint8Array(hex) {
+    if (typeof hex !== 'string') {
+        throw new Error('Expected string containing hex digits');
+    }
+    if (hex.length % 2) {
+        throw new Error('Odd number of hex digits');
+    }
+    const l = hex.length / 2;
+    const result = new Uint8Array(l);
+    for (let i = 0; i < l; ++i) {
+        const x = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        if (Number.isNaN(x)) {
+            throw new Error('Expected hex string');
+        }
+        result[i] = x;
+    }
+    return result;
+};

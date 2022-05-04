@@ -17,9 +17,6 @@ namespace psibase
    };
    PSIO_REFLECT(AccountNumber, value)
 
-   // TODO: remove
-   using account_num = AccountNumber;
-
    template <typename S>
    void to_json(const AccountNumber& n, S& s)
    {
@@ -36,15 +33,17 @@ namespace psibase
    {
       return true;
    }
-}  // namespace psibase
 
-// TODO: move to psibase::literals (inline namespace)
-inline constexpr psibase::AccountNumber operator""_a(const char* s, unsigned long)
-{
-   auto num = psibase::AccountNumber(s);
-   if (not num.value)
+   inline namespace literals
    {
-      std::abort();  // failed_to_compress_name
-   }
-   return num;
-}
+      inline constexpr AccountNumber operator""_a(const char* s, unsigned long)
+      {
+         auto num = AccountNumber(s);
+         if (not num.value)
+         {
+            std::abort();  // failed_to_compress_name
+         }
+         return num;
+      }
+   }  // namespace literals
+}  // namespace psibase

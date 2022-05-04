@@ -32,11 +32,11 @@ namespace psibase
                                    bool             show = false);
 
       AccountNumber add_account(const char*   acc,
-                                AccountNumber auth_contract = AccountNumber("auth-fake-sys"),
-                                bool          show          = false);
+                                AccountNumber authContract = AccountNumber("auth-fake-sys"),
+                                bool          show         = false);
 
       AccountNumber add_account(AccountNumber acc,
-                                AccountNumber auth_contract = AccountNumber("auth-fake-sys"),
-                                bool          show          = false);
+                                AccountNumber authContract = AccountNumber("auth-fake-sys"),
+                                bool          show         = false);
    };
 }  // namespace psibase

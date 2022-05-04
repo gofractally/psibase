@@ -116,10 +116,10 @@ namespace psio
             uint16_t wire_type = uint8_t(key) & 0x07;
             uint32_t number    = key >> 3;
 
-            bool skip_it = true;
+            // bool skip_it = true;
             if (number == 1)
             {
-               skip_it = false;
+               // skip_it = false;
                obj.resize(obj.size() + 1);
                from_protobuf_member(obj.back(), stream);
             }

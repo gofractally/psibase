@@ -25,7 +25,7 @@ struct item
 
    std::optional<uint8_t> max;
 
-   auto get_key(account_num this_contract) const
+   auto getKey(AccountNumber this_contract) const
    {
       auto k = psio::convert_to_key(this_contract);
       k.insert(k.end(), key.begin(), key.end());
@@ -54,22 +54,21 @@ std::vector<item> items = {
 };
 // clang-format on
 
-void test(account_num this_contract)
+void test(AccountNumber this_contract)
 {
    if (enable_print)
-      print("kv_put\n");
+      print("kvPut\n");
    for (const auto& item : items)
       if (item.add)
-         kv_put_raw(kv_map::contract, item.get_key(this_contract),
-                    psio::convert_to_bin(item.value));
+         kvPutRaw(kv_map::contract, item.getKey(this_contract), psio::convert_to_bin(item.value));
 
    if (enable_print)
-      print("kv_remove\n");
+      print("kvRemove\n");
    for (const auto& item : items)
       if (!item.keep)
-         kv_remove_raw(kv_map::contract, item.get_key(this_contract));
+         kvRemoveRaw(kv_map::contract, item.getKey(this_contract));
 
-   auto run = [&](auto match_key_size, auto expected, const auto& key, auto f)
+   auto run = [&](auto matchKeySize, auto expected, const auto& key, auto f)
    {
       if (expected == skip)
       {
@@ -77,10 +76,10 @@ void test(account_num this_contract)
             print("skip ");
          return;
       }
-      auto result = f(kv_map::contract, key, match_key_size + 4);
+      auto result = f(kv_map::contract, key, matchKeySize + 4);
       if (!result && !expected)
       {
-         check(get_key().empty(), "get_key() not empty");
+         check(getKey().empty(), "getKey() not empty");
          if (enable_print)
             print("ok   ");
          return;
@@ -92,14 +91,14 @@ void test(account_num this_contract)
       {
          if (enable_print)
             printf("0x%02x\n", val);
-         abort_message_str("mismatched result");
+         abortMessage("mismatched result");
       }
       bool found = false;
       for (auto& item : items)
       {
          if (item.value != *expected)
             continue;
-         check(item.get_key(this_contract) == get_key(), "get_key() does not match");
+         check(item.getKey(this_contract) == getKey(), "getKey() does not match");
          found = true;
       }
       check(found, "matching value missing in items");
@@ -108,64 +107,64 @@ void test(account_num this_contract)
    };
 
    if (enable_print)
-      print("kv_less_than\n");
+      print("kvLessThan\n");
    for (const auto& item : items)
    {
-      auto key = item.get_key(this_contract);
+      auto key = item.getKey(this_contract);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
          fflush(stdout);
       }
-      run(4, item.lt4, key, kv_less_than_raw);
-      run(5, item.lt5, key, kv_less_than_raw);
-      run(6, item.lt6, key, kv_less_than_raw);
+      run(4, item.lt4, key, kvLessThanRaw);
+      run(5, item.lt5, key, kvLessThanRaw);
+      run(6, item.lt6, key, kvLessThanRaw);
       if (enable_print)
          print("\n");
-   }  // kv_less_than
+   }  // kvLessThan
 
    if (enable_print)
-      print("kv_greater_equal\n");
+      print("kvGreaterEqual\n");
    for (const auto& item : items)
    {
-      auto key = item.get_key(this_contract);
+      auto key = item.getKey(this_contract);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
          fflush(stdout);
       }
-      run(4, item.ge4, key, kv_greater_equal_raw);
-      run(5, item.ge5, key, kv_greater_equal_raw);
-      run(6, item.ge6, key, kv_greater_equal_raw);
+      run(4, item.ge4, key, kvGreaterEqualRaw);
+      run(5, item.ge5, key, kvGreaterEqualRaw);
+      run(6, item.ge6, key, kvGreaterEqualRaw);
       if (enable_print)
          print("\n");
-   }  // kv_greater_equal
+   }  // kvGreaterEqual
 
    if (enable_print)
-      print("kv_max\n");
+      print("kvMax\n");
    for (const auto& item : items)
    {
-      auto key = item.get_key(this_contract);
+      auto key = item.getKey(this_contract);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
          fflush(stdout);
       }
       run(0, item.max, key,
-          [](kv_map map, psio::input_stream key, size_t) { return kv_max_raw(map, key); });
+          [](kv_map map, psio::input_stream key, size_t) { return kvMaxRaw(map, key); });
       if (enable_print)
          print("\n");
-   }  // kv_max
+   }  // kvMax
 
 }  // test()
 
-extern "C" void called(account_num this_contract, account_num sender)
+extern "C" void called(AccountNumber this_contract, AccountNumber sender)
 {
    test(this_contract);
 }
 
 extern "C" void __wasm_call_ctors();
-extern "C" void start(account_num this_contract)
+extern "C" void start(AccountNumber this_contract)
 {
    __wasm_call_ctors();
 }

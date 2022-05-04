@@ -1,6 +1,6 @@
 #include <boost/filesystem/operations.hpp>
 #include <debug_eos_vm/debug_eos_vm.hpp>
-#include <psibase/block_context.hpp>
+#include <psibase/BlockContext.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 
@@ -120,19 +120,19 @@ struct test_chain_ref
 
 struct test_chain
 {
-   ::state&                                 state;
-   std::set<test_chain_ref*>                refs;
-   boost::filesystem::path                  dir;
-   psibase::shared_database                 db;
-   std::unique_ptr<psibase::system_context> sys;
-   std::unique_ptr<psibase::block_context>  block;
+   ::state&                                state;
+   std::set<test_chain_ref*>               refs;
+   boost::filesystem::path                 dir;
+   psibase::SharedDatabase                 db;
+   std::unique_ptr<psibase::SystemContext> sys;
+   std::unique_ptr<psibase::BlockContext>  blockContext;
 
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
       psibase::check(snapshot.empty(), "snapshots not implemented");
       dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
       db  = {dir};
-      sys = std::make_unique<psibase::system_context>(psibase::system_context{db, {128}});
+      sys = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
    test_chain(const test_chain&)            = delete;
@@ -142,7 +142,7 @@ struct test_chain
    {
       for (auto* ref : refs)
          ref->chain = nullptr;
-      block.reset();
+      blockContext.reset();
       sys.reset();
       db = {};
       boost::filesystem::remove_all(dir);
@@ -153,22 +153,22 @@ struct test_chain
       // TODO: time control
       // TODO: undo control
       finish_block();
-      block = std::make_unique<psibase::block_context>(*sys, true, true);
-      block->start();
+      blockContext = std::make_unique<psibase::BlockContext>(*sys, true, true);
+      blockContext->start();
    }
 
    void start_if_needed()
    {
-      if (!block)
+      if (!blockContext)
          start_block();
    }
 
    void finish_block()
    {
-      if (block)
+      if (blockContext)
       {
-         block->commit();
-         block.reset();
+         blockContext->commit();
+         blockContext.reset();
       }
    }
 };  // test_chain
@@ -323,16 +323,10 @@ struct callbacks
       throw std::runtime_error("called eosio_exit");
    }
 
-   void abort_message(span<const char> msg)
+   void abortMessage(span<const char> msg)
    {
       backtrace();
       throw ::assert_exception(span_str(msg));
-   }
-
-   void eosio_assert_message(bool condition, span<const char> msg)
-   {
-      if (!condition)
-         abort_message(msg);
    }
 
    void prints_l(span<const char> str) { std::cout.write(str.data(), str.size()); }
@@ -591,7 +585,7 @@ struct callbacks
    void tester_shutdown_chain(uint32_t chain)
    {
       auto& c = assert_chain(chain);
-      c.block.reset();
+      c.blockContext.reset();
       c.sys.reset();
       c.db = {};
    }
@@ -613,11 +607,11 @@ struct callbacks
    // TODO: drop this and add general kv access
    void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
-      test_chain& chain  = assert_chain(chain_index);
-      auto        status = chain.block->db.kv_get<psibase::status_row>(psibase::status_row::kv_map,
-                                                                psibase::status_key());
+      test_chain& chain = assert_chain(chain_index);
+      auto status = chain.blockContext->db.kvGet<psibase::status_row>(psibase::status_row::kv_map,
+                                                                      psibase::status_key());
 
-      psibase::block_info bi;
+      psibase::BlockInfo bi;
       if (status && status->head)
       {
          bi = *(status->head);
@@ -634,15 +628,15 @@ struct callbacks
       auto&              chain = assert_chain(chain_index);
       psio::input_stream s     = {args_packed.data(), args_packed.size()};
       auto               signed_trx =
-          psio::convert_from_frac<psibase::signed_transaction>(psio::input_stream{s.pos, s.end});
+          psio::convert_from_frac<psibase::SignedTransaction>(psio::input_stream{s.pos, s.end});
 
       chain.start_if_needed();
-      psibase::transaction_trace trace;
-      auto                       start_time = std::chrono::steady_clock::now();
+      psibase::TransactionTrace trace;
+      auto                      start_time = std::chrono::steady_clock::now();
       try
       {
          // TODO: undo and commit control
-         chain.block->push_transaction(signed_trx, trace);
+         chain.blockContext->pushTransaction(signed_trx, trace);
       }
       catch (const std::exception& e)
       {
@@ -688,8 +682,7 @@ void register_callbacks()
 {
    rhf_t::add<&callbacks::tester_abort>("env", "tester_abort");
    rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");
-   rhf_t::add<&callbacks::abort_message>("env", "abort_message");
-   rhf_t::add<&callbacks::eosio_assert_message>("env", "eosio_assert_message");
+   rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
    rhf_t::add<&callbacks::prints_l>("env", "prints_l");
    rhf_t::add<&callbacks::tester_get_arg_counts>("env", "tester_get_arg_counts");
    rhf_t::add<&callbacks::tester_get_args>("env", "tester_get_args");
@@ -845,7 +838,7 @@ int main(int argc, char* argv[])
    try
    {
       std::vector<std::string> args{argv + next_arg, argv + argc};
-      psibase::execution_context::register_host_functions();
+      psibase::ExecutionContext::registerHostFunctions();
       register_callbacks();
       run(argv[next_arg], args, substitutions, additional_args);
       return 0;

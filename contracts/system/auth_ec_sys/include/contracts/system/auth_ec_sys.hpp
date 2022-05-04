@@ -9,39 +9,38 @@ namespace system_contract::auth_ec_sys
 
    struct auth_check
    {
-      psibase::action             action;
-      std::vector<psibase::claim> claims;
+      psibase::Action             action;
+      std::vector<psibase::Claim> claims;
    };
    PSIO_REFLECT(auth_check, action, claims)
 
    struct set_key
    {
-      psibase::account_num account;
-      psibase::PublicKey   key;
+      psibase::AccountNumber account;
+      psibase::PublicKey     key;
    };
    PSIO_REFLECT(set_key, account, key)
 
    // TODO: remove. This is just a temporary approach for creating an account with a key.
    struct create_account
    {
-      using return_type = psibase::account_num;
+      using return_type = psibase::AccountNumber;
 
       psibase::AccountNumber name       = {};
       psibase::PublicKey     public_key = {};
-      bool                   allow_sudo = {};
    };
-   PSIO_REFLECT(create_account, name, public_key, allow_sudo)
+   PSIO_REFLECT(create_account, name, public_key)
 
    using action = std::variant<auth_check, set_key, create_account>;
 
 #ifdef __wasm__
    template <typename T, typename R = typename T::return_type>
-   R call(psibase::account_num sender, T args)
+   R call(psibase::AccountNumber sender, T args)
    {
-      auto result = psibase::call(psibase::action{
+      auto result = psibase::call(psibase::Action{
           .sender   = sender,
           .contract = contract,
-          .raw_data = psio::convert_to_frac(action{std::move(args)}),
+          .rawData  = psio::convert_to_frac(action{std::move(args)}),
       });
       if constexpr (!std::is_same_v<R, void>)
          return psio::convert_from_frac<R>(result);

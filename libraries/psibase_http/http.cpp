@@ -6,8 +6,8 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include "psibase/http.hpp"
+#include "psibase/TransactionContext.hpp"
 #include "psibase/contract_entry.hpp"
-#include "psibase/transaction_context.hpp"
 
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/io_service.hpp>
@@ -151,13 +151,13 @@ namespace psibase::http
    struct server_impl : server, std::enable_shared_from_this<server_impl>
    {
       net::io_service                          ioc;
-      std::shared_ptr<const http::http_config> http_config  = {};
-      std::shared_ptr<psibase::shared_state>   shared_state = {};
-      std::vector<std::thread>                 threads      = {};
+      std::shared_ptr<const http::http_config> http_config = {};
+      std::shared_ptr<psibase::SharedState>    sharedState = {};
+      std::vector<std::thread>                 threads     = {};
 
       server_impl(const std::shared_ptr<const http::http_config>& http_config,
-                  const std::shared_ptr<psibase::shared_state>&   shared_state)
-          : http_config{http_config}, shared_state{shared_state}
+                  const std::shared_ptr<psibase::SharedState>&    sharedState)
+          : http_config{http_config}, sharedState{sharedState}
       {
       }
 
@@ -276,26 +276,26 @@ namespace psibase::http
             data.body      = std::move(req.body());
 
             // TODO: time limit
-            auto          system = server.shared_state->get_system_context();
-            psio::finally f{[&]() { server.shared_state->add_system_context(std::move(system)); }};
-            block_context bc{*system, read_only{}};
+            auto          system = server.sharedState->getSystemContext();
+            psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+            BlockContext  bc{*system, ReadOnly{}};
             bc.start();
-            if (bc.need_genesis_action)
+            if (bc.needGenesisAction)
                return send(error(bhttp::status::internal_server_error,
                                  "Need genesis block; use 'psibase boot' to boot chain"));
-            signed_transaction trx;
-            action             act{
-                            .sender   = AccountNumber(),
-                            .contract = proxyContractNum,
-                            .raw_data = psio::convert_to_frac(data),
+            SignedTransaction trx;
+            Action            action{
+                           .sender   = AccountNumber(),
+                           .contract = proxyContractNum,
+                           .rawData  = psio::convert_to_frac(data),
             };
-            transaction_trace   trace;
-            transaction_context tc{bc, trx, trace, false};
-            action_trace        atrace;
-            tc.exec_rpc(act, atrace);
+            TransactionTrace   trace;
+            TransactionContext tc{bc, trx, trace, false};
+            ActionTrace        atrace;
+            tc.execServe(action, atrace);
             // TODO: option to print this
-            // printf("%s\n", pretty_trace(atrace).c_str());
-            auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.raw_retval);
+            // printf("%s\n", prettyTrace(atrace).c_str());
+            auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.rawRetval);
             if (!result)
                return send(
                    error(bhttp::status::not_found,
@@ -357,7 +357,7 @@ namespace psibase::http
                           try
                           {
                              session->queue_.pause_read = false;
-                             if (auto* trace = std::get_if<transaction_trace>(&result))
+                             if (auto* trace = std::get_if<TransactionTrace>(&result))
                              {
                                 std::vector<char>   data;
                                 psio::vector_stream stream{data};
@@ -863,10 +863,10 @@ namespace psibase::http
    }
 
    std::shared_ptr<server> server::create(const std::shared_ptr<const http_config>& http_config,
-                                          const std::shared_ptr<shared_state>&      shared_state)
+                                          const std::shared_ptr<SharedState>&       sharedState)
    {
       check(http_config->num_threads > 0, "too few threads");
-      auto server = std::make_shared<server_impl>(http_config, shared_state);
+      auto server = std::make_shared<server_impl>(http_config, sharedState);
       if (server->start())
          return server;
       else

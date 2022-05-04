@@ -32,7 +32,7 @@ namespace symbol_sys
    class symbol_contract : public psibase::Contract<symbol_contract>
    {
      public:
-      static constexpr psibase::AccountNumber contract = "symbol-sys"_a;
+      static constexpr auto contract = psibase::AccountNumber("symbol-sys");
 
       // Mutate
       void create(psibase::AccountNumber owner, int64_t max_supply);

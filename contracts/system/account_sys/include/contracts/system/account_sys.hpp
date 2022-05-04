@@ -14,9 +14,9 @@ namespace system_contract
       static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
 
       void startup(psio::const_view<std::vector<psibase::AccountNumber>> existing_accounts);
-      void newAccount(psibase::AccountNumber account,
-                      psibase::AccountNumber auth_contract,
-                      bool                   allow_sudo);
+      void newAccount(psibase::AccountNumber name,
+                      psibase::AccountNumber authContract,
+                      bool                   requireNew);
       bool exists(psibase::AccountNumber num);
 
       struct Events
@@ -31,13 +31,28 @@ namespace system_contract
          {
          };
       };
-
-      //      using Database = Tables<>
+      // using Database = Tables<>
    };
 
    PSIO_REFLECT(account_sys,
                 method(startup, existing_accounts),
-                method(newAccount, name, auth_contract, allow_sudo),
+                method(newAccount, name, authContract, requireNew),
+                method(exists, num))
+
+   // TODO: fix reflection to not need this
+   struct account_sys_iface
+   {
+      void startup(psio::const_view<std::vector<psibase::AccountNumber>> existing_accounts) {}
+      void newAccount(psibase::AccountNumber name,
+                      psibase::AccountNumber authContract,
+                      bool                   requireNew)
+      {
+      }
+      bool exists(psibase::AccountNumber num) { return false; }
+   };
+   PSIO_REFLECT(account_sys_iface,
+                method(startup, existing_accounts),
+                method(newAccount, name, authContract, requireNew),
                 method(exists, num))
 
 }  // namespace system_contract

@@ -2,7 +2,7 @@
 
 extern "C" void prints_l(const char* str, uint32_t len)
 {
-   psibase::raw::write_console(str, len);
+   psibase::raw::writeConsole(str, len);
 }
 
 extern "C" void prints(const char* cstr)

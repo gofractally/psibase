@@ -347,6 +347,7 @@ namespace psio
       }
    }
 
+   // TODO: BUG: this can overflow the uint16_t in some cases
    template <typename T>
    constexpr uint16_t fracpack_fixed_size()
    {
@@ -953,9 +954,12 @@ namespace psio
          }
          else
          {
+            uint16_t fix_size = fracpack_fixed_size<value_type>();
+            if constexpr (may_use_heap<value_type>())
+               fix_size = sizeof(offset_ptr);
             uint32_t size;
             stream.read(&size, sizeof(size));
-            auto elem = size / sizeof(offset_ptr);
+            auto elem = size / fix_size;
             v.resize(elem);
             for (auto& e : v)
             {
@@ -1363,7 +1367,7 @@ namespace psio
       {
          //         std::cout << "root validate optional " << get_type_name<T>() <<"\n";
          stream.heap = stream.pos + 4;
-         if (not bool(stream.valid = (stream.end - stream.pos < sizeof(uint32_t))))
+         if (not bool(stream.valid = (stream.end - stream.pos < (ssize_t)sizeof(uint32_t))))
          {
             uint32_t offset;
             memcpy(&offset, stream.pos, sizeof(offset));
@@ -2259,8 +2263,6 @@ namespace psio
       const auto& operator*() const { return *this; }
 
      private:
-      friend struct const_view<std::tuple<Ts...>>;
-
       template <typename Function, size_t... I>
       auto _call(Function&& f, std::index_sequence<I...>) const
       {

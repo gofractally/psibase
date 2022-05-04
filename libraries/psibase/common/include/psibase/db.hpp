@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stdint.h"
+#include <psibase/block.hpp>
 
 namespace psibase
 {
@@ -23,4 +23,31 @@ namespace psibase
       merkle_event,  // Events that go into merkle tree, readable for 1 hour (configurable) or finality which ever is longer
       history_event  // Events that go into long-term subjective history
    };
+
+   struct KvResourceKey final
+   {
+      AccountNumber contract = {};
+      uint32_t      map      = {};
+
+      friend auto operator<=>(const KvResourceKey&, const KvResourceKey&) = default;
+   };
+   PSIO_REFLECT(KvResourceKey, contract, map)
+
+   struct KvResourceDelta final
+   {
+      int64_t records    = 0;
+      int64_t keyBytes   = 0;
+      int64_t valueBytes = 0;
+   };
+   PSIO_REFLECT(KvResourceDelta, records, keyBytes, valueBytes)
+
+   struct KvResourcePair final
+   {
+      KvResourceKey   first  = {};
+      KvResourceDelta second = {};
+
+      KvResourcePair() = default;
+      KvResourcePair(KvResourceKey first, KvResourceDelta second) : first{first}, second{second} {}
+   };
+   PSIO_REFLECT(KvResourcePair, first, second)
 }  // namespace psibase

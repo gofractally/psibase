@@ -53,6 +53,21 @@ enum Commands {
         #[clap(short = 'p', long)]
         register_proxy: bool,
     },
+
+    /// Upload a file to a contract
+    Upload {
+        /// Contract to upload to
+        contract: String,
+
+        /// Path to store within contract
+        path: String,
+
+        /// MIME content type of file
+        content_type: String,
+
+        /// Filename to upload
+        filename: String,
+    },
 }
 
 // TODO: move to lib
@@ -67,16 +82,21 @@ fn to_hex(bytes: &[u8]) -> String {
 }
 
 // TODO: replace
-fn new_account(account: &str, auth_contract: &str) -> Result<String, anyhow::Error> {
+fn new_account(
+    account: &str,
+    auth_contract: &str,
+    require_new: bool,
+) -> Result<String, anyhow::Error> {
     Ok(to_hex(
         bridge::ffi::pack_new_account(&format!(
             r#"{{
                 "account": {},
-                "auth_contract": {},
-                "allow_sudo": false
+                "authContract": {},
+                "require_new": {}
             }}"#,
             serde_json::to_string(account)?,
-            serde_json::to_string(auth_contract)?
+            serde_json::to_string(auth_contract)?,
+            if require_new { "true" } else { "false" }
         ))
         .as_slice(),
     ))
@@ -88,8 +108,8 @@ fn set_code(contract: &str, code: &str) -> Result<String, anyhow::Error> {
         bridge::ffi::pack_set_code(&format!(
             r#"{{
                 "contract": {},
-                "vm_type": 0,
-                "vm_version": 0,
+                "vmType": 0,
+                "vmVersion": 0,
                 "code": {}
             }}"#,
             serde_json::to_string(contract)?,
@@ -111,7 +131,7 @@ fn action_json(
             "sender": {},
             "contract": {},
             "method": {},
-            "raw_data": {}
+            "rawData": {}
         }}"#,
         serde_json::to_string(sender)?,
         serde_json::to_string(contract)?,
@@ -138,7 +158,7 @@ fn transaction_json(expiration: &str, actions: &[String]) -> Result<String, anyh
 fn signed_transaction_json(trx: &str) -> Result<String, anyhow::Error> {
     Ok(format!(
         r#"{{
-            "trx": {}
+            "transaction": {}
         }}"#,
         trx
     ))
@@ -187,7 +207,7 @@ async fn push_transaction_impl(
     let err = json.get("error").and_then(|v| v.as_str());
     if let Some(e) = err {
         if !e.is_empty() {
-            Err(Error::Msg { s: e.to_string() })?;
+            return Err(Error::Msg { s: e.to_string() }.into());
         }
     }
     Ok(())
@@ -204,23 +224,48 @@ async fn push_transaction(
     Ok(())
 }
 
+fn upload_sys(
+    contract: &str,
+    path: &str,
+    content_type: &str,
+    content: &[u8],
+) -> Result<String, anyhow::Error> {
+    action_json(
+        contract,
+        contract,
+        "uploadSys",
+        &to_hex(
+            bridge::ffi::pack_upload_sys(&format!(
+                r#"{{
+                    "path": {},
+                    "contentType": {},
+                    "content": {}
+                }}"#,
+                serde_json::to_string(path)?,
+                serde_json::to_string(content_type)?,
+                serde_json::to_string(&to_hex(content))?
+            ))
+            .as_slice(),
+        ),
+    )
+}
+
 async fn install(
     args: &Args,
     client: reqwest::Client,
     account: &str,
     filename: &str,
     create_insecure_account: bool,
-    _register_proxy: bool,
+    register_proxy: bool,
 ) -> Result<(), anyhow::Error> {
     let wasm = std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?;
     let mut actions: Vec<String> = Vec::new();
     if create_insecure_account {
-        // TODO: check if account exists
         actions.push(action_json(
             "account-sys",
             "account-sys",
             "newAccount",
-            &new_account(account, "auth-fake-sys")?,
+            &new_account(account, "auth-fake-sys", false)?,
         )?);
     }
     actions.push(action_json(
@@ -229,7 +274,9 @@ async fn install(
         "setCode",
         &set_code(account, &to_hex(&wasm))?,
     )?);
-    actions.push(reg_rpc(account, account)?);
+    if register_proxy {
+        actions.push(reg_rpc(account, account)?);
+    }
     let signed_json = signed_transaction_json(&transaction_json(
         &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
         &actions,
@@ -241,6 +288,31 @@ async fn install(
     println!("Ok");
     Ok(())
 }
+
+async fn upload(
+    args: &Args,
+    client: reqwest::Client,
+    contract: &str,
+    path: &str,
+    content_type: &str,
+    filename: &str,
+) -> Result<(), anyhow::Error> {
+    let signed_json = signed_transaction_json(&transaction_json(
+        &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
+        &[upload_sys(
+            contract,
+            path,
+            content_type,
+            &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
+        )?],
+    )?)?;
+    let packed_signed = bridge::ffi::pack_signed_transaction(&signed_json);
+    push_transaction(args, client, packed_signed.as_slice().into()).await?;
+    println!("Ok");
+    Ok(())
+}
+
+/// Upload a file to a contract
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -265,6 +337,12 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .await?
         }
+        Commands::Upload {
+            contract,
+            path,
+            content_type,
+            filename,
+        } => upload(&args, client, contract, path, content_type, filename).await?,
     }
 
     Ok(())

@@ -20,8 +20,8 @@ namespace psibase
 {
    namespace raw
    {
-      [[clang::import_name("abort_message"), noreturn]] void abort_message(const char* message,
-                                                                           uint32_t    len);
+      [[clang::import_name("abortMessage"), noreturn]] void abortMessage(const char* message,
+                                                                         uint32_t    len);
    }
 }  // namespace psibase
 
@@ -54,7 +54,7 @@ namespace eosio
          {
             size_t new_next_page = align(next_addr, wasm_page_size);
             if (GROW_MEMORY((new_next_page - next_page) >> 16) == -1)
-               psibase::raw::abort_message("failed to allocate pages", 24);
+               psibase::raw::abortMessage("failed to allocate pages", 24);
             next_page = new_next_page;
          }
 

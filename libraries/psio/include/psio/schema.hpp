@@ -128,7 +128,7 @@ namespace psio
          return nullptr;
       }
 
-      const member* get_member_by_number(uint32_t n) const
+      const member* get_member_by_number(int32_t n) const
       {
          for (const auto& m : members)
             if (m.number == n)

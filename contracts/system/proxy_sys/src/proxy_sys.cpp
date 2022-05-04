@@ -36,14 +36,14 @@ namespace psibase
           .contract    = contract,
           .rpcContract = rpcContract,
       };
-      kv_put(row.key(get_receiver()), row);
+      kvPut(row.key(get_receiver()), row);
    }
 
    extern "C" [[clang::export_name("serve")]] void serve()
    {
-      auto act = get_current_action();
+      auto act = getCurrentAction();
       // TODO: use a view
-      auto req = psio::convert_from_frac<rpc_request_data>(act.raw_data);
+      auto req = psio::convert_from_frac<rpc_request_data>(act.rawData);
 
       std::string contractName;
 
@@ -61,13 +61,13 @@ namespace psibase
          contractName = "common-sys";
 
       auto contract = AccountNumber(contractName);
-      auto reg      = kv_get<RegisteredContractRow>(registeredContractKey(act.contract, contract));
+      auto reg      = kvGet<RegisteredContractRow>(registeredContractKey(act.contract, contract));
       if (!reg)
-         abort_message_str("contract not registered: " + contract.str());
+         abortMessage("contract not registered: " + contract.str());
 
       // TODO: avoid repacking (both directions)
       psibase::actor<ServerInterface> iface(act.contract, reg->rpcContract);
-      set_retval(iface.serveSys(req).unpack());
+      setRetval(iface.serveSys(req).unpack());
    }  // serve()
 
 }  // namespace psibase

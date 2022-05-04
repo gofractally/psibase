@@ -34,15 +34,17 @@ namespace psibase
    {
       return true;
    }
-}  // namespace psibase
 
-// TODO: move to psibase::literals (inline namespace)
-inline constexpr psibase::MethodNumber operator""_m(const char* s, unsigned long)
-{
-   auto num = psibase::MethodNumber(s);
-   if (not num.value)
+   inline namespace literals
    {
-      std::abort();  // failed_to_compress_name
-   }
-   return num;
-}
+      inline constexpr psibase::MethodNumber operator""_m(const char* s, unsigned long)
+      {
+         auto num = psibase::MethodNumber(s);
+         if (not num.value)
+         {
+            std::abort();  // failed_to_compress_name
+         }
+         return num;
+      }
+   }  // namespace literals
+}  // namespace psibase

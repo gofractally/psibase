@@ -20,18 +20,18 @@ namespace psibase
       std::cout << "\n" << prefix << " DebugCounter " << ++i << "\n\n";
    };
 
-   inline std::string show(bool include, transaction_trace t)
+   inline std::string show(bool include, TransactionTrace t)
    {
       if (include || t.error)
-         std::cout << pretty_trace(trim_raw_data(t)) << "\n";
+         std::cout << prettyTrace(trimRawData(t)) << "\n";
       if (t.error)
          return *t.error;
       return {};
    }
 
-   inline const action_trace& get_top_action(transaction_trace& t, size_t num)
+   inline const ActionTrace& get_top_action(TransactionTrace& t, size_t num)
    {
-      // TODO: redesign transaction_trace to make this easier
+      // TODO: redesign TransactionTrace to make this easier
       // Current layout:
       //    verify proof 0
       //    verify proof 1
@@ -42,12 +42,12 @@ namespace psibase
       //        check_auth
       //        action 1
       //        ...
-      check(!t.action_traces.empty(), "transaction_trace has no actions");
-      auto&                            root = t.action_traces.back();
-      std::vector<const action_trace*> top_traces;
-      for (auto& inner : root.inner_traces)
-         if (std::holds_alternative<action_trace>(inner.inner))
-            top_traces.push_back(&std::get<action_trace>(inner.inner));
+      check(!t.actionTraces.empty(), "TransactionTrace has no actions");
+      auto&                           root = t.actionTraces.back();
+      std::vector<const ActionTrace*> top_traces;
+      for (auto& inner : root.innerTraces)
+         if (std::holds_alternative<ActionTrace>(inner.inner))
+            top_traces.push_back(&std::get<ActionTrace>(inner.inner));
       check(!(top_traces.size() & 1), "unexpected number of action traces");
       check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];
@@ -62,7 +62,7 @@ namespace psibase
     * transaction should succeed.  Otherwise it represents a string which should be
     * part of the error message.
     */
-   void expect(transaction_trace t, const std::string& expected = "", bool always_show = false);
+   void expect(TransactionTrace t, const std::string& expected = "", bool always_show = false);
 
    /**
     * Sign a digest
@@ -72,28 +72,28 @@ namespace psibase
    class TraceResult
    {
      public:
-      TraceResult(transaction_trace&& t);
+      TraceResult(TransactionTrace&& t);
       bool succeeded();
       bool failed(std::string_view expected);
       bool diskConsumed(const std::vector<std::pair<AccountNumber, int64_t>>& consumption);
 
-      const transaction_trace& trace() { return _t; }
+      const TransactionTrace& trace() { return _t; }
 
      protected:
-      transaction_trace _t;
+      TransactionTrace _t;
    };
 
    template <typename ReturnType>
    class Result : public TraceResult
    {
      public:
-      Result(transaction_trace&& t)
-          : TraceResult(std::forward<transaction_trace>(t)), _return(std::nullopt)
+      Result(TransactionTrace&& t)
+          : TraceResult(std::forward<TransactionTrace>(t)), _return(std::nullopt)
       {
          auto actionTrace = get_top_action(t, 0);
-         if (actionTrace.raw_retval.size() != 0)
+         if (actionTrace.rawRetval.size() != 0)
          {
-            _return = psio::convert_from_frac<ReturnType>(actionTrace.raw_retval);
+            _return = psio::convert_from_frac<ReturnType>(actionTrace.rawRetval);
          }
       }
 
@@ -119,7 +119,7 @@ namespace psibase
    class Result<void> : public TraceResult
    {
      public:
-      Result(transaction_trace&& t) : TraceResult(std::forward<transaction_trace>(t)) {}
+      Result(TransactionTrace&& t) : TraceResult(std::forward<TransactionTrace>(t)) {}
    };
 
    /**
@@ -130,8 +130,8 @@ namespace psibase
    class test_chain
    {
      private:
-      uint32_t                  id;
-      std::optional<block_info> head_block_info;
+      uint32_t                 id;
+      std::optional<BlockInfo> head_block_info;
 
      public:
       static const PublicKey  default_pub_key;
@@ -172,28 +172,28 @@ namespace psibase
        */
       void finish_block();
 
-      const block_info& get_head_block_info();
+      const BlockInfo& get_head_block_info();
 
       /*
        * Set the reference block of the transaction to the head block.
        */
-      void fill_tapos(transaction& t, uint32_t expire_sec = 2);
+      void fill_tapos(Transaction& t, uint32_t expire_sec = 2);
 
       /*
        * Creates a transaction.
        */
-      transaction make_transaction(std::vector<action>&& actions = {});
+      Transaction make_transaction(std::vector<Action>&& actions = {});
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] transaction_trace push_transaction(const signed_transaction& signed_trx);
+      [[nodiscard]] TransactionTrace pushTransaction(const SignedTransaction& signed_trx);
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] transaction_trace push_transaction(
-          const transaction&                                   trx,
+      [[nodiscard]] TransactionTrace pushTransaction(
+          const Transaction&                                   trx,
           const std::vector<std::pair<PublicKey, PrivateKey>>& keys = {
               {default_pub_key, default_priv_key}});
 
@@ -202,11 +202,11 @@ namespace psibase
        *
        * Validates the transaction status according to @ref eosio::expect.
        */
-      transaction_trace transact(std::vector<action>&&                                actions,
-                                 const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
-                                 const char* expected_except = nullptr);
-      transaction_trace transact(std::vector<action>&& actions,
-                                 const char*           expected_except = nullptr);
+      TransactionTrace transact(std::vector<Action>&&                                actions,
+                                const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
+                                const char* expected_except = nullptr);
+      TransactionTrace transact(std::vector<Action>&& actions,
+                                const char*           expected_except = nullptr);
 
       template <typename Action, typename... Args>
       auto trace(const std::optional<std::vector<std::vector<char>>>& cfd,
@@ -215,13 +215,13 @@ namespace psibase
       {
          if (!cfd)
          {
-            return push_transaction(
+            return pushTransaction(
                 make_transaction({action.to_action(std::forward<Args>(args)...)}),
                 {default_priv_key});
          }
          else
          {
-            return push_transaction(
+            return pushTransaction(
                 make_transaction({}, {action.to_action(std::forward<Args>(args)...)}),
                 {default_priv_key}, *cfd);
          }
@@ -230,12 +230,12 @@ namespace psibase
       template <typename Action>
       auto trace(Action&& a)
       {
-         return push_transaction(make_transaction({a}));
+         return pushTransaction(make_transaction({a}));
       }
 
       /**
-    *  This will push a transaction and return the trace and return value
-    */
+       *  This will push a transaction and return the trace and return value
+       */
       struct push_transaction_proxy
       {
          push_transaction_proxy(test_chain& t, AccountNumber s, AccountNumber r)

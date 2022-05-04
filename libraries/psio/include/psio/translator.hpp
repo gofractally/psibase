@@ -182,7 +182,7 @@ namespace psio
 
       string frac_to_json(int type_num, const std::vector<char>& frac) const
       {
-         if (type_num < _types.size())
+         if ((size_t)type_num < _types.size())
             return _types[type_num]->frac_to_json(frac);
          return string();
       }

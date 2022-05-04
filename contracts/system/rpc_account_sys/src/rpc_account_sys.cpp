@@ -2,6 +2,7 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/proxy_sys.hpp>
+#include <psibase/SimpleUI.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/native_tables.hpp>
 #include <psio/from_json.hpp>
@@ -28,16 +29,6 @@ struct WebContentRow
 };
 PSIO_REFLECT(WebContentRow, path, contentType, content)
 
-// TODO: automate defining the struct in reflection macro?
-// TODO: out of date
-struct CreateAccount
-{
-   psibase::AccountNumber account      = {};
-   psibase::AccountNumber authContract = {};
-   bool                   allowSudo    = false;
-};
-PSIO_REFLECT(CreateAccount, account, authContract, allowSudo)
-
 namespace system_contract
 {
    std::optional<rpc_reply_data> rpc_account_sys::serveSys(rpc_request_data request)
@@ -53,7 +44,7 @@ namespace system_contract
 
       if (request.method == "GET")
       {
-         auto content = kv_get<WebContentRow>(webContentKey(get_receiver(), request.target));
+         auto content = kvGet<WebContentRow>(webContentKey(get_receiver(), request.target));
          if (!!content)
          {
             return rpc_reply_data{
@@ -69,11 +60,11 @@ namespace system_contract
             auto                     keySize = sizeof(account_table);
             while (true)
             {
-               auto raw = kv_greater_equal_raw(account_row::kv_map, key, keySize);
+               auto raw = kvGreaterEqualRaw(account_row::kv_map, key, keySize);
                if (!raw)
                   break;
                auto acc = psio::convert_from_frac<account_row>(*raw);
-               key      = get_key();
+               key      = getKey();
                key.push_back(0);
                rows.push_back(std::move(acc));
             }
@@ -81,29 +72,8 @@ namespace system_contract
          }
       }
 
-      if (request.method == "POST")
-      {
-         // TODO: move to an ABI wasm?
-         if (request.target == "/pack/create_account")
-         {
-            request.body.push_back(0);
-            psio::json_token_stream jstream{request.body.data()};
-            CreateAccount           args;
-            psio::from_json(args, jstream);
-            check(args.account.value, "Invalid or missing name");
-            check(args.authContract.value, "Invalid or missing authContract");
-            action act{
-                .sender   = account_sys::contract,
-                .contract = account_sys::contract,
-                .method   = "newAccount"_m,
-                .raw_data = psio::convert_to_frac(args),
-            };
-            return to_json(act);
-         }
-      }
-
-      return std::nullopt;
-   }  // rpc_account_sys::proxy_sys
+      return psibase::serveSimpleUI<account_sys_iface, false>(request);
+   }  // serveSys
 
    void rpc_account_sys::uploadSys(psio::const_view<std::string>       path,
                                    psio::const_view<std::string>       contentType,
@@ -123,8 +93,8 @@ namespace system_contract
           .contentType = contentType,
           .content     = std::move(c),
       };
-      kv_put(row.key(get_receiver()), row);
-   }
+      kvPut(row.key(get_receiver()), row);
+   }  // uploadSys
 
 }  // namespace system_contract
 

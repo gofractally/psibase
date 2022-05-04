@@ -22,7 +22,7 @@ namespace psibase
    void call_method(T& contract, MemberPtr method, Args&&... args)
    {
       psio::shared_view_ptr<R> p((contract.*method)(std::forward<decltype(args)>(args)...));
-      raw::set_retval(p.data(), p.size());
+      raw::setRetval(p.data(), p.size());
    }
 
    /**
@@ -35,7 +35,7 @@ namespace psibase
    {
       Contract contract;  // TODO: Make this static?
       contract.dispatch_set_sender_receiver(sender, receiver);
-      auto act = get_current_action_view();  /// action view...
+      auto act = getCurrentActionView();
 
       bool called = psio::reflect<Contract>::get_by_name(
           act->method()->value(),
@@ -45,9 +45,9 @@ namespace psibase
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
 
-             auto param_data = act->raw_data()->data();
+             auto param_data = act->rawData()->data();
              psibase::check(
-                 psio::fracvalidate<param_tuple>(param_data, param_data + act->raw_data()->size())
+                 psio::fracvalidate<param_tuple>(param_data, param_data + act->rawData()->size())
                      .valid,
                  "invalid argument encoding");
              psio::const_view<param_tuple> param_view(param_data);
@@ -67,7 +67,7 @@ namespace psibase
                  });  // param_view::call
           });         // reflect::get
       if (!called)
-         abort_message_str("unknown contract action: " + act->method()->get().str());
+         abortMessage("unknown contract action: " + act->method()->get().str());
       // psio::member_proxy
    }  // dispatch
 

@@ -1,4 +1,4 @@
-import { postJsonGetJson, pushedSignedTransaction } from '/common/rpc.mjs';
+import { postJsonGetArrayBuffer, pushedSignedTransaction, uint8ArrayToHex } from '/common/rpc.mjs';
 
 const table = document.getElementById('accounts');
 const tbody = table.getElementsByTagName('tbody')[0];
@@ -8,7 +8,7 @@ const tbody = table.getElementsByTagName('tbody')[0];
     for (let acc of accounts) {
         let row = tbody.insertRow(-1);
         row.insertCell().appendChild(document.createTextNode(acc.num + ''));
-        row.insertCell().appendChild(document.createTextNode(acc.auth_contract));
+        row.insertCell().appendChild(document.createTextNode(acc.authContract));
         row.insertCell().appendChild(document.createTextNode(acc.flags + ''));
         row.insertCell().appendChild(document.createTextNode(acc.code_hash));
     }
@@ -22,20 +22,30 @@ function msg(m) {
     document.getElementById('messages').innerText += m + '\n';
 }
 
-async function createAccount() {
+async function newAccount() {
     try {
         clearMsg();
         msg("Packing action...");
-        const account = document.getElementById('account').value;
+        const name = document.getElementById('account').value;
         const authContract = document.getElementById('authContract').value;
-        const action = await postJsonGetJson('/pack/create_account', { account, authContract, allowSudo: false });
+        const action = {
+            sender: 'account-sys',
+            contract: 'account-sys',
+            method: 'newAccount',
+            rawData: uint8ArrayToHex(new Uint8Array(
+                await postJsonGetArrayBuffer('/pack_action/newAccount', {
+                    name, authContract, requireNew: true
+                }))),
+        };
 
         msg("Pushing transaction...");
         const signedTrx = {
             // TODO: TAPOS
             // TODO: Sign
-            trx: {
-                expiration: new Date(Date.now() + 10_000),
+            transaction: {
+                tapos: {
+                    expiration: new Date(Date.now() + 10_000),
+                },
                 actions: [action],
             },
         };
@@ -50,4 +60,4 @@ async function createAccount() {
     }
 }
 
-document.querySelector('#createAccount').addEventListener('click', createAccount)
+document.querySelector('#createAccount').addEventListener('click', newAccount)

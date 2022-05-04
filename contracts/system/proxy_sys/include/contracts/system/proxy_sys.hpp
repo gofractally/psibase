@@ -25,8 +25,8 @@ namespace psibase
    {
       // TODO: allow contract to register multiple contracts to handle
       //    * sub.dom.ains.contract
-      //    * contract/foo/bar/...
-      void registerServer(account_num contract, account_num rpc_contract);
+      //    * contract/foo/bar/... (maybe not; there's a security issue with that)
+      void registerServer(AccountNumber contract, AccountNumber rpc_contract);
    };
    PSIO_REFLECT(proxy_sys, method(registerServer, contract, rpc_contract))
 }  // namespace psibase

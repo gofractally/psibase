@@ -20,10 +20,10 @@ namespace system_contract
 
       // TODO: move to another contract
       uint8_t setCode(psibase::AccountNumber contract,
-                      uint8_t                vm_type,
-                      uint8_t                vm_version,
+                      uint8_t                vmType,
+                      uint8_t                vmVersion,
                       std::vector<char>      code);
    };
 
-   PSIO_REFLECT(transaction_sys, method(setCode, contact, vm_type, vm_version, code))
+   PSIO_REFLECT(transaction_sys, method(setCode, contact, vmType, vmVersion, code))
 }  // namespace system_contract

@@ -91,7 +91,7 @@ TEST_CASE("valid-method-names-check")
    REQUIRE(psibase::MethodNumber("spiderman").value == 311625498215);
    REQUIRE(psibase::MethodNumber("brucewayne").value == 56488722015273161);
    REQUIRE(psibase::MethodNumber("anthonystark").value == 50913722085663764);
-   REQUIRE(psibase::MethodNumber("natasharomanoff").value == 13346021867974402139);
+   REQUIRE(psibase::MethodNumber("natasharomanoff").value == 13346021867974402139ull);
 }
 
 TEST_CASE("convert-method-names-back-to-string")
@@ -102,6 +102,6 @@ TEST_CASE("convert-method-names-back-to-string")
    REQUIRE(psibase::MethodNumber(311625498215).str() == "spiderman");
    REQUIRE(psibase::MethodNumber(56488722015273161).str() == "brucewayne");
    REQUIRE(psibase::MethodNumber(50913722085663764).str() == "anthonystark");
-   REQUIRE(psibase::MethodNumber(13346021867974402139).str() == "#hneunophpilcroch");
+   REQUIRE(psibase::MethodNumber(13346021867974402139ull).str() == "#hneunophpilcroch");
    REQUIRE(psibase::MethodNumber(0).str() == "");
 }

@@ -12,14 +12,14 @@ TEST_CASE("recursion")
 
    REQUIRE(                          //
        show(false,                   //
-            t.push_transaction(      //
+            t.pushTransaction(       //
                 t.make_transaction(  //
                     {{
                         .sender   = AccountNumber("test-cntr"),
                         .contract = AccountNumber("test-cntr"),
-                        .raw_data = psio::convert_to_frac(test_cntr::payload{
-                            .number = 3,
-                            .memo   = "Counting down",
+                        .rawData  = psio::convert_to_frac(test_cntr::payload{
+                             .number = 3,
+                             .memo   = "Counting down",
                         }),
                     }}))) == "");
 }  // recursion
@@ -31,7 +31,7 @@ TEST_CASE("kv")
    auto test_kv_contract = t.add_contract("test-kv", "test_kv.wasm");
    REQUIRE(                          //
        show(false,                   //
-            t.push_transaction(      //
+            t.pushTransaction(       //
                 t.make_transaction(  //
                     {{
                         .sender   = test_kv_contract,
@@ -48,7 +48,7 @@ TEST_CASE("table")
    auto test_table_contract = add_contract(t, "test_table", "test_table.wasm");
    REQUIRE(                          //
        show(false,                   //
-            t.push_transaction(      //
+            t.pushTransaction(      //
                 t.make_transaction(  //
                     {{
                         .sender   = test_table_contract,

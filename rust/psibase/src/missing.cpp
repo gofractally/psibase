@@ -1,13 +1,14 @@
 #include "psibase/src/missing.hpp"
 
 // TODO: fix warnings
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wambiguous-reversed-operator"
 #pragma GCC diagnostic ignored "-Wchar-subscripts"
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
 #pragma GCC diagnostic ignored "-Wunused-local-typedef"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic push
 #include <psibase/block.hpp>
 #include <psio/bytes.hpp>
 #include <psio/fracpack.hpp>
@@ -17,19 +18,19 @@
 struct NewAccount
 {
    psibase::AccountNumber account;
-   psibase::AccountNumber auth_contract;
-   bool                   allow_sudo;
+   psibase::AccountNumber authContract;
+   bool                   require_new;
 };
-PSIO_REFLECT(NewAccount, account, auth_contract, allow_sudo)
+PSIO_REFLECT(NewAccount, account, authContract, require_new)
 
 struct SetCode
 {
    psibase::AccountNumber contract;
-   int8_t                 vm_type;
-   int8_t                 vm_version;
+   int8_t                 vmType;
+   int8_t                 vmVersion;
    std::vector<char>      code;
 };
-PSIO_REFLECT(SetCode, contract, vm_type, vm_version, code)
+PSIO_REFLECT(SetCode, contract, vmType, vmVersion, code)
 
 struct Startup
 {
@@ -78,17 +79,17 @@ std::unique_ptr<std::vector<uint8_t>> pack_set_code(rust::Str json)
 
 std::unique_ptr<std::vector<uint8_t>> pack_signed_transaction(rust::Str json)
 {
-   return pack<psibase::signed_transaction>(json);
+   return pack<psibase::SignedTransaction>(json);
 }
 
 std::unique_ptr<std::vector<uint8_t>> pack_signed_transactions(rust::Str json)
 {
-   return pack<std::vector<psibase::signed_transaction>>(json);
+   return pack<std::vector<psibase::SignedTransaction>>(json);
 }
 
 std::unique_ptr<std::vector<uint8_t>> pack_genesis_action_data(rust::Str json)
 {
-   return pack<psibase::genesis_action_data>(json);
+   return pack<psibase::GenesisActionData>(json);
 }
 
 std::unique_ptr<std::vector<uint8_t>> pack_startup(rust::Str json)

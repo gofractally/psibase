@@ -2,6 +2,8 @@
 
 - [Introduction](README.md)
 - [Installation]()
+  - [Linux](linux.md)
+- [Psinode and Psibase](psibase/README.md)
 - [C++ Contracts]()
   - [Basic Contract](cpp-contract/basic/README.md)
   - [Minimal UI](cpp-contract/minimal-ui/README.md)

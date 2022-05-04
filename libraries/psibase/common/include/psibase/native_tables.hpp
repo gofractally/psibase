@@ -40,35 +40,36 @@ namespace psibase
       static constexpr uint64_t allow_sudo         = uint64_t(1) << 0;
       static constexpr uint64_t allow_write_native = uint64_t(1) << 1;
       static constexpr uint64_t is_subjective      = uint64_t(1) << 2;
+      static constexpr uint64_t can_not_time_out   = uint64_t(1) << 3;
 
-      AccountNumber num;            // TODO: rename
-      AccountNumber auth_contract;  // TODO: move out of native
-      uint64_t      flags = 0;      // allow_sudo | allow_write_native | is_subjective
+      AccountNumber num;           // TODO: rename
+      AccountNumber authContract;  // TODO: move out of native
+      uint64_t      flags = 0;     // allow_sudo | allow_write_native | is_subjective
 
       // TODO?  1 account with contract per 1000+ without - faster perf on dispatch because don't need to lookup new account
-      Checksum256 code_hash  = {};
-      uint8_t     vm_type    = 0;
-      uint8_t     vm_version = 0;
+      Checksum256 code_hash = {};
+      uint8_t     vmType    = 0;
+      uint8_t     vmVersion = 0;
       //==================================^^
 
       static constexpr auto kv_map = psibase::kv_map::native_unconstrained;
       auto                  key() const { return account_key(num); }
    };
-   PSIO_REFLECT(account_row, num, auth_contract, flags, code_hash, vm_type, vm_version)
+   PSIO_REFLECT(account_row, num, authContract, flags, code_hash, vmType, vmVersion)
 
-   inline auto code_key(const Checksum256& code_hash, uint8_t vm_type, uint8_t vm_version)
+   inline auto code_key(const Checksum256& code_hash, uint8_t vmType, uint8_t vmVersion)
    {
       // TODO: leave space for secondary index?
-      return std::tuple{code_table, code_hash, vm_type, vm_version};
+      return std::tuple{code_table, code_hash, vmType, vmVersion};
    }
 
    /// where code is actually stored, duplicate contracts are reused
    struct code_row
    {
       // primary key
-      Checksum256 code_hash  = {};
-      uint8_t     vm_type    = 0;
-      uint8_t     vm_version = 0;
+      Checksum256 code_hash = {};
+      uint8_t     vmType    = 0;
+      uint8_t     vmVersion = 0;
       //==================
 
       uint32_t             ref_count = 0;   // number accounts that ref this
@@ -79,9 +80,9 @@ namespace psibase
       // that could happen if the key->code map doesn't match the
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto kv_map = psibase::kv_map::native_constrained;
-      auto                  key() const { return code_key(code_hash, vm_type, vm_version); }
+      auto                  key() const { return code_key(code_hash, vmType, vmVersion); }
    };
-   PSIO_REFLECT(code_row, code_hash, vm_type, vm_version, ref_count, code)
+   PSIO_REFLECT(code_row, code_hash, vmType, vmVersion, ref_count, code)
 
    inline auto databaseStatusKey()
    {

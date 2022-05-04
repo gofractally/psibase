@@ -52,7 +52,7 @@ struct QueryRoot
           gt, ge, lt, le, first, last, before, after, psibase::kv_map::block_log,
           psibase::BlockNum(0), ~psibase::BlockNum(0), 0,
           [](auto& block) {  //
-             return block.header.num;
+             return block.header.blockNum;
           },
           [](auto& p) {  //
              return Block{p};
@@ -69,7 +69,7 @@ namespace system_contract
    {
       if (request.method == "GET")
       {
-         auto content = kv_get<WebContentRow>(webContentKey(get_receiver(), request.target));
+         auto content = kvGet<WebContentRow>(webContentKey(get_receiver(), request.target));
          if (!!content)
          {
             return psibase::rpc_reply_data{
@@ -113,7 +113,7 @@ namespace system_contract
           .contentType = contentType,
           .content     = std::move(c),
       };
-      kv_put(row.key(get_receiver()), row);
+      kvPut(row.key(get_receiver()), row);
    }
 
 }  // namespace system_contract

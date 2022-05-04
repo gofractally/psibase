@@ -12,6 +12,8 @@
 #include <psio/to_json/map.hpp>
 #include <psio/translator.hpp>
 
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wunused-variable"
 
 struct sync_call_proxy {
    sync_call_proxy( uint32_t s, uint32_t r ):sender(s),receiver(r){}

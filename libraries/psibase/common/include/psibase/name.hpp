@@ -282,7 +282,7 @@ namespace psibase
       if (*m_in_itr <= '9')
          return 0;
       for (auto i : m_input)
-         if (not name_model::char_to_symbol[i])
+         if (not name_model::char_to_symbol[(unsigned char)i])
             return 0;
 
       typedef typename name_model::code_value code_value;
@@ -317,7 +317,7 @@ namespace psibase
       {
          if (m_in_itr == m_input.end())
             return 0;
-         int c = m_model.char_to_symbol[*m_in_itr];
+         int c = m_model.char_to_symbol[(unsigned char)*m_in_itr];
          ++m_in_itr;
          return c;
       };
@@ -458,7 +458,7 @@ namespace psibase
          if (c == '\0')
             break;
 
-         out += m_model.symbol_to_char[char(c)];
+         out += m_model.symbol_to_char[(unsigned char)(c)];
 
          if (p.count == 0)
             return "RUNTIME LOGIC ERROR";

@@ -10,10 +10,10 @@ fn genesis_contract_json(
     Ok(format!(
         r#"{{
             "contract": {},
-            "auth_contract": {},
+            "authContract": {},
             "flags": {},
-            "vm_type": 0,
-            "vm_version": 0,
+            "vmType": 0,
+            "vmVersion": 0,
             "code": {}
         }}"#,
         serde_json::to_string(contract)?,
@@ -39,13 +39,7 @@ fn genesis_action_data_json(contracts: &[String]) -> String {
 
 // TODO: replace with struct
 fn startup() -> Result<String, anyhow::Error> {
-    Ok(to_hex(
-        bridge::ffi::pack_startup(&format!(
-            r#"{{
-            }}"#
-        ))
-        .as_slice(),
-    ))
+    Ok(to_hex(bridge::ffi::pack_startup("{}").as_slice()))
 }
 
 async fn push_boot_impl(
@@ -72,7 +66,7 @@ async fn push_boot_impl(
     let err = json.get("error").and_then(|v| v.as_str());
     if let Some(e) = err {
         if !e.is_empty() {
-            Err(Error::Msg { s: e.to_string() })?;
+            return Err(Error::Msg { s: e.to_string() }.into());
         }
     }
     Ok(())
@@ -156,32 +150,7 @@ fn boot_trx() -> Result<String, anyhow::Error> {
     )?)
 } // boot_trx
 
-fn upload_sys(
-    contract: &str,
-    path: &str,
-    content_type: &str,
-    content: &[u8],
-) -> Result<String, anyhow::Error> {
-    action_json(
-        contract,
-        contract,
-        "uploadSys",
-        &to_hex(
-            bridge::ffi::pack_upload_sys(&format!(
-                r#"{{
-                    "path": {},
-                    "contentType": {},
-                    "content": {}
-                }}"#,
-                serde_json::to_string(path)?,
-                serde_json::to_string(content_type)?,
-                serde_json::to_string(&to_hex(content))?
-            ))
-            .as_slice(),
-        ),
-    )
-}
-
+#[allow(clippy::vec_init_then_push)]
 pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), anyhow::Error> {
     let mut signed_transactions: Vec<String> = Vec::new();
 
@@ -210,6 +179,12 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
                 "/common/useGraphQLQuery.mjs",
                 "text/javascript",
                 include_bytes!("../../../contracts/user/common_sys/common/useGraphQLQuery.mjs"),
+            )?,
+            upload_sys(
+                "common-sys",
+                "/common/SimpleUI.mjs",
+                "text/javascript",
+                include_bytes!("../../../contracts/user/common_sys/common/SimpleUI.mjs"),
             )?,
             upload_sys(
                 "common-sys",
@@ -250,7 +225,7 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
 
     let mut signed_transactions_json: String = "[".to_owned();
     signed_transactions_json.push_str(&signed_transactions.join(","));
-    signed_transactions_json.push_str("]");
+    signed_transactions_json.push(']');
     let packed_signed_transactions =
         bridge::ffi::pack_signed_transactions(&signed_transactions_json);
     push_boot(args, client, packed_signed_transactions.as_slice().into()).await?;

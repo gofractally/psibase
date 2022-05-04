@@ -240,15 +240,15 @@ namespace psio
    template <typename S>
    void increase_indent(pretty_stream<S>& s)
    {
-      s.current_indent.resize(s.current_indent.size() + s.indent_size, ' ');
+      s.current_indent.resize((int)s.current_indent.size() + s.indent_size, ' ');
    }
 
    template <typename S>
    void decrease_indent(pretty_stream<S>& s)
    {
-      if (s.current_indent.size() < s.indent_size)
+      if ((int)s.current_indent.size() < s.indent_size)
          abort_error(stream_error::overrun);
-      s.current_indent.resize(s.current_indent.size() - s.indent_size);
+      s.current_indent.resize((int)s.current_indent.size() - s.indent_size);
    }
 
    template <typename S>
@@ -261,7 +261,7 @@ namespace psio
    void write_newline(pretty_stream<S>& s)
    {
       s.write('\n');
-      s.write(s.current_indent.data(), s.current_indent.size());
+      s.write(s.current_indent.data(), (int)s.current_indent.size());
    }
 
    struct input_stream

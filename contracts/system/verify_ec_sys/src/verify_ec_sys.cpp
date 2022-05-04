@@ -24,10 +24,10 @@ extern "C" [[clang::export_name("verify")]] void verify()
 {
    check(context, "verify_ec_sys not fully built");
 
-   auto act     = get_current_action();
-   auto data    = psio::convert_from_frac<verify_data>(act.raw_data);
-   auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.raw_data);  // TODO: verify no extra
-   auto sig     = psio::convert_from_frac<Signature>(data.proof);           // TODO: verify no extra
+   auto act     = getCurrentAction();
+   auto data    = psio::convert_from_frac<verify_data>(act.rawData);
+   auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.rawData);  // TODO: verify no extra
+   auto sig     = psio::convert_from_frac<Signature>(data.proof);          // TODO: verify no extra
 
    auto* k1_pub_key = std::get_if<0>(&pub_key);
    auto* k1_sig     = std::get_if<0>(&sig);
@@ -53,10 +53,10 @@ extern "C" [[clang::export_name("verify")]] void verify()
        "incorrect signature");
 }
 
-extern "C" void called(account_num this_contract, account_num sender)
+extern "C" void called(AccountNumber this_contract, AccountNumber sender)
 {
-   abort_message_str("this contract has no actions");
+   abortMessage("this contract has no actions");
 }
 
 // Caution! Don't replace with version in dispatcher!
-extern "C" void start(account_num this_contract) {}
+extern "C" void start(AccountNumber this_contract) {}

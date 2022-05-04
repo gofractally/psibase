@@ -12,52 +12,52 @@
 
 namespace psibase
 {
-   struct shared_database_impl;
-   struct shared_database
+   struct SharedDatabaseImpl;
+   struct SharedDatabase
    {
-      std::shared_ptr<shared_database_impl> impl;
+      std::shared_ptr<SharedDatabaseImpl> impl;
 
-      shared_database() = default;
-      shared_database(const boost::filesystem::path& dir);
-      shared_database(const shared_database&) = default;
-      shared_database(shared_database&&)      = default;
+      SharedDatabase() = default;
+      SharedDatabase(const boost::filesystem::path& dir);
+      SharedDatabase(const SharedDatabase&) = default;
+      SharedDatabase(SharedDatabase&&)      = default;
 
-      shared_database& operator=(const shared_database&) = default;
-      shared_database& operator=(shared_database&&)      = default;
+      SharedDatabase& operator=(const SharedDatabase&) = default;
+      SharedDatabase& operator=(SharedDatabase&&)      = default;
    };
 
-   struct database_impl;
-   struct database
+   struct DatabaseImpl;
+   struct Database
    {
-      std::unique_ptr<database_impl> impl;
+      std::unique_ptr<DatabaseImpl> impl;
 
-      struct kv_result
+      struct KVResult
       {
          psio::input_stream key;
          psio::input_stream value;
       };
 
-      struct session
+      struct Session
       {
-         database* db = {};
+         Database* db = {};
 
-         session() = default;
-         session(database* db) : db{db} {}
-         session(const session&) = delete;
-         session(session&& src)
+         Session() = default;
+         Session(Database* db) : db{db} {}
+         Session(const Session&) = delete;
+         Session(Session&& src)
          {
             db     = src.db;
             src.db = nullptr;
          }
-         ~session()
+         ~Session()
          {
             if (db)
                db->abort(*this);
          }
 
-         session& operator=(const session&) = delete;
+         Session& operator=(const Session&) = delete;
 
-         session& operator=(session&& src)
+         Session& operator=(Session&& src)
          {
             db     = src.db;
             src.db = nullptr;
@@ -70,51 +70,51 @@ namespace psibase
                db->commit(*this);
             db = nullptr;
          }
-      };  // session
+      };  // Session
 
-      database(shared_database shared);
-      database(const database&) = delete;
-      ~database();
+      Database(SharedDatabase shared);
+      Database(const Database&) = delete;
+      ~Database();
 
-      session start_read();
-      session start_write();
-      void    commit(session&);
-      void    abort(session&);
+      Session startRead();
+      Session startWrite();
+      void    commit(Session&);
+      void    abort(Session&);
 
-      void kv_put_raw(kv_map map, psio::input_stream key, psio::input_stream value);
-      void kv_remove_raw(kv_map map, psio::input_stream key);
-      std::optional<psio::input_stream> kv_get_raw(kv_map map, psio::input_stream key);
-      std::optional<kv_result>          kv_greater_equal_raw(kv_map             map,
-                                                             psio::input_stream key,
-                                                             size_t             match_key_size);
-      std::optional<kv_result>          kv_less_than_raw(kv_map             map,
-                                                         psio::input_stream key,
-                                                         size_t             match_key_size);
-      std::optional<kv_result>          kv_max_raw(kv_map map, psio::input_stream key);
+      void kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value);
+      void kvRemoveRaw(kv_map map, psio::input_stream key);
+      std::optional<psio::input_stream> kvGetRaw(kv_map map, psio::input_stream key);
+      std::optional<KVResult>           kvGreaterEqualRaw(kv_map             map,
+                                                          psio::input_stream key,
+                                                          size_t             matchKeySize);
+      std::optional<KVResult>           kvLessThanRaw(kv_map             map,
+                                                      psio::input_stream key,
+                                                      size_t             matchKeySize);
+      std::optional<KVResult>           kvMaxRaw(kv_map map, psio::input_stream key);
 
       template <typename K, typename V>
-      auto kv_put(kv_map map, const K& key, const V& value)
+      auto kvPut(kv_map map, const K& key, const V& value)
           -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
-         kv_put_raw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
+         kvPutRaw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
       }
 
       template <typename V, typename K>
-      std::optional<V> kv_get(kv_map map, const K& key)
+      std::optional<V> kvGet(kv_map map, const K& key)
       {
-         auto s = kv_get_raw(map, psio::convert_to_key(key));
+         auto s = kvGetRaw(map, psio::convert_to_key(key));
          if (!s)
             return std::nullopt;
          return psio::convert_from_frac<V>(psio::input_stream(s->pos, s->end));
       }
 
       template <typename V, typename K>
-      V kv_get_or_default(kv_map map, const K& key)
+      V kvGetOrDefault(kv_map map, const K& key)
       {
-         auto obj = kv_get<V>(map, key);
+         auto obj = kvGet<V>(map, key);
          if (obj)
             return std::move(*obj);
          return {};
       }
-   };  // database
+   };  // Database
 }  // namespace psibase

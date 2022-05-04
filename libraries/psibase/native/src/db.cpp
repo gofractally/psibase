@@ -5,8 +5,8 @@
 
 namespace psibase
 {
-   static std::unique_ptr<mdbx::env_managed> construct_env(const boost::filesystem::path& dir,
-                                                           unsigned max_maps = 0)
+   static std::unique_ptr<mdbx::env_managed> constructEnv(const boost::filesystem::path& dir,
+                                                          unsigned max_maps = 0)
    {
       mdbx::env_managed::create_parameters  cp;
       mdbx::env_managed::operate_parameters op;
@@ -27,79 +27,79 @@ namespace psibase
       return kv_map;
    }
 
-   struct shared_database_impl
+   struct SharedDatabaseImpl
    {
-      const std::unique_ptr<mdbx::env_managed> state_env;
-      const std::unique_ptr<mdbx::env_managed> subjective_env;
-      const std::unique_ptr<mdbx::env_managed> write_only_env;
-      const std::unique_ptr<mdbx::env_managed> block_log_env;
-      const mdbx::map_handle                   contract_map;
-      const mdbx::map_handle                   native_constrained_map;
-      const mdbx::map_handle                   native_unconstrained_map;
-      const mdbx::map_handle                   subjective_map;
-      const mdbx::map_handle                   write_only_map;
-      const mdbx::map_handle                   event_map;
-      const mdbx::map_handle                   ui_event_map;
-      const mdbx::map_handle                   block_log_map;
+      const std::unique_ptr<mdbx::env_managed> stateEnv;
+      const std::unique_ptr<mdbx::env_managed> subjectiveEnv;
+      const std::unique_ptr<mdbx::env_managed> writeOnlyEnv;
+      const std::unique_ptr<mdbx::env_managed> blockLogEnv;
+      const mdbx::map_handle                   contractMap;
+      const mdbx::map_handle                   nativeConstrainedMap;
+      const mdbx::map_handle                   nativeUnconstrainedMap;
+      const mdbx::map_handle                   subjectiveMap;
+      const mdbx::map_handle                   writeOnlyMap;
+      const mdbx::map_handle                   eventMap;
+      const mdbx::map_handle                   uiEventMap;
+      const mdbx::map_handle                   blockLogMap;
 
-      shared_database_impl(const boost::filesystem::path& dir)
-          : state_env{construct_env(dir / "state", 3)},
-            subjective_env{construct_env(dir / "subjective")},
-            write_only_env{construct_env(dir / "write_only", 3)},
-            block_log_env{construct_env(dir / "block_log")},
-            contract_map{construct_kv_map(*state_env, "contract")},
-            native_constrained_map{construct_kv_map(*state_env, "native_constrained")},
-            native_unconstrained_map{construct_kv_map(*state_env, "native_unconstrained")},
-            subjective_map{construct_kv_map(*subjective_env, nullptr)},
-            write_only_map{construct_kv_map(*write_only_env, "write_only")},
-            event_map{construct_kv_map(*write_only_env, "event")},
-            ui_event_map{construct_kv_map(*write_only_env, "ui_event")},
-            block_log_map{construct_kv_map(*block_log_env, nullptr)}
+      SharedDatabaseImpl(const boost::filesystem::path& dir)
+          : stateEnv{constructEnv(dir / "state", 3)},
+            subjectiveEnv{constructEnv(dir / "subjective")},
+            writeOnlyEnv{constructEnv(dir / "write_only", 3)},
+            blockLogEnv{constructEnv(dir / "block_log")},
+            contractMap{construct_kv_map(*stateEnv, "contract")},
+            nativeConstrainedMap{construct_kv_map(*stateEnv, "native_constrained")},
+            nativeUnconstrainedMap{construct_kv_map(*stateEnv, "native_unconstrained")},
+            subjectiveMap{construct_kv_map(*subjectiveEnv, nullptr)},
+            writeOnlyMap{construct_kv_map(*writeOnlyEnv, "write_only")},
+            eventMap{construct_kv_map(*writeOnlyEnv, "event")},
+            uiEventMap{construct_kv_map(*writeOnlyEnv, "ui_event")},
+            blockLogMap{construct_kv_map(*blockLogEnv, nullptr)}
       {
       }
 
       mdbx::map_handle get_map(kv_map map)
       {
          if (map == kv_map::contract)
-            return contract_map;
+            return contractMap;
          if (map == kv_map::native_constrained)
-            return native_constrained_map;
+            return nativeConstrainedMap;
          if (map == kv_map::native_unconstrained)
-            return native_unconstrained_map;
+            return nativeUnconstrainedMap;
          if (map == kv_map::subjective)
-            return subjective_map;
+            return subjectiveMap;
          if (map == kv_map::write_only)
-            return write_only_map;
+            return writeOnlyMap;
          if (map == kv_map::event)
-            return write_only_map;
+            return writeOnlyMap;
          if (map == kv_map::ui_event)
-            return write_only_map;
+            return writeOnlyMap;
          if (map == kv_map::block_log)
-            return block_log_map;
+            return blockLogMap;
          throw std::runtime_error("unknown kv_map");
       }
    };
 
-   shared_database::shared_database(const boost::filesystem::path& dir)
-       : impl{std::make_shared<shared_database_impl>(dir)}
+   SharedDatabase::SharedDatabase(const boost::filesystem::path& dir)
+       : impl{std::make_shared<SharedDatabaseImpl>(dir)}
    {
    }
 
-   struct database_impl
+   struct DatabaseImpl
    {
-      shared_database                  shared;
+      SharedDatabase                   shared;
       std::vector<mdbx::txn_managed>   transactions;
-      std::vector<mdbx::txn_managed>   write_only_transactions;
-      std::optional<mdbx::txn_managed> subjective_transaction;
-      std::optional<mdbx::txn_managed> block_log_transaction;
+      std::vector<mdbx::txn_managed>   writeOnlyTransactions;
+      std::optional<mdbx::txn_managed> subjectiveTransaction;
+      std::optional<mdbx::txn_managed> blockLogTransaction;
       mdbx::cursor_managed             cursor;
 
       bool transactions_ok()
       {
          // This mismatch can occur if start_*() or commit() throw
-         return transactions.size() == write_only_transactions.size() &&
-                transactions.empty() == !subjective_transaction.has_value() &&
-                transactions.empty() == !block_log_transaction.has_value();
+         return transactions.size() == writeOnlyTransactions.size() &&
+                transactions.empty() == !subjectiveTransaction.has_value() &&
+                transactions.empty() == !blockLogTransaction.has_value();
       }
 
       bool transactions_available() { return transactions_ok() && !transactions.empty(); }
@@ -108,61 +108,60 @@ namespace psibase
       {
          check(transactions_available(), "no active database transactions");
          if (map == kv_map::subjective)
-            return *subjective_transaction;
+            return *subjectiveTransaction;
          else if (map == kv_map::block_log)
-            return *block_log_transaction;
+            return *blockLogTransaction;
          else if (map == kv_map::write_only)
-            return write_only_transactions.back();
+            return writeOnlyTransactions.back();
          else if (map == kv_map::event)
-            return write_only_transactions.back();
+            return writeOnlyTransactions.back();
          else if (map == kv_map::ui_event)
-            return write_only_transactions.back();
+            return writeOnlyTransactions.back();
          else
             return transactions.back();
       }
    };
 
-   database::database(shared_database shared)
-       : impl{std::make_unique<database_impl>(database_impl{std::move(shared)})}
+   Database::Database(SharedDatabase shared)
+       : impl{std::make_unique<DatabaseImpl>(DatabaseImpl{std::move(shared)})}
    {
    }
 
-   database::~database() {}
+   Database::~Database() {}
 
-   database::session database::start_read()
+   Database::Session Database::startRead()
    {
       check(impl->transactions_ok(), "database transactions mismatch");
-      impl->transactions.push_back(impl->shared.impl->state_env->start_read());
-      impl->write_only_transactions.push_back(impl->shared.impl->write_only_env->start_read());
-      if (!impl->subjective_transaction)
-         impl->subjective_transaction.emplace(impl->shared.impl->subjective_env->start_read());
-      if (!impl->block_log_transaction)
-         impl->block_log_transaction.emplace(impl->shared.impl->block_log_env->start_read());
+      impl->transactions.push_back(impl->shared.impl->stateEnv->start_read());
+      impl->writeOnlyTransactions.push_back(impl->shared.impl->writeOnlyEnv->start_read());
+      if (!impl->subjectiveTransaction)
+         impl->subjectiveTransaction.emplace(impl->shared.impl->subjectiveEnv->start_read());
+      if (!impl->blockLogTransaction)
+         impl->blockLogTransaction.emplace(impl->shared.impl->blockLogEnv->start_read());
       return {this};
    }
 
-   database::session database::start_write()
+   Database::Session Database::startWrite()
    {
       check(impl->transactions_ok(), "database transactions mismatch");
       if (impl->transactions.empty())
       {
-         impl->transactions.push_back(impl->shared.impl->state_env->start_write());
-         impl->write_only_transactions.push_back(impl->shared.impl->write_only_env->start_write());
-         impl->subjective_transaction.emplace(impl->shared.impl->subjective_env->start_write());
-         impl->block_log_transaction.emplace(impl->shared.impl->block_log_env->start_write());
+         impl->transactions.push_back(impl->shared.impl->stateEnv->start_write());
+         impl->writeOnlyTransactions.push_back(impl->shared.impl->writeOnlyEnv->start_write());
+         impl->subjectiveTransaction.emplace(impl->shared.impl->subjectiveEnv->start_write());
+         impl->blockLogTransaction.emplace(impl->shared.impl->blockLogEnv->start_write());
       }
       else
       {
          impl->transactions.push_back(impl->transactions.back().start_nested());
-         impl->write_only_transactions.push_back(
-             impl->write_only_transactions.back().start_nested());
+         impl->writeOnlyTransactions.push_back(impl->writeOnlyTransactions.back().start_nested());
       }
       return {this};
    }
 
    // TODO: consider flushing disk after each commit when
    //       transactions.size() falls to 0.
-   void database::commit(database::session&)
+   void Database::commit(Database::Session&)
    {
       check(impl->transactions_available(), "no active database transactions during commit");
       if (impl->transactions.size() == 1)
@@ -170,15 +169,15 @@ namespace psibase
          // Commit first to prevent consensus state from getting ahead of block
          // log. If the consensus state fails to commit, then replaying the blocks
          // can catch the consensus state back up on restart.
-         impl->block_log_transaction->commit();
-         impl->block_log_transaction.reset();
+         impl->blockLogTransaction->commit();
+         impl->blockLogTransaction.reset();
       }
 
       // Commit write-only before consensus state to prevent consensus from
       // getting ahead. If write-only commits, but consensus state fails to
       // commit, then replaying the block on restart will fix up the problem.
-      impl->write_only_transactions.back().commit();
-      impl->write_only_transactions.pop_back();
+      impl->writeOnlyTransactions.back().commit();
+      impl->writeOnlyTransactions.pop_back();
 
       // Consensus state.
       impl->transactions.back().commit();
@@ -187,24 +186,24 @@ namespace psibase
       // It's no big deal if this fails to commit
       if (impl->transactions.empty())
       {
-         impl->subjective_transaction->commit();
-         impl->subjective_transaction.reset();
+         impl->subjectiveTransaction->commit();
+         impl->subjectiveTransaction.reset();
       }
    }
 
-   void database::abort(database::session&)
+   void Database::abort(Database::Session&)
    {
       if (!impl->transactions_available())
          return;
       impl->transactions.pop_back();
-      impl->write_only_transactions.pop_back();
-      if (impl->transactions.empty() && impl->subjective_transaction.has_value())
+      impl->writeOnlyTransactions.pop_back();
+      if (impl->transactions.empty() && impl->subjectiveTransaction.has_value())
       {
          // The subjective database has no undo stack and survives aborts; this
          // helps subjective contracts perform subjective mitigation.
          try
          {
-            impl->subjective_transaction->commit();
+            impl->subjectiveTransaction->commit();
          }
          catch (...)
          {
@@ -215,24 +214,24 @@ namespace psibase
             // TODO: log the failure since this may indicate a disk-space issue
             //       or a larger problem
          }
-         impl->subjective_transaction.reset();
+         impl->subjectiveTransaction.reset();
       }
       if (impl->transactions.empty())
-         impl->block_log_transaction.reset();
+         impl->blockLogTransaction.reset();
    }
 
-   void database::kv_put_raw(kv_map map, psio::input_stream key, psio::input_stream value)
+   void Database::kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value)
    {
       impl->get_trx(map).upsert(impl->shared.impl->get_map(map), {key.pos, key.remaining()},
                                 {value.pos, value.remaining()});
    }
 
-   void database::kv_remove_raw(kv_map map, psio::input_stream key)
+   void Database::kvRemoveRaw(kv_map map, psio::input_stream key)
    {
       impl->get_trx(map).erase(impl->shared.impl->get_map(map), {key.pos, key.remaining()});
    }
 
-   std::optional<psio::input_stream> database::kv_get_raw(kv_map map, psio::input_stream key)
+   std::optional<psio::input_stream> Database::kvGetRaw(kv_map map, psio::input_stream key)
    {
       mdbx::slice k{key.pos, key.remaining()};
       mdbx::slice v;
@@ -243,26 +242,26 @@ namespace psibase
       return psio::input_stream{(const char*)v.data(), v.size()};
    }
 
-   std::optional<database::kv_result> database::kv_greater_equal_raw(kv_map             map,
-                                                                     psio::input_stream key,
-                                                                     size_t match_key_size)
+   std::optional<Database::KVResult> Database::kvGreaterEqualRaw(kv_map             map,
+                                                                 psio::input_stream key,
+                                                                 size_t             matchKeySize)
    {
       mdbx::slice k{key.pos, key.remaining()};
       impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
       auto result = impl->cursor.lower_bound(k, false);
       if (!result)
          return std::nullopt;
-      if (result.key.size() < match_key_size || memcmp(result.key.data(), key.pos, match_key_size))
+      if (result.key.size() < matchKeySize || memcmp(result.key.data(), key.pos, matchKeySize))
          return std::nullopt;
-      return database::kv_result{
+      return Database::KVResult{
           psio::input_stream{(const char*)result.key.data(), result.key.size()},
           psio::input_stream{(const char*)result.value.data(), result.value.size()},
       };
    }
 
-   std::optional<database::kv_result> database::kv_less_than_raw(kv_map             map,
-                                                                 psio::input_stream key,
-                                                                 size_t             match_key_size)
+   std::optional<Database::KVResult> Database::kvLessThanRaw(kv_map             map,
+                                                             psio::input_stream key,
+                                                             size_t             matchKeySize)
    {
       mdbx::slice k{key.pos, key.remaining()};
       impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
@@ -273,15 +272,15 @@ namespace psibase
          result = impl->cursor.to_previous(false);
       if (!result)
          return std::nullopt;
-      if (result.key.size() < match_key_size || memcmp(result.key.data(), key.pos, match_key_size))
+      if (result.key.size() < matchKeySize || memcmp(result.key.data(), key.pos, matchKeySize))
          return std::nullopt;
-      return database::kv_result{
+      return Database::KVResult{
           psio::input_stream{(const char*)result.key.data(), result.key.size()},
           psio::input_stream{(const char*)result.value.data(), result.value.size()},
       };
    }
 
-   std::optional<database::kv_result> database::kv_max_raw(kv_map map, psio::input_stream key)
+   std::optional<Database::KVResult> Database::kvMaxRaw(kv_map map, psio::input_stream key)
    {
       std::vector<unsigned char> next(reinterpret_cast<const unsigned char*>(key.pos),
                                       reinterpret_cast<const unsigned char*>(key.end));
@@ -310,7 +309,7 @@ namespace psibase
       if (result->key.size() < key.remaining() ||
           memcmp(result->key.data(), key.pos, key.remaining()))
          return std::nullopt;
-      return database::kv_result{
+      return Database::KVResult{
           psio::input_stream{(const char*)result->key.data(), result->key.size()},
           psio::input_stream{(const char*)result->value.data(), result->value.size()},
       };

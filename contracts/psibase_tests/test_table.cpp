@@ -37,7 +37,7 @@ namespace table_test
 
    using test_tables = contract_tables<table0, table1, table2>;
 
-   void test0(account_num this_contract)
+   void test0(AccountNumber this_contract)
    {
       test_tables t{this_contract};
       auto        t0   = t.open<table0>();
@@ -50,7 +50,7 @@ namespace table_test
       check(idx0.get(0) == S0{0, 2} && idx0.get(1) == S0{1, 3}, "get after different key");
    }
 
-   void test1(account_num this_contract)
+   void test1(AccountNumber this_contract)
    {
       return; // TODO: what else breaks
       test_tables t{this_contract};
@@ -66,7 +66,7 @@ namespace table_test
       check(idx1.get(1) == std::nullopt, "get1 removed");
    }
 
-   void test2(account_num this_contract)
+   void test2(AccountNumber this_contract)
    {
       return; // TODO: what else breaks
       test_tables t{this_contract};
@@ -86,7 +86,7 @@ namespace table_test
       check(result[1] == S2{3, 1, 4}, "iter val1");
    }
 
-   extern "C" void called(account_num this_contract, account_num sender)
+   extern "C" void called(AccountNumber this_contract, AccountNumber sender)
    {
       test0(this_contract);
       test1(this_contract);
@@ -94,5 +94,5 @@ namespace table_test
    }
 
    extern "C" void __wasm_call_ctors();
-   extern "C" void start(account_num this_contract) { __wasm_call_ctors(); }
+   extern "C" void start(AccountNumber this_contract) { __wasm_call_ctors(); }
 }  // namespace table_test

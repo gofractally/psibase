@@ -75,3 +75,16 @@ jobs:
           echo =====
           ${DOCKER} sccache -s
           echo =====
+          bash -c "cd build && tar czf ../psidk-linux.tar.gz psidk"
+          echo =====
+          ${DOCKER} bash -c "cd doc/psidk && mdbook build && mv book psidk-book && tar czf ../../psidk-book.tar.gz psidk-book"
+      - name: Upload psidk-linux
+        uses: actions/upload-artifact@v1
+        with:
+          name: psidk-linux
+          path: psidk-linux.tar.gz
+      - name: Upload psidk-book
+        uses: actions/upload-artifact@v1
+        with:
+          name: psidk-book
+          path: psidk-book.tar.gz

@@ -52,12 +52,12 @@ There are 2 common suffixes used by psibase contracts:
 
 ## How it works
 
-* psinode forwards most http requests to the [`proxy-sys` contract](../../system-contract/proxy-sys).
-* If the URL begins with `/common`, [`proxy-sys`](../../system-contract/proxy-sys) forwards the request to the [`common-sys` contract](../../system-contract/common-sys). [`common-sys`](../../system-contract/common-sys) provides shared resources, such as js library code and an RPC request handler for packing transactions.
-* [`proxy-sys`](../../system-contract/proxy-sys) looks at the request domain. If it begins with the name of a registered contract, it calls that contract's `serveSys` action to process the request.
-* `SimpleUI` provides the example contract's `serveSys` action. This action handles the following requests:
-  * `GET /` returns a minimal html file which references the `/common/SimpleUI.js` script. This script generates the UI dynamically.
-  * `GET /action_templates` returns a template json structure (below). This lets the UI know which actions are available and sample values for their arguments. This isn't a schema; it's only suitable for simple cases.
+- psinode forwards most http requests to the [`proxy-sys` contract](../../system-contract/proxy-sys).
+- If the URL begins with `/common`, [`proxy-sys`](../../system-contract/proxy-sys) forwards the request to the [`common-sys` contract](../../system-contract/common-sys). [`common-sys`](../../system-contract/common-sys) provides shared resources, such as js library code and an RPC request handler for packing transactions.
+- [`proxy-sys`](../../system-contract/proxy-sys) looks at the request domain. If it begins with the name of a registered contract, it calls that contract's `serveSys` action to process the request.
+- `SimpleUI` provides the example contract's `serveSys` action. This action handles the following requests:
+  - `GET /` returns a minimal html file which references the `/common/SimpleUI.mjs` script. This script generates the UI dynamically.
+  - `GET /action_templates` returns a template json structure (below). This lets the UI know which actions are available and sample values for their arguments. This isn't a schema; it's only suitable for simple cases.
 
 ### `/action_templates` result
 

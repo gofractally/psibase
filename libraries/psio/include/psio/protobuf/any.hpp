@@ -66,11 +66,17 @@ namespace psio
          void add(uint32_t field, char s) { members.push_back(entry{field, varuint32{uint32_t(s)}}); }
          void add(uint32_t field, double s)
          {
-            members.push_back(entry{field, *reinterpret_cast<int64_t*>(&s)});
+            int64_t i;
+            static_assert(sizeof(s) == sizeof(i));
+            memcpy(&i, &s, sizeof(i));
+            members.push_back(entry{field, i});
          }
          void add(uint32_t field, float s)
          {
-            members.push_back(entry{field, *reinterpret_cast<int32_t*>(&s)});
+            int32_t i;
+            static_assert(sizeof(s) == sizeof(i));
+            memcpy(&i, &s, sizeof(i));
+            members.push_back(entry{field, i});
          }
       };
       PSIO_REFLECT(any, members)

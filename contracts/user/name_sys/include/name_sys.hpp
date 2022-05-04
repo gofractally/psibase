@@ -23,7 +23,7 @@ namespace name_sys
    class name_contract : public psibase::Contract<name_contract>
    {
      public:
-      static constexpr psibase::AccountNumber contract = "name-sys"_a;
+      static constexpr auto contract = psibase::AccountNumber("name-sys");
 
       // Mutate
       void create(psibase::AccountNumber account, psibase::AccountNumber ram_payer);

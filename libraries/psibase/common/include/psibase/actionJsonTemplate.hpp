@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psio/fracpack.hpp>
 #include <psio/to_json.hpp>
 
 namespace psibase
@@ -51,8 +52,9 @@ namespace psibase
                 to_json(meta.name, s);
                 s.write(':');
                 s.write('{');
-                generateActionJsonTemplate((decltype(psio::args_as_tuple(mptr))*)nullptr, false,
-                                           meta.param_names.begin(), meta.param_names.end(), s);
+                generateActionJsonTemplate(
+                    (decltype(psio::tuple_remove_view(psio::args_as_tuple(mptr)))*)nullptr, false,
+                    meta.param_names.begin(), meta.param_names.end(), s);
                 s.write('}');
              }
           });

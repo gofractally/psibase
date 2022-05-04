@@ -42,7 +42,7 @@ namespace psibase
 
       if (request.method == "GET")
       {
-         auto content = kv_get<WebContentRow>(webContentKey(get_receiver(), request.target));
+         auto content = kvGet<WebContentRow>(webContentKey(get_receiver(), request.target));
          if (!!content)
          {
             return rpc_reply_data{
@@ -50,7 +50,18 @@ namespace psibase
                 .reply       = content->content,
             };
          }
-
+         if (request.target == "/common/thiscontract")
+         {
+            std::string contractName;
+            if (request.host.size() > request.root_host.size() + 1 &&
+                request.host.ends_with(request.root_host) &&
+                request.host[request.host.size() - request.root_host.size() - 1] == '.')
+               contractName.assign(request.host.begin(),
+                                   request.host.end() - request.root_host.size() - 1);
+            else
+               contractName = "common-sys";
+            return to_json(contractName);
+         }
          if (request.target == "/common/rootdomain")
             return to_json(request.root_host);
          if (request.target == "/common/rootdomain.js")
@@ -84,11 +95,11 @@ namespace psibase
       if (request.method == "POST")
       {
          // TODO: move to an ABI wasm?
-         if (request.target == "/common/pack/signed_transaction")
+         if (request.target == "/common/pack/SignedTransaction")
          {
             request.body.push_back(0);
             psio::json_token_stream jstream{request.body.data()};
-            signed_transaction      trx;
+            SignedTransaction       trx;
             psio::from_json(trx, jstream);
             return rpc_reply_data{
                 .contentType = "application/octet-stream",
@@ -118,7 +129,7 @@ namespace psibase
           .contentType = contentType,
           .content     = std::move(c),
       };
-      kv_put(row.key(get_receiver()), row);
+      kvPut(row.key(get_receiver()), row);
    }
 
 }  // namespace psibase

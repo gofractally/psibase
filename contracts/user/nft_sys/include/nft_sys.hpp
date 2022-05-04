@@ -11,7 +11,7 @@ namespace UserContract
    {
      public:
       using tables = psibase::contract_tables<NftTable_t, NftHolderTable_t, CreditTable_t>;
-      static constexpr psibase::AccountNumber contract = "nft-sys"_a;
+      static constexpr auto contract = psibase::AccountNumber("nft-sys");
 
       NID  mint();
       void burn(NID nftId);

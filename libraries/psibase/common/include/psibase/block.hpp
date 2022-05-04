@@ -7,46 +7,44 @@
 
 namespace psibase
 {
-   using BlockNum  = uint32_t;
-   using block_num = BlockNum;
+   using BlockNum = uint32_t;
 
    struct Action
    {
       AccountNumber     sender;
       AccountNumber     contract;
       MethodNumber      method;
-      std::vector<char> raw_data;
+      std::vector<char> rawData;
    };
-   using action = Action;
-   PSIO_REFLECT(Action, sender, contract, method, raw_data)
+   PSIO_REFLECT(Action, sender, contract, method, rawData)
 
-   struct genesis_contract
+   struct GenesisContract
    {
       AccountNumber     contract;
-      AccountNumber     auth_contract;
-      uint64_t          flags      = 0;
-      uint8_t           vm_type    = 0;
-      uint8_t           vm_version = 0;
-      std::vector<char> code       = {};
+      AccountNumber     authContract;
+      uint64_t          flags     = 0;
+      uint8_t           vmType    = 0;
+      uint8_t           vmVersion = 0;
+      std::vector<char> code      = {};
    };
-   PSIO_REFLECT(genesis_contract, contract, auth_contract, flags, vm_type, vm_version, code)
+   PSIO_REFLECT(GenesisContract, contract, authContract, flags, vmType, vmVersion, code)
 
    // The genesis action is the first action of the first transaction of
    // the first block. The action struct's fields are ignored, except
-   // raw_data, which contains this struct.
-   struct genesis_action_data
+   // rawData, which contains this struct.
+   struct GenesisActionData
    {
-      std::string                   memo;
-      std::vector<genesis_contract> contracts;
+      std::string                  memo;
+      std::vector<GenesisContract> contracts;
    };
-   PSIO_REFLECT(genesis_action_data, memo, contracts)
+   PSIO_REFLECT(GenesisActionData, memo, contracts)
 
    struct Claim
    {
       AccountNumber     contract;
-      std::vector<char> raw_data;
+      std::vector<char> rawData;
    };
-   PSIO_REFLECT(Claim, contract, raw_data)
+   PSIO_REFLECT(Claim, contract, rawData)
 
    /* mark this as final and put it in memory order that
     * has no padding nor alignment requirements so these fields
@@ -65,32 +63,32 @@ namespace psibase
       static constexpr uint16_t do_not_broadcast = 1u << 0;
 
       TimePointSec expiration;
-      uint16_t     flags            = 0;
-      uint32_t     ref_block_prefix = 0;
-      uint16_t     ref_block_num    = 0;
+      uint16_t     flags          = 0;
+      uint32_t     refBlockPrefix = 0;
+      uint16_t     refBlockNum    = 0;
    };
-   PSIO_REFLECT(Tapos, expiration, flags, ref_block_prefix, ref_block_num)
+   PSIO_REFLECT(Tapos, expiration, flags, refBlockPrefix, refBlockNum)
 
    // TODO: separate native-defined fields from contract-defined fields
-   struct transaction
+   struct Transaction
    {
       Tapos               tapos;
       std::vector<Action> actions;
       std::vector<Claim>  claims;  // TODO: Is there standard terminology that we could use?
    };
-   PSIO_REFLECT(transaction, tapos, actions, claims)
+   PSIO_REFLECT(Transaction, tapos, actions, claims)
 
    // TODO: pruning proofs?
    // TODO: compression? There's a time/space tradeoff and it complicates client libraries.
    //       e.g. complication: there are at least 2 different header formats for gzip.
-   struct signed_transaction
+   struct SignedTransaction
    {
-      transaction trx;
+      Transaction transaction;
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
    };
-   PSIO_REFLECT(signed_transaction, trx, proofs)
+   PSIO_REFLECT(SignedTransaction, transaction, proofs)
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Producer & Rotation
@@ -101,43 +99,38 @@ namespace psibase
    struct BlockHeader
    {
       Checksum256  previous = {};
-      block_num    num      = 0;  // TODO: pack into previous instead?
+      BlockNum     blockNum = 0;  // TODO: pack into previous instead?
       TimePointSec time;          // TODO: switch to microseconds
    };
-   PSIO_REFLECT(BlockHeader, previous, num, time)
+   PSIO_REFLECT(BlockHeader, previous, blockNum, time)
 
    struct Block
    {
-      BlockHeader                     header;
-      std::vector<signed_transaction> transactions;  // TODO: move inside receipts
+      BlockHeader                    header;
+      std::vector<SignedTransaction> transactions;  // TODO: move inside receipts
+      std::vector<std::vector<char>> subjectiveData;
    };
-   PSIO_REFLECT(Block, header, transactions)
+   PSIO_REFLECT(Block, header, transactions, subjectiveData)
 
    /// TODO: you have signed block headers, not signed blocks
-   struct signed_block
+   struct SignedBlock
    {
       Block block;
       Claim signature;  // TODO: switch to proofs?
    };
-   PSIO_REFLECT(signed_block, block, signature)
+   PSIO_REFLECT(SignedBlock, block, signature)
 
    struct BlockInfo
    {
       BlockHeader header;
-      Checksum256 id;
+      Checksum256 blockId;
 
       BlockInfo()                 = default;
       BlockInfo(const BlockInfo&) = default;
 
       // TODO: switch to fracpack for sha
       // TODO: don't repack to compute sha
-      BlockInfo(const Block& b) : header{b.header}, id{sha256(b)} {}
+      BlockInfo(const Block& b) : header{b.header}, blockId{sha256(b)} {}
    };
-   PSIO_REFLECT(BlockInfo, header, id)
-
-   // TODO: remove dependency on these
-   using block      = Block;
-   using block_info = BlockInfo;
-   using claim      = Claim;
-
+   PSIO_REFLECT(BlockInfo, header, blockId)
 }  // namespace psibase

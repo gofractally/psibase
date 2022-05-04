@@ -8,16 +8,16 @@
 namespace psibase
 {
    /**
- *  When an action is called it returns 
- *
- *  psibase::action {
- *    .sender,
- *    .contract,
- *    .raw_data = actionnum, packed_parameters
- *  }
- *
- *  This is useful for tester
- */
+    *  When an action is called it returns 
+    *
+    *  psibase::Action {
+    *    .sender,
+    *    .contract,
+    *    .rawData = actionnum, packed_parameters
+    *  }
+    *
+    *  This is useful for tester
+    */
    struct action_builder_proxy
    {
       action_builder_proxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
@@ -41,14 +41,14 @@ namespace psibase
 
    //#ifdef __wasm__
    template <typename T>
-   psio::shared_view_ptr<T> fraccall(const action& a)
+   psio::shared_view_ptr<T> fraccall(const Action& a)
    {
       auto packed_action = psio::convert_to_frac(a);  /// TODO: avoid double copy of action data
       auto result_size   = raw::call(packed_action.data(), packed_action.size());
       if constexpr (not std::is_same_v<void, T>)
       {
          psio::shared_view_ptr<T> result(psio::size_tag{result_size});
-         raw::get_result(result.data(), result_size, 0);
+         raw::getResult(result.data(), result_size, 0);
          check(result.validate(), "value returned was not serialized as expected");
          return result;
       }
@@ -102,8 +102,8 @@ namespace psibase
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
                        "insufficient arguments passed to method");
 
-         return psibase::kv_put_sequential(event_log, sender, Name,
-                                           param_tuple(std::forward<Args>(args)...));
+         return psibase::kvPutSequential(event_log, sender, Name,
+                                         param_tuple(std::forward<Args>(args)...));
       }
    };
 
@@ -120,7 +120,7 @@ namespace psibase
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
       auto call(EventNumber n) const
       {
-         auto size         = raw::kv_get_sequential(event_log, n);
+         auto size         = raw::kvGetSequential(event_log, n);
          using param_tuple = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
          struct EventHeader
          {
@@ -129,12 +129,12 @@ namespace psibase
          };
 
          EventHeader header;
-         raw::get_result(&header, sizeof(header));
+         raw::getResult(&header, sizeof(header));
          psibase::check(header.event_type == Name, "unexpected event type");
          psibase::check(header.sender == sender, "unexpected event sender");
 
          std::vector<char> tmp(size);
-         raw::get_result(tmp.data(), tmp.size(), 0);
+         raw::getResult(tmp.data(), tmp.size(), 0);
 
          psio::shared_view_ptr<param_tuple> ptr(psio::size_tag{size - 8});
          memcpy(ptr.data(), tmp.data() + 8, ptr.size());
