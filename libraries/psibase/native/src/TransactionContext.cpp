@@ -6,22 +6,24 @@
 
 namespace psibase
 {
-   transaction_context::transaction_context(BlockContext&            blockContext,
-                                            const SignedTransaction& trx,
-                                            TransactionTrace&        transaction_trace,
-                                            bool                     enableUndo)
-       : blockContext{blockContext}, trx{trx}, transaction_trace{transaction_trace}
+   TransactionContext::TransactionContext(BlockContext&            blockContext,
+                                          const SignedTransaction& signedTransaction,
+                                          TransactionTrace&        transactionTrace,
+                                          bool                     enableUndo)
+       : blockContext{blockContext},
+         signedTransaction{signedTransaction},
+         transactionTrace{transactionTrace}
    {
-      start_time = std::chrono::steady_clock::now();
+      startTime = std::chrono::steady_clock::now();
       if (enableUndo)
          session = blockContext.db.startWrite();
    }
 
-   static void exec_genesis_action(transaction_context& self, const Action& action);
-   static void execProcessTransaction(transaction_context& self);
-   static void exec_verify_proofs(transaction_context& self);
+   static void execGenesisAction(TransactionContext& self, const Action& action);
+   static void execProcessTransaction(TransactionContext& self);
+   static void execVerifyProofs(TransactionContext& self);
 
-   void transaction_context::exec_transaction()
+   void TransactionContext::execTransaction()
    {
       // Prepare for execution
       auto& db     = blockContext.db;
@@ -30,14 +32,14 @@ namespace psibase
 
       if (blockContext.needGenesisAction)
       {
-         check(trx.transaction.actions.size() == 1,
+         check(signedTransaction.transaction.actions.size() == 1,
                "genesis transaction must have exactly 1 action");
-         exec_genesis_action(*this, trx.transaction.actions[0]);
+         execGenesisAction(*this, signedTransaction.transaction.actions[0]);
          blockContext.needGenesisAction = false;
       }
       else
       {
-         exec_verify_proofs(*this);
+         execVerifyProofs(*this);
          execProcessTransaction(*this);
       }
 
@@ -47,9 +49,9 @@ namespace psibase
       blockContext.systemContext.setNumMemories(status.num_execution_memories);
    }
 
-   static void exec_genesis_action(transaction_context& self, const Action& action)
+   static void execGenesisAction(TransactionContext& self, const Action& action)
    {
-      auto& atrace  = self.transaction_trace.actionTraces.emplace_back();
+      auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;
       try
       {
@@ -79,19 +81,19 @@ namespace psibase
       }
    }
 
-   static void execProcessTransaction(transaction_context& self)
+   static void execProcessTransaction(TransactionContext& self)
    {
       /// TODO: move this to a common header
       static constexpr AccountNumber trxsys = AccountNumber("transact-sys");
       Action                         action{
                                   .sender   = AccountNumber(),
                                   .contract = trxsys,
-                                  .rawData  = psio::convert_to_frac(self.trx.transaction),
+                                  .rawData = psio::convert_to_frac(self.signedTransaction.transaction),
       };
-      auto& atrace  = self.transaction_trace.actionTraces.emplace_back();
+      auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
-      ActionContext ac = {self, action, self.transaction_trace.actionTraces.back()};
-      auto&         ec = self.get_execution_context(trxsys);
+      ActionContext ac = {self, action, self.transactionTrace.actionTraces.back()};
+      auto&         ec = self.getExecutionContext(trxsys);
       ec.execProcessTransaction(ac);
    }
 
@@ -101,17 +103,18 @@ namespace psibase
    // TODO: separate ExecutionContext pool for executing each proof
    // TODO: time limit
    // TODO: provide execution time to subjective contract
-   static void exec_verify_proofs(transaction_context& self)
+   static void execVerifyProofs(TransactionContext& self)
    {
-      check(self.trx.proofs.size() == self.trx.transaction.claims.size(),
-            "proofs and claims must have same size");
-      // TODO: don't pack trx twice
-      auto packed_trx = psio::convert_to_frac(self.trx.transaction);
+      check(
+          self.signedTransaction.proofs.size() == self.signedTransaction.transaction.claims.size(),
+          "proofs and claims must have same size");
+      // TODO: don't pack transaction twice
+      auto packed_trx = psio::convert_to_frac(self.signedTransaction.transaction);
       auto id         = sha256(packed_trx.data(), packed_trx.size());
-      for (size_t i = 0; i < self.trx.proofs.size(); ++i)
+      for (size_t i = 0; i < self.signedTransaction.proofs.size(); ++i)
       {
-         auto&       claim = self.trx.transaction.claims[i];
-         auto&       proof = self.trx.proofs[i];
+         auto&       claim = self.signedTransaction.transaction.claims[i];
+         auto&       proof = self.signedTransaction.proofs[i];
          verify_data data{
              .transaction_hash = id,
              .claim            = claim,
@@ -122,25 +125,25 @@ namespace psibase
              .contract = claim.contract,
              .rawData  = psio::convert_to_frac(data),
          };
-         auto& atrace     = self.transaction_trace.actionTraces.emplace_back();
+         auto& atrace     = self.transactionTrace.actionTraces.emplace_back();
          atrace.action    = action;
          ActionContext ac = {self, action, atrace};
-         auto&         ec = self.get_execution_context(claim.contract);
+         auto&         ec = self.getExecutionContext(claim.contract);
          ec.execVerify(ac);
       }
    }
 
-   void transaction_context::exec_called_action(uint64_t      callerFlags,
-                                                const Action& action,
-                                                ActionTrace&  atrace)
+   void TransactionContext::execCalledAction(uint64_t      callerFlags,
+                                             const Action& action,
+                                             ActionTrace&  atrace)
    {
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = get_execution_context(action.contract);
+      auto&         ec = getExecutionContext(action.contract);
       ec.execCalled(callerFlags, ac);
    }
 
-   void transaction_context::execServe(const Action& action, ActionTrace& atrace)
+   void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
    {
       auto& db     = blockContext.db;
       auto  status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
@@ -148,30 +151,30 @@ namespace psibase
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = get_execution_context(action.contract);
+      auto&         ec = getExecutionContext(action.contract);
       ec.execServe(ac);
    }
 
-   ExecutionContext& transaction_context::get_execution_context(AccountNumber contract)
+   ExecutionContext& TransactionContext::getExecutionContext(AccountNumber contract)
    {
-      std::lock_guard<std::mutex> guard{ec_mutex};
-      if (ec_canceled)
+      std::lock_guard<std::mutex> guard{ecMutex};
+      if (ecCanceled)
          throw TimeoutException{};
-      auto it = execution_contexts.find(contract);
-      if (it != execution_contexts.end())
+      auto it = executionContexts.find(contract);
+      if (it != executionContexts.end())
          return it->second;
-      check(execution_contexts.size() < blockContext.systemContext.executionMemories.size(),
+      check(executionContexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running contracts");
-      auto& memory = blockContext.systemContext.executionMemories[execution_contexts.size()];
-      return execution_contexts.insert({contract, ExecutionContext{*this, memory, contract}})
+      auto& memory = blockContext.systemContext.executionMemories[executionContexts.size()];
+      return executionContexts.insert({contract, ExecutionContext{*this, memory, contract}})
           .first->second;
    }
 
-   void transaction_context::asyncTimeout()
+   void TransactionContext::asyncTimeout()
    {
-      std::lock_guard<std::mutex> guard{ec_mutex};
-      ec_canceled = true;
-      for (auto& [_, ec] : execution_contexts)
+      std::lock_guard<std::mutex> guard{ecMutex};
+      ecCanceled = true;
+      for (auto& [_, ec] : executionContexts)
          ec.asyncTimeout();
    }
 }  // namespace psibase

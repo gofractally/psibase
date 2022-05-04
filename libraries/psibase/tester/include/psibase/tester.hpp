@@ -42,7 +42,7 @@ namespace psibase
       //        check_auth
       //        action 1
       //        ...
-      check(!t.actionTraces.empty(), "transaction_trace has no actions");
+      check(!t.actionTraces.empty(), "TransactionTrace has no actions");
       auto&                           root = t.actionTraces.back();
       std::vector<const ActionTrace*> top_traces;
       for (auto& inner : root.innerTraces)

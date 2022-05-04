@@ -141,7 +141,7 @@ namespace psibase
    struct ExecutionContextImpl
    {
       Database&                  db;
-      transaction_context&       transactionContext;
+      TransactionContext&        transactionContext;
       eosio::vm::wasm_allocator& wa;
       std::unique_ptr<backend_t> backend;
       std::atomic<bool>          timedOut = false;
@@ -149,9 +149,9 @@ namespace psibase
       bool                       initialized       = false;
       ActionContext*             currentActContext = nullptr;  // Changes during recursion
 
-      ExecutionContextImpl(transaction_context& transactionContext,
-                           ExecutionMemory&     memory,
-                           AccountNumber        contract)
+      ExecutionContextImpl(TransactionContext& transactionContext,
+                           ExecutionMemory&    memory,
+                           AccountNumber       contract)
           : db{transactionContext.blockContext.db},
             transactionContext{transactionContext},
             wa{memory.impl->wa}
@@ -175,7 +175,7 @@ namespace psibase
                 if (!backend)
                    backend = std::make_unique<backend_t>(code->code, nullptr);
              });
-         transactionContext.contract_load_time += std::chrono::steady_clock::now() - loadStart;
+         transactionContext.contractLoadTime += std::chrono::steady_clock::now() - loadStart;
       }
 
       ~ExecutionContextImpl()
@@ -190,13 +190,13 @@ namespace psibase
          rethrowVMExcept(
              [&]
              {
-                // auto start_time = std::chrono::steady_clock::now();
+                // auto startTime = std::chrono::steady_clock::now();
                 backend->set_wasm_allocator(&wa);
                 backend->initialize(this);
                 (*backend)(*this, "env", "start", currentActContext->action.contract.value);
                 initialized = true;
                 // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
-                //     std::chrono::steady_clock::now() - start_time);
+                //     std::chrono::steady_clock::now() - startTime);
                 // std::cout << "init:   " << us.count() << " us\n";
              });
       }
@@ -255,7 +255,11 @@ namespace psibase
          throw std::runtime_error("contract may not read this map, or must use another intrinsic");
       }
 
-      bool keyHasContractPrefix(uint32_t map) { return map == uint32_t(kv_map::contract); }
+      bool keyHasContractPrefix(uint32_t map)
+      {
+         return map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only) ||
+                map == uint32_t(kv_map::subjective);
+      }
 
       struct Writable
       {
@@ -267,7 +271,7 @@ namespace psibase
       {
          check(!transactionContext.blockContext.isReadOnly, "writes disabled during query");
 
-         auto check_prefix = [&]
+         if (keyHasContractPrefix(map))
          {
             uint64_t prefix = contractAccount.num.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
@@ -277,20 +281,14 @@ namespace psibase
 
          if (map == uint32_t(kv_map::subjective) &&
              (contractAccount.flags & account_row::is_subjective))
-         {
-            check_prefix();
             return {(kv_map)map, true};
-         }
 
          // Prevent poison block; subjective contracts skip execution during replay
          check(!(contractAccount.flags & account_row::is_subjective),
                "subjective contracts may only write to kv_map::subjective");
 
          if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
-         {
-            check_prefix();
             return {(kv_map)map, false};
-         }
          if (map == uint32_t(kv_map::native_constrained) &&
              (contractAccount.flags & account_row::allow_write_native))
             return {(kv_map)map, true};
@@ -411,8 +409,8 @@ namespace psibase
          check(contractAccount.flags & account_row::is_subjective,
                "unprivileged contracts may not call getBillableTime");
          return std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::steady_clock::now() - transactionContext.start_time -
-                    transactionContext.contract_load_time)
+                    std::chrono::steady_clock::now() - transactionContext.startTime -
+                    transactionContext.contractLoadTime)
              .count();
       }
 
@@ -424,7 +422,7 @@ namespace psibase
       uint32_t call(span<const char> data)
       {
          // TODO: replace temporary rule
-         if (++currentActContext->transactionContext.call_depth > 6)
+         if (++currentActContext->transactionContext.callDepth > 6)
             check(false, "call depth exceeded (temporary rule)");
 
          // TODO: don't unpack rawData
@@ -439,11 +437,11 @@ namespace psibase
          auto& inner_action_trace =
              std::get<ActionTrace>(currentActContext->actionTrace.innerTraces.back().inner);
          // TODO: avoid reserialization
-         currentActContext->transactionContext.exec_called_action(contractAccount.flags, act,
-                                                                  inner_action_trace);
+         currentActContext->transactionContext.execCalledAction(contractAccount.flags, act,
+                                                                inner_action_trace);
          setResult(inner_action_trace.rawRetval);
 
-         --currentActContext->transactionContext.call_depth;
+         --currentActContext->transactionContext.callDepth;
          return result_value.size();
       }
 
@@ -572,9 +570,9 @@ namespace psibase
       }
    };  // ExecutionContextImpl
 
-   ExecutionContext::ExecutionContext(transaction_context& transactionContext,
-                                      ExecutionMemory&     memory,
-                                      AccountNumber        contract)
+   ExecutionContext::ExecutionContext(TransactionContext& transactionContext,
+                                      ExecutionMemory&    memory,
+                                      AccountNumber       contract)
    {
       impl = std::make_unique<ExecutionContextImpl>(transactionContext, memory, contract);
    }
@@ -642,10 +640,10 @@ namespace psibase
    void ExecutionContext::execVerify(ActionContext& actionContext)
    {
       impl->exec(actionContext, [&] {  //
-         // auto start_time = std::chrono::steady_clock::now();
+         // auto startTime = std::chrono::steady_clock::now();
          (*impl->backend)(*impl, "env", "verify");
          // auto us = std::chrono::duration_cast<std::chrono::microseconds>(
-         //     std::chrono::steady_clock::now() - start_time);
+         //     std::chrono::steady_clock::now() - startTime);
          // std::cout << "verify: " << us.count() << " us\n";
       });
    }

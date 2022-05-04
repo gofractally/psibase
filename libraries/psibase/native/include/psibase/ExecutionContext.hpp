@@ -34,7 +34,7 @@ namespace psibase
       ~ExecutionMemory();
    };
 
-   struct transaction_context;
+   struct TransactionContext;
    struct ActionContext;
 
    struct TimeoutException : std::exception
@@ -47,9 +47,9 @@ namespace psibase
    {
       std::unique_ptr<ExecutionContextImpl> impl;
 
-      ExecutionContext(transaction_context& transactionContext,
-                       ExecutionMemory&     memory,
-                       AccountNumber        contract);
+      ExecutionContext(TransactionContext& transactionContext,
+                       ExecutionMemory&    memory,
+                       AccountNumber       contract);
       ExecutionContext(ExecutionContext&&);
       ~ExecutionContext();
 

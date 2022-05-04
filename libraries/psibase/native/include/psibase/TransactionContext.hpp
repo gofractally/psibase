@@ -13,35 +13,35 @@ namespace psibase
                                                     std::less<KvResourceKey>,
                                                     std::vector<KvResourcePair>>;
 
-   struct transaction_context
+   struct TransactionContext
    {
       BlockContext&                         blockContext;
       Database::Session                     session;
-      const SignedTransaction&              trx;
-      TransactionTrace&                     transaction_trace;
+      const SignedTransaction&              signedTransaction;
+      TransactionTrace&                     transactionTrace;
       KvResourceMap                         kvResourceDeltas;
-      int                                   call_depth = 0;
-      std::chrono::steady_clock::time_point start_time;
-      std::chrono::steady_clock::duration   contract_load_time{0};
+      int                                   callDepth = 0;
+      std::chrono::steady_clock::time_point startTime;
+      std::chrono::steady_clock::duration   contractLoadTime{0};
 
-      transaction_context(BlockContext&            blockContext,
-                          const SignedTransaction& trx,
-                          TransactionTrace&        transaction_trace,
-                          bool                     enableUndo);
+      TransactionContext(BlockContext&            blockContext,
+                         const SignedTransaction& signedTransaction,
+                         TransactionTrace&        transactionTrace,
+                         bool                     enableUndo);
 
-      void exec_transaction();
-      void exec_called_action(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
+      void execTransaction();
+      void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execServe(const Action& act, ActionTrace& atrace);
 
-      ExecutionContext& get_execution_context(AccountNumber contract);
+      ExecutionContext& getExecutionContext(AccountNumber contract);
 
-      // Cancel execution of all execution_contexts because of timeout; may be called from another thread
+      // Cancel execution of all executionContexts because of timeout; may be called from another thread
       void asyncTimeout();
 
      private:
-      std::mutex                                ec_mutex;
-      bool                                      ec_canceled = false;
-      std::map<AccountNumber, ExecutionContext> execution_contexts;
-   };  // transaction_context
+      std::mutex                                ecMutex;
+      bool                                      ecCanceled = false;
+      std::map<AccountNumber, ExecutionContext> executionContexts;
+   };  // TransactionContext
 
 }  // namespace psibase

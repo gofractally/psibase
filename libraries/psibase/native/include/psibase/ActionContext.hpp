@@ -6,9 +6,9 @@ namespace psibase
 {
    struct ActionContext
    {
-      transaction_context& transactionContext;
-      const Action&        action;
-      ActionTrace&         actionTrace;
+      TransactionContext& transactionContext;
+      const Action&       action;
+      ActionTrace&        actionTrace;
    };
 
 }  // namespace psibase

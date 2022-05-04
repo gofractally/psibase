@@ -289,9 +289,9 @@ namespace psibase::http
                            .contract = proxyContractNum,
                            .rawData  = psio::convert_to_frac(data),
             };
-            TransactionTrace    trace;
-            transaction_context tc{bc, trx, trace, false};
-            ActionTrace         atrace;
+            TransactionTrace   trace;
+            TransactionContext tc{bc, trx, trace, false};
+            ActionTrace        atrace;
             tc.execServe(action, atrace);
             // TODO: option to print this
             // printf("%s\n", prettyTrace(atrace).c_str());

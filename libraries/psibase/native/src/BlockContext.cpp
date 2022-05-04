@@ -147,8 +147,8 @@ namespace psibase
          // BlockContext::enableUndo is also false.
          active = enableUndo;
 
-         transaction_context t{*this, trx, trace, enableUndo};
-         t.exec_transaction();
+         TransactionContext t{*this, trx, trace, enableUndo};
+         t.execTransaction();
 
          if (commit)
          {
