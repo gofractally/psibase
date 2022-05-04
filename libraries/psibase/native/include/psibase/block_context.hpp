@@ -17,6 +17,7 @@ namespace psibase
       database::session        session;
       Block                    current;
       DatabaseStatusRow        databaseStatus;
+      size_t                   nextSubjectiveRead  = 0;
       bool                     is_producing        = false;
       bool                     is_read_only        = false;
       bool                     is_genesis_block    = false;

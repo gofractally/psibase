@@ -402,10 +402,14 @@ namespace psibase
                                   "' aborted with message: " + std::string(str.data(), str.size()));
       }
 
-      uint64_t getExecutionTime()
+      uint64_t getBillableTime()
       {
+         // A more-accurate message is "only subjective contracts may
+         // call getBillableTime", but that may mislead contract developers
+         // into thinking they should create a subjective contract;
+         // they shouldn't.
          check(contract_account.flags & account_row::is_subjective,
-               "only subjective contracts may call getExecutionTime");
+               "unprivileged contracts may not call getBillableTime");
          return std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::steady_clock::now() - trx_context.start_time -
                     trx_context.contract_load_time)
@@ -445,9 +449,6 @@ namespace psibase
 
       void setRetval(span<const char> data)
       {
-         // TODO: record return values of top-most subjective calls in block
-         check(!(contract_account.flags & account_row::is_subjective),
-               "setRetval not implemented for subjective contracts");
          current_act_context->action_trace.rawRetval.assign(data.begin(), data.end());
          clear_result();
       }
@@ -589,7 +590,7 @@ namespace psibase
       rhf_t::add<&execution_context_impl::getKey>("env", "getKey");
       rhf_t::add<&execution_context_impl::writeConsole>("env", "writeConsole");
       rhf_t::add<&execution_context_impl::abortMessage>("env", "abortMessage");
-      rhf_t::add<&execution_context_impl::getExecutionTime>("env", "getExecutionTime");
+      rhf_t::add<&execution_context_impl::getBillableTime>("env", "getBillableTime");
       rhf_t::add<&execution_context_impl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&execution_context_impl::call>("env", "call");
       rhf_t::add<&execution_context_impl::setRetval>("env", "setRetval");
@@ -618,10 +619,23 @@ namespace psibase
          check(!(caller_flags & account_row::is_subjective),
                "subjective contracts may not call non-subjective ones");
 
+      auto& bc = impl->trx_context.block_context;
+      if ((impl->contract_account.flags & account_row::is_subjective) && !bc.is_producing)
+      {
+         check(bc.nextSubjectiveRead < bc.current.subjectiveData.size(), "missing subjective data");
+         impl->current_act_context->action_trace.rawRetval =
+             bc.current.subjectiveData[bc.nextSubjectiveRead++];
+         return;
+      }
+
       impl->exec(act_context, [&] {  //
          (*impl->backend)(*impl, "env", "called", act_context.action.contract.value,
                           act_context.action.sender.value);
       });
+
+      if ((impl->contract_account.flags & account_row::is_subjective) &&
+          !(caller_flags & account_row::is_subjective))
+         bc.current.subjectiveData.push_back(impl->current_act_context->action_trace.rawRetval);
    }
 
    void execution_context::exec_verify(action_context& act_context)

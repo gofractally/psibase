@@ -108,8 +108,9 @@ namespace psibase
    {
       BlockHeader                    header;
       std::vector<SignedTransaction> transactions;  // TODO: move inside receipts
+      std::vector<std::vector<char>> subjectiveData;
    };
-   PSIO_REFLECT(Block, header, transactions)
+   PSIO_REFLECT(Block, header, transactions, subjectiveData)
 
    /// TODO: you have signed block headers, not signed blocks
    struct SignedBlock

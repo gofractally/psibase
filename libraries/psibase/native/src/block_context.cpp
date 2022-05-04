@@ -106,8 +106,17 @@ namespace psibase
                                         bool                     enable_undo,
                                         bool                     commit)
    {
-      exec(trx, trace, enable_undo, commit);
-      current.transactions.push_back(std::move(trx));
+      auto subjectiveSize = current.subjectiveData.size();
+      try
+      {
+         exec(trx, trace, enable_undo, commit);
+         current.transactions.push_back(std::move(trx));
+      }
+      catch (...)
+      {
+         current.subjectiveData.resize(subjectiveSize);
+         throw;
+      }
    }
 
    void block_context::exec_all_in_block()
@@ -117,6 +126,8 @@ namespace psibase
          TransactionTrace trace;
          exec(trx, trace, false, true);
       }
+      check(nextSubjectiveRead == current.subjectiveData.size(),
+            "block has unread subjective data");
    }
 
    // TODO: limit charged CPU & NET which can go into a block

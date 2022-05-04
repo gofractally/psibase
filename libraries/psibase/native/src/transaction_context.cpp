@@ -100,6 +100,7 @@ namespace psibase
    // TODO: separate execution memories with smaller number of max active wasms
    // TODO: separate execution_context pool for executing each proof
    // TODO: time limit
+   // TODO: provide execution time to subjective contract
    static void exec_verify_proofs(transaction_context& self)
    {
       check(self.trx.proofs.size() == self.trx.transaction.claims.size(),
