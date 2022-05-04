@@ -838,7 +838,7 @@ int main(int argc, char* argv[])
    try
    {
       std::vector<std::string> args{argv + next_arg, argv + argc};
-      psibase::execution_context::register_host_functions();
+      psibase::ExecutionContext::registerHostFunctions();
       register_callbacks();
       run(argv[next_arg], args, substitutions, additional_args);
       return 0;

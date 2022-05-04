@@ -8,17 +8,17 @@ namespace psibase
    {
       std::mutex                                   mutex;
       SharedDatabase                               db;
-      psibase::wasm_cache                          wasm_cache;
+      psibase::WasmCache                           wasmCache;
       std::vector<std::unique_ptr<system_context>> system_context_cache;
 
-      shared_state_impl(SharedDatabase db, psibase::wasm_cache wasm_cache)
-          : db{std::move(db)}, wasm_cache{std::move(wasm_cache)}
+      shared_state_impl(SharedDatabase db, psibase::WasmCache wasmCache)
+          : db{std::move(db)}, wasmCache{std::move(wasmCache)}
       {
       }
    };
 
-   shared_state::shared_state(SharedDatabase db, psibase::wasm_cache wasm_cache)
-       : impl{std::make_unique<shared_state_impl>(std::move(db), std::move(wasm_cache))}
+   shared_state::shared_state(SharedDatabase db, psibase::WasmCache wasmCache)
+       : impl{std::make_unique<shared_state_impl>(std::move(db), std::move(wasmCache))}
    {
    }
 
@@ -28,7 +28,7 @@ namespace psibase
    {
       std::lock_guard<std::mutex> lock{impl->mutex};
       if (impl->system_context_cache.empty())
-         return std::make_unique<system_context>(system_context{impl->db, impl->wasm_cache});
+         return std::make_unique<system_context>(system_context{impl->db, impl->wasmCache});
       auto result = std::move(impl->system_context_cache.back());
       impl->system_context_cache.pop_back();
       return result;

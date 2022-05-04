@@ -18,7 +18,7 @@ namespace psibase
    }
 
    static void exec_genesis_action(transaction_context& self, const Action& action);
-   static void exec_process_transaction(transaction_context& self);
+   static void execProcessTransaction(transaction_context& self);
    static void exec_verify_proofs(transaction_context& self);
 
    void transaction_context::exec_transaction()
@@ -38,7 +38,7 @@ namespace psibase
       else
       {
          exec_verify_proofs(*this);
-         exec_process_transaction(*this);
+         execProcessTransaction(*this);
       }
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
@@ -68,8 +68,8 @@ namespace psibase
                 .flags        = contract.flags,
             };
             db.kvPut(account_row::kv_map, account.key(), account);
-            set_code(db, contract.contract, contract.vmType, contract.vmVersion,
-                     {contract.code.data(), contract.code.size()});
+            setCode(db, contract.contract, contract.vmType, contract.vmVersion,
+                    {contract.code.data(), contract.code.size()});
          }
       }
       catch (const std::exception& e)
@@ -79,7 +79,7 @@ namespace psibase
       }
    }
 
-   static void exec_process_transaction(transaction_context& self)
+   static void execProcessTransaction(transaction_context& self)
    {
       /// TODO: move this to a common header
       static constexpr AccountNumber trxsys = AccountNumber("transact-sys");
@@ -92,13 +92,13 @@ namespace psibase
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
       ActionContext ac = {self, action, self.transaction_trace.actionTraces.back()};
       auto&         ec = self.get_execution_context(trxsys);
-      ec.exec_process_transaction(ac);
+      ec.execProcessTransaction(ac);
    }
 
    // TODO: disable access to db
    // TODO: parallel execution
    // TODO: separate execution memories with smaller number of max active wasms
-   // TODO: separate execution_context pool for executing each proof
+   // TODO: separate ExecutionContext pool for executing each proof
    // TODO: time limit
    // TODO: provide execution time to subjective contract
    static void exec_verify_proofs(transaction_context& self)
@@ -126,21 +126,21 @@ namespace psibase
          atrace.action    = action;
          ActionContext ac = {self, action, atrace};
          auto&         ec = self.get_execution_context(claim.contract);
-         ec.exec_verify(ac);
+         ec.execVerify(ac);
       }
    }
 
-   void transaction_context::exec_called_action(uint64_t      caller_flags,
+   void transaction_context::exec_called_action(uint64_t      callerFlags,
                                                 const Action& action,
                                                 ActionTrace&  atrace)
    {
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
       auto&         ec = get_execution_context(action.contract);
-      ec.exec_called(caller_flags, ac);
+      ec.execCalled(callerFlags, ac);
    }
 
-   void transaction_context::exec_rpc(const Action& action, ActionTrace& atrace)
+   void transaction_context::execServe(const Action& action, ActionTrace& atrace)
    {
       auto& db     = blockContext.db;
       auto  status = db.kvGetOrDefault<status_row>(status_row::kv_map, status_key());
@@ -149,29 +149,29 @@ namespace psibase
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
       auto&         ec = get_execution_context(action.contract);
-      ec.exec_rpc(ac);
+      ec.execServe(ac);
    }
 
-   execution_context& transaction_context::get_execution_context(AccountNumber contract)
+   ExecutionContext& transaction_context::get_execution_context(AccountNumber contract)
    {
       std::lock_guard<std::mutex> guard{ec_mutex};
       if (ec_canceled)
-         throw timeout_exception{};
+         throw TimeoutException{};
       auto it = execution_contexts.find(contract);
       if (it != execution_contexts.end())
          return it->second;
-      check(execution_contexts.size() < blockContext.system_context.execution_memories.size(),
+      check(execution_contexts.size() < blockContext.system_context.executionMemories.size(),
             "exceeded maximum number of running contracts");
-      auto& memory = blockContext.system_context.execution_memories[execution_contexts.size()];
-      return execution_contexts.insert({contract, execution_context{*this, memory, contract}})
+      auto& memory = blockContext.system_context.executionMemories[execution_contexts.size()];
+      return execution_contexts.insert({contract, ExecutionContext{*this, memory, contract}})
           .first->second;
    }
 
-   void transaction_context::async_timeout()
+   void transaction_context::asyncTimeout()
    {
       std::lock_guard<std::mutex> guard{ec_mutex};
       ec_canceled = true;
       for (auto& [_, ec] : execution_contexts)
-         ec.async_timeout();
+         ec.asyncTimeout();
    }
 }  // namespace psibase

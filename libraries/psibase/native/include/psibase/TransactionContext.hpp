@@ -30,18 +30,18 @@ namespace psibase
                           bool                     enableUndo);
 
       void exec_transaction();
-      void exec_called_action(uint64_t caller_flags, const Action& act, ActionTrace& atrace);
-      void exec_rpc(const Action& act, ActionTrace& atrace);
+      void exec_called_action(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
+      void execServe(const Action& act, ActionTrace& atrace);
 
-      execution_context& get_execution_context(AccountNumber contract);
+      ExecutionContext& get_execution_context(AccountNumber contract);
 
       // Cancel execution of all execution_contexts because of timeout; may be called from another thread
-      void async_timeout();
+      void asyncTimeout();
 
      private:
-      std::mutex                                 ec_mutex;
-      bool                                       ec_canceled = false;
-      std::map<AccountNumber, execution_context> execution_contexts;
+      std::mutex                                ec_mutex;
+      bool                                      ec_canceled = false;
+      std::map<AccountNumber, ExecutionContext> execution_contexts;
    };  // transaction_context
 
 }  // namespace psibase

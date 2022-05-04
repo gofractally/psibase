@@ -323,11 +323,11 @@ void pushTransaction(BlockContext& bc, transaction_queue::entry& entry)
 
 void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 {
-   execution_context::register_host_functions();
+   ExecutionContext::registerHostFunctions();
 
-   // TODO: configurable wasm_cache size
+   // TODO: configurable WasmCache size
    auto shared_state =
-       std::make_shared<psibase::shared_state>(SharedDatabase{db_path}, wasm_cache{128});
+       std::make_shared<psibase::shared_state>(SharedDatabase{db_path}, WasmCache{128});
    auto system = shared_state->get_system_context();
    auto queue  = std::make_shared<transaction_queue>();
 

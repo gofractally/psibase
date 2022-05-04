@@ -292,7 +292,7 @@ namespace psibase::http
             TransactionTrace    trace;
             transaction_context tc{bc, trx, trace, false};
             ActionTrace         atrace;
-            tc.exec_rpc(action, atrace);
+            tc.execServe(action, atrace);
             // TODO: option to print this
             // printf("%s\n", prettyTrace(atrace).c_str());
             auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.rawRetval);

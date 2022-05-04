@@ -82,10 +82,9 @@ namespace system_contract
       kvPut(code_obj->kv_map, code_obj->key(), *code_obj);
 
       return 0;
-   }  // set_code
+   }  // setCode
 
-   // hard coded to account 1, which deploys transaction_sys (or avariant of) and native code
-   // knows to call this method
+   // Native code calls this on the transaction-sys account
    extern "C" [[clang::export_name("process_transaction")]] void process_transaction()
    {
       if (enable_print)
