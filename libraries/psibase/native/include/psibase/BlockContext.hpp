@@ -39,13 +39,6 @@ namespace psibase
                            bool                     enableUndo = true,
                            bool                     commit     = true);
 
-      TransactionTrace pushTransaction(const SignedTransaction& trx)
-      {
-         TransactionTrace trace;
-         pushTransaction(trx, trace);
-         return trace;
-      }
-
       void execAllInBlock();
 
       void exec(const SignedTransaction& trx,

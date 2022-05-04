@@ -38,144 +38,6 @@ std::vector<char> read_whole_file(const char* filename)
    return buf;
 }
 
-// TODO: remove; now lives in rust/psibase
-void bootstrap_chain(SystemContext& system)
-{
-   auto push = [&](auto& bc, AccountNumber sender, AccountNumber contract, const auto& data)
-   {
-      SignedTransaction t;
-      t.transaction.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
-      t.transaction.actions.push_back({
-          .sender   = sender,
-          .contract = contract,
-          .rawData  = psio::convert_to_frac(data),
-      });
-      bc.pushTransaction(t);
-   };
-
-   auto push_action = [&](auto& bc, Action a)
-   {
-      SignedTransaction t;
-      t.transaction.tapos.expiration.seconds = bc.current.header.time.seconds + 1;
-      t.transaction.actions.push_back({a});
-      bc.pushTransaction(t);
-   };
-
-   auto reg_rpc = [&](auto& bc, AccountNumber contract, AccountNumber rpc_contract)
-   {
-      push_action(
-          bc,
-          transactor<proxy_sys>(contract, proxyContractNum).registerServer(contract, rpc_contract));
-   };
-
-   auto upload = [&](auto& bc, AccountNumber contract, const char* path, const char* contentType,
-                     const char* filename)
-   {
-      transactor<system_contract::rpc_account_sys> rasys(contract, contract);
-      push_action(bc, rasys.uploadSys(path, contentType, read_whole_file(filename)));
-   };
-
-   BlockContext bc{system, true, true};
-   bc.start();
-   check(bc.isGenesisBlock, "can not bootstrap non-empty chain");
-   push(bc, AccountNumber(), AccountNumber(),
-        GenesisActionData{
-            .contracts =
-                {
-                    {
-                        .contract     = system_contract::transaction_sys::contract,
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = system_contract::transaction_sys::contract_flags,
-                        .code         = read_whole_file("transaction_sys.wasm"),
-                    },
-                    {
-                        .contract     = system_contract::account_sys::contract,
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = system_contract::account_sys::contract_flags,
-                        .code         = read_whole_file("account_sys.wasm"),
-                    },
-                    {
-                        .contract     = proxyContractNum,
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = 0,
-                        .code         = read_whole_file("proxy_sys.wasm"),
-                    },
-                    {
-                        .contract     = system_contract::auth_fake_sys::contract,
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = 0,
-                        .code         = read_whole_file("auth_fake_sys.wasm"),
-                    },
-                    {
-                        .contract     = system_contract::auth_ec_sys::contract,
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = 0,
-                        .code         = read_whole_file("auth_ec_sys.wasm"),
-                    },
-                    {
-                        .contract     = system_contract::verify_ec_sys::contract,
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = 0,
-                        .code         = read_whole_file("verify_ec_sys.wasm"),
-                    },
-                    {
-                        .contract     = AccountNumber("common-sys"),
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = 0,
-                        .code         = read_whole_file("common_sys.wasm"),
-                    },
-                    {
-                        .contract     = AccountNumber("account-rpc"),  // TODO: need -sys suffix
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = 0,
-                        .code         = read_whole_file("rpc_account_sys.wasm"),
-                    },
-                    {
-                        .contract     = AccountNumber("explore-sys"),
-                        .authContract = system_contract::auth_fake_sys::contract,
-                        .flags        = 0,
-                        .code         = read_whole_file("explore_sys.wasm"),
-                    },
-                },
-        });
-
-   AccountNumber                            common_sys("common-sys");
-   AccountNumber                            account_rpc("account-rpc");
-   transactor<system_contract::account_sys> asys(system_contract::account_sys::contract,
-                                                 system_contract::account_sys::contract);
-   push_action(bc, asys.startup(std::vector<AccountNumber>{
-                       system_contract::transaction_sys::contract,
-                       system_contract::account_sys::contract,
-                       proxyContractNum,
-                       system_contract::auth_fake_sys::contract,
-                       system_contract::auth_ec_sys::contract,
-                       system_contract::verify_ec_sys::contract,
-                       AccountNumber("common-sys"),
-                       AccountNumber("account-rpc"),
-                   }));
-
-   reg_rpc(bc, common_sys, common_sys);
-   upload(bc, common_sys, "/", "text/html", "../contracts/user/common_sys/ui/index.html");
-   upload(bc, common_sys, "/common/rpc.mjs", "text/javascript",
-          "../contracts/user/common_sys/common/rpc.mjs");
-   upload(bc, common_sys, "/common/useGraphQLQuery.mjs", "text/javascript",
-          "../contracts/user/common_sys/common/useGraphQLQuery.mjs");
-   upload(bc, common_sys, "/ui/index.js", "text/javascript",
-          "../contracts/user/common_sys/ui/index.js");
-
-   reg_rpc(bc, system_contract::account_sys::contract, account_rpc);
-   upload(bc, account_rpc, "/", "text/html", "../contracts/system/rpc_account_sys/ui/index.html");
-   upload(bc, account_rpc, "/ui/index.js", "text/javascript",
-          "../contracts/system/rpc_account_sys/ui/index.js");
-
-   reg_rpc(bc, "explore-sys"_a, "explore-sys"_a);
-   upload(bc, "explore-sys"_a, "/", "text/html", "../contracts/user/explore_sys/ui/index.html");
-   upload(bc, "explore-sys"_a, "/ui/index.js", "text/javascript",
-          "../contracts/user/explore_sys/ui/index.js");
-
-   bc.commit();
-}
-
 struct transaction_queue
 {
    struct entry
@@ -321,7 +183,7 @@ void pushTransaction(BlockContext& bc, transaction_queue::entry& entry)
    }
 }  // pushTransaction
 
-void run(const char* db_path, bool bootstrap, bool produce, const char* host)
+void run(const char* db_path, bool produce, const char* host)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -366,9 +228,6 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 
       auto server = http::server::create(http_config, sharedState);
    }
-
-   if (bootstrap)
-      bootstrap_chain(*system);
 
    bool showedBootMsg = false;
 
@@ -417,9 +276,6 @@ void run(const char* db_path, bool bootstrap, bool produce, const char* host)
 const char usage[] = "USAGE: psinode [OPTIONS] database\n";
 const char help[]  = R"(
 OPTIONS:
-      -b, --bootstrap
-            Bootstrap new chain
-
       -p, --produce
             Produce blocks
 
@@ -435,7 +291,6 @@ int main(int argc, char* argv[])
 {
    bool        show_usage = false;
    bool        error      = false;
-   bool        bootstrap  = false;
    bool        produce    = false;
    const char* host       = nullptr;
    int         next_arg   = 1;
@@ -443,8 +298,6 @@ int main(int argc, char* argv[])
    {
       if (!strcmp(argv[next_arg], "-h") || !strcmp(argv[next_arg], "--help"))
          show_usage = true;
-      else if (!strcmp(argv[next_arg], "-b") || !strcmp(argv[next_arg], "--bootstrap"))
-         bootstrap = true;
       else if (!strcmp(argv[next_arg], "-p") || !strcmp(argv[next_arg], "--produce"))
          produce = true;
       else if ((!strcmp(argv[next_arg], "-o") || !strcmp(argv[next_arg], "--host")) &&
@@ -468,7 +321,7 @@ int main(int argc, char* argv[])
    }
    try
    {
-      run(argv[next_arg], bootstrap, produce, host);
+      run(argv[next_arg], produce, host);
       return 0;
    }
    catch (std::exception& e)
