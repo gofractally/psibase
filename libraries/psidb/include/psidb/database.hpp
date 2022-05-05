@@ -19,6 +19,7 @@ namespace psidb
       {
       }
       transaction start_transaction() { return {&_storage, _storage.start_transaction()}; }
+      transaction start_read() { return {&_storage, _storage.get_head()}; }
       void        async_flush() { _storage.async_flush(); }
 
      private:
