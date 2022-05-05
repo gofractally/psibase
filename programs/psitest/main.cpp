@@ -636,7 +636,7 @@ struct callbacks
       try
       {
          // TODO: undo and commit control
-         chain.blockContext->pushTransaction(signed_trx, trace);
+         chain.blockContext->pushTransaction(signed_trx, trace, std::nullopt);
       }
       catch (const std::exception& e)
       {

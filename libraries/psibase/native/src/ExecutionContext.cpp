@@ -156,8 +156,7 @@ namespace psibase
             transactionContext{transactionContext},
             wa{memory.impl->wa}
       {
-         auto loadStart = std::chrono::steady_clock::now();
-         auto ca        = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
+         auto ca = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
          check(ca.has_value(), "unknown contract account");
          check(ca->code_hash != Checksum256{}, "account has no code");
          contractAccount = std::move(*ca);
@@ -175,7 +174,6 @@ namespace psibase
                 if (!backend)
                    backend = std::make_unique<backend_t>(code->code, nullptr);
              });
-         transactionContext.contractLoadTime += std::chrono::steady_clock::now() - loadStart;
       }
 
       ~ExecutionContextImpl()
@@ -412,7 +410,7 @@ namespace psibase
                "unprivileged contracts may not call getBillableTime");
          return std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::steady_clock::now() - transactionContext.startTime -
-                    transactionContext.contractLoadTime)
+                    transactionContext.getContractLoadTime())
              .count();
       }
 

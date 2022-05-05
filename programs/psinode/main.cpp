@@ -82,7 +82,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
             for (auto& trx : transactions)
             {
                trace = {};
-               bc.pushTransaction(trx, trace);
+               bc.pushTransaction(trx, trace, std::nullopt);
             }
          }
       }
@@ -131,7 +131,9 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
    return false;
 }  // push_boot
 
-void pushTransaction(BlockContext& bc, transaction_queue::entry& entry)
+void pushTransaction(BlockContext&             bc,
+                     transaction_queue::entry& entry,
+                     std::chrono::microseconds initialWatchdogLimit)
 {
    try
    {
@@ -145,7 +147,7 @@ void pushTransaction(BlockContext& bc, transaction_queue::entry& entry)
          if (bc.needGenesisAction)
             trace.error = "Need genesis block; use 'psibase boot' to boot chain";
          else
-            bc.pushTransaction(trx, trace);
+            bc.pushTransaction(trx, trace, initialWatchdogLimit);
       }
       RETHROW_BAD_ALLOC
       catch (...)
@@ -183,7 +185,7 @@ void pushTransaction(BlockContext& bc, transaction_queue::entry& entry)
    }
 }  // pushTransaction
 
-void run(const char* db_path, bool produce, const char* host)
+void run(const char* db_path, bool produce, const char* host, uint32_t leeway_us)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -253,7 +255,7 @@ void run(const char* db_path, bool produce, const char* host)
             if (entry.is_boot)
                abort_boot = !push_boot(bc, entry);
             else
-               pushTransaction(bc, entry);
+               pushTransaction(bc, entry, std::chrono::microseconds(leeway_us));
          }
          if (abort_boot)
             continue;
@@ -282,6 +284,9 @@ OPTIONS:
       -o, --host <name>
             Host http server
 
+      -l, --leeway <amount>
+            Transaction leeway, in us. Defaults to 1000.
+
       -h, --help
             Show this message
 )";
@@ -293,6 +298,7 @@ int main(int argc, char* argv[])
    bool        error      = false;
    bool        produce    = false;
    const char* host       = nullptr;
+   uint32_t    leeway_us  = 1000;
    int         next_arg   = 1;
    while (next_arg < argc && argv[next_arg][0] == '-')
    {
@@ -303,6 +309,9 @@ int main(int argc, char* argv[])
       else if ((!strcmp(argv[next_arg], "-o") || !strcmp(argv[next_arg], "--host")) &&
                next_arg + 1 < argc)
          host = argv[++next_arg];
+      else if ((!strcmp(argv[next_arg], "-l") || !strcmp(argv[next_arg], "--leeway")) &&
+               next_arg + 1 < argc)
+         leeway_us = std::stoi(argv[++next_arg]);
       else
       {
          std::cerr << "unknown option: " << argv[next_arg] << "\n";
@@ -321,7 +330,7 @@ int main(int argc, char* argv[])
    }
    try
    {
-      run(argv[next_arg], produce, host);
+      run(argv[next_arg], produce, host, leeway_us);
       return 0;
    }
    catch (std::exception& e)

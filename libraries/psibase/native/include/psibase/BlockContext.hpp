@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
 
@@ -34,16 +35,18 @@ namespace psibase
       void start(Block&& src);
       void commit();
 
-      void pushTransaction(const SignedTransaction& trx,
-                           TransactionTrace&        trace,
-                           bool                     enableUndo = true,
-                           bool                     commit     = true);
+      void pushTransaction(const SignedTransaction&                 trx,
+                           TransactionTrace&                        trace,
+                           std::optional<std::chrono::microseconds> initialWatchdogLimit,
+                           bool                                     enableUndo = true,
+                           bool                                     commit     = true);
 
       void execAllInBlock();
 
-      void exec(const SignedTransaction& trx,
-                TransactionTrace&        trace,
-                bool                     enableUndo,
-                bool                     commit);
+      void exec(const SignedTransaction&                 trx,
+                TransactionTrace&                        trace,
+                std::optional<std::chrono::microseconds> initialWatchdogLimit,
+                bool                                     enableUndo,
+                bool                                     commit);
    };  // BlockContext
 }  // namespace psibase

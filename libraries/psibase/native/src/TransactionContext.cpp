@@ -1,23 +1,35 @@
 #include <psibase/TransactionContext.hpp>
 
+#include <mutex>
 #include <psibase/ActionContext.hpp>
 #include <psibase/contract_entry.hpp>
 #include <psio/from_bin.hpp>
 
 namespace psibase
 {
+   struct TransactionContextImpl
+   {
+      std::mutex                                mutex;
+      bool                                      ecCanceled = false;
+      std::map<AccountNumber, ExecutionContext> executionContexts;
+      std::chrono::steady_clock::duration       contractLoadTime{0};
+   };
+
    TransactionContext::TransactionContext(BlockContext&            blockContext,
                                           const SignedTransaction& signedTransaction,
                                           TransactionTrace&        transactionTrace,
                                           bool                     enableUndo)
        : blockContext{blockContext},
          signedTransaction{signedTransaction},
-         transactionTrace{transactionTrace}
+         transactionTrace{transactionTrace},
+         startTime{std::chrono::steady_clock::now()},
+         impl{std::make_unique<TransactionContextImpl>()}
    {
-      startTime = std::chrono::steady_clock::now();
       if (enableUndo)
          session = blockContext.db.startWrite();
    }
+
+   TransactionContext::~TransactionContext() {}
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
    static void execProcessTransaction(TransactionContext& self);
@@ -101,8 +113,8 @@ namespace psibase
    // TODO: parallel execution
    // TODO: separate execution memories with smaller number of max active wasms
    // TODO: separate ExecutionContext pool for executing each proof
-   // TODO: time limit
-   // TODO: provide execution time to subjective contract
+   // TODO: separate time limits for proofs?
+   // TODO: provide execution time to subjective contract, separated from rest of execution time
    static void execVerifyProofs(TransactionContext& self)
    {
       check(
@@ -157,24 +169,40 @@ namespace psibase
 
    ExecutionContext& TransactionContext::getExecutionContext(AccountNumber contract)
    {
-      std::lock_guard<std::mutex> guard{ecMutex};
-      if (ecCanceled)
+      auto                        loadStart = std::chrono::steady_clock::now();
+      std::lock_guard<std::mutex> guard{impl->mutex};
+      if (impl->ecCanceled)
          throw TimeoutException{};
-      auto it = executionContexts.find(contract);
-      if (it != executionContexts.end())
+      auto it = impl->executionContexts.find(contract);
+      if (it != impl->executionContexts.end())
          return it->second;
-      check(executionContexts.size() < blockContext.systemContext.executionMemories.size(),
+      check(impl->executionContexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running contracts");
-      auto& memory = blockContext.systemContext.executionMemories[executionContexts.size()];
-      return executionContexts.insert({contract, ExecutionContext{*this, memory, contract}})
-          .first->second;
+      auto& memory = blockContext.systemContext.executionMemories[impl->executionContexts.size()];
+      auto& result =
+          impl->executionContexts.insert({contract, ExecutionContext{*this, memory, contract}})
+              .first->second;
+      impl->contractLoadTime += std::chrono::steady_clock::now() - loadStart;
+      // TODO: adjust watchdog
+      return result;
+   }
+
+   std::chrono::steady_clock::duration TransactionContext::getContractLoadTime()
+   {
+      std::lock_guard<std::mutex> guard{impl->mutex};
+      return impl->contractLoadTime;
+   }
+
+   void TransactionContext::setWatchdog(std::chrono::steady_clock::duration watchdogLimit)
+   {
+      // TODO
    }
 
    void TransactionContext::asyncTimeout()
    {
-      std::lock_guard<std::mutex> guard{ecMutex};
-      ecCanceled = true;
-      for (auto& [_, ec] : executionContexts)
+      std::lock_guard<std::mutex> guard{impl->mutex};
+      impl->ecCanceled = true;
+      for (auto& [_, ec] : impl->executionContexts)
          ec.asyncTimeout();
    }
 }  // namespace psibase
