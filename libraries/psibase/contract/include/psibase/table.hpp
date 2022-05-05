@@ -347,6 +347,8 @@ namespace psibase
    {
      public:
       static_assert(1 + sizeof...(Secondary) <= 255, "Too many indices");
+      using key_type   = std::remove_cvref_t<decltype(std::invoke(Primary, std::declval<T>()))>;
+      using value_type = T;
       explicit table(key_view prefix) : prefix(prefix.data.begin(), prefix.data.end()) {}
       explicit table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
       void put(const T& arg)
@@ -382,7 +384,8 @@ namespace psibase
             }
             else
             {
-               auto write_secondary = [&](uint8_t idx, auto wrapped) {
+               auto write_secondary = [&](uint8_t& idx, auto wrapped)
+               {
                   auto key          = std::invoke(decltype(wrapped)::value, arg);
                   key_buffer.back() = idx;
                   psio::convert_to_key(key, key_buffer);
@@ -397,6 +400,39 @@ namespace psibase
          auto serialized = psio::convert_to_bin(arg);
          raw::kvPut(map, pk.data(), pk.size(), serialized.data(), serialized.size());
       }
+      void erase(compatible_key<key_type> auto&& key)
+      {
+         if constexpr (sizeof...(Secondary) == 0)
+         {
+            auto key_buffer = serialize_key(0, key);
+            raw::kvRemove(map, key_buffer.data(), key_buffer.size());
+         }
+         else
+         {
+            if (auto value = get_index<0>().get(key))
+            {
+               remove(*value);
+            }
+         }
+      }
+      void remove(const T& old_value)
+      {
+         std::vector<char> key_buffer = prefix;
+         key_buffer.push_back(0);
+         auto erase_key = [&](std::uint8_t& idx, auto wrapped)
+         {
+            auto key          = std::invoke(decltype(wrapped)::value, old_value);
+            key_buffer.back() = idx;
+            psio::convert_to_key(key, key_buffer);
+            raw::kvRemove(map, key_buffer.data(), key_buffer.size());
+            key_buffer.resize(prefix.size() + 1);
+            ++idx;
+         };
+         std::uint8_t idx = 0;
+         erase_key(idx, wrap<Primary>());
+         (erase_key(idx, wrap<Secondary>()), ...);
+      }
+
       // TODO: get index by name
       template <int Idx>
       auto get_index() const
