@@ -68,6 +68,7 @@ namespace psidb
       }
 
       leaf_ptr child(std::uint16_t idx) { return {this, key_values + idx}; }
+      leaf_ptr back() { return child(size - 1); }
 
       std::uint32_t get_offset(leaf_ptr pos) const
       {

@@ -183,6 +183,7 @@ namespace psidb
       std::string_view get_key(std::uint16_t idx) const { return get_key(_keys[idx]); }
       std::string_view get_key(node_ptr pos) const { return get_key(get_offset(pos)); }
       node_ptr         child(uint16_t idx) { return {this, &_children[idx]}; }
+      node_ptr         back() { return child(_size); }
       uint16_t         get_offset(node_ptr pos) const { return pos.get() - _children; }
 
       std::span<std::atomic<page_id>> get_children() { return {_children, _children + _size + 1}; }

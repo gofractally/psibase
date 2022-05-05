@@ -34,6 +34,10 @@ namespace psidb
       void lower_bound(std::string_view key)
       {
          lower_bound_impl(key);
+         make_valid();
+      }
+      void make_valid()
+      {
          if (!valid())
          {
             for (std::size_t i = depth; i > 0; --i)
@@ -48,6 +52,15 @@ namespace psidb
                }
             }
          }
+      }
+      void back(std::size_t i, page_header* parent)
+      {
+         for (; i < depth; ++i)
+         {
+            stack[i] = static_cast<page_internal_node*>(parent)->back();
+            parent   = get_page(stack[i]);
+         }
+         leaf = static_cast<page_leaf*>(parent)->back();
       }
       void front(std::size_t i, page_header* parent)
       {
@@ -148,6 +161,33 @@ namespace psidb
                db->set_root(c, 0, db->get_id(p));
             }
          }
+      }
+      void next()
+      {
+         auto p = leaf.get_parent<page_leaf>();
+         leaf   = p->child(p->get_offset(leaf) + 1);
+         make_valid();
+      }
+      bool previous()
+      {
+         auto p = leaf.get_parent<page_leaf>();
+         if (p->get_offset(leaf) != 0)
+         {
+            leaf = p->child(p->get_offset(leaf) - 1);
+            return true;
+         }
+         for (std::size_t i = depth; i > 0; --i)
+         {
+            auto node   = stack[i - 1].get_parent<page_internal_node>();
+            auto offset = node->get_offset(stack[i - 1]);
+            if (offset != 0)
+            {
+               stack[i - 1] = node->child(offset - 1);
+               back(i, get_page(stack[i - 1]));
+               return true;
+            }
+         }
+         return false;
       }
       void touch()
       {
