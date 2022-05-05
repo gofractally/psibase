@@ -7,6 +7,9 @@
 
 namespace psibase
 {
+   // TODO: template arg to control size; constant "1" will need
+   //        adjustment to support larger types.
+   // TODO: switch serialization to non-extendable struct
    struct Bitset
    {
       using bitset_t = uint16_t;
