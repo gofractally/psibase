@@ -41,11 +41,9 @@ TEST_CASE("kv")
 
 TEST_CASE("table")
 {
-   /*
-   test_chain t;
-   t.start_block();
-   boot_minimal(t);
-   auto test_table_contract = add_contract(t, "test_table", "test_table.wasm");
+   DefaultTestChain t;
+
+   auto test_table_contract = t.add_contract("test-table", "test_table.wasm");
    REQUIRE(                          //
        show(false,                   //
             t.pushTransaction(      //
@@ -54,5 +52,4 @@ TEST_CASE("table")
                         .sender   = test_table_contract,
                         .contract = test_table_contract,
                     }}))) == "");
-                    */
 }  // table

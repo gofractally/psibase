@@ -52,7 +52,6 @@ namespace table_test
 
    void test1(AccountNumber this_contract)
    {
-      return; // TODO: what else breaks
       test_tables t{this_contract};
       auto        t1   = t.open<table1>();
       auto        idx0 = t1.get_index<0>();
@@ -68,7 +67,6 @@ namespace table_test
 
    void test2(AccountNumber this_contract)
    {
-      return; // TODO: what else breaks
       test_tables t{this_contract};
       auto        t2   = t.open<table2>();
       auto        idx1 = t2.get_index<1>();

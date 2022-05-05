@@ -318,7 +318,7 @@ namespace psibase
       }
 
      private:
-      bool                    is_secondary() const { return prefix[8] != 0; }
+      bool is_secondary() const { return prefix[sizeof(AccountNumber) + sizeof(std::uint32_t)] != 0; }
       static constexpr kv_map map = kv_map::contract;
       std::vector<char>       prefix;
    };
