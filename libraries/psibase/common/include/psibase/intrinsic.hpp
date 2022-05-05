@@ -139,7 +139,10 @@ namespace psibase
    }
 
    // Set the return value of the currently-executing action
-   inline void setRetvalBytes(psio::input_stream s) { raw::setRetval(s.pos, s.remaining()); }
+   inline void setRetvalBytes(psio::input_stream s)
+   {
+      raw::setRetval(s.pos, s.remaining());
+   }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    inline void kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value)
@@ -172,7 +175,7 @@ namespace psibase
    auto kvPutSequential(kv_map map, AccountNumber contract, Type type, const V& value)
    {
       std::vector<char>     packed(psio::fracpack_size(contract) + psio::fracpack_size(type) +
-                               psio::fracpack_size(value));
+                                   psio::fracpack_size(value));
       psio::fast_buf_stream stream(packed.data(), packed.size());
       psio::fracpack(contract, stream);
       psio::fracpack(type, stream);
@@ -419,7 +422,10 @@ namespace psibase
       return kvMax<V>(kv_map::contract, key);
    }
 
-   inline void writeConsole(const std::string_view& sv) { raw::writeConsole(sv.data(), sv.size()); }
+   inline void writeConsole(const std::string_view& sv)
+   {
+      raw::writeConsole(sv.data(), sv.size());
+   }
 
 }  // namespace psibase
 

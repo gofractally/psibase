@@ -318,7 +318,10 @@ namespace psibase
       }
 
      private:
-      bool is_secondary() const { return prefix[sizeof(AccountNumber) + sizeof(std::uint32_t)] != 0; }
+      bool is_secondary() const
+      {
+         return prefix[sizeof(AccountNumber) + sizeof(std::uint32_t)] != 0;
+      }
       static constexpr kv_map map = kv_map::contract;
       std::vector<char>       prefix;
    };
@@ -364,7 +367,8 @@ namespace psibase
                std::vector<char> buffer(sz);
                raw::getResult(buffer.data(), buffer.size(), 0);
                auto data              = psio::convert_from_bin<T>(std::move(buffer));
-               auto replace_secondary = [&](uint8_t& idx, auto wrapped) {
+               auto replace_secondary = [&](uint8_t& idx, auto wrapped)
+               {
                   auto old_key = std::invoke(decltype(wrapped)::value, data);
                   auto new_key = std::invoke(decltype(wrapped)::value, arg);
                   if (old_key != new_key)

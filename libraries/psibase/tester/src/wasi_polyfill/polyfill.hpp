@@ -8,7 +8,7 @@
 #endif
 
 #if WASI_VERSION >= 13
-#define POLYFILL_NAME(x) __imported_wasi_snapshot_preview1_ ## x
+#define POLYFILL_NAME(x) __imported_wasi_snapshot_preview1_##x
 #else
-#define POLYFILL_NAME(x) __wasi_ ## x
+#define POLYFILL_NAME(x) __wasi_##x
 #endif

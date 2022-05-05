@@ -67,7 +67,7 @@ namespace psibase
       {
          auto cumulative_frequency = model_cf[m_last_byte];
          prob p                    = {cumulative_frequency[c], cumulative_frequency[c + 1],
-                   cumulative_frequency[model_width]};
+                                      cumulative_frequency[model_width]};
          update(c);
          return p;
       }
@@ -508,4 +508,3 @@ namespace psibase
    PSIO_REFLECT(account_id_type, value);
 
 }  // namespace psibase
-
