@@ -222,6 +222,15 @@ namespace psidb
          insert_unchecked(get_offset(pos), key, value, flags);
          return true;
       }
+      void erase(leaf_ptr pos)
+      {
+         auto*      ptr = static_cast<kv_storage*>(pos.loc);
+         kv_storage tmp = *ptr;
+         shift_array_left(ptr, key_values + size);
+         key_values[size - 1] = tmp;
+         // TODO: This is pretty inefficient
+         truncate(size - 1);
+      }
       leaf_ptr lower_bound(std::string_view key)
       {
          // TODO: binary search

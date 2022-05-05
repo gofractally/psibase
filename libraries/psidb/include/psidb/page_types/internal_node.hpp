@@ -20,6 +20,13 @@ namespace psidb
       std::memmove(start + 1, start, (end - start) * sizeof(T));
    }
 
+   // moves data from [start + 1, end) to [start, end - 1)
+   template <typename T>
+   void shift_array_left(T* start, T* end)
+   {
+      std::memmove(start, start + 1, (end - start - 1) * sizeof(T));
+   }
+
    static std::string_view unpad(std::string_view data)
    {
       return {data.data(), data.data() + data.size() - 16 + data.back()};
@@ -336,6 +343,26 @@ namespace psidb
          _children[idx + 1].store(p, std::memory_order_relaxed);
          ++_size;
          _key_words += key.size() / 16;
+      }
+      void erase(node_ptr pos)
+      {
+         auto          offset = get_offset(pos);
+         relink_record tmp_buffer[capacity + 1];
+         start_transaction(tmp_buffer);
+         if (offset != _size)
+         {
+            auto tmp = _keys[offset];
+            shift_array_left(_keys + offset, _keys + _size);
+            _keys[_size - 1] = tmp;
+         }
+         {
+            auto tmp = _children[offset].load(std::memory_order_relaxed);
+            shift_array_left(_children + offset, _children + _size + 1);
+            _children[_size].store(tmp, std::memory_order_relaxed);
+         }
+         // TODO: This is pretty inefficient
+         truncate(_size - 1);
+         end_transaction(tmp_buffer);
       }
 
       node_ptr lower_bound(std::string_view key)

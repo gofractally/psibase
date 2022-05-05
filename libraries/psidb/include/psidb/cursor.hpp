@@ -125,6 +125,30 @@ namespace psidb
             db->touch_page(new_page, version);
          }
       }
+      void erase(key_type key)
+      {
+         lower_bound(key);
+         touch();
+         if (valid() && key == get_key())
+         {
+            auto p = maybe_clone<page_leaf>(leaf, depth);
+            // TODO: rebalancing
+            p->erase(leaf);
+            if (p->size == 0)
+            {
+               for (std::size_t i = depth; i > 0; --i)
+               {
+                  auto node = maybe_clone<page_internal_node>(stack[i - 1], i - 1);
+                  if (node->_size != 0)
+                  {
+                     node->erase(stack[i - 1]);
+                     return;
+                  }
+               }
+               db->set_root(c, 0, db->get_id(p));
+            }
+         }
+      }
       void touch()
       {
          for (std::size_t i = 0; i < depth; ++i)

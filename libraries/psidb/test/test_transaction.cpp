@@ -111,6 +111,44 @@ TEST_CASE("lower bound large value", "[lower_bound]")
    CHECK_CURSOR(cursor, "a", value);
 }
 
+TEST_CASE("erase simple", "[erase]")
+{
+   tmp_file file;
+
+   psidb::database db(file.native_handle(), 1024);
+
+   auto trx    = db.start_transaction();
+   auto cursor = trx.get_cursor();
+
+   cursor.insert("a", "v1");
+   cursor.erase("a");
+   cursor.lower_bound("");
+   CHECK(!cursor.valid());
+}
+
+TEST_CASE("erase many", "[erase]")
+{
+   tmp_file file;
+
+   psidb::database db(file.native_handle(), 1024);
+
+   auto trx    = db.start_transaction();
+   auto cursor = trx.get_cursor();
+   for (int i = 100; i < 500; ++i)
+   {
+      auto [k, v] = make_kv(i);
+      cursor.insert(k, v);
+   }
+
+   for (int i = 100; i < 400; ++i)
+   {
+      auto [k, v] = make_kv(i);
+      cursor.erase(k);
+   }
+   cursor.lower_bound("");
+   CHECK_CURSOR(cursor, "400", "409600");
+}
+
 TEST_CASE("persistence simple", "[persistence]")
 {
    tmp_file file;
