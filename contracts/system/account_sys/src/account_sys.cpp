@@ -64,12 +64,12 @@ namespace system_contract
           .flags        = 0,
       };
       kvPut(status->key(), *status);
-      kvPut(account.kv_map, account.key(), account);
+      kvPut(account.db, account.key(), account);
    }
 
    bool account_sys::exists(AccountNumber num)
    {
-      return !!kvGet<AccountRow>(AccountRow::kv_map, accountKey(num));
+      return !!kvGet<AccountRow>(AccountRow::db, accountKey(num));
    }
 
 }  // namespace system_contract

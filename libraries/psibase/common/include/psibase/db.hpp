@@ -4,8 +4,7 @@
 
 namespace psibase
 {
-   //  vector< map<key,val> > similar to enumerated index into vector
-   enum class kv_map : uint32_t /* TODO?: rename to kvdb_arena (kv_map used in external library) */
+   enum class DbId : uint32_t
    {
       contract,              // Contract tables
       native_constrained,    // Native tables which enforce constraints during write
@@ -27,11 +26,11 @@ namespace psibase
    struct KvResourceKey
    {
       AccountNumber contract = {};
-      uint32_t      map      = {};
+      uint32_t      db       = {};
 
       friend auto operator<=>(const KvResourceKey&, const KvResourceKey&) = default;
    };
-   PSIO_REFLECT(KvResourceKey, definitionWillNotChange(), contract, map)
+   PSIO_REFLECT(KvResourceKey, definitionWillNotChange(), contract, db)
 
    struct KvResourceDelta
    {

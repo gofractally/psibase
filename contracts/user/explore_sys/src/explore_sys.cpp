@@ -49,7 +49,7 @@ struct QueryRoot
                const std::optional<std::string>&       after) const
    {
       return psibase::makeKVConnection<BlockConnection, psibase::Block>(
-          gt, ge, lt, le, first, last, before, after, psibase::kv_map::block_log,
+          gt, ge, lt, le, first, last, before, after, psibase::DbId::block_log,
           psibase::BlockNum(0), ~psibase::BlockNum(0), 0,
           [](auto& block) {  //
              return block.header.blockNum;

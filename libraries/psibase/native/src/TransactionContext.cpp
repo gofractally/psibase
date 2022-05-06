@@ -54,7 +54,7 @@ namespace psibase
    {
       // Prepare for execution
       auto& db     = blockContext.db;
-      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::kv_map, statusKey());
+      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
       blockContext.systemContext.setNumMemories(status.num_execution_memories);
 
       if (blockContext.needGenesisAction)
@@ -72,7 +72,7 @@ namespace psibase
 
       // If the transaction adjusted num_execution_memories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
-      status = db.kvGetOrDefault<StatusRow>(StatusRow::kv_map, statusKey());
+      status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
       blockContext.systemContext.setNumMemories(status.num_execution_memories);
    }
 
@@ -89,14 +89,14 @@ namespace psibase
          for (auto& contract : data.contracts)
          {
             check(contract.contract.value, "account 0 is reserved");
-            check(!db.kvGet<AccountRow>(AccountRow::kv_map, accountKey(contract.contract)),
+            check(!db.kvGet<AccountRow>(AccountRow::db, accountKey(contract.contract)),
                   "account already created");
             AccountRow account{
                 .num          = contract.contract,
                 .authContract = contract.authContract,
                 .flags        = contract.flags,
             };
-            db.kvPut(AccountRow::kv_map, account.key(), account);
+            db.kvPut(AccountRow::db, account.key(), account);
             setCode(db, contract.contract, contract.vmType, contract.vmVersion,
                     {contract.code.data(), contract.code.size()});
          }
@@ -173,7 +173,7 @@ namespace psibase
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
    {
       auto& db     = blockContext.db;
-      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::kv_map, statusKey());
+      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
       blockContext.systemContext.setNumMemories(status.num_execution_memories);
 
       atrace.action    = action;

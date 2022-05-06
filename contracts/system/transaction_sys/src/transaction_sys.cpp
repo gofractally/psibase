@@ -12,7 +12,7 @@ static constexpr bool enable_print = false;
 
 static const auto& getStatus()
 {
-   static const auto status = kvGet<StatusRow>(StatusRow::kv_map, statusKey());
+   static const auto status = kvGet<StatusRow>(StatusRow::db, statusKey());
    return status;
 }
 
@@ -41,7 +41,7 @@ namespace system_contract
    {
       // TODO: validate code
       check(get_sender() == contract, "sender must match contract account");
-      auto account = kvGet<AccountRow>(AccountRow::kv_map, accountKey(contract));
+      auto account = kvGet<AccountRow>(AccountRow::db, accountKey(contract));
       check(account.has_value(), "can not set code on a missing account");
       auto code_hash = sha256(code.data(), code.size());
       if (vmType == account->vmType && vmVersion == account->vmVersion &&
@@ -51,10 +51,10 @@ namespace system_contract
       {
          // TODO: Refund RAM? A different resource?
          auto code_obj = kvGet<codeRow>(
-             codeRow::kv_map, codeKey(account->code_hash, account->vmType, account->vmVersion));
+             codeRow::db, codeKey(account->code_hash, account->vmType, account->vmVersion));
          check(code_obj.has_value(), "missing code object");
          if (--code_obj->ref_count)
-            kvPut(code_obj->kv_map, code_obj->key(), *code_obj);
+            kvPut(code_obj->db, code_obj->key(), *code_obj);
          else
          {
             // TODO: erase code_obj
@@ -65,10 +65,10 @@ namespace system_contract
       account->code_hash = code_hash;
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
-      kvPut(account->kv_map, account->key(), *account);
+      kvPut(account->db, account->key(), *account);
 
       auto code_obj = kvGet<codeRow>(
-          codeRow::kv_map, codeKey(account->code_hash, account->vmType, account->vmVersion));
+          codeRow::db, codeKey(account->code_hash, account->vmType, account->vmVersion));
       if (!code_obj)
       {
          code_obj.emplace(codeRow{
@@ -79,7 +79,7 @@ namespace system_contract
          code_obj->code.assign(code.begin(), code.end());
       }
       ++code_obj->ref_count;
-      kvPut(code_obj->kv_map, code_obj->key(), *code_obj);
+      kvPut(code_obj->db, code_obj->key(), *code_obj);
 
       return 0;
    }  // setCode
@@ -109,7 +109,7 @@ namespace system_contract
 
       for (auto& act : trx.actions)
       {
-         auto account = kvGet<AccountRow>(AccountRow::kv_map, accountKey(act.sender));
+         auto account = kvGet<AccountRow>(AccountRow::db, accountKey(act.sender));
          if (!account)
             abortMessage("unknown sender \"" + act.sender.str() + "\"");
 

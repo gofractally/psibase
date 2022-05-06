@@ -1,10 +1,10 @@
-/// Identify key-value map to operate on
+/// Identify database to operate on
 ///
-/// Key-value intrinsics expose a set of key-value maps which serve
-/// various purposes. This enum identifies which key-value map to
+/// Key-value intrinsics expose a set of databases which serve
+/// various purposes. This enum identifies which database to
 /// use when invoking those intrinsics.
 #[repr(u32)]
-pub enum KvMap {
+pub enum DbId {
     /// Most contracts should store their tables here. The first 64
     /// bits of the key match the contract.
     Contract,
@@ -22,12 +22,12 @@ pub enum KvMap {
     /// Data that is not part of consensus. Only accessible to
     /// whitelisted contracts during transactions, but readable
     /// by all contracts during RPC. Individual nodes may modify
-    /// this map or wipe it entirely at will.
+    /// this database or wipe it entirely at will.
     Subjective,
 
     /// Write-only during transactions, and read-only during RPC.
-    /// Individual nodes may modify this map, expire data from this
-    /// map, or wipe it entirely at will.
+    /// Individual nodes may modify this database, expire data from this
+    /// database, or wipe it entirely at will.
     WriteOnly,
 
     /// This contains the block log. Transactions don't have access to
@@ -35,8 +35,8 @@ pub enum KvMap {
     BlockLog,
 
     /// Write-only during transactions, and read-only during RPC.
-    /// Individual nodes may modify this map, expire data from this
-    /// map, or wipe it entirely at will.
+    /// Individual nodes may modify this database, expire data from this
+    /// database, or wipe it entirely at will.
     ///
     /// TODO: this policy may eventually change to allow time-limited
     /// or capacity-limited read access during transactions.

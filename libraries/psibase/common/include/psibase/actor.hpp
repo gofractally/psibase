@@ -87,13 +87,13 @@ namespace psibase
     */
    struct EventEmitterProxy
    {
-      EventEmitterProxy(AccountNumber s, kv_map elog = psibase::kv_map::history_event)
+      EventEmitterProxy(AccountNumber s, DbId elog = psibase::DbId::history_event)
           : sender(s), event_log(elog)
       {
       }
 
       AccountNumber sender;
-      kv_map        event_log;
+      DbId          event_log;
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
       EventNumber call(Args&&... args) const
@@ -109,13 +109,13 @@ namespace psibase
 
    struct EventReaderProxy
    {
-      EventReaderProxy(AccountNumber s, kv_map elog = psibase::kv_map::history_event)
+      EventReaderProxy(AccountNumber s, DbId elog = psibase::DbId::history_event)
           : sender(s), event_log(elog)
       {
       }
 
       AccountNumber sender;
-      kv_map        event_log;
+      DbId          event_log;
 
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
       auto call(EventNumber n) const
@@ -151,17 +151,17 @@ namespace psibase
       auto ui() const
       {
          return EventEmitter<typename T::Events::Ui>(this->psio_get_proxy().sender,
-                                                     psibase::kv_map::ui_event);
+                                                     psibase::DbId::ui_event);
       }
       auto history() const
       {
          return EventEmitter<typename T::Events::History>(this->psio_get_proxy().sender,
-                                                          psibase::kv_map::history_event);
+                                                          psibase::DbId::history_event);
       }
       auto merkle() const
       {
          return EventEmitter<typename T::Events::Merkle>(this->psio_get_proxy().sender,
-                                                         psibase::kv_map::merkle_event);
+                                                         psibase::DbId::merkle_event);
       }
       auto at(AccountNumber n) { return EventEmitter(n, this->psio_get_proxy().event_log); }
 
@@ -178,17 +178,17 @@ namespace psibase
       auto ui() const
       {
          return EventReader<typename T::Events::Ui>(this->psio_get_proxy().sender,
-                                                    psibase::kv_map::ui_event);
+                                                    psibase::DbId::ui_event);
       }
       auto history() const
       {
          return EventReader<typename T::Events::History>(this->psio_get_proxy().sender,
-                                                         psibase::kv_map::history_event);
+                                                         psibase::DbId::history_event);
       }
       auto merkle() const
       {
          return EventReader<typename T::Events::Merkle>(this->psio_get_proxy().sender,
-                                                        psibase::kv_map::merkle_event);
+                                                        psibase::DbId::merkle_event);
       }
       auto at(AccountNumber n) { return EventReader(n, this->psio_get_proxy().event_log); }
 

@@ -36,7 +36,7 @@ namespace psibase
    }
 
    // Only useful for genesis
-   void setCode(Database&          db,
+   void setCode(Database&          database,
                 AccountNumber      contract,
                 uint8_t            vmType,
                 uint8_t            vmVersion,
@@ -45,15 +45,15 @@ namespace psibase
       check(code.remaining(), "native setCode can't clear code");
       auto code_hash = sha256(code.pos, code.remaining());
 
-      auto account = db.kvGet<AccountRow>(AccountRow::kv_map, accountKey(contract));
+      auto account = database.kvGet<AccountRow>(AccountRow::db, accountKey(contract));
       check(account.has_value(), "setCode: unknown contract account");
       check(account->code_hash == Checksum256{}, "native setCode can't replace code");
       account->code_hash = code_hash;
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
-      db.kvPut(AccountRow::kv_map, account->key(), *account);
+      database.kvPut(AccountRow::db, account->key(), *account);
 
-      auto codeObj = db.kvGet<codeRow>(codeRow::kv_map, codeKey(code_hash, vmType, vmVersion));
+      auto codeObj = database.kvGet<codeRow>(codeRow::db, codeKey(code_hash, vmType, vmVersion));
       if (!codeObj)
       {
          codeObj.emplace();
@@ -63,7 +63,7 @@ namespace psibase
          codeObj->code.assign(code.pos, code.end);
       }
       ++codeObj->ref_count;
-      db.kvPut(codeRow::kv_map, codeObj->key(), *codeObj);
+      database.kvPut(codeRow::db, codeObj->key(), *codeObj);
    }  // setCode
 
    struct BackendEntry
@@ -140,7 +140,7 @@ namespace psibase
    // TODO: debugger
    struct ExecutionContextImpl
    {
-      Database&                  db;
+      Database&                  database;
       TransactionContext&        transactionContext;
       eosio::vm::wasm_allocator& wa;
       std::unique_ptr<backend_t> backend;
@@ -152,16 +152,16 @@ namespace psibase
       ExecutionContextImpl(TransactionContext& transactionContext,
                            ExecutionMemory&    memory,
                            AccountNumber       contract)
-          : db{transactionContext.blockContext.db},
+          : database{transactionContext.blockContext.db},
             transactionContext{transactionContext},
             wa{memory.impl->wa}
       {
-         auto ca = db.kvGet<AccountRow>(AccountRow::kv_map, accountKey(contract));
+         auto ca = database.kvGet<AccountRow>(AccountRow::db, accountKey(contract));
          check(ca.has_value(), "unknown contract account");
          check(ca->code_hash != Checksum256{}, "account has no code");
          contractAccount = std::move(*ca);
-         auto code       = db.kvGet<codeRow>(
-             codeRow::kv_map,
+         auto code       = database.kvGet<codeRow>(
+             codeRow::db,
              codeKey(contractAccount.code_hash, contractAccount.vmType, contractAccount.vmVersion));
          check(code.has_value(), "code record is missing");
          check(code->vmType == 0, "vmType is not 0");
@@ -219,15 +219,15 @@ namespace psibase
          currentActContext = prev;
       }
 
-      kv_map getMapRead(uint32_t map)
+      DbId getDbRead(uint32_t db)
       {
-         if (map == uint32_t(kv_map::contract))
-            return (kv_map)map;
-         if (map == uint32_t(kv_map::native_constrained))
-            return (kv_map)map;
-         if (map == uint32_t(kv_map::native_unconstrained))
-            return (kv_map)map;
-         if (map == uint32_t(kv_map::subjective))
+         if (db == uint32_t(DbId::contract))
+            return (DbId)db;
+         if (db == uint32_t(DbId::native_constrained))
+            return (DbId)db;
+         if (db == uint32_t(DbId::native_unconstrained))
+            return (DbId)db;
+         if (db == uint32_t(DbId::subjective))
          {
             // TODO: RPC contract queries currently can read subjective data to monitor node status.
             //       However, there's a possibility this may make it easier on an active attacker.
@@ -235,41 +235,41 @@ namespace psibase
             //       contracts for this?
             if ((contractAccount.flags & AccountRow::is_subjective) ||
                 transactionContext.blockContext.isReadOnly)
-               return (kv_map)map;
+               return (DbId)db;
          }
-         if (map == uint32_t(kv_map::write_only) && transactionContext.blockContext.isReadOnly)
-            return (kv_map)map;
-         if (map == uint32_t(kv_map::block_log) && transactionContext.blockContext.isReadOnly)
-            return (kv_map)map;
-         throw std::runtime_error("contract may not read this map, or must use another intrinsic");
+         if (db == uint32_t(DbId::write_only) && transactionContext.blockContext.isReadOnly)
+            return (DbId)db;
+         if (db == uint32_t(DbId::block_log) && transactionContext.blockContext.isReadOnly)
+            return (DbId)db;
+         throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
 
-      kv_map getMapReadSequential(uint32_t map)
+      DbId getDbReadSequential(uint32_t db)
       {
-         if (map == uint32_t(kv_map::event) && transactionContext.blockContext.isReadOnly)
-            return (kv_map)map;
-         if (map == uint32_t(kv_map::ui_event) && transactionContext.blockContext.isReadOnly)
-            return (kv_map)map;
-         throw std::runtime_error("contract may not read this map, or must use another intrinsic");
+         if (db == uint32_t(DbId::event) && transactionContext.blockContext.isReadOnly)
+            return (DbId)db;
+         if (db == uint32_t(DbId::ui_event) && transactionContext.blockContext.isReadOnly)
+            return (DbId)db;
+         throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
 
-      bool keyHasContractPrefix(uint32_t map)
+      bool keyHasContractPrefix(uint32_t db)
       {
-         return map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only) ||
-                map == uint32_t(kv_map::subjective);
+         return db == uint32_t(DbId::contract) || db == uint32_t(DbId::write_only) ||
+                db == uint32_t(DbId::subjective);
       }
 
       struct Writable
       {
-         kv_map map;
-         bool   readable;
+         DbId db;
+         bool readable;
       };
 
-      Writable getMapWrite(uint32_t map, psio::input_stream key)
+      Writable getDbWrite(uint32_t db, psio::input_stream key)
       {
          check(!transactionContext.blockContext.isReadOnly, "writes disabled during query");
 
-         if (keyHasContractPrefix(map))
+         if (keyHasContractPrefix(db))
          {
             uint64_t prefix = contractAccount.num.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
@@ -277,39 +277,39 @@ namespace psibase
                   "key prefix must match contract during write");
          };
 
-         if (map == uint32_t(kv_map::subjective) &&
+         if (db == uint32_t(DbId::subjective) &&
              (contractAccount.flags & AccountRow::is_subjective))
-            return {(kv_map)map, true};
+            return {(DbId)db, true};
 
          // Prevent poison block; subjective contracts skip execution during replay
          check(!(contractAccount.flags & AccountRow::is_subjective),
-               "subjective contracts may only write to kv_map::subjective");
+               "subjective contracts may only write to DbId::subjective");
 
-         if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
-            return {(kv_map)map, false};
-         if (map == uint32_t(kv_map::native_constrained) &&
+         if (db == uint32_t(DbId::contract) || db == uint32_t(DbId::write_only))
+            return {(DbId)db, false};
+         if (db == uint32_t(DbId::native_constrained) &&
              (contractAccount.flags & AccountRow::allow_write_native))
-            return {(kv_map)map, true};
-         if (map == uint32_t(kv_map::native_unconstrained) &&
+            return {(DbId)db, true};
+         if (db == uint32_t(DbId::native_unconstrained) &&
              (contractAccount.flags & AccountRow::allow_write_native))
-            return {(kv_map)map, true};
-         throw std::runtime_error("contract may not write this map (" + std::to_string(map) +
+            return {(DbId)db, true};
+         throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
       }
 
-      kv_map getMapWriteSequential(uint32_t map)
+      DbId getDbWriteSequential(uint32_t db)
       {
          check(!transactionContext.blockContext.isReadOnly, "writes disabled during query");
 
          // Prevent poison block; subjective contracts skip execution during replay
          check(!(contractAccount.flags & AccountRow::is_subjective),
-               "contract may not write this map, or must use another intrinsic");
+               "contract may not write this db, or must use another intrinsic");
 
-         if (map == uint32_t(kv_map::event))
-            return (kv_map)map;
-         if (map == uint32_t(kv_map::ui_event))
-            return (kv_map)map;
-         throw std::runtime_error("contract may not write this map (" + std::to_string(map) +
+         if (db == uint32_t(DbId::event))
+            return (DbId)db;
+         if (db == uint32_t(DbId::ui_event))
+            return (DbId)db;
+         throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
       }
 
@@ -460,33 +460,33 @@ namespace psibase
 
       // TODO: restrict key size
       // TODO: restrict value size
-      void kvPut(uint32_t map, span<const char> key, span<const char> value)
+      void kvPut(uint32_t db, span<const char> key, span<const char> value)
       {
-         if (map == uint32_t(kv_map::native_constrained))
+         if (db == uint32_t(DbId::native_constrained))
             verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
          clearResult();
-         auto [m, readable] = getMapWrite(map, {key.data(), key.size()});
-         auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, map}];
+         auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
+         auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
          delta.records += 1;
          delta.keyBytes += key.size();
          delta.valueBytes += value.size();
          if (readable)
          {
-            if (auto existing = db.kvGetRaw(m, {key.data(), key.size()}))
+            if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
             {
                delta.records -= 1;
                delta.keyBytes -= key.size();
                delta.valueBytes -= existing->remaining();
             }
          }
-         db.kvPutRaw(m, {key.data(), key.size()}, {value.data(), value.size()});
+         database.kvPutRaw(m, {key.data(), key.size()}, {value.data(), value.size()});
       }
 
       // TODO: restrict value size
-      uint64_t kvPutSequential(uint32_t map, span<const char> value)
+      uint64_t kvPutSequential(uint32_t db, span<const char> value)
       {
-         auto  m     = getMapWriteSequential(map);
-         auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, map}];
+         auto  m     = getDbWriteSequential(db);
+         auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
          delta.records += 1;
          delta.keyBytes += sizeof(uint64_t);
          delta.valueBytes += value.size();
@@ -499,72 +499,72 @@ namespace psibase
 
          auto&    dbStatus = transactionContext.blockContext.databaseStatus;
          uint64_t indexNumber;
-         if (map == uint32_t(kv_map::event))
+         if (db == uint32_t(DbId::event))
             indexNumber = dbStatus.nextEventNumber++;
-         else if (map == uint32_t(kv_map::ui_event))
+         else if (db == uint32_t(DbId::ui_event))
             indexNumber = dbStatus.nextUIEventNumber++;
          else
-            check(false, "kvPutSequential: unsupported map");
-         db.kvPut(DatabaseStatusRow::kv_map, dbStatus.key(), dbStatus);
+            check(false, "kvPutSequential: unsupported db");
+         database.kvPut(DatabaseStatusRow::db, dbStatus.key(), dbStatus);
 
-         db.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
+         database.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
          return indexNumber;
       }  // kvPutSequential()
 
-      void kvRemove(uint32_t map, span<const char> key)
+      void kvRemove(uint32_t db, span<const char> key)
       {
          clearResult();
-         auto [m, readable] = getMapWrite(map, {key.data(), key.size()});
+         auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
          if (readable)
          {
-            if (auto existing = db.kvGetRaw(m, {key.data(), key.size()}))
+            if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
             {
                auto& delta =
-                   transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, map}];
+                   transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
                delta.records -= 1;
                delta.keyBytes -= key.size();
                delta.valueBytes -= existing->remaining();
             }
          }
-         db.kvRemoveRaw(m, {key.data(), key.size()});
+         database.kvRemoveRaw(m, {key.data(), key.size()});
       }
 
-      uint32_t kvGet(uint32_t map, span<const char> key)
+      uint32_t kvGet(uint32_t db, span<const char> key)
       {
-         return setResult(db.kvGetRaw(getMapRead(map), {key.data(), key.size()}));
+         return setResult(database.kvGetRaw(getDbRead(db), {key.data(), key.size()}));
       }
 
-      uint32_t kvGetSequential(uint32_t map, uint64_t indexNumber)
+      uint32_t kvGetSequential(uint32_t db, uint64_t indexNumber)
       {
-         auto m = getMapReadSequential(map);
-         return setResult(db.kvGetRaw(m, psio::convert_to_key(indexNumber)));
+         auto m = getDbReadSequential(db);
+         return setResult(database.kvGetRaw(m, psio::convert_to_key(indexNumber)));
       }
 
-      uint32_t kvGreaterEqual(uint32_t map, span<const char> key, uint32_t matchKeySize)
+      uint32_t kvGreaterEqual(uint32_t db, span<const char> key, uint32_t matchKeySize)
       {
          check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-         if (keyHasContractPrefix(map))
+         if (keyHasContractPrefix(db))
             check(matchKeySize >= sizeof(AccountNumber::value),
                   "matchKeySize is smaller than 8 bytes");
          return setResult(
-             db.kvGreaterEqualRaw(getMapRead(map), {key.data(), key.size()}, matchKeySize));
+             database.kvGreaterEqualRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
       }
 
-      uint32_t kvLessThan(uint32_t map, span<const char> key, uint32_t matchKeySize)
+      uint32_t kvLessThan(uint32_t db, span<const char> key, uint32_t matchKeySize)
       {
          check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-         if (keyHasContractPrefix(map))
+         if (keyHasContractPrefix(db))
             check(matchKeySize >= sizeof(AccountNumber::value),
                   "matchKeySize is smaller than 8 bytes");
          return setResult(
-             db.kvLessThanRaw(getMapRead(map), {key.data(), key.size()}, matchKeySize));
+             database.kvLessThanRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
       }
 
-      uint32_t kvMax(uint32_t map, span<const char> key)
+      uint32_t kvMax(uint32_t db, span<const char> key)
       {
-         if (keyHasContractPrefix(map))
+         if (keyHasContractPrefix(db))
             check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
-         return setResult(db.kvMaxRaw(getMapRead(map), {key.data(), key.size()}));
+         return setResult(database.kvMaxRaw(getDbRead(db), {key.data(), key.size()}));
       }
 
       uint32_t kvGetTransactionUsage()
