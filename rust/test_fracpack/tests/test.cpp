@@ -205,6 +205,18 @@ void round_trip(const T& data, rust::Slice<const uint8_t> blob)
       throw std::runtime_error("c++ unpacked does not match original");
 }
 
+void round_tripz(rust::Slice<const uint8_t> blob)
+{
+   round_trip(ZStruct{.age1     = 0xfafbfcfd,
+                      .btc      = 0xfafb,
+                      .cool     = true,
+                      .msg      = "hello"s,
+                      .maybe1   = 0xfa,
+                      .maybe2   = std::nullopt,
+                      .not_cool = true},
+              blob);
+}
+
 void round_trip_outer_struct(size_t index, rust::Slice<const uint8_t> blob)
 {
    round_trip(tests1_data[index], blob);

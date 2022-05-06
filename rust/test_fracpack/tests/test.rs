@@ -234,3 +234,26 @@ fn t1() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn testz() {
+    println!("running tests!!!!!!!");
+
+    let x = MyStruct {
+        age1: 0xfafbfcfd,
+        btc: 0xfafb,
+        cool: true,
+        msg: String::from("hello"),
+        maybe1: Some(0xfa),
+        maybe2: None,
+        not_cool: true,
+    };
+    let mut bytes: Vec<u8> = Vec::new();
+    x.pack(&mut bytes);
+    println!("rust packed bytes: {:?}", bytes);
+
+    test_fracpack::bridge::ffi::round_tripz(&bytes[..]);
+
+    let unpacked = MyStruct::unpack(&bytes[..], &mut 0).unwrap();
+    assert_eq!(x, unpacked);
+}
