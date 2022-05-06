@@ -5,7 +5,7 @@
 
 namespace psibase
 {
-   struct MethodNumber final
+   struct MethodNumber
    {
       uint64_t value = 0;
       constexpr MethodNumber() : value(0) {}
@@ -16,7 +16,7 @@ namespace psibase
       std::string str() const { return psio::detail::number_to_method(value); }
       auto        operator<=>(const MethodNumber&) const = default;
    };
-   PSIO_REFLECT(MethodNumber, value)
+   PSIO_REFLECT(MethodNumber, definitionWillNotChange(), value)
 
    template <typename S>
    void to_json(const MethodNumber& n, S& s)

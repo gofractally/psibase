@@ -139,7 +139,7 @@ namespace psio
      *    2. alignement_of(T) == 1
      *    3. the order of reflected fields, matches memory layout
      *    4. all members meet the can_memcpy requirement
-     *    5. the struct is final
+     *    5. the struct is definitionWillNotChange
      */
    template <typename T>
    constexpr bool can_memcpy()
@@ -152,7 +152,7 @@ namespace psio
       {
          if constexpr (psio::reflect<T>::is_struct)
          {
-            if (not std::is_final_v<T>)
+            if (not psio::reflect<T>::definitionWillNotChange)
                return false;
 
             bool     is_flat  = true;
@@ -226,8 +226,8 @@ namespace psio
 
    /**
      *  The number of fields on the struct cannot be extended because
-     *  the struct is final and all members are either heap allocated 
-     *  or final.
+     *  the struct is definitionWillNotChange(), and all members are 
+     *  either heap allocated or definitionWillNotChange(), .
      */
    template <typename T>
    constexpr bool is_fixed_structure()
@@ -250,7 +250,7 @@ namespace psio
          return true;  // size followed by heap
       else if constexpr (psio::reflect<T>::is_struct)
       {
-         if (not std::is_final_v<T>)
+         if (not psio::reflect<T>::definitionWillNotChange)
          {
             static_assert(not has_non_optional_after_optional<T>(),
                           "extendable types must not have non-optional after optional member");
@@ -300,7 +300,7 @@ namespace psio
          return may_use_heap<is_shared_view_ptr<T>::value_type>();
       else if constexpr (std::is_arithmetic_v<T>)
          return false;
-      else if constexpr (not std::is_final_v<T>)
+      else if constexpr (not psio::reflect<T>::definitionWillNotChange)
          return true;
       else if constexpr (can_memcpy<T>())
          return false;
@@ -409,7 +409,7 @@ namespace psio
          reflect<T>::for_each(
              [&](const meta& ref, const auto& mptr)
              {
-                if constexpr (not std::is_member_function_pointer_v<decltype(mptr)>)
+                if constexpr (not std::is_member_function_pointer_v<remove_cvref_t<decltype(mptr)>>)
                 {
                    using member_type = decltype(result_of_member(mptr));
                    if constexpr (may_use_heap<member_type>())
@@ -739,7 +739,7 @@ namespace psio
          //       std::cout << "packing struct at: " << stream.consumed() <<"\n";
          //  std::cout << "packing struct: \n";
          uint16_t start_heap = fracpack_fixed_size<T>();
-         if constexpr (not std::is_final_v<T>)  //is_ext_structure<T>())
+         if constexpr (not psio::reflect<T>::definitionWillNotChange)  //is_ext_structure<T>())
          {
             //           std::cout << "ext struct heap: " <<start_heap<<"\n";
             stream.write(&start_heap, sizeof(start_heap));
@@ -981,7 +981,7 @@ namespace psio
       else if constexpr (reflect<T>::is_struct)
       {
          uint16_t start_heap = fracpack_fixed_size<T>();
-         if constexpr (not std::is_final_v<T>)  //is_ext_structure<T>())
+         if constexpr (not psio::reflect<T>::definitionWillNotChange)  //is_ext_structure<T>())
          {
             stream.read(&start_heap, sizeof(start_heap));
          }
@@ -1452,7 +1452,7 @@ namespace psio
 
          return stream;
       }
-      else if constexpr (reflect<T>::is_struct and std::is_final_v<T>)
+      else if constexpr (reflect<T>::is_struct and psio::reflect<T>::definitionWillNotChange)
       {
          stream.pos   = stream.begin + fracpack_fixed_size<T>();
          stream.heap  = stream.pos;
@@ -1604,8 +1604,8 @@ namespace psio
          using tuple_type  = typename psio::reflect<class_type>::struct_tuple_type;
          using member_type = decltype(psio::result_of_member(MemberPtr));
 
-         constexpr uint32_t offset =
-             psio::get_tuple_offset<idx, tuple_type>::value + 2 * (not std::is_final_v<class_type>);
+         constexpr uint32_t offset = psio::get_tuple_offset<idx, tuple_type>::value +
+                                     2 * (not psio::reflect<class_type>::definitionWillNotChange);
 
          //psio::is_ext_structure<class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
 
@@ -1661,8 +1661,8 @@ namespace psio
          using tuple_type  = typename psio::reflect<class_type>::struct_tuple_type;
          using member_type = decltype(psio::result_of_member(MemberPtr));
 
-         constexpr uint32_t offset =
-             psio::get_tuple_offset<idx, tuple_type>::value + 2 * (not std::is_final_v<class_type>);
+         constexpr uint32_t offset = psio::get_tuple_offset<idx, tuple_type>::value +
+                                     2 * (not psio::reflect<class_type>::definitionWillNotChange);
 
          char* out_ptr = buffer + offset;
          //       std::cout << "offset: " << offset <<"\n";
@@ -2500,7 +2500,7 @@ namespace psio
 
       T unpack() const
       {
-         T            tmp;
+         T            tmp{};
          input_stream in(_data.get() + sizeof(uint32_t), size());
          psio::fracunpack(tmp, in);
          return tmp;

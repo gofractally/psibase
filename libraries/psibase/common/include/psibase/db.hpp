@@ -24,24 +24,24 @@ namespace psibase
       history_event  // Events that go into long-term subjective history
    };
 
-   struct KvResourceKey final
+   struct KvResourceKey
    {
       AccountNumber contract = {};
       uint32_t      map      = {};
 
       friend auto operator<=>(const KvResourceKey&, const KvResourceKey&) = default;
    };
-   PSIO_REFLECT(KvResourceKey, contract, map)
+   PSIO_REFLECT(KvResourceKey, definitionWillNotChange(), contract, map)
 
-   struct KvResourceDelta final
+   struct KvResourceDelta
    {
       int64_t records    = 0;
       int64_t keyBytes   = 0;
       int64_t valueBytes = 0;
    };
-   PSIO_REFLECT(KvResourceDelta, records, keyBytes, valueBytes)
+   PSIO_REFLECT(KvResourceDelta, definitionWillNotChange(), records, keyBytes, valueBytes)
 
-   struct KvResourcePair final
+   struct KvResourcePair
    {
       KvResourceKey   first  = {};
       KvResourceDelta second = {};
@@ -49,5 +49,5 @@ namespace psibase
       KvResourcePair() = default;
       KvResourcePair(KvResourceKey first, KvResourceDelta second) : first{first}, second{second} {}
    };
-   PSIO_REFLECT(KvResourcePair, first, second)
+   PSIO_REFLECT(KvResourcePair, definitionWillNotChange(), first, second)
 }  // namespace psibase

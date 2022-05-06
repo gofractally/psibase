@@ -46,7 +46,7 @@ namespace psibase
    };
    PSIO_REFLECT(Claim, contract, rawData)
 
-   /* mark this as final and put it in memory order that
+   /* mark this as definitionWillNotChange() and put it in memory order that
     * has no padding nor alignment requirements so these fields
     * can be effeciently memcpy 
     *
@@ -58,7 +58,7 @@ namespace psibase
    //           the TimePointSec comparison operator, fracpack if the memcpy
    //           optimization ever gets disabled (e.g. its condition for enabling fails
    //           to trigger), to_bin, from_bin, and more; see Todd for details
-   struct FRACPACK Tapos final
+   struct FRACPACK Tapos
    {
       static constexpr uint16_t do_not_broadcast = 1u << 0;
 
@@ -67,7 +67,7 @@ namespace psibase
       uint32_t     refBlockPrefix = 0;
       uint16_t     refBlockNum    = 0;
    };
-   PSIO_REFLECT(Tapos, expiration, flags, refBlockPrefix, refBlockNum)
+   PSIO_REFLECT(Tapos, definitionWillNotChange(), expiration, flags, refBlockPrefix, refBlockNum)
 
    // TODO: separate native-defined fields from contract-defined fields
    struct Transaction
