@@ -411,6 +411,16 @@ namespace psibase
          return transactionContext.getBillableTime().count();
       }
 
+      void setMaxTransactionTime(uint64_t nanoseconds)
+      {
+         check(contractAccount.flags & account_row::can_set_time_limit,
+               "setMaxTransactionTime requires can_set_time_limit privilege");
+         if (transactionContext.blockContext.isProducing)
+            transactionContext.setWatchdog(
+                std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::nanoseconds{nanoseconds}));
+      }
+
       uint32_t getCurrentAction()
       {
          return setResult(psio::convert_to_frac(currentActContext->action));
@@ -587,6 +597,7 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
       rhf_t::add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
       rhf_t::add<&ExecutionContextImpl::getBillableTime>("env", "getBillableTime");
+      rhf_t::add<&ExecutionContextImpl::setMaxTransactionTime>("env", "setMaxTransactionTime");
       rhf_t::add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&ExecutionContextImpl::call>("env", "call");
       rhf_t::add<&ExecutionContextImpl::setRetval>("env", "setRetval");

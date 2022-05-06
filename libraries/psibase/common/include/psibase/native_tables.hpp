@@ -41,6 +41,7 @@ namespace psibase
       static constexpr uint64_t allow_write_native = uint64_t(1) << 1;
       static constexpr uint64_t is_subjective      = uint64_t(1) << 2;
       static constexpr uint64_t can_not_time_out   = uint64_t(1) << 3;
+      static constexpr uint64_t can_set_time_limit = uint64_t(1) << 4;
 
       AccountNumber num;           // TODO: rename
       AccountNumber authContract;  // TODO: move out of native
