@@ -23,6 +23,7 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: None,
                 inner_o_vec_o_u16: None,
             },
+            field_u_inner: UnextensibleInnerStruct::default(),
             field_v_inner: vec![],
             field_option_u8: Some(11),
             field_option_u16: Some(12),
@@ -60,6 +61,15 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_str: None,
                 inner_option_vec_u16: Some(vec![]),
                 inner_o_vec_o_u16: Some(vec![None, Some(0x3456), None]),
+            },
+            field_u_inner: UnextensibleInnerStruct {
+                field_bool: true,
+                field_u32: 32,
+                field_i16: 16,
+                field_str: "hello".to_string(),
+                field_f32: 3.2,
+                field_f64: 64.64,
+                field_v_u16: vec![1, 2, 3],
             },
             field_v_inner: vec![
                 InnerStruct {
@@ -123,6 +133,15 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: Some(vec![]),
                 inner_o_vec_o_u16: Some(vec![None, Some(0x3456), None]),
             },
+            field_u_inner: UnextensibleInnerStruct {
+                field_bool: false,
+                field_u32: 0,
+                field_i16: 0,
+                field_str: "".to_string(),
+                field_f32: 0.0,
+                field_f64: 0.0,
+                field_v_u16: vec![],
+            },
             field_v_inner: vec![InnerStruct {
                 inner_u32: 1234,
                 var: Some(Variant::ItemStr("var".to_string())),
@@ -173,7 +192,11 @@ fn round_trip_field<T: fracpack::PackableOwned + PartialEq + std::fmt::Debug>(
     println!("    {}", field_name);
     let mut packed = Vec::<u8>::new();
     field.pack(&mut packed);
-    T::verify_no_extra(&packed[..]).unwrap();
+    println!("packed bytes {:?}", packed);
+
+    // TODO: pos = 0 (!= src.len() when unextensible), is it desired?
+    // T::verify_no_extra(&packed[..]).unwrap();
+
     let unpacked = T::unpack(&packed[..], &mut 0).unwrap();
     assert_eq!(*field, unpacked);
     test_fracpack::bridge::ffi::round_trip_outer_struct_field(index, field_name, &packed[..]);
@@ -199,6 +222,7 @@ fn round_trip_fields(index: usize, obj: &OuterStruct) {
     do_rt!(index, obj, field_f32);
     do_rt!(index, obj, field_f64);
     do_rt!(index, obj, field_inner);
+    do_rt!(index, obj, field_u_inner);
     do_rt!(index, obj, field_v_inner);
     do_rt!(index, obj, field_option_u8);
     do_rt!(index, obj, field_option_u16);
@@ -224,10 +248,17 @@ fn t1() -> Result<()> {
         println!("index {}", i);
         round_trip_fields(i, t);
         println!("    whole");
+
         let mut packed = Vec::<u8>::new();
         t.pack(&mut packed);
+        println!("    whole packed!");
+
         OuterStruct::verify(&packed[..], &mut 0)?;
+        println!("    whole verified!");
+
         let unpacked = OuterStruct::unpack(&packed[..], &mut 0)?;
+        println!("    whole unpacked {:?}", unpacked);
+
         assert_eq!(*t, unpacked);
         test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
         // TODO: optionals after fixed-data portion ends

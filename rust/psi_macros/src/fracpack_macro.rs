@@ -104,6 +104,11 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
     } else {
         quote! { None }
     };
+    let heap_pos_assignment = if !opts.unextensible {
+        quote! { *pos = heap_pos; }
+    } else {
+        quote! {}
+    };
     let pack_fixed_members = fields
         .iter()
         .enumerate()
@@ -158,7 +163,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
         .map(|field| {
             let ty = &field.ty;
             quote! {
-                <#ty as fracpack::Packable>::embedded_verify(src, pos, Some(&mut heap_pos))?;
+                <#ty as fracpack::Packable>::embedded_verify(src, pos, #unpack_heap_pos)?;
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -174,6 +179,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 #pack_variable_members
             }
             fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
+                println!("u {}", stringify!(#name));
                 #unpack_heap_size
                 let mut heap_pos = *pos + heap_size as u32;
                 println!("checking heappos... {}", heap_pos);
@@ -185,17 +191,21 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 let result = Self {
                     #unpack_fields
                 };
-                *pos = heap_pos;
+                #heap_pos_assignment
                 Ok(result)
             }
             fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
+                println!("v {}", stringify!(#name));
                 #unpack_heap_size
                 let mut heap_pos = *pos + heap_size as u32;
+                println!("verifychecking heappos... {}", heap_pos);
                 if heap_pos < *pos {
                     return Err(fracpack::Error::BadOffset);
                 }
+                println!("verifychecked heappos! {}", heap_pos);
                 #verify
-                *pos = heap_pos;
+                println!("verifychecked heappos final! hp {} pos {}", heap_pos, pos);
+                #heap_pos_assignment
                 Ok(())
             }
             fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
@@ -213,6 +223,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 fixed_pos: &mut u32,
                 heap_pos: Option<&mut u32>,
             ) -> fracpack::Result<Self> {
+                println!("eu {}", stringify!(#name));
                 let orig_pos = *fixed_pos;
                 let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
 
@@ -220,9 +231,11 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 let mut default_dynamic_pos: u32 = dynamic_pos;
                 let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut default_dynamic_pos);
 
+                println!("embedded unpack hp {} dp {}", heap_pos, dynamic_pos);
                 if *heap_pos != dynamic_pos {
                     return Err(fracpack::Error::BadOffset);
                 }
+                println!("embedded unpacked!");
                 <Self as fracpack::Packable>::unpack(src, heap_pos)
             }
             fn embedded_verify(
@@ -230,6 +243,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 fixed_pos: &mut u32,
                 heap_pos: Option<&mut u32>,
             ) -> fracpack::Result<()> {
+                println!("ev {}", stringify!(#name));
                 let orig_pos = *fixed_pos;
                 let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
 
@@ -237,9 +251,11 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 let mut default_dynamic_pos: u32 = dynamic_pos;
                 let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut default_dynamic_pos);
 
+                println!("embedded verify hp {} dp {}", heap_pos, dynamic_pos);
                 if *heap_pos != dynamic_pos {
                     return Err(fracpack::Error::BadOffset);
                 }
+                println!("embedded verified!");
                 <Self as fracpack::Packable>::verify(src, heap_pos)
             }
             fn option_fixed_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
@@ -267,10 +283,12 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 fixed_pos: &mut u32,
                 heap_pos: Option<&mut u32>,
             ) -> fracpack::Result<Option<Self>> {
+                println!("ou1 {}", stringify!(#name));
                 let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(None);
                 }
+                println!("ou2 {}", stringify!(#name));
                 *fixed_pos -= 4;
                 Ok(Some(<Self as fracpack::Packable>::embedded_unpack(
                     src, fixed_pos, heap_pos,
@@ -281,10 +299,13 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 fixed_pos: &mut u32,
                 heap_pos: Option<&mut u32>,
             ) -> fracpack::Result<()> {
+                println!("ov1 {}", stringify!(#name));
                 let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(());
                 }
+
+                println!("ov2 {}", stringify!(#name));
                 *fixed_pos -= 4;
                 <Self as fracpack::Packable>::embedded_verify(src, fixed_pos, heap_pos)
             }
