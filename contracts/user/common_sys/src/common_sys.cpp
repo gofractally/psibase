@@ -3,7 +3,7 @@
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/dispatch.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
 
 static constexpr bool enable_print = false;

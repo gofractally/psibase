@@ -3,7 +3,7 @@
 #include_next <psibase/db.hpp>
 
 #include <psibase/blob.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_key.hpp>

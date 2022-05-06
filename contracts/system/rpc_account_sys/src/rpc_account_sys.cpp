@@ -4,7 +4,7 @@
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/SimpleUI.hpp>
 #include <psibase/dispatch.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
 
@@ -55,15 +55,15 @@ namespace system_contract
 
          if (request.target == "/accounts")
          {
-            std::vector<account_row> rows;
-            auto                     key     = psio::convert_to_key(account_key({}));
-            auto                     keySize = sizeof(account_table);
+            std::vector<AccountRow> rows;
+            auto                    key     = psio::convert_to_key(accountKey({}));
+            auto                    keySize = sizeof(accountTable);
             while (true)
             {
-               auto raw = kvGreaterEqualRaw(account_row::kv_map, key, keySize);
+               auto raw = kvGreaterEqualRaw(AccountRow::kv_map, key, keySize);
                if (!raw)
                   break;
-               auto acc = psio::convert_from_frac<account_row>(*raw);
+               auto acc = psio::convert_from_frac<AccountRow>(*raw);
                key      = getKey();
                key.push_back(0);
                rows.push_back(std::move(acc));

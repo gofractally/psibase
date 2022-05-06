@@ -2,7 +2,7 @@
 
 #include <psibase/Contract.hpp>
 #include <psibase/intrinsic.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_bin.hpp>
 
@@ -13,7 +13,7 @@ namespace system_contract
      public:
       static constexpr auto     contract = psibase::AccountNumber("transact-sys");
       static constexpr uint64_t contract_flags =
-          psibase::account_row::allow_sudo | psibase::account_row::allow_write_native;
+          psibase::AccountRow::allow_sudo | psibase::AccountRow::allow_write_native;
 
       psibase::BlockNum     headBlockNum() const;
       psibase::TimePointSec blockTime() const;

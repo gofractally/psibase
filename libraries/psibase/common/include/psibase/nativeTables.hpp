@@ -5,37 +5,35 @@
 
 namespace psibase
 {
-   // TODO: replace with a name type?
-   // TODO: rename to make it clear it's only for native tables
-   using table_num = uint16_t;
+   using NativeTableNum = uint16_t;
 
-   static constexpr table_num status_table        = 1;
-   static constexpr table_num account_table       = 2;
-   static constexpr table_num code_table          = 3;
-   static constexpr table_num databaseStatusTable = 4;
+   static constexpr NativeTableNum statusTable         = 1;
+   static constexpr NativeTableNum accountTable        = 2;
+   static constexpr NativeTableNum codeTable           = 3;
+   static constexpr NativeTableNum databaseStatusTable = 4;
 
-   inline auto status_key()
+   inline auto statusKey()
    {
-      return std::tuple{status_table};
+      return std::tuple{statusTable};
    }
-   struct status_row
+   struct StatusRow
    {
       Checksum256              chain_id;
       std::optional<BlockInfo> head;
       uint32_t                 num_execution_memories = 32;
 
       static constexpr auto kv_map = psibase::kv_map::native_unconstrained;
-      static auto           key() { return status_key(); }
+      static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(status_row, chain_id, head, num_execution_memories)
+   PSIO_REFLECT(StatusRow, chain_id, head, num_execution_memories)
 
    // TODO: Rename account to contract?
-   inline auto account_key(AccountNumber num)
+   inline auto accountKey(AccountNumber num)
    {
       // TODO: leave space for secondary index?
-      return std::tuple{account_table, num};
+      return std::tuple{accountTable, num};
    }
-   struct account_row
+   struct AccountRow
    {
       static constexpr uint64_t allow_sudo         = uint64_t(1) << 0;
       static constexpr uint64_t allow_write_native = uint64_t(1) << 1;
@@ -54,18 +52,18 @@ namespace psibase
       //==================================^^
 
       static constexpr auto kv_map = psibase::kv_map::native_unconstrained;
-      auto                  key() const { return account_key(num); }
+      auto                  key() const { return accountKey(num); }
    };
-   PSIO_REFLECT(account_row, num, authContract, flags, code_hash, vmType, vmVersion)
+   PSIO_REFLECT(AccountRow, num, authContract, flags, code_hash, vmType, vmVersion)
 
-   inline auto code_key(const Checksum256& code_hash, uint8_t vmType, uint8_t vmVersion)
+   inline auto codeKey(const Checksum256& code_hash, uint8_t vmType, uint8_t vmVersion)
    {
       // TODO: leave space for secondary index?
-      return std::tuple{code_table, code_hash, vmType, vmVersion};
+      return std::tuple{codeTable, code_hash, vmType, vmVersion};
    }
 
    /// where code is actually stored, duplicate contracts are reused
-   struct code_row
+   struct codeRow
    {
       // primary key
       Checksum256 code_hash = {};
@@ -81,9 +79,9 @@ namespace psibase
       // that could happen if the key->code map doesn't match the
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto kv_map = psibase::kv_map::native_constrained;
-      auto                  key() const { return code_key(code_hash, vmType, vmVersion); }
+      auto                  key() const { return codeKey(code_hash, vmType, vmVersion); }
    };
-   PSIO_REFLECT(code_row, code_hash, vmType, vmVersion, ref_count, code)
+   PSIO_REFLECT(codeRow, code_hash, vmType, vmVersion, ref_count, code)
 
    inline auto databaseStatusKey()
    {

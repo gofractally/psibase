@@ -45,15 +45,15 @@ namespace psibase
       check(code.remaining(), "native setCode can't clear code");
       auto code_hash = sha256(code.pos, code.remaining());
 
-      auto account = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
+      auto account = db.kvGet<AccountRow>(AccountRow::kv_map, accountKey(contract));
       check(account.has_value(), "setCode: unknown contract account");
       check(account->code_hash == Checksum256{}, "native setCode can't replace code");
       account->code_hash = code_hash;
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
-      db.kvPut(account_row::kv_map, account->key(), *account);
+      db.kvPut(AccountRow::kv_map, account->key(), *account);
 
-      auto codeObj = db.kvGet<code_row>(code_row::kv_map, code_key(code_hash, vmType, vmVersion));
+      auto codeObj = db.kvGet<codeRow>(codeRow::kv_map, codeKey(code_hash, vmType, vmVersion));
       if (!codeObj)
       {
          codeObj.emplace();
@@ -63,7 +63,7 @@ namespace psibase
          codeObj->code.assign(code.pos, code.end);
       }
       ++codeObj->ref_count;
-      db.kvPut(code_row::kv_map, codeObj->key(), *codeObj);
+      db.kvPut(codeRow::kv_map, codeObj->key(), *codeObj);
    }  // setCode
 
    struct BackendEntry
@@ -145,7 +145,7 @@ namespace psibase
       eosio::vm::wasm_allocator& wa;
       std::unique_ptr<backend_t> backend;
       std::atomic<bool>          timedOut = false;
-      account_row                contractAccount;
+      AccountRow                 contractAccount;
       bool                       initialized       = false;
       ActionContext*             currentActContext = nullptr;  // Changes during recursion
 
@@ -156,13 +156,13 @@ namespace psibase
             transactionContext{transactionContext},
             wa{memory.impl->wa}
       {
-         auto ca = db.kvGet<account_row>(account_row::kv_map, account_key(contract));
+         auto ca = db.kvGet<AccountRow>(AccountRow::kv_map, accountKey(contract));
          check(ca.has_value(), "unknown contract account");
          check(ca->code_hash != Checksum256{}, "account has no code");
          contractAccount = std::move(*ca);
-         auto code       = db.kvGet<code_row>(code_row::kv_map,
-                                        code_key(contractAccount.code_hash, contractAccount.vmType,
-                                                       contractAccount.vmVersion));
+         auto code       = db.kvGet<codeRow>(
+             codeRow::kv_map,
+             codeKey(contractAccount.code_hash, contractAccount.vmType, contractAccount.vmVersion));
          check(code.has_value(), "code record is missing");
          check(code->vmType == 0, "vmType is not 0");
          check(code->vmVersion == 0, "vmVersion is not 0");
@@ -233,7 +233,7 @@ namespace psibase
             //       However, there's a possibility this may make it easier on an active attacker.
             //       Make this capability a node configuration toggle? Allow node config to whitelist
             //       contracts for this?
-            if ((contractAccount.flags & account_row::is_subjective) ||
+            if ((contractAccount.flags & AccountRow::is_subjective) ||
                 transactionContext.blockContext.isReadOnly)
                return (kv_map)map;
          }
@@ -278,20 +278,20 @@ namespace psibase
          };
 
          if (map == uint32_t(kv_map::subjective) &&
-             (contractAccount.flags & account_row::is_subjective))
+             (contractAccount.flags & AccountRow::is_subjective))
             return {(kv_map)map, true};
 
          // Prevent poison block; subjective contracts skip execution during replay
-         check(!(contractAccount.flags & account_row::is_subjective),
+         check(!(contractAccount.flags & AccountRow::is_subjective),
                "subjective contracts may only write to kv_map::subjective");
 
          if (map == uint32_t(kv_map::contract) || map == uint32_t(kv_map::write_only))
             return {(kv_map)map, false};
          if (map == uint32_t(kv_map::native_constrained) &&
-             (contractAccount.flags & account_row::allow_write_native))
+             (contractAccount.flags & AccountRow::allow_write_native))
             return {(kv_map)map, true};
          if (map == uint32_t(kv_map::native_unconstrained) &&
-             (contractAccount.flags & account_row::allow_write_native))
+             (contractAccount.flags & AccountRow::allow_write_native))
             return {(kv_map)map, true};
          throw std::runtime_error("contract may not write this map (" + std::to_string(map) +
                                   "), or must use another intrinsic");
@@ -302,7 +302,7 @@ namespace psibase
          check(!transactionContext.blockContext.isReadOnly, "writes disabled during query");
 
          // Prevent poison block; subjective contracts skip execution during replay
-         check(!(contractAccount.flags & account_row::is_subjective),
+         check(!(contractAccount.flags & AccountRow::is_subjective),
                "contract may not write this map, or must use another intrinsic");
 
          if (map == uint32_t(kv_map::event))
@@ -321,13 +321,13 @@ namespace psibase
          //
          // TODO: use a view here instead of unpacking to a rich object
          // TODO: verify fracpack; no unknown
-         auto code = psio::convert_from_frac<code_row>(psio::input_stream(value.pos, value.end));
+         auto code = psio::convert_from_frac<codeRow>(psio::input_stream(value.pos, value.end));
          auto code_hash = sha256(code.code.data(), code.code.size());
-         check(code.code_hash == code_hash, "code_row has incorrect code_hash");
+         check(code.code_hash == code_hash, "codeRow has incorrect code_hash");
          auto expected_key = psio::convert_to_key(code.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
-               "code_row has incorrect key");
+               "codeRow has incorrect key");
       }
 
       std::vector<char> result_key;
@@ -406,14 +406,14 @@ namespace psibase
          // call getBillableTime", but that may mislead contract developers
          // into thinking they should create a subjective contract;
          // they shouldn't.
-         check(contractAccount.flags & account_row::is_subjective,
+         check(contractAccount.flags & AccountRow::is_subjective,
                "unprivileged contracts may not call getBillableTime");
          return transactionContext.getBillableTime().count();
       }
 
       void setMaxTransactionTime(uint64_t nanoseconds)
       {
-         check(contractAccount.flags & account_row::can_set_time_limit,
+         check(contractAccount.flags & AccountRow::can_set_time_limit,
                "setMaxTransactionTime requires can_set_time_limit privilege");
          if (transactionContext.blockContext.isProducing)
             transactionContext.setWatchdog(
@@ -437,7 +437,7 @@ namespace psibase
                "call: invalid data format");
          auto act = psio::convert_from_frac<Action>({data.data(), data.size()});
          check(
-             act.sender == contractAccount.num || (contractAccount.flags & account_row::allow_sudo),
+             act.sender == contractAccount.num || (contractAccount.flags & AccountRow::allow_sudo),
              "contract is not authorized to call as another sender");
 
          currentActContext->actionTrace.innerTraces.push_back({ActionTrace{}});
@@ -622,12 +622,12 @@ namespace psibase
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       // Prevents a poison block
-      if (!(impl->contractAccount.flags & account_row::is_subjective))
-         check(!(callerFlags & account_row::is_subjective),
+      if (!(impl->contractAccount.flags & AccountRow::is_subjective))
+         check(!(callerFlags & AccountRow::is_subjective),
                "subjective contracts may not call non-subjective ones");
 
       auto& bc = impl->transactionContext.blockContext;
-      if ((impl->contractAccount.flags & account_row::is_subjective) && !bc.isProducing)
+      if ((impl->contractAccount.flags & AccountRow::is_subjective) && !bc.isProducing)
       {
          check(bc.nextSubjectiveRead < bc.current.subjectiveData.size(), "missing subjective data");
          impl->currentActContext->actionTrace.rawRetval =
@@ -640,8 +640,8 @@ namespace psibase
                           actionContext.action.sender.value);
       });
 
-      if ((impl->contractAccount.flags & account_row::is_subjective) &&
-          !(callerFlags & account_row::is_subjective))
+      if ((impl->contractAccount.flags & AccountRow::is_subjective) &&
+          !(callerFlags & AccountRow::is_subjective))
          bc.current.subjectiveData.push_back(impl->currentActContext->actionTrace.rawRetval);
    }
 
@@ -665,7 +665,7 @@ namespace psibase
 
    void ExecutionContext::asyncTimeout()
    {
-      if (impl->contractAccount.flags & account_row::can_not_time_out)
+      if (impl->contractAccount.flags & AccountRow::can_not_time_out)
          return;
       impl->timedOut = true;
       impl->backend->get_module().allocator.disable_code();

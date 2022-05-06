@@ -3,7 +3,7 @@
 #include <psibase/DefaultTestChain.hpp>
 
 #include <psibase/contract_entry.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
 
 #include "test-cntr.hpp"

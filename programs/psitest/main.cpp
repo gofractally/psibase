@@ -608,8 +608,8 @@ struct callbacks
    void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
       test_chain& chain = assert_chain(chain_index);
-      auto status = chain.blockContext->db.kvGet<psibase::status_row>(psibase::status_row::kv_map,
-                                                                      psibase::status_key());
+      auto status = chain.blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::kv_map,
+                                                                     psibase::statusKey());
 
       psibase::BlockInfo bi;
       if (status && status->head)
