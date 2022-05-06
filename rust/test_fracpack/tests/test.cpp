@@ -28,6 +28,7 @@ OuterStruct tests1_data[] = {
                 .inner_option_vec_u16 = None,
                 .inner_o_vec_o_u16    = None,
             },
+        .field_u_inner      = {},
         .field_v_inner      = {},
         .field_option_u8    = Some(11),
         .field_option_u16   = Some(12),
@@ -66,6 +67,16 @@ OuterStruct tests1_data[] = {
                 .inner_option_str     = None,
                 .inner_option_vec_u16 = std::vector<uint16_t>{},
                 .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+            },
+        .field_u_inner =
+            UnextensibleInnerStruct{
+                .field_bool  = true,
+                .field_u32   = 32,
+                .field_i16   = 16,
+                .field_str   = "hello"s,
+                .field_f32   = 3.2,
+                .field_f64   = 64.64,
+                .field_v_u16 = {1, 2, 3},
             },
         .field_v_inner =
             {
@@ -131,6 +142,16 @@ OuterStruct tests1_data[] = {
                 .inner_option_str     = None,
                 .inner_option_vec_u16 = std::vector<uint16_t>{},
                 .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{None, 0x3456, None},
+            },
+        .field_u_inner =
+            UnextensibleInnerStruct{
+                .field_bool  = false,
+                .field_u32   = 0,
+                .field_i16   = 0,
+                .field_str   = ""s,
+                .field_f32   = 0.0,
+                .field_f64   = 0.0,
+                .field_v_u16 = {},
             },
         .field_v_inner =
             {
@@ -242,6 +263,7 @@ void round_trip_outer_struct_field(size_t                     index,
    HANDLE(field_f32);
    HANDLE(field_f64);
    HANDLE(field_inner);
+   HANDLE(field_u_inner);
    HANDLE(field_v_inner);
    HANDLE(field_option_u8);
    HANDLE(field_option_u16);

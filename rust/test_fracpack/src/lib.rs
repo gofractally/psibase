@@ -10,6 +10,18 @@ pub enum Variant {
     // ItemOptStr(Option<String>),  TODO: broken in C++
 }
 
+#[derive(Fracpack, PartialEq, Debug, Default)]
+#[fracpack(unextensible)]
+pub struct UnextensibleInnerStruct {
+    pub field_bool: bool,
+    pub field_u32: u32,
+    pub field_i16: i16,
+    pub field_str: String,
+    pub field_f32: f32,
+    pub field_f64: f64,
+    pub field_v_u16: Vec<u16>,
+}
+
 #[derive(Fracpack, PartialEq, Debug)]
 pub struct InnerStruct {
     pub inner_u32: u32,
@@ -34,6 +46,7 @@ pub struct OuterStruct {
     pub field_f32: f32,
     pub field_f64: f64,
     pub field_inner: InnerStruct,
+    pub field_u_inner: UnextensibleInnerStruct,
     pub field_v_inner: Vec<InnerStruct>,
     pub field_option_u8: Option<u8>,
     pub field_option_u16: Option<u16>,

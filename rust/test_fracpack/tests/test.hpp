@@ -30,6 +30,27 @@ struct FRACPACK ZStruct final
 };
 PSIO_REFLECT(ZStruct, age1, btc, cool, msg, maybe1, maybe2, not_cool)
 
+struct FRACPACK UnextensibleInnerStruct final
+{
+   bool                  field_bool;
+   uint32_t              field_u32;
+   int16_t               field_i16;
+   std::string           field_str;
+   float                 field_f32;
+   double                field_f64;
+   std::vector<uint16_t> field_v_u16;
+
+   auto operator<=>(const UnextensibleInnerStruct& b) const = default;
+};
+PSIO_REFLECT(UnextensibleInnerStruct,
+             field_bool,
+             field_u32,
+             field_i16,
+             field_str,
+             field_f32,
+             field_f64,
+             field_v_u16)
+
 struct InnerStruct
 {
    uint32_t                                            inner_u32;
@@ -63,6 +84,7 @@ struct OuterStruct
    float                                     field_f32;
    double                                    field_f64;
    InnerStruct                               field_inner;
+   UnextensibleInnerStruct                   field_u_inner;
    std::vector<InnerStruct>                  field_v_inner;
    std::optional<uint8_t>                    field_option_u8;
    std::optional<uint16_t>                   field_option_u16;
@@ -96,6 +118,7 @@ PSIO_REFLECT(OuterStruct,
              field_f32,
              field_f64,
              field_inner,
+             field_u_inner,
              field_v_inner,
              field_option_u8,
              field_option_u16,
