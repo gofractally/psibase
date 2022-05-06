@@ -39,7 +39,7 @@ tar xf psidk-linux.tar.gz
    3.2 In the container, start the chain
    `psinode -p -o psibase.127.0.0.1.sslip.io my_psinode_db`
    3.3 In a separate terminal window, exec into the container and boot the chain
-   `docker exec -it psi`
+   `docker exec -it psi /bin/bash`
    `psibase boot`
 
 4. Access the contract web interface via the host machine at http://psibase.127.0.0.1.sslip.io:8080
