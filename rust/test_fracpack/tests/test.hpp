@@ -16,6 +16,20 @@
 
 using Variant = std::variant<uint32_t, std::string>;
 
+struct FRACPACK ZStruct final
+{
+   uint32_t               age1;
+   uint16_t               btc;
+   bool                   cool;
+   std::string            msg;
+   std::optional<uint8_t> maybe1;
+   std::optional<uint8_t> maybe2;
+   bool                   not_cool;
+
+   auto operator<=>(const ZStruct& b) const = default;
+};
+PSIO_REFLECT(ZStruct, age1, btc, cool, msg, maybe1, maybe2, not_cool)
+
 struct InnerStruct
 {
    uint32_t                                            inner_u32;
@@ -100,6 +114,7 @@ PSIO_REFLECT(OuterStruct,
              field_o_o_str2,
              field_o_o_inner)
 
+void round_tripz(rust::Slice<const uint8_t> blob);
 void round_trip_outer_struct(size_t index, rust::Slice<const uint8_t> blob);
 void round_trip_outer_struct_field(size_t                     index,
                                    rust::Str                  field_name,
