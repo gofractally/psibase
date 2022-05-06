@@ -43,17 +43,17 @@ namespace system_contract
       check(get_sender() == contract, "sender must match contract account");
       auto account = kvGet<AccountRow>(AccountRow::db, accountKey(contract));
       check(account.has_value(), "can not set code on a missing account");
-      auto code_hash = sha256(code.data(), code.size());
+      auto codeHash = sha256(code.data(), code.size());
       if (vmType == account->vmType && vmVersion == account->vmVersion &&
-          code_hash == account->code_hash)
+          codeHash == account->codeHash)
          return 0;
-      if (account->code_hash != Checksum256{})
+      if (account->codeHash != Checksum256{})
       {
          // TODO: Refund RAM? A different resource?
          auto code_obj = kvGet<codeRow>(
-             codeRow::db, codeKey(account->code_hash, account->vmType, account->vmVersion));
+             codeRow::db, codeKey(account->codeHash, account->vmType, account->vmVersion));
          check(code_obj.has_value(), "missing code object");
-         if (--code_obj->ref_count)
+         if (--code_obj->numRefs)
             kvPut(code_obj->db, code_obj->key(), *code_obj);
          else
          {
@@ -62,23 +62,23 @@ namespace system_contract
       }
 
       // TODO: Bill RAM? A different resource?
-      account->code_hash = code_hash;
+      account->codeHash  = codeHash;
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
       kvPut(account->db, account->key(), *account);
 
       auto code_obj = kvGet<codeRow>(
-          codeRow::db, codeKey(account->code_hash, account->vmType, account->vmVersion));
+          codeRow::db, codeKey(account->codeHash, account->vmType, account->vmVersion));
       if (!code_obj)
       {
          code_obj.emplace(codeRow{
-             .code_hash = account->code_hash,
+             .codeHash  = account->codeHash,
              .vmType    = account->vmType,
              .vmVersion = account->vmVersion,
          });
          code_obj->code.assign(code.begin(), code.end());
       }
-      ++code_obj->ref_count;
+      ++code_obj->numRefs;
       kvPut(code_obj->db, code_obj->key(), *code_obj);
 
       return 0;

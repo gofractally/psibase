@@ -55,7 +55,7 @@ namespace psibase
       // Prepare for execution
       auto& db     = blockContext.db;
       auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-      blockContext.systemContext.setNumMemories(status.num_execution_memories);
+      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
 
       if (blockContext.needGenesisAction)
       {
@@ -70,10 +70,10 @@ namespace psibase
          execProcessTransaction(*this);
       }
 
-      // If the transaction adjusted num_execution_memories too big for this node, then attempt
+      // If the transaction adjusted numExecutionMemories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
       status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-      blockContext.systemContext.setNumMemories(status.num_execution_memories);
+      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
    }
 
    static void execGenesisAction(TransactionContext& self, const Action& action)
@@ -174,7 +174,7 @@ namespace psibase
    {
       auto& db     = blockContext.db;
       auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-      blockContext.systemContext.setNumMemories(status.num_execution_memories);
+      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};

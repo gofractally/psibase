@@ -18,14 +18,14 @@ namespace psibase
    }
    struct StatusRow
    {
-      Checksum256              chain_id;
+      Checksum256              chainId;
       std::optional<BlockInfo> head;
-      uint32_t                 num_execution_memories = 32;
+      uint32_t                 numExecutionMemories = 32;
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(StatusRow, chain_id, head, num_execution_memories)
+   PSIO_REFLECT(StatusRow, chainId, head, numExecutionMemories)
 
    // TODO: Rename account to contract?
    inline auto accountKey(AccountNumber num)
@@ -35,18 +35,18 @@ namespace psibase
    }
    struct AccountRow
    {
-      static constexpr uint64_t allow_sudo         = uint64_t(1) << 0;
-      static constexpr uint64_t allow_write_native = uint64_t(1) << 1;
-      static constexpr uint64_t is_subjective      = uint64_t(1) << 2;
-      static constexpr uint64_t can_not_time_out   = uint64_t(1) << 3;
-      static constexpr uint64_t can_set_time_limit = uint64_t(1) << 4;
+      static constexpr uint64_t allowSudo        = uint64_t(1) << 0;
+      static constexpr uint64_t allowWriteNative = uint64_t(1) << 1;
+      static constexpr uint64_t isSubjective     = uint64_t(1) << 2;
+      static constexpr uint64_t canNotTimeOut    = uint64_t(1) << 3;
+      static constexpr uint64_t canSetTimeLimit  = uint64_t(1) << 4;
 
       AccountNumber num;           // TODO: rename
       AccountNumber authContract;  // TODO: move out of native
-      uint64_t      flags = 0;     // allow_sudo | allow_write_native | is_subjective
+      uint64_t      flags = 0;     // allowSudo | allowWriteNative | isSubjective
 
       // TODO?  1 account with contract per 1000+ without - faster perf on dispatch because don't need to lookup new account
-      Checksum256 code_hash = {};
+      Checksum256 codeHash  = {};
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
       //==================================^^
@@ -54,34 +54,34 @@ namespace psibase
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       auto                  key() const { return accountKey(num); }
    };
-   PSIO_REFLECT(AccountRow, num, authContract, flags, code_hash, vmType, vmVersion)
+   PSIO_REFLECT(AccountRow, num, authContract, flags, codeHash, vmType, vmVersion)
 
-   inline auto codeKey(const Checksum256& code_hash, uint8_t vmType, uint8_t vmVersion)
+   inline auto codeKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
    {
       // TODO: leave space for secondary index?
-      return std::tuple{codeTable, code_hash, vmType, vmVersion};
+      return std::tuple{codeTable, codeHash, vmType, vmVersion};
    }
 
    /// where code is actually stored, duplicate contracts are reused
    struct codeRow
    {
       // primary key
-      Checksum256 code_hash = {};
+      Checksum256 codeHash  = {};
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
       //==================
 
-      uint32_t             ref_count = 0;   // number accounts that ref this
-      std::vector<uint8_t> code      = {};  // actual code, TODO: compressed
+      uint32_t             numRefs = 0;   // number accounts that ref this
+      std::vector<uint8_t> code    = {};  // actual code, TODO: compressed
 
       // The code table is in nativeConstrained. The native code
-      // verifies code_hash and the key. This prevents a poison block
+      // verifies codeHash and the key. This prevents a poison block
       // that could happen if the key->code map doesn't match the
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto db = psibase::DbId::nativeConstrained;
-      auto                  key() const { return codeKey(code_hash, vmType, vmVersion); }
+      auto                  key() const { return codeKey(codeHash, vmType, vmVersion); }
    };
-   PSIO_REFLECT(codeRow, code_hash, vmType, vmVersion, ref_count, code)
+   PSIO_REFLECT(codeRow, codeHash, vmType, vmVersion, numRefs, code)
 
    inline auto databaseStatusKey()
    {

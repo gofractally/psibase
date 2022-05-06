@@ -90,7 +90,7 @@ namespace psibase
       check(status.has_value(), "missing status record");
       status->head = current;
       if (isGenesisBlock)
-         status->chain_id = status->head->blockId;
+         status->chainId = status->head->blockId;
       db.kvPut(StatusRow::db, status->key(), *status);
 
       // TODO: store block IDs somewhere?

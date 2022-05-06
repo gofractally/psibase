@@ -12,8 +12,8 @@ namespace system_contract
    {
      public:
       static constexpr auto     contract = psibase::AccountNumber("transact-sys");
-      static constexpr uint64_t contract_flags =
-          psibase::AccountRow::allow_sudo | psibase::AccountRow::allow_write_native;
+      static constexpr uint64_t contractFlags =
+          psibase::AccountRow::allowSudo | psibase::AccountRow::allowWriteNative;
 
       psibase::BlockNum     headBlockNum() const;
       psibase::TimePointSec blockTime() const;

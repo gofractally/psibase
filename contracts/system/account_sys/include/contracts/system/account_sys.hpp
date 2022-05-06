@@ -9,9 +9,9 @@ namespace system_contract
    class account_sys : public psibase::Contract<account_sys>
    {
      public:
-      static constexpr auto     contract                  = psibase::AccountNumber("account-sys");
-      static constexpr uint64_t contract_flags            = psibase::AccountRow::allow_write_native;
-      static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
+      static constexpr auto                   contract      = psibase::AccountNumber("account-sys");
+      static constexpr uint64_t               contractFlags = psibase::AccountRow::allowWriteNative;
+      static constexpr psibase::AccountNumber nullAccount   = psibase::AccountNumber(0);
 
       void startup(psio::const_view<std::vector<psibase::AccountNumber>> existing_accounts);
       void newAccount(psibase::AccountNumber name,
