@@ -47,7 +47,7 @@ namespace system_contract
          writeConsole(authContract.str());
       }
 
-      check(name.value, "empty account name");
+      check(name.value, "invalid account name");
       if (exists(name))
       {
          if (requireNew)
