@@ -408,10 +408,7 @@ namespace psibase
          // they shouldn't.
          check(contractAccount.flags & account_row::is_subjective,
                "unprivileged contracts may not call getBillableTime");
-         return std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::steady_clock::now() - transactionContext.startTime -
-                    transactionContext.getContractLoadTime())
-             .count();
+         return transactionContext.getBillableTime().count();
       }
 
       uint32_t getCurrentAction()

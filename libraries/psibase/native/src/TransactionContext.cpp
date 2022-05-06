@@ -1,5 +1,6 @@
 #include <psibase/TransactionContext.hpp>
 
+#include <condition_variable>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
 #include <psibase/contract_entry.hpp>
@@ -9,9 +10,13 @@ namespace psibase
 {
    struct TransactionContextImpl
    {
-      std::mutex                                mutex;
-      bool                                      ecCanceled = false;
-      std::map<AccountNumber, ExecutionContext> executionContexts;
+      std::mutex                                mutex             = {};
+      std::condition_variable                   cond              = {};
+      std::thread                               thread            = {};
+      bool                                      timedOut          = false;
+      bool                                      shuttingDown      = false;
+      std::map<AccountNumber, ExecutionContext> executionContexts = {};
+      std::chrono::steady_clock::duration       watchdogLimit{0};
       std::chrono::steady_clock::duration       contractLoadTime{0};
    };
 
@@ -29,7 +34,17 @@ namespace psibase
          session = blockContext.db.startWrite();
    }
 
-   TransactionContext::~TransactionContext() {}
+   TransactionContext::~TransactionContext()
+   {
+      std::unique_lock<std::mutex> lock{impl->mutex};
+      if (impl->thread.joinable())
+      {
+         impl->shuttingDown = true;
+         impl->cond.notify_one();
+         lock.unlock();
+         impl->thread.join();
+      }
+   }
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
    static void execProcessTransaction(TransactionContext& self);
@@ -171,7 +186,7 @@ namespace psibase
    {
       auto                        loadStart = std::chrono::steady_clock::now();
       std::lock_guard<std::mutex> guard{impl->mutex};
-      if (impl->ecCanceled)
+      if (impl->timedOut)
          throw TimeoutException{};
       auto it = impl->executionContexts.find(contract);
       if (it != impl->executionContexts.end())
@@ -183,26 +198,46 @@ namespace psibase
           impl->executionContexts.insert({contract, ExecutionContext{*this, memory, contract}})
               .first->second;
       impl->contractLoadTime += std::chrono::steady_clock::now() - loadStart;
-      // TODO: adjust watchdog
       return result;
    }
 
-   std::chrono::steady_clock::duration TransactionContext::getContractLoadTime()
+   std::chrono::nanoseconds TransactionContext::getBillableTime()
    {
       std::lock_guard<std::mutex> guard{impl->mutex};
-      return impl->contractLoadTime;
+      return std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::steady_clock::now() - startTime - impl->contractLoadTime);
    }
 
    void TransactionContext::setWatchdog(std::chrono::steady_clock::duration watchdogLimit)
    {
-      // TODO
-   }
-
-   void TransactionContext::asyncTimeout()
-   {
       std::lock_guard<std::mutex> guard{impl->mutex};
-      impl->ecCanceled = true;
-      for (auto& [_, ec] : impl->executionContexts)
-         ec.asyncTimeout();
-   }
+      impl->watchdogLimit = watchdogLimit;
+      if (impl->thread.joinable())
+      {
+         impl->cond.notify_one();
+      }
+      else
+      {
+         impl->thread = std::thread(
+             [this]
+             {
+                std::unique_lock<std::mutex> lock{impl->mutex};
+                while (true)
+                {
+                   if (impl->timedOut || impl->shuttingDown)
+                      return;
+                   auto timeSpent =
+                       std::chrono::steady_clock::now() - startTime - impl->contractLoadTime;
+                   if (timeSpent >= impl->watchdogLimit)
+                   {
+                      impl->timedOut = true;
+                      for (auto& [_, ec] : impl->executionContexts)
+                         ec.asyncTimeout();
+                      return;
+                   }
+                   impl->cond.wait_for(lock, impl->watchdogLimit - timeSpent);
+                }
+             });
+      }
+   }  // TransactionContext::setWatchdog
 }  // namespace psibase

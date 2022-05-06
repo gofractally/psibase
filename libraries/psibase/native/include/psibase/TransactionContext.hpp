@@ -34,14 +34,11 @@ namespace psibase
 
       ExecutionContext& getExecutionContext(AccountNumber contract);
 
-      std::chrono::steady_clock::duration getContractLoadTime();
+      std::chrono::nanoseconds getBillableTime();
 
       // Set watchdog timer; it will expire at startTime + contractLoadTime + watchdogLimit.
-      // It automatically expands when contractLoadTime expands.
+      // This may be called multiple times with different limits; the most-recent limit applies.
       void setWatchdog(std::chrono::steady_clock::duration watchdogLimit);
-
-      // Cancel execution of all executionContexts because of timeout; may be called from another thread
-      void asyncTimeout();
 
      private:
       std::unique_ptr<TransactionContextImpl> impl;

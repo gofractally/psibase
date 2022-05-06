@@ -285,7 +285,7 @@ OPTIONS:
             Host http server
 
       -l, --leeway <amount>
-            Transaction leeway, in us. Defaults to 1000.
+            Transaction leeway, in us. Defaults to 30000.
 
       -h, --help
             Show this message
@@ -298,7 +298,7 @@ int main(int argc, char* argv[])
    bool        error      = false;
    bool        produce    = false;
    const char* host       = nullptr;
-   uint32_t    leeway_us  = 1000;
+   uint32_t    leeway_us  = 30000;  // TODO: find a good default
    int         next_arg   = 1;
    while (next_arg < argc && argv[next_arg][0] == '-')
    {
