@@ -22,7 +22,7 @@ namespace psibase
       std::optional<BlockInfo> head;
       uint32_t                 num_execution_memories = 32;
 
-      static constexpr auto db = psibase::DbId::native_unconstrained;
+      static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
    PSIO_REFLECT(StatusRow, chain_id, head, num_execution_memories)
@@ -51,7 +51,7 @@ namespace psibase
       uint8_t     vmVersion = 0;
       //==================================^^
 
-      static constexpr auto db = psibase::DbId::native_unconstrained;
+      static constexpr auto db = psibase::DbId::nativeUnconstrained;
       auto                  key() const { return accountKey(num); }
    };
    PSIO_REFLECT(AccountRow, num, authContract, flags, code_hash, vmType, vmVersion)
@@ -74,11 +74,11 @@ namespace psibase
       uint32_t             ref_count = 0;   // number accounts that ref this
       std::vector<uint8_t> code      = {};  // actual code, TODO: compressed
 
-      // The code table is in native_constrained. The native code
+      // The code table is in nativeConstrained. The native code
       // verifies code_hash and the key. This prevents a poison block
       // that could happen if the key->code map doesn't match the
       // key->(jitted code) map or the key->(optimized code) map.
-      static constexpr auto db = psibase::DbId::native_constrained;
+      static constexpr auto db = psibase::DbId::nativeConstrained;
       auto                  key() const { return codeKey(code_hash, vmType, vmVersion); }
    };
    PSIO_REFLECT(codeRow, code_hash, vmType, vmVersion, ref_count, code)
@@ -92,9 +92,9 @@ namespace psibase
       uint64_t nextEventNumber   = 1;
       uint64_t nextUIEventNumber = 1;
 
-      // This table is in native_constrained. The native code blocks contracts
+      // This table is in nativeConstrained. The native code blocks contracts
       // from writing to this since it could break backing stores.
-      static constexpr auto db = psibase::DbId::native_constrained;
+      static constexpr auto db = psibase::DbId::nativeConstrained;
       static auto           key() { return databaseStatusKey(); }
    };
    PSIO_REFLECT(DatabaseStatusRow, nextEventNumber, nextUIEventNumber)

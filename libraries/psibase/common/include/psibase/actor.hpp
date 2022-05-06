@@ -87,7 +87,7 @@ namespace psibase
     */
    struct EventEmitterProxy
    {
-      EventEmitterProxy(AccountNumber s, DbId elog = psibase::DbId::history_event)
+      EventEmitterProxy(AccountNumber s, DbId elog = psibase::DbId::historyEvent)
           : sender(s), event_log(elog)
       {
       }
@@ -109,7 +109,7 @@ namespace psibase
 
    struct EventReaderProxy
    {
-      EventReaderProxy(AccountNumber s, DbId elog = psibase::DbId::history_event)
+      EventReaderProxy(AccountNumber s, DbId elog = psibase::DbId::historyEvent)
           : sender(s), event_log(elog)
       {
       }
@@ -151,17 +151,17 @@ namespace psibase
       auto ui() const
       {
          return EventEmitter<typename T::Events::Ui>(this->psio_get_proxy().sender,
-                                                     psibase::DbId::ui_event);
+                                                     psibase::DbId::uiEvent);
       }
       auto history() const
       {
          return EventEmitter<typename T::Events::History>(this->psio_get_proxy().sender,
-                                                          psibase::DbId::history_event);
+                                                          psibase::DbId::historyEvent);
       }
       auto merkle() const
       {
          return EventEmitter<typename T::Events::Merkle>(this->psio_get_proxy().sender,
-                                                         psibase::DbId::merkle_event);
+                                                         psibase::DbId::merkleEvent);
       }
       auto at(AccountNumber n) { return EventEmitter(n, this->psio_get_proxy().event_log); }
 
@@ -178,17 +178,17 @@ namespace psibase
       auto ui() const
       {
          return EventReader<typename T::Events::Ui>(this->psio_get_proxy().sender,
-                                                    psibase::DbId::ui_event);
+                                                    psibase::DbId::uiEvent);
       }
       auto history() const
       {
          return EventReader<typename T::Events::History>(this->psio_get_proxy().sender,
-                                                         psibase::DbId::history_event);
+                                                         psibase::DbId::historyEvent);
       }
       auto merkle() const
       {
          return EventReader<typename T::Events::Merkle>(this->psio_get_proxy().sender,
-                                                        psibase::DbId::merkle_event);
+                                                        psibase::DbId::merkleEvent);
       }
       auto at(AccountNumber n) { return EventReader(n, this->psio_get_proxy().event_log); }
 

@@ -62,19 +62,19 @@ namespace psibase
       {
          if (db == DbId::contract)
             return contractMap;
-         if (db == DbId::native_constrained)
+         if (db == DbId::nativeConstrained)
             return nativeConstrainedMap;
-         if (db == DbId::native_unconstrained)
+         if (db == DbId::nativeUnconstrained)
             return nativeUnconstrainedMap;
          if (db == DbId::subjective)
             return subjectiveMap;
-         if (db == DbId::write_only)
+         if (db == DbId::writeOnly)
             return writeOnlyMap;
          if (db == DbId::event)
             return writeOnlyMap;
-         if (db == DbId::ui_event)
+         if (db == DbId::uiEvent)
             return writeOnlyMap;
-         if (db == DbId::block_log)
+         if (db == DbId::blockLog)
             return blockLogMap;
          throw std::runtime_error("unknown DbId");
       }
@@ -109,13 +109,13 @@ namespace psibase
          check(transactions_available(), "no active database transactions");
          if (db == DbId::subjective)
             return *subjectiveTransaction;
-         else if (db == DbId::block_log)
+         else if (db == DbId::blockLog)
             return *blockLogTransaction;
-         else if (db == DbId::write_only)
+         else if (db == DbId::writeOnly)
             return writeOnlyTransactions.back();
          else if (db == DbId::event)
             return writeOnlyTransactions.back();
-         else if (db == DbId::ui_event)
+         else if (db == DbId::uiEvent)
             return writeOnlyTransactions.back();
          else
             return transactions.back();

@@ -96,7 +96,7 @@ namespace psibase
       // TODO: store block IDs somewhere?
       // TODO: store block proofs somewhere
       // TODO: avoid repacking
-      db.kvPut(DbId::block_log, current.header.blockNum, current);
+      db.kvPut(DbId::blockLog, current.header.blockNum, current);
 
       session.commit();
    }

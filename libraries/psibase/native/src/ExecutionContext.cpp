@@ -223,9 +223,9 @@ namespace psibase
       {
          if (db == uint32_t(DbId::contract))
             return (DbId)db;
-         if (db == uint32_t(DbId::native_constrained))
+         if (db == uint32_t(DbId::nativeConstrained))
             return (DbId)db;
-         if (db == uint32_t(DbId::native_unconstrained))
+         if (db == uint32_t(DbId::nativeUnconstrained))
             return (DbId)db;
          if (db == uint32_t(DbId::subjective))
          {
@@ -237,9 +237,9 @@ namespace psibase
                 transactionContext.blockContext.isReadOnly)
                return (DbId)db;
          }
-         if (db == uint32_t(DbId::write_only) && transactionContext.blockContext.isReadOnly)
+         if (db == uint32_t(DbId::writeOnly) && transactionContext.blockContext.isReadOnly)
             return (DbId)db;
-         if (db == uint32_t(DbId::block_log) && transactionContext.blockContext.isReadOnly)
+         if (db == uint32_t(DbId::blockLog) && transactionContext.blockContext.isReadOnly)
             return (DbId)db;
          throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
@@ -248,14 +248,14 @@ namespace psibase
       {
          if (db == uint32_t(DbId::event) && transactionContext.blockContext.isReadOnly)
             return (DbId)db;
-         if (db == uint32_t(DbId::ui_event) && transactionContext.blockContext.isReadOnly)
+         if (db == uint32_t(DbId::uiEvent) && transactionContext.blockContext.isReadOnly)
             return (DbId)db;
          throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
 
       bool keyHasContractPrefix(uint32_t db)
       {
-         return db == uint32_t(DbId::contract) || db == uint32_t(DbId::write_only) ||
+         return db == uint32_t(DbId::contract) || db == uint32_t(DbId::writeOnly) ||
                 db == uint32_t(DbId::subjective);
       }
 
@@ -285,12 +285,12 @@ namespace psibase
          check(!(contractAccount.flags & AccountRow::is_subjective),
                "subjective contracts may only write to DbId::subjective");
 
-         if (db == uint32_t(DbId::contract) || db == uint32_t(DbId::write_only))
+         if (db == uint32_t(DbId::contract) || db == uint32_t(DbId::writeOnly))
             return {(DbId)db, false};
-         if (db == uint32_t(DbId::native_constrained) &&
+         if (db == uint32_t(DbId::nativeConstrained) &&
              (contractAccount.flags & AccountRow::allow_write_native))
             return {(DbId)db, true};
-         if (db == uint32_t(DbId::native_unconstrained) &&
+         if (db == uint32_t(DbId::nativeUnconstrained) &&
              (contractAccount.flags & AccountRow::allow_write_native))
             return {(DbId)db, true};
          throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
@@ -307,7 +307,7 @@ namespace psibase
 
          if (db == uint32_t(DbId::event))
             return (DbId)db;
-         if (db == uint32_t(DbId::ui_event))
+         if (db == uint32_t(DbId::uiEvent))
             return (DbId)db;
          throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
@@ -315,7 +315,7 @@ namespace psibase
 
       void verifyWriteConstrained(psio::input_stream key, psio::input_stream value)
       {
-         // Currently, code is the only table which lives in native_constrained
+         // Currently, code is the only table which lives in nativeConstrained
          // which is writable by contracts. The other tables aren't writable by
          // contracts.
          //
@@ -462,7 +462,7 @@ namespace psibase
       // TODO: restrict value size
       void kvPut(uint32_t db, span<const char> key, span<const char> value)
       {
-         if (db == uint32_t(DbId::native_constrained))
+         if (db == uint32_t(DbId::nativeConstrained))
             verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
          clearResult();
          auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
@@ -501,7 +501,7 @@ namespace psibase
          uint64_t indexNumber;
          if (db == uint32_t(DbId::event))
             indexNumber = dbStatus.nextEventNumber++;
-         else if (db == uint32_t(DbId::ui_event))
+         else if (db == uint32_t(DbId::uiEvent))
             indexNumber = dbStatus.nextUIEventNumber++;
          else
             check(false, "kvPutSequential: unsupported db");
