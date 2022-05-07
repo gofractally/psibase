@@ -16,7 +16,7 @@
 
 using Variant = std::variant<uint32_t, std::string>;
 
-struct FRACPACK ZStruct final
+struct ZStruct final
 {
    uint32_t               age1;
    uint16_t               btc;
@@ -30,7 +30,7 @@ struct FRACPACK ZStruct final
 };
 PSIO_REFLECT(ZStruct, age1, btc, cool, msg, maybe1, maybe2, not_cool)
 
-struct FRACPACK UnextensibleInnerStruct final
+struct UnextensibleInnerStruct final
 {
    bool                  field_bool;
    uint32_t              field_u32;
