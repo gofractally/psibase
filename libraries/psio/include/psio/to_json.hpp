@@ -269,9 +269,10 @@ template <typename S> void to_json(float value, S& stream)              { return
       bool first = true;
       stream.write('{');
       reflect<T>::for_each(
-          [&](const psio::meta& ref, auto&& member)
+          [&](const psio::meta& ref, auto member)
           {
-             if constexpr (not std::is_member_function_pointer_v<std::decay_t<decltype(member)>>)
+             if constexpr (not std::is_member_function_pointer_v<
+                               remove_cvref_t<decltype(member(&t))>>)
              {
                 auto addfield = [&]()
                 {
@@ -287,17 +288,17 @@ template <typename S> void to_json(float value, S& stream)              { return
                    write_newline(stream);
                    to_json(ref.name, stream);
                    write_colon(stream);
-                   to_json(t.*member, stream);
+                   to_json(t.*member(&t), stream);
                 };
 
-                using member_type = std::decay_t<decltype(t.*member)>;
+                using member_type = remove_cvref_t<decltype(member(&t))>;
                 if constexpr (not is_std_optional<member_type>::value)
                 {
                    addfield();
                 }
                 else
                 {
-                   if (!!(t.*member))
+                   if (!!(t.*member(&t)))
                       addfield();
                 }
              }

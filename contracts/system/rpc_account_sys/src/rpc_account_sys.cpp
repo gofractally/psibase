@@ -72,7 +72,7 @@ namespace system_contract
          }
       }
 
-      return psibase::serveSimpleUI<account_sys_iface, false>(request);
+      return psibase::serveSimpleUI<account_sys, false>(request);
    }  // serveSys
 
    void rpc_account_sys::uploadSys(psio::const_view<std::string>       path,

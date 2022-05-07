@@ -38,21 +38,4 @@ namespace system_contract
                 method(startup, existing_accounts),
                 method(newAccount, name, authContract, requireNew),
                 method(exists, num))
-
-   // TODO: fix reflection to not need this
-   struct account_sys_iface
-   {
-      void startup(psio::const_view<std::vector<psibase::AccountNumber>> existing_accounts) {}
-      void newAccount(psibase::AccountNumber name,
-                      psibase::AccountNumber authContract,
-                      bool                   requireNew)
-      {
-      }
-      bool exists(psibase::AccountNumber num) { return false; }
-   };
-   PSIO_REFLECT(account_sys_iface,
-                method(startup, existing_accounts),
-                method(newAccount, name, authContract, requireNew),
-                method(exists, num))
-
 }  // namespace system_contract

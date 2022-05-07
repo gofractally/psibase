@@ -158,11 +158,13 @@ namespace psio
             bool     is_flat  = true;
             uint64_t last_pos = 0;
             psio::reflect<T>::for_each(
-                [&](const psio::meta& ref, auto mptr)
+                [&](const psio::meta& ref, auto member)
                 {
-                   if constexpr (not std::is_member_function_pointer_v<decltype(mptr)>)
+                   using MemPtr = decltype(member(std::declval<T*>()));
+                   if constexpr (not std::is_member_function_pointer_v<MemPtr>)
                    {
-                      using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                      using member_type =
+                          std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
                       is_flat &= ref.offset == last_pos;
                       is_flat &= can_memcpy<member_type>();
                       last_pos += sizeof(member_type);
@@ -185,11 +187,13 @@ namespace psio
          bool found_optional = false;
          bool has_error      = false;
          psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto mptr)
+             [&](const psio::meta& ref, auto member)
              {
-                if constexpr (not std::is_member_function_pointer_v<decltype(mptr)>)
+                using MemPtr = decltype(member(std::declval<T*>()));
+                if constexpr (not std::is_member_function_pointer_v<MemPtr>)
                 {
-                   using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                   using member_type =
+                       std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
                    if constexpr (is_std_optional<member_type>())
                    {
                       found_optional = true;
@@ -258,11 +262,13 @@ namespace psio
          }
          bool is_fixed = true;
          psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto mptr)
+             [&](const psio::meta& ref, auto member)
              {
-                if constexpr (not std::is_member_function_pointer_v<decltype(mptr)>)
+                using MemPtr = decltype(member(std::declval<T*>()));
+                if constexpr (not std::is_member_function_pointer_v<MemPtr>)
                 {
-                   using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                   using member_type =
+                       std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
                    is_fixed &= is_fixed_structure<member_type>();
                 }
              });
@@ -312,9 +318,11 @@ namespace psio
       {
          bool is_flat = true;
          psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto mptr)
+             [&](const psio::meta& ref, auto member)
              {
-                using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                using MemPtr = decltype(member(std::declval<T*>()));
+                using member_type =
+                    std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
                 is_flat &= not may_use_heap<member_type>();
              });
          return not is_flat;
@@ -332,11 +340,13 @@ namespace psio
       {
          bool use_heap = false;
          psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto mptr)
+             [&](const psio::meta& ref, auto member)
              {
-                if constexpr (not std::is_member_function_pointer_v<decltype(mptr)>)
+                using MemPtr = decltype(member(std::declval<T*>()));
+                if constexpr (not std::is_member_function_pointer_v<MemPtr>)
                 {
-                   using member_type = std::remove_cv_t<decltype(psio::result_of_member(mptr))>;
+                   using member_type =
+                       std::remove_cv_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
                    if constexpr (psio::reflect<member_type>::is_struct)
                       use_heap |= known_members_may_use_heap<member_type>();
                    else
@@ -407,11 +417,12 @@ namespace psio
       {
          uint16_t size = 0;
          reflect<T>::for_each(
-             [&](const meta& ref, const auto& mptr)
+             [&](const meta& ref, auto member)
              {
-                if constexpr (not std::is_member_function_pointer_v<remove_cvref_t<decltype(mptr)>>)
+                using MemPtr = decltype(member(std::declval<T*>()));
+                if constexpr (not std::is_member_function_pointer_v<remove_cvref_t<MemPtr>>)
                 {
-                   using member_type = decltype(result_of_member(mptr));
+                   using member_type = decltype(result_of_member(std::declval<MemPtr>()));
                    if constexpr (may_use_heap<member_type>())
                    {
                       size += sizeof(offset_ptr);
@@ -438,11 +449,13 @@ namespace psio
          bool     found_optional = false;
          uint32_t fixed_size     = 0;
          psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto mptr)
+             [&](const psio::meta& ref, auto member)
              {
-                if constexpr (not std::is_member_function_pointer_v<decltype(mptr)>)
+                using MemPtr = decltype(member(std::declval<T*>()));
+                if constexpr (not std::is_member_function_pointer_v<MemPtr>)
                 {
-                   using member_type = std::decay_t<decltype(psio::result_of_member(mptr))>;
+                   using member_type =
+                       std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
 
                    if constexpr (is_std_optional<member_type>())
                    {
@@ -752,8 +765,8 @@ namespace psio
 
          /// no need to write start_heap, it is always the same because
          /// the structure is "fixed" and cannot be extended in the future
-         reflect<T>::for_each([&](const meta& ref, auto mptr)
-                              { fracpack_member(heap, v, mptr, stream); });
+         reflect<T>::for_each([&](const meta& ref, auto member)
+                              { fracpack_member(heap, v, member(&v), stream); });
 
          if constexpr (not std::is_same_v<size_stream, S>)
             stream.pos = heap;
@@ -987,10 +1000,10 @@ namespace psio
          }
          const char* heap = stream.pos + start_heap;
          reflect<T>::for_each(
-             [&](const meta& ref, const auto& mptr)
+             [&](const meta& ref, auto member)
              {
                 if (stream.pos < heap)
-                   fracunpack_member(v, mptr, stream);
+                   fracunpack_member(v, member(&v), stream);
              });
       }
       else
@@ -1465,11 +1478,12 @@ namespace psio
                const char* memptr = stream.begin;
                // visit each offset ptr
                reflect<T>::for_each(
-                   [&](const meta& ref, const auto& mptr)
+                   [&](const meta& ref, auto member)
                    {
-                      if constexpr (not std::is_member_function_pointer_v<decltype(mptr)>)
+                      using MemPtr = decltype(member(std::declval<T*>()));
+                      if constexpr (not std::is_member_function_pointer_v<MemPtr>)
                       {
-                         using member_type = decltype(result_of_member(mptr));
+                         using member_type = decltype(result_of_member(std::declval<MemPtr>()));
                          memptr += fracvalidate_member<member_type>(memptr, stream);
                       }
                    });
@@ -1494,11 +1508,12 @@ namespace psio
             {
                const char* memptr = stream.pos;
                reflect<T>::for_each(
-                   [&](const meta& ref, const auto& mptr)
+                   [&](const meta& ref, auto member)
                    {
-                      if constexpr (not std::is_member_function_pointer_v<decltype(mptr)>)
+                      using MemPtr = decltype(member(std::declval<T*>()));
+                      if constexpr (not std::is_member_function_pointer_v<MemPtr>)
                       {
-                         using member_type = decltype(result_of_member(mptr));
+                         using member_type = decltype(result_of_member(std::declval<MemPtr>()));
                          memptr += fracvalidate_member<member_type>(memptr, stream);
                       }
                    });

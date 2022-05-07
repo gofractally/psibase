@@ -430,21 +430,26 @@ namespace std
 #define PSIO_TUPLE_TYPE(s, STRUCT, elem) \
    psio::remove_cvref_t<decltype(psio::result_of_member(&STRUCT::PSIO_GET_IDENT(elem)))>
 
-#define PSIO_FOR_EACH_MEMBER(r, STRUCT, i, elem)                                                  \
-   {                                                                                              \
-      /* TODO: fix or remove: auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem)); */     \
-      auto off = ~uint64_t(0);                                                                    \
-      (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .offset = off,    \
-                                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)}, \
-                              &STRUCT::PSIO_GET_IDENT(elem));                                     \
+#define PSIO_FOR_EACH_MEMBER(r, STRUCT, i, elem)                                                \
+   {                                                                                            \
+      /* TODO: fix or remove: auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem)); */   \
+      auto off = ~uint64_t(0);                                                                  \
+      (void)lambda(                                                                             \
+          psio::meta{                                                                           \
+              .name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .offset = off,                  \
+                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)},               \
+              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem)) \
+              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });           \
    }
 
-#define PSIO_FOR_EACH_METHOD(r, STRUCT, elem)                                                     \
-   (void)lambda(psio::meta{                                                                       \
-       .name =                                                                                    \
-           BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .param_names = {PSIO_GET_QUOTED_ARGS(elem)}, \
-           },                                                                                     \
-       &STRUCT::PSIO_GET_IDENT(elem));
+#define PSIO_FOR_EACH_METHOD(r, STRUCT, elem)                                                  \
+   (void)lambda(                                                                               \
+       psio::meta{                                                                             \
+           .name                                   = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), \
+                                      .param_names = {PSIO_GET_QUOTED_ARGS(elem)},             \
+           },                                                                                  \
+           [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem))   \
+           { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });
 
 #define PSIO_GET_BY_STR(r, STRUCT, elem)              \
    if (BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)) == m) \

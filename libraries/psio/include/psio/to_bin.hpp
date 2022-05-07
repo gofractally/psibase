@@ -182,11 +182,11 @@ namespace psio
       else
       {
          reflect<T>::for_each(
-             [&](const psio::meta&, auto m)
+             [&](const psio::meta&, auto member)
              {
-                if constexpr (not std::is_member_function_pointer_v<decltype(m)>)
+                if constexpr (not std::is_member_function_pointer_v<decltype(member(&obj))>)
                 {
-                   to_bin(obj.*m, stream);
+                   to_bin(obj.*member(&obj), stream);
                 }
              });
       }

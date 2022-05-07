@@ -42,9 +42,10 @@ namespace psibase
       s.write('{');
       bool needComma = false;
       psio::reflect<T>::for_each(
-          [&](const psio::meta& meta, auto mptr)
+          [&](const psio::meta& meta, auto member)
           {
-             if constexpr (std::is_member_function_pointer_v<decltype(mptr)>)
+             using MemPtr = decltype(member(std::declval<T*>()));
+             if constexpr (std::is_member_function_pointer_v<MemPtr>)
              {
                 if (needComma)
                    s.write(',');
@@ -53,8 +54,9 @@ namespace psibase
                 s.write(':');
                 s.write('{');
                 generateActionJsonTemplate(
-                    (decltype(psio::tuple_remove_view(psio::args_as_tuple(mptr)))*)nullptr, false,
-                    meta.param_names.begin(), meta.param_names.end(), s);
+                    (decltype(psio::tuple_remove_view(
+                        psio::args_as_tuple(std::declval<MemPtr>())))*)nullptr,
+                    false, meta.param_names.begin(), meta.param_names.end(), s);
                 s.write('}');
              }
           });
