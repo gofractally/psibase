@@ -246,10 +246,14 @@ namespace psibase
 
       DbId getDbReadSequential(uint32_t db)
       {
-         if (db == uint32_t(DbId::event) && transactionContext.blockContext.isReadOnly)
-            return (DbId)db;
-         if (db == uint32_t(DbId::uiEvent) && transactionContext.blockContext.isReadOnly)
-            return (DbId)db;
+         if (transactionContext.blockContext.isReadOnly ||
+             (contractAccount.flags & AccountRow::isSubjective))
+         {
+            if (db == uint32_t(DbId::event))
+               return (DbId)db;
+            if (db == uint32_t(DbId::uiEvent))
+               return (DbId)db;
+         }
          throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
 
@@ -464,17 +468,21 @@ namespace psibase
             verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
          clearResult();
          auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
-         auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
-         delta.records += 1;
-         delta.keyBytes += key.size();
-         delta.valueBytes += value.size();
-         if (readable)
+         if (!(contractAccount.flags & AccountRow::isSubjective))
          {
-            if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
+            auto& delta =
+                transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
+            delta.records += 1;
+            delta.keyBytes += key.size();
+            delta.valueBytes += value.size();
+            if (readable)
             {
-               delta.records -= 1;
-               delta.keyBytes -= key.size();
-               delta.valueBytes -= existing->remaining();
+               if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
+               {
+                  delta.records -= 1;
+                  delta.keyBytes -= key.size();
+                  delta.valueBytes -= existing->remaining();
+               }
             }
          }
          database.kvPutRaw(m, {key.data(), key.size()}, {value.data(), value.size()});
@@ -483,11 +491,16 @@ namespace psibase
       // TODO: restrict value size
       uint64_t kvPutSequential(uint32_t db, span<const char> value)
       {
-         auto  m     = getDbWriteSequential(db);
-         auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
-         delta.records += 1;
-         delta.keyBytes += sizeof(uint64_t);
-         delta.valueBytes += value.size();
+         auto m = getDbWriteSequential(db);
+
+         if (!(contractAccount.flags & AccountRow::isSubjective))
+         {
+            auto& delta =
+                transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
+            delta.records += 1;
+            delta.keyBytes += sizeof(uint64_t);
+            delta.valueBytes += value.size();
+         }
 
          psio::input_stream v{value.data(), value.size()};
          check(v.remaining() >= sizeof(AccountNumber::value),
@@ -513,7 +526,7 @@ namespace psibase
       {
          clearResult();
          auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
-         if (readable)
+         if (readable && !(contractAccount.flags & AccountRow::isSubjective))
          {
             if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
             {
