@@ -14,9 +14,8 @@ TEST_CASE("persistence simple", "[persistence]")
    {
       psidb::database db(::dup(file.native_handle()), 1024);
 
-      auto trx    = db.start_transaction();
-      auto cursor = trx.get_cursor();
-      cursor.insert("a", value);
+      auto trx = db.start_transaction();
+      trx.insert("a", value);
       trx.commit();
       db.async_flush();
    }
@@ -37,9 +36,8 @@ TEST_CASE("persistence large value", "[persistence]")
    {
       psidb::database db(::dup(file.native_handle()), 1024);
 
-      auto trx    = db.start_transaction();
-      auto cursor = trx.get_cursor();
-      cursor.insert("a", value);
+      auto trx = db.start_transaction();
+      trx.insert("a", value);
       trx.commit();
       db.async_flush();
    }
@@ -52,6 +50,26 @@ TEST_CASE("persistence large value", "[persistence]")
    }
 }
 
+TEST_CASE("abort", "[abort]")
+{
+   tmp_file file;
+
+   psidb::database db(file.native_handle(), 1024);
+
+   {
+      auto trx = db.start_transaction();
+      trx.insert("a", "v1");
+      trx.abort();
+   }
+
+   {
+      auto trx    = db.start_read();
+      auto cursor = trx.get_cursor();
+      cursor.lower_bound("");
+      CHECK(!cursor.valid());
+   }
+}
+
 TEST_CASE("leaf transaction insert independence")
 {
    tmp_file file;
@@ -60,7 +78,7 @@ TEST_CASE("leaf transaction insert independence")
    auto            trx    = db.start_transaction();
    auto            cursor = trx.get_cursor();
    // add elements
-   cursor.insert("b", "v1");
+   trx.insert("b", "v1");
    trx.commit();
 
    // After a transaction is committed, it can still be used read-only
@@ -68,7 +86,7 @@ TEST_CASE("leaf transaction insert independence")
    auto trx2    = db.start_transaction();
    auto cursor2 = trx2.get_cursor();
    // add more elements
-   cursor2.insert("a", "v2");
+   trx2.insert("a", "v2");
 
    // verify that original cursor shows no changes
    cursor.lower_bound("a");
@@ -85,7 +103,7 @@ TEST_CASE("transaction insert independence")
    for (int i = 0; i < 400; ++i)
    {
       auto [k, v] = make_kv(i);
-      cursor.insert(k, v);
+      trx.insert(k, v);
    }
    trx.commit();
 
@@ -94,7 +112,7 @@ TEST_CASE("transaction insert independence")
    for (int i = 400; i < 600; ++i)
    {
       auto [k, v] = make_kv(i);
-      cursor2.insert(k, v);
+      trx2.insert(k, v);
    }
 
    // verify that values inserted by cursor2 are not present in cursor1

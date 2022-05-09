@@ -38,12 +38,11 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages) : _allocator(nu
       static_cast<page_leaf*>(page)->clear();
       next_file_page += 2;
 
-      checkpoint_root h     = {};
-      h.version             = page->version;
-      h.table_roots[0]      = id;
-      auto [iter, inserted] = active_checkpoints.emplace(page->version, h);
-      stable_checkpoint     = nullptr;
-      last_commit = head = &iter->second;
+      checkpoint_root h = {};
+      h.version         = page->version;
+      h.table_roots[0]  = id;
+      stable_checkpoint = nullptr;
+      last_commit = head = checkpoint_ptr{new checkpoint_data{this, h}};
    }
    else
    {
@@ -488,19 +487,19 @@ void psidb::page_manager::read_header()
    read_header(&tmp);
    for (std::uint32_t i = 0; i < tmp.num_checkpoints; ++i)
    {
-      auto [iter, inserted] =
-          active_checkpoints.emplace(tmp.checkpoints[i].version, tmp.checkpoints[i]);
+      checkpoint_ptr c{new checkpoint_data(this, tmp.checkpoints[i])};
       if (i == 0)
       {
-         stable_checkpoint = &iter->second;
+         stable_checkpoint = c;
       }
       else if (i == 1)
       {
-         last_commit = &iter->second;
+         last_commit = c;
       }
       else
       {
-         head = &iter->second;
+         head = c;
+         // TODO: make sure that uncommitted checkpoints do not get freed.
       }
    }
    if (!last_commit)
@@ -527,8 +526,8 @@ void psidb::page_manager::prepare_header(database_header* header)
    {
       stable_checkpoint = head;
    }
-   header->checkpoints[0] = *stable_checkpoint;
-   header->checkpoints[1] = *head;
+   header->checkpoints[0] = stable_checkpoint->_root;
+   header->checkpoints[1] = head->_root;
    prepare_flush(header->checkpoints[0].table_roots[0]);
    prepare_flush(header->checkpoints[1].table_roots[0]);
    header->num_checkpoints = 2;
@@ -555,4 +554,27 @@ void psidb::page_manager::write_header()
    {
       throw std::system_error{errno, std::system_category(), "fdatasync"};
    }
+}
+
+psidb::checkpoint_data::checkpoint_data(page_manager* self, const checkpoint_root& value)
+    : _self(self), _root(value)
+{
+   std::lock_guard l{_self->_checkpoint_mutex};
+   _self->_active_checkpoints.push_back(*this);
+}
+
+// Creates a new checkpoint based on the head checkpoint
+psidb::checkpoint_data::checkpoint_data(page_manager* self) : _self(self)
+{
+   std::lock_guard l{_self->_checkpoint_mutex};
+   _root = _self->_active_checkpoints.back()._root;
+   ++_root.version;
+   _self->_active_checkpoints.push_back(*this);
+}
+
+psidb::checkpoint_data::~checkpoint_data()
+{
+   std::lock_guard l{_self->_checkpoint_mutex};
+   // process cleanups
+   _self->_active_checkpoints.erase(_self->_active_checkpoints.iterator_to(*this));
 }

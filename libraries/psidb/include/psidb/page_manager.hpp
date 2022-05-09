@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/intrusive/list.hpp>
 #include <cstddef>
 #include <map>
 #include <psidb/allocator.hpp>
@@ -15,6 +16,19 @@ namespace psidb
 {
 
    static constexpr std::size_t max_memory_pages = 0x10000000;
+
+   class page_manager;
+
+   struct checkpoint_data : boost::intrusive::list_base_hook<>
+   {
+      checkpoint_data(page_manager* self, const checkpoint_root& value);
+      // Creates a new checkpoint based on the head checkpoint
+      checkpoint_data(page_manager* self);
+      ~checkpoint_data();
+      page_manager*   _self;
+      checkpoint_root _root;
+      // memory management data
+   };
 
    class page_manager
    {
@@ -99,48 +113,64 @@ namespace psidb
       }
       void set_root(const checkpoint& c, int db, page_id new_root)
       {
-         c._root->table_roots[db] = new_root;
+         c._root->_root.table_roots[db] = new_root;
       }
-      page_header* root(const checkpoint& c, int db) { return get_page(c._root->table_roots[db]); }
-      page_id get_root_id(const checkpoint& c, int db) const { return c._root->table_roots[db]; }
-      version_type get_version(const checkpoint& c) { return c._root->version; }
-      checkpoint   get_head() { return {last_commit}; }
-      checkpoint   start_transaction()
+      page_header* root(const checkpoint& c, int db)
+      {
+         return get_page(c._root->_root.table_roots[db]);
+      }
+      page_id get_root_id(const checkpoint& c, int db) const
+      {
+         return c._root->_root.table_roots[db];
+      }
+      version_type get_version(const checkpoint& c) { return c._root->_root.version; }
+      checkpoint   get_head()
+      {
+         std::lock_guard l{_commit_mutex};
+         return {last_commit};
+      }
+      checkpoint start_transaction()
       {
          if (_flush_pending)
          {
-            _flush_version = head->version;
+            _flush_version = head->_root.version;
             _flush_pending = false;
             _dirty_flag    = switch_dirty_flag(_dirty_flag);
             // TODO: should this be in async_flush?
             if (head == last_commit)
             {
-               start_flush(head);
+               start_flush(&head->_root);
             }
          }
-         auto [iter, inserted] = active_checkpoints.emplace(head->version + 1, *head);
-         head                  = &iter->second;
-         ++head->version;
+         head.reset(new checkpoint_data(this));
          return {head};
       }
       void commit_transaction(const checkpoint& c)
       {
-         last_commit = c._root;
-         if (last_commit->version == _flush_version)
          {
-            start_flush(last_commit);
+            std::lock_guard l{_commit_mutex};
+            last_commit = c._root;
          }
+         if (last_commit->_root.version == _flush_version)
+         {
+            start_flush(&last_commit->_root);
+         }
+      }
+      void abort_transaction(checkpoint&& c)
+      {
+         assert(c._root.get() == &_active_checkpoints.back());
+         c._root.reset();
       }
       void async_flush()
       {
          if (head == last_commit)
          {
-            if (_flush_version != head->version)
+            if (_flush_version != head->_root.version)
             {
-               _flush_version = head->version;
+               _flush_version = head->_root.version;
                _flush_pending = false;
                _dirty_flag    = switch_dirty_flag(_dirty_flag);
-               start_flush(head);
+               start_flush(&head->_root);
             }
          }
          else
@@ -188,8 +218,12 @@ namespace psidb
                  static_cast<const char*>(copy)};
       }
 
+      void queue_gc(page_header* node);
+
      private:
       page_manager(const page_manager&) = delete;
+
+      friend struct checkpoint_data;
 
       page_flags switch_dirty_flag(page_flags f)
       {
@@ -207,7 +241,6 @@ namespace psidb
          }
       }
 
-      void    queue_gc(page_header* node);
       page_id allocate_file_page();
       page_id allocate_file_pages(std::size_t count);
 
@@ -251,6 +284,20 @@ namespace psidb
          std::atomic<int>* counter;
       };
 
+#if 0
+      struct checkpoint_range {
+      public:
+         checkpoint_list::const_iterator begin() const { return _begin; }
+         checkpoint_list::const_iterator end() const { return _end; }
+      private:
+         checkpoint_list::const_iterator _begin;
+         checkpoint_list::const_iterator _end;
+         std::unique_lock<std::mutex> _lock;
+      };
+#endif
+
+      using checkpoint_ptr = std::shared_ptr<checkpoint_data>;
+
       allocator                         _allocator;
       int                               fd             = -1;
       page_flags                        _dirty_flag    = page_flags::dirty0;
@@ -260,11 +307,15 @@ namespace psidb
       // TODO: use a real allocation algorithm
       page_id next_file_page = max_memory_pages;
 
-      checkpoint_root* stable_checkpoint = nullptr;
-      checkpoint_root* last_commit       = nullptr;
-      checkpoint_root* head              = nullptr;
-      // needs reference count
-      std::map<version_type, checkpoint_root> active_checkpoints;
+      // What do we need:
+      // - iterate over uncommitted transactions in order
+      // - committed checkpoints can be freed as soon as they are no longer referenced.
+      std::mutex                              _checkpoint_mutex;
+      boost::intrusive::list<checkpoint_data> _active_checkpoints;
+      std::mutex                              _commit_mutex;
+      checkpoint_ptr                          stable_checkpoint = nullptr;
+      checkpoint_ptr                          last_commit       = nullptr;
+      checkpoint_ptr                          head              = nullptr;
 
       mutex_set<page_id> _page_load_mutex;
 

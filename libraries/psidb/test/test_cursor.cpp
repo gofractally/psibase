@@ -24,7 +24,7 @@ TEST_CASE("lower_bound simple", "[lower_bound]")
    psidb::database db(file.native_handle(), 1024);
    auto            trx    = db.start_transaction();
    auto            cursor = trx.get_cursor();
-   cursor.insert("a", "v1");
+   trx.insert("a", "v1");
    cursor.lower_bound("a");
    CHECK_CURSOR(cursor, "a", "v1");
    cursor.lower_bound(std::string_view{"a", 2});
@@ -43,7 +43,7 @@ TEST_CASE("lower_bound many", "[lower_bound]")
    for (int i = 100; i < 900; i += 2)
    {
       auto [k, v] = make_kv(i);
-      cursor.insert(k, v);
+      trx.insert(k, v);
    }
    cursor.lower_bound("");
    CHECK_CURSOR(cursor, "100", "102400");
@@ -75,7 +75,7 @@ TEST_CASE("lower bound large value", "[lower_bound]")
    auto        trx    = db.start_transaction();
    auto        cursor = trx.get_cursor();
    std::string value(65536, static_cast<char>(0xCC));
-   cursor.insert("a", value);
+   trx.insert("a", value);
    cursor.lower_bound("a");
    CHECK_CURSOR(cursor, "a", value);
 }
@@ -88,8 +88,8 @@ TEST_CASE("next", "[next]")
 
    auto trx    = db.start_transaction();
    auto cursor = trx.get_cursor();
-   cursor.insert("a", "v1");
-   cursor.insert("b", "v2");
+   trx.insert("a", "v1");
+   trx.insert("b", "v2");
    cursor.lower_bound("");
    cursor.next();
    CHECK_CURSOR(cursor, "b", "v2");
@@ -105,7 +105,7 @@ TEST_CASE("previous", "[previous]")
 
    auto trx    = db.start_transaction();
    auto cursor = trx.get_cursor();
-   cursor.insert("a", "v1");
+   trx.insert("a", "v1");
    cursor.lower_bound("b");
    cursor.previous();
    CHECK_CURSOR(cursor, "a", "v1");
@@ -120,8 +120,8 @@ TEST_CASE("erase simple", "[erase]")
    auto trx    = db.start_transaction();
    auto cursor = trx.get_cursor();
 
-   cursor.insert("a", "v1");
-   cursor.erase("a");
+   trx.insert("a", "v1");
+   trx.erase("a");
    cursor.lower_bound("");
    CHECK(!cursor.valid());
 }
@@ -137,13 +137,13 @@ TEST_CASE("erase many", "[erase]")
    for (int i = 100; i < 500; ++i)
    {
       auto [k, v] = make_kv(i);
-      cursor.insert(k, v);
+      trx.insert(k, v);
    }
 
    for (int i = 100; i < 400; ++i)
    {
       auto [k, v] = make_kv(i);
-      cursor.erase(k);
+      trx.erase(k);
    }
    cursor.lower_bound("");
    CHECK_CURSOR(cursor, "400", "409600");

@@ -38,11 +38,10 @@ TEST_CASE("thread tests", "[thread]")
    auto              test_failed = [&]() { done = true; };
    // set up initial state
    {
-      auto trx    = db.start_transaction();
-      auto cursor = trx.get_cursor();
-      cursor.insert("0", "0");
+      auto trx = db.start_transaction();
+      trx.insert("0", "0");
       std::uint32_t i = 0;
-      cursor.insert("", {reinterpret_cast<const char*>(&i), sizeof(i)});
+      trx.insert("", {reinterpret_cast<const char*>(&i), sizeof(i)});
       trx.commit();
    };
    // one thread writes in a determinsic pattern
@@ -51,16 +50,15 @@ TEST_CASE("thread tests", "[thread]")
       for (std::uint32_t i = 1; i < 10000; ++i)
       {
          auto trx    = db.start_transaction();
-         auto cursor = trx.get_cursor();
          auto [k, v] = make_kv(i);
-         cursor.insert(k, v);
+         trx.insert(k, v);
          if (i % 4 == 2)
          {
             auto [half, _] = make_kv(i / 2);
-            cursor.erase(half);
+            trx.erase(half);
          }
-         cursor.erase("");
-         cursor.insert("", {reinterpret_cast<const char*>(&i), sizeof(i)});
+         trx.erase("");
+         trx.insert("", {reinterpret_cast<const char*>(&i), sizeof(i)});
          trx.commit();
       }
       done = true;
