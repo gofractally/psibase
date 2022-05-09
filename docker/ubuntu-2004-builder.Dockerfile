@@ -33,6 +33,11 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-11 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-11 100
 
+RUN cd /opt \
+    && curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz \
+    && tar xf clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz \
+    && rm clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+
 RUN cd /root \
     && curl -LO https://github.com/ccache/ccache/releases/download/v4.3/ccache-4.3.tar.gz \
     && tar xf ccache-4.3.tar.gz \
@@ -76,4 +81,4 @@ RUN cd /root \
     && rm rustup.sh
 
 ENV WASI_SDK_PREFIX=/opt/wasi-sdk-14.0
-ENV PATH=/opt/cargo/bin:/opt/node-v14.16.0-linux-x64/bin:$PATH
+ENV PATH=/opt/cargo/bin:/opt/node-v14.16.0-linux-x64/bin:/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH
