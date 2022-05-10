@@ -147,7 +147,6 @@ macro_rules! scalar_impl {
                 if offset == 1 {
                     return Ok(None);
                 }
-
                 if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
@@ -159,7 +158,6 @@ macro_rules! scalar_impl {
                 if offset == 1 {
                     return Ok(());
                 }
-
                 if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
@@ -251,7 +249,6 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
         if offset == 1 {
             return Ok(None);
         }
-
         if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
@@ -264,7 +261,6 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
         if offset == 1 {
             return Ok(());
         }
-
         if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
@@ -351,7 +347,6 @@ macro_rules! bytes_impl {
                 }
                 <Self as Packable>::pack(self, dest)
             }
-
             fn embedded_unpack(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
@@ -387,7 +382,6 @@ macro_rules! bytes_impl {
                 if offset == 0 {
                     return Ok(());
                 }
-
                 if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
@@ -549,7 +543,6 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
         if offset == 0 {
             return Ok(Self::new());
         }
-
         if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
@@ -585,7 +578,6 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
         if offset == 0 {
             return Ok(());
         }
-
         if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
