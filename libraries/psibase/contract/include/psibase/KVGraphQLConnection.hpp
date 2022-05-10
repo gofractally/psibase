@@ -19,7 +19,7 @@ namespace psibase
                                std::optional<uint32_t>           last,
                                const std::optional<std::string>& before,
                                const std::optional<std::string>& after,
-                               psibase::kv_map                   map,
+                               psibase::DbId                     db,
                                const Key&                        minKey,
                                const Key&                        maxKey,
                                uint32_t                          keyPrefixSize,
@@ -59,7 +59,7 @@ namespace psibase
       auto lowerBound = [&](const Key& key) -> Iter
       {
          // eosio::print("lowerBound ", key, "\n");
-         if (auto b = kvGreaterEqual<Value>(map, key, keyPrefixSize))
+         if (auto b = kvGreaterEqual<Value>(db, key, keyPrefixSize))
             return toIter(std::move(*b));
          else
             return {};
@@ -70,7 +70,7 @@ namespace psibase
          // eosio::print("upperBound ", key, "\n");
          auto k = psio::convert_to_key(key);
          k.push_back(0);
-         if (auto v = kvGreaterEqualRaw(map, k, keyPrefixSize))
+         if (auto v = kvGreaterEqualRaw(db, k, keyPrefixSize))
             return toIter(psio::convert_from_frac<Value>(*v));
          else
             return {};
@@ -96,7 +96,7 @@ namespace psibase
             key = psio::convert_to_key(maxKey);
             key.push_back(0);
          }
-         if (auto b = kvLessThanRaw(map, key, keyPrefixSize))
+         if (auto b = kvLessThanRaw(db, key, keyPrefixSize))
          {
             it = toIter(psio::convert_from_frac<Value>(*b));
          }
@@ -105,7 +105,7 @@ namespace psibase
       };
 
       Iter begin, end;
-      if (auto b = kvGreaterEqual<Value>(map, minKey, keyPrefixSize))
+      if (auto b = kvGreaterEqual<Value>(db, minKey, keyPrefixSize))
          begin = toIter(std::move(*b));
 
       return psio::makeConnection<Connection, Key>(  //

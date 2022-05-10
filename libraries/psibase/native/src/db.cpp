@@ -58,25 +58,25 @@ namespace psibase
       {
       }
 
-      mdbx::map_handle get_map(kv_map map)
+      mdbx::map_handle get_map(DbId db)
       {
-         if (map == kv_map::contract)
+         if (db == DbId::contract)
             return contractMap;
-         if (map == kv_map::native_constrained)
+         if (db == DbId::nativeConstrained)
             return nativeConstrainedMap;
-         if (map == kv_map::native_unconstrained)
+         if (db == DbId::nativeUnconstrained)
             return nativeUnconstrainedMap;
-         if (map == kv_map::subjective)
+         if (db == DbId::subjective)
             return subjectiveMap;
-         if (map == kv_map::write_only)
+         if (db == DbId::writeOnly)
             return writeOnlyMap;
-         if (map == kv_map::event)
+         if (db == DbId::event)
             return writeOnlyMap;
-         if (map == kv_map::ui_event)
+         if (db == DbId::uiEvent)
             return writeOnlyMap;
-         if (map == kv_map::block_log)
+         if (db == DbId::blockLog)
             return blockLogMap;
-         throw std::runtime_error("unknown kv_map");
+         throw std::runtime_error("unknown DbId");
       }
    };
 
@@ -104,18 +104,18 @@ namespace psibase
 
       bool transactions_available() { return transactions_ok() && !transactions.empty(); }
 
-      mdbx::txn_managed& get_trx(kv_map map)
+      mdbx::txn_managed& get_trx(DbId db)
       {
          check(transactions_available(), "no active database transactions");
-         if (map == kv_map::subjective)
+         if (db == DbId::subjective)
             return *subjectiveTransaction;
-         else if (map == kv_map::block_log)
+         else if (db == DbId::blockLog)
             return *blockLogTransaction;
-         else if (map == kv_map::write_only)
+         else if (db == DbId::writeOnly)
             return writeOnlyTransactions.back();
-         else if (map == kv_map::event)
+         else if (db == DbId::event)
             return writeOnlyTransactions.back();
-         else if (map == kv_map::ui_event)
+         else if (db == DbId::uiEvent)
             return writeOnlyTransactions.back();
          else
             return transactions.back();
@@ -220,34 +220,34 @@ namespace psibase
          impl->blockLogTransaction.reset();
    }
 
-   void Database::kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value)
+   void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
    {
-      impl->get_trx(map).upsert(impl->shared.impl->get_map(map), {key.pos, key.remaining()},
-                                {value.pos, value.remaining()});
+      impl->get_trx(db).upsert(impl->shared.impl->get_map(db), {key.pos, key.remaining()},
+                               {value.pos, value.remaining()});
    }
 
-   void Database::kvRemoveRaw(kv_map map, psio::input_stream key)
+   void Database::kvRemoveRaw(DbId db, psio::input_stream key)
    {
-      impl->get_trx(map).erase(impl->shared.impl->get_map(map), {key.pos, key.remaining()});
+      impl->get_trx(db).erase(impl->shared.impl->get_map(db), {key.pos, key.remaining()});
    }
 
-   std::optional<psio::input_stream> Database::kvGetRaw(kv_map map, psio::input_stream key)
+   std::optional<psio::input_stream> Database::kvGetRaw(DbId db, psio::input_stream key)
    {
       mdbx::slice k{key.pos, key.remaining()};
       mdbx::slice v;
-      auto stat = ::mdbx_get(impl->get_trx(map), impl->shared.impl->get_map(map).dbi, &k, &v);
+      auto        stat = ::mdbx_get(impl->get_trx(db), impl->shared.impl->get_map(db).dbi, &k, &v);
       if (stat == MDBX_NOTFOUND)
          return std::nullopt;
       mdbx::error::success_or_throw(stat);
       return psio::input_stream{(const char*)v.data(), v.size()};
    }
 
-   std::optional<Database::KVResult> Database::kvGreaterEqualRaw(kv_map             map,
+   std::optional<Database::KVResult> Database::kvGreaterEqualRaw(DbId               db,
                                                                  psio::input_stream key,
                                                                  size_t             matchKeySize)
    {
       mdbx::slice k{key.pos, key.remaining()};
-      impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
+      impl->cursor.bind(impl->get_trx(db), impl->shared.impl->get_map(db).dbi);
       auto result = impl->cursor.lower_bound(k, false);
       if (!result)
          return std::nullopt;
@@ -259,12 +259,12 @@ namespace psibase
       };
    }
 
-   std::optional<Database::KVResult> Database::kvLessThanRaw(kv_map             map,
+   std::optional<Database::KVResult> Database::kvLessThanRaw(DbId               db,
                                                              psio::input_stream key,
                                                              size_t             matchKeySize)
    {
       mdbx::slice k{key.pos, key.remaining()};
-      impl->cursor.bind(impl->get_trx(map), impl->shared.impl->get_map(map).dbi);
+      impl->cursor.bind(impl->get_trx(db), impl->shared.impl->get_map(db).dbi);
       auto result = impl->cursor.lower_bound(k, false);
       if (!result)
          result = impl->cursor.to_last(false);
@@ -280,7 +280,7 @@ namespace psibase
       };
    }
 
-   std::optional<Database::KVResult> Database::kvMaxRaw(kv_map map, psio::input_stream key)
+   std::optional<Database::KVResult> Database::kvMaxRaw(DbId db, psio::input_stream key)
    {
       std::vector<unsigned char> next(reinterpret_cast<const unsigned char*>(key.pos),
                                       reinterpret_cast<const unsigned char*>(key.end));

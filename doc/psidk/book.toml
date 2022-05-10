@@ -3,3 +3,8 @@ language = "en"
 multilingual = false
 src = "src"
 title = "psidk"
+
+[preprocessor.gen-cpp-doc]
+command = "../../build/rust/release/gen-cpp-doc"
+# command = "../../rust/target/debug/gen-cpp-doc"
+after = ["links","index"]

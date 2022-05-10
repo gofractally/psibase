@@ -3,7 +3,7 @@
 #include_next <psibase/db.hpp>
 
 #include <psibase/blob.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_key.hpp>
@@ -81,37 +81,35 @@ namespace psibase
       void    commit(Session&);
       void    abort(Session&);
 
-      void kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value);
-      void kvRemoveRaw(kv_map map, psio::input_stream key);
-      std::optional<psio::input_stream> kvGetRaw(kv_map map, psio::input_stream key);
-      std::optional<KVResult>           kvGreaterEqualRaw(kv_map             map,
+      void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
+      void kvRemoveRaw(DbId db, psio::input_stream key);
+      std::optional<psio::input_stream> kvGetRaw(DbId db, psio::input_stream key);
+      std::optional<KVResult>           kvGreaterEqualRaw(DbId               db,
                                                           psio::input_stream key,
                                                           size_t             matchKeySize);
-      std::optional<KVResult>           kvLessThanRaw(kv_map             map,
-                                                      psio::input_stream key,
-                                                      size_t             matchKeySize);
-      std::optional<KVResult>           kvMaxRaw(kv_map map, psio::input_stream key);
+      std::optional<KVResult> kvLessThanRaw(DbId db, psio::input_stream key, size_t matchKeySize);
+      std::optional<KVResult> kvMaxRaw(DbId db, psio::input_stream key);
 
       template <typename K, typename V>
-      auto kvPut(kv_map map, const K& key, const V& value)
+      auto kvPut(DbId db, const K& key, const V& value)
           -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
-         kvPutRaw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
+         kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
       }
 
       template <typename V, typename K>
-      std::optional<V> kvGet(kv_map map, const K& key)
+      std::optional<V> kvGet(DbId db, const K& key)
       {
-         auto s = kvGetRaw(map, psio::convert_to_key(key));
+         auto s = kvGetRaw(db, psio::convert_to_key(key));
          if (!s)
             return std::nullopt;
          return psio::convert_from_frac<V>(psio::input_stream(s->pos, s->end));
       }
 
       template <typename V, typename K>
-      V kvGetOrDefault(kv_map map, const K& key)
+      V kvGetOrDefault(DbId db, const K& key)
       {
-         auto obj = kvGet<V>(map, key);
+         auto obj = kvGet<V>(db, key);
          if (obj)
             return std::move(*obj);
          return {};

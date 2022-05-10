@@ -1,10 +1,7 @@
 #pragma once
 
-#include <psibase/BlockContext.hpp>
-
 #include <boost/container/flat_map.hpp>
-#include <chrono>
-#include <mutex>
+#include <psibase/BlockContext.hpp>
 
 namespace psibase
 {
@@ -13,21 +10,23 @@ namespace psibase
                                                     std::less<KvResourceKey>,
                                                     std::vector<KvResourcePair>>;
 
+   struct TransactionContextImpl;
+
    struct TransactionContext
    {
-      BlockContext&                         blockContext;
-      Database::Session                     session;
-      const SignedTransaction&              signedTransaction;
-      TransactionTrace&                     transactionTrace;
-      KvResourceMap                         kvResourceDeltas;
-      int                                   callDepth = 0;
-      std::chrono::steady_clock::time_point startTime;
-      std::chrono::steady_clock::duration   contractLoadTime{0};
+      BlockContext&                               blockContext;
+      Database::Session                           session;
+      const SignedTransaction&                    signedTransaction;
+      TransactionTrace&                           transactionTrace;
+      KvResourceMap                               kvResourceDeltas;
+      int                                         callDepth = 0;
+      const std::chrono::steady_clock::time_point startTime;
 
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,
                          TransactionTrace&        transactionTrace,
                          bool                     enableUndo);
+      ~TransactionContext();
 
       void execTransaction();
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
@@ -35,13 +34,14 @@ namespace psibase
 
       ExecutionContext& getExecutionContext(AccountNumber contract);
 
-      // Cancel execution of all executionContexts because of timeout; may be called from another thread
-      void asyncTimeout();
+      std::chrono::nanoseconds getBillableTime();
+
+      // Set watchdog timer; it will expire at startTime + contractLoadTime + watchdogLimit.
+      // This may be called multiple times with different limits; the most-recent limit applies.
+      void setWatchdog(std::chrono::steady_clock::duration watchdogLimit);
 
      private:
-      std::mutex                                ecMutex;
-      bool                                      ecCanceled = false;
-      std::map<AccountNumber, ExecutionContext> executionContexts;
+      std::unique_ptr<TransactionContextImpl> impl;
    };  // TransactionContext
 
 }  // namespace psibase

@@ -1,7 +1,7 @@
 #include <contracts/system/auth_fake_sys.hpp>
 
 #include <psibase/crypto.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psibase/print.hpp>
 
 using namespace psibase;

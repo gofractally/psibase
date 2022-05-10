@@ -6,7 +6,7 @@
 
 namespace psibase
 {
-   struct AccountNumber final
+   struct AccountNumber
    {
       uint64_t value = 0;
       constexpr AccountNumber() : value(0) {}
@@ -15,7 +15,7 @@ namespace psibase
       std::string str() const { return number_to_name(value); }
       auto        operator<=>(const AccountNumber&) const = default;
    };
-   PSIO_REFLECT(AccountNumber, value)
+   PSIO_REFLECT(AccountNumber, definitionWillNotChange(), value)
 
    template <typename S>
    void to_json(const AccountNumber& n, S& s)

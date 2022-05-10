@@ -11,7 +11,6 @@
 
 namespace psibase
 {
-
    template <uint8_t nrBits>
    struct BitsetTypeMap;
 
@@ -31,6 +30,7 @@ namespace psibase
    concept validNrBits = std::integral<typename BitsetTypeMap<nrBits>::inner_t>;
 
    template <uint8_t nrBits>
+
    struct Bitset
    {
       static_assert(validNrBits<nrBits>, "Unsupported Bitset size. Supported sizes: 8, 16, 32, 64");

@@ -607,9 +607,9 @@ struct callbacks
    // TODO: drop this and add general kv access
    void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
-      test_chain& chain = assert_chain(chain_index);
-      auto status = chain.blockContext->db.kvGet<psibase::status_row>(psibase::status_row::kv_map,
-                                                                      psibase::status_key());
+      test_chain& chain  = assert_chain(chain_index);
+      auto        status = chain.blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
+                                                                     psibase::statusKey());
 
       psibase::BlockInfo bi;
       if (status && status->head)
@@ -636,7 +636,7 @@ struct callbacks
       try
       {
          // TODO: undo and commit control
-         chain.blockContext->pushTransaction(signed_trx, trace);
+         chain.blockContext->pushTransaction(signed_trx, trace, std::nullopt);
       }
       catch (const std::exception& e)
       {

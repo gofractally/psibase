@@ -304,8 +304,9 @@ namespace psio
                object_type ot;
                uint32_t    offset = 0;
                reflect<T>::for_each(
-                   [&](const meta& r, auto m)
+                   [&](const meta& r, auto member)
                    {
+                      auto m = member((std::decay_t<T>*)nullptr);
                       if constexpr (not std::is_member_function_pointer_v<decltype(m)>)
                       {
                          using member_type =

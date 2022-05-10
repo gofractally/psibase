@@ -146,11 +146,11 @@ namespace psio
    void to_protobuf_object(const T& obj, S& stream)
    {
       reflect<T>::for_each(
-          [&](const psio::meta& ref, auto m)
+          [&](const psio::meta& ref, auto member)
           {
-             if constexpr (not std::is_member_function_pointer_v<decltype(m)>)
+             if constexpr (not std::is_member_function_pointer_v<decltype(member(&obj))>)
              {
-                write_protobuf_field(ref.number, obj.*m, stream);
+                write_protobuf_field(ref.number, obj.*member(&obj), stream);
              }
           });
    }

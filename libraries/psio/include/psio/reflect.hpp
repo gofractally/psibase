@@ -124,8 +124,9 @@ namespace psio
    template <typename QueryClass>
    struct reflect_undefined
    {
-      static constexpr bool is_defined = false;
-      static constexpr bool is_struct  = false;
+      static constexpr bool is_defined              = false;
+      static constexpr bool is_struct               = false;
+      static constexpr bool definitionWillNotChange = false;
       template <typename L>
       static void get(const std::string_view& m, L&& lambda);
    };
@@ -337,6 +338,9 @@ namespace std
 #define PSIO_MATCH_ITEMSnumbered(...) (PSIO_KEEP_NUMBERED, __VA_ARGS__), 1
 #define PSIO_MATCH_ITEMSmethod(...) (PSIO_KEEP_METHOD, __VA_ARGS__), 1
 
+#define PSIO_MATCH_ITEMSdefinitionWillNotChange(...) (PSIO_KEEP_FLAG, definitionWillNotChange), 1
+#define PSIO_HAS_FLAG_IMPL_definitionWillNotChange_definitionWillNotChange(...) , 1
+
 #define PSIO_MATCH_ITEMSallowHashedMethods(...) (PSIO_KEEP_FLAG, allowHashedMethods), 1
 #define PSIO_HAS_FLAG_IMPL_allowHashedMethods_allowHashedMethods(...) , 1
 
@@ -426,21 +430,26 @@ namespace std
 #define PSIO_TUPLE_TYPE(s, STRUCT, elem) \
    psio::remove_cvref_t<decltype(psio::result_of_member(&STRUCT::PSIO_GET_IDENT(elem)))>
 
-#define PSIO_FOR_EACH_MEMBER(r, STRUCT, i, elem)                                                  \
-   {                                                                                              \
-      /* TODO: fix or remove: auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem)); */     \
-      auto off = ~uint64_t(0);                                                                    \
-      (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .offset = off,    \
-                                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)}, \
-                              &STRUCT::PSIO_GET_IDENT(elem));                                     \
+#define PSIO_FOR_EACH_MEMBER(r, STRUCT, i, elem)                                                \
+   {                                                                                            \
+      /* TODO: fix or remove: auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem)); */   \
+      auto off = ~uint64_t(0);                                                                  \
+      (void)lambda(                                                                             \
+          psio::meta{                                                                           \
+              .name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .offset = off,                  \
+                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)},               \
+              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem)) \
+              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });           \
    }
 
-#define PSIO_FOR_EACH_METHOD(r, STRUCT, elem)                                                     \
-   (void)lambda(psio::meta{                                                                       \
-       .name =                                                                                    \
-           BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .param_names = {PSIO_GET_QUOTED_ARGS(elem)}, \
-           },                                                                                     \
-       &STRUCT::PSIO_GET_IDENT(elem));
+#define PSIO_FOR_EACH_METHOD(r, STRUCT, elem)                                                  \
+   (void)lambda(                                                                               \
+       psio::meta{                                                                             \
+           .name                                   = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), \
+                                      .param_names = {PSIO_GET_QUOTED_ARGS(elem)},             \
+           },                                                                                  \
+           [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem))   \
+           { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });
 
 #define PSIO_GET_BY_STR(r, STRUCT, elem)              \
    if (BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)) == m) \
@@ -508,11 +517,12 @@ namespace std
 /**
  * PSIO_REFLECT(<struct>, <member or base spec>...)
  * Each parameter may be one of the following:
- *    * ident:                         non-static data member
- *    * allowHashedMethods():          allow hashed method identifiers
- *    * base(ident):                   base class
- *    * method(ident, arg1, ...):      method
- *    * numbered(int, ident):          non-static data member with field number
+ *    * ident                          non-static data member
+ *    * definitionWillNotChange()      the struct's definition will not change in the future. This saves 2 bytes from the fracpack representation.
+ *    * allowHashedMethods()           allow hashed method identifiers
+ *    * base(ident)                    base class (not implemented)
+ *    * method(ident, arg1, ...)       method
+ *    * numbered(int, ident)           non-static data member with field number
  */
 #define PSIO_REFLECT(STRUCT, ...)                                                                 \
    PSIO_REFLECT_TYPENAME(STRUCT)                                                                  \
@@ -520,6 +530,8 @@ namespace std
    {                                                                                              \
       static constexpr bool is_defined = true;                                                    \
       static constexpr bool is_struct  = true;                                                    \
+      static constexpr bool definitionWillNotChange =                                             \
+          PSIO_HAS_FLAG(definitionWillNotChange, __VA_ARGS__);                                    \
       static constexpr bool requires_compressed_method_names()                                    \
       {                                                                                           \
          constexpr bool allowHashedMethods = PSIO_HAS_FLAG(allowHashedMethods, __VA_ARGS__);      \

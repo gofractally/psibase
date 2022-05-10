@@ -35,14 +35,15 @@ namespace psibase
    {
       std::optional<std::vector<char>> result;
       psio::reflect<T>::for_each(
-          [&](const psio::meta& meta, auto MemberPtr)
+          [&](const psio::meta& meta, auto member)
           {
-             if constexpr (std::is_member_function_pointer_v<decltype(MemberPtr)>)
+             using MemPtr = decltype(member(std::declval<T*>()));
+             if constexpr (std::is_member_function_pointer_v<MemPtr>)
              {
                 if (meta.name == name)
                 {
-                   using param_tuple =
-                       decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
+                   using param_tuple = decltype(psio::tuple_remove_view(
+                       psio::args_as_tuple(std::declval<MemPtr>())));
                    param_tuple params{};
                    json.push_back(0);
                    psio::json_token_stream stream{json.data()};

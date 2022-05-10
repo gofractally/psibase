@@ -10,6 +10,8 @@
   - [Calling Others](cpp-contract/calling/README.md)
   - [Recursion]()
   - [Debugging]()
+  - [Reference]()
+    - [Native Functions](cpp-contract/native-functions.md)
 - [Rust Contracts]()
 - [System Contracts]()
   - [common-sys](system-contract/common-sys/README.md)

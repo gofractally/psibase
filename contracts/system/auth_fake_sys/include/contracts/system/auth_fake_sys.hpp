@@ -1,7 +1,7 @@
 #pragma once
 
 #include <psibase/intrinsic.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_bin.hpp>
 

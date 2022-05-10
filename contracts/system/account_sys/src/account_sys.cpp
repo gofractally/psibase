@@ -2,7 +2,7 @@
 
 #include <contracts/system/transaction_sys.hpp>
 #include <psibase/dispatch.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 
 static constexpr bool enable_print = false;
 
@@ -10,6 +10,7 @@ using namespace psibase;
 
 namespace system_contract
 {
+   using table_num                                     = uint16_t;
    static constexpr table_num account_sys_status_table = 1;
 
    inline auto account_sys_status_key()
@@ -47,7 +48,7 @@ namespace system_contract
          writeConsole(authContract.str());
       }
 
-      check(name.value, "empty account name");
+      check(name.value, "invalid account name");
       if (exists(name))
       {
          if (requireNew)
@@ -57,18 +58,18 @@ namespace system_contract
       check(exists(authContract), "unknown auth contract");
 
       status->total_accounts++;
-      account_row account{
+      AccountRow account{
           .num          = name,
           .authContract = authContract,
           .flags        = 0,
       };
       kvPut(status->key(), *status);
-      kvPut(account.kv_map, account.key(), account);
+      kvPut(account.db, account.key(), account);
    }
 
    bool account_sys::exists(AccountNumber num)
    {
-      return !!kvGet<account_row>(account_row::kv_map, account_key(num));
+      return !!kvGet<AccountRow>(AccountRow::db, accountKey(num));
    }
 
 }  // namespace system_contract

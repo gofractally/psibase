@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:7d2db9589be0e1b18fba09f8d0a94a5293796aa2"
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:5e9cf7b832db69880f3c5bd0fb9a5263da51695a"
   LIBMDBX_MIRROR_PRIVATE_KEY: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
 
 jobs:
@@ -66,6 +66,8 @@ jobs:
           ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DBUILD_RUST=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
+          echo =====
+          ${DOCKER} bash -c "cd build && clang-doc --output=doc-wasm --format=yaml --doxygen wasm/compile_commands.json"
           echo =====
           ${DOCKER} bash -c "cd build && ctest -j $(nproc)"
           echo =====

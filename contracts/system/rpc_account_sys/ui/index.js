@@ -10,7 +10,7 @@ const tbody = table.getElementsByTagName('tbody')[0];
         row.insertCell().appendChild(document.createTextNode(acc.num + ''));
         row.insertCell().appendChild(document.createTextNode(acc.authContract));
         row.insertCell().appendChild(document.createTextNode(acc.flags + ''));
-        row.insertCell().appendChild(document.createTextNode(acc.code_hash));
+        row.insertCell().appendChild(document.createTextNode(acc.codeHash));
     }
 })()
 

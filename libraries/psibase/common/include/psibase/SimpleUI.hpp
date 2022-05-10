@@ -18,7 +18,7 @@ namespace psibase
          {
             return rpc_reply_data{
                 .contentType = "text/html",
-                .reply       = {std::begin(simpleUIMainPage), std::end(simpleUIMainPage)},
+                .reply       = {simpleUIMainPage, simpleUIMainPage + strlen(simpleUIMainPage)},
             };
          }
          if (request.target == "/action_templates")

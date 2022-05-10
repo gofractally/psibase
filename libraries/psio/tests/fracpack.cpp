@@ -49,22 +49,22 @@
  *  packed as if by memcpy. This requires that the struct is reflected
  *  in the same order.
  */
-struct FRACPACK simple final
+struct FRACPACK simple
 {
    uint32_t a;
    uint64_t b;
    uint16_t c;
 };
-PSIO_REFLECT(simple, a, b, c)
+PSIO_REFLECT(simple, definitionWillNotChange(), a, b, c)
 
-struct simple_with_string final
+struct simple_with_string
 {
    uint32_t    a;
    uint64_t    b;
    uint16_t    c;
    std::string s;
 };
-PSIO_REFLECT(simple_with_string, a, b, c, s)
+PSIO_REFLECT(simple_with_string, definitionWillNotChange(), a, b, c, s)
 
 struct ext_simple_with_string
 {
@@ -84,24 +84,24 @@ struct not_final_simple
 PSIO_REFLECT(not_final_simple, a, b, c)
 
 /** this struct requires alignement of something other than 1*/
-struct req_align_simple final
+struct req_align_simple
 {
    uint64_t a;
    uint32_t b;
    uint16_t c;
    uint16_t d;
 };
-PSIO_REFLECT(req_align_simple, a, b, c, d)
+PSIO_REFLECT(req_align_simple, definitionWillNotChange(), a, b, c, d)
 
-struct FRACPACK mixed_simple final
+struct FRACPACK mixed_simple
 {
    uint32_t a;
    uint64_t b;
    uint16_t c;
 };
-PSIO_REFLECT(mixed_simple, c, a, b)
+PSIO_REFLECT(mixed_simple, definitionWillNotChange(), c, a, b)
 
-struct simple_with_mult_string final
+struct simple_with_mult_string
 {
    uint32_t    a;
    uint64_t    b;
@@ -109,33 +109,33 @@ struct simple_with_mult_string final
    std::string s;
    std::string s2;
 };
-PSIO_REFLECT(simple_with_mult_string, a, b, c, s, s2)
+PSIO_REFLECT(simple_with_mult_string, definitionWillNotChange(), a, b, c, s, s2)
 
-struct nested_final_struct final
+struct nested_final_struct
 {
    uint32_t                a;
    simple_with_mult_string nest;
 };
-PSIO_REFLECT(nested_final_struct, a, nest)
+PSIO_REFLECT(nested_final_struct, definitionWillNotChange(), a, nest)
 
-struct nested_not_final_struct final
+struct nested_not_final_struct
 {
    uint32_t         a;
    not_final_simple nest;
 };
-PSIO_REFLECT(nested_not_final_struct, a, nest)
+PSIO_REFLECT(nested_not_final_struct, definitionWillNotChange(), a, nest)
 
-struct varstr final
+struct varstr
 {
    std::variant<simple, int32_t, double> v;
 };
-PSIO_REFLECT(varstr, v)
+PSIO_REFLECT(varstr, definitionWillNotChange(), v)
 
-struct varstrextra final
+struct varstrextra
 {
    std::variant<simple, int32_t, double, varstr> v;
 };
-PSIO_REFLECT(varstrextra, v)
+PSIO_REFLECT(varstrextra, definitionWillNotChange(), v)
 
 struct FRACPACK test_view
 {
@@ -391,11 +391,11 @@ struct struct_with_vector_int
 };
 PSIO_REFLECT(struct_with_vector_int, test)
 
-struct struct_with_vector_str final
+struct struct_with_vector_str
 {
    std::vector<std::string> test;
 };
-PSIO_REFLECT(struct_with_vector_str, test)
+PSIO_REFLECT(struct_with_vector_str, definitionWillNotChange(), test)
 
 struct struct_error
 {
@@ -505,18 +505,18 @@ TEST_CASE("fracpack_vector_str")
    REQUIRE(u.test[1] == "bc|");
 }
 
-struct FRACPACK inner final
+struct FRACPACK inner
 {
    uint32_t a;
    uint32_t b;
 };
-PSIO_REFLECT(inner, a, b)
-struct FRACPACK outer final
+PSIO_REFLECT(inner, definitionWillNotChange(), a, b)
+struct FRACPACK outer
 {
    inner    in;
    uint32_t c;
 };
-PSIO_REFLECT(outer, in, c)
+PSIO_REFLECT(outer, definitionWillNotChange(), in, c)
 
 TEST_CASE("nestfinal")
 {
@@ -630,12 +630,12 @@ TEST_CASE("tree")
    REQUIRE(u.children[0].children[0].s == "three");
 }
 
-struct optstr final
+struct optstr
 {
    std::optional<std::string> str;
 };
 
-PSIO_REFLECT(optstr, str);
+PSIO_REFLECT(optstr, definitionWillNotChange(), str);
 
 TEST_CASE("optstr")
 {
@@ -1084,13 +1084,13 @@ TEST_CASE("blockchain")
    }
 }
 
-struct simple_non_memcpy final
+struct simple_non_memcpy
 {
    int32_t a;
    int32_t b;
    int32_t c;
 };
-PSIO_REFLECT(simple_non_memcpy, c, b, a)
+PSIO_REFLECT(simple_non_memcpy, definitionWillNotChange(), c, b, a)
 
 struct vec_non_memcpy
 {
@@ -1732,12 +1732,12 @@ TEST_CASE("stdarray")
    REQUIRE(not psio::may_use_heap<std::array<uint32_t, 5>>());
 };
 
-struct str_with_bool final
+struct str_with_bool
 {
    bool b;
    int  x;
 };
-PSIO_REFLECT(str_with_bool, b, x)
+PSIO_REFLECT(str_with_bool, definitionWillNotChange(), b, x)
 
 TEST_CASE("bool")
 {

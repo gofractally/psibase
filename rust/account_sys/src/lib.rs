@@ -35,7 +35,7 @@ mod example_impl {
             serde_json::to_string(&json!({
                 "name": name,
                 "authContract": auth_contract,
-                "allow_sudo": allow_sudo,
+                "allowSudo": allow_sudo,
             }))
             .unwrap()
             .as_str(),

@@ -1,2 +1,2 @@
 [workspace]
-members = ["account_sys", "fracpack", "test_fracpack", "libpsibase", "psi_macros", "psibase"]
+members = ["account_sys", "fracpack", "test_fracpack", "libpsibase", "psi_macros", "psibase", "gen-cpp-doc"]

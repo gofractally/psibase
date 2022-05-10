@@ -1,7 +1,7 @@
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/actor.hpp>
 #include <psibase/dispatch.hpp>
-#include <psibase/native_tables.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/fracpack.hpp>
 #include "contracts/system/account_sys.hpp"
 

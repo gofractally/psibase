@@ -24,79 +24,94 @@ namespace psibase
    // with other libraries.
    namespace raw
    {
-      // Intrinsics which return data do it by storing it in a result buffer.
-      // getResult copies min(dest_size, result_size - offset) bytes from
-      // result + offset into dest and returns result_size. If offset >= result_size,
-      // then it skips the copy.
+      /// Copy `min(destSize, resultSize - offset)` bytes from
+      /// `result + offset` into `dest` and return `resultSize`
+      ///
+      /// If `offset >= resultSize`, then skip the copy.
+      ///
+      /// Other functions set result.
       PSIBASE_INTRINSIC(getResult)
-      uint32_t getResult(const char* dest, uint32_t dest_size, uint32_t offset);
+      uint32_t getResult(const char* dest, uint32_t destSize, uint32_t offset);
 
-      // Intrinsics which return keys do it by storing it in a key buffer.
-      // getKey copies min(dest_size, key_size) bytes into dest and returns key_size.
-      PSIBASE_INTRINSIC(getKey) uint32_t getKey(const char* dest, uint32_t dest_size);
+      /// Copy `min(destSize, key_size)` bytes of the most-recent key into
+      /// dest and return `key_size`
+      ///
+      /// Other functions set the key.
+      PSIBASE_INTRINSIC(getKey) uint32_t getKey(const char* dest, uint32_t destSize);
 
-      // Write message to console. Message should be UTF8.
+      /// Write `message` to console
+      ///
+      /// Message should be UTF8.
       PSIBASE_INTRINSIC(writeConsole) void writeConsole(const char* message, uint32_t len);
 
-      // Store the currently-executing action into result and return the result size.
-      //
-      // If the contract, while handling action A, calls itself with action B:
-      //    * Before the call to B, getCurrentAction() returns A.
-      //    * After the call to B, getCurrentAction() returns B.
-      //    * After B returns, getCurrentAction() returns A.
-      //
-      // Note: The above only applies if the contract uses the call() intrinsic.
-      //       The call() function and the action wrappers use the call() intrinsic.
-      //       Calling a contract function directly does NOT use the call() intrinsic.
+      /// Store the currently-executing action into result and return the result size
+      ///
+      /// Use [getResult](#psibaserawgetresult) to get result.
+      ///
+      /// If the contract, while handling action A, calls itself with action B:
+      /// * Before the call to B, `getCurrentAction()` returns A.
+      /// * After the call to B, `getCurrentAction()` returns B.
+      /// * After B returns, `getCurrentAction()` returns A.
+      ///
+      /// Note: The above only applies if the contract uses `call`. `actor` uses `call`.
       PSIBASE_INTRINSIC(getCurrentAction) uint32_t getCurrentAction();
 
-      // Call a contract, store the return value into result, and return the result size.
+      /// Call a contract, store the return value into result, and return the result size
+      ///
+      /// Use [getResult](#psibaserawgetresult) to get result.
       PSIBASE_INTRINSIC(call) uint32_t call(const char* action, uint32_t len);
 
-      // Set the return value of the currently-executing action
+      /// Set the return value of the currently-executing action
       PSIBASE_INTRINSIC(setRetval) void setRetval(const char* retval, uint32_t len);
 
-      // Set a key-value pair. If key already exists, then replace the existing value.
+      /// Set a key-value pair
+      ///
+      /// If key already exists, then replace the existing value.
       PSIBASE_INTRINSIC(kvPut)
-      void kvPut(kv_map      map,
-                 const char* key,
-                 uint32_t    key_len,
-                 const char* value,
-                 uint32_t    value_len);
+      void kvPut(DbId db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen);
 
-      // Add a sequentially-numbered record. Returns the id.
+      /// Add a sequentially-numbered record. Returns the id.
       PSIBASE_INTRINSIC(kvPutSequential)
-      EventNumber kvPutSequential(kv_map map, const char* value, uint32_t value_len);
+      uint64_t kvPutSequential(DbId db, const char* value, uint32_t valueLen);
 
-      // Remove a key-value pair if it exists
-      PSIBASE_INTRINSIC(kvRemove) void kvRemove(kv_map map, const char* key, uint32_t key_len);
+      /// Remove a key-value pair if it exists
+      PSIBASE_INTRINSIC(kvRemove) void kvRemove(DbId db, const char* key, uint32_t keyLen);
 
-      // Get a key-value pair, if any. If key exists, then sets result to value and
-      // returns size. If key does not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kvGet) uint32_t kvGet(kv_map map, const char* key, uint32_t key_len);
+      /// Get a key-value pair, if any
+      ///
+      /// If key exists, then sets result to value and returns size. If key does not
+      /// exist, returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get result.
+      PSIBASE_INTRINSIC(kvGet) uint32_t kvGet(DbId db, const char* key, uint32_t keyLen);
 
-      // Get a sequentially-numbered record. If id is available, then sets result to value and
-      // returns size. If id does not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kvGetSequential) uint32_t kvGetSequential(kv_map map, EventNumber id);
+      /// Get a sequentially-numbered record. If `id` is available, then sets result to value and
+      /// returns size. If id does not exist, returns -1 and clears result.
+      PSIBASE_INTRINSIC(kvGetSequential) uint32_t kvGetSequential(DbId db, uint64_t id);
 
-      // Get the first key-value pair which is greater than or equal to the provided
-      // key. If one is found, and the first matchKeySize bytes of the found key
-      // matches the provided key, then sets result to value and returns size. Also
-      // sets key (use getKey). Otherwise returns -1 and clears result.
+      /// Get the first key-value pair which is greater than or equal to the provided
+      /// key
+      ///
+      /// If one is found, and the first `matchKeySize` bytes of the found key
+      /// matches the provided key, then sets result to value and returns size. Also
+      /// sets key. Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get
+      /// result and [getKey](#psibaserawgetkey) to get found key.
       PSIBASE_INTRINSIC(kvGreaterEqual)
-      uint32_t kvGreaterEqual(kv_map map, const char* key, uint32_t key_len, uint32_t matchKeySize);
+      uint32_t kvGreaterEqual(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
-      // Get the key-value pair immediately-before provided key. If one is found,
-      // and the first matchKeySize bytes of the found key matches the provided
-      // key, then sets result to value and returns size. Also sets key (use getKey).
-      // Otherwise returns -1 and clears result.
+      /// Get the key-value pair immediately-before provided key
+      ///
+      /// If one is found, and the first `matchKeySize` bytes of the found key
+      /// matches the provided key, then sets result to value and returns size.
+      /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult)
+      /// to get result and [getKey](#psibaserawgetkey) to get found key.
       PSIBASE_INTRINSIC(kvLessThan)
-      uint32_t kvLessThan(kv_map map, const char* key, uint32_t key_len, uint32_t matchKeySize);
+      uint32_t kvLessThan(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
-      // Get the maximum key-value pair which has key as a prefix. If one is found,
-      // then sets result to value and returns size. Also sets key (use getKey).
-      // Otherwise returns -1 and clears result.
-      PSIBASE_INTRINSIC(kvMax) uint32_t kvMax(kv_map map, const char* key, uint32_t key_len);
+      /// Get the maximum key-value pair which has key as a prefix
+      ///
+      /// If one is found, then sets result to value and returns size. Also sets key.
+      /// Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get result
+      /// and [getKey](#psibaserawgetkey) to get found key.
+      PSIBASE_INTRINSIC(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
    }  // namespace raw
 
    // Get result when size is known. Caution: this does not verify size.
@@ -115,9 +130,9 @@ namespace psibase
    //    * After the call to B, getCurrentAction() returns B.
    //    * After B returns, getCurrentAction() returns A.
    //
-   // Note: The above only applies if the contract uses the call() intrinsic.
-   //       The call() function and the action wrappers use the call() intrinsic.
-   //       Calling a contract function directly does NOT use the call() intrinsic.
+   // Note: The above only applies if the contract uses the call() function.
+   //       The call() function and the action wrappers use the call() function.
+   //       Calling a contract function directly does NOT use the call() function.
    Action                        getCurrentAction();
    psio::shared_view_ptr<Action> getCurrentActionView();
 
@@ -139,71 +154,74 @@ namespace psibase
    }
 
    // Set the return value of the currently-executing action
-   inline void setRetvalBytes(psio::input_stream s) { raw::setRetval(s.pos, s.remaining()); }
+   inline void setRetvalBytes(psio::input_stream s)
+   {
+      raw::setRetval(s.pos, s.remaining());
+   }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
-   inline void kvPutRaw(kv_map map, psio::input_stream key, psio::input_stream value)
+   inline void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
    {
-      raw::kvPut(map, key.pos, key.remaining(), value.pos, value.remaining());
+      raw::kvPut(db, key.pos, key.remaining(), value.pos, value.remaining());
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, NotOptional V>
-   auto kvPut(kv_map map, const K& key, const V& value)
+   auto kvPut(DbId db, const K& key, const V& value)
    {
-      kvPutRaw(map, psio::convert_to_key(key), psio::convert_to_frac(value));
+      kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
    }
 
    // Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, NotOptional V>
    auto kvPut(const K& key, const V& value)
    {
-      kvPut(kv_map::contract, key, value);
+      kvPut(DbId::contract, key, value);
    }
 
    // Add a sequentially-numbered record. Returns the id.
-   inline uint64_t kvPutSequentialRaw(kv_map map, psio::input_stream value)
+   inline uint64_t kvPutSequentialRaw(DbId db, psio::input_stream value)
    {
-      return raw::kvPutSequential(map, value.pos, value.remaining());
+      return raw::kvPutSequential(db, value.pos, value.remaining());
    }
 
    // Add a sequentially-numbered record. Returns the id.
    template <typename Type, NotOptional V>
-   auto kvPutSequential(kv_map map, AccountNumber contract, Type type, const V& value)
+   auto kvPutSequential(DbId db, AccountNumber contract, Type type, const V& value)
    {
       std::vector<char>     packed(psio::fracpack_size(contract) + psio::fracpack_size(type) +
-                               psio::fracpack_size(value));
+                                   psio::fracpack_size(value));
       psio::fast_buf_stream stream(packed.data(), packed.size());
       psio::fracpack(contract, stream);
       psio::fracpack(type, stream);
       psio::fracpack(value, stream);
-      return kvPutSequentialRaw(map, packed);
+      return kvPutSequentialRaw(db, packed);
    }
 
    // Remove a key-value pair if it exists
-   inline void kvRemoveRaw(kv_map map, psio::input_stream key)
+   inline void kvRemoveRaw(DbId db, psio::input_stream key)
    {
-      raw::kvRemove(map, key.pos, key.remaining());
+      raw::kvRemove(db, key.pos, key.remaining());
    }
 
    // Remove a key-value pair if it exists
    template <typename K>
-   void kvRemove(kv_map map, const K& key)
+   void kvRemove(DbId db, const K& key)
    {
-      kvRemoveRaw(map, psio::convert_to_key(key));
+      kvRemoveRaw(db, psio::convert_to_key(key));
    }
 
    // Remove a key-value pair if it exists
    template <typename K>
    void kvRemove(const K& key)
    {
-      kvRemove(kv_map::contract, key);
+      kvRemove(DbId::contract, key);
    }
 
    // Size of key-value pair, if any
-   inline std::optional<uint32_t> kvGetSizeRaw(kv_map map, psio::input_stream key)
+   inline std::optional<uint32_t> kvGetSizeRaw(DbId db, psio::input_stream key)
    {
-      auto size = raw::kvGet(map, key.pos, key.remaining());
+      auto size = raw::kvGet(db, key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
       return size;
@@ -211,22 +229,22 @@ namespace psibase
 
    // Size of key-value pair, if any
    template <typename K>
-   inline std::optional<uint32_t> kvGetSize(kv_map map, const K& key)
+   inline std::optional<uint32_t> kvGetSize(DbId db, const K& key)
    {
-      return kvGetSizeRaw(map, psio::convert_to_key(key));
+      return kvGetSizeRaw(db, psio::convert_to_key(key));
    }
 
    // Size of key-value pair, if any
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(const K& key)
    {
-      return kvGetSize(kv_map::contract, key);
+      return kvGetSize(DbId::contract, key);
    }
 
    // Get a key-value pair, if any
-   inline std::optional<std::vector<char>> kvGetRaw(kv_map map, psio::input_stream key)
+   inline std::optional<std::vector<char>> kvGetRaw(DbId db, psio::input_stream key)
    {
-      auto size = raw::kvGet(map, key.pos, key.remaining());
+      auto size = raw::kvGet(db, key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -234,9 +252,9 @@ namespace psibase
 
    // Get a key-value pair, if any
    template <typename V, typename K>
-   inline std::optional<V> kvGet(kv_map map, const K& key)
+   inline std::optional<V> kvGet(DbId db, const K& key)
    {
-      auto v = kvGetRaw(map, psio::convert_to_key(key));
+      auto v = kvGetRaw(db, psio::convert_to_key(key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -247,14 +265,14 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGet(const K& key)
    {
-      return kvGet<V>(kv_map::contract, key);
+      return kvGet<V>(DbId::contract, key);
    }
 
    // Get a value, or the default if not found
    template <typename V, typename K>
-   inline V kvGetOrDefault(kv_map map, const K& key)
+   inline V kvGetOrDefault(DbId db, const K& key)
    {
-      auto obj = kvGet<V>(map, key);
+      auto obj = kvGet<V>(db, key);
       if (obj)
          return std::move(*obj);
       return {};
@@ -264,13 +282,13 @@ namespace psibase
    template <typename V, typename K>
    inline V kvGetOrDefault(const K& key)
    {
-      return kvGetOrDefault<V>(kv_map::contract, key);
+      return kvGetOrDefault<V>(DbId::contract, key);
    }
 
    // Get a sequentially-numbered record, if available
-   inline std::optional<std::vector<char>> kvGetSequentialRaw(kv_map map, uint64_t id)
+   inline std::optional<std::vector<char>> kvGetSequentialRaw(DbId db, uint64_t id)
    {
-      auto size = raw::kvGetSequential(map, id);
+      auto size = raw::kvGetSequential(db, id);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -286,7 +304,7 @@ namespace psibase
    // * If type is non-null, then it receives the record type. It is left untouched if either the record
    //   is not available or if matchContract is not null but doesn't match.
    template <typename V, typename Type>
-   inline std::optional<V> kvGetSequential(kv_map               map,
+   inline std::optional<V> kvGetSequential(DbId                 db,
                                            uint64_t             id,
                                            const AccountNumber* matchContract = nullptr,
                                            const Type*          matchType     = nullptr,
@@ -294,7 +312,7 @@ namespace psibase
                                            Type*                type          = nullptr)
    {
       std::optional<V> result;
-      auto             v = kvGetSequentialRaw(map, id);
+      auto             v = kvGetSequentialRaw(db, id);
       if (!v)
          return result;
       psio::input_stream stream(v->data(), v->size());
@@ -322,11 +340,11 @@ namespace psibase
    // Get the first key-value pair which is greater than or equal to the provided key. If one is
    // found, and the first matchKeySize bytes of the found key matches the provided key, then
    // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kvGreaterEqualRaw(kv_map             map,
+   inline std::optional<std::vector<char>> kvGreaterEqualRaw(DbId               db,
                                                              psio::input_stream key,
                                                              uint32_t           matchKeySize)
    {
-      auto size = raw::kvGreaterEqual(map, key.pos, key.remaining(), matchKeySize);
+      auto size = raw::kvGreaterEqual(db, key.pos, key.remaining(), matchKeySize);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -336,9 +354,9 @@ namespace psibase
    // found, and the first matchKeySize bytes of the found key matches the provided key, then
    // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
-   inline std::optional<V> kvGreaterEqual(kv_map map, const K& key, uint32_t matchKeySize)
+   inline std::optional<V> kvGreaterEqual(DbId db, const K& key, uint32_t matchKeySize)
    {
-      auto v = kvGreaterEqualRaw(map, psio::convert_to_key(key), matchKeySize);
+      auto v = kvGreaterEqualRaw(db, psio::convert_to_key(key), matchKeySize);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -351,17 +369,17 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGreaterEqual(const K& key, uint32_t matchKeySize)
    {
-      return kvGreaterEqual<V>(kv_map::contract, key, matchKeySize);
+      return kvGreaterEqual<V>(DbId::contract, key, matchKeySize);
    }
 
    // Get the key-value pair immediately-before provided key. If one is found, and the first
    // matchKeySize bytes of the found key matches the provided key, then returns the value.
    // Also sets key (use getKey). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kvLessThanRaw(kv_map             map,
+   inline std::optional<std::vector<char>> kvLessThanRaw(DbId               db,
                                                          psio::input_stream key,
                                                          uint32_t           matchKeySize)
    {
-      auto size = raw::kvLessThan(map, key.pos, key.remaining(), matchKeySize);
+      auto size = raw::kvLessThan(db, key.pos, key.remaining(), matchKeySize);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -371,9 +389,9 @@ namespace psibase
    // matchKeySize bytes of the found key matches the provided key, then returns the value.
    // Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
-   inline std::optional<V> kvLessThan(kv_map map, const K& key, uint32_t matchKeySize)
+   inline std::optional<V> kvLessThan(DbId db, const K& key, uint32_t matchKeySize)
    {
-      auto v = kvLessThanRaw(map, psio::convert_to_key(key), matchKeySize);
+      auto v = kvLessThanRaw(db, psio::convert_to_key(key), matchKeySize);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -386,14 +404,14 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvLessThan(const K& key, uint32_t matchKeySize)
    {
-      return kvLessThan<V>(kv_map::contract, key, matchKeySize);
+      return kvLessThan<V>(DbId::contract, key, matchKeySize);
    }
 
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
    // value. Also sets key (use getKey). Otherwise returns nullopt.
-   inline std::optional<std::vector<char>> kvMaxRaw(kv_map map, psio::input_stream key)
+   inline std::optional<std::vector<char>> kvMaxRaw(DbId db, psio::input_stream key)
    {
-      auto size = raw::kvMax(map, key.pos, key.remaining());
+      auto size = raw::kvMax(db, key.pos, key.remaining());
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -402,9 +420,9 @@ namespace psibase
    // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
    // value. Also sets key (use getKey). Otherwise returns nullopt.
    template <typename V, typename K>
-   inline std::optional<V> kvMax(kv_map map, const K& key)
+   inline std::optional<V> kvMax(DbId db, const K& key)
    {
-      auto v = kvMaxRaw(map, psio::convert_to_key(key));
+      auto v = kvMaxRaw(db, psio::convert_to_key(key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -416,10 +434,13 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvMax(const K& key)
    {
-      return kvMax<V>(kv_map::contract, key);
+      return kvMax<V>(DbId::contract, key);
    }
 
-   inline void writeConsole(const std::string_view& sv) { raw::writeConsole(sv.data(), sv.size()); }
+   inline void writeConsole(const std::string_view& sv)
+   {
+      raw::writeConsole(sv.data(), sv.size());
+   }
 
 }  // namespace psibase
 

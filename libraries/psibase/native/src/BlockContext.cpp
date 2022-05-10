@@ -26,19 +26,19 @@ namespace psibase
    void BlockContext::start(std::optional<TimePointSec> time)
    {
       check(!started, "block has already been started");
-      auto status = db.kvGet<status_row>(status_row::kv_map, status_key());
+      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       if (!status)
       {
          status.emplace();
          if (!isReadOnly)
-            db.kvPut(status_row::kv_map, status->key(), *status);
+            db.kvPut(StatusRow::db, status->key(), *status);
       }
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::kv_map, databaseStatusKey());
+      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
       if (!dbStatus)
       {
          dbStatus.emplace();
          if (!isReadOnly)
-            db.kvPut(DatabaseStatusRow::kv_map, dbStatus->key(), *dbStatus);
+            db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
       }
       databaseStatus = *dbStatus;
 
@@ -86,30 +86,31 @@ namespace psibase
       check(!needGenesisAction, "missing genesis action in block");
       active = false;
 
-      auto status = db.kvGet<status_row>(status_row::kv_map, status_key());
+      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       check(status.has_value(), "missing status record");
       status->head = current;
       if (isGenesisBlock)
-         status->chain_id = status->head->blockId;
-      db.kvPut(status_row::kv_map, status->key(), *status);
+         status->chainId = status->head->blockId;
+      db.kvPut(StatusRow::db, status->key(), *status);
 
       // TODO: store block IDs somewhere?
       // TODO: store block proofs somewhere
       // TODO: avoid repacking
-      db.kvPut(kv_map::block_log, current.header.blockNum, current);
+      db.kvPut(DbId::blockLog, current.header.blockNum, current);
 
       session.commit();
    }
 
-   void BlockContext::pushTransaction(const SignedTransaction& trx,
-                                      TransactionTrace&        trace,
-                                      bool                     enableUndo,
-                                      bool                     commit)
+   void BlockContext::pushTransaction(const SignedTransaction&                 trx,
+                                      TransactionTrace&                        trace,
+                                      std::optional<std::chrono::microseconds> initialWatchdogLimit,
+                                      bool                                     enableUndo,
+                                      bool                                     commit)
    {
       auto subjectiveSize = current.subjectiveData.size();
       try
       {
-         exec(trx, trace, enableUndo, commit);
+         exec(trx, trace, initialWatchdogLimit, enableUndo, commit);
          current.transactions.push_back(std::move(trx));
       }
       catch (...)
@@ -124,7 +125,7 @@ namespace psibase
       for (auto& trx : current.transactions)
       {
          TransactionTrace trace;
-         exec(trx, trace, false, true);
+         exec(trx, trace, std::nullopt, false, true);
       }
       check(nextSubjectiveRead == current.subjectiveData.size(),
             "block has unread subjective data");
@@ -132,10 +133,11 @@ namespace psibase
 
    // TODO: limit charged CPU & NET which can go into a block
    // TODO: duplicate detection
-   void BlockContext::exec(const SignedTransaction& trx,
-                           TransactionTrace&        trace,
-                           bool                     enableUndo,
-                           bool                     commit)
+   void BlockContext::exec(const SignedTransaction&                 trx,
+                           TransactionTrace&                        trace,
+                           std::optional<std::chrono::microseconds> initialWatchdogLimit,
+                           bool                                     enableUndo,
+                           bool                                     commit)
    {
       try
       {
@@ -148,6 +150,8 @@ namespace psibase
          active = enableUndo;
 
          TransactionContext t{*this, trx, trace, enableUndo};
+         if (initialWatchdogLimit)
+            t.setWatchdog(*initialWatchdogLimit);
          t.execTransaction();
 
          if (commit)

@@ -47,7 +47,7 @@ namespace psibase
       {
          if (!is_end)
             key.push_back(0);
-         set(raw::kvGreaterEqual(map, key.data(), key.size(), prefix_size));
+         set(raw::kvGreaterEqual(db, key.data(), key.size(), prefix_size));
          return *this;
       }
       kv_raw_iterator operator++(int)
@@ -58,8 +58,8 @@ namespace psibase
       }
       kv_raw_iterator& operator--()
       {
-         set(is_end ? raw::kvMax(map, key.data(), key.size())
-                    : raw::kvLessThan(map, key.data(), key.size(), prefix_size));
+         set(is_end ? raw::kvMax(db, key.data(), key.size())
+                    : raw::kvLessThan(db, key.data(), key.size(), prefix_size));
          return *this;
       }
       kv_raw_iterator operator--(int)
@@ -72,13 +72,13 @@ namespace psibase
       void read(C& c) const
       {
          //static_assert(C::value_type is char, unsigned char, or std::byte);
-         int sz = raw::kvGet(map, key.data(), key.size());
+         int sz = raw::kvGet(db, key.data(), key.size());
          check(sz >= 0, "no such key");
          c.resize(sz);
          raw::getResult(c.data(), c.size(), 0);
          if (is_secondary)
          {
-            int sz = raw::kvGet(map, c.data(), c.size());
+            int sz = raw::kvGet(db, c.data(), c.size());
             check(sz >= 0, "primary key not found");
             c.resize(sz);
             raw::getResult(c.data(), c.size(), 0);
@@ -121,11 +121,11 @@ namespace psibase
             key.resize(prefix_size);
          }
       }
-      static constexpr kv_map map = kv_map::contract;
-      std::vector<char>       key;
-      std::size_t             prefix_size;
-      bool                    is_end       = true;
-      bool                    is_secondary = false;
+      static constexpr DbId db = DbId::contract;
+      std::vector<char>     key;
+      std::size_t           prefix_size;
+      bool                  is_end       = true;
+      bool                  is_secondary = false;
    };
 
    template <typename T>
@@ -301,7 +301,7 @@ namespace psibase
       {
          key_view key_base{{prefix.data(), prefix.size()}};
          auto     buffer = psio::convert_to_key(std::tie(key_base, k));
-         int      res    = raw::kvGet(map, buffer.data(), buffer.size());
+         int      res    = raw::kvGet(db, buffer.data(), buffer.size());
          if (res < 0)
          {
             return {};
@@ -310,7 +310,7 @@ namespace psibase
          raw::getResult(buffer.data(), buffer.size(), 0);
          if (is_secondary())
          {
-            res = raw::kvGet(map, buffer.data(), buffer.size());
+            res = raw::kvGet(db, buffer.data(), buffer.size());
             buffer.resize(res);
             raw::getResult(buffer.data(), buffer.size(), 0);
          }
@@ -318,9 +318,12 @@ namespace psibase
       }
 
      private:
-      bool is_secondary() const { return prefix[sizeof(AccountNumber) + sizeof(std::uint32_t)] != 0; }
-      static constexpr kv_map map = kv_map::contract;
-      std::vector<char>       prefix;
+      bool is_secondary() const
+      {
+         return prefix[sizeof(AccountNumber) + sizeof(std::uint32_t)] != 0;
+      }
+      static constexpr DbId db = DbId::contract;
+      std::vector<char>     prefix;
    };
 
    template <auto V>
@@ -329,17 +332,17 @@ namespace psibase
       static constexpr decltype(V) value = V;
    };
 
-   inline void kv_insert(kv_map      map,
+   inline void kv_insert(DbId        db,
                          const char* key,
                          std::size_t key_len,
                          const char* value,
                          std::size_t value_len)
    {
-      if (raw::kvGet(map, key, key_len) != -1)
+      if (raw::kvGet(db, key, key_len) != -1)
       {
          check(false, "key already exists");
       }
-      raw::kvPut(map, key, key_len, value, value_len);
+      raw::kvPut(db, key, key_len, value, value_len);
    }
 
    template <typename T, auto Primary, auto... Secondary>
@@ -356,7 +359,7 @@ namespace psibase
          auto pk = serialize_key(0, std::invoke(Primary, arg));
          if constexpr (sizeof...(Secondary) > 0)
          {
-            int               sz         = raw::kvGet(map, pk.data(), pk.size());
+            int               sz         = raw::kvGet(db, pk.data(), pk.size());
             std::vector<char> key_buffer = prefix;
             key_buffer.push_back(0);
             if (sz != -1)
@@ -364,17 +367,18 @@ namespace psibase
                std::vector<char> buffer(sz);
                raw::getResult(buffer.data(), buffer.size(), 0);
                auto data              = psio::convert_from_bin<T>(std::move(buffer));
-               auto replace_secondary = [&](uint8_t& idx, auto wrapped) {
+               auto replace_secondary = [&](uint8_t& idx, auto wrapped)
+               {
                   auto old_key = std::invoke(decltype(wrapped)::value, data);
                   auto new_key = std::invoke(decltype(wrapped)::value, arg);
                   if (old_key != new_key)
                   {
                      key_buffer.back() = idx;
                      psio::convert_to_key(old_key, key_buffer);
-                     raw::kvRemove(map, key_buffer.data(), key_buffer.size());
+                     raw::kvRemove(db, key_buffer.data(), key_buffer.size());
                      key_buffer.resize(prefix.size() + 1);
                      psio::convert_to_key(new_key, key_buffer);
-                     kv_insert(map, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
+                     kv_insert(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
                      key_buffer.resize(prefix.size() + 1);
                   }
                   ++idx;
@@ -389,7 +393,7 @@ namespace psibase
                   auto key          = std::invoke(decltype(wrapped)::value, arg);
                   key_buffer.back() = idx;
                   psio::convert_to_key(key, key_buffer);
-                  kv_insert(map, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
+                  kv_insert(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
                   key_buffer.resize(prefix.size() + 1);
                   ++idx;
                };
@@ -398,14 +402,14 @@ namespace psibase
             }
          }
          auto serialized = psio::convert_to_bin(arg);
-         raw::kvPut(map, pk.data(), pk.size(), serialized.data(), serialized.size());
+         raw::kvPut(db, pk.data(), pk.size(), serialized.data(), serialized.size());
       }
       void erase(compatible_key<key_type> auto&& key)
       {
          if constexpr (sizeof...(Secondary) == 0)
          {
             auto key_buffer = serialize_key(0, key);
-            raw::kvRemove(map, key_buffer.data(), key_buffer.size());
+            raw::kvRemove(db, key_buffer.data(), key_buffer.size());
          }
          else
          {
@@ -424,7 +428,7 @@ namespace psibase
             auto key          = std::invoke(decltype(wrapped)::value, old_value);
             key_buffer.back() = idx;
             psio::convert_to_key(key, key_buffer);
-            raw::kvRemove(map, key_buffer.data(), key_buffer.size());
+            raw::kvRemove(db, key_buffer.data(), key_buffer.size());
             key_buffer.resize(prefix.size() + 1);
             ++idx;
          };
@@ -449,7 +453,7 @@ namespace psibase
       void erase(auto key)
       {
          auto pk = serialize_key(0, key);
-         raw::kvRemove(map, pk.data(), pk.size());
+         raw::kvRemove(db, pk.data(), pk.size());
       }
 
      private:
@@ -458,8 +462,8 @@ namespace psibase
          key_view key_base{{prefix.data(), prefix.size()}};
          return psio::convert_to_key(std::tie(key_base, idx, k));
       }
-      static constexpr kv_map map = kv_map::contract;
-      std::vector<char>       prefix;
+      static constexpr DbId db = DbId::contract;
+      std::vector<char>     prefix;
    };
 
    // TODO: allow tables to be forward declared.  The simplest method is:

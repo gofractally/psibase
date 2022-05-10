@@ -48,7 +48,7 @@ pub mod raw {
         ///
         /// Don't use [get_key] after calling this.
         pub fn kv_put(
-            map: crate::KvMap,
+            db: crate::DbId,
             key: *const u8,
             key_len: u32,
             value: *const u8,
@@ -58,7 +58,7 @@ pub mod raw {
         /// Remove a key-value pair if it exists
         ///
         /// Don't use [get_key] after calling this.
-        pub fn kv_remove(map: crate::KvMap, key: *const u8, key_len: u32);
+        pub fn kv_remove(db: crate::DbId, key: *const u8, key_len: u32);
 
         /// Get a key-value pair, if any
         ///
@@ -66,7 +66,7 @@ pub mod raw {
         /// exist, returns `-1` and clears result. Use [get_result] to get result.
         ///
         /// Don't use [get_key] after calling this.
-        pub fn kv_get(map: crate::KvMap, key: *const u8, key_len: u32) -> u32;
+        pub fn kv_get(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
 
         /// Get the first key-value pair which is greater than or equal to the provided
         /// key
@@ -76,7 +76,7 @@ pub mod raw {
         /// sets key. Otherwise returns `-1` and clears result. Use [get_result] to get
         /// result and [get_key] to get found key.
         pub fn kv_greater_equal(
-            map: crate::KvMap,
+            db: crate::DbId,
             key: *const u8,
             key_len: u32,
             match_key_size: u32,
@@ -89,7 +89,7 @@ pub mod raw {
         /// Also sets key. Otherwise returns `-1` and clears result. Use [get_result]
         /// to get result and [get_key] to get found key.
         pub fn kv_less_than(
-            map: crate::KvMap,
+            db: crate::DbId,
             key: *const u8,
             key_len: u32,
             match_key_size: u32,
@@ -100,7 +100,7 @@ pub mod raw {
         /// If one is found, then sets result to value and returns size. Also sets key.
         /// Otherwise returns `-1` and clears result. Use [get_result] to get result
         /// and [get_key] to get found key.
-        pub fn kv_max(map: crate::KvMap, key: *const u8, key_len: u32) -> u32;
+        pub fn kv_max(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
     }
 }
 

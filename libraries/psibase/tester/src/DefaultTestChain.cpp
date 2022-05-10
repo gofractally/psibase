@@ -43,13 +43,13 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
                      {
                          .contract     = system_contract::transaction_sys::contract,
                          .authContract = system_contract::auth_fake_sys::contract,
-                         .flags        = system_contract::transaction_sys::contract_flags,
+                         .flags        = system_contract::transaction_sys::contractFlags,
                          .code         = read_whole_file("transaction_sys.wasm"),
                     },
                      {
                          .contract     = system_contract::account_sys::contract,
                          .authContract = system_contract::auth_fake_sys::contract,
-                         .flags        = system_contract::account_sys::contract_flags,
+                         .flags        = system_contract::account_sys::contractFlags,
                          .code         = read_whole_file("account_sys.wasm"),
                     },
                      {
