@@ -38,6 +38,7 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_option_f32: Some(-17.5),
             field_option_f64: None,
             field_option_inner: None,
+            field_option_u_inner: None,
             field_o_o_i8: None,
             field_o_o_str: None,
             field_o_o_str2: Some(Some("".into())),
@@ -109,6 +110,15 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
                 inner_o_vec_o_u16: Some(vec![]),
             }),
+            field_option_u_inner: Some(UnextensibleInnerStruct {
+                field_bool: true,
+                field_u32: 44,
+                field_i16: 55,
+                field_str: "byebye".to_string(),
+                field_f32: 6.4,
+                field_f64: 128.128,
+                field_v_u16: vec![3, 2, 1],
+            }),
             field_o_o_i8: Some(None),
             field_o_o_str: Some(None),
             field_o_o_str2: None,
@@ -169,6 +179,15 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_str: Some("testing".to_string()),
                 inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
                 inner_o_vec_o_u16: Some(vec![]),
+            }),
+            field_option_u_inner: Some(UnextensibleInnerStruct {
+                field_bool: false,
+                field_u32: 0,
+                field_i16: 0,
+                field_str: "".to_string(),
+                field_f32: 0.0,
+                field_f64: 0.0,
+                field_v_u16: vec![],
             }),
             field_o_o_i8: Some(Some(123)),
             field_o_o_str: Some(Some("a string".into())),
@@ -267,31 +286,6 @@ fn t1() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn testz() {
-    println!("running tests!!!!!!!");
-
-    let x = MyStruct {
-        age1: 0xfafbfcfd,
-        btc: 0xfafb,
-        cool: true,
-        msg: String::from("hello"),
-        maybe1: Some(0xfa),
-        maybe2: None,
-        not_cool: true,
-    };
-    let mut bytes: Vec<u8> = Vec::new();
-    x.pack(&mut bytes);
-    println!("rust packed bytes: {:?}", bytes);
-
-    test_fracpack::bridge::ffi::round_tripz(&bytes[..]);
-
-    MyStruct::verify(&bytes[..], &mut 0).unwrap();
-
-    let unpacked = MyStruct::unpack(&bytes[..], &mut 0).unwrap();
-    assert_eq!(x, unpacked);
-}
-
 #[derive(Fracpack, Debug, PartialEq)]
 #[fracpack(unextensible)]
 struct SimpleWithString {
@@ -312,6 +306,7 @@ struct OuterSimple {
     z: bool,
     s: String,
 }
+// TODO: check arrays, tuples, bool, char,
 
 #[test]
 fn test_simple_isolated_structs() {

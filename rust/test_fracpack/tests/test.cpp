@@ -28,24 +28,25 @@ OuterStruct tests1_data[] = {
                 .inner_option_vec_u16 = None,
                 .inner_o_vec_o_u16    = None,
             },
-        .field_u_inner      = {},
-        .field_v_inner      = {},
-        .field_option_u8    = Some(11),
-        .field_option_u16   = Some(12),
-        .field_option_u32   = None,
-        .field_option_u64   = Some(13),
-        .field_option_i8    = Some(-14),
-        .field_option_i16   = None,
-        .field_option_i32   = Some(-15),
-        .field_option_i64   = None,
-        .field_option_str   = ""s,
-        .field_option_f32   = Some(-17.5),
-        .field_option_f64   = None,
-        .field_option_inner = None,
-        .field_o_o_i8       = None,
-        .field_o_o_str      = None,
-        .field_o_o_str2     = std::optional<std::string>{""s},
-        .field_o_o_inner    = None,
+        .field_u_inner        = {},
+        .field_v_inner        = {},
+        .field_option_u8      = Some(11),
+        .field_option_u16     = Some(12),
+        .field_option_u32     = None,
+        .field_option_u64     = Some(13),
+        .field_option_i8      = Some(-14),
+        .field_option_i16     = None,
+        .field_option_i32     = Some(-15),
+        .field_option_i64     = None,
+        .field_option_str     = ""s,
+        .field_option_f32     = Some(-17.5),
+        .field_option_f64     = None,
+        .field_option_inner   = None,
+        .field_option_u_inner = None,
+        .field_o_o_i8         = None,
+        .field_o_o_str        = None,
+        .field_o_o_str2       = std::optional<std::string>{""s},
+        .field_o_o_inner      = None,
     },
     OuterStruct{
         .field_u8  = 0xff,
@@ -117,6 +118,16 @@ OuterStruct tests1_data[] = {
                 .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
                 .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
             },
+        .field_option_u_inner =
+            UnextensibleInnerStruct{
+                .field_bool  = true,
+                .field_u32   = 44,
+                .field_i16   = 55,
+                .field_str   = "byebye"s,
+                .field_f32   = 6.4,
+                .field_f64   = 128.128,
+                .field_v_u16 = {3, 2, 1},
+            },
         .field_o_o_i8    = std::optional<int8_t>{None},
         .field_o_o_str   = std::optional<std::string>{None},
         .field_o_o_str2  = None,
@@ -184,6 +195,16 @@ OuterStruct tests1_data[] = {
                 .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
                 .inner_o_vec_o_u16    = std::vector<std::optional<uint16_t>>{},
             },
+        .field_option_u_inner =
+            UnextensibleInnerStruct{
+                .field_bool  = false,
+                .field_u32   = 0,
+                .field_i16   = 0,
+                .field_str   = ""s,
+                .field_f32   = 0,
+                .field_f64   = 0,
+                .field_v_u16 = {},
+            },
         .field_o_o_i8    = std::optional<int8_t>{123},
         .field_o_o_str   = std::optional<std::string>{"a string"s},
         .field_o_o_str2  = None,
@@ -226,18 +247,6 @@ void round_trip(const T& data, rust::Slice<const uint8_t> blob)
       throw std::runtime_error("c++ unpacked does not match original");
 }
 
-void round_tripz(rust::Slice<const uint8_t> blob)
-{
-   round_trip(ZStruct{.age1     = 0xfafbfcfd,
-                      .btc      = 0xfafb,
-                      .cool     = true,
-                      .msg      = "hello"s,
-                      .maybe1   = 0xfa,
-                      .maybe2   = std::nullopt,
-                      .not_cool = true},
-              blob);
-}
-
 void round_trip_outer_struct(size_t index, rust::Slice<const uint8_t> blob)
 {
    round_trip(tests1_data[index], blob);
@@ -277,6 +286,7 @@ void round_trip_outer_struct_field(size_t                     index,
    HANDLE(field_option_f32);
    HANDLE(field_option_f64);
    HANDLE(field_option_inner);
+   HANDLE(field_option_u_inner);
    HANDLE(field_o_o_i8);
    HANDLE(field_o_o_str);
    HANDLE(field_o_o_str2);
