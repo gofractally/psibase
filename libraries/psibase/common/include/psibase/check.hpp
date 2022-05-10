@@ -23,7 +23,9 @@ namespace psibase
       [[noreturn]] void abortMessage(const char* message, uint32_t len);
    }  // namespace raw
 
-   // Abort with message. Message should be UTF8.
+   /// Abort with `message`
+   ///
+   /// Message should be UTF8.
    [[noreturn]] inline void abortMessage(std::string_view message)
    {
 #ifdef COMPILING_WASM
@@ -33,7 +35,9 @@ namespace psibase
 #endif
    }
 
-   // Abort with message if !cond. Message should be UTF8.
+   /// Abort with message if `!cond`
+   ///
+   /// Message should be UTF8.
    inline void check(bool cond, std::string_view message)
    {
       if (!cond)

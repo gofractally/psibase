@@ -131,7 +131,16 @@ namespace psibase
    /// * After B returns, `getCurrentAction()` returns A.
    ///
    /// Note: The above only applies if the contract uses [call]. `actor` uses [call].
-   Action                        getCurrentAction();
+   Action getCurrentAction();
+
+   /// Get the currently-executing action.
+   ///
+   /// If the contract, while handling action A, calls itself with action B:
+   /// * Before the call to B, `getCurrentAction()` returns A.
+   /// * After the call to B, `getCurrentAction()` returns B.
+   /// * After B returns, `getCurrentAction()` returns A.
+   ///
+   /// Note: The above only applies if the contract uses [call]. `actor` uses [call].
    psio::shared_view_ptr<Action> getCurrentActionView();
 
    /// Call a contract and return its result
@@ -143,7 +152,7 @@ namespace psibase
    /// Call a contract and return its result
    std::vector<char> call(const Action& action);
 
-   // Set the return value of the currently-executing action
+   /// Set the return value of the currently-executing action
    template <typename T>
    void setRetval(const T& retval)
    {
@@ -151,41 +160,41 @@ namespace psibase
       raw::setRetval(data.data(), data.size());
    }
 
-   // Set the return value of the currently-executing action
+   /// Set the return value of the currently-executing action
    inline void setRetvalBytes(psio::input_stream s)
    {
       raw::setRetval(s.pos, s.remaining());
    }
 
-   // Set a key-value pair. If key already exists, then replace the existing value.
+   /// Set a key-value pair. If key already exists, then replace the existing value.
    inline void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
    {
       raw::kvPut(db, key.pos, key.remaining(), value.pos, value.remaining());
    }
 
-   // Set a key-value pair. If key already exists, then replace the existing value.
+   /// Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, NotOptional V>
-   auto kvPut(DbId db, const K& key, const V& value)
+   void kvPut(DbId db, const K& key, const V& value)
    {
       kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
    }
 
-   // Set a key-value pair. If key already exists, then replace the existing value.
+   /// Set a key-value pair. If key already exists, then replace the existing value.
    template <typename K, NotOptional V>
-   auto kvPut(const K& key, const V& value)
+   void kvPut(const K& key, const V& value)
    {
       kvPut(DbId::contract, key, value);
    }
 
-   // Add a sequentially-numbered record. Returns the id.
+   /// Add a sequentially-numbered record. Returns the id.
    inline uint64_t kvPutSequentialRaw(DbId db, psio::input_stream value)
    {
       return raw::kvPutSequential(db, value.pos, value.remaining());
    }
 
-   // Add a sequentially-numbered record. Returns the id.
+   /// Add a sequentially-numbered record. Returns the id.
    template <typename Type, NotOptional V>
-   auto kvPutSequential(DbId db, AccountNumber contract, Type type, const V& value)
+   uint64_t kvPutSequential(DbId db, AccountNumber contract, Type type, const V& value)
    {
       std::vector<char>     packed(psio::fracpack_size(contract) + psio::fracpack_size(type) +
                                    psio::fracpack_size(value));
@@ -196,27 +205,27 @@ namespace psibase
       return kvPutSequentialRaw(db, packed);
    }
 
-   // Remove a key-value pair if it exists
+   /// Remove a key-value pair if it exists
    inline void kvRemoveRaw(DbId db, psio::input_stream key)
    {
       raw::kvRemove(db, key.pos, key.remaining());
    }
 
-   // Remove a key-value pair if it exists
+   /// Remove a key-value pair if it exists
    template <typename K>
    void kvRemove(DbId db, const K& key)
    {
       kvRemoveRaw(db, psio::convert_to_key(key));
    }
 
-   // Remove a key-value pair if it exists
+   /// Remove a key-value pair if it exists
    template <typename K>
    void kvRemove(const K& key)
    {
       kvRemove(DbId::contract, key);
    }
 
-   // Size of key-value pair, if any
+   /// Get size of key-value pair, if any
    inline std::optional<uint32_t> kvGetSizeRaw(DbId db, psio::input_stream key)
    {
       auto size = raw::kvGet(db, key.pos, key.remaining());
@@ -225,21 +234,21 @@ namespace psibase
       return size;
    }
 
-   // Size of key-value pair, if any
+   /// Size of key-value pair, if any
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(DbId db, const K& key)
    {
       return kvGetSizeRaw(db, psio::convert_to_key(key));
    }
 
-   // Size of key-value pair, if any
+   /// Size of key-value pair, if any
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(const K& key)
    {
       return kvGetSize(DbId::contract, key);
    }
 
-   // Get a key-value pair, if any
+   /// Get a key-value pair, if any
    inline std::optional<std::vector<char>> kvGetRaw(DbId db, psio::input_stream key)
    {
       auto size = raw::kvGet(db, key.pos, key.remaining());
@@ -248,7 +257,7 @@ namespace psibase
       return getResult(size);
    }
 
-   // Get a key-value pair, if any
+   /// Get a key-value pair, if any
    template <typename V, typename K>
    inline std::optional<V> kvGet(DbId db, const K& key)
    {
@@ -259,14 +268,14 @@ namespace psibase
       return psio::convert_from_frac<V>(*v);
    }
 
-   // Get a key-value pair, if any
+   /// Get a key-value pair, if any
    template <typename V, typename K>
    inline std::optional<V> kvGet(const K& key)
    {
       return kvGet<V>(DbId::contract, key);
    }
 
-   // Get a value, or the default if not found
+   /// Get a value, or the default if not found
    template <typename V, typename K>
    inline V kvGetOrDefault(DbId db, const K& key)
    {
@@ -276,14 +285,14 @@ namespace psibase
       return {};
    }
 
-   // Get a value, or the default if not found
+   /// Get a value, or the default if not found
    template <typename V, typename K>
    inline V kvGetOrDefault(const K& key)
    {
       return kvGetOrDefault<V>(DbId::contract, key);
    }
 
-   // Get a sequentially-numbered record, if available
+   /// Get a sequentially-numbered record, if available
    inline std::optional<std::vector<char>> kvGetSequentialRaw(DbId db, uint64_t id)
    {
       auto size = raw::kvGetSequential(db, id);
@@ -292,15 +301,15 @@ namespace psibase
       return getResult(size);
    }
 
-   // Get a sequentially-numbered record, if available.
-   // * If matchContract is non-null, and the record wasn't written by matchContract, then return nullopt.
-   //   This prevents a spurious abort from mismatched serialization.
-   // * If matchType is non-null, and the record type doesn't match, then return nullopt.
-   //   This prevents a spurious abort from mismatched serialization.
-   // * If contract is non-null, then it receives the contract that wrote the record. It is
-   //   left untouched if the record is not available.
-   // * If type is non-null, then it receives the record type. It is left untouched if either the record
-   //   is not available or if matchContract is not null but doesn't match.
+   /// Get a sequentially-numbered record, if available.
+   /// * If `matchContract` is non-null, and the record wasn't written by `matchContract`, then return nullopt.
+   ///   This prevents a spurious abort from mismatched serialization.
+   /// * If `matchType` is non-null, and the record type doesn't match, then return nullopt.
+   ///   This prevents a spurious abort from mismatched serialization.
+   /// * If `contract` is non-null, then it receives the contract that wrote the record. It is
+   ///   left untouched if the record is not available.
+   /// * If `type` is non-null, then it receives the record type. It is left untouched if either the record
+   ///   is not available or if `matchContract` is not null but doesn't match.
    template <typename V, typename Type>
    inline std::optional<V> kvGetSequential(DbId                 db,
                                            uint64_t             id,
@@ -335,9 +344,11 @@ namespace psibase
       return result;
    }
 
-   // Get the first key-value pair which is greater than or equal to the provided key. If one is
-   // found, and the first matchKeySize bytes of the found key matches the provided key, then
-   // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the first key-value pair which is greater than or equal to `key`
+   ///
+   /// If one is found, and the first `matchKeySize` bytes of the found key
+   /// matches the provided key, then returns the value. Use [getKey] to
+   /// get the found key.
    inline std::optional<std::vector<char>> kvGreaterEqualRaw(DbId               db,
                                                              psio::input_stream key,
                                                              uint32_t           matchKeySize)
@@ -348,9 +359,11 @@ namespace psibase
       return getResult(size);
    }
 
-   // Get the first key-value pair which is greater than or equal to the provided key. If one is
-   // found, and the first matchKeySize bytes of the found key matches the provided key, then
-   // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the first key-value pair which is greater than or equal to `key`
+   ///
+   /// If one is found, and the first `matchKeySize` bytes of the found key
+   /// matches the provided key, then returns the value. Use [getKey] to
+   /// get the found key.
    template <typename V, typename K>
    inline std::optional<V> kvGreaterEqual(DbId db, const K& key, uint32_t matchKeySize)
    {
@@ -361,18 +374,22 @@ namespace psibase
       return psio::convert_from_frac<V>(*v);
    }
 
-   // Get the first key-value pair which is greater than or equal to the provided key. If one is
-   // found, and the first matchKeySize bytes of the found key matches the provided key, then
-   // returns the value. Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the first key-value pair which is greater than or equal to `key`
+   ///
+   /// If one is found, and the first `matchKeySize` bytes of the found key
+   /// matches the provided key, then returns the value. Use [getKey] to
+   /// get the found key.
    template <typename V, typename K>
    inline std::optional<V> kvGreaterEqual(const K& key, uint32_t matchKeySize)
    {
       return kvGreaterEqual<V>(DbId::contract, key, matchKeySize);
    }
 
-   // Get the key-value pair immediately-before provided key. If one is found, and the first
-   // matchKeySize bytes of the found key matches the provided key, then returns the value.
-   // Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the key-value pair immediately-before provided key
+   ///
+   /// If one is found, and the first `matchKeySize` bytes of the found key
+   /// matches the provided key, then returns the value. Use [getKey] to
+   /// get the found key.
    inline std::optional<std::vector<char>> kvLessThanRaw(DbId               db,
                                                          psio::input_stream key,
                                                          uint32_t           matchKeySize)
@@ -383,9 +400,11 @@ namespace psibase
       return getResult(size);
    }
 
-   // Get the key-value pair immediately-before provided key. If one is found, and the first
-   // matchKeySize bytes of the found key matches the provided key, then returns the value.
-   // Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the key-value pair immediately-before provided key
+   ///
+   /// If one is found, and the first `matchKeySize` bytes of the found key
+   /// matches the provided key, then returns the value. Use [getKey] to
+   /// get the found key.
    template <typename V, typename K>
    inline std::optional<V> kvLessThan(DbId db, const K& key, uint32_t matchKeySize)
    {
@@ -396,17 +415,21 @@ namespace psibase
       return psio::convert_from_frac<V>(*v);
    }
 
-   // Get the key-value pair immediately-before provided key. If one is found, and the first
-   // matchKeySize bytes of the found key matches the provided key, then returns the value.
-   // Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the key-value pair immediately-before provided key
+   ///
+   /// If one is found, and the first `matchKeySize` bytes of the found key
+   /// matches the provided key, then returns the value. Use [getKey] to
+   /// get the found key.
    template <typename V, typename K>
    inline std::optional<V> kvLessThan(const K& key, uint32_t matchKeySize)
    {
       return kvLessThan<V>(DbId::contract, key, matchKeySize);
    }
 
-   // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the maximum key-value pair which has key as a prefix
+   ///
+   /// If one is found, then returns the value. Use [getKey] to
+   /// get the found key.
    inline std::optional<std::vector<char>> kvMaxRaw(DbId db, psio::input_stream key)
    {
       auto size = raw::kvMax(db, key.pos, key.remaining());
@@ -415,8 +438,10 @@ namespace psibase
       return getResult(size);
    }
 
-   // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the maximum key-value pair which has key as a prefix
+   ///
+   /// If one is found, then returns the value. Use [getKey] to
+   /// get the found key.
    template <typename V, typename K>
    inline std::optional<V> kvMax(DbId db, const K& key)
    {
@@ -427,14 +452,19 @@ namespace psibase
       return psio::convert_from_frac<V>(*v);
    }
 
-   // Get the maximum key-value pair which has key as a prefix. If one is found, then returns the
-   // value. Also sets key (use getKey). Otherwise returns nullopt.
+   /// Get the maximum key-value pair which has key as a prefix
+   ///
+   /// If one is found, then returns the value. Use [getKey] to
+   /// get the found key.
    template <typename V, typename K>
    inline std::optional<V> kvMax(const K& key)
    {
       return kvMax<V>(DbId::contract, key);
    }
 
+   /// Write `message` to console
+   ///
+   /// Message should be UTF8.
    inline void writeConsole(const std::string_view& sv)
    {
       raw::writeConsole(sv.data(), sv.size());
