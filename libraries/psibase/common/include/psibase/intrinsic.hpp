@@ -46,7 +46,7 @@ namespace psibase
 
       /// Store the currently-executing action into result and return the result size
       ///
-      /// Use [getResult](#psibaserawgetresult) to get result.
+      /// Use [getResult] to get result.
       ///
       /// If the contract, while handling action A, calls itself with action B:
       /// * Before the call to B, `getCurrentAction()` returns A.
@@ -58,7 +58,7 @@ namespace psibase
 
       /// Call a contract, store the return value into result, and return the result size
       ///
-      /// Use [getResult](#psibaserawgetresult) to get result.
+      /// Use [getResult] to get result.
       PSIBASE_INTRINSIC(call) uint32_t call(const char* action, uint32_t len);
 
       /// Set the return value of the currently-executing action
@@ -80,7 +80,7 @@ namespace psibase
       /// Get a key-value pair, if any
       ///
       /// If key exists, then sets result to value and returns size. If key does not
-      /// exist, returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get result.
+      /// exist, returns `-1` and clears result. Use [getResult] to get result.
       PSIBASE_INTRINSIC(kvGet) uint32_t kvGet(DbId db, const char* key, uint32_t keyLen);
 
       /// Get a sequentially-numbered record. If `id` is available, then sets result to value and
@@ -92,8 +92,8 @@ namespace psibase
       ///
       /// If one is found, and the first `matchKeySize` bytes of the found key
       /// matches the provided key, then sets result to value and returns size. Also
-      /// sets key. Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get
-      /// result and [getKey](#psibaserawgetkey) to get found key.
+      /// sets key. Otherwise returns `-1` and clears result. Use [getResult] to get
+      /// result and [getKey] to get found key.
       PSIBASE_INTRINSIC(kvGreaterEqual)
       uint32_t kvGreaterEqual(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
@@ -101,16 +101,16 @@ namespace psibase
       ///
       /// If one is found, and the first `matchKeySize` bytes of the found key
       /// matches the provided key, then sets result to value and returns size.
-      /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult)
-      /// to get result and [getKey](#psibaserawgetkey) to get found key.
+      /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult]
+      /// to get result and [getKey] to get found key.
       PSIBASE_INTRINSIC(kvLessThan)
       uint32_t kvLessThan(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
       /// Get the maximum key-value pair which has key as a prefix
       ///
       /// If one is found, then sets result to value and returns size. Also sets key.
-      /// Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get result
-      /// and [getKey](#psibaserawgetkey) to get found key.
+      /// Otherwise returns `-1` and clears result. Use [getResult] to get result
+      /// and [getKey] to get found key.
       PSIBASE_INTRINSIC(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
    }  // namespace raw
 
