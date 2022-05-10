@@ -386,7 +386,7 @@ macro_rules! bytes_impl {
             fn embedded_unpack(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
-                heap_pos: Option<&mut u32>,
+                opt_heap_pos: Option<&mut u32>,
             ) -> Result<Self> {
                 let orig_pos = *fixed_pos;
                 let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
@@ -396,7 +396,8 @@ macro_rules! bytes_impl {
 
                 let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
                 let mut fake_heap_pos: u32 = dynamic_pos;
-                let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut fake_heap_pos);
+                let is_unextensible = opt_heap_pos.is_none();
+                let heap_pos: &mut u32 = opt_heap_pos.unwrap_or(&mut fake_heap_pos);
 
                 if *heap_pos != dynamic_pos {
                     return Err(Error::BadOffset);
@@ -408,7 +409,12 @@ macro_rules! bytes_impl {
                 let bytes = src
                     .get(*heap_pos as usize..(*heap_pos + len) as usize)
                     .ok_or(Error::ReadPastEnd)?;
+
                 *heap_pos += len;
+                if is_unextensible {
+                    *fixed_pos += len + 4;
+                }
+
                 <$t>::fracpack_from_bytes(bytes)
             }
 

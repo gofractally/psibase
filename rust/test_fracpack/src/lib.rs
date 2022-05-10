@@ -1,3 +1,9 @@
+// #![feature(structural_match)]
+// #![feature(core_intrinsics)]
+// #![feature(core_panic)]
+// #![feature(fmt_internals)]
+// #![feature(print_internals)]
+
 pub mod bridge;
 
 use psi_macros::Fracpack;

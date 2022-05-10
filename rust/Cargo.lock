@@ -728,6 +728,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hex"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
+
+[[package]]
 name = "html5ever"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1949,6 +1955,7 @@ dependencies = [
  "cxx",
  "cxx-build",
  "fracpack",
+ "hex",
  "psi_macros",
 ]
 
