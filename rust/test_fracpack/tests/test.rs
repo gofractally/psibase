@@ -314,7 +314,7 @@ struct OuterSimple {
 }
 
 #[test]
-fn testn() {
+fn test_simple_isolated_structs() {
     let sws = SimpleWithString {
         a: 0x0a,
         b: 0x0b,
@@ -330,7 +330,7 @@ fn testn() {
         hex::encode(&sws_bytes).to_uppercase()
     );
     // 0A0000000B000000000000000C0008000000A4709D3F020000006869
-    
+
     let y = SimpleWithString::unpack(&sws_bytes[..], &mut 0).unwrap();
     println!("unpacked sws: {:?}", y);
 
@@ -353,14 +353,4 @@ fn testn() {
 
     let y = OuterSimple::unpack(&os_bytes[..], &mut 0).unwrap();
     println!("unpacked os: {:?}", y);
-}
-
-#[test]
-fn testx() {
-    let mut x: Vec<u8> = vec![1, 2, 3];
-    let y = 0_u32.to_le_bytes();
-    println!("{:?} {:?}", x, y);
-
-    x.extend_from_slice(&y);
-    println!("{:?}", x);
 }

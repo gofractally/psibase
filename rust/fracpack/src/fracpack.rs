@@ -39,16 +39,8 @@ pub trait Packable<'a>: Sized {
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>);
     fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>);
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>);
-    fn embedded_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
-    ) -> Result<Self>;
-    fn embedded_verify(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
-    ) -> Result<()>;
+    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self>;
+    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()>;
 
     fn option_fixed_pack(opt: &Option<Self>, dest: &mut Vec<u8>);
     fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>);
@@ -56,9 +48,9 @@ pub trait Packable<'a>: Sized {
     fn option_unpack(
         src: &'a [u8],
         fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
+        heap_pos: &mut u32,
     ) -> Result<Option<Self>>;
-    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: Option<&mut u32>) -> Result<()>;
+    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()>;
 } // Packable
 
 fn read_u8_arr<const SIZE: usize>(src: &[u8], pos: &mut u32) -> Result<[u8; SIZE]> {
@@ -115,14 +107,14 @@ macro_rules! scalar_impl {
             fn embedded_unpack(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
-                _heap_pos: Option<&mut u32>,
+                _heap_pos: &mut u32,
             ) -> Result<Self> {
                 <Self as Packable>::unpack(src, fixed_pos)
             }
             fn embedded_verify(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
-                _heap_pos: Option<&mut u32>,
+                _heap_pos: &mut u32,
             ) -> Result<()> {
                 <Self as Packable>::verify(src, fixed_pos)
             }
@@ -148,7 +140,7 @@ macro_rules! scalar_impl {
             fn option_unpack(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
-                heap_pos: Option<&mut u32>,
+                heap_pos: &mut u32,
             ) -> Result<Option<Self>> {
                 let orig_pos = *fixed_pos;
                 let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
@@ -156,31 +148,19 @@ macro_rules! scalar_impl {
                     return Ok(None);
                 }
 
-                let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
-                let mut fake_heap_pos: u32 = dynamic_pos;
-                let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut fake_heap_pos);
-
-                if *heap_pos != dynamic_pos {
+                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
                 Ok(Some(<Self as Packable>::unpack(src, heap_pos)?))
             }
-            fn option_verify(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                heap_pos: Option<&mut u32>,
-            ) -> Result<()> {
+            fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
                 let orig_pos = *fixed_pos;
                 let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(());
                 }
 
-                let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
-                let mut fake_heap_pos: u32 = dynamic_pos;
-                let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut fake_heap_pos);
-
-                if *heap_pos != dynamic_pos {
+                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
                 <Self as Packable>::verify(src, heap_pos)
@@ -215,13 +195,13 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
     fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
         let mut fixed_pos = *pos;
         *pos += 4;
-        <T as Packable>::option_unpack(src, &mut fixed_pos, Some(pos))
+        <T as Packable>::option_unpack(src, &mut fixed_pos, pos)
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
         let mut fixed_pos = *pos;
         *pos += 4;
-        <T as Packable>::option_verify(src, &mut fixed_pos, Some(pos))
+        <T as Packable>::option_verify(src, &mut fixed_pos, pos)
     }
 
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
@@ -236,19 +216,11 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
         <T as Packable>::option_variable_pack(self, dest)
     }
 
-    fn embedded_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
-    ) -> Result<Self> {
+    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
         <T as Packable>::option_unpack(src, fixed_pos, heap_pos)
     }
 
-    fn embedded_verify(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
-    ) -> Result<()> {
+    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
         <T as Packable>::option_verify(src, fixed_pos, heap_pos)
     }
 
@@ -272,7 +244,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
     fn option_unpack(
         src: &'a [u8],
         fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
+        heap_pos: &mut u32,
     ) -> Result<Option<Self>> {
         let orig_pos = *fixed_pos;
         let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
@@ -280,28 +252,20 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
             return Ok(None);
         }
 
-        let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
-        let mut fake_heap_pos: u32 = dynamic_pos;
-        let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut fake_heap_pos);
-
-        if *heap_pos != dynamic_pos {
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
         Ok(Some(<Self as Packable<'a>>::unpack(src, heap_pos)?))
     }
 
-    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: Option<&mut u32>) -> Result<()> {
+    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
         let orig_pos = *fixed_pos;
         let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
         if offset == 1 {
             return Ok(());
         }
 
-        let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
-        let mut fake_heap_pos: u32 = dynamic_pos;
-        let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut fake_heap_pos);
-
-        if *heap_pos != dynamic_pos {
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
         <Self as Packable>::verify(src, heap_pos)
@@ -391,7 +355,7 @@ macro_rules! bytes_impl {
             fn embedded_unpack(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
-                opt_heap_pos: Option<&mut u32>,
+                heap_pos: &mut u32,
             ) -> Result<Self> {
                 let orig_pos = *fixed_pos;
                 let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
@@ -399,12 +363,7 @@ macro_rules! bytes_impl {
                     return Ok(Default::default());
                 }
 
-                let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
-                let mut fake_heap_pos: u32 = dynamic_pos;
-                let is_unextensible = opt_heap_pos.is_none();
-                let heap_pos: &mut u32 = opt_heap_pos.unwrap_or(&mut fake_heap_pos);
-
-                if *heap_pos != dynamic_pos {
+                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
                 let len = <u32 as Packable>::unpack(src, heap_pos)?;
@@ -414,19 +373,14 @@ macro_rules! bytes_impl {
                 let bytes = src
                     .get(*heap_pos as usize..(*heap_pos + len) as usize)
                     .ok_or(Error::ReadPastEnd)?;
-
                 *heap_pos += len;
-                if is_unextensible {
-                    *fixed_pos += len + 4;
-                }
-
                 <$t>::fracpack_from_bytes(bytes)
             }
 
             fn embedded_verify(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
-                heap_pos: Option<&mut u32>,
+                heap_pos: &mut u32,
             ) -> Result<()> {
                 let orig_pos = *fixed_pos;
                 let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
@@ -434,11 +388,7 @@ macro_rules! bytes_impl {
                     return Ok(());
                 }
 
-                let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
-                let mut fake_heap_pos: u32 = dynamic_pos;
-                let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut fake_heap_pos);
-
-                if *heap_pos != dynamic_pos {
+                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
                 let len = <u32 as Packable>::unpack(src, heap_pos)?;
@@ -484,7 +434,7 @@ macro_rules! bytes_impl {
             fn option_unpack(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
-                heap_pos: Option<&mut u32>,
+                heap_pos: &mut u32,
             ) -> Result<Option<Self>> {
                 let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
@@ -496,11 +446,7 @@ macro_rules! bytes_impl {
                 )?))
             }
 
-            fn option_verify(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                heap_pos: Option<&mut u32>,
-            ) -> Result<()> {
+            fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
                 let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(());
@@ -554,11 +500,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
         let len = (num_bytes / <T as Packable>::FIXED_SIZE) as usize;
         let mut result = Self::with_capacity(len);
         for _ in 0..len {
-            result.push(<T as Packable>::embedded_unpack(
-                src,
-                pos,
-                Some(&mut heap_pos),
-            )?);
+            result.push(<T as Packable>::embedded_unpack(src, pos, &mut heap_pos)?);
         }
         *pos = heap_pos;
         Ok(result)
@@ -576,7 +518,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
             return Err(Error::ReadPastEnd);
         }
         for _ in 0..num_bytes / <T as Packable>::FIXED_SIZE {
-            <T as Packable>::embedded_verify(src, pos, Some(&mut heap_pos))?;
+            <T as Packable>::embedded_verify(src, pos, &mut heap_pos)?;
         }
         *pos = heap_pos;
         Ok(())
@@ -601,22 +543,14 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
     }
 
     // TODO: optimize scalar
-    fn embedded_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
-    ) -> Result<Self> {
+    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
         let orig_pos = *fixed_pos;
         let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
         if offset == 0 {
             return Ok(Self::new());
         }
 
-        let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
-        let mut fake_heap_pos: u32 = dynamic_pos;
-        let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut fake_heap_pos);
-
-        if *heap_pos != dynamic_pos {
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
         let num_bytes = <u32 as Packable>::unpack(src, heap_pos)?;
@@ -638,29 +572,21 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
             result.push(<T as Packable>::embedded_unpack(
                 src,
                 &mut inner_fixed_pos,
-                Some(heap_pos),
+                heap_pos,
             )?);
         }
         Ok(result)
     }
 
     // TODO: optimize scalar
-    fn embedded_verify(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
-    ) -> Result<()> {
+    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
         let orig_pos = *fixed_pos;
         let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
         if offset == 0 {
             return Ok(());
         }
 
-        let dynamic_pos: u32 = (orig_pos as u64 + offset as u64) as u32;
-        let mut fake_heap_pos: u32 = dynamic_pos;
-        let heap_pos: &mut u32 = heap_pos.unwrap_or(&mut fake_heap_pos);
-
-        if *heap_pos != dynamic_pos {
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
             return Err(Error::BadOffset);
         }
         let num_bytes = <u32 as Packable>::unpack(src, heap_pos)?;
@@ -677,7 +603,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
             return Err(Error::ReadPastEnd);
         }
         for _ in 0..num_bytes / <T as Packable>::FIXED_SIZE {
-            <T as Packable>::embedded_verify(src, &mut inner_fixed_pos, Some(heap_pos))?;
+            <T as Packable>::embedded_verify(src, &mut inner_fixed_pos, heap_pos)?;
         }
         Ok(())
     }
@@ -706,7 +632,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
     fn option_unpack(
         src: &'a [u8],
         fixed_pos: &mut u32,
-        heap_pos: Option<&mut u32>,
+        heap_pos: &mut u32,
     ) -> Result<Option<Self>> {
         let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
         if offset == 1 {
@@ -718,7 +644,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
         )?))
     }
 
-    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: Option<&mut u32>) -> Result<()> {
+    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
         let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
         if offset == 1 {
             return Ok(());
