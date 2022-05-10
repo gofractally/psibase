@@ -1,7 +1,9 @@
 #pragma once
 
+#include <array>
 #include <compare>
 #include <limits>
+#include <psibase/MethodNumber.hpp>
 #include <psibase/table.hpp>
 
 #include "nft_sys.hpp"
@@ -15,8 +17,7 @@ namespace UserContract
       uint64_t daily_limit_qty;
       uint64_t yearly_limit_pct;
 
-      friend std::strong_ordering operator<=>(const InfSettingsRecord&,
-                                              const InfSettingsRecord&) = default;
+      auto operator<=>(const InfSettingsRecord&) const = default;
    };
    PSIO_REFLECT(InfSettingsRecord, daily_limit_pct, daily_limit_qty, yearly_limit_pct);
 
@@ -25,8 +26,7 @@ namespace UserContract
       int64_t avg_daily;
       int64_t avg_yearly;
 
-      friend std::strong_ordering operator<=>(const InfStatsRecord&,
-                                              const InfStatsRecord&) = default;
+      auto operator<=>(const InfStatsRecord&) const = default;
    };
    PSIO_REFLECT(InfStatsRecord, avg_daily, avg_yearly);
 
@@ -35,20 +35,21 @@ namespace UserContract
       InfSettingsRecord settings;
       InfStatsRecord    stats;
 
-      friend std::strong_ordering operator<=>(const InflationRecord&,
-                                              const InflationRecord&) = default;
+      auto operator<=>(const InflationRecord&) const = default;
    };
    PSIO_REFLECT(InflationRecord, settings, stats);
 
    struct TokenRecord
    {
-      TID             id;
-      NID             ownerNft;
-      InflationRecord inflation;
-      psibase::Bitset flags;
-      Precision       precision;
-      Quantity        currentSupply;
-      Quantity        maxSupply;
+      TID                id;
+      NID                ownerNft;
+      InflationRecord    inflation;
+      psibase::Bitset<8> config;
+      Precision          precision;
+      Quantity           currentSupply;
+      Quantity           maxSupply;
+
+      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"}>;
 
       static bool isValidKey(TID tokenId)
       {
@@ -61,22 +62,17 @@ namespace UserContract
          return tokenId > 0 && tokenId <= std::numeric_limits<uint32_t>::max() / 2;
       }
 
-      enum Flags : uint8_t
-      {
-         unrecallable
-      };
-
-      friend std::strong_ordering operator<=>(const TokenRecord&, const TokenRecord&) = default;
+      auto operator<=>(const TokenRecord&) const = default;
    };
-   PSIO_REFLECT(TokenRecord, id, ownerNft, inflation, flags, precision, currentSupply, maxSupply);
+   PSIO_REFLECT(TokenRecord, id, ownerNft, inflation, config, precision, currentSupply, maxSupply);
    using TokenTable_t = psibase::table<TokenRecord, &TokenRecord::id>;
 
    struct BalanceKey_t
    {
-      TID                    tokenId;
       psibase::AccountNumber account;
+      TID                    tokenId;
 
-      friend std::strong_ordering operator<=>(const BalanceKey_t&, const BalanceKey_t&) = default;
+      auto operator<=>(const BalanceKey_t&) const = default;
    };
    PSIO_REFLECT(BalanceKey_t, tokenId, account);
 
@@ -85,52 +81,56 @@ namespace UserContract
       BalanceKey_t key;
       uint64_t     balance;
 
-      operator uint64_t() const { return balance; }
-      operator Quantity() const { return Quantity{balance}; }
-
-      friend std::strong_ordering operator<=>(const BalanceRecord&, const BalanceRecord&) = default;
+      auto           operator<=>(const BalanceRecord&) const = default;
+      constexpr auto operator<=>(const int& other) const
+      {
+         return balance <=> static_cast<uint64_t>(other);
+      }
+      constexpr bool operator==(const int& other) const
+      {
+         return balance == static_cast<uint64_t>(other);
+      }
    };
    PSIO_REFLECT(BalanceRecord, key, balance);
    using BalanceTable_t = psibase::table<BalanceRecord, &BalanceRecord::key>;
 
    struct SharedBalanceKey_t
    {
-      TID                    tokenId;
       psibase::AccountNumber creditor;
       psibase::AccountNumber debitor;
+      TID                    tokenId;
 
-      friend std::strong_ordering operator<=>(const SharedBalanceKey_t&,
-                                              const SharedBalanceKey_t&) = default;
+      auto operator<=>(const SharedBalanceKey_t&) const = default;
    };
    PSIO_REFLECT(SharedBalanceKey_t, tokenId, creditor, debitor);
+
    struct SharedBalanceRecord
    {
       SharedBalanceKey_t key;
       uint64_t           balance;
 
-      operator uint64_t() const { return balance; }
-      operator Quantity() const { return Quantity{balance}; }
-
-      friend std::strong_ordering operator<=>(const SharedBalanceRecord&,
-                                              const SharedBalanceRecord&) = default;
+      auto           operator<=>(const SharedBalanceRecord&) const = default;
+      constexpr auto operator<=>(const int& other) const
+      {
+         return balance <=> static_cast<uint64_t>(other);
+      }
+      constexpr bool operator==(const int& other) const
+      {
+         return balance == static_cast<uint64_t>(other);
+      }
    };
    PSIO_REFLECT(SharedBalanceRecord, key, balance);
    using SharedBalanceTable_t = psibase::table<SharedBalanceRecord, &SharedBalanceRecord::key>;
+   // Todo - How can I add a secondary index for debitor? I imagine people will want to search for shared balances by debitor.
 
    struct TokenHolderRecord
    {
       psibase::AccountNumber account;
-      psibase::Bitset        config;
+      psibase::Bitset<8>     config;
 
-      operator psibase::AccountNumber() const { return account; }
+      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"manualDebit"}>;
 
-      enum Flags : uint8_t
-      {
-         manualDebit
-      };
-
-      friend std::strong_ordering operator<=>(const TokenHolderRecord&,
-                                              const TokenHolderRecord&) = default;
+      auto operator<=>(const TokenHolderRecord&) const = default;
    };
    PSIO_REFLECT(TokenHolderRecord, account, config);
    using TokenHolderTable_t = psibase::table<TokenHolderRecord, &TokenHolderRecord::account>;

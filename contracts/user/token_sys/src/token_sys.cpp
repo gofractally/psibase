@@ -9,6 +9,7 @@ using namespace UserContract::Errors;
 using namespace psibase;
 using psio::const_view;
 using system_contract::account_sys;
+using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
 // For helpers
 #include <concepts>
@@ -27,6 +28,8 @@ namespace
    {
       return sumOverflows(addend1, addend2) || addend1 + addend2 > limit;
    }
+
+   constexpr auto unrecallable = "unrecallable"_m;
 }  // namespace
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
@@ -40,7 +43,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    TID newId = (tokenIdx.begin() == tokenIdx.end()) ? 1 : (*(--tokenIdx.end())).id + 1;
 
    check(TokenRecord::isValidKey(newId), invalidTokenId);
-   check(maxSupply > Quantity{0}, supplyGt0);
+   check(maxSupply > 0, supplyGt0);
 
    auto nftId = nftContract.mint();
    nftContract.credit(nftId, creator, "Nft for new token ID: " + std::to_string(newId));
@@ -64,7 +67,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver, const_
    auto balance     = getBalance(tokenId, receiver);
    auto nftContract = at<NftSys>();
 
-   check(amount > Quantity{0}, quantityGt0);
+   check(amount > 0, quantityGt0);
    check(nftContract.exists(token.ownerNft), missingRequiredAuth);
    check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
    check(not sumExceeds(token.currentSupply.value, amount.value, token.maxSupply.value),
@@ -80,17 +83,18 @@ void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver, const_
 
 void TokenSys::setUnrecallable(TID tokenId)
 {
-   auto sender      = get_sender();
-   auto token       = getToken(tokenId);
-   auto nftContract = at<NftSys>();
+   auto sender          = get_sender();
+   auto token           = getToken(tokenId);
+   auto nftContract     = at<NftSys>();
+   auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
 
    check(nftContract.exists(token.ownerNft), missingRequiredAuth);
    check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
 
-   token.flags.set(TokenRecord::Flags::unrecallable, true);
+   token.config.set(unrecallableBit, true);
    db.open<TokenTable_t>().put(token);
 
-   emit().ui().set(tokenId, sender, TokenRecord::Flags::unrecallable);
+   emit().ui().setUnrecallable(tokenId, sender);
 }
 
 void TokenSys::burn(TID tokenId, Quantity amount)
@@ -99,18 +103,14 @@ void TokenSys::burn(TID tokenId, Quantity amount)
    auto token   = getToken(tokenId);
    auto balance = getBalance(tokenId, sender);
 
-   if (amount == 0)
-   {
-      return;
-   }
-
+   check(amount > 0, quantityGt0);
    check(balance.balance >= amount.value, insufficientBalance);
 
    balance.balance -= amount.value;
 
    if (balance.balance == 0)
    {
-      db.open<BalanceTable_t>().erase(BalanceKey_t{tokenId, sender});
+      db.open<BalanceTable_t>().erase(BalanceKey_t{sender, tokenId});
    }
    else
    {
@@ -120,24 +120,18 @@ void TokenSys::burn(TID tokenId, Quantity amount)
    emit().ui().burned(tokenId, sender, amount);
 }
 
-void TokenSys::manualDebit(bool enable)
+void TokenSys::setConfig(psibase::NamedBit_t flag, bool enable)
 {
-   auto sender = get_sender();
-   auto hodler = getTokenHolder(sender);
+   auto sender  = get_sender();
+   auto hodler  = getTokenHolder(sender);
+   auto flagBit = TokenHolderRecord::Configurations::getIndex(flag);
 
-   check(not hodler.config.get(TokenHolderRecord::Flags::manualDebit) == enable, redundantUpdate);
+   check(not hodler.config.get(flagBit) == enable, redundantUpdate);
 
-   hodler.config.set(TokenHolderRecord::Flags::manualDebit, enable);
+   hodler.config.set(flagBit, enable);
    db.open<TokenHolderTable_t>().put(hodler);
 
-   if (enable)
-   {
-      emit().ui().enabledManDeb(sender);
-   }
-   else
-   {
-      emit().ui().disabledManDeb(sender);
-   }
+   emit().ui().configChanged(sender, flag, enable);
 }
 
 void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
@@ -145,13 +139,15 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    auto sender  = get_sender();
    auto balance = getBalance(tokenId, sender);
 
-   check(amount > Quantity{0}, quantityGt0);
+   check(amount > 0, quantityGt0);
    check(amount <= balance, insufficientBalance);
 
    balance.balance -= amount.value;
    db.open<BalanceTable_t>().put(balance);
 
-   bool manualDebit = getTokenHolder(receiver).config.get(TokenHolderRecord::Flags::manualDebit);
+   emit().ui().credited(tokenId, sender, receiver, amount, memo);
+   auto manualDebitFlag = TokenHolderConfig::getIndex("manualDebit"_m);
+   bool manualDebit     = getTokenHolder(receiver).config.get(manualDebitFlag);
    if (manualDebit)
    {
       auto sharedBalance = getSharedBal(tokenId, sender, receiver);
@@ -163,12 +159,6 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
       auto balance = getBalance(tokenId, receiver);
       balance.balance += amount.value;
       db.open<BalanceTable_t>().put(balance);
-   }
-
-   emit().ui().credited(tokenId, sender, receiver, amount, memo);
-
-   if (!manualDebit)
-   {
       emit().ui().transferred(tokenId, sender, receiver, amount, memo);
    }
 }
@@ -190,7 +180,7 @@ void TokenSys::uncredit(TID                tokenId,
 
    if (sharedBalance.balance == 0)
    {
-      db.open<SharedBalanceTable_t>().erase(SharedBalanceKey_t{tokenId, sender, receiver});
+      db.open<SharedBalanceTable_t>().erase(SharedBalanceKey_t{sender, receiver, tokenId});
    }
    else
    {
@@ -215,7 +205,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
    if (sharedBalance.balance == 0)
    {
-      db.open<SharedBalanceTable_t>().erase(SharedBalanceKey_t{tokenId, sender, receiver});
+      db.open<SharedBalanceTable_t>().erase(SharedBalanceKey_t{sender, receiver, tokenId});
    }
    else
    {
@@ -226,37 +216,27 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    emit().ui().transferred(tokenId, sender, receiver, amount, memo);
 }
 
-void TokenSys::recall(TID                tokenId,
-                      AccountNumber      from,
-                      AccountNumber      to,
-                      Quantity           amount,
-                      const_view<String> memo)
+void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
 {
-   auto sender      = get_sender();
-   auto token       = getToken(tokenId);
-   auto fromBalance = getBalance(tokenId, from);
-   auto toBalance   = getBalance(tokenId, to);
-   auto nftContract = at<NftSys>();
+   auto sender          = get_sender();
+   auto token           = getToken(tokenId);
+   auto fromBalance     = getBalance(tokenId, from);
+   auto nftContract     = at<NftSys>();
+   auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
 
    check(nftContract.exists(token.ownerNft), missingRequiredAuth);
    check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
-   check(not token.flags.get(TokenRecord::Flags::unrecallable), tokenUnrecallable);
+   check(not token.config.get(unrecallableBit), tokenUnrecallable);
    check(amount.value > 0, quantityGt0);
    check(fromBalance.balance >= amount.value, insufficientBalance);
 
+   // Recall is ultimately a remote burn
    fromBalance.balance -= amount.value;
-   toBalance.balance += amount.value;
-
-   // Todo - How should this work?
-   // If it goes into shared balance between from/to, then from could uncredit.
-   // If it goes into shared balance between issuer/to, then the recipient needs to know token issuer
-   // Should it just directly transfer to their balance?
 
    auto balanceTable = db.open<BalanceTable_t>();
    balanceTable.put(fromBalance);
-   balanceTable.put(toBalance);
 
-   emit().ui().recalled(tokenId, from, to, amount, memo);
+   emit().ui().recalled(tokenId, from, amount, memo);
 }
 
 TokenRecord TokenSys::getToken(TID tokenId)
@@ -278,7 +258,7 @@ BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
 {
    auto balanceTable = db.open<BalanceTable_t>();
    auto balanceIdx   = balanceTable.get_index<0>();
-   auto balanceOpt   = balanceIdx.get(BalanceKey_t{tokenId, account});
+   auto balanceOpt   = balanceIdx.get(BalanceKey_t{account, tokenId});
 
    BalanceRecord record;
    if (balanceOpt != std::nullopt)
@@ -290,7 +270,7 @@ BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
       check(at<account_sys>().exists(account), invalidAccount);
       check(exists(tokenId), tokenDNE);
 
-      record = {{tokenId, account}, 0};
+      record = {.key = {account, tokenId}, .balance = 0};
    }
 
    return record;
@@ -302,7 +282,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
 {
    auto               sharedBalanceTable = db.open<SharedBalanceTable_t>();
    auto               sbIdx              = sharedBalanceTable.get_index<0>();
-   SharedBalanceKey_t key                = {tokenId, creditor, debitor};
+   SharedBalanceKey_t key                = {creditor, debitor, tokenId};
    auto               sbOpt              = sbIdx.get(key);
 
    SharedBalanceRecord record;
@@ -337,13 +317,13 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
    else
    {
       _checkAccountValid(account);
-      record = {.account = account, .config = Bitset()};
+      record = TokenHolderRecord{account};
    }
 
    return record;
 }
 
-bool TokenSys::isManualDebit(AccountNumber account)
+bool TokenSys::getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag)
 {
    auto hodler = db.open<TokenHolderTable_t>().get_index<0>().get(account);
    if (hodler.has_value() == false)
@@ -352,7 +332,7 @@ bool TokenSys::isManualDebit(AccountNumber account)
    }
    else
    {
-      return (*hodler).config.get(TokenHolderRecord::Flags::manualDebit);
+      return (*hodler).config.get(TokenHolderConfig::getIndex(flag));
    }
 }
 

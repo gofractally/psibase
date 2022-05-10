@@ -3,6 +3,7 @@
 #include "token_sys.hpp"
 
 #include <psibase/DefaultTestChain.hpp>
+#include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
 
 using namespace psibase;
@@ -29,6 +30,9 @@ namespace
    const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
        {TokenSys::contract, "token_sys.wasm"},
        {NftSys::contract, "nft_sys.wasm"}};
+
+   constexpr auto manualDebit  = "manualDebit"_m;
+   constexpr auto unrecallable = "unrecallable"_m;
 
 }  // namespace
 
@@ -138,10 +142,10 @@ SCENARIO("Minting tokens")
             auto getBalanceBob   = b.getBalance(tokenId, bob);
 
             CHECK(getBalanceAlice.succeeded());
-            CHECK(getBalanceAlice.returnVal() == 1000);
+            CHECK(getBalanceAlice.returnVal().balance == 1000);
 
             CHECK(getBalanceBob.succeeded());
-            CHECK(getBalanceBob.returnVal() == 1000);
+            CHECK(getBalanceBob.returnVal().balance == 1000);
          }
          AND_THEN("Storage was billed correctly")
          {  //
@@ -182,27 +186,33 @@ SCENARIO("Recalling tokens")
 
       THEN("The token is recallable by default")
       {
-         CHECK(false == token.flags.get(TokenRecord::Flags::unrecallable));
+         auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
+         CHECK(false == token.config.get(unrecallableBit));
       }
       THEN("Alice can recall Bob's tokens")
       {
-         auto recall = a.recall(tokenId, bob, alice, 1000, memo);
+         auto recall = a.recall(tokenId, bob, 1000, memo);
          CHECK(recall.succeeded());
 
-         AND_THEN("Alice owns Bob's tokens")
+         AND_THEN("Bob's token balance has decreased")
          {
-            CHECK(a.getBalance(tokenId, bob).returnVal() == 0);
-            CHECK(a.getBalance(tokenId, alice).returnVal() == 1000);
+            CHECK(a.getBalance(tokenId, bob).returnVal().balance == 0);
+         }
+         AND_THEN("Alice's token balance has not changed")
+         {
+            CHECK(a.getBalance(tokenId, alice).returnVal().balance == 0);
          }
       }
       THEN("The token issuer may turn off recallability")
       {
          CHECK(a.setUnrecallable(tokenId).succeeded());
-         CHECK(a.getToken(tokenId).returnVal().flags.get(TokenRecord::Flags::unrecallable));
+
+         auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
+         CHECK(a.getToken(tokenId).returnVal().config.get(unrecallableBit));
 
          AND_THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, alice, 1000, memo).failed(tokenUnrecallable));
+            CHECK(a.recall(tokenId, bob, 1000, memo).failed(tokenUnrecallable));
          }
       }
    }
@@ -249,12 +259,12 @@ SCENARIO("Interactions with the Issuer NFT")
          THEN("Alice may not recall Bob's tokens")
          {
             b.mint(tokenId, 1000, bob, memo);
-            CHECK(a.recall(tokenId, bob, alice, 1000, memo).failed(missingRequiredAuth));
+            CHECK(a.recall(tokenId, bob, 1000, memo).failed(missingRequiredAuth));
          }
          THEN("Bob may recall Alice's tokens")
          {
             b.mint(tokenId, 1000, alice, memo);
-            CHECK(b.recall(tokenId, alice, bob, 1000, memo).succeeded());
+            CHECK(b.recall(tokenId, alice, 1000, memo).succeeded());
          }
       }
       WHEN("Alice burns the issuer NFT")
@@ -272,7 +282,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, alice, 1000, memo).failed(missingRequiredAuth));
+            CHECK(a.recall(tokenId, bob, 1000, memo).failed(missingRequiredAuth));
          }
          THEN("Alice may not update the token inflation")
          {  //
@@ -325,11 +335,11 @@ SCENARIO("Burning tokens")
 
          THEN("She still owns 40 tokens")
          {  //
-            CHECK(a.getBalance(tokenId, alice).returnVal() == 40);
+            CHECK(a.getBalance(tokenId, alice).returnVal().balance == 40);
          }
          THEN("Bob still owns 100 tokens")
          {  //
-            CHECK(b.getBalance(tokenId, bob).returnVal() == 100);
+            CHECK(b.getBalance(tokenId, bob).returnVal().balance == 100);
          }
       }
       WHEN("Alice burns 100 tokens")
@@ -338,7 +348,7 @@ SCENARIO("Burning tokens")
 
          THEN("Her balance is 0")
          {  //
-            CHECK(a.getBalance(tokenId, alice).returnVal() == 0);
+            CHECK(a.getBalance(tokenId, alice).returnVal().balance == 0);
          }
          THEN("She may not burn any more")
          {
@@ -354,11 +364,11 @@ SCENARIO("Burning tokens")
 
             THEN("Bob still has 90 tokens")
             {  //
-               CHECK(b.getBalance(tokenId, bob).returnVal() == 90);
+               CHECK(b.getBalance(tokenId, bob).returnVal().balance == 90);
             }
             THEN("Alice still has 0 tokens")
             {  //
-               CHECK(a.getBalance(tokenId, alice).returnVal() == 0);
+               CHECK(a.getBalance(tokenId, alice).returnVal().balance == 0);
             }
          }
       }
@@ -378,54 +388,50 @@ SCENARIO("Toggling manual-debit")
 
       THEN("Alice and Bob both have manualDebit disabled")
       {
-         auto isManualDebit1 = a.isManualDebit(alice);
+         auto isManualDebit1 = a.getConfig(alice, manualDebit);
          REQUIRE(isManualDebit1.succeeded());
          CHECK(isManualDebit1.returnVal() == false);
 
-         auto isManualDebit2 = a.isManualDebit(bob);
+         auto isManualDebit2 = a.getConfig(bob, manualDebit);
          REQUIRE(isManualDebit2.succeeded());
          CHECK(isManualDebit2.returnVal() == false);
       }
       THEN("Alice may enable manual-debit")
       {  //
-         CHECK(a.manualDebit(true).succeeded());
+         CHECK(a.setConfig(manualDebit, true).succeeded());
       }
       WHEN("Alice enabled manual-debit")
       {
-         a.manualDebit(true);
+         a.setConfig(manualDebit, true);
 
          THEN("Alice has manual-debit enabled")
          {  //
-            CHECK(a.isManualDebit(alice).returnVal() == true);
+            CHECK(a.getConfig(alice, manualDebit).returnVal() == true);
          }
          THEN("Bob still has manual-debit disabled")
          {  //
-            CHECK(a.isManualDebit(bob).returnVal() == false);
+            CHECK(a.getConfig(bob, manualDebit).returnVal() == false);
          }
          THEN("Alice may not enable manual-debit again")
          {
-            CHECK(a.manualDebit(true).failed(redundantUpdate));
+            CHECK(a.setConfig(manualDebit, true).failed(redundantUpdate));
 
             AND_THEN("But Bob may enable manual-debit")
             {  //
-               CHECK(b.manualDebit(true).succeeded());
+               CHECK(b.setConfig(manualDebit, true).succeeded());
             }
          }
          THEN("Alice may disable manual-debit")
          {  //
-            CHECK(a.manualDebit(false).succeeded());
-         }
-         WHEN("Alice disabled manual-debit")
-         {
-            a.manualDebit(false);
+            CHECK(a.setConfig(manualDebit, false).succeeded());
 
-            THEN("Alice has manual-debit disabled")
+            AND_THEN("Alice has manual-debit disabled")
             {  //
-               CHECK(a.isManualDebit(alice).returnVal() == false);
+               CHECK(a.getConfig(alice, manualDebit).returnVal() == false);
             }
-            THEN("Bob still has manual-debit disabled")
+            AND_THEN("Bob still has manual-debit disabled")
             {
-               CHECK(a.isManualDebit(bob).returnVal() == false);
+               CHECK(a.getConfig(bob, manualDebit).returnVal() == false);
             }
          }
       }
@@ -462,11 +468,11 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
 
          THEN("Bob immediately has 200 tokens")
          {  //
-            CHECK(b.getBalance(tokenId, bob).returnVal() == 200);
+            CHECK(b.getBalance(tokenId, bob).returnVal().balance == 200);
          }
          THEN("Alice immediately has 0 tokens")
          {  //
-            CHECK(a.getBalance(tokenId, alice).returnVal() == 0);
+            CHECK(a.getBalance(tokenId, alice).returnVal().balance == 0);
          }
          THEN("Alice may not credit Bob 1 token")
          {
@@ -490,11 +496,11 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
 
             THEN("Bob has 190 tokens")
             {  //
-               CHECK(b.getBalance(tokenId, bob).returnVal() == 190);
+               CHECK(b.getBalance(tokenId, bob).returnVal().balance == 190);
             }
             THEN("Alice has 10 tokens")
             {  //
-               CHECK(a.getBalance(tokenId, alice).returnVal() == 10);
+               CHECK(a.getBalance(tokenId, alice).returnVal().balance == 10);
             }
          }
       }
@@ -519,7 +525,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 
       AND_GIVEN("Alice turns on manual-debit")
       {
-         a.manualDebit(true);
+         a.setConfig(manualDebit, true);
 
          THEN("Alice may credit Bob 50 tokens")
          {
@@ -535,8 +541,8 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 
             THEN("The transfer happens immediately")
             {
-               CHECK(150 == b.getBalance(tokenId, bob).returnVal());
-               CHECK(50 == a.getBalance(tokenId, alice).returnVal());
+               CHECK(150 == b.getBalance(tokenId, bob).returnVal().balance);
+               CHECK(50 == a.getBalance(tokenId, alice).returnVal().balance);
             }
             THEN("Alice and Bob may not uncredit any tokens")
             {
@@ -555,10 +561,10 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 
             THEN("Bob owns 50 tokens in his individual balance")
             {
-               CHECK(50 == b.getBalance(tokenId, bob).returnVal());
+               CHECK(50 == b.getBalance(tokenId, bob).returnVal().balance);
                AND_THEN("Bob owns 50 tokens in his shared balance with Alice")
                {
-                  CHECK(50 == b.getSharedBal(tokenId, bob, alice).returnVal());
+                  CHECK(50 == b.getSharedBal(tokenId, bob, alice).returnVal().balance);
                }
             }
             THEN("Bob may not uncredit 51 tokens")
@@ -578,7 +584,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
                   CHECK(b.uncredit(tokenId, alice, 25, memo).succeeded());
                   AND_THEN("Bob owns 0 tokens in his shared balance with Alice")
                   {
-                     CHECK(0 == b.getSharedBal(tokenId, bob, alice).returnVal());
+                     CHECK(0 == b.getSharedBal(tokenId, bob, alice).returnVal().balance);
                   }
                }
                AND_THEN("Alice may not debit 26 tokens")

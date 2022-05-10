@@ -28,6 +28,8 @@ namespace
       static constexpr int64_t subsequentEmplace = 100;
       static constexpr int64_t update            = 100;
    };
+
+   constexpr auto manualDebitBit = NftHolderRecord::Configurations::getIndex("manualDebit"_m);
 }  // namespace
 
 SCENARIO("Minting & burning nfts")
@@ -139,8 +141,7 @@ SCENARIO("Transferring NFTs")
          auto getNftHolder = b.getNftHolder(bob);
          CHECK(getNftHolder.succeeded());
 
-         auto isManualDebit =
-             getNftHolder.returnVal().config.get(NftHolderRecord::Flags::manualDebit);
+         auto isManualDebit = getNftHolder.returnVal().config.get(manualDebitBit);
          CHECK(not isManualDebit);
       }
       THEN("Bob is able to opt in to manual-debit")
@@ -148,8 +149,7 @@ SCENARIO("Transferring NFTs")
          auto manualDebit = b.manualDebit(true);
          CHECK(manualDebit.succeeded());
 
-         auto isManualDebit =
-             b.getNftHolder(bob).returnVal().config.get(NftHolderRecord::Flags::manualDebit);
+         auto isManualDebit = b.getNftHolder(bob).returnVal().config.get(manualDebitBit);
          CHECK(isManualDebit);
 
          AND_THEN("Storage billing is updated correctly")
