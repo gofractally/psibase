@@ -1,11 +1,9 @@
 use clap::{Parser, Subcommand};
 use mdbook::preprocess::CmdPreprocessor;
 use mdbook::BookItem;
-use regex::{CaptureMatches, Captures, Regex};
-use std::cell::Cell;
+use regex::{Captures, Regex};
 use std::cmp::max;
 use std::collections::HashMap;
-use std::fs::DirEntry;
 use std::path::Path;
 use std::{fs, io};
 use yaml_rust::{Yaml, YamlLoader};
@@ -22,113 +20,253 @@ enum Commands {
     Supports { renderer: String },
 }
 
-fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
+#[derive(Copy, Clone)]
+enum Type {
+    Namespace,
+    Function,
+    Record,
+}
+
+struct Item {
+    yaml_index: usize,
+    name: String,
+    _ty: Type,
+    parent: Option<usize>,
+    children: Vec<usize>,
+}
+
+fn load_yamls(dir: &Path, yamls: &mut Vec<Yaml>) -> io::Result<()> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_dir() {
-                visit_dirs(&path, cb)?;
+                load_yamls(&path, yamls)?;
             } else {
-                cb(&entry);
+                yamls.append(
+                    &mut YamlLoader::load_from_str(
+                        &fs::read_to_string(entry.path().to_str().unwrap()).unwrap(),
+                    )
+                    .unwrap(),
+                );
             }
         }
     }
     Ok(())
 }
 
-fn process_directive<'r, 't>(
-    map: &HashMap<&str, &Yaml>,
-    global_namespace: &Yaml,
-    path: &str,
-    matches: CaptureMatches<'r, 't>,
-) -> String {
-    let mut item = global_namespace;
-    let empty = Vec::new();
-    for matched_path in matches {
-        let items = item["ChildNamespaces"].as_vec().unwrap_or(&empty).iter();
-        let items = items.chain(item["ChildRecords"].as_vec().unwrap_or(&empty));
-        let items = items.chain(item["ChildFunctions"].as_vec().unwrap_or(&empty));
-        let items: Vec<&Yaml> = items.collect();
-        let pos = items.iter().position(|item| {
-            item["Name"].as_str().unwrap_or("") == matched_path.get(1).unwrap().as_str()
+fn convert_item<'a>(
+    yamls: &'a mut Vec<Yaml>,
+    by_usr: &'a mut HashMap<String, usize>,
+    items: &'a mut Vec<Item>,
+    parent: Option<usize>,
+    ty: Type,
+    usr: &str,
+) -> Option<usize> {
+    let mut ancestor = parent;
+    while let Some(x) = ancestor {
+        if yamls[items[x].yaml_index]["USR"].as_str().unwrap() == usr {
+            return None;
+        }
+        ancestor = items[x].parent;
+    }
+    if let Some(i) = by_usr.get(usr) {
+        let i = *i;
+        let index = items.len();
+        items.push(Item {
+            yaml_index: i,
+            name: yamls[i]["Name"].as_str().unwrap_or("").to_owned(),
+            _ty: ty,
+            parent,
+            children: Vec::new(),
         });
-        if let Some(pos) = pos {
-            let next_item = map.get(items[pos]["USR"].as_str().unwrap());
-            if let Some(next_item) = next_item {
-                item = *next_item;
-            } else {
-                item = items[pos];
-            }
-        } else {
-            panic!("{} not found", path);
+        convert_items(
+            yamls,
+            by_usr,
+            items,
+            index,
+            i,
+            "ChildNamespaces",
+            Type::Namespace,
+            false,
+        );
+        convert_items(
+            yamls,
+            by_usr,
+            items,
+            index,
+            i,
+            "ChildRecords",
+            Type::Function,
+            false,
+        );
+        convert_items(
+            yamls,
+            by_usr,
+            items,
+            index,
+            i,
+            "ChildFunctions",
+            Type::Record,
+            true,
+        );
+        Some(index)
+    } else {
+        None
+    }
+} // convert_item
+
+#[allow(clippy::too_many_arguments)]
+fn convert_items<'a>(
+    yamls: &'a mut Vec<Yaml>,
+    by_usr: &'a mut HashMap<String, usize>,
+    items: &'a mut Vec<Item>,
+    parent: usize,
+    children_in_index: usize,
+    children_name: &str,
+    ty: Type,
+    create_children: bool,
+) {
+    let empty = Vec::new();
+    for x in yamls[children_in_index][children_name]
+        .clone()
+        .as_vec()
+        .unwrap_or(&empty)
+        .iter()
+    {
+        let usr = x["USR"].as_str().unwrap();
+        if create_children && by_usr.get(usr).is_none() {
+            yamls.push(x.clone());
+            by_usr.insert(usr.to_owned(), yamls.len() - 1);
+        }
+        if let Some(index) = convert_item(yamls, by_usr, items, Some(parent), ty, usr) {
+            items[parent].children.push(index);
         }
     }
+}
 
-    // eprintln!("{:?}", item);
-    let mut desc = String::new();
-    for a in item["Description"].as_vec().unwrap_or(&empty).iter() {
-        if a["Kind"].as_str().unwrap_or("") == "FullComment" {
-            for b in a["Children"].as_vec().unwrap_or(&empty).iter() {
-                if b["Kind"].as_str().unwrap_or("") == "ParagraphComment" {
-                    for c in b["Children"].as_vec().unwrap_or(&empty).iter() {
-                        if c["Kind"].as_str().unwrap_or("") == "TextComment" {
-                            let mut line = c["Text"].as_str().unwrap_or("");
-                            if line.len() > 0 && line.bytes().nth(0).unwrap() == b' ' {
-                                line = &line[1..];
+fn lookup<'a>(
+    yamls: &'a mut Vec<Yaml>,
+    items: &Vec<Item>,
+    parent: usize,
+    path: &[&str],
+    recursed: bool,
+    result: &mut Vec<usize>,
+) {
+    if path.is_empty() {
+        if recursed {
+            result.push(parent);
+        }
+        return;
+    }
+    let item = &items[parent];
+    for child_index in &item.children {
+        if items[*child_index].name == path[0] {
+            lookup(yamls, items, *child_index, &path[1..], true, result);
+        }
+    }
+    if result.is_empty() && !recursed {
+        if let Some(grandparent) = item.parent {
+            lookup(yamls, items, grandparent, path, recursed, result);
+        }
+    }
+}
+
+fn process_directive<'a>(
+    yamls: &'a mut Vec<Yaml>,
+    items: &Vec<Item>,
+    global_namespace: usize,
+    path: &str,
+) -> String {
+    let empty = Vec::new();
+    let mut found_indexes = Vec::new();
+    lookup(
+        yamls,
+        items,
+        global_namespace,
+        &path
+            .split("::")
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>(),
+        false,
+        &mut found_indexes,
+    );
+
+    if found_indexes.is_empty() {
+        panic!("{} not found", path);
+    }
+
+    let mut result = String::new();
+    for index in found_indexes {
+        let item = &items[index];
+        let mut desc = String::new();
+        for a in yamls[item.yaml_index]["Description"]
+            .as_vec()
+            .unwrap_or(&empty)
+            .iter()
+        {
+            if a["Kind"].as_str().unwrap_or("") == "FullComment" {
+                for b in a["Children"].as_vec().unwrap_or(&empty).iter() {
+                    if b["Kind"].as_str().unwrap_or("") == "ParagraphComment" {
+                        for c in b["Children"].as_vec().unwrap_or(&empty).iter() {
+                            if c["Kind"].as_str().unwrap_or("") == "TextComment" {
+                                let mut line = c["Text"].as_str().unwrap_or("");
+                                if !line.is_empty() && *line.as_bytes().get(0).unwrap() == b' ' {
+                                    line = &line[1..];
+                                }
+                                desc.push_str(line);
+                                desc.push('\n');
                             }
-                            desc.push_str(line);
-                            desc.push_str("\n");
                         }
+                        desc.push('\n');
                     }
-                    desc.push_str("\n");
                 }
             }
         }
-    }
-    // eprintln!("---\n{}---\n", desc);
+        // eprintln!("---\n{}---\n", desc);
 
-    let get_param_type = |param: &Yaml| {
-        let mut t = param["Type"]["Name"].as_str().unwrap_or("");
-        if t.starts_with("enum ") {
-            t = &t[5..];
+        let get_param_type = |param: &Yaml| {
+            let mut t = param["Type"]["Name"].as_str().unwrap_or("");
+            if t.starts_with("enum ") {
+                t = &t[5..];
+            }
+            t.to_owned()
+        };
+
+        let mut def = String::new();
+        def.push_str("```c++\n");
+        def.push_str(&item.name);
+        def.push(' ');
+        def.push_str(&path[2..]);
+        def.push('(');
+        let params = yamls[item.yaml_index]["Params"].as_vec().unwrap_or(&empty);
+        let mut type_size = 0usize;
+        for param in params.iter() {
+            type_size = max(type_size, get_param_type(param).len());
         }
-        t.to_owned()
-    };
-
-    let mut def = String::new();
-    def.push_str("```c++\n");
-    def.push_str(item["ReturnType"]["Type"]["Name"].as_str().unwrap_or(""));
-    def.push_str(" ");
-    def.push_str(&path[2..]);
-    def.push_str("(");
-    let params = item["Params"].as_vec().unwrap_or(&empty);
-    let mut type_size = 0usize;
-    for param in params.iter() {
-        type_size = max(type_size, get_param_type(param).len());
-    }
-    let mut need_comma = false;
-    for param in params.iter() {
+        let mut need_comma = false;
+        for param in params.iter() {
+            if need_comma {
+                def.push(',');
+            }
+            def.push_str("\n    ");
+            def.push_str(&format!("{:1$}", get_param_type(param), type_size + 1));
+            def.push_str(param["Name"].as_str().unwrap_or(""));
+            need_comma = true;
+        }
         if need_comma {
-            def.push_str(",");
+            def.push('\n');
         }
-        def.push_str("\n    ");
-        def.push_str(&format!("{:1$}", get_param_type(param), type_size + 1));
-        def.push_str(param["Name"].as_str().unwrap_or(""));
-        need_comma = true;
-    }
-    if need_comma {
-        def.push_str("\n");
-    }
-    def.push_str(");\n");
-    def.push_str("```\n");
+        def.push_str(");\n");
+        def.push_str("```\n");
 
-    format!("### {}\n\n{}\n{}\n", &path[2..], def, desc)
-}
+        result.push_str(&format!("### {}\n\n{}\n{}\n", &path[2..], def, desc));
+    }
+    result
+} // process_directive
 
 fn main() -> Result<(), anyhow::Error> {
     let re1 = Regex::new(r"[{][{] *#cpp-doc +(::[^ ]+)+ *[}][}]").unwrap();
-    let re2 = Regex::new(r"::([^: ]+)").unwrap();
     let args = Args::parse();
     if args.command.is_some() {
         return Ok(());
@@ -137,31 +275,29 @@ fn main() -> Result<(), anyhow::Error> {
     let (ctx, mut book) = CmdPreprocessor::parse_input(io::stdin())?;
     let mut path = ctx.root;
     path.push("../../build/doc-wasm");
-    let definitions = Cell::new(Vec::new());
-    visit_dirs(&path, &|entry| {
-        // eprintln!("{}", entry.path().to_str().unwrap());
-        let mut defs = definitions.take();
-        defs.append(
-            &mut YamlLoader::load_from_str(
-                &fs::read_to_string(entry.path().to_str().unwrap()).unwrap(),
-            )
-            .unwrap(),
-        );
-        definitions.set(defs);
-    })?;
-    let definitions = definitions.take();
-    let mut map = HashMap::new();
-    for x in definitions.iter() {
-        map.insert(x["USR"].as_str().unwrap(), x);
+    let mut yamls = Vec::new();
+    load_yamls(&path, &mut yamls)?;
+    let mut by_usr = HashMap::new();
+    for (i, x) in yamls.iter().enumerate() {
+        by_usr.insert(x["USR"].as_str().unwrap().to_owned(), i);
     }
 
-    if let Some(global_namespace) = map.get("0000000000000000000000000000000000000000") {
+    let mut items = Vec::new();
+    let xx = convert_item(
+        &mut yamls,
+        &mut by_usr,
+        &mut items,
+        None,
+        Type::Namespace,
+        "0000000000000000000000000000000000000000",
+    );
+    if let Some(global_namespace) = xx {
         book.for_each_mut(|item: &mut BookItem| match item {
             BookItem::Chapter(chapter) => {
                 chapter.content = re1
                     .replace_all(&chapter.content, |caps: &Captures| {
                         let path = caps.get(1).unwrap().as_str();
-                        process_directive(&map, global_namespace, path, re2.captures_iter(path))
+                        process_directive(&mut yamls, &items, global_namespace, path)
                     })
                     .to_string();
             }
