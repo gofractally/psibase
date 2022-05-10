@@ -491,6 +491,7 @@ namespace psibase
       // TODO: restrict value size
       uint64_t kvPutSequential(uint32_t db, span<const char> value)
       {
+         clearResult();
          auto m = getDbWriteSequential(db);
 
          if (!(contractAccount.flags & AccountRow::isSubjective))

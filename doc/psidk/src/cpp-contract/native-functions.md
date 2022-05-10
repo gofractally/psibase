@@ -1,10 +1,10 @@
 # Native Functions
 
-Native functions give contracts the ability to print debugging messages, abort transactions on errors, access databases and event logs, and synchronously call other contracts. There are very few native functions since contracts implement most Psibase functionality.
+Native functions give contracts the ability to print debugging messages, abort transactions on errors, access databases and event logs, and synchronously call other contracts. There aren't many native functions since contracts implement most Psibase functionality.
 
 ## Raw Native Functions
 
-This is the set of raw native functions. They are fully documented and available for contracts to use directly, but we recommend using the [Wrapped Native Functions](#wrapped-native-functions) instead.
+This is the set of raw native functions (wasm imports). They are available for contracts to use directly, but we recommend using the [Wrapped Native Functions](#wrapped-native-functions) instead.
 
 {{#cpp-doc ::psibase::raw::abortMessage}}
 {{#cpp-doc ::psibase::raw::call}}

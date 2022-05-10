@@ -67,7 +67,7 @@ jobs:
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
           echo =====
-          ${DOCKER} bash -c "cd build && clang-doc --output=doc-wasm --format=yaml wasm/compile_commands.json"
+          ${DOCKER} bash -c "cd build && clang-doc --output=doc-wasm --format=yaml --doxygen wasm/compile_commands.json"
           echo =====
           ${DOCKER} bash -c "cd build && ctest -j $(nproc)"
           echo =====

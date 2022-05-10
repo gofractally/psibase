@@ -3,6 +3,7 @@ use mdbook::preprocess::CmdPreprocessor;
 use mdbook::BookItem;
 use regex::{CaptureMatches, Captures, Regex};
 use std::cell::Cell;
+use std::cmp::max;
 use std::collections::HashMap;
 use std::fs::DirEntry;
 use std::path::Path;
@@ -65,7 +66,64 @@ fn process_directive<'r, 't>(
     }
 
     // eprintln!("{:?}", item);
-    String::new()
+    let mut desc = String::new();
+    for a in item["Description"].as_vec().unwrap_or(&empty).iter() {
+        if a["Kind"].as_str().unwrap_or("") == "FullComment" {
+            for b in a["Children"].as_vec().unwrap_or(&empty).iter() {
+                if b["Kind"].as_str().unwrap_or("") == "ParagraphComment" {
+                    for c in b["Children"].as_vec().unwrap_or(&empty).iter() {
+                        if c["Kind"].as_str().unwrap_or("") == "TextComment" {
+                            let mut line = c["Text"].as_str().unwrap_or("");
+                            if line.len() > 0 && line.bytes().nth(0).unwrap() == b' ' {
+                                line = &line[1..];
+                            }
+                            desc.push_str(line);
+                            desc.push_str("\n");
+                        }
+                    }
+                    desc.push_str("\n");
+                }
+            }
+        }
+    }
+    // eprintln!("---\n{}---\n", desc);
+
+    let get_param_type = |param: &Yaml| {
+        let mut t = param["Type"]["Name"].as_str().unwrap_or("");
+        if t.starts_with("enum ") {
+            t = &t[5..];
+        }
+        t.to_owned()
+    };
+
+    let mut def = String::new();
+    def.push_str("```c++\n");
+    def.push_str(item["ReturnType"]["Type"]["Name"].as_str().unwrap_or(""));
+    def.push_str(" ");
+    def.push_str(&path[2..]);
+    def.push_str("(");
+    let params = item["Params"].as_vec().unwrap_or(&empty);
+    let mut type_size = 0usize;
+    for param in params.iter() {
+        type_size = max(type_size, get_param_type(param).len());
+    }
+    let mut need_comma = false;
+    for param in params.iter() {
+        if need_comma {
+            def.push_str(",");
+        }
+        def.push_str("\n    ");
+        def.push_str(&format!("{:1$}", get_param_type(param), type_size + 1));
+        def.push_str(param["Name"].as_str().unwrap_or(""));
+        need_comma = true;
+    }
+    if need_comma {
+        def.push_str("\n");
+    }
+    def.push_str(");\n");
+    def.push_str("```\n");
+
+    format!("### {}\n\n{}\n{}\n", &path[2..], def, desc)
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -81,7 +139,7 @@ fn main() -> Result<(), anyhow::Error> {
     path.push("../../build/doc-wasm");
     let definitions = Cell::new(Vec::new());
     visit_dirs(&path, &|entry| {
-        eprintln!("{}", entry.path().to_str().unwrap());
+        // eprintln!("{}", entry.path().to_str().unwrap());
         let mut defs = definitions.take();
         defs.append(
             &mut YamlLoader::load_from_str(

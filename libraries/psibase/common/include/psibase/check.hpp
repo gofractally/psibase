@@ -16,7 +16,9 @@ namespace psibase
    // with other libraries.
    namespace raw
    {
-      // Abort with message. Message should be UTF8.
+      /// Abort with `message`
+      ///
+      /// Message should be UTF8.
       PSIBASE_INTRINSIC(abortMessage)
       [[noreturn]] void abortMessage(const char* message, uint32_t len);
    }  // namespace raw

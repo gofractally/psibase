@@ -24,75 +24,94 @@ namespace psibase
    // with other libraries.
    namespace raw
    {
-      // Intrinsics which return data do it by storing it in a result buffer.
-      // getResult copies min(dest_size, result_size - offset) bytes from
-      // result + offset into dest and returns result_size. If offset >= result_size,
-      // then it skips the copy.
+      /// Copy `min(destSize, resultSize - offset)` bytes from
+      /// `result + offset` into `dest` and return `resultSize`
+      ///
+      /// If `offset >= resultSize`, then skip the copy.
+      ///
+      /// Other functions set result.
       PSIBASE_INTRINSIC(getResult)
-      uint32_t getResult(const char* dest, uint32_t dest_size, uint32_t offset);
+      uint32_t getResult(const char* dest, uint32_t destSize, uint32_t offset);
 
-      // Intrinsics which return keys do it by storing it in a key buffer.
-      // getKey copies min(dest_size, key_size) bytes into dest and returns key_size.
-      PSIBASE_INTRINSIC(getKey) uint32_t getKey(const char* dest, uint32_t dest_size);
+      /// Copy `min(destSize, key_size)` bytes of the most-recent key into
+      /// dest and return `key_size`
+      ///
+      /// Other functions set the key.
+      PSIBASE_INTRINSIC(getKey) uint32_t getKey(const char* dest, uint32_t destSize);
 
-      // Write message to console. Message should be UTF8.
+      /// Write `message` to console
+      ///
+      /// Message should be UTF8.
       PSIBASE_INTRINSIC(writeConsole) void writeConsole(const char* message, uint32_t len);
 
-      // Store the currently-executing action into result and return the result size.
-      //
-      // If the contract, while handling action A, calls itself with action B:
-      //    * Before the call to B, getCurrentAction() returns A.
-      //    * After the call to B, getCurrentAction() returns B.
-      //    * After B returns, getCurrentAction() returns A.
-      //
-      // Note: The above only applies if the contract uses the call() intrinsic.
-      //       The call() function and the action wrappers use the call() intrinsic.
-      //       Calling a contract function directly does NOT use the call() intrinsic.
+      /// Store the currently-executing action into result and return the result size
+      ///
+      /// Use [getResult](#psibaserawgetresult) to get result.
+      ///
+      /// If the contract, while handling action A, calls itself with action B:
+      /// * Before the call to B, `getCurrentAction()` returns A.
+      /// * After the call to B, `getCurrentAction()` returns B.
+      /// * After B returns, `getCurrentAction()` returns A.
+      ///
+      /// Note: The above only applies if the contract uses `call`. `actor` uses `call`.
       PSIBASE_INTRINSIC(getCurrentAction) uint32_t getCurrentAction();
 
-      // Call a contract, store the return value into result, and return the result size.
+      /// Call a contract, store the return value into result, and return the result size
+      ///
+      /// Use [getResult](#psibaserawgetresult) to get result.
       PSIBASE_INTRINSIC(call) uint32_t call(const char* action, uint32_t len);
 
-      // Set the return value of the currently-executing action
+      /// Set the return value of the currently-executing action
       PSIBASE_INTRINSIC(setRetval) void setRetval(const char* retval, uint32_t len);
 
-      // Set a key-value pair. If key already exists, then replace the existing value.
+      /// Set a key-value pair
+      ///
+      /// If key already exists, then replace the existing value.
       PSIBASE_INTRINSIC(kvPut)
-      void kvPut(DbId db, const char* key, uint32_t key_len, const char* value, uint32_t value_len);
+      void kvPut(DbId db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen);
 
-      // Add a sequentially-numbered record. Returns the id.
+      /// Add a sequentially-numbered record. Returns the id.
       PSIBASE_INTRINSIC(kvPutSequential)
-      EventNumber kvPutSequential(DbId db, const char* value, uint32_t value_len);
+      uint64_t kvPutSequential(DbId db, const char* value, uint32_t valueLen);
 
-      // Remove a key-value pair if it exists
-      PSIBASE_INTRINSIC(kvRemove) void kvRemove(DbId db, const char* key, uint32_t key_len);
+      /// Remove a key-value pair if it exists
+      PSIBASE_INTRINSIC(kvRemove) void kvRemove(DbId db, const char* key, uint32_t keyLen);
 
-      // Get a key-value pair, if any. If key exists, then sets result to value and
-      // returns size. If key does not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kvGet) uint32_t kvGet(DbId db, const char* key, uint32_t key_len);
+      /// Get a key-value pair, if any
+      ///
+      /// If key exists, then sets result to value and returns size. If key does not
+      /// exist, returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get result.
+      PSIBASE_INTRINSIC(kvGet) uint32_t kvGet(DbId db, const char* key, uint32_t keyLen);
 
-      // Get a sequentially-numbered record. If id is available, then sets result to value and
-      // returns size. If id does not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kvGetSequential) uint32_t kvGetSequential(DbId db, EventNumber id);
+      /// Get a sequentially-numbered record. If `id` is available, then sets result to value and
+      /// returns size. If id does not exist, returns -1 and clears result.
+      PSIBASE_INTRINSIC(kvGetSequential) uint32_t kvGetSequential(DbId db, uint64_t id);
 
-      // Get the first key-value pair which is greater than or equal to the provided
-      // key. If one is found, and the first matchKeySize bytes of the found key
-      // matches the provided key, then sets result to value and returns size. Also
-      // sets key (use getKey). Otherwise returns -1 and clears result.
+      /// Get the first key-value pair which is greater than or equal to the provided
+      /// key
+      ///
+      /// If one is found, and the first `matchKeySize` bytes of the found key
+      /// matches the provided key, then sets result to value and returns size. Also
+      /// sets key. Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get
+      /// result and [getKey](#psibaserawgetkey) to get found key.
       PSIBASE_INTRINSIC(kvGreaterEqual)
-      uint32_t kvGreaterEqual(DbId db, const char* key, uint32_t key_len, uint32_t matchKeySize);
+      uint32_t kvGreaterEqual(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
-      // Get the key-value pair immediately-before provided key. If one is found,
-      // and the first matchKeySize bytes of the found key matches the provided
-      // key, then sets result to value and returns size. Also sets key (use getKey).
-      // Otherwise returns -1 and clears result.
+      /// Get the key-value pair immediately-before provided key
+      ///
+      /// If one is found, and the first `matchKeySize` bytes of the found key
+      /// matches the provided key, then sets result to value and returns size.
+      /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult)
+      /// to get result and [getKey](#psibaserawgetkey) to get found key.
       PSIBASE_INTRINSIC(kvLessThan)
-      uint32_t kvLessThan(DbId db, const char* key, uint32_t key_len, uint32_t matchKeySize);
+      uint32_t kvLessThan(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
-      // Get the maximum key-value pair which has key as a prefix. If one is found,
-      // then sets result to value and returns size. Also sets key (use getKey).
-      // Otherwise returns -1 and clears result.
-      PSIBASE_INTRINSIC(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t key_len);
+      /// Get the maximum key-value pair which has key as a prefix
+      ///
+      /// If one is found, then sets result to value and returns size. Also sets key.
+      /// Otherwise returns `-1` and clears result. Use [getResult](#psibaserawgetresult) to get result
+      /// and [getKey](#psibaserawgetkey) to get found key.
+      PSIBASE_INTRINSIC(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
    }  // namespace raw
 
    // Get result when size is known. Caution: this does not verify size.
@@ -111,9 +130,9 @@ namespace psibase
    //    * After the call to B, getCurrentAction() returns B.
    //    * After B returns, getCurrentAction() returns A.
    //
-   // Note: The above only applies if the contract uses the call() intrinsic.
-   //       The call() function and the action wrappers use the call() intrinsic.
-   //       Calling a contract function directly does NOT use the call() intrinsic.
+   // Note: The above only applies if the contract uses the call() function.
+   //       The call() function and the action wrappers use the call() function.
+   //       Calling a contract function directly does NOT use the call() function.
    Action                        getCurrentAction();
    psio::shared_view_ptr<Action> getCurrentActionView();
 
