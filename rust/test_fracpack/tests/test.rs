@@ -335,18 +335,10 @@ fn t1() -> Result<()> {
     for (i, t) in get_tests1().iter().enumerate() {
         println!("index {}", i);
         round_trip_fields(i, t);
-        println!("    whole");
-
         let mut packed = Vec::<u8>::new();
         t.pack(&mut packed);
-        println!("    whole packed!");
-
         OuterStruct::verify(&packed[..], &mut 0)?;
-        println!("    whole verified!");
-
         let unpacked = OuterStruct::unpack(&packed[..], &mut 0)?;
-        println!("    whole unpacked {:?}", unpacked);
-
         assert_eq!(*t, unpacked);
         test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
         // TODO: optionals after fixed-data portion ends
