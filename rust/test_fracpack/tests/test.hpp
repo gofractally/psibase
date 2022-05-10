@@ -17,20 +17,6 @@
 
 using Variant = std::variant<uint32_t, std::string>;
 
-struct ZStruct
-{
-   uint32_t               age1;
-   uint16_t               btc;
-   bool                   cool;
-   std::string            msg;
-   std::optional<uint8_t> maybe1;
-   std::optional<uint8_t> maybe2;
-   bool                   not_cool;
-
-   auto operator<=>(const ZStruct& b) const = default;
-};
-PSIO_REFLECT(ZStruct, definitionWillNotChange(), age1, btc, cool, msg, maybe1, maybe2, not_cool)
-
 struct UnextensibleInnerStruct
 {
    bool                  field_bool;
@@ -100,6 +86,7 @@ struct OuterStruct
    std::optional<float>                      field_option_f32;
    std::optional<double>                     field_option_f64;
    std::optional<InnerStruct>                field_option_inner;
+   std::optional<UnextensibleInnerStruct>    field_option_u_inner;
    std::optional<std::optional<int8_t>>      field_o_o_i8;
    std::optional<std::optional<std::string>> field_o_o_str;
    std::optional<std::optional<std::string>> field_o_o_str2;
@@ -134,6 +121,7 @@ PSIO_REFLECT(OuterStruct,
              field_option_f32,
              field_option_f64,
              field_option_inner,
+             field_option_u_inner,
              field_o_o_i8,
              field_o_o_str,
              field_o_o_str2,

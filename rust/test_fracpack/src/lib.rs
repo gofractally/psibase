@@ -66,21 +66,9 @@ pub struct OuterStruct {
     pub field_option_f32: Option<f32>,
     pub field_option_f64: Option<f64>,
     pub field_option_inner: Option<InnerStruct>,
+    pub field_option_u_inner: Option<UnextensibleInnerStruct>,
     pub field_o_o_i8: Option<Option<i8>>,
     pub field_o_o_str: Option<Option<String>>,
     pub field_o_o_str2: Option<Option<String>>,
     pub field_o_o_inner: Option<Option<InnerStruct>>,
 }
-
-#[derive(Fracpack, PartialEq, Debug)]
-#[fracpack(unextensible)]
-pub struct MyStruct {
-    pub age1: u32,
-    pub btc: u16,
-    pub cool: bool,
-    pub msg: String,
-    pub maybe1: Option<u8>,
-    pub maybe2: Option<u8>,
-    pub not_cool: bool,
-}
-// TODO: check arrays, tuples, bool, char,
