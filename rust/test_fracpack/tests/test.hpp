@@ -19,13 +19,18 @@ using Variant = std::variant<uint32_t, std::string>;
 
 struct UnextensibleInnerStruct
 {
-   bool                  field_bool;
-   uint32_t              field_u32;
-   int16_t               field_i16;
-   std::string           field_str;
-   float                 field_f32;
-   double                field_f64;
-   std::vector<uint16_t> field_v_u16;
+   bool                               field_bool;
+   uint32_t                           field_u32;
+   Variant                            field_var;
+   int16_t                            field_i16;
+   std::optional<Variant>             field_o_var;
+   std::string                        field_str;
+   float                              field_f32;
+   std::optional<std::vector<int8_t>> field_o_v_i8;
+   double                             field_f64;
+   std::optional<std::string>         field_o_str;
+   std::vector<uint16_t>              field_v_u16;
+   int32_t                            field_i32;
 
    auto operator<=>(const UnextensibleInnerStruct& b) const = default;
 };
@@ -33,11 +38,16 @@ PSIO_REFLECT(UnextensibleInnerStruct,
              definitionWillNotChange(),
              field_bool,
              field_u32,
+             field_var,
              field_i16,
+             field_o_var,
              field_str,
              field_f32,
+             field_o_v_i8,
              field_f64,
-             field_v_u16)
+             field_o_str,
+             field_v_u16,
+             field_i32)
 
 struct InnerStruct
 {
