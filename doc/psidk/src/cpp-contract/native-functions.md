@@ -6,6 +6,36 @@ Native functions give contracts the ability to print debugging messages, abort t
 
 These functions wrap the [Raw Native Functions](#raw-native-functions).
 
+{{#cpp-doc ::psibase::abortMessage}}
+{{#cpp-doc ::psibase::call}}
+{{#cpp-doc ::psibase::check}}
+{{#cpp-doc ::psibase::getCurrentAction}}
+{{#cpp-doc ::psibase::getCurrentActionView}}
+{{#cpp-doc ::psibase::getKey}}
+{{#cpp-doc ::psibase::getResult}}
+{{#cpp-doc ::psibase::kvGet}}
+{{#cpp-doc ::psibase::kvGetOrDefault}}
+{{#cpp-doc ::psibase::kvGetRaw}}
+{{#cpp-doc ::psibase::kvGetSequential}}
+{{#cpp-doc ::psibase::kvGetSequentialRaw}}
+{{#cpp-doc ::psibase::kvGetSize}}
+{{#cpp-doc ::psibase::kvGetSizeRaw}}
+{{#cpp-doc ::psibase::kvGreaterEqual}}
+{{#cpp-doc ::psibase::kvGreaterEqualRaw}}
+{{#cpp-doc ::psibase::kvLessThan}}
+{{#cpp-doc ::psibase::kvLessThanRaw}}
+{{#cpp-doc ::psibase::kvMax}}
+{{#cpp-doc ::psibase::kvMaxRaw}}
+{{#cpp-doc ::psibase::kvPut}}
+{{#cpp-doc ::psibase::kvPutRaw}}
+{{#cpp-doc ::psibase::kvPutSequential}}
+{{#cpp-doc ::psibase::kvPutSequentialRaw}}
+{{#cpp-doc ::psibase::kvRemove}}
+{{#cpp-doc ::psibase::kvRemoveRaw}}
+{{#cpp-doc ::psibase::setRetval}}
+{{#cpp-doc ::psibase::setRetvalBytes}}
+{{#cpp-doc ::psibase::writeConsole}}
+
 ## Raw Native Functions
 
 This is the set of raw native functions (wasm imports). They are available for contracts to use directly, but we recommend using the [Wrapped Native Functions](#wrapped-native-functions) instead.

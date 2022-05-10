@@ -53,7 +53,7 @@ namespace psibase
       /// * After the call to B, `getCurrentAction()` returns B.
       /// * After B returns, `getCurrentAction()` returns A.
       ///
-      /// Note: The above only applies if the contract uses `call`. `actor` uses `call`.
+      /// Note: The above only applies if the contract uses [call]. `actor` uses [call].
       PSIBASE_INTRINSIC(getCurrentAction) uint32_t getCurrentAction();
 
       /// Call a contract, store the return value into result, and return the result size
@@ -114,35 +114,33 @@ namespace psibase
       PSIBASE_INTRINSIC(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
    }  // namespace raw
 
-   // Get result when size is known. Caution: this does not verify size.
+   /// Get result when size is known. Caution: this does not verify size.
    std::vector<char> getResult(uint32_t size);
 
-   // Get result when size is unknown
+   /// Get result when size is unknown
    std::vector<char> getResult();
 
-   // Get key
+   /// Get key
    std::vector<char> getKey();
 
-   // Get the currently-executing action.
-   //
-   // If the contract, while handling action A, calls itself with action B:
-   //    * Before the call to B, getCurrentAction() returns A.
-   //    * After the call to B, getCurrentAction() returns B.
-   //    * After B returns, getCurrentAction() returns A.
-   //
-   // Note: The above only applies if the contract uses the call() function.
-   //       The call() function and the action wrappers use the call() function.
-   //       Calling a contract function directly does NOT use the call() function.
+   /// Get the currently-executing action.
+   ///
+   /// If the contract, while handling action A, calls itself with action B:
+   /// * Before the call to B, `getCurrentAction()` returns A.
+   /// * After the call to B, `getCurrentAction()` returns B.
+   /// * After B returns, `getCurrentAction()` returns A.
+   ///
+   /// Note: The above only applies if the contract uses [call]. `actor` uses [call].
    Action                        getCurrentAction();
    psio::shared_view_ptr<Action> getCurrentActionView();
 
-   // Call a contract and return its result
+   /// Call a contract and return its result
    std::vector<char> call(const char* action, uint32_t len);
 
-   // Call a contract and return its result
+   /// Call a contract and return its result
    std::vector<char> call(psio::input_stream action);
 
-   // Call a contract and return its result
+   /// Call a contract and return its result
    std::vector<char> call(const Action& action);
 
    // Set the return value of the currently-executing action

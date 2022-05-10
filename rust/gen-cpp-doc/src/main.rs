@@ -89,8 +89,9 @@ fn convert_doc_str(yaml: &Yaml) -> String {
 // Looks up a yaml by USR. If found, add it to items. Recurses into children.
 fn convert_item<'a>(
     yamls: &'a mut Vec<Yaml>,
-    by_usr: &'a mut HashMap<String, usize>,
+    yamls_by_usr: &'a mut HashMap<String, usize>,
     items: &'a mut Vec<Item>,
+    items_by_usr: &'a mut HashMap<String, usize>,
     parent: Option<usize>,
     ty: Type,
     usr: &str,
@@ -102,7 +103,7 @@ fn convert_item<'a>(
         }
         ancestor = items[x].parent;
     }
-    if let Some(i) = by_usr.get(usr) {
+    if let Some(i) = yamls_by_usr.get(usr) {
         let i = *i;
         let name;
         let full_name;
@@ -124,10 +125,12 @@ fn convert_item<'a>(
             parent,
             children: Vec::new(),
         });
+        items_by_usr.insert(usr.to_owned(), items.len() - 1);
         convert_items(
             yamls,
-            by_usr,
+            yamls_by_usr,
             items,
+            items_by_usr,
             index,
             i,
             "ChildNamespaces",
@@ -136,8 +139,9 @@ fn convert_item<'a>(
         );
         convert_items(
             yamls,
-            by_usr,
+            yamls_by_usr,
             items,
+            items_by_usr,
             index,
             i,
             "ChildRecords",
@@ -146,8 +150,9 @@ fn convert_item<'a>(
         );
         convert_items(
             yamls,
-            by_usr,
+            yamls_by_usr,
             items,
+            items_by_usr,
             index,
             i,
             "ChildFunctions",
@@ -164,8 +169,9 @@ fn convert_item<'a>(
 #[allow(clippy::too_many_arguments)]
 fn convert_items<'a>(
     yamls: &'a mut Vec<Yaml>,
-    by_usr: &'a mut HashMap<String, usize>,
+    yamls_by_usr: &'a mut HashMap<String, usize>,
     items: &'a mut Vec<Item>,
+    items_by_usr: &'a mut HashMap<String, usize>,
     parent: usize,
     children_in_index: usize,
     children_name: &str,
@@ -180,11 +186,19 @@ fn convert_items<'a>(
         .iter()
     {
         let usr = x["USR"].as_str().unwrap();
-        if create_children && by_usr.get(usr).is_none() {
+        if create_children && yamls_by_usr.get(usr).is_none() {
             yamls.push(x.clone());
-            by_usr.insert(usr.to_owned(), yamls.len() - 1);
+            yamls_by_usr.insert(usr.to_owned(), yamls.len() - 1);
         }
-        if let Some(index) = convert_item(yamls, by_usr, items, Some(parent), ty, usr) {
+        if let Some(index) = convert_item(
+            yamls,
+            yamls_by_usr,
+            items,
+            items_by_usr,
+            Some(parent),
+            ty,
+            usr,
+        ) {
             items[parent].children.push(index);
         }
     }
@@ -306,10 +320,43 @@ fn fill_all_links<'a>(
     .into_owned()
 }
 
+fn expand_type(items: &[Item], items_by_usr: &HashMap<String, usize>, yaml: &Yaml) -> String {
+    if let Some(usr) = yaml["USR"].as_str() {
+        if let Some(index) = items_by_usr.get(usr) {
+            let mut item = &items[*index];
+            let mut name = item.name.clone();
+            while let Some(parent) = item.parent {
+                item = &items[parent];
+                name = item.name.clone() + "::" + &name;
+            }
+            if name.starts_with("::") {
+                name.replace_range(..2, "");
+            }
+            return name;
+        }
+    }
+    let mut result = yaml["Name"]
+        .as_str()
+        .unwrap_or("")
+        .to_owned()
+        .replace("enum ", "")
+        .replace("struct ", "");
+    if result == "_Bool" {
+        result = "bool".to_owned();
+    }
+    if let Some(path) = yaml["Path"].as_str() {
+        result = path.replace('/', "::") + "::" + &result;
+    }
+    result
+        .replace("std::__1::", "std::")
+        .replace("std::__2::", "std::")
+}
+
 // Generate documentation for matching items
-fn generate_documentation<'a>(
-    yamls: &'a Vec<Yaml>,
+fn generate_documentation(
+    yamls: &Vec<Yaml>,
     items: &Vec<Item>,
+    items_by_usr: &HashMap<String, usize>,
     global_namespace: usize,
     path: &str,
 ) -> String {
@@ -335,24 +382,23 @@ fn generate_documentation<'a>(
     for index in found_indexes {
         let item = &items[index];
 
-        let get_param_type = |param: &Yaml| {
-            let mut t = param["Type"]["Name"].as_str().unwrap_or("");
-            if t.starts_with("enum ") {
-                t = &t[5..];
-            }
-            t.to_owned()
-        };
-
         let mut def = String::new();
-        def.push_str("```c++\n");
-        def.push_str(&item.name);
+        def.push_str("```text\n");
+        def.push_str(&expand_type(
+            items,
+            items_by_usr,
+            &yamls[item.yaml_index]["ReturnType"]["Type"],
+        ));
         def.push(' ');
         def.push_str(&path[2..]);
         def.push('(');
         let params = yamls[item.yaml_index]["Params"].as_vec().unwrap_or(&empty);
         let mut type_size = 0usize;
         for param in params.iter() {
-            type_size = max(type_size, get_param_type(param).len());
+            type_size = max(
+                type_size,
+                expand_type(items, items_by_usr, &param["Type"]).len(),
+            );
         }
         let mut need_comma = false;
         for param in params.iter() {
@@ -360,7 +406,11 @@ fn generate_documentation<'a>(
                 def.push(',');
             }
             def.push_str("\n    ");
-            def.push_str(&format!("{:1$}", get_param_type(param), type_size + 1));
+            def.push_str(&format!(
+                "{:1$}",
+                expand_type(items, items_by_usr, &param["Type"]),
+                type_size + 1
+            ));
             def.push_str(param["Name"].as_str().unwrap_or(""));
             need_comma = true;
         }
@@ -374,7 +424,7 @@ fn generate_documentation<'a>(
             "### {}\n\n{}\n{}\n",
             &path[2..],
             def,
-            fill_all_links(&item.doc_str, &yamls, &items, index)
+            fill_all_links(&item.doc_str, yamls, items, index)
         ));
     }
     result
@@ -392,16 +442,18 @@ fn main() -> Result<(), anyhow::Error> {
     path.push("../../build/doc-wasm");
     let mut yamls = Vec::new();
     load_yamls(&path, &mut yamls)?;
-    let mut by_usr = HashMap::new();
+    let mut yamls_by_usr = HashMap::new();
     for (i, x) in yamls.iter().enumerate() {
-        by_usr.insert(x["USR"].as_str().unwrap().to_owned(), i);
+        yamls_by_usr.insert(x["USR"].as_str().unwrap().to_owned(), i);
     }
 
     let mut items = Vec::new();
+    let mut items_by_usr = HashMap::new();
     let global_namespace = convert_item(
         &mut yamls,
-        &mut by_usr,
+        &mut yamls_by_usr,
         &mut items,
+        &mut items_by_usr,
         None,
         Type::Namespace,
         "0000000000000000000000000000000000000000",
@@ -412,7 +464,7 @@ fn main() -> Result<(), anyhow::Error> {
                 BookItem::Chapter(chapter) => {
                     for capture in re.captures_iter(&chapter.content) {
                         let path = capture.get(1).unwrap().as_str();
-                        set_urls(&chapter, &yamls, &mut items, global_namespace, path);
+                        set_urls(chapter, &yamls, &mut items, global_namespace, path);
                     }
                 }
                 BookItem::Separator => (),
@@ -424,7 +476,13 @@ fn main() -> Result<(), anyhow::Error> {
                 chapter.content = re
                     .replace_all(&chapter.content, |caps: &Captures| {
                         let path = caps.get(1).unwrap().as_str();
-                        generate_documentation(&mut yamls, &items, global_namespace, path)
+                        generate_documentation(
+                            &yamls,
+                            &items,
+                            &items_by_usr,
+                            global_namespace,
+                            path,
+                        )
                     })
                     .to_string();
             }
