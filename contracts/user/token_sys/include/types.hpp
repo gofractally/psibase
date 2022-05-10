@@ -41,8 +41,8 @@ namespace UserContract
       static constexpr std::string_view error_underflow = "underflow in Quantity arithmetic";
       static constexpr std::string_view error_divzero   = "division by zero in Quantity arithmetic";
 
-      Quantity(Quantity_t q) : value{q} {}
-      Quantity() : Quantity(0) {}
+      constexpr explicit Quantity(Quantity_t q) : value{q} {}
+      Quantity() = default;
 
       operator Quantity_t() { return value; }
 
@@ -72,11 +72,20 @@ namespace UserContract
          return *this;
       }
 
-      friend std::strong_ordering operator<=>(const Quantity&, const Quantity&) = default;
+      constexpr auto operator<=>(const Quantity&) const = default;
 
-      bool operator==(int otherValue) const { return static_cast<Quantity_t>(otherValue) == value; }
-      bool operator==(Quantity otherValue) const { return otherValue.value == value; }
-   };
+      constexpr bool operator==(const Quantity& other) const = default;
+
+      constexpr auto operator<=>(const int& other) const
+      {
+         return value <=> static_cast<Quantity_t>(other);
+      }
+
+      bool operator==(const int& otherValue) const
+      {
+         return static_cast<Quantity_t>(otherValue) == value;
+      }
+   };  // namespace UserContract
    PSIO_REFLECT(Quantity, value);
 
 }  // namespace UserContract

@@ -11,6 +11,7 @@
 
 namespace UserContract
 {
+
    class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
@@ -30,7 +31,9 @@ namespace UserContract
       //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
 
       void burn(TID tokenId, Quantity amount);
-      void manualDebit(bool enable);
+
+      void setConfig(psibase::NamedBit_t flag, bool enable);
+
       void credit(TID                               tokenId,
                   psibase::AccountNumber            receiver,
                   Quantity                          amount,
@@ -45,7 +48,6 @@ namespace UserContract
                  psio::const_view<psibase::String> memo);
       void recall(TID                               tokenId,
                   psibase::AccountNumber            from,
-                  psibase::AccountNumber            to,
                   Quantity                          amount,
                   psio::const_view<psibase::String> memo);
 
@@ -57,7 +59,7 @@ namespace UserContract
                                        psibase::AccountNumber creditor,
                                        psibase::AccountNumber debitor);
       TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
-      bool                isManualDebit(psibase::AccountNumber account);
+      bool                getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag);
 
      private:
       tables db{contract};
@@ -75,10 +77,9 @@ namespace UserContract
          {
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
             void minted(TID tokenId, Account minter, Quantity amount, Account receiver, StringView memo) {}
-            void set(TID tokenId, Account setter, uint8_t flag) {}
+            void setUnrecallable(TID tokenId, Account setter) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
-            void enabledManDeb(Account account) {}
-            void disabledManDeb(Account account) {}
+            void configChanged(Account account, psibase::NamedBit_t flag, bool enable) {}
             //};
 
             //struct Ui
@@ -90,7 +91,7 @@ namespace UserContract
             //struct Merkle
             //{
             void transferred(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-            void recalled(TID tokenId, Account from, Account to, Quantity amount, StringView memo) {}
+            void recalled(TID tokenId, Account from, Quantity amount, StringView memo) {}
          };
       };
       // clang-format on
@@ -103,24 +104,23 @@ namespace UserContract
       method(setUnrecallable, tokenId, flag),
       
       method(burn, tokenId, amount),
-      method(manualDebit, enable),
+      method(setConfig, flag, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, amount, memo),
       method(debit, tokenId, sender, amount, memo),
-      method(recall, tokenId, from, to, amount, memo),
+      method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
-      method(isManualDebit)
+      method(getConfig, account, flag)
     );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
       method(created, tokenId, creator, precision, maxSupply),
       method(minted, tokenId, minter, amount, receiver, memo),
-      method(set, tokenId, setter, flag),
+      method(setUnrecallable, tokenId, setter),
       method(burned, tokenId, burner, amount),
-      method(enabledManDeb, account),
-      method(disabledManDeb, account),
+      method(configChanged, account, flag, enable),
    //);
    //PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
       method(credited, tokenId, sender, receiver, amount, memo),
@@ -128,7 +128,7 @@ namespace UserContract
    //);
    //PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys, 
       method(transferred, tokenId, sender, receiver, amount, memo),
-      method(recalled, tokenId, from, to, amount, memo)
+      method(recalled, tokenId, from, amount, memo)
    );
    // clang-format on
 

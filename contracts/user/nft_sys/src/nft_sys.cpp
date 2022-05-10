@@ -18,6 +18,11 @@ namespace stubs
    bool require_auth(AccountNumber acc) { return true; }
 }  // namespace stubs
 
+namespace
+{
+   constexpr auto manualDebitBit = NftHolderRecord::Configurations::getIndex("manualDebit"_m);
+}
+
 NID NftSys::mint()
 {
    auto issuer   = get_sender();
@@ -56,7 +61,7 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
    auto                   record       = getNft(nftId);
    psibase::AccountNumber sender       = get_sender();
    CreditRecord           creditRecord = getCredRecord(nftId);
-   auto isTransfer = not getNftHolder(receiver).config.get(NftHolderRecord::Flags::manualDebit);
+   auto                   isTransfer   = not getNftHolder(receiver).config.get(manualDebitBit);
 
    check(record.owner == sender, Errors::missingRequiredAuth);
    check(receiver != record.owner, Errors::creditorIsDebitor);
@@ -117,9 +122,9 @@ void NftSys::manualDebit(bool enable)
 {
    auto record = getNftHolder(get_sender());
 
-   check(record.config.get(NftHolderRecord::Flags::manualDebit) != enable, Errors::redundantUpdate);
+   check(record.config.get(manualDebitBit) != enable, Errors::redundantUpdate);
 
-   record.config.set(NftHolderRecord::Flags::manualDebit);
+   record.config.set(manualDebitBit);
    db.open<NftHolderTable_t>().put(record);
 
    if (enable)
@@ -154,7 +159,7 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
       check(account != account_sys::nullAccount, Errors::invalidAccount);
       check(at<account_sys>().exists(account), Errors::invalidAccount);
 
-      return NftHolderRecord{account, Bitset()};
+      return NftHolderRecord{account};
    }
 }
 

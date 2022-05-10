@@ -11,17 +11,11 @@ namespace UserContract
    struct NftHolderRecord
    {
       psibase::AccountNumber account;
-      psibase::Bitset        config;
+      psibase::Bitset<8>     config;
 
-      operator psibase::AccountNumber() const { return account; }
+      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"manualDebit"}>;
 
-      enum Flags : uint8_t
-      {
-         manualDebit
-      };
-
-      friend std::strong_ordering operator<=>(const NftHolderRecord&,
-                                              const NftHolderRecord&) = default;
+      auto operator<=>(const NftHolderRecord&) const = default;
    };
    PSIO_REFLECT(NftHolderRecord, account, config);
    using NftHolderTable_t = psibase::table<NftHolderRecord, &NftHolderRecord::account>;
@@ -34,7 +28,7 @@ namespace UserContract
 
       static bool isValidKey(const NID& id) { return id != 0; }
 
-      friend std::strong_ordering operator<=>(const NftRecord&, const NftRecord&) = default;
+      auto operator<=>(const NftRecord&) const = default;
    };
    PSIO_REFLECT(NftRecord, id, issuer, owner);
    using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;
@@ -44,7 +38,7 @@ namespace UserContract
       NID                    nftId;
       psibase::AccountNumber debitor;
 
-      friend std::strong_ordering operator<=>(const CreditRecord&, const CreditRecord&) = default;
+      auto operator<=>(const CreditRecord&) const = default;
    };
    PSIO_REFLECT(CreditRecord, nftId, debitor);
    using CreditTable_t = psibase::table<CreditRecord, &CreditRecord::nftId>;

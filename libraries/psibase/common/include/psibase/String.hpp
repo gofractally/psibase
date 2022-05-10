@@ -17,8 +17,6 @@ namespace psibase
       String(const std::string& s) : contents{s} {}
       String() : String("") {}
 
-      operator std::string() const { return contents; }
-
       static void fracpack_validate(const String& str)
       {
          psibase::check(str.contents.size() <= MAX_BYTES, error_invalid.data());
