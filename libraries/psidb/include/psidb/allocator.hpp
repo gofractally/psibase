@@ -189,7 +189,16 @@ namespace psidb
       {
          pools[pool] = new (ptr) pool_type{pools[pool]};
       }
-      void* base() { return _base; }
+      void*        base() { return _base; }
+      page_header* translate_page_address(page_id id)
+      {
+         return reinterpret_cast<page_header*>(reinterpret_cast<char*>(_base) + id * page_size);
+      }
+      page_id get_id(const page_header* page) const
+      {
+         return (reinterpret_cast<const char*>(page) - reinterpret_cast<const char*>(_base)) /
+                page_size;
+      }
       struct pool_type
       {
          pool_type* next;

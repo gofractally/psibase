@@ -146,8 +146,10 @@ page_id psidb::page_manager::allocate_file_pages(std::size_t count)
    return result;
 }
 
-// TODO: implement
-void page_manager::queue_gc(page_header* node) {}
+void page_manager::queue_gc(page_header* node)
+{
+   _gc_manager.queue_gc(_allocator, node);
+}
 
 void psidb::page_manager::write_worker()
 {

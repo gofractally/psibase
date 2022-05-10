@@ -54,6 +54,11 @@ namespace psidb
             }
          }
       }
+      std::uint8_t load(std::memory_order order) const
+      {
+         auto state = _state.load(order);
+         return state.value;
+      }
       /**
        * Releases a shared lock.
        * \pre a shared lock is held for value.
@@ -120,6 +125,11 @@ namespace psidb
             _state.wait(state);
             state = _state.load(std::memory_order_acquire);
          }
+      }
+      bool try_wait()
+      {
+         auto state = _state.load(std::memory_order_acquire);
+         return state.prev == 0;
       }
 
       void store(std::uint8_t value)

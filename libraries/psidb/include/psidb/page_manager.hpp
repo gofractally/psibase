@@ -7,6 +7,7 @@
 #include <psidb/checkpoint.hpp>
 #include <psidb/node_ptr.hpp>
 #include <psidb/page_header.hpp>
+#include <psidb/page_types/free_list.hpp>
 #include <psidb/sync/mutex_set.hpp>
 #include <psidb/sync/shared_queue.hpp>
 #include <stdexcept>
@@ -299,6 +300,7 @@ namespace psidb
       using checkpoint_ptr = std::shared_ptr<checkpoint_data>;
 
       allocator                         _allocator;
+      gc_manager                        _gc_manager;
       int                               fd             = -1;
       page_flags                        _dirty_flag    = page_flags::dirty0;
       bool                              _flush_pending = false;
