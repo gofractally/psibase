@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <psibase/block.hpp>
-#include <psibase/intrinsic.hpp>
+#include <psibase/nativeFunctions.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_json.hpp>
 

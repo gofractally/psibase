@@ -1,4 +1,4 @@
-#include <psibase/intrinsic.hpp>
+#include <psibase/nativeFunctions.hpp>
 
 #include <psio/from_bin.hpp>
 

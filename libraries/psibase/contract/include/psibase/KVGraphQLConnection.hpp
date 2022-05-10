@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/intrinsic.hpp>
+#include <psibase/nativeFunctions.hpp>
 #include <psio/graphql_connection.hpp>
 
 namespace psibase

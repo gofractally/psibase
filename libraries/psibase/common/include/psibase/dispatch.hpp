@@ -1,6 +1,6 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
-#include <psibase/intrinsic.hpp>
+#include <psibase/nativeFunctions.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase

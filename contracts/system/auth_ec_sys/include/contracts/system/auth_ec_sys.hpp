@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/intrinsic.hpp>
+#include <psibase/nativeFunctions.hpp>
 #include <psibase/nativeTables.hpp>
 
 namespace system_contract::auth_ec_sys

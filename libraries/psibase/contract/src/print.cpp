@@ -1,4 +1,4 @@
-#include <psibase/intrinsic.hpp>
+#include <psibase/nativeFunctions.hpp>
 
 extern "C" void prints_l(const char* str, uint32_t len)
 {
