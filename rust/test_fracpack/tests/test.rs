@@ -1,6 +1,43 @@
-use fracpack::{Packable, Result};
+use fracpack::{Packable, PackableOwned, Result};
 use psi_macros::Fracpack;
 use test_fracpack::*;
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(unextensible)]
+struct SimpleWithString {
+    a: u32,
+    b: u64,
+    c: u16,
+    s: String,
+    f: f32,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+struct OuterSimple {
+    oa: u32,
+    ob: u64,
+    oc: u16,
+    is: SimpleWithString,
+    vu32: Vec<u32>,
+    z: bool,
+    s: String,
+}
+// TODO: check arrays, tuples, bool, char,
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(unextensible)]
+struct UnextensibleWithOptions {
+    a: u32,
+    opt_a: Option<u32>,
+    b: u64,
+    opt_b: Option<u64>,
+    c: u16,
+    opt_c: Option<u16>,
+    s: String,
+    opt_s: Option<String>,
+    f: f32,
+    opt_f: Option<f32>,
+}
 
 fn get_tests1() -> [OuterStruct; 3] {
     [
@@ -24,7 +61,20 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: None,
                 inner_o_vec_o_u16: None,
             },
-            field_u_inner: UnextensibleInnerStruct::default(),
+            field_u_inner: UnextensibleInnerStruct {
+                field_bool: false,
+                field_u32: 0,
+                field_var: Variant::ItemU32(0),
+                field_i16: 0,
+                field_o_var: None,
+                field_str: "".to_string(),
+                field_f32: 0.0,
+                field_o_v_i8: None,
+                field_f64: 0.0,
+                field_o_str: None,
+                field_v_u16: vec![],
+                field_i32: 0,
+            },
             field_v_inner: vec![],
             field_option_u8: Some(11),
             field_option_u16: Some(12),
@@ -67,11 +117,16 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_u_inner: UnextensibleInnerStruct {
                 field_bool: true,
                 field_u32: 32,
+                field_var: Variant::ItemStr("abcd".to_string()),
                 field_i16: 16,
+                field_o_var: Some(Variant::ItemU32(99)),
                 field_str: "hello".to_string(),
                 field_f32: 3.2,
+                field_o_v_i8: Some(vec![11, 22, 33]),
                 field_f64: 64.64,
+                field_o_str: Some("hi".to_string()),
                 field_v_u16: vec![1, 2, 3],
+                field_i32: -123,
             },
             field_v_inner: vec![
                 InnerStruct {
@@ -113,11 +168,16 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_option_u_inner: Some(UnextensibleInnerStruct {
                 field_bool: true,
                 field_u32: 44,
+                field_var: Variant::ItemStr("xyz".to_string()),
                 field_i16: 55,
+                field_o_var: Some(Variant::ItemU32(88)),
                 field_str: "byebye".to_string(),
                 field_f32: 6.4,
+                field_o_v_i8: Some(vec![44, 55, 66]),
                 field_f64: 128.128,
+                field_o_str: Some("lo".to_string()),
                 field_v_u16: vec![3, 2, 1],
+                field_i32: -999,
             }),
             field_o_o_i8: Some(None),
             field_o_o_str: Some(None),
@@ -147,11 +207,16 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_u_inner: UnextensibleInnerStruct {
                 field_bool: false,
                 field_u32: 0,
+                field_var: Variant::ItemU32(0),
                 field_i16: 0,
+                field_o_var: None,
                 field_str: "".to_string(),
                 field_f32: 0.0,
+                field_o_v_i8: None,
                 field_f64: 0.0,
+                field_o_str: None,
                 field_v_u16: vec![],
+                field_i32: 0,
             },
             field_v_inner: vec![InnerStruct {
                 inner_u32: 1234,
@@ -183,11 +248,16 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_option_u_inner: Some(UnextensibleInnerStruct {
                 field_bool: false,
                 field_u32: 0,
+                field_var: Variant::ItemU32(0),
                 field_i16: 0,
+                field_o_var: None,
                 field_str: "".to_string(),
                 field_f32: 0.0,
+                field_o_v_i8: None,
                 field_f64: 0.0,
+                field_o_str: None,
                 field_v_u16: vec![],
+                field_i32: 0,
             }),
             field_o_o_i8: Some(Some(123)),
             field_o_o_str: Some(Some("a string".into())),
@@ -212,10 +282,8 @@ fn round_trip_field<T: fracpack::PackableOwned + PartialEq + std::fmt::Debug>(
     println!("    {}", field_name);
     let mut packed = Vec::<u8>::new();
     field.pack(&mut packed);
-    println!("packed bytes {:?}", packed);
 
-    // TODO: pos = 0 (!= src.len() when unextensible), is it desired?
-    // T::verify_no_extra(&packed[..]).unwrap();
+    T::verify_no_extra(&packed[..]).unwrap();
 
     let unpacked = T::unpack(&packed[..], &mut 0).unwrap();
     assert_eq!(*field, unpacked);
@@ -286,28 +354,6 @@ fn t1() -> Result<()> {
     Ok(())
 }
 
-#[derive(Fracpack, Debug, PartialEq)]
-#[fracpack(unextensible)]
-struct SimpleWithString {
-    a: u32,
-    b: u64,
-    c: u16,
-    s: String,
-    f: f32,
-}
-
-#[derive(Fracpack, Debug, PartialEq)]
-struct OuterSimple {
-    oa: u32,
-    ob: u64,
-    oc: u16,
-    is: SimpleWithString,
-    vu32: Vec<u32>,
-    z: bool,
-    s: String,
-}
-// TODO: check arrays, tuples, bool, char,
-
 #[test]
 fn test_simple_isolated_structs() {
     let sws = SimpleWithString {
@@ -317,17 +363,10 @@ fn test_simple_isolated_structs() {
         s: "hi".to_string(),
         f: 1.23,
     };
-
-    let mut sws_bytes: Vec<u8> = Vec::new();
-    sws.pack(&mut sws_bytes);
-    println!(
-        ">>> sws packed bytes: {}",
-        hex::encode(&sws_bytes).to_uppercase()
+    pack_and_compare(
+        &sws,
+        "0A0000000B000000000000000C0008000000A4709D3F020000006869",
     );
-    // 0A0000000B000000000000000C0008000000A4709D3F020000006869
-
-    let y = SimpleWithString::unpack(&sws_bytes[..], &mut 0).unwrap();
-    println!("unpacked sws: {:?}", y);
 
     let os = OuterSimple {
         oa: 0xfa,
@@ -338,14 +377,53 @@ fn test_simple_isolated_structs() {
         z: true,
         s: "abc".to_string(),
     };
-    let mut os_bytes: Vec<u8> = Vec::new();
-    os.pack(&mut os_bytes);
-    println!(
-        ">>> os packed bytes: {}",
-        hex::encode(&os_bytes).to_uppercase()
+    pack_and_compare(
+        &os,
+        "1B00FA000000FB00000000000000FC000D0000002500000001300000000A0000000B000000000000000C0008000000A4709D3F0200000068690C000000AA000000BB000000CC00000003000000616263",
     );
-    // 1B00FA000000FB00000000000000FC000D0000002500000001300000000A0000000B000000000000000C0008000000A4709D3F0200000068690C000000AA000000BB000000CC00000003000000616263
+}
 
-    let y = OuterSimple::unpack(&os_bytes[..], &mut 0).unwrap();
-    println!("unpacked os: {:?}", y);
+#[test]
+fn test_unextensible_option_fields() {
+    let x = UnextensibleWithOptions {
+        a: 0x0a,
+        opt_a: Some(0x1a),
+        b: 0x0b,
+        opt_b: Some(0x1b),
+        c: 0x0c,
+        opt_c: Some(0x1c),
+        s: "hi".to_string(),
+        opt_s: Some("bye".to_string()),
+        f: 1.23,
+        opt_f: Some(2.34),
+    };
+    pack_and_compare(
+        &x,
+        "0A000000260000000B000000000000001E0000000C00200000001E00000020000000A4709D3F1F0000001A0000001B000000000000001C00020000006869030000006279658FC21540",
+    );
+}
+
+fn pack_and_compare<T>(src_struct: &T, expected_hex: &str) -> Vec<u8>
+where
+    T: PackableOwned + PartialEq + std::fmt::Debug,
+{
+    let mut bytes: Vec<u8> = Vec::new();
+    src_struct.pack(&mut bytes);
+    let encoded_hex = hex::encode(&bytes).to_uppercase();
+    assert_eq!(encoded_hex, expected_hex);
+
+    unpack_and_compare(src_struct, &bytes[..]);
+
+    bytes
+}
+
+fn unpack_and_compare<T>(src_struct: &T, bytes: &[u8])
+where
+    T: PackableOwned,
+    T: PartialEq<T>,
+    T: std::fmt::Debug,
+{
+    T::verify(bytes, &mut 0).unwrap();
+    let unpacked = T::unpack(bytes, &mut 0).unwrap();
+    assert_eq!(*src_struct, unpacked);
 }
