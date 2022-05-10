@@ -13,15 +13,29 @@ struct SimpleWithString {
 }
 
 #[derive(Fracpack, Debug, PartialEq)]
-struct OuterSimple {
+struct ParentStruct {
     oa: u32,
     ob: u64,
     oc: u16,
+    ar: [i16; 3],
     is: SimpleWithString,
     vu32: Vec<u32>,
+    ar_s: [String; 3],
     z: bool,
     s: String,
 }
+
+#[derive(Fracpack, Debug, PartialEq)]
+struct OuterSimpleArray {
+    oa: u32,
+    ob: u64,
+    oc: u16,
+    arrs: [String; 3],
+    s: String,
+    arri: [i16; 2],
+    z: bool,
+}
+
 // TODO: check arrays, tuples, bool, char,
 
 #[derive(Fracpack, Debug, PartialEq)]
@@ -37,6 +51,14 @@ struct UnextensibleWithOptions {
     opt_s: Option<String>,
     f: f32,
     opt_f: Option<f32>,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(unextensible)]
+struct ThreeElementsFixedStruct {
+    element_1: i16,
+    element_2: i16,
+    element_3: i16,
 }
 
 fn get_tests1() -> [OuterStruct; 3] {
@@ -360,18 +382,34 @@ fn test_simple_isolated_structs() {
         "0A0000000B000000000000000C0008000000A4709D3F020000006869",
     );
 
-    let os = OuterSimple {
+    let osa = OuterSimpleArray {
+        oa: 0x0a,
+        ob: 0x0b,
+        oc: 0x0c,
+        arrs: ["hi".to_string(), "abc".to_string(), "xyz".to_string()],
+        s: "qwerty".to_string(),
+        arri: [111, -111],
+        z: true,
+    };
+    pack_and_compare(
+        &osa,
+        "1B000A0000000B000000000000000C000D000000290000006F0091FF010C0000000E00000011000000020000006869030000006162630300000078797A06000000717765727479",
+    );
+
+    let os = ParentStruct {
         oa: 0xfa,
         ob: 0xfb,
         oc: 0xfc,
+        ar: [0xea, 0xeb, 0xec],
         is: sws,
         vu32: vec![0xaa, 0xbb, 0xcc],
+        ar_s: ["d".to_string(), "e".to_string(), "f".to_string()],
         z: true,
         s: "abc".to_string(),
     };
     pack_and_compare(
         &os,
-        "1B00FA000000FB00000000000000FC000D0000002500000001300000000A0000000B000000000000000C0008000000A4709D3F0200000068690C000000AA000000BB000000CC00000003000000616263",
+        "2D00FA000000FB00000000000000FC00EA00EB00EC00190000003100000000000000000000000000000001300000000A0000000B000000000000000C0008000000A4709D3F0200000068690C000000AA000000BB000000CC00000003000000616263",
     );
 }
 
@@ -392,6 +430,33 @@ fn test_unextensible_option_fields() {
     pack_and_compare(
         &x,
         "0A000000260000000B000000000000001E0000000C00200000001E00000020000000A4709D3F1F0000001A0000001B000000000000001C00020000006869030000006279658FC21540",
+    );
+}
+
+#[test]
+fn test_fixed_array_with_unextensible_struct() {
+    let x = ThreeElementsFixedStruct {
+        element_1: 1234,
+        element_2: 0,
+        element_3: -1234,
+    };
+    let expected_elements_hex = "D20400002EFB";
+    pack_and_compare(&x, expected_elements_hex);
+
+    let x_array: [i16; 3] = [1234, 0, -1234];
+    let mut bytes: Vec<u8> = Vec::new();
+    x_array.pack(&mut bytes);
+    let encoded_x_array_hex = hex::encode(&bytes).to_uppercase();
+    assert_eq!(encoded_x_array_hex, expected_elements_hex);
+
+    // since vectors does not have fixed sizes we have to prefix the vector length
+    let x_vector: Vec<i16> = vec![1234, 0, -1234];
+    let mut bytes: Vec<u8> = Vec::new();
+    x_vector.pack(&mut bytes);
+    let encoded_x_vector_hex = hex::encode(&bytes).to_uppercase();
+    assert_eq!(
+        encoded_x_vector_hex,
+        "06000000".to_owned() + expected_elements_hex
     );
 }
 
