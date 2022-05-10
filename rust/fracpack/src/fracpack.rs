@@ -342,6 +342,7 @@ macro_rules! bytes_impl {
                 }
                 <Self as Packable>::pack(self, dest)
             }
+
             fn embedded_unpack(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
@@ -352,7 +353,6 @@ macro_rules! bytes_impl {
                 if offset == 0 {
                     return Ok(Default::default());
                 }
-
                 if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
                     return Err(Error::BadOffset);
                 }
