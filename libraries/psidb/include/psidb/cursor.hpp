@@ -55,6 +55,24 @@ namespace psidb
             }
          }
       }
+      void back()
+      {
+         page_header* p = db->root(c, 0);
+         depth          = 0;
+         while (true)
+         {
+            if (p->type == page_type::leaf)
+            {
+               break;
+            }
+            assert(p->type == page_type::node);
+            assert(depth < max_depth);
+            node_ptr node  = static_cast<page_internal_node*>(p)->back();
+            stack[depth++] = node;
+            p              = get_page(node);
+         }
+         leaf = static_cast<page_leaf*>(p)->back();
+      }
       void back(std::size_t i, page_header* parent)
       {
          for (; i < depth; ++i)

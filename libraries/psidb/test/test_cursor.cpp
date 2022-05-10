@@ -111,6 +111,20 @@ TEST_CASE("previous", "[previous]")
    CHECK_CURSOR(cursor, "a", "v1");
 }
 
+TEST_CASE("back", "[back]")
+{
+   tmp_file file;
+
+   psidb::database db(file.native_handle(), 1024);
+
+   auto trx    = db.start_transaction();
+   auto cursor = trx.get_cursor();
+   trx.insert("a", "v1");
+   trx.insert("b", "v2");
+   cursor.back();
+   CHECK_CURSOR(cursor, "b", "v2");
+}
+
 TEST_CASE("erase simple", "[erase]")
 {
    tmp_file file;
