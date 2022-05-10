@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include "test_fracpack/src/bridge.rs.h"
 
@@ -16,7 +17,7 @@
 
 using Variant = std::variant<uint32_t, std::string>;
 
-struct ZStruct final
+struct ZStruct
 {
    uint32_t               age1;
    uint16_t               btc;
@@ -28,9 +29,9 @@ struct ZStruct final
 
    auto operator<=>(const ZStruct& b) const = default;
 };
-PSIO_REFLECT(ZStruct, age1, btc, cool, msg, maybe1, maybe2, not_cool)
+PSIO_REFLECT(ZStruct, definitionWillNotChange(), age1, btc, cool, msg, maybe1, maybe2, not_cool)
 
-struct UnextensibleInnerStruct final
+struct UnextensibleInnerStruct
 {
    bool                  field_bool;
    uint32_t              field_u32;
@@ -43,6 +44,7 @@ struct UnextensibleInnerStruct final
    auto operator<=>(const UnextensibleInnerStruct& b) const = default;
 };
 PSIO_REFLECT(UnextensibleInnerStruct,
+             definitionWillNotChange(),
              field_bool,
              field_u32,
              field_i16,

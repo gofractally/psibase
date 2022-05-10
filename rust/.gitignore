@@ -2,4 +2,4 @@ target
 target2
 
 # useful for testing macros
-expanded.rs
+expanded*.rs

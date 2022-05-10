@@ -1,4 +1,5 @@
 use fracpack::{Packable, Result};
+use psi_macros::Fracpack;
 use test_fracpack::*;
 
 fn get_tests1() -> [OuterStruct; 3] {
@@ -285,6 +286,81 @@ fn testz() {
 
     test_fracpack::bridge::ffi::round_tripz(&bytes[..]);
 
+    MyStruct::verify(&bytes[..], &mut 0).unwrap();
+
     let unpacked = MyStruct::unpack(&bytes[..], &mut 0).unwrap();
     assert_eq!(x, unpacked);
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(unextensible)]
+struct SimpleWithString {
+    a: u32,
+    b: u64,
+    c: u16,
+    s: String,
+    f: f32,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+struct OuterSimple {
+    oa: u32,
+    ob: u64,
+    oc: u16,
+    is: SimpleWithString,
+    vu32: Vec<u32>,
+    z: bool,
+    s: String,
+}
+
+#[test]
+fn testn() {
+    let sws = SimpleWithString {
+        a: 0x0a,
+        b: 0x0b,
+        c: 0x0c,
+        s: "hi".to_string(),
+        f: 1.23,
+    };
+
+    let mut sws_bytes: Vec<u8> = Vec::new();
+    sws.pack(&mut sws_bytes);
+    println!(
+        ">>> sws packed bytes: {}",
+        hex::encode(&sws_bytes).to_uppercase()
+    );
+    // 0A0000000B000000000000000C0008000000A4709D3F020000006869
+    
+    let y = SimpleWithString::unpack(&sws_bytes[..], &mut 0).unwrap();
+    println!("unpacked sws: {:?}", y);
+
+    let os = OuterSimple {
+        oa: 0xfa,
+        ob: 0xfb,
+        oc: 0xfc,
+        is: sws,
+        vu32: vec![0xaa, 0xbb, 0xcc],
+        z: true,
+        s: "abc".to_string(),
+    };
+    let mut os_bytes: Vec<u8> = Vec::new();
+    os.pack(&mut os_bytes);
+    println!(
+        ">>> os packed bytes: {}",
+        hex::encode(&os_bytes).to_uppercase()
+    );
+    // 1B00FA000000FB00000000000000FC000D0000002500000001300000000A0000000B000000000000000C0008000000A4709D3F0200000068690C000000AA000000BB000000CC00000003000000616263
+
+    let y = OuterSimple::unpack(&os_bytes[..], &mut 0).unwrap();
+    println!("unpacked os: {:?}", y);
+}
+
+#[test]
+fn testx() {
+    let mut x: Vec<u8> = vec![1, 2, 3];
+    let y = 0_u32.to_le_bytes();
+    println!("{:?} {:?}", x, y);
+
+    x.extend_from_slice(&y);
+    println!("{:?}", x);
 }
