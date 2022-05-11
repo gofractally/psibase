@@ -142,16 +142,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             let name = &field.name;
             let ty = &field.ty;
             quote! {
-                let #name = <#ty as fracpack::Packable>::embedded_unpack(src, pos, &mut heap_pos)?;
-            }
-        })
-        .fold(quote! {}, |acc, new| quote! {#acc #new});
-    let unpack_fields = fields
-        .iter()
-        .map(|field| {
-            let name = &field.name;
-            quote! {
-                #name,
+                #name: <#ty as fracpack::Packable>::embedded_unpack(src, pos, &mut heap_pos)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -181,9 +172,8 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 if heap_pos < *pos {
                     return Err(fracpack::Error::BadOffset);
                 }
-                #unpack
                 let result = Self {
-                    #unpack_fields
+                    #unpack
                 };
                 *pos = heap_pos;
                 Ok(result)
