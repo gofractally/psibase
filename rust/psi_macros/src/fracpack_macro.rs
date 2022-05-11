@@ -78,9 +78,20 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
         .iter()
         .map(|field| {
             let ty = &field.ty;
-            quote! {<#ty as fracpack::Packable>::FIXED_SIZE}
+            quote! {if <#ty as fracpack::Packable>::USE_HEAP {
+                4
+            } else {
+                <#ty as fracpack::Packable>::FIXED_SIZE
+            } }
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
+    let use_heap = fields
+        .iter()
+        .map(|field| {
+            let ty = &field.ty;
+            quote! {<#ty as fracpack::Packable>::USE_HEAP}
+        })
+        .fold(quote! {false}, |acc, new| quote! {#acc || #new});
     let positions: Vec<syn::Ident> = fields
         .iter()
         .map(|field| {
@@ -131,6 +142,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             let name = &field.name;
             let ty = &field.ty;
             quote! {
+                println!("u {}", stringify!(#name));
                 let #name = <#ty as fracpack::Packable>::embedded_unpack(src, pos, &mut heap_pos)?;
             }
         })
@@ -155,8 +167,8 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
         .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
         impl<'a> fracpack::Packable<'a> for #name #generics {
-            const FIXED_SIZE: u32 = 4;
-
+            const USE_HEAP: bool = #use_heap;
+            const FIXED_SIZE: u32 = if Self::USE_HEAP { 4 } else { #fixed_size };
             fn pack(&self, dest: &mut Vec<u8>) {
                 let heap = #fixed_size;
                 assert!(heap as u16 as u32 == heap); // TODO: return error
@@ -167,13 +179,16 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
                 #unpack_heap_size
                 let mut heap_pos = *pos + heap_size as u32;
+                println!("u hp {}, pos {}", heap_pos, pos);
                 if heap_pos < *pos {
                     return Err(fracpack::Error::BadOffset);
                 }
+                println!("checked hp {}, pos {}", heap_pos, pos);
                 #unpack
                 let result = Self {
                     #unpack_fields
                 };
+                println!("uassign hp {}, pos {}", heap_pos, pos);
                 *pos = heap_pos;
                 Ok(result)
             }
@@ -188,14 +203,22 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 Ok(())
             }
             fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-                dest.extend_from_slice(&0_u32.to_le_bytes());
+                if Self::USE_HEAP {
+                    dest.extend_from_slice(&0_u32.to_le_bytes());
+                } else {
+                    Self::pack(&self, dest);
+                }
             }
             fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-                dest[fixed_pos as usize..fixed_pos as usize + 4]
-                    .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
+                if Self::USE_HEAP {
+                    dest[fixed_pos as usize..fixed_pos as usize + 4]
+                        .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
+                }
             }
             fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-                <Self as fracpack::Packable>::pack(&self, dest)
+                if Self::USE_HEAP {
+                    <Self as fracpack::Packable>::pack(&self, dest);
+                }
             }
             fn embedded_unpack(
                 src: &'a [u8],
@@ -322,7 +345,7 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
     TokenStream::from(quote! {
         impl<'a> fracpack::Packable<'a> for #name #generics {
             const FIXED_SIZE: u32 = 4;
-
+            const USE_HEAP: bool = true;
             fn pack(&self, dest: &mut Vec<u8>) {
                 let size_pos;
                 match &self {
