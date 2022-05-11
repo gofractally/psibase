@@ -6,8 +6,8 @@ publish = false
 
 [dependencies]
 anyhow = "1.0"
+clang = {version = "1", features = ["clang_10_0"]}
 clap = {version = "3.1", features = ["derive"]}
 mdbook = "0.4"
 regex = "1"
 serde_json = "1.0"
-yaml-rust = "0.4"
