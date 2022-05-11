@@ -7,7 +7,7 @@ use syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields};
 #[derive(Debug, Default, FromDeriveInput)]
 #[darling(default, attributes(fracpack))]
 pub struct Options {
-    unextensible: bool,
+    definition_will_not_change: bool,
 }
 
 struct FracpackField<'a> {
@@ -100,12 +100,12 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             syn::Ident::new(&concatenated, name.span())
         })
         .collect();
-    let pack_heap = if !opts.unextensible {
+    let pack_heap = if !opts.definition_will_not_change {
         quote! { <u16 as fracpack::Packable>::pack(&(heap as u16), dest); }
     } else {
         quote! {}
     };
-    let unpack_heap_size = if !opts.unextensible {
+    let unpack_heap_size = if !opts.definition_will_not_change {
         quote! { let heap_size = <u16 as fracpack::Packable>::unpack(src, pos)?; }
     } else {
         quote! { let heap_size = #fixed_size; }

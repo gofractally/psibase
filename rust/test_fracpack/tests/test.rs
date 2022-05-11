@@ -23,15 +23,17 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: None,
                 inner_o_vec_o_u16: None,
             },
-            field_u_inner: UnextensibleInnerStruct {
+            field_u_inner: DefWontChangeInnerStruct {
                 field_bool: false,
                 field_u32: 0,
                 field_var: Variant::ItemU32(0),
                 field_i16: 0,
                 field_o_var: None,
                 field_str: "".to_string(),
+                field_a_i16_3: [0, 0, 0],
                 field_f32: 0.0,
                 field_o_v_i8: None,
+                field_a_s_2: ["".to_string(), "".to_string()],
                 field_f64: 0.0,
                 field_o_str: None,
                 field_v_u16: vec![],
@@ -76,15 +78,17 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: Some(vec![]),
                 inner_o_vec_o_u16: Some(vec![None, Some(0x3456), None]),
             },
-            field_u_inner: UnextensibleInnerStruct {
+            field_u_inner: DefWontChangeInnerStruct {
                 field_bool: true,
                 field_u32: 32,
                 field_var: Variant::ItemStr("abcd".to_string()),
                 field_i16: 16,
                 field_o_var: Some(Variant::ItemU32(99)),
                 field_str: "hello".to_string(),
+                field_a_i16_3: [44, 55, 66],
                 field_f32: 3.2,
                 field_o_v_i8: Some(vec![11, 22, 33]),
+                field_a_s_2: ["cc".to_string(), "dd".to_string()],
                 field_f64: 64.64,
                 field_o_str: Some("hi".to_string()),
                 field_v_u16: vec![1, 2, 3],
@@ -127,15 +131,17 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
                 inner_o_vec_o_u16: Some(vec![]),
             }),
-            field_option_u_inner: Some(UnextensibleInnerStruct {
+            field_option_u_inner: Some(DefWontChangeInnerStruct {
                 field_bool: true,
                 field_u32: 44,
                 field_var: Variant::ItemStr("xyz".to_string()),
                 field_i16: 55,
                 field_o_var: Some(Variant::ItemU32(88)),
                 field_str: "byebye".to_string(),
+                field_a_i16_3: [77, 88, 99],
                 field_f32: 6.4,
                 field_o_v_i8: Some(vec![44, 55, 66]),
+                field_a_s_2: ["aa".to_string(), "bb".to_string()],
                 field_f64: 128.128,
                 field_o_str: Some("lo".to_string()),
                 field_v_u16: vec![3, 2, 1],
@@ -166,15 +172,17 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: Some(vec![]),
                 inner_o_vec_o_u16: Some(vec![None, Some(0x3456), None]),
             },
-            field_u_inner: UnextensibleInnerStruct {
+            field_u_inner: DefWontChangeInnerStruct {
                 field_bool: false,
                 field_u32: 0,
                 field_var: Variant::ItemU32(0),
                 field_i16: 0,
                 field_o_var: None,
                 field_str: "".to_string(),
+                field_a_i16_3: [0, 0, 0],
                 field_f32: 0.0,
                 field_o_v_i8: None,
+                field_a_s_2: ["".to_string(), "".to_string()],
                 field_f64: 0.0,
                 field_o_str: None,
                 field_v_u16: vec![],
@@ -207,15 +215,17 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
                 inner_o_vec_o_u16: Some(vec![]),
             }),
-            field_option_u_inner: Some(UnextensibleInnerStruct {
+            field_option_u_inner: Some(DefWontChangeInnerStruct {
                 field_bool: false,
                 field_u32: 0,
                 field_var: Variant::ItemU32(0),
                 field_i16: 0,
                 field_o_var: None,
                 field_str: "".to_string(),
+                field_a_i16_3: [0, 0, 0],
                 field_f32: 0.0,
                 field_o_v_i8: None,
+                field_a_s_2: ["".to_string(), "".to_string()],
                 field_f64: 0.0,
                 field_o_str: None,
                 field_v_u16: vec![],
@@ -309,7 +319,7 @@ fn t1() -> Result<()> {
 }
 
 #[test]
-fn test_simple_isolated_structs() {
+fn test_isolated_structs() {
     let osa = OuterSimpleArray {
         oa: 0x0a,
         ob: 0x0b,

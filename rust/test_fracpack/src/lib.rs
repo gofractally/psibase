@@ -17,16 +17,18 @@ pub enum Variant {
 }
 
 #[derive(Fracpack, PartialEq, Debug)]
-#[fracpack(unextensible)]
-pub struct UnextensibleInnerStruct {
+#[fracpack(definition_will_not_change)]
+pub struct DefWontChangeInnerStruct {
     pub field_bool: bool,
     pub field_u32: u32,
     pub field_var: Variant,
     pub field_i16: i16,
     pub field_o_var: Option<Variant>,
     pub field_str: String,
+    pub field_a_i16_3: [i16; 3],
     pub field_f32: f32,
     pub field_o_v_i8: Option<Vec<i8>>,
+    pub field_a_s_2: [String; 2],
     pub field_f64: f64,
     pub field_o_str: Option<String>,
     pub field_v_u16: Vec<u16>,
@@ -57,7 +59,7 @@ pub struct OuterStruct {
     pub field_f32: f32,
     pub field_f64: f64,
     pub field_inner: InnerStruct,
-    pub field_u_inner: UnextensibleInnerStruct,
+    pub field_u_inner: DefWontChangeInnerStruct,
     pub field_v_inner: Vec<InnerStruct>,
     pub field_option_u8: Option<u8>,
     pub field_option_u16: Option<u16>,
@@ -71,7 +73,7 @@ pub struct OuterStruct {
     pub field_option_f32: Option<f32>,
     pub field_option_f64: Option<f64>,
     pub field_option_inner: Option<InnerStruct>,
-    pub field_option_u_inner: Option<UnextensibleInnerStruct>,
+    pub field_option_u_inner: Option<DefWontChangeInnerStruct>,
     pub field_o_o_i8: Option<Option<i8>>,
     pub field_o_o_str: Option<Option<String>>,
     pub field_o_o_str2: Option<Option<String>>,
@@ -79,7 +81,7 @@ pub struct OuterStruct {
 }
 
 #[derive(Fracpack, Debug, PartialEq)]
-#[fracpack(unextensible)]
+#[fracpack(definition_will_not_change)]
 pub struct SimpleWithString {
     pub a: u32,
     pub b: u64,
@@ -116,7 +118,7 @@ pub struct OuterSimpleArray {
 // TODO: check arrays, tuples, bool, char,
 
 #[derive(Fracpack, Debug, PartialEq)]
-#[fracpack(unextensible)]
+#[fracpack(definition_will_not_change)]
 pub struct UnextensibleWithOptions {
     pub a: u32,
     pub opt_a: Option<u32>,
@@ -131,7 +133,7 @@ pub struct UnextensibleWithOptions {
 }
 
 #[derive(Fracpack, Debug, PartialEq)]
-#[fracpack(unextensible)]
+#[fracpack(definition_will_not_change)]
 pub struct ThreeElementsFixedStruct {
     pub element_1: i16,
     pub element_2: i16,
