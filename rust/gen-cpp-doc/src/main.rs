@@ -27,7 +27,7 @@ enum Kind {
     Function,
 }
 
-struct Item2<'tu> {
+struct Item<'tu> {
     entity: Entity<'tu>,
     name: String,
     full_name: String,
@@ -39,7 +39,7 @@ struct Item2<'tu> {
 }
 
 // Convert children of entity to items
-fn convert_children<'a, 'tu>(items: &'a mut Vec<Item2<'tu>>, current: usize, entity: Entity<'tu>) {
+fn convert_children<'a, 'tu>(items: &'a mut Vec<Item<'tu>>, current: usize, entity: Entity<'tu>) {
     for child in entity.get_children() {
         match child.get_kind() {
             EntityKind::FunctionDecl => {
@@ -59,7 +59,7 @@ fn convert_children<'a, 'tu>(items: &'a mut Vec<Item2<'tu>>, current: usize, ent
 // Convert a child and insert it into parent
 #[allow(clippy::unnecessary_unwrap)]
 fn convert_child<'a, 'tu>(
-    items: &'a mut Vec<Item2<'tu>>,
+    items: &'a mut Vec<Item<'tu>>,
     current: usize,
     entity: Entity<'tu>,
     ty: Kind,
@@ -92,7 +92,7 @@ fn convert_child<'a, 'tu>(
             items[current].full_name.clone() + "::" + &name
         };
 
-        items.push(Item2 {
+        items.push(Item {
             entity,
             name,
             full_name,
@@ -108,7 +108,7 @@ fn convert_child<'a, 'tu>(
 }
 
 #[allow(dead_code)]
-fn dump_items(items: &Vec<Item2>, current: usize, indent: usize) {
+fn dump_items(items: &Vec<Item>, current: usize, indent: usize) {
     let item = &items[current];
     eprintln!(
         "{}{:?} {} {}",
@@ -124,8 +124,8 @@ fn dump_items(items: &Vec<Item2>, current: usize, indent: usize) {
     }
 }
 
-fn get_items<'tu>(tu: &'tu TranslationUnit) -> Vec<Item2<'tu>> {
-    let mut items = vec![Item2 {
+fn get_items<'tu>(tu: &'tu TranslationUnit) -> Vec<Item<'tu>> {
+    let mut items = vec![Item {
         entity: tu.get_entity(),
         name: String::new(),
         full_name: String::new(),
@@ -166,7 +166,7 @@ fn convert_doc_str(comment: &Option<Comment>) -> String {
 
 // Look up item by path and fill result. There may be multiple matches (e.g. function overloads).
 fn lookup(
-    items: &Vec<Item2>,
+    items: &Vec<Item>,
     parent: usize,
     path: &[&str],
     recursed: bool,
@@ -192,7 +192,7 @@ fn lookup(
 }
 
 // Set the url field of every item embedded in a chapter
-fn set_urls(chapter: &mdbook::book::Chapter, items: &mut Vec<Item2>, path: &str) {
+fn set_urls(chapter: &mdbook::book::Chapter, items: &mut Vec<Item>, path: &str) {
     let mut chapter_path = chapter
         .path
         .clone()
@@ -221,7 +221,7 @@ fn set_urls(chapter: &mdbook::book::Chapter, items: &mut Vec<Item2>, path: &str)
 }
 
 // Replace text of the form "foo" or "foo::bar::baz" with a link
-fn fill_link(text: &str, items: &Vec<Item2>, parent: usize) -> Option<String> {
+fn fill_link(text: &str, items: &Vec<Item>, parent: usize) -> Option<String> {
     let mut candidates = Vec::new();
     lookup(
         items,
@@ -242,7 +242,7 @@ fn fill_link(text: &str, items: &Vec<Item2>, parent: usize) -> Option<String> {
 
 // Replace all occurrences of the form "[foo]" or "[foo::bar::baz]" with a link. Leaves
 // "[...](...)" untouched.
-fn fill_all_links(text: &str, items: &Vec<Item2>, parent: usize) -> String {
+fn fill_all_links(text: &str, items: &Vec<Item>, parent: usize) -> String {
     let re = Regex::new(r"[\[]([^\]\n]+)[\]]([(][^)]*[)])?").unwrap();
     re.replace_all(text, |caps: &Captures| {
         if caps.get(2).is_some() {
@@ -261,7 +261,7 @@ fn fill_all_links(text: &str, items: &Vec<Item2>, parent: usize) -> String {
 }
 
 // Generate documentation for matching items
-fn generate_documentation(items: &Vec<Item2>, path: &str) -> String {
+fn generate_documentation(items: &Vec<Item>, path: &str) -> String {
     let mut found_indexes = Vec::new();
     lookup(
         items,
@@ -375,7 +375,7 @@ fn parse<'tu>(
     Ok(parser.parse()?)
 }
 
-fn modify_book(book: &mut mdbook::book::Book, re: Regex, mut items: Vec<Item2>) {
+fn modify_book(book: &mut mdbook::book::Book, re: Regex, mut items: Vec<Item>) {
     for item in book.iter() {
         match item {
             BookItem::Chapter(chapter) => {
