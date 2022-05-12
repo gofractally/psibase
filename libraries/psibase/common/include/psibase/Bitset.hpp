@@ -30,19 +30,19 @@ namespace psibase
    concept validNrBits = std::integral<typename BitsetTypeMap<nrBits>::inner_t>;
 
    template <uint8_t nrBits>
-
    struct Bitset
    {
       static_assert(validNrBits<nrBits>, "Unsupported Bitset size. Supported sizes: 8, 16, 32, 64");
 
       using Bitset_t                   = typename BitsetTypeMap<nrBits>::inner_t;
       static constexpr size_t MAX_BITS = std::numeric_limits<Bitset_t>::digits;
+      static constexpr auto   one      = static_cast<Bitset_t>(1);
       Bitset_t                bits     = 0;
 
       bool get(std::size_t pos) const
       {
          _check(pos);
-         return static_cast<bool>((bits & (1 << pos)) >> pos);
+         return static_cast<bool>((bits & (one << pos)) >> pos);
       }
 
       void set(std::size_t pos, bool value = true)
@@ -50,11 +50,11 @@ namespace psibase
          _check(pos);
          if (value)
          {
-            bits |= (1 << pos);
+            bits |= (one << pos);
          }
          else
          {
-            bits &= ~(1 << pos);
+            bits &= ~(one << pos);
          }
       }
 
@@ -75,7 +75,7 @@ namespace psibase
    PSIO_REFLECT(Bitset_64, bits);
 
    using NamedBit_t = psibase::MethodNumber;
-   template <psibase::MethodNumber... Args>
+   template <NamedBit_t... Args>
    class NamedBits
    {
      public:

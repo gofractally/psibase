@@ -37,13 +37,18 @@ namespace
 }  // namespace
 
 /* Todo:
- *    Templatize psibase::Bitset
- *    Test Precision and Quantity types
- *    Code review psibase::Bitset and psibase::String
  *    Code review token tables
  *    Code review UserContext class in Tester
  *    Add test cases for verifying events were emitted properly in this and nft tests
 */
+
+TEST_CASE("Data type tests")
+{
+   Precision p0{0};
+   Precision p1{1};
+   Precision p2{16};
+   Precision p3{17};
+}
 
 SCENARIO("Creating a token")
 {
@@ -69,6 +74,28 @@ SCENARIO("Creating a token")
          {  //
             CHECK(storageBillingImplemented);
          }
+      }
+      THEN("Alice may not create a token with invalid precision")
+      {
+         Quantity  q{100};
+         Precision p0{0};
+         Precision p1{16};
+         Precision p2{17};
+         CHECK(a.create(p0, q).succeeded());
+         CHECK(a.create(p1, q).succeeded());
+         CHECK(a.create(p2, q).failed(Precision::error_invalid));
+      }
+      THEN("Alice may not create a token with invalid quantity")
+      {
+         Precision p{4};
+         Quantity  q0{0};
+         Quantity  q1{1};
+         Quantity  q2{2};
+         Quantity  q3{std::numeric_limits<Quantity::Quantity_t>::max()};
+         CHECK(a.create(p, q0).failed(Errors::supplyGt0));
+         CHECK(a.create(p, q1).succeeded());
+         CHECK(a.create(p, q2).succeeded());
+         CHECK(a.create(p, q3).succeeded());
       }
       WHEN("Alice creates a token")
       {

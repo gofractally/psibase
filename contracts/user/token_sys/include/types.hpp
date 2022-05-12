@@ -21,9 +21,6 @@ namespace UserContract
       Precision(uint8_t p) : value{p} {}
       Precision() : Precision(0) {}
 
-      constexpr          operator uint8_t() { return value; }
-      constexpr explicit operator bool() const { return value != 0; }
-
       static void fracpack_validate(Precision p)
       {
          psibase::check(PRECISION_MIN <= p.value && p.value >= PRECISION_MAX, error_invalid);
