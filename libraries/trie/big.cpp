@@ -17,7 +17,7 @@ int64_t rand64() {
 
 int main(int argc, char** argv)
 {
-   trie::database db("big.dat", 8192ull * 1024 * 128 * 16 * 8, true);
+   trie::database db("big.dat", 8192ull * 1024 * 32 * 16 * 8, true);
    auto           s = db.start_revision(0, 0);
    /*
    int count = 0;

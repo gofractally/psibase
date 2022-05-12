@@ -110,6 +110,7 @@ namespace trie
       if (init_arena)
       {
          assert(_impl->_region->get_address());
+         mlock( _impl->_region->get_address(), existing_size);
 
          auto* a            = new (_impl->_region->get_address()) arena(existing_size);
          _impl->_root_arena = a;
@@ -128,14 +129,19 @@ namespace trie
          
          std::cout << "items: " << _impl->_dbm->_count <<"\n";
          std::cout << "free space: " << (a->arena_size - a->free_area) / 1024 /1024.<< " MB\n";
+         std::cout << "used space: " << (a->arena_size ) / 1024 /1024.<< " MB\n";
          std::cout << "total space: " << (a->arena_size ) / 1024 /1024.<< " MB\n";
       
       }
    }
 
    database::~database() {
-         std::cout << "items: " << _impl->_dbm->_count <<"\n";
-         std::cout << "free space: " << (_impl->_root_arena->arena_size - _impl->_root_arena->free_area) / 1024 /1024<< "\n";
+         //std::cout << "items: " << _impl->_dbm->_count <<"\n";
+         //std::cout << "free space: " << (_impl->_root_arena->arena_size - _impl->_root_arena->free_area) / 1024 /1024<< "\n";
+         auto a = _impl->_root_arena;
+         std::cout << "free space: " << (a->arena_size - a->free_area) / 1024 /1024.<< " MB\n";
+         std::cout << "used space: " << (a->free_area) / 1024 /1024.<< " MB\n";
+         std::cout << "total space: " << (a->arena_size ) / 1024 /1024.<< " MB\n";
    }
 
    database::session database::start_revision(uint32_t new_version, uint32_t prev_version)

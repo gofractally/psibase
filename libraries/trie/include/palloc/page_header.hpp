@@ -125,7 +125,7 @@ namespace palloc
       page_header(uint64_t size, arena* a)
          :alloc_arena(a)
       {
-         assert( (uint64_t(this)) % (2*4096) == 0 ); 
+         assert( (uint64_t(this)) % (system_page_size) == 0 ); 
          //next = nullptr;
          //prev = nullptr;
 

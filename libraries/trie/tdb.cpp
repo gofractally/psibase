@@ -83,7 +83,7 @@ void test_remove()
    try
    {
       std::remove("data.dat");
-      trie::database db("data.dat", 8192 * 1024 * 2, true);
+      trie::database db("data.dat", 8192ull * 1024 * 4ull, true);
 
       auto s = db.start_revision(0, 0);
       s.upsert(to_key("Dan"), "Dan");
@@ -181,7 +181,7 @@ int main(int argc, char** argv)
       std::cout << "loaded " << keys.size() << " keys\n";
 
       std::remove("data.dat");
-      trie::database db("data.dat", 8192 * 1024 * 128, true);
+      trie::database db("data.dat", 8192 * 1024ull * 128*4ull, true);
 
       double total = 0;
       auto s = db.start_revision(0, 0);
@@ -393,9 +393,8 @@ void test_boost(const std::vector<std::string>& keys, const std::vector<std::str
    std::cout << "\n\n============== BOOST ============\n\n";
    boost::interprocess::shared_memory_object::remove("my shared memory");
    boost::interprocess::shared_memory_object::remove("my shared memory2");
-   return;
    boost::interprocess::managed_shared_memory seg(
-       boost::interprocess::create_only, "my shared memory2", 2 * 1 * 1024 * 1024 * 1024ull);
+       boost::interprocess::create_only, "my shared memory2", 4 * 1 * 1024 * 1024 * 1024ull);
 
    auto kvdb = seg.construct<key_val_db>("MyKeyVal")(key_val_db::ctor_args_list(),
                                                      seg.get_allocator<key_val>());
@@ -461,6 +460,7 @@ void test_boost(const std::vector<std::string>& keys, const std::vector<std::str
       auto delta = end - start;
       std::cout << "bmi find:    " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms\n";
+      std::cout << "seg used: " << seg.get_size() - seg.get_free_memory() <<"\n";
    }
 }
 

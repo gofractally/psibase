@@ -73,22 +73,22 @@ namespace trie
 
          const_iterator first() const;
          const_iterator last() const;
-         const_iterator find(const string_view prefix) const;
-         const_iterator lower_bound(const string_view prefix) const;
-         const_iterator upper_bound(const string_view prefix) const;
+         const_iterator find(string_view prefix) const;
+         const_iterator lower_bound(string_view prefix) const;
+         const_iterator upper_bound(string_view prefix) const;
 
          iterator first();
          iterator last();
-         iterator find(const string_view prefix);
-         iterator lower_bound(const string_view prefix);
-         iterator upper_bound(const string_view prefix);
+         iterator find(string_view prefix);
+         iterator lower_bound(string_view prefix);
+         iterator upper_bound(string_view prefix);
 
          std::optional<string_view> get(string_view key) const;
 
          // invalidates all iterator on this revision because the nodes may
          // have to be replaced
-         bool upsert(const string_view key, const string_view val);
-         bool remove(const string_view key);
+         bool upsert(string_view key, string_view val);
+         bool remove(string_view key);
 
          ~session() { _db.unlock_revision(_version); };
 
@@ -96,25 +96,25 @@ namespace trie
 
         private:
          node_ptr set_branch2(const node_ptr& in, uint8_t branch, node_ptr&& val);
-         bool     set_branch(node_ptr& in, const string_view branch, node_ptr&& val);
+         bool     set_branch(node_ptr& in, string_view branch, node_ptr&& val);
          std::pair<node_ptr, bool> set_branch2(const node_ptr&   in,
-                                               const string_view branch,
+                                               string_view branch,
                                                node_ptr&&        val);
-         bool                      add_child(node_ptr& n, const string_view key, node_ptr&& val);
+         bool                      add_child(node_ptr& n, string_view key, node_ptr&& val);
 
          std::pair<node_ptr, bool> add_child2(const node_ptr&   in,
-                                              const string_view key,
+                                              string_view key,
                                               node_ptr&&        val);
 
-         bool                      remove(node_ptr& n, const string_view key);
-         std::pair<node_ptr, bool> remove2(const node_ptr& n, const string_view key);
+         bool                      remove(node_ptr& n, string_view key);
+         std::pair<node_ptr, bool> remove2(const node_ptr& n, string_view key);
          inline node_ptr           clone(const node_ptr& from, uint64_t branches = -1);
 
          inline node_ptr make_inner(const inner&      from,
-                                    const string_view prefix,
+                                    string_view prefix,
                                     uint8_t           num_branch);
-         inline node_ptr make_inner(const string_view prefix, uint8_t num_branch);
-         inline node_ptr make_value(const string_view val);
+         inline node_ptr make_inner(string_view prefix, uint8_t num_branch);
+         inline node_ptr make_value(string_view val);
 
          friend class database;
          session(database& db, uint32_t version) : _db(db), _version(version) {}
