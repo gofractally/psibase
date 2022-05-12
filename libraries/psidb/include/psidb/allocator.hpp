@@ -6,6 +6,8 @@
 #include <new>
 #include <psidb/page_header.hpp>
 
+#include <iostream>
+
 namespace psidb
 {
 
@@ -28,8 +30,15 @@ namespace psidb
          freelist_by_size.clear();
          ::munmap(_base, _size);
       }
-      void* allocate(std::size_t size)
+      // TODO: avoid global lock
+      mutable std::mutex _mutex;
+      void*              allocate(std::size_t size)
       {
+         std::lock_guard l{_mutex};
+         if (size != page_size || true)
+         {
+            //std::cerr << "allocating: " << size << std::endl;
+         }
          auto pool = get_pool(size);
          if (pool == max_pools)
          {
@@ -42,6 +51,11 @@ namespace psidb
       }
       void deallocate(void* ptr, std::size_t size)
       {
+         std::lock_guard l{_mutex};
+         if (size != page_size || true)
+         {
+            //std::cerr << "deallocating: " << size << std::endl;
+         }
          auto pool = get_pool(size);
          if (pool == max_pools)
          {
@@ -52,6 +66,30 @@ namespace psidb
             return deallocate_pool(ptr, pool);
          }
       }
+      std::size_t available() const
+      {
+         std::lock_guard l{_mutex};
+         std::size_t     result = 0;
+         for (std::size_t i = 0; i < max_pools; ++i)
+         {
+            std::size_t element_size = pool_element_size(i);
+            for (const pool_type* p = pools[i]; p != nullptr; p = p->next)
+            {
+               result += element_size;
+            }
+         }
+         for (const auto& node : freelist_by_addr)
+         {
+            result += node.size;
+         }
+         return result;
+      }
+      struct stats
+      {
+         std::size_t used;
+         std::size_t total;
+      };
+      stats              get_stats() const { return {_size - available(), _size}; }
       static std::size_t round_to_page(std::size_t size)
       {
          return (size + page_size - 1) & ~(page_size - 1);
@@ -113,7 +151,7 @@ namespace psidb
          }
 
          void*      next      = reinterpret_cast<char*>(&*pos) + size;
-         auto       next_size = size - pos->size;
+         auto       next_size = pos->size - size;
          node_type* result    = &*pos;
          freelist_by_size.erase(pos);
          auto* node = new (next) node_type;

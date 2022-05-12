@@ -37,7 +37,9 @@ namespace psidb
       page_id              id;
       std::atomic<page_id> prev;
       version_type         version;
-      bool                 is_dirty(page_flags f) const
+      // The oldest version in the list formed by prev
+      version_type min_version;
+      bool         is_dirty(page_flags f) const
       {
          if (f == page_flags::dirty0)
          {

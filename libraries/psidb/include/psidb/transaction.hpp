@@ -6,11 +6,61 @@
 namespace psidb
 {
 
+   // general invariants:
+   //
+   // Each fat node forms a circular singly linked list
+   //
+   // Every node has a minimum and maximum version that it is accessible from
+   //
+   // A node can have multiple parents
+   // A parent node points to the highest relevant version of the child node
+   //
+   // There is a set of live versions
+   //
+   // A node becomes obsolete when no version in its lifetime is live
+   //
+   // An obsolete node is removed from its fat node list
+   //
+   // To prove: if a node is obsolete, then any direct parents are also obsolete
+   //
+   // - A node is made obsolete when a transaction that replaces it is committed
+   //   and there are no live versions in the range [creation, replacement)
+   //
+   // problem:
+   // - copy node n0 = [0, 4), n1 = [4, *)
+   // - copy parent p0 = [0, 5), p1 = [5, *)
+   // - copy node n1 = [4, 6), n2 = [6,*)
+   // p0 -> n1, p1 -> n2
+   // Therefore, p0 relies on n1 to access n0
+   //
+   // Limiting fat nodes to a single extra copy solves most of these problems. or does it?
+   // what if we link the other way?
+   //
+   // - version field represents xxx version
+   // - when a node becomes obsolete, its parents need to be relinked
+   //
+   // Suppose we keep a record of the parent:
+   // - The parent is live as long as this checkpoint is live
+   // - When folding checkpoints, if parent is newer the checkpoint, switch to parent prev
+   // - What if... parent is a split node...
+   //
+   // - Or, when a node is freed.
+   //
+   // - or, unlink the node, fix
+
    class transaction
    {
      public:
       transaction(page_manager* db, const checkpoint& ck) : _db(db), _checkpoint(ck) {}
       cursor get_cursor() { return {_db, _checkpoint}; }
+
+      // when a transaction is destroyed
+      // - if is committed or aborted do nothing
+      // - if it is the head, abort
+      // - if it is not the head, fold it into the next transaction
+
+      // move constructor is allowed
+      // move assignement is equivalent to destroying the lhs and then moving
 
       void insert(std::string_view key, std::string_view value)
       {
@@ -36,25 +86,7 @@ namespace psidb
       }
       void erase(cursor& c) { c.erase(*this); }
 
-      void commit()
-      {
-         _db->commit_transaction(_checkpoint);
-
-         //std::vector<page_header*> freed_pages;
-         // node_ptr + version
-         // what could possibly go wrong?
-
-         // The parent page could be created in this transaction,
-         // which allows it to be freed too soon.
-         //
-         // Otherwise...
-         // given a page_header*, we need to find all references to it.
-         // an obsolete page could be referenced by:
-         // - the prev ptr from a page created in this transaction
-         // - the prev ptr from a page created in a later transaction
-         // - a node_ptr from an earlier transaction.  Such references do NOT
-         //   need to be fixed because the page will not be gc'ed until they go away.
-      }
+      void commit() { _db->commit_transaction(_checkpoint, std::move(obsolete_nodes)); }
       // A transaction can only be aborted if it is the current head.
       void abort()
       {
@@ -87,12 +119,20 @@ namespace psidb
          modified_nodes.clear();
       }
 
-      void on_copy(node_ptr ptr) { modified_nodes.push_back(ptr); }
+      void on_delete(page_header* p) { obsolete_nodes.push_back(p); }
+
+      void on_copy(node_ptr ptr)
+      {
+         obsolete_nodes.push_back(_db->translate_page_address(
+             _db->translate_page_address(ptr->load(std::memory_order_relaxed))->prev));
+         modified_nodes.push_back(ptr);
+      }
 
      private:
       page_manager* _db;
       checkpoint    _checkpoint;
       // list of pages obsoleted by this transaction
+      std::vector<page_header*> obsolete_nodes;
       // list of pages created by this transaction
       std::vector<node_ptr> modified_nodes;
    };

@@ -28,7 +28,17 @@ namespace psidb
       ~checkpoint_data();
       page_manager*   _self;
       checkpoint_root _root;
-      // memory management data
+
+      // Pages that are used by this checkpoint, but not by any later checkpoint.
+      // When a checkpoint is deleted, this list is merged into the previous checkpoint.
+      // Optimized for few large transactions.
+      // A mergeable priority queue would be faster for many small transactions.
+      std::vector<std::vector<page_header*>> _pages_to_free;
+
+      void add_free_pages(std::vector<page_header*>&& pages);
+      // Free all pages more recent than version
+      void free_pages(version_type version);
+      void splice_pages(checkpoint_data& other);
    };
 
    class page_manager
@@ -146,8 +156,16 @@ namespace psidb
          head.reset(new checkpoint_data(this));
          return {head};
       }
-      void commit_transaction(const checkpoint& c)
+      void commit_transaction(const checkpoint& c, std::vector<page_header*>&& obsolete_pages)
       {
+         {
+            std::lock_guard l{_checkpoint_mutex};
+            auto            pos = _active_checkpoints.iterator_to(*c._root);
+            // last_commit must exist and be before c.
+            assert(pos != _active_checkpoints.begin());
+            --pos;
+            pos->add_free_pages(std::move(obsolete_pages));
+         }
          {
             std::lock_guard l{_commit_mutex};
             last_commit = c._root;
@@ -156,6 +174,7 @@ namespace psidb
          {
             start_flush(&last_commit->_root);
          }
+         _gc_manager.process_gc(_allocator);
       }
       void abort_transaction(checkpoint&& c)
       {
@@ -220,6 +239,23 @@ namespace psidb
       }
 
       void queue_gc(page_header* node);
+      struct stats
+      {
+         file_allocator::stats file;
+         allocator::stats      memory;
+         std::size_t           checkpoints;
+      };
+      stats get_stats() const
+      {
+         return {_file_allocator.get_stats(), _allocator.get_stats(), checkpoints()};
+      }
+      std::size_t available() const { return _allocator.available(); }
+      std::size_t checkpoints() const
+      {
+         std::lock_guard l{_checkpoint_mutex};
+         return _active_checkpoints.size();
+      }
+      void print_summary();
 
      private:
       page_manager(const page_manager&) = delete;
@@ -301,18 +337,17 @@ namespace psidb
 
       allocator                         _allocator;
       gc_manager                        _gc_manager;
-      int                               fd             = -1;
+      int                               fd = -1;
+      file_allocator                    _file_allocator;
       page_flags                        _dirty_flag    = page_flags::dirty0;
       bool                              _flush_pending = false;
       version_type                      _flush_version = 0;
       shared_queue<write_queue_element> _write_queue;
-      // TODO: use a real allocation algorithm
-      page_id next_file_page = max_memory_pages;
 
       // What do we need:
       // - iterate over uncommitted transactions in order
       // - committed checkpoints can be freed as soon as they are no longer referenced.
-      std::mutex                              _checkpoint_mutex;
+      mutable std::mutex                      _checkpoint_mutex;
       boost::intrusive::list<checkpoint_data> _active_checkpoints;
       std::mutex                              _commit_mutex;
       checkpoint_ptr                          stable_checkpoint = nullptr;

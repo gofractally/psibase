@@ -76,3 +76,13 @@ TEST_CASE("allocate small")
       CHECK(elems[i]->data[1] == i);
    }
 }
+
+TEST_CASE("available")
+{
+   allocator alloc(1024 * 1024);
+   CHECK(alloc.available() == 1024 * 1024);
+   void* p0 = alloc.allocate(32);
+   CHECK(alloc.available() == 1024 * 1024 - 32);
+   alloc.free(p0, 32);
+   CHECK(alloc.available() == 1024 * 1024);
+}

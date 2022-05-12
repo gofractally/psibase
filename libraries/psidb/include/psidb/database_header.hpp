@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <psidb/file_allocator.hpp>
 #include <psidb/page_header.hpp>
 
 namespace psidb
@@ -22,9 +23,11 @@ namespace psidb
    {
       std::uint32_t magic          = 0x626488cf;
       std::uint32_t format_version = 0;
+      page_id       freelist       = 0;
+      std::uint32_t freelist_size  = 0;
       // Information about free space
       // Try to align checkpoints to 64 bytes.
-      char padding[52];
+      char reserved[44];
       // On disk we maintain:
       // - The last stable checkpoint
       // - The last committed version

@@ -18,14 +18,24 @@ namespace psidb
    struct pending_gc_list
    {
       page_free_list* _head;
+      std::mutex      _mutex;
       void            queue_gc(allocator& alloc, page_header* page)
       {
+         std::lock_guard l{_mutex};
          if (_head == nullptr || _head->_size == page_free_list::capacity)
          {
-            auto new_head          = new (alloc.allocate(page_size)) page_free_list;
-            new_head->_children[0] = alloc.get_id(_head);
-            new_head->_size        = 1;
-            _head                  = new_head;
+            auto new_head = new (alloc.allocate(page_size)) page_free_list;
+            if (_head)
+            {
+               new_head->_children[0] = alloc.get_id(_head);
+            }
+            else
+            {
+               // FIXME: figure out better null page
+               new_head->_children[0] = 0xffffffff;
+            }
+            new_head->_size = 1;
+            _head           = new_head;
          }
          _head->_children[_head->_size++] = alloc.get_id(page);
       }
@@ -33,13 +43,22 @@ namespace psidb
       // to allow this function to run in constant time.
       void free(allocator& alloc)
       {
-         while (_head)
+         std::lock_guard l{_mutex};
+         auto            head = _head;
+         _head                = nullptr;
+         while (head)
          {
-            for (std::size_t i = 1; i < _head->_size; ++i)
+            for (std::size_t i = 1; i < head->_size; ++i)
             {
-               alloc.deallocate(alloc.translate_page_address(_head->_children[i]), page_size);
+               alloc.deallocate(alloc.translate_page_address(head->_children[i]), page_size);
             }
-            _head = static_cast<page_free_list*>(alloc.translate_page_address(_head->_children[0]));
+            if (head->_children[0] == 0xffffffff)
+            {
+               break;
+            }
+            auto old_head = head;
+            head = static_cast<page_free_list*>(alloc.translate_page_address(head->_children[0]));
+            alloc.deallocate(old_head, page_size);
          }
       }
    };

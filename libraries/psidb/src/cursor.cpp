@@ -27,8 +27,10 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
          return;
       }
       auto [new_page, new_page_id] = db->allocate_page();
-      key   = p->split(static_cast<page_leaf*>(new_page), p->get_offset(leaf), key, value, flags);
-      child = new_page_id;
+      key = p->split(static_cast<page_leaf*>(new_page), p->get_offset(leaf), key, value, flags);
+      static_cast<page_internal_node*>(new_page)->version     = version;
+      static_cast<page_internal_node*>(new_page)->min_version = version;
+      child                                                   = new_page_id;
       db->touch_page(new_page, version);
    }
    // Insert into internal nodes
@@ -42,14 +44,19 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       }
       // FIXME: Handle allocation failure
       auto [new_page, new_page_id] = db->allocate_page();
-      key   = p->split(static_cast<page_internal_node*>(new_page), p->get_offset(pos), key, child);
-      child = new_page_id;
+      key = p->split(static_cast<page_internal_node*>(new_page), p->get_offset(pos), key, child);
+      static_cast<page_internal_node*>(new_page)->version     = version;
+      static_cast<page_internal_node*>(new_page)->min_version = version;
+      child                                                   = new_page_id;
       db->touch_page(new_page, version);
    }
    // Create a new root, increasing the depth of the tree
    {
       auto [new_page, new_page_id] = db->allocate_page();
+      static_cast<page_internal_node*>(new_page)->init();
       static_cast<page_internal_node*>(new_page)->set(db->get_root_id(c, 0), key, child);
+      static_cast<page_internal_node*>(new_page)->version     = version;
+      static_cast<page_internal_node*>(new_page)->min_version = version;
       db->set_root(c, 0, new_page_id);
       db->touch_page(new_page, version);
    }
@@ -72,6 +79,7 @@ void psidb::cursor::erase(transaction& trx)
             return;
          }
       }
+      // FIXME: deallocate
       db->set_root(c, 0, db->get_id(p));
    }
 }
@@ -87,7 +95,8 @@ Page* psidb::cursor::maybe_clone(transaction& trx, Ptr& node, std::size_t i)
       copy                 = new (copy) Page;
       p->copy(static_cast<Page*>(copy));
       copy->prev.store(db->get_id(p), std::memory_order_release);
-      copy->version = version;
+      copy->version     = version;
+      copy->min_version = p->min_version;
       relink_after_copy(trx, i, copy_id);
       node = static_cast<Page*>(copy)->child(p->get_offset(node));
       p    = static_cast<Page*>(copy);
@@ -100,6 +109,7 @@ void psidb::cursor::relink_after_copy(transaction& trx, std::size_t depth, page_
 {
    if (depth == 0)
    {
+      trx.on_delete(db->root(c, 0));
       db->set_root(c, 0, page);
    }
    else

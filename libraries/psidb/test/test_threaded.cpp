@@ -60,6 +60,10 @@ TEST_CASE("thread tests", "[thread]")
          trx.erase("");
          trx.insert("", {reinterpret_cast<const char*>(&i), sizeof(i)});
          trx.commit();
+         auto stats = db.get_stats();
+         std::cout << "memory used: " << stats.memory.used << " / " << stats.memory.total
+                   << ", checkpoints: " << stats.checkpoints << ", disk used: " << stats.file.used
+                   << " / " << stats.file.total << std::endl;
       }
       done = true;
    };

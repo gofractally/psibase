@@ -204,9 +204,7 @@ namespace psidb
       }
       void set(page_id lhs, std::string_view k, page_id rhs)
       {
-         _size        = 0;
-         _key_words   = 0;
-         _children[0] = lhs;
+         set(lhs);
          append(k, rhs);
       }
       void copy(page_internal_node* other)

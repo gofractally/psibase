@@ -15,7 +15,8 @@ using namespace psidb;
 static constexpr page_id header_page        = max_memory_pages;
 static constexpr page_id backup_header_page = header_page + 1;
 
-psidb::page_manager::page_manager(int fd, std::size_t num_pages) : _allocator(num_pages * page_size)
+psidb::page_manager::page_manager(int fd, std::size_t num_pages)
+    : _allocator(num_pages * page_size), _file_allocator(fd)
 {
    // FIXME: inconsistent behavior W.R.T. cleanup of fd on exception.
    this->fd = fd;
@@ -31,18 +32,21 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages) : _allocator(nu
    if (file_info.st_size == 0)
    {
       // initialize new database
-      auto [page, id] = allocate_page();
-      page->type      = page_type::leaf;
-      page->version   = 1;
+      auto [page, id]   = allocate_page();
+      page->type        = page_type::leaf;
+      page->version     = 1;
+      page->min_version = page->version;
       touch_page(page, page->version);
       static_cast<page_leaf*>(page)->clear();
-      next_file_page += 2;
 
       checkpoint_root h = {};
       h.version         = page->version;
       h.table_roots[0]  = id;
       stable_checkpoint = nullptr;
       last_commit = head = checkpoint_ptr{new checkpoint_data{this, h}};
+
+      // reserve the first to pages for the header
+      _file_allocator.initialize(2);
    }
    else
    {
@@ -136,14 +140,12 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
 
 page_id psidb::page_manager::allocate_file_page()
 {
-   return next_file_page++;
+   return _file_allocator.allocate(1);
 }
 
 page_id psidb::page_manager::allocate_file_pages(std::size_t count)
 {
-   page_id result = next_file_page;
-   next_file_page += count;
-   return result;
+   return _file_allocator.allocate(count);
 }
 
 void page_manager::queue_gc(page_header* node)
@@ -224,7 +226,7 @@ struct freelist {
    template<typename Disposer>
    void free(version_type version, Disposer&& dispose) {
       for(auto& v : other.free_pages) {
-         while(!v.empty() && v.back()->version > version) {
+         while(!v.empty() && v.back()->oldest_version > version) {
             dispose(v.back());
             v.pop_back();
          }
@@ -232,7 +234,7 @@ struct freelist {
    }
    void splice(freelist& other) {
       for(auto& v : other.free_pages) {
-         while(!v.empty() && v.back()->version > version) {
+         while(!v.empty() && v.back()->oldest_version > version) {
             v.pop_back();
          }
          if(!v.empty()) {
@@ -487,6 +489,7 @@ void psidb::page_manager::read_header()
 {
    database_header tmp;
    read_header(&tmp);
+   _file_allocator.load(tmp.freelist, tmp.freelist_size, _allocator);
    for (std::uint32_t i = 0; i < tmp.num_checkpoints; ++i)
    {
       checkpoint_ptr c{new checkpoint_data(this, tmp.checkpoints[i])};
@@ -540,7 +543,13 @@ void psidb::page_manager::prepare_header(database_header* header)
 // other work.
 void psidb::page_manager::write_header()
 {
+   // TODO: flush file allocator and record in header
    database_header tmp;
+   auto [freelist, freelist_pages] = _file_allocator.flush(_allocator);
+   tmp.freelist                    = freelist;
+   tmp.freelist_size               = freelist_pages;
+   // TODO: skip the copy if the header is not valid (after creating a new
+   // database or after crash recovery)
    read_page(&tmp, header_page);
    write_page(&tmp, backup_header_page);
    if (::fdatasync(fd) != 0)
@@ -578,5 +587,68 @@ psidb::checkpoint_data::~checkpoint_data()
 {
    std::lock_guard l{_self->_checkpoint_mutex};
    // process cleanups
-   _self->_active_checkpoints.erase(_self->_active_checkpoints.iterator_to(*this));
+   auto pos = _self->_active_checkpoints.iterator_to(*this);
+   if (pos == _self->_active_checkpoints.begin())
+   {
+      free_pages(0);
+   }
+   else
+   {
+      auto prev = pos;
+      --prev;
+      free_pages(prev->_root.version);
+      prev->splice_pages(*this);
+   }
+   _self->_active_checkpoints.erase(pos);
+}
+
+void psidb::checkpoint_data::add_free_pages(std::vector<page_header*>&& pages)
+{
+   // partition first? I don't know whether that's worthwhile
+   std::sort(pages.begin(), pages.end(),
+             [](page_header* lhs, page_header* rhs)
+             { return lhs->min_version < rhs->min_version; });
+   while (!pages.empty() && pages.back()->min_version > _root.version)
+   {
+      _self->queue_gc(pages.back());
+      pages.pop_back();
+   }
+   _pages_to_free.push_back(std::move(pages));
+}
+
+// Free all pages more recent than version
+void psidb::checkpoint_data::free_pages(version_type version)
+{
+   for (auto& v : _pages_to_free)
+   {
+      while (!v.empty() && v.back()->min_version > version)
+      {
+         _self->queue_gc(v.back());
+         v.pop_back();
+      }
+   }
+}
+
+void psidb::checkpoint_data::splice_pages(checkpoint_data& other)
+{
+   for (auto& v : other._pages_to_free)
+   {
+      if (!v.empty())
+      {
+         _pages_to_free.push_back(std::move(v));
+      }
+   }
+}
+
+void psidb::page_manager::print_summary()
+{
+   std::lock_guard l{_checkpoint_mutex};
+   for (auto& c : _active_checkpoints)
+   {
+      std::size_t count = 0;
+      for (const auto& v : c._pages_to_free)
+      {
+         count += v.size();
+      }
+   }
 }
