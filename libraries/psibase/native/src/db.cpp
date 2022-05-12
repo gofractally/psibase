@@ -38,7 +38,7 @@ namespace psibase
       const mdbx::map_handle                   nativeUnconstrainedMap;
       const mdbx::map_handle                   subjectiveMap;
       const mdbx::map_handle                   writeOnlyMap;
-      const mdbx::map_handle                   eventMap;
+      const mdbx::map_handle                   historyEventMap;
       const mdbx::map_handle                   uiEventMap;
       const mdbx::map_handle                   blockLogMap;
 
@@ -52,7 +52,7 @@ namespace psibase
             nativeUnconstrainedMap{construct_kv_map(*stateEnv, "native_unconstrained")},
             subjectiveMap{construct_kv_map(*subjectiveEnv, nullptr)},
             writeOnlyMap{construct_kv_map(*writeOnlyEnv, "write_only")},
-            eventMap{construct_kv_map(*writeOnlyEnv, "event")},
+            historyEventMap{construct_kv_map(*writeOnlyEnv, "history_event")},
             uiEventMap{construct_kv_map(*writeOnlyEnv, "ui_event")},
             blockLogMap{construct_kv_map(*blockLogEnv, nullptr)}
       {
@@ -70,10 +70,10 @@ namespace psibase
             return subjectiveMap;
          if (db == DbId::writeOnly)
             return writeOnlyMap;
-         if (db == DbId::event)
-            return writeOnlyMap;
+         if (db == DbId::historyEvent)
+            return historyEventMap;
          if (db == DbId::uiEvent)
-            return writeOnlyMap;
+            return uiEventMap;
          if (db == DbId::blockLog)
             return blockLogMap;
          throw std::runtime_error("unknown DbId");
@@ -113,7 +113,7 @@ namespace psibase
             return *blockLogTransaction;
          else if (db == DbId::writeOnly)
             return writeOnlyTransactions.back();
-         else if (db == DbId::event)
+         else if (db == DbId::historyEvent)
             return writeOnlyTransactions.back();
          else if (db == DbId::uiEvent)
             return writeOnlyTransactions.back();
