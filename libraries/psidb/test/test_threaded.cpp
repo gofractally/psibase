@@ -115,4 +115,11 @@ TEST_CASE("thread tests", "[thread]")
    {
       t.join();
    }
+
+   db.start_transaction().commit();
+   db.start_transaction().commit();
+         auto stats = db.get_stats();
+         std::cout << "memory used: " << stats.memory.used << " / " << stats.memory.total
+                   << ", checkpoints: " << stats.checkpoints << ", disk used: " << stats.file.used
+                   << " / " << stats.file.total << std::endl;
 }

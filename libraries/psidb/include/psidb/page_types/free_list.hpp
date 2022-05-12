@@ -21,6 +21,7 @@ namespace psidb
       std::mutex      _mutex;
       void            queue_gc(allocator& alloc, page_header* page)
       {
+         //std::cerr << "queue_gc" << std::endl;
          std::lock_guard l{_mutex};
          if (_head == nullptr || _head->_size == page_free_list::capacity)
          {
@@ -54,6 +55,7 @@ namespace psidb
             }
             if (head->_children[0] == 0xffffffff)
             {
+               alloc.deallocate(head, page_size);
                break;
             }
             auto old_head = head;

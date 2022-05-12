@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <new>
 #include <psidb/page_header.hpp>
+#include <set>
 
 #include <iostream>
 
@@ -42,16 +43,22 @@ namespace psidb
          auto pool = get_pool(size);
          if (pool == max_pools)
          {
-            return allocate_block(round_to_page(size));
+            auto result = allocate_block(round_to_page(size));
+            _dbg_allocated_pages.insert(result);
+            return result;
          }
          else
          {
-            return allocate_pool(pool);
+            auto result = allocate_pool(pool);
+            std::memset(result, 0xCC, size);
+            _dbg_allocated_pages.insert(result);
+            return result;
          }
       }
       void deallocate(void* ptr, std::size_t size)
       {
          std::lock_guard l{_mutex};
+         _dbg_allocated_pages.erase(ptr);
          if (size != page_size || true)
          {
             //std::cerr << "deallocating: " << size << std::endl;
@@ -267,6 +274,8 @@ namespace psidb
           boost::intrusive::key_of_value<K>>;
       freelist<by_size> freelist_by_size;
       freelist<by_addr> freelist_by_addr;
+
+      std::set<void*> _dbg_allocated_pages;
    };
 
 }  // namespace psidb

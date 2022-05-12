@@ -591,6 +591,10 @@ psidb::checkpoint_data::~checkpoint_data()
    if (pos == _self->_active_checkpoints.begin())
    {
       free_pages(0);
+      for(auto& v : _pages_to_free)
+      {
+         assert(v.empty());
+      }
    }
    else
    {
@@ -604,6 +608,7 @@ psidb::checkpoint_data::~checkpoint_data()
 
 void psidb::checkpoint_data::add_free_pages(std::vector<page_header*>&& pages)
 {
+   std::cerr << "freeing pages: " << pages.size() << std::endl;
    // partition first? I don't know whether that's worthwhile
    std::sort(pages.begin(), pages.end(),
              [](page_header* lhs, page_header* rhs)
