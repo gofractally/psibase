@@ -154,6 +154,7 @@ fn convert_doc_str(comment: &Option<Comment>) -> String {
                             text = &text[1..];
                         }
                         result.push_str(text);
+                        result.push('\n');
                     }
                 }
                 result.push('\n');

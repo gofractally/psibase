@@ -6,6 +6,7 @@
 #include <psibase/db.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/to_key.hpp>
+#include <span>
 
 #ifdef COMPILING_WASM
 #define PSIBASE_INTRINSIC(x) [[clang::import_name(#x)]]
@@ -125,6 +126,9 @@ namespace psibase
 
    /// Get the currently-executing action.
    ///
+   /// This function unpacks the data into the [Action] struct. For large
+   /// data, [getCurrentActionView] can be more efficient.
+   ///
    /// If the contract, while handling action A, calls itself with action B:
    /// * Before the call to B, `getCurrentAction()` returns A.
    /// * After the call to B, `getCurrentAction()` returns B.
@@ -134,6 +138,9 @@ namespace psibase
    Action getCurrentAction();
 
    /// Get the currently-executing action.
+   ///
+   /// This function creates a view, which can save time for large data. For small
+   /// data, [getCurrentAction] can be more efficient.
    ///
    /// If the contract, while handling action A, calls itself with action B:
    /// * Before the call to B, `getCurrentAction()` returns A.
