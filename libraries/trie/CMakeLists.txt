@@ -1,21 +1,27 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.16)
 project( trie )
 
-find_package(Boost 1.78 REQUIRED COMPONENTS filesystem )
-include_directories( ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
+find_package(Threads REQUIRED)
+if(UNIX AND NOT APPLE)
+    set(LINUX_LIBS rt)
+endif()
+
+find_package(Boost 1.75 REQUIRED COMPONENTS filesystem )
 
 add_executable( test db.cpp tdb.cpp palloc.cpp )
-target_link_libraries( test PUBLIC Boost::filesystem )
+target_link_libraries( test PUBLIC Boost::filesystem ${LINUX_LIBS} Threads::Threads )
 target_compile_options( test PUBLIC -msse4.1 )
+target_include_directories( test PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
 set_property( TARGET test PROPERTY CXX_STANDARD 20 )
 
 add_executable( bigdb db.cpp big.cpp palloc.cpp )
-target_link_libraries( bigdb PUBLIC Boost::filesystem )
+target_link_libraries( bigdb PUBLIC Boost::filesystem ${LINUX_LIBS} Threads::Threads )
 target_compile_options( bigdb PUBLIC -msse4.1 )
+target_include_directories( bigdb PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
 set_property( TARGET bigdb PROPERTY CXX_STANDARD 20 )
 
 add_executable( bigbmit db.cpp bigbmi.cpp palloc.cpp )
-target_link_libraries( bigbmit PUBLIC Boost::filesystem )
+target_link_libraries( bigbmit PUBLIC Boost::filesystem ${LINUX_LIBS} Threads::Threads )
 target_compile_options( bigbmit PUBLIC -msse4.1 )
+target_include_directories( bigbmit PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
 set_property( TARGET bigbmit PROPERTY CXX_STANDARD 20 )
-
