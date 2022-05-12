@@ -47,6 +47,8 @@ namespace psibase
 
       /// Store the currently-executing action into result and return the result size
       ///
+      /// The result contains a fracpacked [Action].
+      ///
       /// Use [getResult] to get result.
       ///
       /// If the contract, while handling action A, calls itself with action B:
@@ -58,6 +60,8 @@ namespace psibase
       PSIBASE_INTRINSIC(getCurrentAction) uint32_t getCurrentAction();
 
       /// Call a contract, store the return value into result, and return the result size
+      ///
+      /// `action` must contain a fracpacked [Action].
       ///
       /// Use [getResult] to get result.
       PSIBASE_INTRINSIC(call) uint32_t call(const char* action, uint32_t len);
@@ -115,11 +119,11 @@ namespace psibase
       PSIBASE_INTRINSIC(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
    }  // namespace raw
 
+   /// Get result
+   std::vector<char> getResult();
+
    /// Get result when size is known. Caution: this does not verify size.
    std::vector<char> getResult(uint32_t size);
-
-   /// Get result when size is unknown
-   std::vector<char> getResult();
 
    /// Get key
    std::vector<char> getKey();
@@ -151,9 +155,13 @@ namespace psibase
    psio::shared_view_ptr<Action> getCurrentActionView();
 
    /// Call a contract and return its result
+   ///
+   /// `action` must contain a fracpacked [Action].
    std::vector<char> call(const char* action, uint32_t len);
 
    /// Call a contract and return its result
+   ///
+   /// `action` must contain a fracpacked [Action].
    std::vector<char> call(psio::input_stream action);
 
    /// Call a contract and return its result

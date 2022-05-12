@@ -181,7 +181,9 @@ fn lookup(
     let item = &items[parent];
     for (name, indexes) in &item.children {
         if name == path[0] {
-            lookup(items, indexes[0], &path[1..], true, result);
+            for index in indexes {
+                lookup(items, *index, &path[1..], true, result);
+            }
         }
     }
     if result.is_empty() && !recursed {
@@ -283,12 +285,46 @@ fn generate_documentation(items: &Vec<Item>, path: &str) -> String {
         let item = &items[index];
         let mut def = String::new();
         def.push_str("```text\n");
+
+        let template_args: Vec<Entity> = item
+            .entity
+            .get_children()
+            .iter()
+            .filter(|c| {
+                c.get_kind() == EntityKind::TemplateTypeParameter
+                    || c.get_kind() == EntityKind::NonTypeTemplateParameter
+            })
+            .copied()
+            .collect();
+
+        if !template_args.is_empty() {
+            def.push_str("template<");
+            let mut need_comma = false;
+            for arg in template_args {
+                if need_comma {
+                    def.push_str(", ");
+                }
+                // TODO: NonTypeTemplateParameter
+                def.push_str(&(String::from("typename ") + &arg.get_name().unwrap()));
+                need_comma = true;
+            }
+            def.push_str(">\n");
+        }
+
         def.push_str(&item.entity.get_result_type().unwrap().get_display_name());
 
         def.push(' ');
         def.push_str(&path[2..]);
         def.push('(');
-        let args = item.entity.get_arguments().unwrap_or_default();
+
+        // item.entity.get_arguments() misses some arguments
+        let args: Vec<Entity> = item
+            .entity
+            .get_children()
+            .iter()
+            .filter(|c| c.get_kind() == EntityKind::ParmDecl)
+            .copied()
+            .collect();
 
         let mut type_size = 0usize;
         for arg in args.iter() {
