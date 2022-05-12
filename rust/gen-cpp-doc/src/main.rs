@@ -25,6 +25,8 @@ enum Commands {
 enum Kind {
     Namespace,
     Function,
+    Enum,
+    Struct,
 }
 
 struct Item<'tu> {
@@ -42,11 +44,20 @@ struct Item<'tu> {
 fn convert_children<'a, 'tu>(items: &'a mut Vec<Item<'tu>>, current: usize, entity: Entity<'tu>) {
     for child in entity.get_children() {
         match child.get_kind() {
+            EntityKind::ClassDecl => {
+                convert_child(items, current, child, Kind::Struct, false);
+            }
+            EntityKind::EnumDecl => {
+                convert_child(items, current, child, Kind::Enum, false);
+            }
             EntityKind::FunctionDecl => {
                 convert_child(items, current, child, Kind::Function, false);
             }
             EntityKind::FunctionTemplate => {
                 convert_child(items, current, child, Kind::Function, false);
+            }
+            EntityKind::StructDecl => {
+                convert_child(items, current, child, Kind::Struct, false);
             }
             EntityKind::Namespace => {
                 convert_child(items, current, child, Kind::Namespace, true);
@@ -275,90 +286,151 @@ fn generate_documentation(items: &Vec<Item>, path: &str) -> String {
         false,
         &mut found_indexes,
     );
-
     if found_indexes.is_empty() {
         panic!("{} not found", path);
     }
-
     let mut result = String::new();
     for index in found_indexes {
-        let item = &items[index];
-        let mut def = String::new();
-        def.push_str("```text\n");
-
-        let template_args: Vec<Entity> = item
-            .entity
-            .get_children()
-            .iter()
-            .filter(|c| {
-                c.get_kind() == EntityKind::TemplateTypeParameter
-                    || c.get_kind() == EntityKind::NonTypeTemplateParameter
-            })
-            .copied()
-            .collect();
-
-        if !template_args.is_empty() {
-            def.push_str("template<");
-            let mut need_comma = false;
-            for arg in template_args {
-                if need_comma {
-                    def.push_str(", ");
-                }
-                // TODO: NonTypeTemplateParameter
-                def.push_str(&(String::from("typename ") + &arg.get_name().unwrap()));
-                need_comma = true;
-            }
-            def.push_str(">\n");
+        match items[index].kind {
+            Kind::Enum => document_enum(items, index, path, &mut result),
+            Kind::Function => document_function(items, index, path, &mut result),
+            _ => (),
         }
-
-        def.push_str(&item.entity.get_result_type().unwrap().get_display_name());
-
-        def.push(' ');
-        def.push_str(&path[2..]);
-        def.push('(');
-
-        // item.entity.get_arguments() misses some arguments
-        let args: Vec<Entity> = item
-            .entity
-            .get_children()
-            .iter()
-            .filter(|c| c.get_kind() == EntityKind::ParmDecl)
-            .copied()
-            .collect();
-
-        let mut type_size = 0usize;
-        for arg in args.iter() {
-            type_size = max(type_size, arg.get_type().unwrap().get_display_name().len());
-        }
-        let mut need_comma = false;
-        for arg in args.iter() {
-            if need_comma {
-                def.push(',');
-            }
-            def.push_str("\n    ");
-            def.push_str(&format!(
-                "{:1$}",
-                arg.get_type().unwrap().get_display_name(),
-                type_size + 1
-            ));
-            def.push_str(&arg.get_name().unwrap());
-            need_comma = true;
-        }
-        if need_comma {
-            def.push('\n');
-        }
-        def.push_str(");\n");
-        def.push_str("```\n");
-
-        result.push_str(&format!(
-            "### {}\n\n{}\n{}\n",
-            &path[2..],
-            def,
-            fill_all_links(&item.doc_str, items, index)
-        ));
     }
     result
-} // generate_documentation
+}
+
+fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
+    let item = &items[index];
+    let mut def = String::new();
+    def.push_str("```text\n");
+    document_template_args(item, &mut def);
+    def.push_str(&(String::from("enum ") + &path[2..]));
+    if let Some(under) = item.entity.get_enum_underlying_type() {
+        def.push_str(&(String::from(": ") + &under.get_display_name()));
+    }
+    def.push_str(" {");
+
+    let constants: Vec<Entity> = item
+        .entity
+        .get_children()
+        .iter()
+        .filter(|c| c.get_kind() == EntityKind::EnumConstantDecl)
+        .copied()
+        .collect();
+    let mut name_size = 0usize;
+    for c in constants.iter() {
+        name_size = max(name_size, c.get_display_name().unwrap().len());
+    }
+    for c in constants.iter() {
+        def.push_str("\n    ");
+        def.push_str(&format!(
+            "{:1$} = ",
+            c.get_display_name().unwrap(),
+            name_size + 1
+        ));
+        def.push_str(&c.get_enum_constant_value().unwrap().0.to_string());
+        def.push(',');
+    }
+    def.push_str("\n};\n");
+    def.push_str("```\n");
+    result.push_str(&format!(
+        "### {}\n\n{}\n{}\n",
+        &path[2..],
+        def,
+        fill_all_links(&item.doc_str, items, index)
+    ));
+
+    for c in constants.iter() {
+        let doc_str = convert_doc_str(&c.get_parsed_comment());
+        eprintln!("---\n{}\n---\n", fill_all_links(&doc_str, items, index));
+        if !doc_str.is_empty() {
+            result.push_str(&format!(
+                "### {}::{}\n\n{}\n",
+                &path[2..],
+                c.get_name().unwrap(),
+                fill_all_links(&doc_str, items, index)
+            ));
+        }
+    }
+} // document_enum
+
+fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
+    let item = &items[index];
+    let mut def = String::new();
+    def.push_str("```text\n");
+    document_template_args(item, &mut def);
+    def.push_str(&item.entity.get_result_type().unwrap().get_display_name());
+    def.push(' ');
+    def.push_str(&path[2..]);
+    def.push('(');
+
+    // item.entity.get_arguments() misses some arguments
+    let args: Vec<Entity> = item
+        .entity
+        .get_children()
+        .iter()
+        .filter(|c| c.get_kind() == EntityKind::ParmDecl)
+        .copied()
+        .collect();
+
+    let mut type_size = 0usize;
+    for arg in args.iter() {
+        type_size = max(type_size, arg.get_type().unwrap().get_display_name().len());
+    }
+    let mut need_comma = false;
+    for arg in args.iter() {
+        if need_comma {
+            def.push(',');
+        }
+        def.push_str("\n    ");
+        def.push_str(&format!(
+            "{:1$}",
+            arg.get_type().unwrap().get_display_name(),
+            type_size + 1
+        ));
+        def.push_str(&arg.get_name().unwrap());
+        need_comma = true;
+    }
+    if need_comma {
+        def.push('\n');
+    }
+    def.push_str(");\n");
+    def.push_str("```\n");
+
+    result.push_str(&format!(
+        "### {}\n\n{}\n{}\n",
+        &path[2..],
+        def,
+        fill_all_links(&item.doc_str, items, index)
+    ));
+} // document_function
+
+fn document_template_args(item: &Item, def: &mut String) {
+    let template_args: Vec<Entity> = item
+        .entity
+        .get_children()
+        .iter()
+        .filter(|c| {
+            c.get_kind() == EntityKind::TemplateTypeParameter
+                || c.get_kind() == EntityKind::NonTypeTemplateParameter
+        })
+        .copied()
+        .collect();
+    if !template_args.is_empty() {
+        def.push_str("template<");
+        let mut need_comma = false;
+        for arg in template_args {
+            if need_comma {
+                def.push_str(", ");
+            }
+            // TODO: NonTypeTemplateParameter
+            def.push_str(&(String::from("typename ") + &arg.get_name().unwrap()));
+            need_comma = true;
+        }
+        def.push_str(">\n");
+    }
+}
 
 #[allow(dead_code)]
 fn dump(entity: &Entity, indent: usize) {
@@ -424,6 +496,13 @@ fn modify_book(book: &mut mdbook::book::Book, re: Regex, mut items: Vec<Item>) {
             BookItem::PartTitle(_) => (),
         }
     }
+    book.for_each_mut(|item: &mut BookItem| match item {
+        BookItem::Chapter(chapter) => {
+            chapter.content = fill_all_links(&chapter.content, &items, 0);
+        }
+        BookItem::Separator => (),
+        BookItem::PartTitle(_) => (),
+    });
     book.for_each_mut(|item: &mut BookItem| match item {
         BookItem::Chapter(chapter) => {
             chapter.content = re
