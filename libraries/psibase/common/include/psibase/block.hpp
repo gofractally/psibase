@@ -9,6 +9,14 @@ namespace psibase
 {
    using BlockNum = uint32_t;
 
+   /// A synchronous call
+   ///
+   /// An Action represents a synchronous call between contracts.
+   /// It is the argument to [call] and can be fetched using
+   /// [getCurrentAction].
+   ///
+   /// [Transaction] also contains actions requested by the
+   /// transaction authorizers.
    struct Action
    {
       AccountNumber     sender;    ///< Account sending the action

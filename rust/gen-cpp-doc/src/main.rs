@@ -260,7 +260,7 @@ fn fill_link(text: &str, items: &Vec<Item>, parent: usize) -> Option<String> {
         false,
         &mut candidates,
     );
-    if !candidates.is_empty() {
+    if !candidates.is_empty() && !items[candidates[0]].url.is_empty() {
         Some(String::new() + "[" + text + "](" + &items[candidates[0]].url + ")")
     } else {
         None

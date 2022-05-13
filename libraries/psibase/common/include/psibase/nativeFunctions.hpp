@@ -47,9 +47,7 @@ namespace psibase
 
       /// Store the currently-executing action into result and return the result size
       ///
-      /// The result contains a fracpacked [Action].
-      ///
-      /// Use [getResult] to get result.
+      /// The result contains a fracpacked [Action]; use [getResult] to get it.
       ///
       /// If the contract, while handling action A, calls itself with action B:
       /// * Before the call to B, `getCurrentAction()` returns A.
@@ -167,6 +165,9 @@ namespace psibase
    psio::shared_view_ptr<Action> getCurrentActionView();
 
    /// Call a contract and return its result
+   std::vector<char> call(const Action& action);
+
+   /// Call a contract and return its result
    ///
    /// `action` must contain a fracpacked [Action].
    std::vector<char> call(const char* action, uint32_t len);
@@ -175,9 +176,6 @@ namespace psibase
    ///
    /// `action` must contain a fracpacked [Action].
    std::vector<char> call(psio::input_stream action);
-
-   /// Call a contract and return its result
-   std::vector<char> call(const Action& action);
 
    /// Set the return value of the currently-executing action
    template <typename T>
