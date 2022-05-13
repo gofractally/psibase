@@ -8,12 +8,45 @@ Native functions give contracts the ability to print debugging messages, abort t
 
 ## Types For Native Functions
 
-{{#cpp-doc ::psibase::DbId}}
+- [psibase::Action]
+- [psibase::DbId]
+
 {{#cpp-doc ::psibase::Action}}
+{{#cpp-doc ::psibase::DbId}}
 
 ## Wrapped Native Functions
 
 These functions wrap the [Raw Native Functions](#raw-native-functions).
+
+- [psibase::abortMessage]
+- [psibase::call]
+- [psibase::check]
+- [psibase::getCurrentAction]
+- [psibase::getCurrentActionView]
+- [psibase::getKey]
+- [psibase::getResult]
+- [psibase::kvGet]
+- [psibase::kvGetOrDefault]
+- [psibase::kvGetRaw]
+- [psibase::kvGetSequential]
+- [psibase::kvGetSequentialRaw]
+- [psibase::kvGetSize]
+- [psibase::kvGetSizeRaw]
+- [psibase::kvGreaterEqual]
+- [psibase::kvGreaterEqualRaw]
+- [psibase::kvLessThan]
+- [psibase::kvLessThanRaw]
+- [psibase::kvMax]
+- [psibase::kvMaxRaw]
+- [psibase::kvPut]
+- [psibase::kvPutRaw]
+- [psibase::kvPutSequential]
+- [psibase::kvPutSequentialRaw]
+- [psibase::kvRemove]
+- [psibase::kvRemoveRaw]
+- [psibase::setRetval]
+- [psibase::setRetvalBytes]
+- [psibase::writeConsole]
 
 {{#cpp-doc ::psibase::abortMessage}}
 {{#cpp-doc ::psibase::call}}
@@ -48,6 +81,22 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 ## Raw Native Functions
 
 This is the set of raw native functions (wasm imports). They are available for contracts to use directly, but we recommend using the [Wrapped Native Functions](#wrapped-native-functions) instead.
+
+- [psibase::raw::abortMessage]
+- [psibase::raw::call]
+- [psibase::raw::getCurrentAction]
+- [psibase::raw::getKey]
+- [psibase::raw::getResult]
+- [psibase::raw::kvGet]
+- [psibase::raw::kvGetSequential]
+- [psibase::raw::kvGreaterEqual]
+- [psibase::raw::kvLessThan]
+- [psibase::raw::kvMax]
+- [psibase::raw::kvPut]
+- [psibase::raw::kvPutSequential]
+- [psibase::raw::kvRemove]
+- [psibase::raw::setRetval]
+- [psibase::raw::writeConsole]
 
 {{#cpp-doc ::psibase::raw::abortMessage}}
 {{#cpp-doc ::psibase::raw::call}}

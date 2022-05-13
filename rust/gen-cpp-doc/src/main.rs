@@ -308,6 +308,7 @@ fn generate_documentation(items: &Vec<Item>, path: &str) -> String {
         match items[index].kind {
             Kind::Enum => document_enum(items, index, path, &mut result),
             Kind::Function => document_function(items, index, path, &mut result),
+            Kind::Struct => document_struct(items, index, path, &mut result),
             _ => (),
         }
     }
@@ -325,13 +326,9 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
     }
     def.push_str(" {");
 
-    let constants: Vec<Entity> = item
-        .entity
-        .get_children()
-        .iter()
-        .filter(|c| c.get_kind() == EntityKind::EnumConstantDecl)
-        .copied()
-        .collect();
+    let constants: Vec<Entity> = filter_children(&item.entity, |c| {
+        c.get_kind() == EntityKind::EnumConstantDecl
+    });
     let mut name_size = 0usize;
     for c in constants.iter() {
         name_size = max(name_size, c.get_display_name().unwrap().len());
@@ -344,7 +341,7 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
             "<a href=\"{3}\">{1}{0:2$} = {4}, // {5}</a>",
             "",
             name,
-            name_size + 1 - name.len(),
+            name_size - name.len(),
             hash_link(&(path[2..].to_owned() + &name)),
             val,
             c.get_comment_brief().unwrap()
@@ -373,6 +370,43 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
     }
 } // document_enum
 
+fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
+    let item = &items[index];
+    let mut def = String::new();
+    def.push_str("<pre><code class=\"language-c++\">");
+    document_template_args(item, &mut def);
+    def.push_str(&(String::from("struct ") + &path[2..]));
+    def.push_str(" {\n");
+
+    let fields = filter_children(&item.entity, |c| c.get_kind() == EntityKind::FieldDecl);
+    let mut type_size = 0;
+    let mut name_size = 0;
+    for arg in fields.iter() {
+        type_size = max(type_size, arg.get_type().unwrap().get_display_name().len());
+        name_size = max(name_size, arg.get_name().unwrap().len());
+    }
+    for field in fields.iter() {
+        let ty = field.get_type().unwrap().get_display_name();
+        let name = field.get_name().unwrap();
+        def.push_str(&format!(
+            "    {1}{0:2$} {3};{0:4$} // {5}\n",
+            "",
+            escape_html(&ty),
+            type_size - ty.len(),
+            name,
+            name_size - name.len(),
+            field.get_comment_brief().unwrap_or_default()
+        ));
+    }
+    def.push_str("};\n</code></pre>\n");
+    result.push_str(&format!(
+        "### {}\n\n{}\n{}\n",
+        &path[2..],
+        def,
+        fill_all_links(&item.doc_str, items, index)
+    ));
+} // document_struct
+
 fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
     let item = &items[index];
     let mut def = String::new();
@@ -383,15 +417,7 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
     def.push_str(&path[2..]);
     def.push('(');
 
-    // item.entity.get_arguments() misses some arguments
-    let args: Vec<Entity> = item
-        .entity
-        .get_children()
-        .iter()
-        .filter(|c| c.get_kind() == EntityKind::ParmDecl)
-        .copied()
-        .collect();
-
+    let args: Vec<Entity> = filter_children(&item.entity, |c| c.get_kind() == EntityKind::ParmDecl);
     let mut type_size = 0usize;
     for arg in args.iter() {
         type_size = max(type_size, arg.get_type().unwrap().get_display_name().len());
@@ -403,11 +429,11 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
         }
         def.push_str("\n    ");
         def.push_str(&format!(
-            "{:1$}",
+            "{:1$}{2}",
             arg.get_type().unwrap().get_display_name(),
-            type_size + 1
+            type_size + 1,
+            arg.get_name().unwrap()
         ));
-        def.push_str(&arg.get_name().unwrap());
         need_comma = true;
     }
     if need_comma {
@@ -425,16 +451,10 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
 } // document_function
 
 fn document_template_args(item: &Item, def: &mut String) {
-    let template_args: Vec<Entity> = item
-        .entity
-        .get_children()
-        .iter()
-        .filter(|c| {
-            c.get_kind() == EntityKind::TemplateTypeParameter
-                || c.get_kind() == EntityKind::NonTypeTemplateParameter
-        })
-        .copied()
-        .collect();
+    let template_args: Vec<Entity> = filter_children(&item.entity, |c| {
+        c.get_kind() == EntityKind::TemplateTypeParameter
+            || c.get_kind() == EntityKind::NonTypeTemplateParameter
+    });
     if !template_args.is_empty() {
         def.push_str("template<");
         let mut need_comma = false;
@@ -448,6 +468,24 @@ fn document_template_args(item: &Item, def: &mut String) {
         }
         def.push_str(">\n");
     }
+}
+
+fn escape_html(s: &str) -> String {
+    let mut result = String::new();
+    pulldown_cmark::escape::escape_html(&mut result, s).unwrap();
+    result
+}
+
+fn filter_children<'a, P>(entity: &Entity<'a>, predicate: P) -> Vec<Entity<'a>>
+where
+    P: FnMut(&&Entity<'a>) -> bool,
+{
+    entity
+        .get_children()
+        .iter()
+        .filter(predicate)
+        .copied()
+        .collect()
 }
 
 #[allow(dead_code)]

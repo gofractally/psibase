@@ -11,10 +11,10 @@ namespace psibase
 
    struct Action
    {
-      AccountNumber     sender;
-      AccountNumber     contract;
-      MethodNumber      method;
-      std::vector<char> rawData;
+      AccountNumber     sender;    ///< Account sending the action
+      AccountNumber     contract;  ///< Contract to execute the action
+      MethodNumber      method;    ///< Contract method to execute
+      std::vector<char> rawData;   ///< Data for the method
    };
    PSIO_REFLECT(Action, sender, contract, method, rawData)
 
