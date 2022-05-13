@@ -11,33 +11,42 @@ namespace psibase
    /// use when invoking those functions.
    enum class DbId : uint32_t
    {
-      /// Most contracts should store their tables here. The first 64
-      /// bits of the key match the contract.
+      /// Contracts should store their tables here
+      ///
+      /// The first 64 bits of the key match the contract.
       contract,
 
+      /// Data for RPC
+      ///
       /// Write-only during transactions, and read-only during RPC.
       /// Individual nodes may modify this database, expire data from this
       /// database, or wipe it entirely at will.
       writeOnly,
 
-      /// Data that is not part of consensus. Only accessible to
-      /// subjective contracts during transactions, but readable
-      /// by all contracts during RPC. Individual nodes may modify
-      /// this database or wipe it entirely at will.
+      /// Data that is not part of consensus
+      ///
+      /// Only accessible to subjective contracts during transactions,
+      /// but readable by all contracts during RPC. Individual nodes may
+      /// modify this database or wipe it entirely at will.
       subjective,
 
-      /// Native tables which enforce constraints during write. Only
+      /// Tables used by native code
+      ///
+      /// This database enforces constraints during write. Only
       /// writable by priviledged contracts, but readable by all
       /// contracts.
       nativeConstrained,
 
-      /// Native tables which don't enforce constraints during write.
+      /// Tables used by native code
+      ///
+      /// This database doesn't enforce constraints during write.
       /// Only writable by priviledged contracts, but readable by all
       /// contracts.
       nativeUnconstrained,
 
-      /// This contains the block log. Transactions don't have access to
-      /// it, but RPC does.
+      /// Block log
+      ///
+      /// Transactions don't have access to this, but RPC does.
       blockLog,
 
       /// Long-term history event storage

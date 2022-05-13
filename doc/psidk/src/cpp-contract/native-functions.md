@@ -2,9 +2,14 @@
 
 Native functions give contracts the ability to print debugging messages, abort transactions on errors, access databases and event logs, and synchronously call other contracts. There aren't many native functions since contracts implement most Psibase functionality.
 
+- [Types For Native Functions](#types-for-native-functions)
+- [Wrapped Native Functions](#wrapped-native-functions)
+- [Raw Native Functions](#raw-native-functions)
+
 ## Types For Native Functions
 
 {{#cpp-doc ::psibase::DbId}}
+{{#cpp-doc ::psibase::Action}}
 
 ## Wrapped Native Functions
 

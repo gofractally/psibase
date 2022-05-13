@@ -156,19 +156,28 @@ fn get_items<'tu>(tu: &'tu TranslationUnit) -> Vec<Item<'tu>> {
 fn convert_doc_str(comment: &Option<Comment>) -> String {
     let mut result = String::new();
     if let Some(comment) = comment {
+        let mut is_brief = true;
         for child in comment.get_children() {
             if let CommentChild::Paragraph(lines) = child {
+                let mut need_nl = false;
                 for line in lines {
                     if let CommentChild::Text(text) = line {
+                        if need_nl {
+                            result.push('\n');
+                        }
+                        need_nl = true;
                         let mut text = text.as_str();
                         if !text.is_empty() && *text.as_bytes().get(0).unwrap() == b' ' {
                             text = &text[1..];
                         }
                         result.push_str(text);
-                        result.push('\n');
                     }
                 }
-                result.push('\n');
+                if is_brief {
+                    result.push('.');
+                    is_brief = false;
+                }
+                result.push_str("\n\n");
             }
         }
     }
@@ -227,10 +236,15 @@ fn set_urls(chapter: &mdbook::book::Chapter, items: &mut Vec<Item>, path: &str) 
     );
     for index in indexes {
         let item = &mut items[index];
-        let mut link_name = item.full_name.replace("::", "");
-        link_name.make_ascii_lowercase();
-        item.url = chapter_path.clone() + "#" + &link_name;
+        item.url = chapter_path.clone() + &hash_link(&item.full_name);
     }
+}
+
+// Replace "::a::b::c" with "#abc"
+fn hash_link(x: &str) -> String {
+    let mut link_name = x.replace("::", "");
+    link_name.make_ascii_lowercase();
+    String::from('#') + &link_name
 }
 
 // Replace text of the form "foo" or "foo::bar::baz" with a link
@@ -303,7 +317,7 @@ fn generate_documentation(items: &Vec<Item>, path: &str) -> String {
 fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
     let item = &items[index];
     let mut def = String::new();
-    def.push_str("```text\n");
+    def.push_str("<pre><code class=\"language-c++\">");
     document_template_args(item, &mut def);
     def.push_str(&(String::from("enum ") + &path[2..]));
     if let Some(under) = item.entity.get_enum_underlying_type() {
@@ -323,17 +337,21 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
         name_size = max(name_size, c.get_display_name().unwrap().len());
     }
     for c in constants.iter() {
+        let name = c.get_display_name().unwrap();
+        let val = c.get_enum_constant_value().unwrap().0.to_string();
         def.push_str("\n    ");
         def.push_str(&format!(
-            "{:1$} = ",
-            c.get_display_name().unwrap(),
-            name_size + 1
+            "<a href=\"{3}\">{1}{0:2$} = {4}, // {5}</a>",
+            "",
+            name,
+            name_size + 1 - name.len(),
+            hash_link(&(path[2..].to_owned() + &name)),
+            val,
+            c.get_comment_brief().unwrap()
         ));
-        def.push_str(&c.get_enum_constant_value().unwrap().0.to_string());
-        def.push(',');
     }
     def.push_str("\n};\n");
-    def.push_str("```\n");
+    def.push_str("</code></pre>\n");
     result.push_str(&format!(
         "### {}\n\n{}\n{}\n",
         &path[2..],
@@ -343,7 +361,7 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
 
     for c in constants.iter() {
         let doc_str = convert_doc_str(&c.get_parsed_comment());
-        eprintln!("---\n{}\n---\n", fill_all_links(&doc_str, items, index));
+        // eprintln!("---\n{}\n---\n", fill_all_links(&doc_str, items, index));
         if !doc_str.is_empty() {
             result.push_str(&format!(
                 "### {}::{}\n\n{}\n",
@@ -533,11 +551,8 @@ fn main() -> Result<(), anyhow::Error> {
     let index = clang::Index::new(&clang, false, true);
     let tu = parse(&index, repo_path)?;
     // dump(&tu.get_entity(), 0);
-
     let items = get_items(&tu);
-
     modify_book(&mut book, re, items);
-
     serde_json::to_writer(io::stdout(), &book)?;
     Ok(())
 }

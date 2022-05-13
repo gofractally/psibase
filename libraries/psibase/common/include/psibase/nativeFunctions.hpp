@@ -75,7 +75,9 @@ namespace psibase
       PSIBASE_INTRINSIC(kvPut)
       void kvPut(DbId db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen);
 
-      /// Add a sequentially-numbered record. Returns the id.
+      /// Add a sequentially-numbered record
+      ///
+      /// Returns the id.
       PSIBASE_INTRINSIC(kvPutSequential)
       uint64_t kvPutSequential(DbId db, const char* value, uint32_t valueLen);
 
@@ -88,8 +90,10 @@ namespace psibase
       /// exist, returns `-1` and clears result. Use [getResult] to get result.
       PSIBASE_INTRINSIC(kvGet) uint32_t kvGet(DbId db, const char* key, uint32_t keyLen);
 
-      /// Get a sequentially-numbered record. If `id` is available, then sets result to value and
-      /// returns size. If id does not exist, returns -1 and clears result.
+      /// Get a sequentially-numbered record
+      ///
+      /// If `id` is available, then sets result to value and returns size. If id does
+      /// not exist, returns -1 and clears result.
       PSIBASE_INTRINSIC(kvGetSequential) uint32_t kvGetSequential(DbId db, uint64_t id);
 
       /// Get the first key-value pair which is greater than or equal to the provided
@@ -120,15 +124,23 @@ namespace psibase
    }  // namespace raw
 
    /// Get result
+   ///
+   /// Other functions set result.
    std::vector<char> getResult();
 
-   /// Get result when size is known. Caution: this does not verify size.
+   /// Get result when size is known
+   ///
+   /// Other functions set result.
+   ///
+   /// Caution: this does not verify size.
    std::vector<char> getResult(uint32_t size);
 
    /// Get key
+   ///
+   /// Other functions set the key.
    std::vector<char> getKey();
 
-   /// Get the currently-executing action.
+   /// Get the currently-executing action
    ///
    /// This function unpacks the data into the [Action] struct. For large
    /// data, [getCurrentActionView] can be more efficient.
@@ -141,7 +153,7 @@ namespace psibase
    /// Note: The above only applies if the contract uses [call]. `actor` uses [call].
    Action getCurrentAction();
 
-   /// Get the currently-executing action.
+   /// Get the currently-executing action
    ///
    /// This function creates a view, which can save time for large data. For small
    /// data, [getCurrentAction] can be more efficient.
@@ -181,33 +193,43 @@ namespace psibase
       raw::setRetval(s.pos, s.remaining());
    }
 
-   /// Set a key-value pair. If key already exists, then replace the existing value.
+   /// Set a key-value pair
+   ///
+   /// If key already exists, then replace the existing value.
    inline void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
    {
       raw::kvPut(db, key.pos, key.remaining(), value.pos, value.remaining());
    }
 
-   /// Set a key-value pair. If key already exists, then replace the existing value.
+   /// Set a key-value pair
+   ///
+   /// If key already exists, then replace the existing value.
    template <typename K, NotOptional V>
    void kvPut(DbId db, const K& key, const V& value)
    {
       kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
    }
 
-   /// Set a key-value pair. If key already exists, then replace the existing value.
+   /// Set a key-value pair
+   ///
+   /// If key already exists, then replace the existing value.
    template <typename K, NotOptional V>
    void kvPut(const K& key, const V& value)
    {
       kvPut(DbId::contract, key, value);
    }
 
-   /// Add a sequentially-numbered record. Returns the id.
+   /// Add a sequentially-numbered record
+   ///
+   /// Returns the id.
    inline uint64_t kvPutSequentialRaw(DbId db, psio::input_stream value)
    {
       return raw::kvPutSequential(db, value.pos, value.remaining());
    }
 
-   /// Add a sequentially-numbered record. Returns the id.
+   /// Add a sequentially-numbered record
+   ///
+   /// Returns the id.
    template <typename Type, NotOptional V>
    uint64_t kvPutSequential(DbId db, AccountNumber contract, Type type, const V& value)
    {
@@ -240,7 +262,7 @@ namespace psibase
       kvRemove(DbId::contract, key);
    }
 
-   /// Get size of key-value pair, if any
+   /// Get size of stored value, if any
    inline std::optional<uint32_t> kvGetSizeRaw(DbId db, psio::input_stream key)
    {
       auto size = raw::kvGet(db, key.pos, key.remaining());
@@ -249,14 +271,14 @@ namespace psibase
       return size;
    }
 
-   /// Size of key-value pair, if any
+   /// Get size of stored value, if any
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(DbId db, const K& key)
    {
       return kvGetSizeRaw(db, psio::convert_to_key(key));
    }
 
-   /// Size of key-value pair, if any
+   /// Get size of stored value, if any
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(const K& key)
    {
@@ -316,7 +338,8 @@ namespace psibase
       return getResult(size);
    }
 
-   /// Get a sequentially-numbered record, if available.
+   /// Get a sequentially-numbered record, if available
+   ///
    /// * If `matchContract` is non-null, and the record wasn't written by `matchContract`, then return nullopt.
    ///   This prevents a spurious abort from mismatched serialization.
    /// * If `matchType` is non-null, and the record type doesn't match, then return nullopt.
