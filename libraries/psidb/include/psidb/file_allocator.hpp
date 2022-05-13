@@ -42,7 +42,10 @@ namespace psidb
       stats get_stats() const;
 
      private:
-      file_allocator(const file_allocator&)          = delete;
+      file_allocator(const file_allocator&) = delete;
+      page_id                          allocate_unlocked(std::size_t size);
+      void                             deallocate_unlocked(page_id id, std::size_t size);
+      mutable std::mutex               _mutex;
       int                              fd            = -1;
       free_segment                     previous_root = {};
       std::map<page_id, std::uint32_t> freelist_by_addr;

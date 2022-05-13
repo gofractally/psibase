@@ -21,7 +21,7 @@ namespace psidb
             }
             _cond.wait(l);
          }
-         result = _queue.front();
+         result = std::move(_queue.front());
          _queue.pop();
          return true;
       }
@@ -29,6 +29,12 @@ namespace psidb
       {
          std::lock_guard l{_mutex};
          _queue.push(t);
+         _cond.notify_one();
+      }
+      void push(T&& t)
+      {
+         std::lock_guard l{_mutex};
+         _queue.push(std::move(t));
          _cond.notify_one();
       }
       void interrupt()

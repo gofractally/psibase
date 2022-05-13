@@ -34,6 +34,7 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages)
       // initialize new database
       auto [page, id]   = allocate_page();
       page->type        = page_type::leaf;
+      page->id          = 0;
       page->version     = 1;
       page->min_version = page->version;
       touch_page(page, page->version);
@@ -171,14 +172,6 @@ void psidb::page_manager::write_worker()
          }
          else if (size == res)
          {
-            if (data)
-            {
-               if (data->fetch_add(-1, std::memory_order_relaxed) == 1)
-               {
-                  delete data;
-                  write_header();
-               }
-            }
             break;
          }
          else
@@ -191,7 +184,9 @@ void psidb::page_manager::write_worker()
    }
 }
 
-void psidb::page_manager::queue_write(page_id dest, page_header* src, std::atomic<int>* refcount)
+void psidb::page_manager::queue_write(page_id                      dest,
+                                      page_header*                 src,
+                                      const std::shared_ptr<void>& refcount)
 {
    _write_queue.push({get_file_offset(dest), src, page_size, refcount});
 }
@@ -206,63 +201,22 @@ void psidb::page_manager::evict_page(node_ptr ptr) {
 }
 #endif
 
-#if 0
-/*
-Managing the free list:
-
-A page has a live range, which is [version created, version removed)
-A page can be reused when there is no checkpoint in that range
-
-Every checkpoint holds a list of pages that are used by it, but not
-by any later checkpoint.  When a checkpoint is deleted, this list is
-merged into the previous checkpoint.
-*/
-
-struct freelist {
-   // Optimized for few large transactions.
-   // A mergeable priority queue would be faster for many small transactions.
-   std::vector<std::vector<page_header*>> free_pages;
-   // Free all pages more recent than version
-   template<typename Disposer>
-   void free(version_type version, Disposer&& dispose) {
-      for(auto& v : other.free_pages) {
-         while(!v.empty() && v.back()->oldest_version > version) {
-            dispose(v.back());
-            v.pop_back();
-         }
-      }
-   }
-   void splice(freelist& other) {
-      for(auto& v : other.free_pages) {
-         while(!v.empty() && v.back()->oldest_version > version) {
-            v.pop_back();
-         }
-         if(!v.empty()) {
-            free_pages.push_back(std::move(v));
-         }
-      }
-   }
-};
-#endif
-
-void psidb::page_manager::write_page(page_header*      page,
-                                     page_flags        dirty_flag,
-                                     std::atomic<int>* refcount)
+void psidb::page_manager::write_page(page_header*                 page,
+                                     page_flags                   dirty_flag,
+                                     const std::shared_ptr<void>& refcount)
 {
    auto dest = allocate_file_page();
    page->id  = dest;
    page->set_dirty(dirty_flag, false);
    queue_write(dest, page, refcount);
-   refcount->fetch_add(1, std::memory_order_relaxed);
 }
 
-void psidb::page_manager::write_pages(page_id           dest,
-                                      const void*       src,
-                                      std::size_t       count,
-                                      std::atomic<int>* refcount)
+void psidb::page_manager::write_pages(page_id                      dest,
+                                      const void*                  src,
+                                      std::size_t                  count,
+                                      const std::shared_ptr<void>& refcount)
 {
    _write_queue.push({get_file_offset(dest), src, page_size * count, refcount});
-   refcount->fetch_add(1, std::memory_order_relaxed);
 }
 
 static void fix_data_reference(std::string_view value,
@@ -278,10 +232,10 @@ static void fix_data_reference(std::string_view value,
    std::memcpy(const_cast<char*>(value.data()), &result, sizeof(result));
 }
 
-bool psidb::page_manager::write_tree(page_id           page,
-                                     version_type      version,
-                                     page_flags        dirty_flag,
-                                     std::atomic<int>* refcount)
+bool psidb::page_manager::write_tree(page_id                      page,
+                                     version_type                 version,
+                                     page_flags                   dirty_flag,
+                                     const std::shared_ptr<void>& refcount)
 {
    // This requires the invariant that if a node is on
    // disk, its children are also on disk.
@@ -403,16 +357,19 @@ bool psidb::page_manager::write_tree(page_id           page,
    }
 }
 
-void psidb::page_manager::start_flush(checkpoint_root* c)
+void psidb::page_manager::start_flush(const checkpoint_ptr& ptr, bool stable)
 {
-   std::atomic<int>* refcount = new std::atomic<int>(1);
-   // TODO: flush all tables
-   write_tree(c->table_roots[0], c->version, switch_dirty_flag(_dirty_flag), refcount);
-   if (refcount->fetch_add(-1, std::memory_order_relaxed) == 1)
+   struct finish_flush
    {
-      delete refcount;
-      write_header();
-   }
+      ~finish_flush() { self->write_header(ptr, stable); }
+      checkpoint_ptr ptr;
+      page_manager*  self;
+      bool           stable;
+   };
+   std::shared_ptr<void> refcount = std::make_shared<finish_flush>(ptr, this, stable);
+   // TODO: flush all tables
+   auto* c = &ptr->_root;
+   write_tree(c->table_roots[0], c->version, switch_dirty_flag(_dirty_flag), refcount);
 }
 
 void psidb::page_manager::read_page(void* out, page_id id, std::size_t count)
@@ -525,14 +482,14 @@ void psidb::page_manager::prepare_flush(page_id& root)
    }
 }
 
-void psidb::page_manager::prepare_header(database_header* header)
+void psidb::page_manager::prepare_header(database_header* header, const checkpoint_ptr& root)
 {
    if (stable_checkpoint == nullptr)
    {
-      stable_checkpoint = head;
+      stable_checkpoint = root;
    }
    header->checkpoints[0] = stable_checkpoint->_root;
-   header->checkpoints[1] = head->_root;
+   header->checkpoints[1] = root->_root;
    prepare_flush(header->checkpoints[0].table_roots[0]);
    prepare_flush(header->checkpoints[1].table_roots[0]);
    header->num_checkpoints = 2;
@@ -541,9 +498,17 @@ void psidb::page_manager::prepare_header(database_header* header)
 
 // Writing the header MUST be fully syncronized, but doesn't need to block
 // other work.
-void psidb::page_manager::write_header()
+void psidb::page_manager::write_header(const checkpoint_ptr& root, bool stable)
 {
-   // TODO: flush file allocator and record in header
+   // ensure that the old stable checkpoint is preserved until after
+   // the new checkpoint is durably stored.
+   // TODO: on error, swap back
+   checkpoint_ptr old_stable_checkpoint;
+   if (stable)
+   {
+      old_stable_checkpoint = root;
+      std::swap(stable_checkpoint, old_stable_checkpoint);
+   }
    database_header tmp;
    auto [freelist, freelist_pages] = _file_allocator.flush(_allocator);
    tmp.freelist                    = freelist;
@@ -556,7 +521,7 @@ void psidb::page_manager::write_header()
    {
       throw std::system_error{errno, std::system_category(), "fdatasync"};
    }
-   prepare_header(&tmp);
+   prepare_header(&tmp, root);
    tmp.set_checksum();
    write_page(&tmp, header_page);
    // TODO: On linux pwritev2 with RWF_DSYNC can sync just the data written
@@ -565,6 +530,7 @@ void psidb::page_manager::write_header()
    {
       throw std::system_error{errno, std::system_category(), "fdatasync"};
    }
+   _syncing.store(false, std::memory_order_release);
 }
 
 psidb::checkpoint_data::checkpoint_data(page_manager* self, const checkpoint_root& value)
@@ -591,7 +557,7 @@ psidb::checkpoint_data::~checkpoint_data()
    if (pos == _self->_active_checkpoints.begin())
    {
       free_pages(0);
-      for(auto& v : _pages_to_free)
+      for (auto& v : _pages_to_free)
       {
          assert(v.empty());
       }
@@ -608,7 +574,7 @@ psidb::checkpoint_data::~checkpoint_data()
 
 void psidb::checkpoint_data::add_free_pages(std::vector<page_header*>&& pages)
 {
-   std::cerr << "freeing pages: " << pages.size() << std::endl;
+   //std::cerr << "freeing pages: " << pages.size() << std::endl;
    // partition first? I don't know whether that's worthwhile
    std::sort(pages.begin(), pages.end(),
              [](page_header* lhs, page_header* rhs)

@@ -150,7 +150,7 @@ namespace psidb
             // TODO: should this be in async_flush?
             if (head == last_commit)
             {
-               start_flush(&head->_root);
+               start_flush(head, _flush_stable);
             }
          }
          head.reset(new checkpoint_data(this));
@@ -172,17 +172,24 @@ namespace psidb
          }
          if (last_commit->_root.version == _flush_version)
          {
-            start_flush(&last_commit->_root);
+            start_flush(c._root, _flush_stable);
          }
-         _gc_manager.process_gc(_allocator);
+         _gc_manager.process_gc(_allocator, _file_allocator);
       }
       void abort_transaction(checkpoint&& c)
       {
          assert(c._root.get() == &_active_checkpoints.back());
          c._root.reset();
       }
-      void async_flush()
+      void async_flush(bool stable = true)
       {
+         // FIXME: automatically ignoring multiple flushes
+         // is probably a bad idea.  At the very least, it interacts
+         // badly with stable.
+         if (_syncing.exchange(true, std::memory_order_relaxed))
+         {
+            return;
+         }
          if (head == last_commit)
          {
             if (_flush_version != head->_root.version)
@@ -190,11 +197,12 @@ namespace psidb
                _flush_version = head->_root.version;
                _flush_pending = false;
                _dirty_flag    = switch_dirty_flag(_dirty_flag);
-               start_flush(&head->_root);
+               start_flush(head, stable);
             }
          }
          else
          {
+            _flush_stable  = stable;
             _flush_pending = true;
          }
       }
@@ -262,6 +270,8 @@ namespace psidb
 
       friend struct checkpoint_data;
 
+      using checkpoint_ptr = std::shared_ptr<checkpoint_data>;
+
       page_flags switch_dirty_flag(page_flags f)
       {
          if (f == page_flags::dirty0)
@@ -289,17 +299,19 @@ namespace psidb
 
       // Write dirty pages back to the filesystem
       void write_worker();
-      void queue_write(page_id dest, page_header* src, std::atomic<int>* refcount);
-      void write_pages(page_id           dest,
-                       const void*       src,
-                       std::size_t       count,
-                       std::atomic<int>* refcount);
-      void write_page(page_header* page, page_flags dirty_flag, std::atomic<int>* refcount);
-      bool write_tree(page_id           page,
-                      version_type      version,
-                      page_flags        dirty_flag,
-                      std::atomic<int>* refcount);
-      void start_flush(checkpoint_root* c);
+      void queue_write(page_id dest, page_header* src, const std::shared_ptr<void>& refcount);
+      void write_pages(page_id                      dest,
+                       const void*                  src,
+                       std::size_t                  count,
+                       const std::shared_ptr<void>& refcount);
+      void write_page(page_header*                 page,
+                      page_flags                   dirty_flag,
+                      const std::shared_ptr<void>& refcount);
+      bool write_tree(page_id                      page,
+                      version_type                 version,
+                      page_flags                   dirty_flag,
+                      const std::shared_ptr<void>& refcount);
+      void start_flush(const std::shared_ptr<checkpoint_data>& ptr, bool stable);
 
       // Raw file io
       void read_page(void* out, page_id id, std::size_t count = 1);
@@ -309,8 +321,8 @@ namespace psidb
       void read_header(database_header* header);
       void read_header();
       void prepare_flush(page_id& root);
-      void prepare_header(database_header* header);
-      void write_header();
+      void prepare_header(database_header* header, const checkpoint_ptr& root);
+      void write_header(const checkpoint_ptr& root, bool stable);
 
       struct write_queue_element
       {
@@ -318,7 +330,7 @@ namespace psidb
          const void*  src;
          std::size_t  size;
          // completion handler
-         std::atomic<int>* counter;
+         std::shared_ptr<void> counter;
       };
 
 #if 0
@@ -333,15 +345,15 @@ namespace psidb
       };
 #endif
 
-      using checkpoint_ptr = std::shared_ptr<checkpoint_data>;
-
       allocator                         _allocator;
       gc_manager                        _gc_manager;
       int                               fd = -1;
       file_allocator                    _file_allocator;
       page_flags                        _dirty_flag    = page_flags::dirty0;
       bool                              _flush_pending = false;
+      bool                              _flush_stable  = true;
       version_type                      _flush_version = 0;
+      std::atomic<bool>                 _syncing       = false;
       shared_queue<write_queue_element> _write_queue;
 
       // What do we need:

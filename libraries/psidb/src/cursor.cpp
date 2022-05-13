@@ -28,10 +28,11 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       }
       auto [new_page, new_page_id] = db->allocate_page();
       key = p->split(static_cast<page_leaf*>(new_page), p->get_offset(leaf), key, value, flags);
-      static_cast<page_header*>(new_page)->type     = page_type::leaf;
+      new_page->id                                     = 0;
+      static_cast<page_header*>(new_page)->type        = page_type::leaf;
       static_cast<page_header*>(new_page)->version     = version;
       static_cast<page_header*>(new_page)->min_version = version;
-      child                                                   = new_page_id;
+      child                                            = new_page_id;
       db->touch_page(new_page, version);
    }
    // Insert into internal nodes
@@ -46,7 +47,8 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       // FIXME: Handle allocation failure
       auto [new_page, new_page_id] = db->allocate_page();
       key = p->split(static_cast<page_internal_node*>(new_page), p->get_offset(pos), key, child);
-      static_cast<page_internal_node*>(new_page)->type     = page_type::node;
+      new_page->id                                            = 0;
+      static_cast<page_internal_node*>(new_page)->type        = page_type::node;
       static_cast<page_internal_node*>(new_page)->version     = version;
       static_cast<page_internal_node*>(new_page)->min_version = version;
       child                                                   = new_page_id;
@@ -57,7 +59,8 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       auto [new_page, new_page_id] = db->allocate_page();
       static_cast<page_internal_node*>(new_page)->init();
       static_cast<page_internal_node*>(new_page)->set(db->get_root_id(c, 0), key, child);
-      static_cast<page_internal_node*>(new_page)->type     = page_type::node;
+      new_page->id                                            = 0;
+      static_cast<page_internal_node*>(new_page)->type        = page_type::node;
       static_cast<page_internal_node*>(new_page)->version     = version;
       static_cast<page_internal_node*>(new_page)->min_version = version;
       db->set_root(c, 0, new_page_id);
@@ -98,6 +101,7 @@ Page* psidb::cursor::maybe_clone(transaction& trx, Ptr& node, std::size_t i)
       copy                 = new (copy) Page;
       p->copy(static_cast<Page*>(copy));
       copy->type = p->type;
+      copy->id   = 0;
       copy->prev.store(db->get_id(p), std::memory_order_release);
       copy->version     = version;
       copy->min_version = p->min_version;

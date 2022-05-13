@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psidb/allocator.hpp>
+#include <psidb/file_allocator.hpp>
 #include <psidb/page_header.hpp>
 #include <psidb/sync/shared_value.hpp>
 
@@ -42,7 +43,7 @@ namespace psidb
       }
       // TODO: single page deallocation can integrate with the allocator's free list
       // to allow this function to run in constant time.
-      void free(allocator& alloc)
+      void free(allocator& alloc, file_allocator& falloc)
       {
          std::lock_guard l{_mutex};
          auto            head = _head;
@@ -51,7 +52,12 @@ namespace psidb
          {
             for (std::size_t i = 1; i < head->_size; ++i)
             {
-               alloc.deallocate(alloc.translate_page_address(head->_children[i]), page_size);
+               page_header* p = alloc.translate_page_address(head->_children[i]);
+               if (p->id)
+               {
+                  falloc.deallocate(p->id, 1);
+               }
+               alloc.deallocate(p, page_size);
             }
             if (head->_children[0] == 0xffffffff)
             {
@@ -76,12 +82,12 @@ namespace psidb
          // FIXME: RAII
          manager.unlock(val);
       }
-      void process_gc(allocator& alloc)
+      void process_gc(allocator& alloc, file_allocator& falloc)
       {
          if (manager.try_wait())
          {
             auto val = manager.load(std::memory_order_relaxed);
-            lists[val ^ 1].free(alloc);
+            lists[val ^ 1].free(alloc, falloc);
             manager.async_store(val ^ 1);
          }
       }

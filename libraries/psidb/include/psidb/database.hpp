@@ -20,7 +20,7 @@ namespace psidb
       }
       transaction start_transaction() { return {&_storage, _storage.start_transaction()}; }
       transaction start_read() { return {&_storage, _storage.get_head()}; }
-      void        async_flush() { _storage.async_flush(); }
+      void        async_flush(bool stable) { _storage.async_flush(stable); }
       auto        get_stats() const { return _storage.get_stats(); }
       std::size_t available_memory() const { return _storage.available(); }
       std::size_t checkpoints() const { return _storage.checkpoints(); }
