@@ -1,3 +1,5 @@
+// TODO: switch from bin to fracpack
+
 #pragma once
 
 #include <boost/mp11/algorithm.hpp>
@@ -10,6 +12,7 @@
 #include <psio/from_bin.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_key.hpp>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -166,12 +169,15 @@ namespace psibase
       kv_raw_iterator base;
    };
 
-   struct key_view
+   /// A serialized key (non-owning)
+   ///
+   /// The serialized data has the same sort order as the non-serialized form
+   struct KeyView
    {
-      std::string_view data;
+      std::span<const char> data;
    };
    template <typename S>
-   void to_key(const key_view& k, S& s)
+   void to_key(const KeyView& k, S& s)
    {
       s.write(k.data.data(), k.data.size());
    }
@@ -246,10 +252,10 @@ namespace psibase
        typename key_suffix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>::type;
 
    template <typename T, typename K>
-   class index
+   class TableIndex
    {
      public:
-      explicit index(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
+      explicit TableIndex(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
       kv_iterator<T> begin() const
       {
          kv_iterator<T> result = end();
@@ -263,7 +269,7 @@ namespace psibase
       }
       kv_iterator<T> lower_bound(compatible_key_prefix<K> auto&& k) const
       {
-         key_view       key_base{{prefix.data(), prefix.size()}};
+         KeyView        key_base{{prefix.data(), prefix.size()}};
          auto           key = psio::convert_to_key(std::tie(key_base, k));
          result_handle  res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
          kv_iterator<T> result(std::move(key), prefix.size(), is_secondary());
@@ -272,8 +278,8 @@ namespace psibase
       }
       kv_iterator<T> upper_bound(compatible_key_prefix<K> auto&& k) const
       {
-         key_view key_base{{prefix.data(), prefix.size()}};
-         auto     key = psio::convert_to_key(std::tie(key_base, k));
+         KeyView key_base{{prefix.data(), prefix.size()}};
+         auto    key = psio::convert_to_key(std::tie(key_base, k));
          while (true)
          {
             if (key.size() <= prefix.size())
@@ -291,17 +297,17 @@ namespace psibase
          return result;
       }
       template <compatible_key_prefix<K> K2>
-      index<T, key_suffix<K2, K>> subindex(K2&& k)
+      TableIndex<T, key_suffix<K2, K>> subindex(K2&& k)
       {
-         key_view key_base{{prefix.data(), prefix.size()}};
-         auto     key = psio::convert_to_key(std::tie(key_base, k));
-         return index<T, key_suffix<K2, K>>(std::move(key));
+         KeyView key_base{{prefix.data(), prefix.size()}};
+         auto    key = psio::convert_to_key(std::tie(key_base, k));
+         return TableIndex<T, key_suffix<K2, K>>(std::move(key));
       }
       std::optional<T> get(compatible_key<K> auto&& k) const
       {
-         key_view key_base{{prefix.data(), prefix.size()}};
-         auto     buffer = psio::convert_to_key(std::tie(key_base, k));
-         int      res    = raw::kvGet(db, buffer.data(), buffer.size());
+         KeyView key_base{{prefix.data(), prefix.size()}};
+         auto    buffer = psio::convert_to_key(std::tie(key_base, k));
+         int     res    = raw::kvGet(db, buffer.data(), buffer.size());
          if (res < 0)
          {
             return {};
@@ -345,18 +351,22 @@ namespace psibase
       raw::kvPut(db, key, key_len, value, value_len);
    }
 
-   /// Table of objects stored in database
+   /// Table of objects stored in the key-value database
    ///
    /// Template arguments:
    /// - `T`: Type of object stored in table
    /// - `Primary`: fetches primary key from an object
-   /// - `Secondary`: fetches a secondary key from an object
+   /// - `Secondary`: fetches a secondary key from an object. This is optional; there may be 0 or more secondary keys.
    ///
    /// `Primary` and `Secondary` may be:
-   /// - pointer-to-data-member of `T`. e.g. `&MyType::key`
-   /// - pointer-to-member-function of `T` which returns a key. e.g. `&MyType::key_function`
+   /// - pointer-to-data-member. e.g. `&MyType::key`
+   /// - pointer-to-member-function which returns a key. e.g. `&MyType::key_function`
    /// - non-member function which takes a `const T&` as its only argument and returns a key
    /// - a callable object which takes a `const T&` as its only argument and returns a key
+   ///
+   /// Caution: secondary keys must be unique. If multiple objects in the table
+   /// have the same secondary key value, then the secondary index for that key
+   /// will become corrupt.
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {
@@ -364,8 +374,27 @@ namespace psibase
       static_assert(1 + sizeof...(Secondary) <= 255, "Too many indices");
       using key_type   = std::remove_cvref_t<decltype(std::invoke(Primary, std::declval<T>()))>;
       using value_type = T;
-      explicit Table(key_view prefix) : prefix(prefix.data.begin(), prefix.data.end()) {}
+
+      /// Construct table with prefix
+      ///
+      /// `prefix` identifies the range of keys within the database that the
+      /// table occupies. If a key within the database begins with `prefix`, then
+      /// `Table` assumes the key belongs to it.
+      ///
+      /// This version of the constructor copies the prefix.
+      explicit Table(KeyView prefix) : prefix(prefix.data.begin(), prefix.data.end()) {}
+
+      /// Construct table with prefix
+      ///
+      /// `prefix` identifies the range of keys within the database that the
+      /// table occupies. If a key within the database begins with `prefix`, then
+      /// `Table` assumes the key belongs to it.
       explicit Table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
+
+      /// Store `arg` into the table
+      ///
+      /// If an object already exists with the same primary key, then the new
+      /// object replaces it.
       void put(const T& arg)
       {
          auto pk = serialize_key(0, std::invoke(Primary, arg));
@@ -416,6 +445,11 @@ namespace psibase
          auto serialized = psio::convert_to_bin(arg);
          raw::kvPut(db, pk.data(), pk.size(), serialized.data(), serialized.size());
       }
+
+      /// Remove `key` from table
+      ///
+      /// This is equivalent to looking the object up by key, then calling
+      /// [remove] if found.
       void erase(compatible_key<key_type> auto&& key)
       {
          if constexpr (sizeof...(Secondary) == 0)
@@ -431,6 +465,8 @@ namespace psibase
             }
          }
       }
+
+      /// Remove object from table
       void remove(const T& old_value)
       {
          std::vector<char> key_buffer = prefix;
@@ -450,6 +486,12 @@ namespace psibase
       }
 
       // TODO: get index by name
+      /// Get a primary or secondary index
+      ///
+      /// If `Idx` is 0, then this returns the primary index, else it returns
+      /// a secondary index.
+      ///
+      /// The result is [TableIndex].
       template <int Idx>
       auto get_index() const
       {
@@ -459,19 +501,13 @@ namespace psibase
              std::remove_cvref_t<decltype(std::invoke(key_extractor::value, std::declval<T>()))>;
          auto index_prefix = prefix;
          index_prefix.push_back(static_cast<char>(Idx));
-         return index<T, key_type>(std::move(index_prefix));
-      }
-
-      void erase(auto key)
-      {
-         auto pk = serialize_key(0, key);
-         raw::kvRemove(db, pk.data(), pk.size());
+         return TableIndex<T, key_type>(std::move(index_prefix));
       }
 
      private:
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
       {
-         key_view key_base{{prefix.data(), prefix.size()}};
+         KeyView key_base{{prefix.data(), prefix.size()}};
          return psio::convert_to_key(std::tie(key_base, idx, k));
       }
       static constexpr DbId db = DbId::contract;

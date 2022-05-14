@@ -455,13 +455,13 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
         let ty = field.get_type().unwrap().get_display_name();
         let name = field.get_name().unwrap();
         def.push_str(&format!(
-            "    {1}{0:2$} <span class=\"hljs-variable\">{3}</span>;{0:4$} // <span class=\"hljs-comment\">{5}</span>\n",
+            "    {1}{0:2$} <span class=\"hljs-variable\">{3}</span>;{0:4$} <span class=\"hljs-comment\">{5}</span>\n",
             "",
             style_type(&ty, items, index),
             type_size - ty.len(),
             name,
             name_size - name.len(),
-            field.get_comment_brief().unwrap_or_default()
+            field.get_comment_brief().and_then(|c| Some(String::from("// ") + &c)).unwrap_or_default(),
         ));
     }
 
@@ -507,13 +507,13 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
     }
     for (name, ty, method) in methods.iter() {
         def.push_str(&format!(
-            "    {1}{0:2$} <span class=\"hljs-title\"><span class=\"hljs-function\">{3}</span></span>(...);{0:4$} // <span class=\"hljs-comment\">{5}</span>\n",
+            "    {1}{0:2$} <span class=\"hljs-title\"><span class=\"hljs-function\">{3}</span></span>(...);{0:4$} <span class=\"hljs-comment\">{5}</span>\n",
             "",
             style_type(ty, items, index),
             type_size - ty.len(),
             name,
             name_size - name.len(),
-            method.get_comment_brief().unwrap_or_default(),
+            method.get_comment_brief().and_then(|c| Some(String::from("// ") + &c)).unwrap_or_default(),
         ));
     }
 
@@ -524,6 +524,16 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
         def,
         replace_bracket_links(&item.doc_str, items, index)
     ));
+
+    for (i, (name, _, _)) in methods.iter().enumerate() {
+        if i > 0 && &methods[i - 1].0 == name {
+            continue;
+        }
+        result.push_str(&generate_documentation(
+            items,
+            &(String::from("::") + &path[2..] + "::" + &name),
+        ));
+    }
 } // document_struct
 
 fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
@@ -587,10 +597,9 @@ fn document_template_args(item: &Item, def: &mut String) {
             if need_comma {
                 def.push_str(", ");
             }
-            // TODO: NonTypeTemplateParameter
             def.push_str(&format!(
-                r#"<span class="hljs-keyword">typename</span> <span class="hljs-title">{}</span>"#,
-                arg.get_name().unwrap()
+                r#"<span class="hljs-title">{}</span>"#,
+                arg.get_pretty_printer().print()
             ));
             need_comma = true;
         }
