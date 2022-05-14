@@ -266,8 +266,16 @@ fn set_urls(chapter: &mdbook::book::Chapter, items: &mut Vec<Item>, path: &str) 
         &mut indexes,
     );
     for index in indexes {
-        let item = &mut items[index];
-        item.url = chapter_path.clone() + &hash_link(&item.full_name);
+        set_urls_in_item(items, index, &chapter_path);
+    }
+}
+
+fn set_urls_in_item(items: &mut Vec<Item>, index: usize, chapter_path: &String) {
+    let item = &mut items[index];
+    item.url = chapter_path.clone() + &hash_link(&item.full_name);
+    let children: Vec<usize> = item.children.values().flatten().copied().collect();
+    for child in children {
+        set_urls_in_item(items, child, chapter_path);
     }
 }
 
