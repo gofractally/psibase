@@ -351,7 +351,7 @@ namespace psibase
       raw::kvPut(db, key, key_len, value, value_len);
    }
 
-   /// Table of objects stored in the key-value database
+   /// Stores objects in the key-value database
    ///
    /// Template arguments:
    /// - `T`: Type of object stored in table
