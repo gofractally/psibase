@@ -247,8 +247,8 @@ fn hash_link(x: &str) -> String {
     String::from('#') + &link_name
 }
 
-// Replace text of the form "foo" or "foo::bar::baz" with a link
-fn fill_link(text: &str, items: &Vec<Item>, parent: usize) -> Option<String> {
+// Get link for text of the form "foo" or "foo::bar::baz"
+fn get_link(text: &str, items: &Vec<Item>, parent: usize) -> Option<String> {
     let mut candidates = Vec::new();
     lookup(
         items,
@@ -261,22 +261,25 @@ fn fill_link(text: &str, items: &Vec<Item>, parent: usize) -> Option<String> {
         &mut candidates,
     );
     if !candidates.is_empty() && !items[candidates[0]].url.is_empty() {
-        Some(String::new() + "[" + text + "](" + &items[candidates[0]].url + ")")
+        Some(format!(
+            r#"<a href="{1}">{0}</a>"#,
+            text, &items[candidates[0]].url
+        ))
     } else {
         None
     }
 }
 
-// Replace all occurrences of the form "[foo]" or "[foo::bar::baz]" with a link. Leaves
-// "[...](...)" untouched.
-fn fill_all_links(text: &str, items: &Vec<Item>, parent: usize) -> String {
+// Replace all occurrences of the form "[foo]" or "[foo::bar::baz]" with a link,
+// if one is found. Leaves "[...](...)" untouched.
+fn replace_bracket_links(text: &str, items: &Vec<Item>, parent: usize) -> String {
     let re = Regex::new(r"[\[]([^\]\n]+)[\]]([(][^)]*[)])?").unwrap();
     re.replace_all(text, |caps: &Captures| {
         if caps.get(2).is_some() {
             caps.get(0).unwrap().as_str().to_owned()
         } else {
             let str = caps.get(1).unwrap().as_str();
-            let link = fill_link(str, items, parent);
+            let link = get_link(str, items, parent);
             if let Some(link) = link {
                 link
             } else {
@@ -285,6 +288,28 @@ fn fill_all_links(text: &str, items: &Vec<Item>, parent: usize) -> String {
         }
     })
     .into_owned()
+}
+
+// Escape html characters and create links
+fn escape_and_add_links(text: &str, items: &Vec<Item>, parent: usize) -> String {
+    let re = Regex::new(r"((?:[[:word:]]+(?:::)?)+)").unwrap();
+    re.replace_all(&escape_html(text), |caps: &Captures| {
+        let str = caps.get(0).unwrap().as_str();
+        if let Some(link) = get_link(str, items, parent) {
+            link
+        } else {
+            str.to_owned()
+        }
+    })
+    .into_owned()
+}
+
+// Style type and create links
+fn style_type(text: &str, items: &Vec<Item>, parent: usize) -> String {
+    format!(
+        r#"<span class="hljs-type">{}</span>"#,
+        escape_and_add_links(text, items, parent)
+    )
 }
 
 // Generate documentation for matching items
@@ -353,7 +378,7 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
         "### {}\n\n{}\n{}\n",
         &path[2..],
         def,
-        fill_all_links(&item.doc_str, items, index)
+        replace_bracket_links(&item.doc_str, items, index)
     ));
 
     for c in constants.iter() {
@@ -364,7 +389,7 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
                 "### {}::{}\n\n{}\n",
                 &path[2..],
                 c.get_name().unwrap(),
-                fill_all_links(&doc_str, items, index)
+                replace_bracket_links(&doc_str, items, index)
             ));
         }
     }
@@ -373,10 +398,14 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
 fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
     let item = &items[index];
     let mut def = String::new();
-    def.push_str("<pre><code class=\"language-c++\">");
+    def.push_str(r#"<pre><code class="nohighlight">"#);
     document_template_args(item, &mut def);
-    def.push_str(&(String::from("struct ") + &path[2..]));
-    def.push_str(" {\n");
+    def.push_str(r#"<span class="hljs-class">"#);
+    def.push_str(r#"<span class="hljs-keyword">struct</span> "#);
+    def.push_str(r#"<span class="hljs-title">"#);
+    def.push_str(&path[2..]);
+    def.push_str(r#"</span></span> {"#);
+    def.push('\n');
 
     let fields = filter_children(&item.entity, |c| c.get_kind() == EntityKind::FieldDecl);
     let mut type_size = 0;
@@ -389,9 +418,9 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
         let ty = field.get_type().unwrap().get_display_name();
         let name = field.get_name().unwrap();
         def.push_str(&format!(
-            "    {1}{0:2$} {3};{0:4$} // {5}\n",
+            "    {1}{0:2$} <span class=\"hljs-variable\">{3}</span>;{0:4$} // <span class=\"hljs-comment\">{5}</span>\n",
             "",
-            escape_html(&ty),
+            style_type(&ty, items, index),
             type_size - ty.len(),
             name,
             name_size - name.len(),
@@ -403,16 +432,20 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
         "### {}\n\n{}\n{}\n",
         &path[2..],
         def,
-        fill_all_links(&item.doc_str, items, index)
+        replace_bracket_links(&item.doc_str, items, index)
     ));
 } // document_struct
 
 fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
     let item = &items[index];
     let mut def = String::new();
-    def.push_str("```text\n");
+    def.push_str("<pre><code class=\"language-c++\">");
     document_template_args(item, &mut def);
-    def.push_str(&item.entity.get_result_type().unwrap().get_display_name());
+    def.push_str(&style_type(
+        &item.entity.get_result_type().unwrap().get_display_name(),
+        items,
+        index,
+    ));
     def.push(' ');
     def.push_str(&path[2..]);
     def.push('(');
@@ -424,14 +457,16 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
     }
     let mut need_comma = false;
     for arg in args.iter() {
+        let ty = arg.get_type().unwrap().get_display_name();
         if need_comma {
             def.push(',');
         }
         def.push_str("\n    ");
         def.push_str(&format!(
-            "{:1$}{2}",
-            arg.get_type().unwrap().get_display_name(),
-            type_size + 1,
+            "{1}{0:2$}{3}",
+            "",
+            style_type(&ty, items, index),
+            type_size - ty.len() + 1,
             arg.get_name().unwrap()
         ));
         need_comma = true;
@@ -440,13 +475,13 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
         def.push('\n');
     }
     def.push_str(");\n");
-    def.push_str("```\n");
+    def.push_str("</code></pre>\n");
 
     result.push_str(&format!(
         "### {}\n\n{}\n{}\n",
         &path[2..],
         def,
-        fill_all_links(&item.doc_str, items, index)
+        replace_bracket_links(&item.doc_str, items, index)
     ));
 } // document_function
 
@@ -554,7 +589,7 @@ fn modify_book(book: &mut mdbook::book::Book, re: Regex, mut items: Vec<Item>) {
     }
     book.for_each_mut(|item: &mut BookItem| match item {
         BookItem::Chapter(chapter) => {
-            chapter.content = fill_all_links(&chapter.content, &items, 0);
+            chapter.content = replace_bracket_links(&chapter.content, &items, 0);
         }
         BookItem::Separator => (),
         BookItem::PartTitle(_) => (),
