@@ -8,7 +8,7 @@ namespace psibase
    /*
    namespace detail
    {
-      struct FRACPACK raw_variant_view
+      struct raw_variant_view
       {
          uint8_t  action_idx;
          uint32_t size;
