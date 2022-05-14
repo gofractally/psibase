@@ -4,7 +4,7 @@
 #include <compare>
 #include <limits>
 #include <psibase/MethodNumber.hpp>
-#include <psibase/table.hpp>
+#include <psibase/Table.hpp>
 
 #include "nft_sys.hpp"
 #include "types.hpp"
@@ -65,7 +65,7 @@ namespace UserContract
       auto operator<=>(const TokenRecord&) const = default;
    };
    PSIO_REFLECT(TokenRecord, id, ownerNft, inflation, config, precision, currentSupply, maxSupply);
-   using TokenTable_t = psibase::table<TokenRecord, &TokenRecord::id>;
+   using TokenTable_t = psibase::Table<TokenRecord, &TokenRecord::id>;
 
    struct BalanceKey_t
    {
@@ -92,7 +92,7 @@ namespace UserContract
       }
    };
    PSIO_REFLECT(BalanceRecord, key, balance);
-   using BalanceTable_t = psibase::table<BalanceRecord, &BalanceRecord::key>;
+   using BalanceTable_t = psibase::Table<BalanceRecord, &BalanceRecord::key>;
 
    struct SharedBalanceKey_t
    {
@@ -120,7 +120,7 @@ namespace UserContract
       }
    };
    PSIO_REFLECT(SharedBalanceRecord, key, balance);
-   using SharedBalanceTable_t = psibase::table<SharedBalanceRecord, &SharedBalanceRecord::key>;
+   using SharedBalanceTable_t = psibase::Table<SharedBalanceRecord, &SharedBalanceRecord::key>;
    // Todo - How can I add a secondary index for debitor? I imagine people will want to search for shared balances by debitor.
 
    struct TokenHolderRecord
@@ -133,6 +133,6 @@ namespace UserContract
       auto operator<=>(const TokenHolderRecord&) const = default;
    };
    PSIO_REFLECT(TokenHolderRecord, account, config);
-   using TokenHolderTable_t = psibase::table<TokenHolderRecord, &TokenHolderRecord::account>;
+   using TokenHolderTable_t = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
 
 }  // namespace UserContract

@@ -2,7 +2,7 @@
 
 #include <compare>
 #include <psibase/Contract.hpp>
-#include <psibase/table.hpp>
+#include <psibase/Table.hpp>
 #include <string_view>
 
 namespace name_sys
@@ -17,7 +17,7 @@ namespace name_sys
    };
    PSIO_REFLECT(display_name_row, acc, display_name);
 
-   using display_name_table_t = psibase::table<display_name_row, &display_name_row::acc>;
+   using display_name_table_t = psibase::Table<display_name_row, &display_name_row::acc>;
 
    using tables = psibase::contract_tables<display_name_table_t>;
    class name_contract : public psibase::Contract<name_contract>

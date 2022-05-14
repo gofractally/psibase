@@ -12,6 +12,7 @@
   - [Debugging]()
   - [Reference]()
     - [Native Functions](cpp-contract/native-functions.md)
+    - [Table](cpp-contract/table.md)
 - [Rust Contracts]()
 - [System Contracts]()
   - [common-sys](system-contract/common-sys/README.md)

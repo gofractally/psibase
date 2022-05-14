@@ -1,4 +1,4 @@
-#include <psibase/table.hpp>
+#include <psibase/Table.hpp>
 #include <variant>
 
 using namespace psibase;
@@ -12,7 +12,7 @@ namespace table_test
       friend std::strong_ordering operator<=>(const S0&, const S0&) = default;
    };
    PSIO_REFLECT(S0, key, value)
-   using table0 = table<S0, &S0::key>;
+   using table0 = Table<S0, &S0::key>;
 
    struct S1
    {
@@ -22,7 +22,7 @@ namespace table_test
       friend std::strong_ordering operator<=>(const S1&, const S1&) = default;
    };
    PSIO_REFLECT(S1, key1, key2, value);
-   using table1 = table<S1, &S1::key1, &S1::key2>;
+   using table1 = Table<S1, &S1::key1, &S1::key2>;
 
    struct S2
    {
@@ -33,7 +33,7 @@ namespace table_test
       friend std::strong_ordering operator<=>(const S2&, const S2&) = default;
    };
    PSIO_REFLECT(S2, key1, key2, value, method(compound_key));
-   using table2 = table<S2, &S2::key1, &S2::compound_key>;
+   using table2 = Table<S2, &S2::key1, &S2::compound_key>;
 
    using test_tables = contract_tables<table0, table1, table2>;
 

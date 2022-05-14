@@ -2,7 +2,6 @@
 
 #include <compare>
 #include <psibase/Contract.hpp>
-#include <psibase/table.hpp>
 #include <string_view>
 
 namespace exchange_sys

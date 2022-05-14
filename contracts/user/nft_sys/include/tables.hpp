@@ -2,7 +2,7 @@
 #include <compare>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Bitset.hpp>
-#include <psibase/table.hpp>
+#include <psibase/Table.hpp>
 
 namespace UserContract
 {
@@ -18,7 +18,7 @@ namespace UserContract
       auto operator<=>(const NftHolderRecord&) const = default;
    };
    PSIO_REFLECT(NftHolderRecord, account, config);
-   using NftHolderTable_t = psibase::table<NftHolderRecord, &NftHolderRecord::account>;
+   using NftHolderTable_t = psibase::Table<NftHolderRecord, &NftHolderRecord::account>;
 
    struct NftRecord
    {
@@ -31,7 +31,7 @@ namespace UserContract
       auto operator<=>(const NftRecord&) const = default;
    };
    PSIO_REFLECT(NftRecord, id, issuer, owner);
-   using NftTable_t = psibase::table<NftRecord, &NftRecord::id>;
+   using NftTable_t = psibase::Table<NftRecord, &NftRecord::id>;
 
    struct CreditRecord
    {
@@ -41,6 +41,6 @@ namespace UserContract
       auto operator<=>(const CreditRecord&) const = default;
    };
    PSIO_REFLECT(CreditRecord, nftId, debitor);
-   using CreditTable_t = psibase::table<CreditRecord, &CreditRecord::nftId>;
+   using CreditTable_t = psibase::Table<CreditRecord, &CreditRecord::nftId>;
 
 }  // namespace UserContract

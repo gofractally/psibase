@@ -1,5 +1,5 @@
 use clang::documentation::{Comment, CommentChild};
-use clang::{Entity, EntityKind, TranslationUnit};
+use clang::{Accessibility, Entity, EntityKind, TranslationUnit};
 use clap::{Parser, Subcommand};
 use mdbook::preprocess::CmdPreprocessor;
 use mdbook::BookItem;
@@ -47,6 +47,15 @@ fn convert_children<'a, 'tu>(items: &'a mut Vec<Item<'tu>>, current: usize, enti
             EntityKind::ClassDecl => {
                 convert_child(items, current, child, Kind::Struct, false);
             }
+            EntityKind::ClassTemplate => {
+                convert_child(items, current, child, Kind::Struct, false);
+            }
+            EntityKind::Constructor => {
+                convert_child(items, current, child, Kind::Function, false);
+            }
+            EntityKind::Destructor => {
+                convert_child(items, current, child, Kind::Function, false);
+            }
             EntityKind::EnumDecl => {
                 convert_child(items, current, child, Kind::Enum, false);
             }
@@ -56,11 +65,14 @@ fn convert_children<'a, 'tu>(items: &'a mut Vec<Item<'tu>>, current: usize, enti
             EntityKind::FunctionTemplate => {
                 convert_child(items, current, child, Kind::Function, false);
             }
-            EntityKind::StructDecl => {
-                convert_child(items, current, child, Kind::Struct, false);
+            EntityKind::Method => {
+                convert_child(items, current, child, Kind::Function, false);
             }
             EntityKind::Namespace => {
                 convert_child(items, current, child, Kind::Namespace, true);
+            }
+            EntityKind::StructDecl => {
+                convert_child(items, current, child, Kind::Struct, false);
             }
             _ => (),
         }
@@ -77,7 +89,11 @@ fn convert_child<'a, 'tu>(
     merge: bool,
 ) -> usize {
     let name;
-    if let Some(n) = entity.get_name() {
+    if entity.get_kind() == EntityKind::Constructor {
+        name = items[current].name.clone();
+    } else if entity.get_kind() == EntityKind::Destructor {
+        name = String::from("~") + &items[current].name;
+    } else if let Some(n) = entity.get_name() {
         name = n;
     } else if ty == Kind::Namespace {
         name = "@anonymous".to_owned();
@@ -153,6 +169,21 @@ fn get_items<'tu>(tu: &'tu TranslationUnit) -> Vec<Item<'tu>> {
 
 // Convert comments to markdown. Assumes any formatting within the comments are
 // compatible with markdown (doesn't escape).
+//
+// Newline handling
+// ----------------
+// libclang represents single-line breaks as separate Text() entries. It represents
+// double-line-breaks as Paragraph() entries. Unfortunately libclang represents
+// "`&MyType::key`" as Text("`"), Text("&MyType"), Text("::key`"). This creates
+// an ambiguity.
+//
+// Line breaks in markdown matter. Randomly inserting them creates problems.
+// e.g. "`&MyType::key`" becomes "`\n&MyType\n::key`", which markdown
+// treats as "` &MyType ::key`", which is ugly in its final html form.
+//
+// libclang preserves the leading space in "/// foo" after removing the "///".
+// This opens up a workaround: if a Text() starts with a space, then it's the
+// beginning of a new line, otherwise it's not.
 fn convert_doc_str(comment: &Option<Comment>) -> String {
     let mut result = String::new();
     if let Some(comment) = comment {
@@ -162,14 +193,14 @@ fn convert_doc_str(comment: &Option<Comment>) -> String {
                 let mut need_nl = false;
                 for line in lines {
                     if let CommentChild::Text(text) = line {
-                        if need_nl {
-                            result.push('\n');
-                        }
-                        need_nl = true;
                         let mut text = text.as_str();
                         if !text.is_empty() && *text.as_bytes().get(0).unwrap() == b' ' {
                             text = &text[1..];
+                            if need_nl {
+                                result.push('\n');
+                            }
                         }
+                        need_nl = true;
                         result.push_str(text);
                     }
                 }
@@ -407,12 +438,18 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
     def.push_str(r#"</span></span> {"#);
     def.push('\n');
 
-    let fields = filter_children(&item.entity, |c| c.get_kind() == EntityKind::FieldDecl);
+    let fields = filter_children(&item.entity, |c| {
+        c.get_kind() == EntityKind::FieldDecl
+            && c.get_accessibility().unwrap() == Accessibility::Public
+    });
     let mut type_size = 0;
     let mut name_size = 0;
-    for arg in fields.iter() {
-        type_size = max(type_size, arg.get_type().unwrap().get_display_name().len());
-        name_size = max(name_size, arg.get_name().unwrap().len());
+    for field in fields.iter() {
+        type_size = max(
+            type_size,
+            field.get_type().unwrap().get_display_name().len(),
+        );
+        name_size = max(name_size, field.get_name().unwrap().len());
     }
     for field in fields.iter() {
         let ty = field.get_type().unwrap().get_display_name();
@@ -427,6 +464,59 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
             field.get_comment_brief().unwrap_or_default()
         ));
     }
+
+    let methods: Vec<(String, String, Entity)> = filter_children(&item.entity, |entity| {
+        (entity.get_kind() == EntityKind::Constructor
+            || entity.get_kind() == EntityKind::Destructor
+            || entity.get_kind() == EntityKind::Method
+            || entity.get_kind() == EntityKind::FunctionTemplate)
+            && entity.get_accessibility().unwrap() == Accessibility::Public
+    })
+    .into_iter()
+    .map(|method| {
+        let (name, ty) = match method.get_kind() {
+            EntityKind::Constructor => (
+                item.entity.get_name().unwrap(),
+                if method.is_converting_constructor() {
+                    String::from("")
+                } else {
+                    String::from("explicit")
+                },
+            ),
+            EntityKind::Destructor => (
+                String::from("~") + &item.entity.get_name().unwrap(),
+                String::from(""),
+            ),
+            _ => (
+                method.get_name().unwrap(),
+                method.get_result_type().unwrap().get_display_name(),
+            ),
+        };
+        (name, ty, method)
+    })
+    .collect();
+
+    if !fields.is_empty() && !methods.is_empty() {
+        def.push('\n');
+    }
+    let mut type_size = 0;
+    let mut name_size = 0;
+    for (name, ty, _method) in methods.iter() {
+        type_size = max(type_size, ty.len());
+        name_size = max(name_size, name.len());
+    }
+    for (name, ty, method) in methods.iter() {
+        def.push_str(&format!(
+            "    {1}{0:2$} <span class=\"hljs-title\"><span class=\"hljs-function\">{3}</span></span>(...);{0:4$} // <span class=\"hljs-comment\">{5}</span>\n",
+            "",
+            style_type(ty, items, index),
+            type_size - ty.len(),
+            name,
+            name_size - name.len(),
+            method.get_comment_brief().unwrap_or_default(),
+        ));
+    }
+
     def.push_str("};\n</code></pre>\n");
     result.push_str(&format!(
         "### {}\n\n{}\n{}\n",
@@ -491,17 +581,20 @@ fn document_template_args(item: &Item, def: &mut String) {
             || c.get_kind() == EntityKind::NonTypeTemplateParameter
     });
     if !template_args.is_empty() {
-        def.push_str("template<");
+        def.push_str(r#"<span class="hljs-keyword">template</span>&lt;"#);
         let mut need_comma = false;
         for arg in template_args {
             if need_comma {
                 def.push_str(", ");
             }
             // TODO: NonTypeTemplateParameter
-            def.push_str(&(String::from("typename ") + &arg.get_name().unwrap()));
+            def.push_str(&format!(
+                r#"<span class="hljs-keyword">typename</span> <span class="hljs-title">{}</span>"#,
+                arg.get_name().unwrap()
+            ));
             need_comma = true;
         }
-        def.push_str(">\n");
+        def.push_str("&gt;\n");
     }
 }
 
@@ -541,9 +634,7 @@ fn parse<'tu>(
     index: &'tu clang::Index<'tu>,
     repo_path: &str,
 ) -> Result<TranslationUnit<'tu>, anyhow::Error> {
-    let mut parser = index.parser(
-        repo_path.to_owned() + "/libraries/psibase/common/include/psibase/nativeFunctions.hpp",
-    );
+    let mut parser = index.parser(repo_path.to_owned() + "/doc/psidk/src/doc-root.cpp");
     let wasi_sdk_prefix = env::var("WASI_SDK_PREFIX")?;
     parser.arguments(&[
         "-fcolor-diagnostics",

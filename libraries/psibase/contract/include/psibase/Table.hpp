@@ -345,15 +345,27 @@ namespace psibase
       raw::kvPut(db, key, key_len, value, value_len);
    }
 
+   /// Table of objects stored in database
+   ///
+   /// Template arguments:
+   /// - `T`: Type of object stored in table
+   /// - `Primary`: fetches primary key from an object
+   /// - `Secondary`: fetches a secondary key from an object
+   ///
+   /// `Primary` and `Secondary` may be:
+   /// - pointer-to-data-member of `T`. e.g. `&MyType::key`
+   /// - pointer-to-member-function of `T` which returns a key. e.g. `&MyType::key_function`
+   /// - non-member function which takes a `const T&` as its only argument and returns a key
+   /// - a callable object which takes a `const T&` as its only argument and returns a key
    template <typename T, auto Primary, auto... Secondary>
-   class table
+   class Table
    {
      public:
       static_assert(1 + sizeof...(Secondary) <= 255, "Too many indices");
       using key_type   = std::remove_cvref_t<decltype(std::invoke(Primary, std::declval<T>()))>;
       using value_type = T;
-      explicit table(key_view prefix) : prefix(prefix.data.begin(), prefix.data.end()) {}
-      explicit table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
+      explicit Table(key_view prefix) : prefix(prefix.data.begin(), prefix.data.end()) {}
+      explicit Table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
       void put(const T& arg)
       {
          auto pk = serialize_key(0, std::invoke(Primary, arg));
@@ -467,7 +479,7 @@ namespace psibase
    };
 
    // TODO: allow tables to be forward declared.  The simplest method is:
-   // struct xxx : table<...> {};
+   // struct xxx : Table<...> {};
    template <typename... Tables>
    struct contract_tables
    {

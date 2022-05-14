@@ -2,7 +2,7 @@
 
 #include <compare>
 #include <psibase/Contract.hpp>
-#include <psibase/table.hpp>
+#include <psibase/Table.hpp>
 #include <string_view>
 
 #include "nft_sys.hpp"
@@ -26,7 +26,7 @@ namespace symbol_sys
    };
    PSIO_REFLECT(symbol_row, symbol_name, nft_id);
 
-   using symbol_table_t = psibase::table<symbol_row, &symbol_row::nft_id>;
+   using symbol_table_t = psibase::Table<symbol_row, &symbol_row::nft_id>;
 
    using tables = psibase::contract_tables<symbol_table_t>;
    class symbol_contract : public psibase::Contract<symbol_contract>
