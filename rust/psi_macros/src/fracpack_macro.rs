@@ -78,11 +78,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
         .iter()
         .map(|field| {
             let ty = &field.ty;
-            quote! {if <#ty as fracpack::Packable>::USE_HEAP {
-                4
-            } else {
-                <#ty as fracpack::Packable>::FIXED_SIZE
-            } }
+            quote! {<#ty as fracpack::Packable>::FIXED_SIZE}
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
     let use_heap = fields

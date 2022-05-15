@@ -649,9 +649,13 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
     }
 } // impl<T> Packable for Vec<T>
 
-impl<'a, T: Packable<'a> + std::fmt::Debug, const N: usize> Packable<'a> for [T; N] {
+impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
     const USE_HEAP: bool = T::USE_HEAP;
-    const FIXED_SIZE: u32 = T::FIXED_SIZE * N as u32;
+    const FIXED_SIZE: u32 = if T::USE_HEAP {
+        4
+    } else {
+        T::FIXED_SIZE * N as u32
+    };
 
     fn pack(&self, dest: &mut Vec<u8>) {
         let start = dest.len();
@@ -666,7 +670,13 @@ impl<'a, T: Packable<'a> + std::fmt::Debug, const N: usize> Packable<'a> for [T;
     }
 
     fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        let hp = *pos as u64 + Self::FIXED_SIZE as u64;
+        let dynamic_size = if Self::USE_HEAP {
+            T::FIXED_SIZE * N as u32
+        } else {
+            Self::FIXED_SIZE
+        };
+
+        let hp = *pos as u64 + dynamic_size as u64;
         let mut heap_pos = hp as u32;
         if heap_pos as u64 != hp {
             return Err(Error::ReadPastEnd);
@@ -689,7 +699,13 @@ impl<'a, T: Packable<'a> + std::fmt::Debug, const N: usize> Packable<'a> for [T;
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let hp = *pos as u64 + Self::FIXED_SIZE as u64;
+        let dynamic_size = if Self::USE_HEAP {
+            T::FIXED_SIZE * N as u32
+        } else {
+            Self::FIXED_SIZE
+        };
+
+        let hp = *pos as u64 + dynamic_size as u64;
         let mut heap_pos = hp as u32;
         if heap_pos as u64 != hp {
             return Err(Error::ReadPastEnd);

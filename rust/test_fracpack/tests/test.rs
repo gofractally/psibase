@@ -319,7 +319,22 @@ fn t1() -> Result<()> {
 }
 
 #[test]
-fn test_isolated_structs() {
+fn test_simple() {
+    let sws = SimpleWithString {
+        a: 0x0a,
+        b: 0x0b,
+        c: 0x0c,
+        s: "hi".to_string(),
+        f: 1.23,
+    };
+    pack_and_compare(
+        &sws,
+        "0A0000000B000000000000000C0008000000A4709D3F020000006869",
+    );
+}
+
+#[test]
+fn test_complex_structs() {
     let osa = OuterSimpleArray {
         oa: 0x0a,
         ob: 0x0b,
@@ -346,11 +361,6 @@ fn test_isolated_structs() {
         s: "hi".to_string(),
         f: 1.23,
     };
-    pack_and_compare(
-        &sws,
-        "0A0000000B000000000000000C0008000000A4709D3F020000006869",
-    );
-
     let os = ParentStruct {
         oa: 0xfa,
         ob: 0xfb,
