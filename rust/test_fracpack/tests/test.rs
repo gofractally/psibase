@@ -399,7 +399,7 @@ fn test_unextensible_option_fields() {
 }
 
 #[test]
-fn test_fixed_array_with_unextensible_struct() {
+fn test_fixed_arrays() {
     let x = ThreeElementsFixedStruct {
         element_1: 1234,
         element_2: 0,
@@ -409,10 +409,7 @@ fn test_fixed_array_with_unextensible_struct() {
     pack_and_compare(&x, expected_elements_hex);
 
     let x_array: [i16; 3] = [1234, 0, -1234];
-    let mut bytes: Vec<u8> = Vec::new();
-    x_array.pack(&mut bytes);
-    let encoded_x_array_hex = hex::encode(&bytes).to_uppercase();
-    assert_eq!(encoded_x_array_hex, expected_elements_hex);
+    pack_and_compare(&x_array, expected_elements_hex);
 
     // since vectors does not have fixed sizes we have to prefix the vector length
     let x_vector: Vec<i16> = vec![1234, 0, -1234];
@@ -422,6 +419,18 @@ fn test_fixed_array_with_unextensible_struct() {
     assert_eq!(
         encoded_x_vector_hex,
         "06000000".to_owned() + expected_elements_hex
+    );
+}
+
+#[test]
+fn test_tuples() {
+    let x_tuple: (i16, i16, i16) = (1234, 0, -1234);
+    pack_and_compare(&x_tuple, "0600D20400002EFB");
+
+    let sws_tuple: (u32, u64, u16, String, f32) = (0x0a, 0x0b, 0x0c, "hi".to_string(), 1.23);
+    pack_and_compare(
+        &sws_tuple,
+        "16000A0000000B000000000000000C0008000000A4709D3F020000006869",
     );
 }
 

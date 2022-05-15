@@ -805,3 +805,149 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
         <Self as Packable>::verify(src, heap_pos)
     }
 }
+
+macro_rules! tuple_impls {
+    ($($len:expr => ($($n:tt $name:ident)+))+) => {
+        $(
+            impl<'a, $($name: Packable<'a>),+> Packable<'a> for ($($name,)+)
+            {
+                const USE_HEAP: bool = true;
+                const FIXED_SIZE: u32 = 4;
+
+                #[allow(non_snake_case)]
+                fn pack(&self, dest: &mut Vec<u8>) {
+                    let heap: u32 = $($name::FIXED_SIZE +)+ 0;
+                    assert!(heap as u16 as u32 == heap); // TODO: return error
+                    (heap as u16).pack(dest);
+                    $(
+                        let $name = dest.len() as u32;
+                        self.$n.embedded_fixed_pack(dest);
+                    )+
+                    $(
+                        let heap_pos = dest.len() as u32;
+                        self.$n.embedded_fixed_repack($name, heap_pos, dest);
+                        self.$n.embedded_variable_pack(dest);
+                    )+
+                }
+
+                #[allow(non_snake_case)]
+                fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
+                    let heap_size = <u16 as Packable>::unpack(src, pos)?;
+                    let mut heap_pos = *pos + heap_size as u32;
+                    if heap_pos < *pos {
+                        return Err(Error::BadOffset);
+                    }
+                    $(
+                        let $name = $name::embedded_unpack(src, pos, &mut heap_pos)?;
+                    )+
+                    *pos = heap_pos;
+                    Ok(($($name,)+))
+                }
+
+                fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+                    let heap_size = <u16 as Packable>::unpack(src, pos)?;
+                    let mut heap_pos = *pos + heap_size as u32;
+                    if heap_pos < *pos {
+                        return Err(Error::BadOffset);
+                    }
+                    $(
+                        $name::embedded_unpack(src, pos, &mut heap_pos)?;
+                    )+
+                    *pos = heap_pos;
+                    Ok(())
+                }
+
+                fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
+                    dest.extend_from_slice(&0_u32.to_le_bytes());
+                }
+
+                fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+                    dest[fixed_pos as usize..fixed_pos as usize + 4]
+                        .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
+                }
+
+                fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
+                    Self::pack(&self, dest);
+                }
+
+                fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
+                    let orig_pos = *fixed_pos;
+                    let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
+                    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                        return Err(Error::BadOffset);
+                    }
+                    Self::unpack(src, heap_pos)
+                }
+                fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+                    let orig_pos = *fixed_pos;
+                    let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
+                    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                        return Err(Error::BadOffset);
+                    }
+                    Self::verify(src, heap_pos)
+                }
+                fn option_fixed_pack(_opt: &Option<Self>, dest: &mut Vec<u8>) {
+                    dest.extend_from_slice(&1u32.to_le_bytes())
+                }
+                fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+                    if let Some(_) = opt {
+                        dest[fixed_pos as usize..fixed_pos as usize + 4]
+                            .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes())
+                    }
+                }
+                fn option_variable_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
+                    if let Some(x) = opt {
+                        <Self as Packable>::pack(x, dest)
+                    }
+                }
+                fn option_unpack(
+                    src: &'a [u8],
+                    fixed_pos: &mut u32,
+                    heap_pos: &mut u32,
+                ) -> Result<Option<Self>> {
+                    let orig_pos = *fixed_pos;
+                    let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
+                    if offset == 1 {
+                        return Ok(None);
+                    }
+
+                    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                        return Err(Error::BadOffset);
+                    }
+                    Ok(Some(<Self as Packable>::unpack(src, heap_pos)?))
+                }
+                fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+                    let orig_pos = *fixed_pos;
+                    let offset = <u32 as Packable>::unpack(src, fixed_pos)?;
+                    if offset == 1 {
+                        return Ok(());
+                    }
+
+                    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                        return Err(Error::BadOffset);
+                    }
+                    <Self as Packable>::verify(src, heap_pos)
+                }
+            }
+        )+
+    }
+}
+
+tuple_impls! {
+    1 => (0 T0)
+    2 => (0 T0 1 T1)
+    3 => (0 T0 1 T1 2 T2)
+    4 => (0 T0 1 T1 2 T2 3 T3)
+    5 => (0 T0 1 T1 2 T2 3 T3 4 T4)
+    6 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5)
+    7 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6)
+    8 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7)
+    9 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8)
+    10 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9)
+    11 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10)
+    12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
+    13 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12)
+    14 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13)
+    15 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14)
+    16 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14 15 T15)
+}
