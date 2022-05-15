@@ -1,5 +1,3 @@
-// TODO: switch from bin to fracpack
-
 #pragma once
 
 #include <boost/mp11/algorithm.hpp>
@@ -9,8 +7,6 @@
 #include <cstdint>
 #include <functional>
 #include <psibase/nativeFunctions.hpp>
-#include <psio/from_bin.hpp>
-#include <psio/to_bin.hpp>
 #include <psio/to_key.hpp>
 #include <span>
 #include <string_view>
@@ -161,7 +157,7 @@ namespace psibase
          --*this;
          return result;
       }
-      T                         operator*() const { return psio::convert_from_bin<T>(*base); }
+      T                         operator*() const { return psio::convert_from_frac<T>(*base); }
       friend std::weak_ordering operator<=>(const KvIterator& lhs, const KvIterator& rhs) = default;
 
      private:
@@ -355,7 +351,7 @@ namespace psibase
             buffer.resize(res);
             raw::getResult(buffer.data(), buffer.size(), 0);
          }
-         return psio::convert_from_bin<T>(buffer);
+         return psio::convert_from_frac<T>(buffer);
       }
 
      private:
@@ -401,14 +397,16 @@ namespace psibase
    ///
    /// #### Schema changes
    ///
-   /// You may modify the schema the following ways:
+   /// You may modify the schema of an existing table the following ways:
    /// - Add new `optional<...>` fields to the end of `T`, unless `T` is marked `definitionWillNotChange()`. When you read old records, these values will be `std::nullopt`.
-   /// - If `T` has a field with type `X`, then you may add new `optional<...>` fields to the end of `X`, unless `X` is marked `definitionWillNotChange()`. This rule is recursive, even through `vector`, `optional`, and user-defined types.
-   /// - Add new secondary indexes after the existing ones. Old records will not appear in the new secondary indexes until they are removed then re-added.
-   ///
-   /// TODO: switch to fracpack to support schema changes
+   /// - If `T` has a field with type `X`, then you may add new `optional<...>` fields to the end of `X`, unless `X` is marked `definitionWillNotChange()`. This rule is recursive, including through `vector`, `optional`, and user-defined types.
+   /// - Add new secondary indexes after the existing ones. Old records will not appear in the new secondary indexes. Remove then re-add records to fill the new secondary indexes.
    ///
    /// Don't do any of the following; these will corrupt data:
+   /// - Don't modify any type marked `definitionWillNotChange()`
+   /// - Don't remove `definitionWillNotChange()` from a type; this changes its serialization format
+   /// - Don't add new fields to the middle of `T` or any types that it contains
+   /// - Don't add new non-optional fields to `T` or any types that it contains
    /// - Don't reorder fields within `T` or any types that it contains
    /// - Don't remove fields from `T` or any types that it contains
    /// - Don't change the types of fields within `T` or any types that it contains
@@ -422,14 +420,12 @@ namespace psibase
    /// | Usage | Key | Value |
    /// | ----  | --- | ----- |
    /// | primary index | prefix, 0, primary key | object data |
-   /// | secondary index | prefix, i, primary key | prefix, 0, primary key |
+   /// | secondary index | prefix, i, secondary key | prefix, 0, primary key |
    ///
    /// Each secondary index is numbered `1 <= i <= 255` above. The secondary indexes
    /// point to the primary index.
    ///
-   /// `Table` serializes keys using `psio::to_key`. It serializes `T` using `psio::to_bin`.
-   ///
-   /// TODO: replace `to_bin` with fracpack.
+   /// `Table` serializes keys using `psio::to_key`. It serializes `T` using fracpack.
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {
@@ -462,7 +458,7 @@ namespace psibase
             {
                std::vector<char> buffer(sz);
                raw::getResult(buffer.data(), buffer.size(), 0);
-               auto data              = psio::convert_from_bin<T>(std::move(buffer));
+               auto data              = psio::convert_from_frac<T>(std::move(buffer));
                auto replace_secondary = [&](uint8_t& idx, auto wrapped)
                {
                   auto old_key = std::invoke(decltype(wrapped)::value, data);
@@ -497,7 +493,7 @@ namespace psibase
                (write_secondary(idx, wrap<Secondary>()), ...);
             }
          }
-         auto serialized = psio::convert_to_bin(arg);
+         auto serialized = psio::convert_to_frac(arg);
          raw::kvPut(db, pk.data(), pk.size(), serialized.data(), serialized.size());
       }
 
