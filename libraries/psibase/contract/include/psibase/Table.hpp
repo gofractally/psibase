@@ -132,38 +132,37 @@ namespace psibase
    };
 
    template <typename T>
-   struct kv_iterator
+   struct KvIterator
    {
      public:
-      kv_iterator(std::vector<char>&& key, std::size_t prefix_size, bool is_secondary)
+      KvIterator(std::vector<char>&& key, std::size_t prefix_size, bool is_secondary)
           : base(std::move(key), prefix_size, is_secondary)
       {
       }
-      kv_iterator& operator++()
+      KvIterator& operator++()
       {
          ++base;
          return *this;
       }
-      kv_iterator operator++(int)
+      KvIterator operator++(int)
       {
          auto result = *this;
          ++*this;
          return result;
       }
-      kv_iterator& operator--()
+      KvIterator& operator--()
       {
          --base;
          return *this;
       }
-      kv_iterator operator--(int)
+      KvIterator operator--(int)
       {
          auto result = *this;
          --*this;
          return result;
       }
       T                         operator*() const { return psio::convert_from_bin<T>(*base); }
-      friend std::weak_ordering operator<=>(const kv_iterator& lhs,
-                                            const kv_iterator& rhs) = default;
+      friend std::weak_ordering operator<=>(const KvIterator& lhs, const KvIterator& rhs) = default;
 
      private:
       kv_raw_iterator base;
@@ -223,7 +222,7 @@ namespace psibase
    concept compatible_key_prefix_unqual =
        std::same_as<T, U> || compatible_tuple_prefix<T, U>::value;
    template <typename T, typename U>
-   concept compatible_key_prefix =
+   concept CompatibleKeyPrefix =
        compatible_key_prefix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
 
    template <typename T, typename U>
@@ -248,35 +247,63 @@ namespace psibase
    };
 
    template <typename T, typename U>
-   using key_suffix =
+   using KeySuffix =
        typename key_suffix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>::type;
 
+   /// A primary or secondary index in a Table
+   ///
+   /// Template arguments:
+   /// - `T`: Type of object stored in table
+   /// - `K`: Type of key this index uses
    template <typename T, typename K>
    class TableIndex
    {
      public:
+      /// Construct with prefix
+      ///
+      /// `prefix` identifies the range of database keys that the index occupies.
       explicit TableIndex(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
-      kv_iterator<T> begin() const
+
+      /// Get iterator to first object
+      KvIterator<T> begin() const
       {
-         kv_iterator<T> result = end();
+         KvIterator<T> result = end();
          ++result;
          return result;
       }
-      kv_iterator<T> end() const
+
+      /// Get iterator past the end
+      KvIterator<T> end() const
       {
          auto copy = prefix;
-         return kv_iterator<T>(std::move(copy), prefix.size(), is_secondary());
+         return KvIterator<T>(std::move(copy), prefix.size(), is_secondary());
       }
-      kv_iterator<T> lower_bound(compatible_key_prefix<K> auto&& k) const
+
+      /// Get iterator to first object with `key >= k`
+      ///
+      /// If the index's key is an `std::tuple`, then `k` may be the first `n` fields
+      /// of the key.
+      ///
+      /// Returns [end] if none found.
+      template <CompatibleKeyPrefix<K> K2>
+      KvIterator<T> lower_bound(K2&& k) const
       {
-         KeyView        key_base{{prefix.data(), prefix.size()}};
-         auto           key = psio::convert_to_key(std::tie(key_base, k));
-         result_handle  res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
-         kv_iterator<T> result(std::move(key), prefix.size(), is_secondary());
+         KeyView       key_base{{prefix.data(), prefix.size()}};
+         auto          key = psio::convert_to_key(std::tie(key_base, k));
+         result_handle res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
+         KvIterator<T> result(std::move(key), prefix.size(), is_secondary());
          result.move_to(res);
          return result;
       }
-      kv_iterator<T> upper_bound(compatible_key_prefix<K> auto&& k) const
+
+      /// Get iterator to first object with `key > k`
+      ///
+      /// If the index's key is an `std::tuple`, then `k` may be the first `n` fields
+      /// of the key.
+      ///
+      /// Returns [end] if none found.
+      template <CompatibleKeyPrefix<K> K2>
+      KvIterator<T> upper_bound(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
          auto    key = psio::convert_to_key(std::tie(key_base, k));
@@ -291,17 +318,25 @@ namespace psibase
             }
             key.pop_back();
          }
-         result_handle  res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
-         kv_iterator<T> result(std::move(key), prefix.size(), is_secondary());
+         result_handle res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
+         KvIterator<T> result(std::move(key), prefix.size(), is_secondary());
          result.move_to(res);
          return result;
       }
-      template <compatible_key_prefix<K> K2>
-      TableIndex<T, key_suffix<K2, K>> subindex(K2&& k)
+
+      /// Divide the key space
+      ///
+      /// Assume `K` is a `std::tuple<A, B, C, D>`. If you call `subindex` with
+      /// a tuple with the first `n` fields of `K`, e.g. `std::tuple(aValue, bValue)`,
+      /// then `subindex` returns another `TableIndex` which restricts its view
+      /// to the subrange. e.g. it will iterate and search for `std::tuple(cValue, dValue)`,
+      /// holding `aValue` and `bValue` constant.
+      template <CompatibleKeyPrefix<K> K2>
+      TableIndex<T, KeySuffix<K2, K>> subindex(K2&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
          auto    key = psio::convert_to_key(std::tie(key_base, k));
-         return TableIndex<T, key_suffix<K2, K>>(std::move(key));
+         return TableIndex<T, KeySuffix<K2, K>>(std::move(key));
       }
       std::optional<T> get(compatible_key<K> auto&& k) const
       {
@@ -338,11 +373,11 @@ namespace psibase
       static constexpr decltype(V) value = V;
    };
 
-   inline void kv_insert(DbId        db,
-                         const char* key,
-                         std::size_t key_len,
-                         const char* value,
-                         std::size_t value_len)
+   inline void kvInsertUnique(DbId        db,
+                              const char* key,
+                              std::size_t key_len,
+                              const char* value,
+                              std::size_t value_len)
    {
       if (raw::kvGet(db, key, key_len) != -1)
       {
@@ -360,13 +395,41 @@ namespace psibase
    ///
    /// `Primary` and `Secondary` may be:
    /// - pointer-to-data-member. e.g. `&MyType::key`
-   /// - pointer-to-member-function which returns a key. e.g. `&MyType::key_function`
+   /// - pointer-to-member-function which returns a key. e.g. `&MyType::keyFunction`
    /// - non-member function which takes a `const T&` as its only argument and returns a key
    /// - a callable object which takes a `const T&` as its only argument and returns a key
    ///
-   /// Caution: secondary keys must be unique. If multiple objects in the table
-   /// have the same secondary key value, then the secondary index for that key
-   /// will become corrupt.
+   /// #### Schema changes
+   ///
+   /// You may modify the schema the following ways:
+   /// - Add new `optional<...>` fields to the end of `T`, unless `T` is marked `definitionWillNotChange()`. When you read old records, these values will be `std::nullopt`.
+   /// - If `T` has a field with type `X`, then you may add new `optional<...>` fields to the end of `X`, unless `X` is marked `definitionWillNotChange()`. This rule is recursive, even through `vector`, `optional`, and user-defined types.
+   /// - Add new secondary indexes after the existing ones. Old records will not appear in the new secondary indexes until they are removed then re-added.
+   ///
+   /// TODO: switch to fracpack to support schema changes
+   ///
+   /// Don't do any of the following; these will corrupt data:
+   /// - Don't reorder fields within `T` or any types that it contains
+   /// - Don't remove fields from `T` or any types that it contains
+   /// - Don't change the types of fields within `T` or any types that it contains
+   /// - Don't reorder secondary indexes
+   /// - Don't remove secondary indexes
+   ///
+   /// #### Data format
+   ///
+   /// The key-value pairs have this format:
+   ///
+   /// | Usage | Key | Value |
+   /// | ----  | --- | ----- |
+   /// | primary index | prefix, 0, primary key | object data |
+   /// | secondary index | prefix, i, primary key | prefix, 0, primary key |
+   ///
+   /// Each secondary index is numbered `1 <= i <= 255` above. The secondary indexes
+   /// point to the primary index.
+   ///
+   /// `Table` serializes keys using `psio::to_key`. It serializes `T` using `psio::to_bin`.
+   ///
+   /// TODO: replace `to_bin` with fracpack.
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {
@@ -376,25 +439,17 @@ namespace psibase
       using value_type = T;
 
       /// Construct table with prefix
-      ///
-      /// `prefix` identifies the range of keys within the database that the
-      /// table occupies. If a key within the database begins with `prefix`, then
-      /// `Table` assumes the key belongs to it.
-      ///
-      /// This version of the constructor copies the prefix.
       explicit Table(KeyView prefix) : prefix(prefix.data.begin(), prefix.data.end()) {}
 
       /// Construct table with prefix
-      ///
-      /// `prefix` identifies the range of keys within the database that the
-      /// table occupies. If a key within the database begins with `prefix`, then
-      /// `Table` assumes the key belongs to it.
       explicit Table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
 
       /// Store `arg` into the table
       ///
       /// If an object already exists with the same primary key, then the new
-      /// object replaces it.
+      /// object replaces it. If the object has any secondary keys which
+      /// have the same value as another object, but not the one it's replacing,
+      /// then `put` aborts the transaction.
       void put(const T& arg)
       {
          auto pk = serialize_key(0, std::invoke(Primary, arg));
@@ -419,7 +474,7 @@ namespace psibase
                      raw::kvRemove(db, key_buffer.data(), key_buffer.size());
                      key_buffer.resize(prefix.size() + 1);
                      psio::convert_to_key(new_key, key_buffer);
-                     kv_insert(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
+                     kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
                      key_buffer.resize(prefix.size() + 1);
                   }
                   ++idx;
@@ -434,7 +489,7 @@ namespace psibase
                   auto key          = std::invoke(decltype(wrapped)::value, arg);
                   key_buffer.back() = idx;
                   psio::convert_to_key(key, key_buffer);
-                  kv_insert(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
+                  kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
                   key_buffer.resize(prefix.size() + 1);
                   ++idx;
                };
@@ -460,7 +515,7 @@ namespace psibase
          }
          else
          {
-            if (auto value = get_index<0>().get(key))
+            if (auto value = getIndex<0>().get(key))
             {
                remove(*value);
             }
@@ -494,7 +549,7 @@ namespace psibase
       ///
       /// The result is [TableIndex].
       template <int Idx>
-      auto get_index() const
+      auto getIndex() const
       {
          using key_extractor =
              boost::mp11::mp_at_c<boost::mp11::mp_list<wrap<Primary>, wrap<Secondary>...>, Idx>;

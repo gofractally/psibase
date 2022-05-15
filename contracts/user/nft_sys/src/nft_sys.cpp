@@ -27,7 +27,7 @@ NID NftSys::mint()
 {
    auto issuer   = get_sender();
    auto nftTable = db.open<NftTable_t>();
-   auto nftIdx   = nftTable.get_index<0>();
+   auto nftIdx   = nftTable.getIndex<0>();
 
    // Todo - replace with auto incrementing when available
    auto newId = (nftIdx.begin() == nftIdx.end()) ? 1 : (*(--nftIdx.end())).id + 1;
@@ -139,7 +139,7 @@ void NftSys::manualDebit(bool enable)
 
 NftRecord NftSys::getNft(NID nftId)
 {
-   auto nftRecord = db.open<NftTable_t>().get_index<0>().get(nftId);
+   auto nftRecord = db.open<NftTable_t>().getIndex<0>().get(nftId);
 
    check(nftRecord.has_value(), Errors::nftDNE);
 
@@ -148,7 +148,7 @@ NftRecord NftSys::getNft(NID nftId)
 
 NftHolderRecord NftSys::getNftHolder(AccountNumber account)
 {
-   auto nftHodler = db.open<NftHolderTable_t>().get_index<0>().get(account);
+   auto nftHodler = db.open<NftHolderTable_t>().getIndex<0>().get(account);
 
    if (nftHodler.has_value())
    {
@@ -165,7 +165,7 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
 
 CreditRecord NftSys::getCredRecord(NID nftId)
 {
-   auto creditRecord = db.open<CreditTable_t>().get_index<0>().get(nftId);
+   auto creditRecord = db.open<CreditTable_t>().getIndex<0>().get(nftId);
 
    if (creditRecord.has_value())
    {
@@ -181,7 +181,7 @@ CreditRecord NftSys::getCredRecord(NID nftId)
 
 bool NftSys::exists(NID nftId)
 {
-   return db.open<NftTable_t>().get_index<0>().get(nftId).has_value();
+   return db.open<NftTable_t>().getIndex<0>().get(nftId).has_value();
 }
 
 PSIBASE_DISPATCH(UserContract::NftSys)

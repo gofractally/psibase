@@ -36,7 +36,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
 {
    auto creator     = get_sender();
    auto tokenTable  = db.open<TokenTable_t>();
-   auto tokenIdx    = tokenTable.get_index<0>();
+   auto tokenIdx    = tokenTable.getIndex<0>();
    auto nftContract = at<NftSys>();
 
    // Todo - replace with auto incrementing when available
@@ -242,7 +242,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
 TokenRecord TokenSys::getToken(TID tokenId)
 {
    auto tokenTable = db.open<TokenTable_t>();
-   auto tokenIdx   = tokenTable.get_index<0>();
+   auto tokenIdx   = tokenTable.getIndex<0>();
    auto tokenOpt   = tokenIdx.get(tokenId);
    psibase::check(tokenOpt.has_value(), invalidTokenId);
 
@@ -251,13 +251,13 @@ TokenRecord TokenSys::getToken(TID tokenId)
 
 bool TokenSys::exists(TID tokenId)
 {
-   return db.open<TokenTable_t>().get_index<0>().get(tokenId).has_value();
+   return db.open<TokenTable_t>().getIndex<0>().get(tokenId).has_value();
 }
 
 BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
 {
    auto balanceTable = db.open<BalanceTable_t>();
-   auto balanceIdx   = balanceTable.get_index<0>();
+   auto balanceIdx   = balanceTable.getIndex<0>();
    auto balanceOpt   = balanceIdx.get(BalanceKey_t{account, tokenId});
 
    BalanceRecord record;
@@ -281,7 +281,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
                                            AccountNumber debitor)
 {
    auto               sharedBalanceTable = db.open<SharedBalanceTable_t>();
-   auto               sbIdx              = sharedBalanceTable.get_index<0>();
+   auto               sbIdx              = sharedBalanceTable.getIndex<0>();
    SharedBalanceKey_t key                = {creditor, debitor, tokenId};
    auto               sbOpt              = sbIdx.get(key);
 
@@ -306,7 +306,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
 TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
 {
    auto acTable = db.open<TokenHolderTable_t>();
-   auto acIdx   = acTable.get_index<0>();
+   auto acIdx   = acTable.getIndex<0>();
    auto acOpt   = acIdx.get(account);
 
    TokenHolderRecord record;
@@ -325,7 +325,7 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
 
 bool TokenSys::getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag)
 {
-   auto hodler = db.open<TokenHolderTable_t>().get_index<0>().get(account);
+   auto hodler = db.open<TokenHolderTable_t>().getIndex<0>().get(account);
    if (hodler.has_value() == false)
    {
       return false;

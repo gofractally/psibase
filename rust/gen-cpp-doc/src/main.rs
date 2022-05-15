@@ -272,7 +272,7 @@ fn set_urls(chapter: &mdbook::book::Chapter, items: &mut Vec<Item>, path: &str) 
 
 fn set_urls_in_item(items: &mut Vec<Item>, index: usize, chapter_path: &String) {
     let item = &mut items[index];
-    item.url = chapter_path.clone() + &hash_link(&item.full_name);
+    item.url = chapter_path.clone() + &local_link(&item.full_name);
     let children: Vec<usize> = item.children.values().flatten().copied().collect();
     for child in children {
         set_urls_in_item(items, child, chapter_path);
@@ -280,7 +280,7 @@ fn set_urls_in_item(items: &mut Vec<Item>, index: usize, chapter_path: &String) 
 }
 
 // Replace "::a::b::c" with "#abc"
-fn hash_link(x: &str) -> String {
+fn local_link(x: &str) -> String {
     let mut link_name = x.replace("::", "");
     link_name.make_ascii_lowercase();
     String::from('#') + &link_name
@@ -343,11 +343,18 @@ fn escape_and_add_links(text: &str, items: &Vec<Item>, parent: usize) -> String 
     .into_owned()
 }
 
-// Style type and create links
-fn style_type(text: &str, items: &Vec<Item>, parent: usize) -> String {
+fn style_comment(text: &str) -> String {
+    format!(r#"<span class="hljs-comment">{}</span>"#, text)
+}
+
+fn style_type(text: &str) -> String {
+    format!(r#"<span class="hljs-type">{}</span>"#, text)
+}
+
+fn style_fn(text: &str) -> String {
     format!(
-        r#"<span class="hljs-type">{}</span>"#,
-        escape_and_add_links(text, items, parent)
+        r#"<span class="hljs-title"><span class="hljs-function">{}</span></span>"#,
+        text
     )
 }
 
@@ -406,7 +413,7 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
             "",
             name,
             name_size - name.len(),
-            hash_link(&(path[2..].to_owned() + &name)),
+            local_link(&(path[2..].to_owned() + &name)),
             val,
             c.get_comment_brief().unwrap()
         ));
@@ -463,13 +470,18 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
         let ty = field.get_type().unwrap().get_display_name();
         let name = field.get_name().unwrap();
         def.push_str(&format!(
-            "    {1}{0:2$} <span class=\"hljs-variable\">{3}</span>;{0:4$} <span class=\"hljs-comment\">{5}</span>\n",
+            "    {1}{0:2$} <span class=\"hljs-variable\">{3}</span>;{0:4$} {5}\n",
             "",
-            style_type(&ty, items, index),
+            style_type(&escape_and_add_links(&ty, items, index)),
             type_size - ty.len(),
             name,
             name_size - name.len(),
-            field.get_comment_brief().and_then(|c| Some(String::from("// ") + &c)).unwrap_or_default(),
+            style_comment(
+                &field
+                    .get_comment_brief()
+                    .map(|c| String::from("// ") + &c)
+                    .unwrap_or_default()
+            ),
         ));
     }
 
@@ -515,13 +527,19 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
     }
     for (name, ty, method) in methods.iter() {
         def.push_str(&format!(
-            "    {1}{0:2$} <span class=\"hljs-title\"><span class=\"hljs-function\">{3}</span></span>(...);{0:4$} <span class=\"hljs-comment\">{5}</span>\n",
+            "    <a href=\"{6}\">{1}{0:2$} {3}(...);{0:4$} {5}</a>\n",
             "",
-            style_type(ty, items, index),
+            style_type(&escape_html(ty)),
             type_size - ty.len(),
-            name,
+            style_fn(name),
             name_size - name.len(),
-            method.get_comment_brief().and_then(|c| Some(String::from("// ") + &c)).unwrap_or_default(),
+            style_comment(
+                &method
+                    .get_comment_brief()
+                    .map(|c| String::from("// ") + &c)
+                    .unwrap_or_default()
+            ),
+            local_link(&(path[2..].to_owned() + name)),
         ));
     }
 
@@ -539,7 +557,7 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
         }
         result.push_str(&generate_documentation(
             items,
-            &(String::from("::") + &path[2..] + "::" + &name),
+            &(String::from("::") + &path[2..] + "::" + name),
         ));
     }
 } // document_struct
@@ -549,11 +567,11 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
     let mut def = String::new();
     def.push_str("<pre><code class=\"language-c++\">");
     document_template_args(item, &mut def);
-    def.push_str(&style_type(
+    def.push_str(&style_type(&escape_and_add_links(
         &item.entity.get_result_type().unwrap().get_display_name(),
         items,
         index,
-    ));
+    )));
     def.push(' ');
     def.push_str(&path[2..]);
     def.push('(');
@@ -573,7 +591,7 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
         def.push_str(&format!(
             "{1}{0:2$}{3}",
             "",
-            style_type(&ty, items, index),
+            style_type(&escape_and_add_links(&ty, items, index)),
             type_size - ty.len() + 1,
             arg.get_name().unwrap()
         ));
@@ -607,7 +625,7 @@ fn document_template_args(item: &Item, def: &mut String) {
             }
             def.push_str(&format!(
                 r#"<span class="hljs-title">{}</span>"#,
-                arg.get_pretty_printer().print()
+                escape_html(&arg.get_pretty_printer().print())
             ));
             need_comma = true;
         }
