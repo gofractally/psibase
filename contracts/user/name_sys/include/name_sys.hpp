@@ -19,7 +19,7 @@ namespace name_sys
 
    using display_name_table_t = psibase::Table<display_name_row, &display_name_row::acc>;
 
-   using tables = psibase::contract_tables<display_name_table_t>;
+   using tables = psibase::ContractTables<display_name_table_t>;
    class name_contract : public psibase::Contract<name_contract>
    {
      public:

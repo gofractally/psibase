@@ -16,7 +16,7 @@ namespace UserContract
    {
      public:
       using tables = psibase::
-          contract_tables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t, TokenHolderTable_t>;
+          ContractTables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t, TokenHolderTable_t>;
       static constexpr auto contract = psibase::AccountNumber("token-sys");
 
       TID  create(Precision precision, Quantity maxSupply);

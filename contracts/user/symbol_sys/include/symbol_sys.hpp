@@ -28,7 +28,7 @@ namespace symbol_sys
 
    using symbol_table_t = psibase::Table<symbol_row, &symbol_row::nft_id>;
 
-   using tables = psibase::contract_tables<symbol_table_t>;
+   using tables = psibase::ContractTables<symbol_table_t>;
    class symbol_contract : public psibase::Contract<symbol_contract>
    {
      public:

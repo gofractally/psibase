@@ -416,7 +416,7 @@ namespace psibase
      private:
       bool is_secondary() const
       {
-         return prefix[sizeof(AccountNumber) + sizeof(std::uint32_t)] != 0;
+         return prefix[sizeof(AccountNumber) + sizeof(std::uint16_t)] != 0;
       }
       static constexpr DbId db = DbId::contract;
       std::vector<char>     prefix;
@@ -633,21 +633,62 @@ namespace psibase
 
    // TODO: allow tables to be forward declared.  The simplest method is:
    // struct xxx : Table<...> {};
+   /// Defines the set of tables in a contract
+   ///
+   /// Template arguments:
+   /// - `Tables`: one or more [Table] types; one for each table the contract supports.
+   ///
+   /// #### Modifying table set
+   ///
+   /// You may add additional tables at the end.
+   ///
+   /// Don't do any of the following; these will corrupt data:
+   /// - Don't remove any tables
+   /// - Don't reorder the tables
+   ///
+   /// #### Prefix format
+   ///
+   /// `ContractTables` gives each table the following prefix. See [Data format](#data-format).
+   ///
+   /// | Field | Size | Description |
+   /// | ----- | ---- | ----------- |
+   /// | account | 64 bits | Contract account |
+   /// | Table | 16 bits | Table number. First table is 0. |
    template <typename... Tables>
-   struct contract_tables
+   struct ContractTables
    {
-      explicit constexpr contract_tables(AccountNumber account) : account(account) {}
-      template <std::uint32_t Table>
+      /// Constructor
+      ///
+      /// `account` is the account the contract runs on.
+      explicit constexpr ContractTables(AccountNumber account) : account(account) {}
+
+      /// Open by table number
+      ///
+      /// This gets a table by number. The first table is 0.
+      ///
+      /// e.g. `auto table = MyContractTables{myContractAccount}.open<2>();`
+      ///
+      /// Returns a [Table].
+      template <std::uint16_t Table>
       auto open() const
       {
          std::vector<char> key_prefix = psio::convert_to_key(std::tuple(account, Table));
          return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(std::move(key_prefix));
       }
+
+      /// Open by type
+      ///
+      /// This gets a table by the type of data it stores.
+      ///
+      /// e.g. `auto table = MyContractTables{myContractAccount}.open<MyType>();`
+      ///
+      /// Returns a [Table].
       template <typename T>
       auto open() const
       {
          return open<boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>::value>();
       }
-      AccountNumber account;
+
+      AccountNumber account;  ///< the contract runs on this account
    };
 }  // namespace psibase
