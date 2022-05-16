@@ -46,7 +46,8 @@ namespace psibase
 
       /// Comparisons
       ///
-      /// Compares by 64-bit `value`
+      /// Compares by 64-bit `value`. This does not sort by the
+      /// string (name) form.
       auto operator<=>(const AccountNumber&) const = default;
    };
    PSIO_REFLECT(AccountNumber, definitionWillNotChange(), value)
