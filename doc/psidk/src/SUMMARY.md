@@ -13,6 +13,7 @@
   - [Reference]()
     - [Native Functions](cpp-contract/native-functions.md)
     - [Table](cpp-contract/table.md)
+    - [Magic Numbers](cpp-contract/magic-numbers.md)
 - [Rust Contracts]()
 - [System Contracts]()
   - [common-sys](system-contract/common-sys/README.md)

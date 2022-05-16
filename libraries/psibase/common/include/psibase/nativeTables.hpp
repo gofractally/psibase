@@ -12,9 +12,11 @@ namespace psibase
    static constexpr NativeTableNum codeTable           = 3;
    static constexpr NativeTableNum databaseStatusTable = 4;
 
+   static constexpr uint8_t nativeTablePrimaryIndex = 0;
+
    inline auto statusKey()
    {
-      return std::tuple{statusTable};
+      return std::tuple{statusTable, nativeTablePrimaryIndex};
    }
    struct StatusRow
    {
@@ -31,7 +33,7 @@ namespace psibase
    inline auto accountKey(AccountNumber num)
    {
       // TODO: leave space for secondary index?
-      return std::tuple{accountTable, num};
+      return std::tuple{accountTable, nativeTablePrimaryIndex, num};
    }
    struct AccountRow
    {
@@ -59,7 +61,7 @@ namespace psibase
    inline auto codeKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
    {
       // TODO: leave space for secondary index?
-      return std::tuple{codeTable, codeHash, vmType, vmVersion};
+      return std::tuple{codeTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
    }
 
    /// where code is actually stored, duplicate contracts are reused
@@ -85,7 +87,7 @@ namespace psibase
 
    inline auto databaseStatusKey()
    {
-      return std::tuple{databaseStatusTable};
+      return std::tuple{databaseStatusTable, nativeTablePrimaryIndex};
    }
    struct DatabaseStatusRow
    {

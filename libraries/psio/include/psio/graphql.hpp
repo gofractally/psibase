@@ -447,6 +447,7 @@ namespace psio
             return error("expected :");
          input_stream.skip();
 
+         // TODO: don't hash the name; the real names could be made easily available
          bool found = reflect<T>::get_by_name(hash_name(field_name), [&](const meta& m, auto mptr)
                                               { gql_parse_arg(arg.*mptr, input_stream, error); });
 
@@ -678,6 +679,7 @@ namespace psio
          }
 
          found = reflect<T>::get_by_name(
+             // TODO: don't hash the name; the real names could be made easily available
              hash_name(field_name),
              [&](const meta& m, auto mptr)
              {

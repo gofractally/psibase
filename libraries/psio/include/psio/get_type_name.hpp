@@ -186,6 +186,8 @@ namespace psio
       }
       else
       {
+         // TODO: replace with hash function which has been ported to other languages
+         // TODO: redundant with hashing within method_to_number? But also somewhat different?
          return city_hash_name(str);
       }
    }

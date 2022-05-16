@@ -127,24 +127,10 @@ namespace psibase
       bool                  is_secondary = false;
    };
 
-   // Doc note: https://crates.io/crates/clang doesn't currently expose operator<=>, so the doc generator
-   //    can't see it. We have to manually list the comparisons for now.
-   //
    /// An iterator into a [TableIndex]
    ///
    /// Use [TableIndex::begin], [TableIndex::end], [TableIndex::lower_bound], or [TableIndex::upper_bound]
    /// to get an iterator.
-   ///
-   /// In addition to the members above, this also includes the following comparisons:
-   /// ```
-   /// ==
-   /// !=
-   /// <
-   /// <=
-   /// >
-   /// >=
-   /// <=>
-   /// ```
    template <typename T>
    struct KvIterator
    {
@@ -212,7 +198,8 @@ namespace psibase
       /// each time it's used.
       T operator*() const { return psio::convert_from_frac<T>(*base); }
 
-      friend std::weak_ordering operator<=>(const KvIterator& lhs, const KvIterator& rhs) = default;
+      /// Comparisons
+      std::weak_ordering operator<=>(const KvIterator& rhs) const = default;
 
      private:
       kv_raw_iterator base;
@@ -392,6 +379,9 @@ namespace psibase
       }
 
       /// Look up object by key
+      ///
+      /// If a matching key is found, then it returns a fresh object;
+      /// it does not cache.
       template <compatible_key<K> K2>
       std::optional<T> get(K2&& k) const
       {

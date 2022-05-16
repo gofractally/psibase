@@ -354,6 +354,9 @@ namespace psio
          if (m_in_itr != m_input.end() || c != '\0')
             m_output = 0;
 
+         // TODO: replace with hash function which has been ported to other languages
+         // TODO: why is this different from (and somewhat redundant with) the hashing
+         //       in hash_name()?
          if (not m_output)
          {
             m_output = consthash::city64_seed(m_input.data(), m_input.size(),
