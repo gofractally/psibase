@@ -82,6 +82,10 @@ namespace UserContract
       {
          return static_cast<Quantity_t>(otherValue) == value;
       }
+
+      constexpr auto operator<=>(const Quantity_t& other) const { return value <=> other; }
+
+      bool operator==(const Quantity_t& otherValue) const { return otherValue == value; }
    };  // namespace UserContract
    PSIO_REFLECT(Quantity, value);
 
