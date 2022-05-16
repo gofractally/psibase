@@ -248,6 +248,8 @@ namespace psibase
 
    /// A primary or secondary index in a Table
    ///
+   /// Use [Table::getIndex] to get this.
+   ///
    /// Template arguments:
    /// - `T`: Type of object stored in table
    /// - `K`: Type of key this index uses
@@ -334,7 +336,10 @@ namespace psibase
          auto    key = psio::convert_to_key(std::tie(key_base, k));
          return TableIndex<T, KeySuffix<K2, K>>(std::move(key));
       }
-      std::optional<T> get(compatible_key<K> auto&& k) const
+
+      /// Look up object by key
+      template <compatible_key<K> K2>
+      std::optional<T> get(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
          auto    buffer = psio::convert_to_key(std::tie(key_base, k));
@@ -435,9 +440,15 @@ namespace psibase
       using value_type = T;
 
       /// Construct table with prefix
+      ///
+      /// The prefix separates this table's data from other tables; see [Data format](#data-format).
+      ///
+      /// This version of the constructor copies the data within `prefix`.
       explicit Table(KeyView prefix) : prefix(prefix.data.begin(), prefix.data.end()) {}
 
       /// Construct table with prefix
+      ///
+      /// The prefix separates this table's data from other tables; see [Data format](#data-format).
       explicit Table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
 
       /// Store `arg` into the table

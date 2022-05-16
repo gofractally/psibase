@@ -485,7 +485,7 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
         ));
     }
 
-    let methods: Vec<(String, String, Entity)> = filter_children(&item.entity, |entity| {
+    let methods: Vec<(String, Entity)> = filter_children(&item.entity, |entity| {
         (entity.get_kind() == EntityKind::Constructor
             || entity.get_kind() == EntityKind::Destructor
             || entity.get_kind() == EntityKind::Method
@@ -494,43 +494,26 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
     })
     .into_iter()
     .map(|method| {
-        let (name, ty) = match method.get_kind() {
-            EntityKind::Constructor => (
-                item.entity.get_name().unwrap(),
-                if method.is_converting_constructor() {
-                    String::from("")
-                } else {
-                    String::from("explicit")
-                },
-            ),
-            EntityKind::Destructor => (
-                String::from("~") + &item.entity.get_name().unwrap(),
-                String::from(""),
-            ),
-            _ => (
-                method.get_name().unwrap(),
-                method.get_result_type().unwrap().get_display_name(),
-            ),
+        let name = match method.get_kind() {
+            EntityKind::Constructor => item.entity.get_name().unwrap(),
+            EntityKind::Destructor => String::from("~") + &item.entity.get_name().unwrap(),
+            _ => method.get_name().unwrap(),
         };
-        (name, ty, method)
+        (name, method)
     })
     .collect();
 
     if !fields.is_empty() && !methods.is_empty() {
         def.push('\n');
     }
-    let mut type_size = 0;
     let mut name_size = 0;
-    for (name, ty, _method) in methods.iter() {
-        type_size = max(type_size, ty.len());
+    for (name, _method) in methods.iter() {
         name_size = max(name_size, name.len());
     }
-    for (name, ty, method) in methods.iter() {
+    for (name, method) in methods.iter() {
         def.push_str(&format!(
-            "    <a href=\"{6}\">{1}{0:2$} {3}(...);{0:4$} {5}</a>\n",
+            "    <a href=\"{4}\">{1}(...);{0:2$} {3}</a>\n",
             "",
-            style_type(&escape_html(ty)),
-            type_size - ty.len(),
             style_fn(name),
             name_size - name.len(),
             style_comment(
@@ -551,7 +534,7 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
         replace_bracket_links(&item.doc_str, items, index)
     ));
 
-    for (i, (name, _, _)) in methods.iter().enumerate() {
+    for (i, (name, _ty)) in methods.iter().enumerate() {
         if i > 0 && &methods[i - 1].0 == name {
             continue;
         }
@@ -565,13 +548,20 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
 fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
     let item = &items[index];
     let mut def = String::new();
+    let ty = match item.entity.get_kind() {
+        EntityKind::Constructor => {
+            if item.entity.is_converting_constructor() {
+                String::from("")
+            } else {
+                String::from("explicit")
+            }
+        }
+        EntityKind::Destructor => String::from(""),
+        _ => item.entity.get_result_type().unwrap().get_display_name(),
+    };
     def.push_str("<pre><code class=\"language-c++\">");
     document_template_args(item, &mut def);
-    def.push_str(&style_type(&escape_and_add_links(
-        &item.entity.get_result_type().unwrap().get_display_name(),
-        items,
-        index,
-    )));
+    def.push_str(&style_type(&escape_and_add_links(&ty, items, index)));
     def.push(' ');
     def.push_str(&path[2..]);
     def.push('(');
