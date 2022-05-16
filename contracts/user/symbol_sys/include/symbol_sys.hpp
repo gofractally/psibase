@@ -5,7 +5,9 @@
 #include <psibase/table.hpp>
 #include <string_view>
 
-#include "nft_sys.hpp"
+#include "errors.hpp"
+#include "tables.hpp"
+#include "types.hpp"
 
 /* 04/18/2022
  * James and Dan call notes:
@@ -15,28 +17,16 @@
  * 
 */
 
-namespace symbol_sys
+namespace UserContract
 {
-   struct symbol_row
-   {
-      UserContract::NID nft_id;
-      std::string       symbol_name;
 
-      friend std::strong_ordering operator<=>(const symbol_row&, const symbol_row&) = default;
-   };
-   PSIO_REFLECT(symbol_row, symbol_name, nft_id);
-
-   using symbol_table_t = psibase::table<symbol_row, &symbol_row::nft_id>;
-
-   using tables = psibase::contract_tables<symbol_table_t>;
-   class symbol_contract : public psibase::Contract<symbol_contract>
+   using tables = psibase::contract_tables<symbolTable_t>;
+   class SymbolSys : public psibase::Contract<SymbolSys>
    {
      public:
       static constexpr auto contract = psibase::AccountNumber("symbol-sys");
 
-      // Mutate
-      void create(psibase::AccountNumber owner, int64_t max_supply);
-      void purchase(psibase::AccountNumber buyer, std::string newsymbol, int64_t amount);
+      SID  purchase(Ticker newSymbol, Quantity maxCost);
       void buysymbol(psibase::AccountNumber buyer, std::string symbol);
       void sellsymbol(std::string symbol, int64_t price);
       void withdraw(psibase::AccountNumber owner, int64_t amount);
@@ -49,12 +39,19 @@ namespace symbol_sys
                   uint32_t window);
       void setowner(psibase::AccountNumber owner, std::string sym, std::string memo);
 
+      SymbolRecord getSymbol(SID symbolId);
+      Quantity     getPrice(uint8_t numChars);
+
      private:
       tables db{contract};
    };
 
-   PSIO_REFLECT(  //
-       symbol_contract,
-       method(create, owner, max_supply));
+   // clang-format off
+   PSIO_REFLECT(SymbolSys,
+       method(purchase, newSymbol, maxCost),
+       method(getSymbol, symbolId),
+       method(getPrice, numChars)
+   );
+   // clang-format on
 
-}  // namespace symbol_sys
+}  // namespace UserContract

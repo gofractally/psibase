@@ -2,12 +2,24 @@
 
 #include <psibase/dispatch.hpp>
 
-using namespace symbol_sys;
+using namespace UserContract;
 using namespace psibase;
 
-void symbol_contract::create(psibase::AccountNumber owner, int64_t max_supply)
+SID SymbolSys::purchase(Ticker newSymbol, Quantity maxCost)
 {
    // NOP
+   return 0;
 }
 
-PSIBASE_DISPATCH(symbol_sys::symbol_contract)
+SymbolRecord SymbolSys::getSymbol(SID symbolId)
+{
+   // NOP
+   return {};
+}
+
+Quantity SymbolSys::getPrice(uint8_t numChars)
+{
+   return Quantity{1000};
+}
+
+PSIBASE_DISPATCH(UserContract::SymbolSys)
