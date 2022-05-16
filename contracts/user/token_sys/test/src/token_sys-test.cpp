@@ -37,18 +37,11 @@ namespace
 }  // namespace
 
 /* Todo:
- *    Code review token tables
+ *    Code review token tables - Add event storage
  *    Code review UserContext class in Tester
  *    Add test cases for verifying events were emitted properly in this and nft tests
+ *    Benchmark when possible
 */
-
-TEST_CASE("Data type tests")
-{
-   Precision p0{0};
-   Precision p1{1};
-   Precision p2{16};
-   Precision p3{17};
-}
 
 SCENARIO("Creating a token")
 {
@@ -597,6 +590,11 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
             THEN("Bob may not uncredit 51 tokens")
             {
                CHECK(b.uncredit(tokenId, alice, 51, memo).failed(insufficientBalance));
+               CHECK(false);
+               // Todo: Actually, the uncredit amount should be a "max"
+               //   That way, people can credit, perform action that debits an unknown amount,
+               //    and uncredit in the same transaction.
+               // This also implies that the uncredit action should succeed even if the sharedBalance is 0.
             }
             THEN("Bob may uncredit 25 tokens")
             {
