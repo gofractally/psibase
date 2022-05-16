@@ -127,37 +127,91 @@ namespace psibase
       bool                  is_secondary = false;
    };
 
+   // Doc note: https://crates.io/crates/clang doesn't currently expose operator<=>, so the doc generator
+   //    can't see it. We have to manually list the comparisons for now.
+   //
+   /// An iterator into a [TableIndex]
+   ///
+   /// Use [TableIndex::begin], [TableIndex::end], [TableIndex::lower_bound], or [TableIndex::upper_bound]
+   /// to get an iterator.
+   ///
+   /// In addition to the members above, this also includes the following comparisons:
+   /// ```
+   /// ==
+   /// !=
+   /// <
+   /// <=
+   /// >
+   /// >=
+   /// <=>
+   /// ```
    template <typename T>
    struct KvIterator
    {
      public:
-      KvIterator(std::vector<char>&& key, std::size_t prefix_size, bool is_secondary)
-          : base(std::move(key), prefix_size, is_secondary)
+      /// constructor
+      ///
+      /// * See the "Key" column of [Data format](#data-format); the `key` field contains this.
+      /// * `prefixSize` is the number of bytes within `key` which covers the index's prefix (includes the index number byte).
+      /// * `isSecondary` is true if this iterator is for a secondary index.
+      ///
+      /// You don't need this constructor in most cases; use [TableIndex::begin], [TableIndex::end],
+      /// [TableIndex::lower_bound], or [TableIndex::upper_bound] instead.
+      KvIterator(std::vector<char>&& key, std::size_t prefixSize, bool isSecondary)
+          : base(std::move(key), prefixSize, isSecondary)
       {
       }
+
+      /// preincrement (++it)
+      ///
+      /// This moves the iterator forward.
       KvIterator& operator++()
       {
          ++base;
          return *this;
       }
+
+      /// postincrement (it++)
+      ///
+      /// This moves the iterator forward.
+      ///
+      /// Note: postincrement (`it++`) and postdecrement (`it--`) have higher
+      /// overhead than preincrement (`++it`) and predecrement (`--it`).
       KvIterator operator++(int)
       {
          auto result = *this;
          ++*this;
          return result;
       }
+
+      /// predecrement (--it)
+      ///
+      /// This moves the iterator backward.
       KvIterator& operator--()
       {
          --base;
          return *this;
       }
+
+      /// postdecrement (it--)
+      ///
+      /// This moves the iterator backward.
+      ///
+      /// Note: postincrement (`it++`) and postdecrement (`it--`) have higher
+      /// overhead than preincrement (`++it`) and predecrement (`--it`).
       KvIterator operator--(int)
       {
          auto result = *this;
          --*this;
          return result;
       }
-      T                         operator*() const { return psio::convert_from_frac<T>(*base); }
+
+      /// get object
+      ///
+      /// This reads an object from the database. It does not cache; it returns a fresh object
+      /// each time it's used.
+      T operator*() const { return psio::convert_from_frac<T>(*base); }
+
       friend std::weak_ordering operator<=>(const KvIterator& lhs, const KvIterator& rhs) = default;
 
      private:
@@ -451,15 +505,15 @@ namespace psibase
       /// The prefix separates this table's data from other tables; see [Data format](#data-format).
       explicit Table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
 
-      /// Store `arg` into the table
+      /// Store `value` into the table
       ///
       /// If an object already exists with the same primary key, then the new
       /// object replaces it. If the object has any secondary keys which
       /// have the same value as another object, but not the one it's replacing,
       /// then `put` aborts the transaction.
-      void put(const T& arg)
+      void put(const T& value)
       {
-         auto pk = serialize_key(0, std::invoke(Primary, arg));
+         auto pk = serialize_key(0, std::invoke(Primary, value));
          if constexpr (sizeof...(Secondary) > 0)
          {
             int               sz         = raw::kvGet(db, pk.data(), pk.size());
@@ -473,7 +527,7 @@ namespace psibase
                auto replace_secondary = [&](uint8_t& idx, auto wrapped)
                {
                   auto old_key = std::invoke(decltype(wrapped)::value, data);
-                  auto new_key = std::invoke(decltype(wrapped)::value, arg);
+                  auto new_key = std::invoke(decltype(wrapped)::value, value);
                   if (old_key != new_key)
                   {
                      key_buffer.back() = idx;
@@ -493,7 +547,7 @@ namespace psibase
             {
                auto write_secondary = [&](uint8_t& idx, auto wrapped)
                {
-                  auto key          = std::invoke(decltype(wrapped)::value, arg);
+                  auto key          = std::invoke(decltype(wrapped)::value, value);
                   key_buffer.back() = idx;
                   psio::convert_to_key(key, key_buffer);
                   kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
@@ -504,7 +558,7 @@ namespace psibase
                (write_secondary(idx, wrap<Secondary>()), ...);
             }
          }
-         auto serialized = psio::convert_to_frac(arg);
+         auto serialized = psio::convert_to_frac(value);
          raw::kvPut(db, pk.data(), pk.size(), serialized.data(), serialized.size());
       }
 
@@ -530,13 +584,13 @@ namespace psibase
       }
 
       /// Remove object from table
-      void remove(const T& old_value)
+      void remove(const T& oldValue)
       {
          std::vector<char> key_buffer = prefix;
          key_buffer.push_back(0);
          auto erase_key = [&](std::uint8_t& idx, auto wrapped)
          {
-            auto key          = std::invoke(decltype(wrapped)::value, old_value);
+            auto key          = std::invoke(decltype(wrapped)::value, oldValue);
             key_buffer.back() = idx;
             psio::convert_to_key(key, key_buffer);
             raw::kvRemove(db, key_buffer.data(), key_buffer.size());

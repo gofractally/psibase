@@ -583,7 +583,7 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
             "",
             style_type(&escape_and_add_links(&ty, items, index)),
             type_size - ty.len() + 1,
-            arg.get_name().unwrap()
+            arg.get_name().unwrap_or_default()
         ));
         need_comma = true;
     }
