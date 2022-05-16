@@ -12,7 +12,7 @@ namespace psidb
 {
 
    template <typename F>
-   decltype(auto) visit(page_header* root, F&& f)
+   decltype(auto) visit(F&& f, page_header* root)
    {
       switch (root->type)
       {
@@ -35,6 +35,7 @@ namespace psidb
 
       void lower_bound(std::string_view key)
       {
+         auto l = db->gc_lock();
          lower_bound_impl(key);
          make_valid();
       }
@@ -57,6 +58,7 @@ namespace psidb
       }
       void back()
       {
+         auto         l = db->gc_lock();
          page_header* p = db->root(c, 0);
          depth          = 0;
          while (true)
@@ -121,6 +123,7 @@ namespace psidb
       {
          auto p = leaf.get_parent<page_leaf>();
          leaf   = p->child(p->get_offset(leaf) + 1);
+         auto l = db->gc_lock();
          make_valid();
       }
       bool previous()
@@ -137,6 +140,7 @@ namespace psidb
             auto offset = node->get_offset(stack[i - 1]);
             if (offset != 0)
             {
+               auto l       = db->gc_lock();
                stack[i - 1] = node->child(offset - 1);
                back(i, get_page(stack[i - 1]));
                return true;
@@ -197,7 +201,7 @@ namespace psidb
       page_header* get_page(node_ptr p) { return db->get_page(p, version); }
       node_ptr     lower_bound(page_header* p, key_type key)
       {
-         return visit(p, [&](auto* p) { return lower_bound(p, key); });
+         return visit([&](auto* p) { return lower_bound(p, key); }, p);
       }
       node_ptr lower_bound(page_leaf* p, key_type key)
       {

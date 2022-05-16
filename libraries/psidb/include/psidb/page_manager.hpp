@@ -2,21 +2,22 @@
 
 #include <boost/intrusive/list.hpp>
 #include <cstddef>
+#include <iostream>
 #include <map>
 #include <psidb/allocator.hpp>
 #include <psidb/checkpoint.hpp>
+#include <psidb/gc_allocator.hpp>
 #include <psidb/node_ptr.hpp>
 #include <psidb/page_header.hpp>
 #include <psidb/page_types/free_list.hpp>
 #include <psidb/sync/mutex_set.hpp>
 #include <psidb/sync/shared_queue.hpp>
 #include <stdexcept>
+#include <syncstream>
 #include <utility>
 
 namespace psidb
 {
-
-   static constexpr std::size_t max_memory_pages = 0x10000000;
 
    class page_manager;
 
@@ -51,15 +52,9 @@ namespace psidb
       bool         is_memory_page(page_id id) { return id < max_memory_pages; }
       page_header* translate_page_address(page_id id)
       {
-         return reinterpret_cast<page_header*>(reinterpret_cast<char*>(_allocator.base()) +
-                                               id * page_size);
+         return _allocator.translate_page_address(id);
       }
-      page_id get_id(const page_header* page)
-      {
-         return (reinterpret_cast<const char*>(page) -
-                 reinterpret_cast<const char*>(_allocator.base())) /
-                page_size;
-      }
+      page_id      get_id(const page_header* page) { return _allocator.get_id(page); }
       page_header* get_page(node_ptr ptr)
       {
          auto id = *ptr;
@@ -79,13 +74,16 @@ namespace psidb
          {
             while (true)
             {
+               //std::osyncstream(std::cout) << "reading page: " << id << " v" << version << std::endl;
                page_header* p = translate_page_address(id);
+               assert(p->type != page_type::free);
                if (p->version <= version)
                {
                   return p;
                }
                else
                {
+                  //std::osyncstream(std::cout) << id << " (v" << p->version << ") -> " << p->prev << std::endl;
                   id = p->prev;
                }
             }
@@ -119,7 +117,7 @@ namespace psidb
       }
       std::pair<page_header*, page_id> allocate_page()
       {
-         page_header* result = static_cast<page_header*>(_allocator.allocate(page_size));
+         page_header* result = static_cast<page_header*>(_allocator.allocate_page());
          return {result, get_id(result)};
       }
       void set_root(const checkpoint& c, int db, page_id new_root)
@@ -174,7 +172,11 @@ namespace psidb
          {
             start_flush(c._root, _flush_stable);
          }
-         _gc_manager.process_gc(_allocator, _file_allocator);
+         if (_allocator.should_gc())
+         {
+            run_gc();
+         }
+         //_gc_manager.process_gc(_allocator, _file_allocator);
       }
       void abort_transaction(checkpoint&& c)
       {
@@ -246,18 +248,41 @@ namespace psidb
                  static_cast<const char*>(copy)};
       }
 
+      auto gc_lock() { return _allocator.lock(); }
+
+      void run_gc()
+      {
+         std::vector<version_type> versions;
+         std::vector<page_header*> roots;
+         gc_allocator::cycle       cycle;
+         {
+            std::lock_guard l{_checkpoint_mutex};
+            for (const auto& c : _active_checkpoints)
+            {
+               versions.push_back(c._root.version);
+               roots.push_back(translate_page_address(c._root.table_roots[0]));
+            }
+            cycle = _allocator.start_cycle(std::move(versions));
+         }
+         for (page_header* root : roots)
+         {
+            _allocator.scan_root(cycle, root);
+         }
+         // FIXME: need to wait for anything that is currently accessing
+         _allocator.sweep(std::move(cycle));
+      }
+
       void queue_gc(page_header* node);
       struct stats
       {
          file_allocator::stats file;
-         allocator::stats      memory;
+         gc_allocator::stats   memory;
          std::size_t           checkpoints;
       };
       stats get_stats() const
       {
          return {_file_allocator.get_stats(), _allocator.get_stats(), checkpoints()};
       }
-      std::size_t available() const { return _allocator.available(); }
       std::size_t checkpoints() const
       {
          std::lock_guard l{_checkpoint_mutex};
@@ -345,8 +370,9 @@ namespace psidb
       };
 #endif
 
-      allocator                         _allocator;
-      gc_manager                        _gc_manager;
+      //allocator                         _allocator;
+      //gc_manager                        _gc_manager;
+      gc_allocator                      _allocator;
       int                               fd = -1;
       file_allocator                    _file_allocator;
       page_flags                        _dirty_flag    = page_flags::dirty0;

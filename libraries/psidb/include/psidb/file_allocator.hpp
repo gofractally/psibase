@@ -2,6 +2,7 @@
 
 #include <map>
 #include <psidb/allocator.hpp>
+#include <psidb/gc_allocator.hpp>
 #include <psidb/page_header.hpp>
 #include <utility>
 
@@ -30,10 +31,10 @@ namespace psidb
       void         initialize(std::uint32_t reserved_pages);
       page_id      allocate(std::size_t size);
       void         deallocate(page_id id, std::size_t size);
-      free_segment flush(allocator& alloc);
+      free_segment flush(gc_allocator& alloc);
       int          read(void* data, page_id page, std::size_t num_pages);
       int          write(page_id page, const void* data, std::size_t num_pages);
-      void         load(page_id root, std::uint32_t num_pages, allocator& alloc);
+      void         load(page_id root, std::uint32_t num_pages, gc_allocator& alloc);
       struct stats
       {
          std::size_t used;

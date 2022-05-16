@@ -64,7 +64,7 @@ void psidb::file_allocator::deallocate_unlocked(page_id start, std::size_t num_p
    freelist_by_addr.insert(pos, {start, num_pages});
 }
 
-file_allocator::free_segment psidb::file_allocator::flush(allocator& alloc)
+file_allocator::free_segment psidb::file_allocator::flush(gc_allocator& alloc)
 {
    std::lock_guard l{_mutex};
    std::size_t     n             = freelist_by_addr.size() + 1;
@@ -95,7 +95,7 @@ int psidb::file_allocator::read(void* data, page_id page, std::size_t num_pages)
    return ::pread(fd, data, num_pages * page_size, page * page_size);
 }
 
-void psidb::file_allocator::load(page_id root, std::uint32_t num_pages, allocator& alloc)
+void psidb::file_allocator::load(page_id root, std::uint32_t num_pages, gc_allocator& alloc)
 {
    std::lock_guard l{_mutex};
    auto*           buf = static_cast<free_segment*>(alloc.allocate(num_pages * page_size));

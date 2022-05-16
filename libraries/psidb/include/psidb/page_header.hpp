@@ -18,7 +18,8 @@ namespace psidb
    enum class page_type : std::uint8_t
    {
       node,
-      leaf
+      leaf,
+      free
    };
 
    enum class page_flags : std::uint8_t
@@ -28,12 +29,17 @@ namespace psidb
       evicted = 4
    };
 
+   using gc_flag_type = std::uint8_t;
+
+   static constexpr std::size_t max_memory_pages = 0x10000000;
+
    struct page_header
    {
       page_type            type;
       page_flags           flags;
       std::atomic<bool>    dirty0;
       std::atomic<bool>    dirty1;
+      gc_flag_type         gc_flag;
       page_id              id;
       std::atomic<page_id> prev;
       version_type         version;

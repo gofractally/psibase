@@ -1,4 +1,5 @@
 #include <psidb/database.hpp>
+#include <syncstream>
 
 #include "test_util.hpp"
 
@@ -47,7 +48,7 @@ TEST_CASE("thread tests", "[thread]")
    // one thread writes in a determinsic pattern
    auto writer = [&]()
    {
-      for (std::uint32_t i = 1; i < 200; ++i)
+      for (std::uint32_t i = 1; i < 10000; ++i)
       {
          auto trx    = db.start_transaction();
          auto [k, v] = make_kv(i);
@@ -60,11 +61,12 @@ TEST_CASE("thread tests", "[thread]")
          trx.erase("");
          trx.insert("", {reinterpret_cast<const char*>(&i), sizeof(i)});
          trx.commit();
-         db.async_flush(true);
+         //db.async_flush(true);
          auto stats = db.get_stats();
-         std::cout << "memory used: " << stats.memory.used << " / " << stats.memory.total
-                   << ", checkpoints: " << stats.checkpoints << ", disk used: " << stats.file.used
-                   << " / " << stats.file.total << std::endl;
+         std::osyncstream(std::cout)
+             << "memory used: " << stats.memory.used << " / " << stats.memory.total
+             << ", checkpoints: " << stats.checkpoints << ", disk used: " << stats.file.used
+             << " / " << stats.file.total << std::endl;
       }
       done = true;
    };

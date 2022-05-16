@@ -16,7 +16,7 @@ static constexpr page_id header_page        = max_memory_pages;
 static constexpr page_id backup_header_page = header_page + 1;
 
 psidb::page_manager::page_manager(int fd, std::size_t num_pages)
-    : _allocator(num_pages * page_size), _file_allocator(fd)
+    : _allocator(num_pages), _file_allocator(fd)
 {
    // FIXME: inconsistent behavior W.R.T. cleanup of fd on exception.
    this->fd = fd;
@@ -37,6 +37,7 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages)
       page->id          = 0;
       page->version     = 1;
       page->min_version = page->version;
+      page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
       touch_page(page, page->version);
       static_cast<page_leaf*>(page)->clear();
 
@@ -151,7 +152,7 @@ page_id psidb::page_manager::allocate_file_pages(std::size_t count)
 
 void page_manager::queue_gc(page_header* node)
 {
-   _gc_manager.queue_gc(_allocator, node);
+   //_gc_manager.queue_gc(_allocator, node);
 }
 
 void psidb::page_manager::write_worker()
@@ -306,6 +307,9 @@ bool psidb::page_manager::write_tree(page_id                      page,
          }
          if (pages != 0)
          {
+#if 1
+            assert("multi page allocation not implemented");
+#else
             void* data_pages           = _allocator.allocate(pages * page_size);
             current_page_size          = page_size;
             std::size_t page_num       = 0;
@@ -347,6 +351,7 @@ bool psidb::page_manager::write_tree(page_id                      page,
             }
             write_pages(data_base_page, data_pages, pages, refcount);
             write_page(header, dirty_flag, refcount);
+#endif
          }
          else
          {
