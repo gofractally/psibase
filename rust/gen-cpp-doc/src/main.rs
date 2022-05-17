@@ -585,6 +585,10 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
             type_size - ty.len() + 1,
             arg.get_name().unwrap_or_default()
         ));
+        let pretty = arg.get_pretty_printer().print();
+        if let Some(pos) = pretty.find(" = ") {
+            def.push_str(&escape_html(&pretty[pos..]));
+        }
         need_comma = true;
     }
     if need_comma {

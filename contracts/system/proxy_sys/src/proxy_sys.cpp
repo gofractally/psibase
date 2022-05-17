@@ -1,5 +1,4 @@
 #include <contracts/system/proxy_sys.hpp>
-#include <psibase/actor.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/fracpack.hpp>
@@ -66,7 +65,7 @@ namespace psibase
          abortMessage("contract not registered: " + contract.str());
 
       // TODO: avoid repacking (both directions)
-      psibase::actor<ServerInterface> iface(act.contract, reg->rpcContract);
+      psibase::Actor<ServerInterface> iface(act.contract, reg->rpcContract);
       setRetval(iface.serveSys(req).unpack());
    }  // serve()
 

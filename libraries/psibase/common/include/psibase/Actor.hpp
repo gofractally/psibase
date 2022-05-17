@@ -200,17 +200,17 @@ namespace psibase
  * Makes calls to other contracts and gets the results
  */
    template <typename T = void>
-   struct actor : public psio::reflect<T>::template proxy<sync_call_proxy>
+   struct Actor : public psio::reflect<T>::template proxy<sync_call_proxy>
    {
       using base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
       using base::base;
 
-      auto as(AccountNumber other) const { return actor(other, base::receiver); }
+      auto as(AccountNumber other) const { return Actor(other, base::receiver); }
 
       template <typename Other, uint64_t OtherReceiver>
       auto at() const
       {
-         return actor<Other>(base::sender, AccountNumber(OtherReceiver));
+         return Actor<Other>(base::sender, AccountNumber(OtherReceiver));
       }
 
       auto* operator->() const { return this; }
@@ -218,22 +218,22 @@ namespace psibase
    };
 
    template <>
-   struct actor<void>
+   struct Actor<void>
    {
       AccountNumber sender;
       AccountNumber receiver;
 
-      actor(AccountNumber s = AccountNumber(), AccountNumber r = AccountNumber())
+      Actor(AccountNumber s = AccountNumber(), AccountNumber r = AccountNumber())
           : sender(s), receiver(r)
       {
       }
 
-      auto as(AccountNumber other) const { return actor(other, receiver); }
+      auto as(AccountNumber other) const { return Actor(other, receiver); }
 
       template <typename Other, uint64_t OtherReceiver>
       auto at() const
       {
-         return actor<Other>(sender, AccountNumber(OtherReceiver));
+         return Actor<Other>(sender, AccountNumber(OtherReceiver));
       }
 
       auto* operator->() const { return this; }

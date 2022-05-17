@@ -2,7 +2,7 @@
 
 #include <concepts>
 #include <psibase/AccountNumber.hpp>
-#include <psibase/actor.hpp>
+#include <psibase/Actor.hpp>
 
 namespace psibase
 {
@@ -37,21 +37,25 @@ namespace psibase
       auto emit() const { return EventEmitter<DerivedContract>(_receiver); }
       auto events() const { return EventReader<DerivedContract>(_receiver); }
 
-      auto as(AccountNumber u = AccountNumber())
+      /// Prepare to call another contract
+      ///
+      /// - If `u` is `0` (the default), then use this contract's authority ([getReceiver]).
+      /// - If `u` is non-0, then use `u`'s authority. Non-priviledged contracts may only use their own authority.
+      Actor<DerivedContract> as(AccountNumber u = AccountNumber())
       {
          if (u == AccountNumber())
-            return actor<DerivedContract>(_sender, _receiver);
-         return actor<DerivedContract>(u, _receiver);
+            return {_sender, _receiver};
+         return {u, _receiver};
       }
 
       template <typename T = DerivedContract>
-      actor<T> at(AccountNumber callee)
+      Actor<T> at(AccountNumber callee)
       {
-         return actor<T>(_receiver, callee);
+         return Actor<T>(_receiver, callee);
       }
 
       template <DefinesContract T = DerivedContract>
-      actor<T> at()
+      Actor<T> at()
       {
          return at<T>(T::contract);
       }

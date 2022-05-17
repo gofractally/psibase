@@ -1,7 +1,7 @@
 #pragma once
 #include <catch2/catch.hpp>
 #include <iostream>
-#include <psibase/actor.hpp>
+#include <psibase/Actor.hpp>
 #include <psibase/trace.hpp>
 
 namespace psibase

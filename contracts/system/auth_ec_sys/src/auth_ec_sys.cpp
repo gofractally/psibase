@@ -2,7 +2,6 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
-#include <psibase/actor.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/print.hpp>
@@ -52,7 +51,7 @@ namespace system_contract::auth_ec_sys
    AccountNumber exec(AccountNumber this_contract, AccountNumber sender, create_account& args)
    {
       writeConsole("account_sys::create_account");
-      psibase::actor<account_sys> asys(this_contract, account_sys::contract);
+      psibase::Actor<account_sys> asys(this_contract, account_sys::contract);
       asys.newAccount(args.name, this_contract, true);
       auth_row row{AccountNumber{args.name}, args.public_key};
       kvPut(row.key(), row);

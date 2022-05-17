@@ -2,7 +2,6 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <psibase/Bitset.hpp>
-#include <psibase/actor.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/fracpack.hpp>
 
