@@ -31,11 +31,13 @@ namespace psibase
 
    template <uint8_t nrBits>
 
+   // TODO: consider adding std::bitset to fracpack, to_json, and from_json instead
    struct Bitset
    {
       static_assert(validNrBits<nrBits>, "Unsupported Bitset size. Supported sizes: 8, 16, 32, 64");
 
       using Bitset_t                   = typename BitsetTypeMap<nrBits>::inner_t;
+      // TODO: rename; UPPERCASE_IS_FOR_MACROS_ONLY
       static constexpr size_t MAX_BITS = std::numeric_limits<Bitset_t>::digits;
       Bitset_t                bits     = 0;
 
@@ -80,6 +82,7 @@ namespace psibase
    {
      public:
       static const size_t      nrBits  = sizeof...(Args);
+      // TODO: rename; UPPERCASE_IS_FOR_MACROS_ONLY
       static constexpr uint8_t INVALID = std::numeric_limits<uint8_t>::max();
 
       static constexpr uint8_t getIndex(NamedBit_t flag)
