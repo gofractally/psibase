@@ -23,7 +23,10 @@ namespace psidb
       void        async_flush(bool stable = true) { _storage.async_flush(stable); }
       auto        get_stats() const { return _storage.get_stats(); }
       std::size_t checkpoints() const { return _storage.checkpoints(); }
-      void        print_summary() { _storage.print_summary(); }
+
+      void run_gc_loop() { _storage.run_gc_loop(); }
+      void stop_gc() { _storage.stop_gc(); }
+      void print_summary() { _storage.print_summary(); }
 
      private:
       page_manager _storage;

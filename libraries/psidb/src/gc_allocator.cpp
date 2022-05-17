@@ -6,12 +6,21 @@
 
 using namespace psidb;
 
+//#define GC_LOG
+
+#ifdef GC_LOG
+#define DEBUG_PRINT(...) std::osyncstream(std::cout) << __VA_ARGS__
+#else
+#define DEBUG_PRINT(...) ((void)0)
+#endif
+
 static node_ptr get_prev(page_header* header)
 {
    return node_ptr{header, &header->prev};
 }
 
 psidb::gc_allocator::gc_allocator(std::size_t max_pages)
+    : _page_flags(new std::atomic<gc_flag_type>[max_pages])
 {
    _size = max_pages * page_size;
    _base = _unused =
@@ -37,14 +46,10 @@ void psidb::gc_allocator::sweep(cycle&& c)
         iter < end;
         iter = reinterpret_cast<page_header*>(reinterpret_cast<char*>(iter) + page_size))
    {
-      if (iter->type != page_type::free && !is_marked(iter))
+      if (!is_marked(iter) && !is_free(iter) && !is_new(iter))
       {
-         //std::osyncstream(std::cout) << "freeing page: " << get_id(iter) << " v" << iter->version << std::endl;
-#if 0
-            iter->type = page_type::free;
-            ::mprotect(iter, page_size, PROT_READ);
-            continue;
-#endif
+         mark_free(iter);
+         DEBUG_PRINT("freeing page: " << get_id(iter) << " v" << iter->version << std::endl);
          page_id id = null_page;
          if (!last)
          {
@@ -58,13 +63,12 @@ void psidb::gc_allocator::sweep(cycle&& c)
          iter->prev.store(id, std::memory_order_relaxed);
          new_head = iter;
       }
-      else if (iter->type != page_type::free)
+      else if (!is_free(iter))
       {
          ++used_pages;
       }
    }
-   _gc_threshold = used_pages * 2;
-   //std::cout << "threshold: " << _gc_threshold << std::endl;
+   gc_set_threshold(used_pages / 2);
    if (last)
    {
       while (true)
@@ -80,28 +84,19 @@ void psidb::gc_allocator::sweep(cycle&& c)
    }
 }
 
-gc_allocator::cycle psidb::gc_allocator::start_cycle(std::vector<version_type>&& active_versions)
+gc_allocator::cycle psidb::gc_allocator::start_cycle()
 {
-   _gc_flag = _gc_flag ^ 1;
-#if 0
-      {
-         std::osyncstream ss(std::cout);
-         ss << "gc: ";
-         for(auto v : active_versions)
-         {
-            ss << v << " ";
-         }
-         ss << std::endl;
-      }
-#endif
-   return {std::move(active_versions)};
+   _gc_flag.store(_gc_flag.load(std::memory_order_relaxed) ^ 1, std::memory_order_relaxed);
+   // Ensure that the flag is propagated to all threads that might allocate
+   _gc_mutex.store(_gc_mutex.load(std::memory_order_relaxed) ^ 1);
+   return {};
 }
 
 void psidb::gc_allocator::scan_root(cycle& data, page_header* page)
 {
    if (!is_marked(page))
    {
-      //std::osyncstream(std::cout) << "scanning page: " << get_id(page) << std::endl;
+      DEBUG_PRINT("scanning page: " << get_id(page) << std::endl);
       visit([&](auto* p) { scan_children(data, p); }, page);
       scan_prev(data, page);
       mark(page);
@@ -118,7 +113,7 @@ void psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
       page_header* page = translate_page_address(id);
       if (!is_marked(page))
       {
-         //std::osyncstream(std::cout) << "scanning page: " << id << std::endl;
+         DEBUG_PRINT("scanning page: " << id << std::endl);
          visit([&](auto* p) { scan_children(data, p); }, page);
          scan_prev(data, page);
       }
@@ -128,7 +123,13 @@ void psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
          {
             ptr->store(page->id, std::memory_order_relaxed);
          }
-         // For now, don't write back
+         else
+         {
+            // For now, don't write back.  The checkpoint manager is responsible for that
+            // and pages will never remain dirty indefinitely.  In fact, we could probably
+            // fold is_dirty into is_old.
+            mark(page);
+         }
       }
       else
       {
@@ -150,22 +151,26 @@ void psidb::gc_allocator::scan_prev(cycle& data, page_header* page)
    if (node_ptr prev = get_prev(page))
    {
       page_id id = *prev;
-      //std::osyncstream(std::cout) << "scan prev: " << get_id(page) << " -> " << id << std::endl;
+      DEBUG_PRINT("scan prev: " << get_id(page) << " -> " << id << std::endl);
+      version_type min_version = page->version;
       while (is_memory_page(id))
       {
          assert(id != get_id(page));
          page_header* prev_page = translate_page_address(id);
-         assert(prev_page->version < page->version);
+         assert(prev_page->version < min_version);
+         min_version = prev_page->version;
          if (page_is_live(data, prev_page, page->version))
          {
-            //std::osyncstream(std::cout) << "prev: " << get_id(page) << " -> " << id << std::endl;
+            DEBUG_PRINT("prev: " << get_id(page) << " -> " << id << std::endl);
             scan(data, prev);
             break;
          }
          else
          {
             auto new_id = prev_page->prev.load(std::memory_order_relaxed);
-            //std::osyncstream(std::cout) << "dropping page: " << id << ", version [" << prev_page->version << "," << page->version << ") " << get_id(page) << " -> " << new_id << std::endl;
+            DEBUG_PRINT("dropping page: " << id << ", version [" << prev_page->version << ","
+                                          << page->version << ") " << get_id(page) << " -> "
+                                          << new_id << std::endl);
             id = new_id;
             assert(id != get_id(page));
             prev->store(id);
@@ -190,5 +195,6 @@ bool psidb::gc_allocator::page_is_live(cycle& data, page_header* page, version_t
 {
    auto low_version = page->version;
    auto pos         = std::lower_bound(data.versions.begin(), data.versions.end(), low_version);
-   return pos != data.versions.end() && *pos < end_version;
+   // Newly created checkpoints are considered live
+   return pos == data.versions.end() || *pos < end_version;
 }

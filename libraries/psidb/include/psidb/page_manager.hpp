@@ -172,10 +172,12 @@ namespace psidb
          {
             start_flush(c._root, _flush_stable);
          }
+#if 0
          if (_allocator.should_gc())
          {
             run_gc();
          }
+#endif
          //_gc_manager.process_gc(_allocator, _file_allocator);
       }
       void abort_transaction(checkpoint&& c)
@@ -248,27 +250,50 @@ namespace psidb
                  static_cast<const char*>(copy)};
       }
 
+      // A lock must be held around:
+      // - All allocations
+      // - All page lookups that might follow a prev ptr
+      // Locks are non-exclusive, and acquiring a lock is non-blocking.
       auto gc_lock() { return _allocator.lock(); }
+
+      void run_gc_loop()
+      {
+         while (_allocator.gc_wait())
+         {
+            run_gc();
+         }
+      }
+
+      void stop_gc() { _allocator.gc_stop(); }
 
       void run_gc()
       {
          std::vector<version_type> versions;
          std::vector<page_header*> roots;
-         gc_allocator::cycle       cycle;
+         gc_allocator::cycle       cycle = _allocator.start_cycle();
          {
             std::lock_guard l{_checkpoint_mutex};
             for (const auto& c : _active_checkpoints)
             {
-               versions.push_back(c._root.version);
+               cycle.versions.push_back(c._root.version);
                roots.push_back(translate_page_address(c._root.table_roots[0]));
             }
-            cycle = _allocator.start_cycle(std::move(versions));
          }
+#if 0
+      {
+         std::osyncstream ss(std::cout);
+         ss << "gc: ";
+         for(auto v : cycle.versions)
+         {
+            ss << v << " ";
+         }
+         ss << std::endl;
+      }
+#endif
          for (page_header* root : roots)
          {
             _allocator.scan_root(cycle, root);
          }
-         // FIXME: need to wait for anything that is currently accessing
          _allocator.sweep(std::move(cycle));
       }
 

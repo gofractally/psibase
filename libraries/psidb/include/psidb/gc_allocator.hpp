@@ -1,7 +1,9 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <cstddef>
+#include <mutex>
 #include <psidb/node_ptr.hpp>
 #include <psidb/page_header.hpp>
 #include <psidb/sync/shared_value.hpp>
@@ -15,6 +17,20 @@ namespace psidb
 
    struct page_leaf;
    struct page_internal_node;
+   // During a collection cycle, a node can have 3 possible states
+   // - new: allocated after the collection phase started, but not reached by the gc
+   // - marked: Seen by the gc scan
+   // - old: Not seen by the scan
+   //
+   // A new node will not be freed
+   // new and old nodes can become marked
+   //
+   // If an old or marked node is modified to point to a new node,
+   // then the new node contains a copy of the old pointer.  This
+   // restriction on modification makes concurrent collection safe.
+   //
+   // When starting a new collection phase any node that was new or marked
+   // becomes old.
    class gc_allocator
    {
      public:
@@ -37,8 +53,9 @@ namespace psidb
                {
                   auto result = reinterpret_cast<page_header*>(_unused);
                   _unused     = reinterpret_cast<char*>(_unused) + page_size;
-                  mark(result);
-                  --_gc_threshold;
+                  mark_new(result);
+                  gc_notify();
+                  //std::osyncstream(std::cout) << "allocate page: " << get_id(result) << std::endl;
                   return result;
                }
                else
@@ -56,8 +73,8 @@ namespace psidb
             _head = translate_page_address(result->prev.load(std::memory_order_relaxed));
          }
          assert(result->type == page_type::free);
-         --_gc_threshold;
-         mark(result);
+         gc_notify();
+         mark_new(result);
          //std::osyncstream(std::cout) << "allocate page: " << get_id(result) << std::endl;
          return result;
       }
@@ -84,17 +101,34 @@ namespace psidb
          std::vector<version_type> versions;
       };
       void  sweep(cycle&&);
-      cycle start_cycle(std::vector<version_type>&& active_versions);
+      cycle start_cycle();
       void  scan_root(cycle& data, page_header* header);
       void  scan(cycle& data, node_ptr ptr);
-      void  mark(page_header* header) { header->gc_flag = _gc_flag; }
-      bool  is_marked(page_header* header) { return header->gc_flag == _gc_flag; }
-      bool  is_old(page_header* header);
-      bool  is_dirty(page_header* header);
-      void  scan_prev(cycle& data, page_header* page);
-      void  scan_children(cycle& data, page_internal_node* node);
-      void  scan_children(cycle& data, page_leaf*);
-      bool  page_is_live(cycle& data, page_header* page, version_type end_version);
+      void  mark(page_header* header)
+      {
+         set_gc_flag(header, _gc_flag.load(std::memory_order_relaxed));
+      }
+      void mark_new(page_header* header)
+      {
+         set_gc_flag(header, _gc_flag.load(std::memory_order_relaxed) | 2);
+      }
+      void mark_free(page_header* header) { set_gc_flag(header, 0xFF); }
+      bool is_marked(page_header* header)
+      {
+         return get_gc_flag(header) == _gc_flag.load(std::memory_order_relaxed);
+      }
+      bool is_new(page_header* header)
+      {
+         return get_gc_flag(header) == (_gc_flag.load(std::memory_order_relaxed) | 2);
+      }
+      bool is_free(page_header* header) { return get_gc_flag(header) == 0xFF; }
+      // Returns true if the page has not been accessed recently
+      bool is_old(page_header* header);
+      bool is_dirty(page_header* header);
+      void scan_prev(cycle& data, page_header* page);
+      void scan_children(cycle& data, page_internal_node* node);
+      void scan_children(cycle& data, page_leaf*);
+      bool page_is_live(cycle& data, page_header* page, version_type end_version);
 
       struct scoped_lock
       {
@@ -117,15 +151,55 @@ namespace psidb
                                           reinterpret_cast<char*>(_base)),
                  _size};
       }
-      bool should_gc() const { return _gc_threshold <= 0; }
+      // Blocks until the gc should run
+      bool gc_wait()
+      {
+         std::unique_lock l{_notify_mutex};
+         _notify_cond.wait(l, [this]() { return should_gc() || _stopped; });
+         return !_stopped;
+      }
+      void gc_stop()
+      {
+         std::unique_lock l{_notify_mutex};
+         _stopped = true;
+         _notify_cond.notify_one();
+      }
+      void gc_set_threshold(std::int64_t count)
+      {
+         _gc_threshold.store(count, std::memory_order_relaxed);
+      }
+      void gc_notify()
+      {
+         auto val = _gc_threshold.fetch_sub(1, std::memory_order_relaxed);
+         if (val == 0)
+         {
+            std::unique_lock{_notify_mutex};
+            _notify_cond.notify_one();
+         }
+      }
+      bool should_gc() const { return _gc_threshold.load(std::memory_order_relaxed) < 0; }
 
      private:
-      page_header*              _head = nullptr;
-      void*                     _unused;
-      std::atomic<page_header*> _free_pool;
-      std::int64_t              _gc_threshold;
-      gc_flag_type              _gc_flag;
-      shared_value              _gc_mutex;
+      void set_gc_flag(page_header* header, gc_flag_type value)
+      {
+         _page_flags[get_id(header)].store(value, std::memory_order_relaxed);
+      }
+      gc_flag_type get_gc_flag(page_header* header)
+      {
+         return _page_flags[get_id(header)].load(std::memory_order_relaxed);
+      }
+      // TODO: separate data accessed by the garbage collector
+      // from data modified on every allocation.
+      page_header*                                 _head = nullptr;
+      std::unique_ptr<std::atomic<gc_flag_type>[]> _page_flags;
+      void*                                        _unused;
+      std::atomic<page_header*>                    _free_pool;
+      std::atomic<std::int64_t>                    _gc_threshold;
+      std::mutex                                   _notify_mutex;
+      std::condition_variable                      _notify_cond;
+      bool                                         _stopped = false;
+      std::atomic<gc_flag_type>                    _gc_flag;
+      shared_value                                 _gc_mutex;
 
       void*       _base = nullptr;
       std::size_t _size = 0;

@@ -35,14 +35,14 @@ namespace psidb
 
    struct page_header
    {
-      page_type            type;
-      page_flags           flags;
-      std::atomic<bool>    dirty0;
-      std::atomic<bool>    dirty1;
-      gc_flag_type         gc_flag;
-      page_id              id;
-      std::atomic<page_id> prev;
-      version_type         version;
+      page_type                 type;
+      page_flags                flags;
+      std::atomic<bool>         dirty0;
+      std::atomic<bool>         dirty1;
+      std::atomic<gc_flag_type> gc_flag;
+      page_id                   id;
+      std::atomic<page_id>      prev;
+      version_type              version;
       // The oldest version in the list formed by prev
       version_type min_version;
       bool         is_dirty(page_flags f) const

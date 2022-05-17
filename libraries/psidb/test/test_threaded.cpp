@@ -34,7 +34,9 @@ TEST_CASE("thread tests", "[thread]")
 {
    tmp_file file;
 
-   psidb::database   db(::dup(file.native_handle()), 65536);
+   psidb::database db(::dup(file.native_handle()), 65536);
+
+   std::thread       gc_thread{[&] { db.run_gc_loop(); }};
    std::atomic<bool> done{false};
    auto              test_failed = [&]() { done = true; };
    // set up initial state
@@ -125,4 +127,6 @@ TEST_CASE("thread tests", "[thread]")
    std::cout << "memory used: " << stats.memory.used << " / " << stats.memory.total
              << ", checkpoints: " << stats.checkpoints << ", disk used: " << stats.file.used
              << " / " << stats.file.total << std::endl;
+   db.stop_gc();
+   gc_thread.join();
 }

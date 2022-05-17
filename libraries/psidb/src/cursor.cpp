@@ -5,6 +5,7 @@ using namespace psidb;
 
 void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_view value)
 {
+   auto l = db->gc_lock();
    lower_bound_impl(key);
    // TODO: This isn't quite right as it dirties even nodes that we're going to make a copy of
    touch();
@@ -77,6 +78,7 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
 void psidb::cursor::erase(transaction& trx)
 {
    touch();
+   auto l = db->gc_lock();
    auto p = maybe_clone<page_leaf>(trx, leaf, depth);
    // TODO: rebalancing
    p->erase(leaf);
