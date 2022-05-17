@@ -8,7 +8,7 @@
 namespace psibase
 {
    /**
-    *  When an action is called it returns 
+    *  When an action is called it returns
     *
     *  psibase::Action {
     *    .sender,
@@ -25,6 +25,7 @@ namespace psibase
       AccountNumber sender;
       AccountNumber receiver;
 
+      // TODO: remove idx (unused)
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
@@ -56,7 +57,7 @@ namespace psibase
    }
 
    /**
- *  This will dispatch a sync call and grab the return 
+ *  This will dispatch a sync call and grab the return
  */
    struct sync_call_proxy
    {
@@ -65,6 +66,7 @@ namespace psibase
       AccountNumber sender;
       AccountNumber receiver;
 
+      // TODO: remove idx (unused)
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
@@ -95,6 +97,7 @@ namespace psibase
       AccountNumber sender;
       DbId          event_log;
 
+      // TODO: remove idx (unused)
       template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
       EventNumber call(Args&&... args) const
       {
@@ -117,6 +120,7 @@ namespace psibase
       AccountNumber sender;
       DbId          event_log;
 
+      // TODO: remove idx (unused)
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
       auto call(EventNumber n) const
       {
@@ -196,21 +200,19 @@ namespace psibase
       auto& operator*() const { return *this; }
    };
 
-   /**
- * Makes calls to other contracts and gets the results
- */
+#ifndef GENERATING_DOCUMENTATION
    template <typename T = void>
    struct Actor : public psio::reflect<T>::template proxy<sync_call_proxy>
    {
-      using base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
-      using base::base;
+      using Base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
+      using Base::Base;
 
-      auto as(AccountNumber other) const { return Actor(other, base::receiver); }
+      auto as(AccountNumber other) const { return Actor(other, Base::receiver); }
 
       template <typename Other, uint64_t OtherReceiver>
       auto at() const
       {
-         return Actor<Other>(base::sender, AccountNumber(OtherReceiver));
+         return Actor<Other>(Base::sender, AccountNumber(OtherReceiver));
       }
 
       auto* operator->() const { return this; }
@@ -239,7 +241,82 @@ namespace psibase
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
    };
-   //#endif  // __wasm__
+#endif  // !GENERATING_DOCUMENTATION
+
+#ifdef GENERATING_DOCUMENTATION
+   /// Calls other contracts
+   ///
+   /// Template arguments:
+   /// - `T`: the contract class for the receiver
+   ///
+   /// #### Additional methods (not shown above)
+   ///
+   /// `Actor` uses reflection to get the set of methods on `T`. It adds methods to
+   /// itself with the same names and types to simplify calling.
+   ///
+   /// For example, if `SomeContract` has this set of methods:
+   ///
+   /// ```c++
+   /// struct SomeContract : psibase::Contract<SomeContract>
+   /// {
+   ///    void        doSomething(std::string_view str);
+   ///    std::string doAnother(uint32_t x, psibase::AccountNumber y);
+   /// };
+   /// PSIO_REFLECT(SomeContract,
+   ///              method(doSomething, str),
+   ///              method(doAnother, x, y))
+   /// ```
+   ///
+   /// Then `Actor<SomeContract>` will have the same methods. Actor's methods:
+   /// - Pack their arguments, along with `sender` and `receiver` into [Action]
+   /// - Use [call] to synchronously call `receiver` with the action data
+   /// - Unpack the return value from the synchonous call
+   /// - Return it
+   template <typename T = void>
+   struct Actor
+   {
+      // **** This isn't the real version; it's just the version the doc generator sees ****
+      //
+      // Differences:
+      // - doesn't inherit from proxy; showing that would complicate the documentation
+      // - reproduces the interface that proxy provides
+      // - explicit types on function return values
+      // - no implementations on functions
+
+      AccountNumber sender;    ///< Use this authority
+      AccountNumber receiver;  ///< Send actions to this account
+
+      /// Constructor
+      ///
+      /// This actor will send actions to `receiver` using `sender` authority.
+      ///
+      /// Non-priviledged contracts may only use their own authority.
+      Actor(AccountNumber sender, AccountNumber receiver);
+
+      /// Use `other` authority
+      ///
+      /// This returns a new `Actor` object instead of modifying this.
+      ///
+      /// Non-priviledged contracts may only use their own authority.
+      Actor<T> as(AccountNumber other) const;
+
+      /// Select a different contract to send actions to
+      ///
+      /// Template arguments:
+      /// - `Other`: the contract class for the other contract to call
+      /// - `OtherReceiver`: the account the contract runs on
+      ///
+      /// This returns a new `Actor` object instead of modifying this.
+      template <typename Other, uint64_t OtherReceiver>
+      Actor<Other> at() const;
+
+      /// Return this
+      Actor<T>* operator->() const;
+
+      /// Return *this
+      Actor<T>& operator*() const;
+   };
+#endif
 
    /**
  *  Builds actions to add to transactions
