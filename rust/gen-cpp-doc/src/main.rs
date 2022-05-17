@@ -594,8 +594,11 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
     if need_comma {
         def.push('\n');
     }
-    def.push_str(");\n");
-    def.push_str("</code></pre>\n");
+    def.push(')');
+    if item.entity.is_const_method() {
+        def.push_str(" const");
+    }
+    def.push_str(";\n</code></pre>\n");
 
     result.push_str(&format!(
         "### {}\n\n{}\n{}\n",

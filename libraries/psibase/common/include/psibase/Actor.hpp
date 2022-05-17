@@ -252,7 +252,7 @@ namespace psibase
    /// #### Additional methods (not shown above)
    ///
    /// `Actor` uses reflection to get the set of methods on `T`. It adds methods to
-   /// itself with the same names and types to simplify calling.
+   /// itself with the same names, arguments, and return types to simplify calling.
    ///
    /// For example, if `SomeContract` has this set of methods:
    ///
@@ -300,10 +300,10 @@ namespace psibase
       /// Non-priviledged contracts may only use their own authority.
       Actor<T> as(AccountNumber other) const;
 
-      /// Select a different contract to send actions to
+      /// Select a contract to send actions to
       ///
       /// Template arguments:
-      /// - `Other`: the contract class for the other contract to call
+      /// - `Other`: the contract's class
       /// - `OtherReceiver`: the account the contract runs on
       ///
       /// This returns a new `Actor` object instead of modifying this.
