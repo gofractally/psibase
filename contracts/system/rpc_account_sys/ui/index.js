@@ -1,33 +1,41 @@
-import { postJsonGetArrayBuffer, pushedSignedTransaction, uint8ArrayToHex } from '/common/rpc.mjs';
+import htm from 'https://unpkg.com/htm@3.1.0?module';
+import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex, pushedSignedTransaction } from '/common/rpc.mjs';
 
-const table = document.getElementById('accounts');
-const tbody = table.getElementsByTagName('tbody')[0];
+await import('https://unpkg.com/react@18/umd/react.production.min.js');
+await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
+const html = htm.bind(React.createElement);
 
-(async () => {
-    const accounts = await (await fetch('/accounts')).json();
-    for (let acc of accounts) {
-        let row = tbody.insertRow(-1);
-        row.insertCell().appendChild(document.createTextNode(acc.num + ''));
-        row.insertCell().appendChild(document.createTextNode(acc.authContract));
-        row.insertCell().appendChild(document.createTextNode(acc.flags + ''));
-        row.insertCell().appendChild(document.createTextNode(acc.codeHash));
-    }
-})()
-
-function clearMsg() {
-    document.getElementById('messages').innerText = '';
+function useAccounts(addMsg, clearMsg) {
+    const [accounts, setAccounts] = React.useState([]);
+    React.useEffect(() => {
+        (async () => {
+            try {
+                setAccounts(await getJson('/accounts'));
+            } catch (e) {
+                clearMsg();
+                addMsg(e);
+            }
+        })();
+    }, []);
+    return accounts;
 }
 
-function msg(m) {
-    document.getElementById('messages').innerText += m + '\n';
+function AccountList(addMsg, clearMsg) {
+    const accounts = useAccounts(addMsg, clearMsg);
+    return html`<table><tbody>${accounts.map(account =>
+        html`<tr key=${account.num}>
+                <td style=${{ border: '2px solid' }}>${account.num}</td>
+                <td style=${{ border: '2px solid' }}>${account.authContract}</td>
+                <td style=${{ border: '2px solid' }}>${account.flags}</td>
+                <td style=${{ border: '2px solid' }}>${account.codeHash}</td>
+            </tr>`
+    )}</tbody></table>`
 }
 
-async function newAccount() {
+async function newAccount(name, authContract, addMsg, clearMsg) {
     try {
         clearMsg();
-        msg("Packing action...");
-        const name = document.getElementById('account').value;
-        const authContract = document.getElementById('authContract').value;
+        addMsg("Packing action...");
         const action = {
             sender: 'account-sys',
             contract: 'account-sys',
@@ -38,7 +46,7 @@ async function newAccount() {
                 }))),
         };
 
-        msg("Pushing transaction...");
+        addMsg("Pushing transaction...");
         const signedTrx = {
             // TODO: TAPOS
             // TODO: Sign
@@ -51,13 +59,66 @@ async function newAccount() {
         };
         const trace = await pushedSignedTransaction(signedTrx);
 
-        msg(JSON.stringify(trace, null, 4));
+        addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {
         console.error(e);
-        msg(e.message);
-        if (e.trace)
-            msg('trace: ' + JSON.stringify(e.trace, null, 4));
+        addMsg('');
+        addMsg(e.message);
+        if (e.trace) {
+            addMsg('');
+            addMsg('trace: ' + JSON.stringify(e.trace, null, 4));
+        }
     }
 }
 
-document.querySelector('#createAccount').addEventListener('click', newAccount)
+function AccountForm(addMsg, clearMsg) {
+    const [name, setName] = React.useState('');
+    const [authContract, setAuthContract] = React.useState('auth-fake-sys');
+    return html`<div>
+        <table><tbody>
+            <tr>
+                <td>Name</td>
+                <td><input type="text" value=${name} onChange=${e => setName(e.target.value)}></input></td>
+            </tr>
+            <tr>
+                <td>Auth Contract</td>
+                <td><input type="text" value=${authContract} onChange=${e => setAuthContract(e.target.value)}></input></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td><button onClick=${e => newAccount(name, authContract, addMsg, clearMsg)}>Create Account</button></td>
+            </tr>
+        </tbody></table>
+    </div>`
+}
+
+function useMsg() {
+    const [msg, setMsg] = React.useState('');
+    const [nonSignallingState] = React.useState({ msg: '' });
+    const clearMsg = () => {
+        nonSignallingState.msg = '';
+        setMsg(nonSignallingState.msg);
+    };
+    const addMsg = (msg) => {
+        nonSignallingState.msg += msg + '\n';
+        setMsg(nonSignallingState.msg);
+    };
+    return { msg, addMsg, clearMsg };
+}
+
+function App() {
+    const [trx, setTrx] = React.useState('');
+    const { msg, addMsg, clearMsg } = useMsg();
+    return html`<div>
+        <h1>account_sys</h1>
+        <h2>Accounts</h2>
+        ${AccountList(addMsg, clearMsg)}
+        <h2>Create Account</h2>
+        ${AccountForm(addMsg, clearMsg)}
+        <h2>Messages</h2>
+        <pre style=${{ border: '1px solid' }}><code>${msg}</code></pre>
+    </div>`;
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(html`<${App}/>`);
