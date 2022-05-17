@@ -25,18 +25,67 @@ namespace psibase
    /// Example:
    ///
    /// ```c++
-   /// struct MyContract : psibase::Contract<MyContract>
+   /// struct MyContract: psibase::Contract<MyContract>
    /// {
    ///    void        doSomething(std::string_view str);
-   ///    std::string another(uint32_t x, psibase::AccountNumber y);
+   ///    std::string somethingElse(uint32_t x, psibase::AccountNumber y);
    /// };
    ///
    /// PSIO_REFLECT(MyContract,
    ///              method(doSomething, str),
-   ///              method(another, x, y))
+   ///              method(somethingElse, x, y))
    /// ```
    ///
-   /// #### Multiple calls and recursion
+   /// #### Defining events
+   ///
+   /// To define events for a contract, declare the event functions as below, then reflect them using the macros below. Skip any macro for event types you do not have.
+   ///
+   /// ```c++
+   /// struct MyContract: psibase::Contract<MyContract>
+   /// {
+   ///    struct Events
+   ///    {
+   ///       // Events which live a long time
+   ///       struct History
+   ///       {
+   ///          // These functions don't need implementations;
+   ///          // they only define the interface
+   ///          void myEvent(uint32_t a, std::string s);
+   ///          void anotherEvent(psibase::AccountNumber account);
+   ///       };
+   ///
+   ///       // Events which live a short time
+   ///       struct Ui
+   ///       {
+   ///          void updateDisplay();
+   ///       };
+   ///
+   ///       // Events which live in Merkle trees
+   ///       struct Merkle
+   ///       {
+   ///          void credit(
+   ///             psibase::AccountNumber from,
+   ///             psibase::AccountNumber to,
+   ///             uint64_t amount);
+   ///       };
+   ///    };
+   /// };
+   ///
+   /// PSIBASE_REFLECT_HISTORY_EVENTS(
+   ///    MyContract,
+   ///    method(myEvent, a, s),
+   ///    method(anotherEvent, account))
+   ///
+   /// PSIBASE_REFLECT_UI_EVENTS(
+   ///    MyContract,
+   ///    method(updateDisplay))
+   ///
+   /// PSIBASE_REFLECT_MERKLE_EVENTS(
+   ///    MyContract,
+   ///    method(credit, from, to, amount))
+   /// ```
+   ///
+   /// #### Recursion safety
    ///
    /// - By default, contracts support recursion. TODO: make it opt-in instead.
    /// - When a contract is called multiple times within a transaction, including recursively, each action gets a fresh `DerivedContract` instance. However, it runs in the same WASM memory space as the other executing actions for that contract. Global variables and static variables are shared.
@@ -63,10 +112,17 @@ namespace psibase
       /// The account which received the currently-executing action
       AccountNumber getReceiver() const { return _receiver; }
 
-      auto emit() const { return EventEmitter<DerivedContract>(_receiver); }
-      auto events() const { return EventReader<DerivedContract>(_receiver); }
+      EventEmitter<DerivedContract> emit() const
+      {
+         return EventEmitter<DerivedContract>(_receiver);
+      }
 
-      /// Prepare to call another contract
+      EventReader<DerivedContract> events() const
+      {
+         return EventReader<DerivedContract>(_receiver);
+      }
+
+      /// Prepare to call a contract
       ///
       /// Template arguments:
       /// - `Other`: the receiver's class
@@ -84,7 +140,7 @@ namespace psibase
          return Actor<Other>(_receiver, receiver);
       }
 
-      /// Prepare to call another contract
+      /// Prepare to call a contract
       ///
       /// Template arguments:
       /// - `Other`: the receiver's class
@@ -105,12 +161,21 @@ namespace psibase
          return at<Other>(Other::contract);
       }
 
-      /// Prepare to call another contract
+      /// Prepare to call a contract
       ///
       /// - If `u` is `0` (the default), then use this contract's authority ([getReceiver]).
       /// - If `u` is non-0, then use `u`'s authority. Non-priviledged contracts may only use their own authority.
       ///
       /// See [at]; it covers the majority use cases.
+      ///
+      /// Example use:
+      ///
+      /// ```c++
+      /// auto result =
+      ///   as(userAccount)
+      ///   .at<OtherContractClass, otherContractAccount>()
+      ///   .someMethod(args...);
+      /// ```
       Actor<DerivedContract> as(AccountNumber u = AccountNumber())
       {
          if (u == AccountNumber())

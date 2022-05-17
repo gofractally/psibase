@@ -550,19 +550,20 @@ fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut S
     let mut def = String::new();
     let ty = match item.entity.get_kind() {
         EntityKind::Constructor => {
-            if item.entity.is_converting_constructor() {
+            if item.entity.is_converting_constructor()
+                || item.entity.get_arguments().unwrap().len() != 1
+            {
                 String::from("")
             } else {
-                String::from("explicit")
+                String::from("explicit ")
             }
         }
         EntityKind::Destructor => String::from(""),
-        _ => item.entity.get_result_type().unwrap().get_display_name(),
+        _ => item.entity.get_result_type().unwrap().get_display_name() + " ",
     };
     def.push_str("<pre><code class=\"language-c++\">");
     document_template_args(item, &mut def);
     def.push_str(&style_type(&escape_and_add_links(&ty, items, index)));
-    def.push(' ');
     def.push_str(&path[2..]);
     def.push('(');
 
