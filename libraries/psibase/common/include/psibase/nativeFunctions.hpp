@@ -54,7 +54,7 @@ namespace psibase
       /// * After the call to B, `getCurrentAction()` returns B.
       /// * After B returns, `getCurrentAction()` returns A.
       ///
-      /// Note: The above only applies if the contract uses [call]. `actor` uses [call].
+      /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
       PSIBASE_INTRINSIC(getCurrentAction) uint32_t getCurrentAction();
 
       /// Call a contract, store the return value into result, and return the result size
@@ -148,7 +148,7 @@ namespace psibase
    /// * After the call to B, `getCurrentAction()` returns B.
    /// * After B returns, `getCurrentAction()` returns A.
    ///
-   /// Note: The above only applies if the contract uses [call]. `actor` uses [call].
+   /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
    Action getCurrentAction();
 
    /// Get the currently-executing action
@@ -161,7 +161,7 @@ namespace psibase
    /// * After the call to B, `getCurrentAction()` returns B.
    /// * After B returns, `getCurrentAction()` returns A.
    ///
-   /// Note: The above only applies if the contract uses [call]. `actor` uses [call].
+   /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
    psio::shared_view_ptr<Action> getCurrentActionView();
 
    /// Call a contract and return its result
