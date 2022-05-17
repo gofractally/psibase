@@ -14,9 +14,11 @@ using namespace UserContract;
 
 namespace
 {
-   constexpr bool storageBillingImplemented  = false;
-   constexpr bool inflationLimitsImplemented = false;
-   constexpr bool tokenSymbolsSupported      = false;
+   constexpr bool storageBillingImplemented     = false;
+   constexpr bool inflationLimitsImplemented    = false;
+   constexpr bool tokenSymbolsSupported         = false;
+   constexpr bool eventEmissionTestingSupported = false;
+   constexpr bool customTokensSupported         = false;
 
    struct DiskUsage_TokenRecord
    {
@@ -656,4 +658,16 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
          }
       }
    }
+}
+
+TEST_CASE("Reading emitted events")
+{
+   CHECK(eventEmissionTestingSupported);
+}
+
+TEST_CASE("Testing custom tokens")
+{
+   // Test a custom token contract that uses the main token contract
+   //    hooks to customize distribution or other behavior.
+   CHECK(customTokensSupported);
 }

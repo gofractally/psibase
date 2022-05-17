@@ -5,8 +5,8 @@
 #include <psibase/table.hpp>
 #include <string_view>
 
-#include "errors.hpp"
-#include "tables.hpp"
+#include "symbol_errors.hpp"
+#include "symbol_tables.hpp"
 #include "types.hpp"
 
 /* 04/18/2022
@@ -26,18 +26,18 @@ namespace UserContract
      public:
       static constexpr auto contract = psibase::AccountNumber("symbol-sys");
 
-      SID  purchase(Ticker newSymbol, Quantity maxCost);
-      void buysymbol(psibase::AccountNumber buyer, std::string symbol);
-      void sellsymbol(std::string symbol, int64_t price);
-      void withdraw(psibase::AccountNumber owner, int64_t amount);
-      void setsalefee(uint32_t fee);
-      void setsym(uint32_t symlen,
-                  int64_t  price,
-                  int64_t  floor,
-                  uint32_t increase_thresold,
-                  uint32_t decrease_threshold,
-                  uint32_t window);
-      void setowner(psibase::AccountNumber owner, std::string sym, std::string memo);
+      SID purchase(Ticker newSymbol, Quantity maxCost);
+      // void buysymbol(psibase::AccountNumber buyer, std::string symbol);
+      // void sellsymbol(std::string symbol, int64_t price);
+      // void withdraw(psibase::AccountNumber owner, int64_t amount);
+      // void setsalefee(uint32_t fee);
+      // void setsym(uint32_t symlen,
+      //             int64_t  price,
+      //             int64_t  floor,
+      //             uint32_t increase_thresold,
+      //             uint32_t decrease_threshold,
+      //             uint32_t window);
+      // void setowner(psibase::AccountNumber owner, std::string sym, std::string memo);
 
       SymbolRecord getSymbol(SID symbolId);
       Quantity     getPrice(uint8_t numChars);

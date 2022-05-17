@@ -78,7 +78,7 @@ SCENARIO("Minting & burning nfts")
 
             AND_THEN("The NFT no longer exists")
             {  //
-               CHECK(a.getNft(nft1.id).failed(nftDNE));
+               CHECK(a.getNft(nft1.id).failed(nftBurned));
             }
             AND_THEN("Storage billing was correctly updated")
             {  //

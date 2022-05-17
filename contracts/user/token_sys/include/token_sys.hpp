@@ -4,9 +4,10 @@
 #include <psibase/String.hpp>
 #include <psibase/check.hpp>
 #include <string>
-#include "errors.hpp"
-#include "tables.hpp"
+#include "symbol_tables.hpp"
+#include "token_errors.hpp"
 #include "token_sys.hpp"
+#include "token_tables.hpp"
 #include "types.hpp"
 
 namespace UserContract
@@ -61,6 +62,8 @@ namespace UserContract
       TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
       bool                getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag);
 
+      void mapSymbol(SID symbolId, TID tokenId);
+
      private:
       tables db{contract};
 
@@ -113,7 +116,8 @@ namespace UserContract
       method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
-      method(getConfig, account, flag)
+      method(getConfig, account, flag),
+      method(mapSymbol, symbolId, tokenId)
     );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
       method(created, tokenId, creator, precision, maxSupply),

@@ -1,5 +1,5 @@
 #include "token_sys.hpp"
-#include "errors.hpp"
+#include "token_errors.hpp"
 
 #include <contracts/system/account_sys.hpp>
 #include <psibase/dispatch.hpp>
@@ -340,6 +340,11 @@ void TokenSys::_checkAccountValid(psibase::AccountNumber account)
 {
    check(at<account_sys>().exists(account), invalidAccount);
    check(account != AccountNumber{0}, invalidAccount);
+}
+
+void TokenSys::mapSymbol(SID symbolId, TID tokenId)
+{
+   // NOP
 }
 
 PSIBASE_DISPATCH(UserContract::TokenSys)

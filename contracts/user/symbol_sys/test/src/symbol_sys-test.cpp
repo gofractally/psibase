@@ -240,7 +240,7 @@ SCENARIO("Measuring price increases")
    }
 }
 
-SCENARIO("Transfering symbol ownership")
+SCENARIO("Using symbol ownership NFT")
 {
    GIVEN("Alice has purchased a symbol")
    {
@@ -252,12 +252,12 @@ SCENARIO("Transfering symbol ownership")
 
       // Mint token used for purchasing symbols
       auto aliceBalance = 1'000'000e8;
-      auto tokenId      = alice.at<TokenSys>().create(8, aliceBalance).returnVal();
-      alice.at<TokenSys>().mint(tokenId, aliceBalance, alice, memo);
+      auto sysToken     = alice.at<TokenSys>().create(8, aliceBalance).returnVal();
+      alice.at<TokenSys>().mint(sysToken, aliceBalance, alice, memo);
 
       // Purchase the symbol and claim the owner NFT
       auto symbolCost = a.getPrice(3).returnVal();
-      alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, symbolCost, memo);
+      alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, symbolCost, memo);
       auto symbolId     = a.purchase("abc"_a, symbolCost).returnVal();
       auto symbolRecord = a.getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
@@ -275,21 +275,65 @@ SCENARIO("Transfering symbol ownership")
             CHECK(symbolRecord2 == symbolRecord);
          }
       }
+      WHEN("Alice burns her symbol owner NFT")
+      {
+         alice.at<NftSys>().burn(nftId);
+
+         THEN("The symbol record is identical")
+         {
+            auto symbolRecord2 = a.getSymbol(symbolId).returnVal();
+            CHECK(symbolRecord2 == symbolRecord);
+         }
+      }
    }
 }
 
-SCENARIO("Burning the Symbol NFT")
+SCENARIO("Mapping a symbol to a token")
 {
-   GIVEN("Alice has purchased a symbol")
+   GIVEN("Alice has created a token and purchased a symbol")
    {
-      THEN("Alice can burn the underlying NFT")
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto bob   = t.as(t.add_account("bob"_a));
+      auto a     = alice.at<SymbolSys>();
+
+      // Mint token used for purchasing symbols
+      auto aliceBalance = 1'000'000e8;
+      auto sysToken     = alice.at<TokenSys>().create(8, aliceBalance).returnVal();
+      alice.at<TokenSys>().mint(sysToken, aliceBalance, alice, memo);
+
+      // Mint a second token
+      t.start_block();
+      auto newToken = alice.at<TokenSys>().create(8, aliceBalance).returnVal();
+      alice.at<TokenSys>().mint(newToken, aliceBalance, alice, memo);
+
+      // Purchase the symbol and claim the owner NFT
+      auto symbolCost = a.getPrice(3).returnVal();
+      alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, symbolCost, memo);
+      auto symbolId     = a.purchase("abc"_a, symbolCost).returnVal();
+      auto symbolRecord = a.getSymbol(symbolId).returnVal();
+      auto nftId        = symbolRecord.ownerNft;
+      alice.at<NftSys>().debit(nftId, memo);
+
+      THEN("Bob is unable to map the symbol to the token") {}
+      WHEN("Alice burns the symbol owner NFT")
       {
-         AND_THEN("The symbol record is identical") {}
-         AND_THEN("Storage billing is updated correctly") {}
+         THEN("Alice is unable to map the symbol to the token") {}
       }
-      WHEN("Alice burns the underlying NFT")
+      WHEN("Alice burns the token owner NFT")
       {
-         THEN("Alice is unable to map this symbol to a token") {}
+         THEN("Alice is unable to map the symbol to the token") {}
+      }
+      WHEN("Alice burns or transfers ")
+      THEN("Alice is able to map the symbol to the token")
+      {
+         AND_THEN("The token ID mapping exists") {}
+         AND_THEN("Storage cost is updated accordingly") {}
+      }
+      WHEN("Alice maps the symbol to the token")
+      {
+         THEN("The symbol record is identical") {}
       }
    }
 }

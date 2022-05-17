@@ -140,8 +140,16 @@ void NftSys::manualDebit(bool enable)
 NftRecord NftSys::getNft(NID nftId)
 {
    auto nftRecord = db.open<NftTable_t>().get_index<0>().get(nftId);
+   bool exists    = nftRecord.has_value();
 
-   check(nftRecord.has_value(), Errors::nftDNE);
+   if (false)  // if (nftId < nextAvailableID()) // Then the NFt definitely existed at one point
+   {
+      check(exists, Errors::nftBurned);
+   }
+   else
+   {
+      check(exists, Errors::nftDNE);
+   }
 
    return *nftRecord;
 }
