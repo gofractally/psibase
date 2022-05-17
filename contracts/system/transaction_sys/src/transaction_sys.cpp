@@ -40,7 +40,7 @@ namespace system_contract
                                     std::vector<char> code)
    {
       // TODO: validate code
-      check(get_sender() == contract, "sender must match contract account");
+      check(getSender() == contract, "sender must match contract account");
       auto account = kvGet<AccountRow>(AccountRow::db, accountKey(contract));
       check(account.has_value(), "can not set code on a missing account");
       auto codeHash = sha256(code.data(), code.size());

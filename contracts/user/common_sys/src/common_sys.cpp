@@ -42,7 +42,7 @@ namespace psibase
 
       if (request.method == "GET")
       {
-         auto content = kvGet<WebContentRow>(webContentKey(get_receiver(), request.target));
+         auto content = kvGet<WebContentRow>(webContentKey(getReceiver(), request.target));
          if (!!content)
          {
             return rpc_reply_data{
@@ -115,7 +115,7 @@ namespace psibase
                               psio::const_view<std::string>       contentType,
                               psio::const_view<std::vector<char>> content)
    {
-      check(get_sender() == get_receiver(), "wrong sender");
+      check(getSender() == getReceiver(), "wrong sender");
 
       // TODO
       auto              size = content.size();
@@ -129,7 +129,7 @@ namespace psibase
           .contentType = contentType,
           .content     = std::move(c),
       };
-      kvPut(row.key(get_receiver()), row);
+      kvPut(row.key(getReceiver()), row);
    }
 
 }  // namespace psibase

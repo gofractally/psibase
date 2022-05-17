@@ -31,12 +31,12 @@ namespace psibase
 
    void proxy_sys::registerServer(AccountNumber contract, AccountNumber rpcContract)
    {
-      check(contract == get_sender(), "wrong sender");
+      check(contract == getSender(), "wrong sender");
       RegisteredContractRow row{
           .contract    = contract,
           .rpcContract = rpcContract,
       };
-      kvPut(row.key(get_receiver()), row);
+      kvPut(row.key(getReceiver()), row);
    }
 
    extern "C" [[clang::export_name("serve")]] void serve()

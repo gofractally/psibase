@@ -10,13 +10,29 @@ namespace psibase
    concept DefinesContract =
        std::same_as<std::decay_t<decltype(T::contract)>, psibase::AccountNumber>;
 
-   /** all contracts should derive from psibase::Contract */
+   /// Contracts should inherit from this
+   ///
+   /// Template arguments:
+   /// - `DerivedContract`: the most-derived contract class that inherits from `Contract`
+   ///
+   /// Multiple calls and recursion:
+   /// - By default, contracts support recursion. TODO: make it opt-in instead.
+   /// - When a contract is called multiple times within a transaction, including recursively, each action gets a fresh `DerivedContract` instance. However, it runs in the same WASM memory space as the other executing actions for that contract. Global variables and static variables are shared.
+   /// - Potential hazards to watch out for:
+   ///   - If a call modifies member variables within a `DerivedContract` instance, other calls aren't likely to see it.
+   ///   - If a call modifies global or static variables, this will effect both the other currently-executing calls, and subsequent calls.
+   ///   - If a call modifies the database, other currently-executing calls will see the change only if they read or re-read the database.
+   ///   - When you call into any contract; assume it can call you back unless you opted out of recursion. TODO: make it possible to opt out of recursion.
+   ///   - Calling other contracts while you are iterating through the database can be dangerous, since they can call back into you, causing you to change the database.
    template <typename DerivedContract>
    class Contract
    {
      public:
-      AccountNumber get_sender() const { return _sender; }
-      AccountNumber get_receiver() const { return _receiver; }
+      /// The account which authorized the currently-executing action
+      AccountNumber getSender() const { return _sender; }
+
+      /// The account which received the currently-executing action
+      AccountNumber getReceiver() const { return _receiver; }
 
       auto emit() const { return EventEmitter<DerivedContract>(_receiver); }
       auto events() const { return EventReader<DerivedContract>(_receiver); }
@@ -44,8 +60,8 @@ namespace psibase
       template <typename Contract>
       friend void dispatch(AccountNumber receiver, AccountNumber sender);
 
-      /* called by dispatch */
-      void dispatch_set_sender_receiver(AccountNumber sender, AccountNumber receiver)
+      // called by dispatch
+      void dispatchSetSenderReceiver(AccountNumber sender, AccountNumber receiver)
       {
          _sender   = sender;
          _receiver = receiver;

@@ -34,7 +34,7 @@ namespace
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
 {
-   auto creator     = get_sender();
+   auto creator     = getSender();
    auto tokenTable  = db.open<TokenTable_t>();
    auto tokenIdx    = tokenTable.getIndex<0>();
    auto nftContract = at<NftSys>();
@@ -62,7 +62,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
 
 void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver, const_view<String> memo)
 {
-   auto sender      = get_sender();
+   auto sender      = getSender();
    auto token       = getToken(tokenId);
    auto balance     = getBalance(tokenId, receiver);
    auto nftContract = at<NftSys>();
@@ -83,7 +83,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver, const_
 
 void TokenSys::setUnrecallable(TID tokenId)
 {
-   auto sender          = get_sender();
+   auto sender          = getSender();
    auto token           = getToken(tokenId);
    auto nftContract     = at<NftSys>();
    auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
@@ -99,7 +99,7 @@ void TokenSys::setUnrecallable(TID tokenId)
 
 void TokenSys::burn(TID tokenId, Quantity amount)
 {
-   auto sender  = get_sender();
+   auto sender  = getSender();
    auto token   = getToken(tokenId);
    auto balance = getBalance(tokenId, sender);
 
@@ -122,7 +122,7 @@ void TokenSys::burn(TID tokenId, Quantity amount)
 
 void TokenSys::setConfig(psibase::NamedBit_t flag, bool enable)
 {
-   auto sender  = get_sender();
+   auto sender  = getSender();
    auto hodler  = getTokenHolder(sender);
    auto flagBit = TokenHolderRecord::Configurations::getIndex(flag);
 
@@ -136,7 +136,7 @@ void TokenSys::setConfig(psibase::NamedBit_t flag, bool enable)
 
 void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
 {
-   auto sender  = get_sender();
+   auto sender  = getSender();
    auto balance = getBalance(tokenId, sender);
 
    check(amount > 0, quantityGt0);
@@ -168,7 +168,7 @@ void TokenSys::uncredit(TID                tokenId,
                         Quantity           amount,
                         const_view<String> memo)
 {
-   auto sender          = get_sender();
+   auto sender          = getSender();
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
    auto creditorBalance = getBalance(tokenId, sender);
 
@@ -193,7 +193,7 @@ void TokenSys::uncredit(TID                tokenId,
 
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
 {
-   auto receiver        = get_sender();  //The action sender is the token receiver
+   auto receiver        = getSender();  //The action sender is the token receiver
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
    auto receiverBalance = getBalance(tokenId, receiver);
 
@@ -218,7 +218,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
 void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
 {
-   auto sender          = get_sender();
+   auto sender          = getSender();
    auto token           = getToken(tokenId);
    auto fromBalance     = getBalance(tokenId, from);
    auto nftContract     = at<NftSys>();

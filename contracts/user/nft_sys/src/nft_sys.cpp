@@ -25,7 +25,7 @@ namespace
 
 NID NftSys::mint()
 {
-   auto issuer   = get_sender();
+   auto issuer   = getSender();
    auto nftTable = db.open<NftTable_t>();
    auto nftIdx   = nftTable.getIndex<0>();
 
@@ -49,7 +49,7 @@ void NftSys::burn(NID nftId)
 {
    auto record = getNft(nftId);
 
-   check(record.owner == get_sender(), Errors::missingRequiredAuth);
+   check(record.owner == getSender(), Errors::missingRequiredAuth);
 
    db.open<NftTable_t>().erase(nftId);
 
@@ -59,7 +59,7 @@ void NftSys::burn(NID nftId)
 void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<String> memo)
 {
    auto                   record       = getNft(nftId);
-   psibase::AccountNumber sender       = get_sender();
+   psibase::AccountNumber sender       = getSender();
    CreditRecord           creditRecord = getCredRecord(nftId);
    auto                   isTransfer   = not getNftHolder(receiver).config.get(manualDebitBit);
 
@@ -89,7 +89,7 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
 void NftSys::uncredit(NID nftId, const_view<String> memo)
 {
    auto                   record       = getNft(nftId);
-   psibase::AccountNumber sender       = get_sender();
+   psibase::AccountNumber sender       = getSender();
    auto                   creditRecord = getCredRecord(nftId);
 
    check(creditRecord.debitor != account_sys::nullAccount, Errors::uncreditRequiresCredit);
@@ -103,7 +103,7 @@ void NftSys::uncredit(NID nftId, const_view<String> memo)
 void NftSys::debit(NID nftId, const_view<String> memo)
 {
    auto record       = getNft(nftId);
-   auto debiter      = get_sender();
+   auto debiter      = getSender();
    auto creditor     = record.owner;
    auto creditRecord = getCredRecord(nftId);
 
@@ -120,7 +120,7 @@ void NftSys::debit(NID nftId, const_view<String> memo)
 
 void NftSys::manualDebit(bool enable)
 {
-   auto record = getNftHolder(get_sender());
+   auto record = getNftHolder(getSender());
 
    check(record.config.get(manualDebitBit) != enable, Errors::redundantUpdate);
 
@@ -129,11 +129,11 @@ void NftSys::manualDebit(bool enable)
 
    if (enable)
    {
-      emit().ui().enabledManDeb(get_sender());
+      emit().ui().enabledManDeb(getSender());
    }
    else
    {
-      emit().ui().disabledManDeb(get_sender());
+      emit().ui().disabledManDeb(getSender());
    }
 }
 

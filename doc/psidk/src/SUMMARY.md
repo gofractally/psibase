@@ -11,6 +11,7 @@
   - [Recursion]()
   - [Debugging]()
   - [Reference]()
+    - [Actions and Events](cpp-contract/actions-events.md)
     - [Native Functions](cpp-contract/native-functions.md)
     - [Table](cpp-contract/table.md)
     - [Magic Numbers](cpp-contract/magic-numbers.md)
