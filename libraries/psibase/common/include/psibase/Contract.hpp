@@ -68,13 +68,10 @@ namespace psibase
    /// TODO: Merkle events aren't implemented yet
    ///
    /// ```c++
-   /// struct MyContract: psibase::Contract<MyContract>
-   /// {
-   ///    struct Events
-   ///    {
+   /// struct MyContract: psibase::Contract<MyContract> {
+   ///    struct Events {
    ///       // Events which live a long time
-   ///       struct History
-   ///       {
+   ///       struct History {
    ///          // These functions don't need implementations;
    ///          // they only define the interface
    ///          void myEvent(uint32_t a, std::string s);
@@ -82,14 +79,12 @@ namespace psibase
    ///       };
    ///
    ///       // Events which live a short time
-   ///       struct Ui
-   ///       {
+   ///       struct Ui {
    ///          void updateDisplay();
    ///       };
    ///
    ///       // Events which live in Merkle trees
-   ///       struct Merkle
-   ///       {
+   ///       struct Merkle {
    ///          void credit(
    ///             psibase::AccountNumber from,
    ///             psibase::AccountNumber to,

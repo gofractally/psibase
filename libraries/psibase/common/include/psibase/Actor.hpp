@@ -146,30 +146,121 @@ namespace psibase
       }
    };
 
+   /// Emits events
+   ///
+   /// Template arguments:
+   /// - `T`: the contract class which defines the events (e.g. `MyContract`), or
+   /// - `T`: the inner-most struct within the contract class which defines the events (e.g. `MyContract::Events::History`)
+   ///
+   /// #### Event methods
+   ///
+   /// `EventEmitter` uses reflection to get the set of events on `T`. It adds methods to
+   /// itself with the same names and arguments.
+   ///
+   /// For example, assume `SomeContract` has this set of events:
+   ///
+   /// ```c++
+   /// struct MyContract: psibase::Contract<MyContract> {
+   ///    struct Events {
+   ///       struct History {
+   ///          void myEvent(uint32_t a, std::string s);
+   ///       };
+   ///
+   ///       struct Ui {
+   ///          void updateDisplay();
+   ///       };
+   ///
+   ///       struct Merkle {
+   ///          void credit(
+   ///             psibase::AccountNumber from,
+   ///             psibase::AccountNumber to,
+   ///             uint64_t amount);
+   ///       };
+   ///    };
+   /// };
+   ///
+   /// PSIBASE_REFLECT_HISTORY_EVENTS(
+   ///    MyContract,
+   ///    method(myEvent, a, s),
+   ///
+   /// PSIBASE_REFLECT_UI_EVENTS(
+   ///    MyContract,
+   ///    method(updateDisplay))
+   ///
+   /// PSIBASE_REFLECT_MERKLE_EVENTS(
+   ///    MyContract,
+   ///    method(credit, from, to, amount))
+   /// ```
+   ///
+   /// `EventEmitter<MyContract> e` will support the following:
+   /// * `e.history().myEvent(a, s);`
+   /// * `e.ui().updateDisplay();`
+   /// * `e.merkle().credit(from, to, amount);`
+   ///
+   /// These functions return a `psibase::EventNumber`, aka `uint64_t`, which uniquely identifies the event. This number supports lookup; see [Contract::events].
+   ///
+   /// TODO: Merkle events aren't implemented yet
+   ///
+   /// @hidebases
    template <typename T = void>
    struct EventEmitter : public psio::reflect<T>::template proxy<EventEmitterProxy>
    {
-      using base = typename psio::reflect<T>::template proxy<EventEmitterProxy>;
-      using base::base;
+      using Base = typename psio::reflect<T>::template proxy<EventEmitterProxy>;
 
+      /// Constructor
+      ///
+      /// Initialize the emitter with:
+      ///
+      /// - `sender`: the account emitting the events
+      /// - `elog`: the event log to emit to
+      ///
+      /// You probably don't need this constructor; use [Contract::emit] instead.
+      EventEmitter(AccountNumber sender, DbId elog = psibase::DbId::historyEvent)
+          : Base{sender, elog}
+      {
+      }
+
+      /// Emit Ui events
+      ///
+      /// See [Event Methods](#event-methods)
       auto ui() const
       {
          return EventEmitter<typename T::Events::Ui>(this->psio_get_proxy().sender,
                                                      psibase::DbId::uiEvent);
       }
+
+      /// Emit History events
+      ///
+      /// See [Event Methods](#event-methods)
       auto history() const
       {
          return EventEmitter<typename T::Events::History>(this->psio_get_proxy().sender,
                                                           psibase::DbId::historyEvent);
       }
+
+      /// Emit Merkle events
+      ///
+      /// See [Event Methods](#event-methods)
       auto merkle() const
       {
          return EventEmitter<typename T::Events::Merkle>(this->psio_get_proxy().sender,
                                                          psibase::DbId::merkleEvent);
       }
-      auto at(AccountNumber n) { return EventEmitter(n, this->psio_get_proxy().event_log); }
 
+      /// Emit events from sender
+      ///
+      /// This returns a new `EventEmitter` object instead of modifying this.
+      ///
+      /// You probably don't need this; use [Contract::emit] instead.
+      auto at(AccountNumber sender) const
+      {
+         return EventEmitter(sender, this->psio_get_proxy().event_log);
+      }
+
+      /// Return this
       auto* operator->() const { return this; }
+
+      /// Return *this
       auto& operator*() const { return *this; }
    };
 
@@ -249,7 +340,7 @@ namespace psibase
    /// Template arguments:
    /// - `T`: the contract class for the receiver
    ///
-   /// #### Additional methods (not shown above)
+   /// #### Actor methods
    ///
    /// `Actor` uses reflection to get the set of methods on `T`. It adds methods to
    /// itself with the same names, arguments, and return types to simplify calling.
@@ -289,6 +380,8 @@ namespace psibase
       /// Constructor
       ///
       /// This actor will send actions to `receiver` using `sender` authority.
+      ///
+      /// You probably don't need this constructor; use [Contract::at] or [Contract::as].
       ///
       /// Non-priviledged contracts may only use their own authority.
       Actor(AccountNumber sender, AccountNumber receiver);

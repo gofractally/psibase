@@ -219,6 +219,23 @@ fn convert_doc_str(comment: &Option<Comment>) -> String {
     result
 }
 
+fn has_inline_command(comment: &Option<Comment>, name: &str) -> bool {
+    if let Some(comment) = comment {
+        for child in comment.get_children() {
+            if let CommentChild::Paragraph(lines) = child {
+                for line in lines {
+                    if let CommentChild::InlineCommand(cmd) = line {
+                        if cmd.command == name {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
 // Look up item by path and fill result. There may be multiple matches (e.g. function overloads).
 fn lookup(
     items: &Vec<Item>,
@@ -454,8 +471,11 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
     def.push_str(r#"<span class="hljs-keyword">struct</span> "#);
     def.push_str(r#"<span class="hljs-title">"#);
     def.push_str(&path[2..]);
-    def.push_str(r#"</span></span> {"#);
-    def.push('\n');
+    def.push_str(r#"</span></span>"#);
+    if !has_inline_command(&item.entity.get_parsed_comment(), "hidebases") {
+        // TODO: bases
+    }
+    def.push_str(" {\n");
 
     let fields = filter_children(&item.entity, |c| {
         c.get_kind() == EntityKind::FieldDecl
