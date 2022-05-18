@@ -241,6 +241,13 @@ namespace psidb
          std::memcpy(_buf + _key_words * 16, key.data(), key.size());
          shift_array(_keys + idx, _keys + _size);
          _keys[idx] = {static_cast<std::uint16_t>(_key_words * 16), key.size()};
+         // FIXME: making this work correctly with concurrent garbage collection
+         // can be done with only load + store release (no atomic RMW), but
+         // requires very close attention to order of operations.
+         // The required guarantee is that a concurrent scan of the array will
+         // always see all the old elements, may or may not see the new
+         // element and may see spurious duplicates.  But... relinking
+         // is a problem.
          shift_array(_children + idx, _children + _size + 1);
          _children[idx + 1].store(p, std::memory_order_relaxed);
          ++_size;

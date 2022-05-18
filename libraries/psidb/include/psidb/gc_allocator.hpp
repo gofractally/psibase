@@ -39,9 +39,9 @@ namespace psidb
       ~gc_allocator();
       void*        allocate(std::size_t size) { return ::operator new(size); }
       void         deallocate(void* ptr, std::size_t size) { return ::operator delete(ptr); }
-      page_header* allocate_page()
+      page_header* allocate_page(page_header* src)
       {
-         // Only one thread will allocate new pages
+         // Only one thread will allocate new pages -- WRONG because reader threads load from disk
          auto result = _head;
          if (result == nullptr)
          {
@@ -53,7 +53,7 @@ namespace psidb
                {
                   auto result = reinterpret_cast<page_header*>(_unused);
                   _unused     = reinterpret_cast<char*>(_unused) + page_size;
-                  mark_new(result);
+                  mark_copy(src, result);
                   gc_notify();
                   //std::osyncstream(std::cout) << "allocate page: " << get_id(result) << std::endl;
                   return result;
@@ -74,7 +74,7 @@ namespace psidb
          }
          assert(result->type == page_type::free);
          gc_notify();
-         mark_new(result);
+         mark_copy(src, result);
          //std::osyncstream(std::cout) << "allocate page: " << get_id(result) << std::endl;
          return result;
       }
@@ -104,9 +104,33 @@ namespace psidb
       cycle start_cycle();
       void  scan_root(cycle& data, page_header* header);
       void  scan(cycle& data, node_ptr ptr);
-      void  mark(page_header* header)
+      void  mark_copy(page_header* src, page_header* dest)
+      {
+         // What happens if _gc_flag is flipped concurrently?
+         // - This page will be linked into the tree before the roots are scanned
+         //   so it is guaranteed to be scanned.
+         // - It is indeterminate whether the page is marked as new or old.
+         //   It must not be marked as scanned no matter what, because that
+         //   would prevent scanning.
+         // - If gc is not currently executing, then all pages are either new or marked.
+         //   No additional check is required to avoid unnecessary queueing.
+         if (!src || is_marked(src) || is_new(src))
+         {
+            mark_new(dest);
+         }
+         else
+         {
+            mark_old(dest);
+            queue_scan(dest);
+         }
+      }
+      void mark(page_header* header)
       {
          set_gc_flag(header, _gc_flag.load(std::memory_order_relaxed));
+      }
+      void mark_old(page_header* header)
+      {
+         set_gc_flag(header, (_gc_flag.load(std::memory_order_relaxed) ^ 1) | 2);
       }
       void mark_new(page_header* header)
       {
@@ -188,6 +212,16 @@ namespace psidb
       {
          return _page_flags[get_id(header)].load(std::memory_order_relaxed);
       }
+      void queue_scan(page_header* header)
+      {
+         std::lock_guard l{_scan_queue_mutex};
+         _scan_queue.push_back(header);
+      }
+      std::vector<page_header*> get_scan_queue()
+      {
+         std::lock_guard l{_scan_queue_mutex};
+         return std::move(_scan_queue);
+      }
       // TODO: separate data accessed by the garbage collector
       // from data modified on every allocation.
       page_header*                                 _head = nullptr;
@@ -200,6 +234,10 @@ namespace psidb
       bool                                         _stopped = false;
       std::atomic<gc_flag_type>                    _gc_flag;
       shared_value                                 _gc_mutex;
+
+      //
+      std::mutex                _scan_queue_mutex;
+      std::vector<page_header*> _scan_queue;
 
       void*       _base = nullptr;
       std::size_t _size = 0;

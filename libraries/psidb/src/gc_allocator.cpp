@@ -34,9 +34,32 @@ psidb::gc_allocator::~gc_allocator()
 
 void psidb::gc_allocator::sweep(cycle&& c)
 {
+   // process any queued nodes
+   while (true)
+   {
+      // Block until all any copies that have started finish.
+      // If the queue is empty, then we can safely ignore any elements
+      // that are added afterwards (they are pushed to the queue
+      // before the data is copied, therefore the data that they
+      // read must have been completley processed by the garbage
+      // collector, but we still need to drain the queue, and
+      // mark the nodes).
+      _gc_mutex.store(_gc_mutex.load(std::memory_order_relaxed) ^ 1);
+      auto queue = get_scan_queue();
+      if (queue.empty())
+      {
+         break;
+      }
+      // wait to make sure that the queued nodes are initialized
+      _gc_mutex.store(_gc_mutex.load(std::memory_order_relaxed) ^ 1);
+      for (auto ptr : queue)
+      {
+         scan_root(c, ptr);
+      }
+   }
+
    c.versions.clear();
-   // block until all current readers finish
-   _gc_mutex.store(_gc_mutex.load(std::memory_order_relaxed) ^ 1);
+
    page_header* last       = nullptr;
    page_header* new_head   = nullptr;
    std::int64_t used_pages = 0;

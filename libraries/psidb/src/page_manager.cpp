@@ -32,7 +32,7 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages)
    if (file_info.st_size == 0)
    {
       // initialize new database
-      auto [page, id]   = allocate_page();
+      auto [page, id]   = allocate_page(nullptr);
       page->type        = page_type::leaf;
       page->id          = 0;
       page->version     = 1;
@@ -114,7 +114,7 @@ psidb::page_header* psidb::page_manager::read_page(page_id& id)
       return translate_page_address(id);
    }
 
-   auto [page, num] = allocate_page();
+   auto [page, num] = allocate_page(nullptr);
    page             = new (page) page_internal_node;
 
    read_page(page, id);
@@ -146,7 +146,7 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
 
    page_internal_node* node = ptr.get_parent<page_internal_node>();
 
-   auto [page, num] = allocate_page();
+   auto [page, num] = allocate_page(nullptr);
    page             = new (page) page_internal_node;
 
    read_page(page, id);

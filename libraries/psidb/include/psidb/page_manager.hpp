@@ -115,9 +115,9 @@ namespace psidb
             return read_pages(id, count);
          }
       }
-      std::pair<page_header*, page_id> allocate_page()
+      std::pair<page_header*, page_id> allocate_page(page_header* src)
       {
-         page_header* result = static_cast<page_header*>(_allocator.allocate_page());
+         page_header* result = static_cast<page_header*>(_allocator.allocate_page(src));
          return {result, get_id(result)};
       }
       void set_root(const checkpoint& c, int db, page_id new_root)

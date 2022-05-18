@@ -52,7 +52,7 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       {
          return;
       }
-      auto [new_page, new_page_id] = db->allocate_page();
+      auto [new_page, new_page_id] = db->allocate_page(p);
       key = p->split(static_cast<page_leaf*>(new_page), p->get_offset(leaf), key, value, flags);
       new_page->id                                     = 0;
       static_cast<page_header*>(new_page)->type        = page_type::leaf;
@@ -73,7 +73,7 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
          return;
       }
       // FIXME: Handle allocation failure
-      auto [new_page, new_page_id] = db->allocate_page();
+      auto [new_page, new_page_id] = db->allocate_page(p);
       key = p->split(static_cast<page_internal_node*>(new_page), p->get_offset(pos), key, child);
       new_page->id                                            = 0;
       static_cast<page_internal_node*>(new_page)->type        = page_type::node;
@@ -86,7 +86,7 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
    }
    // Create a new root, increasing the depth of the tree
    {
-      auto [new_page, new_page_id] = db->allocate_page();
+      auto [new_page, new_page_id] = db->allocate_page(nullptr);
       static_cast<page_internal_node*>(new_page)->init();
       static_cast<page_internal_node*>(new_page)->set(db->get_root_id(c, 0), key, child);
       new_page->id                                            = 0;
@@ -130,7 +130,7 @@ Page* psidb::cursor::maybe_clone(transaction& trx, Ptr& node, std::size_t i)
    if (p->version < version)
    {
       // clone p
-      auto [copy, copy_id] = db->allocate_page();
+      auto [copy, copy_id] = db->allocate_page(p);
       copy                 = new (copy) Page;
       p->copy(static_cast<Page*>(copy));
       copy->type = p->type;
