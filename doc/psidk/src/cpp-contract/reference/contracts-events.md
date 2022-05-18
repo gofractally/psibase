@@ -7,7 +7,9 @@
   - [Recursion safety](#recursion-safety)
 - [psibase::Actor]
 - [psibase::EventEmitter]
+- [psibase::EventReader]
 
 {{#cpp-doc ::psibase::Contract}}
 {{#cpp-doc ::psibase::Actor}}
 {{#cpp-doc ::psibase::EventEmitter}}
+{{#cpp-doc ::psibase::EventReader}}
