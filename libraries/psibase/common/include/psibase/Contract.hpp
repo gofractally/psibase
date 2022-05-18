@@ -49,7 +49,7 @@ namespace psibase
    /// To call into this contract recursively:
    ///
    /// ```c++
-   /// auto result = at<>().someMethod(args...);
+   /// auto result = as().someMethod(args...);
    /// ```
    ///
    /// You rarely need to do this. It has higher overhead than simply calling your own functions directly.
@@ -62,6 +62,8 @@ namespace psibase
    /// - [DbId::merkleEvent]
    ///
    /// To define events for a contract, declare the event functions as below, then reflect them using the macros below. Skip any macro for event types you do not have.
+   ///
+   /// After you have defined your events, use [Contract::emit] to emit them and [Contract::events] to read them.
    ///
    /// TODO: Merkle events aren't implemented yet
    ///
@@ -137,17 +139,7 @@ namespace psibase
       /// The account which received the currently-executing action
       AccountNumber getReceiver() const { return _receiver; }
 
-      EventEmitter<DerivedContract> emit() const
-      {
-         return EventEmitter<DerivedContract>(_receiver);
-      }
-
-      EventReader<DerivedContract> events() const
-      {
-         return EventReader<DerivedContract>(_receiver);
-      }
-
-      /// Prepare to call a contract
+      /// Call a contract
       ///
       /// Template arguments:
       /// - `Other`: the receiver's class
@@ -165,7 +157,7 @@ namespace psibase
          return Actor<Other>(_receiver, receiver);
       }
 
-      /// Prepare to call a contract
+      /// Call a contract
       ///
       /// Template arguments:
       /// - `Other`: the receiver's class
@@ -186,12 +178,14 @@ namespace psibase
          return at<Other>(Other::contract);
       }
 
-      /// Prepare to call a contract
+      /// Call a contract
       ///
       /// - If `u` is `0` (the default), then use this contract's authority ([getReceiver]).
       /// - If `u` is non-0, then use `u`'s authority. Non-priviledged contracts may only use their own authority.
       ///
-      /// See [at]; it covers the majority use cases.
+      /// In either case, defaults to sending actions to this contract (recursion).
+      ///
+      /// See [Contract::at]; it covers the majority use case.
       ///
       /// Example use:
       ///
@@ -206,6 +200,16 @@ namespace psibase
          if (u == AccountNumber())
             return {_sender, _receiver};
          return {u, _receiver};
+      }
+
+      EventEmitter<DerivedContract> emit() const
+      {
+         return EventEmitter<DerivedContract>(_receiver);
+      }
+
+      EventReader<DerivedContract> events() const
+      {
+         return EventReader<DerivedContract>(_receiver);
       }
 
      private:
