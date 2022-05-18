@@ -16,7 +16,7 @@ static constexpr page_id header_page        = max_memory_pages;
 static constexpr page_id backup_header_page = header_page + 1;
 
 psidb::page_manager::page_manager(int fd, std::size_t num_pages)
-    : _allocator(num_pages), _file_allocator(fd)
+    : _allocator(num_pages), _file_allocator(fd), _page_map(num_pages * 2)
 {
    // FIXME: inconsistent behavior W.R.T. cleanup of fd on exception.
    this->fd = fd;
@@ -47,7 +47,7 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages)
       stable_checkpoint = nullptr;
       last_commit = head = checkpoint_ptr{new checkpoint_data{this, h}};
 
-      // reserve the first to pages for the header
+      // reserve the first two pages for the header
       _file_allocator.initialize(2);
    }
    else
@@ -78,8 +78,11 @@ static off_t get_file_offset(page_id id)
 
 void* psidb::page_manager::read_pages(page_id& id, std::size_t count)
 {
-   auto            mutex = _page_load_mutex[id];
-   std::lock_guard l{mutex};
+   auto pos = _page_map.lock(id);
+   if (pos)
+   {
+      id = *pos;
+   }
 
    if (is_memory_page(id))
    {
@@ -90,14 +93,21 @@ void* psidb::page_manager::read_pages(page_id& id, std::size_t count)
 
    read_page(result, id, count);
 
-   id = get_id(static_cast<page_header*>(result));
+   auto new_id = get_id(static_cast<page_header*>(result));
+
+   id = new_id;
+   // makes the loaded page visible to other threads
+   pos.store(new_id);
    return result;
 }
 
 psidb::page_header* psidb::page_manager::read_page(page_id& id)
 {
-   auto            mutex = _page_load_mutex[id];
-   std::lock_guard l{mutex};
+   auto pos = _page_map.lock(id);
+   if (pos)
+   {
+      id = *pos;
+   }
 
    if (is_memory_page(id))
    {
@@ -110,13 +120,23 @@ psidb::page_header* psidb::page_manager::read_page(page_id& id)
    read_page(page, id);
 
    id = num;
+   pos.store(num);
    return page;
 }
 
 psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
 {
-   auto            mutex = _page_load_mutex[id];
-   std::lock_guard l{mutex};
+   auto pos = _page_map.lock(id);
+   if (pos)
+   {
+      id = *pos;
+      // TODO: what if ptr was modified after we checked it?
+      // read/read conflict is excluded by the page lock
+      // read/evict conflict????  This will always result in ABA
+      //   and is undetectable.  Not yet sure whether it's a problem.
+      ptr->store(id, std::memory_order_release);
+      return translate_page_address(id);
+   }
 
    id = *ptr;
    if (is_memory_page(id))
@@ -125,18 +145,15 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
    }
 
    page_internal_node* node = ptr.get_parent<page_internal_node>();
-#if 0
-   if(node->flags & page_flags::evicted) {
-      unqueue_gc(node);
-   }
-#endif
 
    auto [page, num] = allocate_page();
    page             = new (page) page_internal_node;
 
    read_page(page, id);
 
-   node->relink_all(ptr, id, num);
+   ptr->store(num, std::memory_order_release);
+   pos.store(num);
+
    return page;
 }
 
@@ -207,7 +224,8 @@ void psidb::page_manager::write_page(page_header*                 page,
                                      const std::shared_ptr<void>& refcount)
 {
    auto dest = allocate_file_page();
-   page->id  = dest;
+   _page_map.store(dest, get_id(page));
+   page->id = dest;
    page->set_dirty(dirty_flag, false);
    queue_write(dest, page, refcount);
 }

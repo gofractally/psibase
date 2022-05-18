@@ -3,12 +3,37 @@
 
 using namespace psidb;
 
+void psidb::cursor::touch(transaction& trx)
+{
+   bool found_some = false;
+   for (std::size_t i = 0; i < depth; ++i)
+   {
+      if (leaf.get_parent<page_internal_node>()->version <= trx.always_clone_version())
+      {
+         maybe_clone<page_internal_node>(trx, stack[i], i);
+         found_some = true;
+      }
+      else
+      {
+         // An old parent should never point to a new child
+         assert(!found_some);
+      }
+   }
+   if (leaf.get_parent<page_leaf>()->version <= trx.always_clone_version())
+   {
+      maybe_clone<page_leaf>(trx, leaf, depth);
+   }
+   else
+   {
+      assert(!found_some);
+   }
+}
+
 void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_view value)
 {
    auto l = db->gc_lock();
    lower_bound_impl(key);
-   // TODO: This isn't quite right as it dirties even nodes that we're going to make a copy of
-   touch();
+   touch(trx);
    std::uint32_t child;
    // Insert into the leaf
    {
@@ -77,7 +102,7 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
 
 void psidb::cursor::erase(transaction& trx)
 {
-   touch();
+   touch(trx);
    auto l = db->gc_lock();
    auto p = maybe_clone<page_leaf>(trx, leaf, depth);
    // TODO: rebalancing

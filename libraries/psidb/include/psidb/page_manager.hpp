@@ -9,8 +9,8 @@
 #include <psidb/gc_allocator.hpp>
 #include <psidb/node_ptr.hpp>
 #include <psidb/page_header.hpp>
+#include <psidb/page_map.hpp>
 #include <psidb/page_types/free_list.hpp>
-#include <psidb/sync/mutex_set.hpp>
 #include <psidb/sync/shared_queue.hpp>
 #include <stdexcept>
 #include <syncstream>
@@ -210,6 +210,7 @@ namespace psidb
             _flush_pending = true;
          }
       }
+      version_type flush_version() const { return _flush_version; }
       // Mark a page as dirty.
       void touch_page(page_header* page, version_type version)
       {
@@ -400,6 +401,7 @@ namespace psidb
       gc_allocator                      _allocator;
       int                               fd = -1;
       file_allocator                    _file_allocator;
+      page_map                          _page_map;
       page_flags                        _dirty_flag    = page_flags::dirty0;
       bool                              _flush_pending = false;
       bool                              _flush_stable  = true;
@@ -416,8 +418,6 @@ namespace psidb
       checkpoint_ptr                          stable_checkpoint = nullptr;
       checkpoint_ptr                          last_commit       = nullptr;
       checkpoint_ptr                          head              = nullptr;
-
-      mutex_set<page_id> _page_load_mutex;
 
       std::thread _write_worker{[this]() { write_worker(); }};
    };

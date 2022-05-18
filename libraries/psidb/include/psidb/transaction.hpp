@@ -5,53 +5,13 @@
 
 namespace psidb
 {
-
-   // general invariants:
-   //
-   // Each fat node forms a circular singly linked list
-   //
-   // Every node has a minimum and maximum version that it is accessible from
-   //
-   // A node can have multiple parents
-   // A parent node points to the highest relevant version of the child node
-   //
-   // There is a set of live versions
-   //
-   // A node becomes obsolete when no version in its lifetime is live
-   //
-   // An obsolete node is removed from its fat node list
-   //
-   // To prove: if a node is obsolete, then any direct parents are also obsolete
-   //
-   // - A node is made obsolete when a transaction that replaces it is committed
-   //   and there are no live versions in the range [creation, replacement)
-   //
-   // problem:
-   // - copy node n0 = [0, 4), n1 = [4, *)
-   // - copy parent p0 = [0, 5), p1 = [5, *)
-   // - copy node n1 = [4, 6), n2 = [6,*)
-   // p0 -> n1, p1 -> n2
-   // Therefore, p0 relies on n1 to access n0
-   //
-   // Limiting fat nodes to a single extra copy solves most of these problems. or does it?
-   // what if we link the other way?
-   //
-   // - version field represents xxx version
-   // - when a node becomes obsolete, its parents need to be relinked
-   //
-   // Suppose we keep a record of the parent:
-   // - The parent is live as long as this checkpoint is live
-   // - When folding checkpoints, if parent is newer the checkpoint, switch to parent prev
-   // - What if... parent is a split node...
-   //
-   // - Or, when a node is freed.
-   //
-   // - or, unlink the node, fix
-
    class transaction
    {
      public:
-      transaction(page_manager* db, const checkpoint& ck) : _db(db), _checkpoint(ck) {}
+      transaction(page_manager* db, const checkpoint& ck, version_type clone_version)
+          : _db(db), _checkpoint(ck), _clone_version(clone_version)
+      {
+      }
       cursor get_cursor() { return {_db, _checkpoint}; }
 
       // when a transaction is destroyed
@@ -128,9 +88,14 @@ namespace psidb
          modified_nodes.push_back(ptr);
       }
 
+      // Nodes at or before this version will always be
+      // cloned if any child is modified
+      version_type always_clone_version() const { return _clone_version; }
+
      private:
       page_manager* _db;
       checkpoint    _checkpoint;
+      version_type  _clone_version;
       // list of pages obsoleted by this transaction
       std::vector<page_header*> obsolete_nodes;
       // list of pages created by this transaction

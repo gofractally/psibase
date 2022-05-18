@@ -148,17 +148,7 @@ namespace psidb
          }
          return false;
       }
-      void touch()
-      {
-         for (std::size_t i = 0; i < depth; ++i)
-         {
-            auto p = stack[i].get_parent<page_internal_node>();
-            db->touch_page(p, version);
-         }
-         {
-            db->touch_page(leaf.get_parent<page_leaf>(), version);
-         }
-      }
+      void touch(transaction& trx);
       bool valid() const
       {
          auto p = leaf.get_parent<page_leaf>();

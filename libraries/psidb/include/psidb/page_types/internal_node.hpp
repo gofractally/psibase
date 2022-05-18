@@ -38,18 +38,10 @@ namespace psidb
    // - be trivially copyable
    struct page_internal_node : page_header
    {
-      struct relink_record
-      {
-         key_type key;
-         page_id  old_page;
-         page_id  new_page;
-      };
-
-      std::atomic<relink_record*>      _relink_queue;
-      std::atomic<page_internal_node*> _next;
-      shared_value                     _mutex;
-      std::uint8_t                     _size;
-      std::uint8_t                     _key_words;
+      using relink_record = char;
+      shared_value _mutex;
+      std::uint8_t _size;
+      std::uint8_t _key_words;
 
       // Keys are 16-byte aligned and padded to a multiple of 16 bytes
       struct key_storage
@@ -65,9 +57,9 @@ namespace psidb
          constexpr std::uint16_t size() const { return shifted_size * 16; }
       };
 
-      static constexpr std::size_t header_size =
-          sizeof(page_header) + sizeof(_mutex) + sizeof(_relink_queue) + sizeof(_next) +
-          sizeof(_size) + sizeof(_key_words) + sizeof(page_id);
+      static constexpr std::size_t header_size = sizeof(page_header) + sizeof(_mutex) +
+                                                 sizeof(_size) + sizeof(_key_words) +
+                                                 sizeof(page_id);
       static constexpr std::size_t min_key_size     = 16;
       static constexpr std::size_t fixed_entry_size = sizeof(page_id) + sizeof(key_storage);
       static constexpr std::size_t min_entry_size   = min_key_size + fixed_entry_size;
@@ -82,98 +74,13 @@ namespace psidb
                 padding * sizeof(key_storage)];
 
       // Construct a new object
-      void init()
-      {
-         // Don't care about the value of _relink_queue
-         _next.store(this, std::memory_order_relaxed);
-         _mutex.init();
-      }
+      void init() { _mutex.init(); }
 
       // queue must point to the begining of an array that
       // contains at least capacity+1 elements.
-      void start_transaction(relink_record* queue)
-      {
-         _relink_queue.store(queue, std::memory_order_relaxed);
-         _mutex.store(1);
-      }
+      void start_transaction(relink_record* queue) {}
       // queue must be the same as the queue that was passed to start_transaction
-      void end_transaction(relink_record* queue)
-      {
-         _mutex.store(0);
-         auto end = _relink_queue.load(std::memory_order_relaxed);
-         for (; queue != end; ++queue)
-         {
-            relink_unlocked(queue->key, queue->old_page, queue->new_page);
-         }
-      }
-      void push_relink(key_type k, page_id old_page, page_id new_page)
-      {
-         *_relink_queue.fetch_add(1, std::memory_order_relaxed) = {k, old_page, new_page};
-      }
-      void relink_unlocked(key_type k, page_id old_page, page_id new_page)
-      {
-         auto pos = lower_bound(k);
-         if (pos->load(std::memory_order_relaxed) == old_page)
-         {
-            pos->store(new_page, std::memory_order_relaxed);
-         }
-      }
-      void relink(key_type k, page_id old_page, page_id new_page)
-      {
-         auto pool = _mutex.load_and_lock();
-         if (pool == 0)
-         {
-            // simple set
-            relink_unlocked(k, old_page, new_page);
-         }
-         else
-         {
-            push_relink(k, old_page, new_page);
-         }
-         _mutex.unlock(pool);
-      }
-      void insert_after(page_internal_node* new_node)
-      {
-         auto next = _next.load(std::memory_order_relaxed);
-         do
-         {
-            new_node->_next.store(next, std::memory_order_relaxed);
-         } while (!_next.compare_exchange_weak(next, new_node, std::memory_order_release));
-      }
-#if 0
-      // WARNING: does NOT synchronize with for_each.
-      // After a page is unlinked it cannot be reused safely
-      // until the next gc cycle.
-      // This node may not be copied in parallel with unlink.
-      // Only one unlink can run at a time
-      void unlink() {
-         page_internal_node* prev = this;
-         while(true) {
-            page_internal_node* current  = prev->next.load(std::memory_order_acquire);
-            if(current == this) {
-               // The previous node might have been copied
-               if(prev->next.compare_exchange_strong(current, _next.load(std::memory_order_relaxed), std::memory_order::relaxed)) {
-                  return;
-               }
-            } else {
-               prev = current;
-            }
-         }
-      }
-#endif
-      // Iterates over all copies and splits of this page
-      // It's critically important that this processes a source node
-      // that is being copied before the new node that is being copied from it.
-      void relink_all(node_ptr p, page_id old_page, page_id new_page)
-      {
-         p->store(new_page, std::memory_order_relaxed);
-         page_internal_node* current = this;
-         auto                key     = get_key(p);
-         while ((current = current->_next.load(std::memory_order_acquire)) != this)
-         {
-            relink(key, old_page, new_page);
-         }
-      }
+      void end_transaction(relink_record* queue) {}
 
       // accessors
       std::string_view get_key(key_storage k) const
@@ -212,7 +119,6 @@ namespace psidb
          relink_record tmp_buffer[capacity + 1];
          other->init();
          other->start_transaction(tmp_buffer);
-         insert_after(other);
          other->set(_children[0]);
          for (std::uint32_t i = 0; i < _size; ++i)
          {
@@ -247,7 +153,6 @@ namespace psidb
                // only needs to be around the copy of the child links.
                other->init();
                other->start_transaction(tmp_buffer);
-               insert_after(other);
                other->set(_children[i + 1]);
                copy_some(i + 1, idx);
                other->append(k, p);
@@ -266,7 +171,6 @@ namespace psidb
             {
                other->init();
                other->start_transaction(tmp_buffer);
-               insert_after(other);
                other->set(p);
                copy_some(idx, _size);
                other->end_transaction(tmp_buffer);
@@ -283,7 +187,6 @@ namespace psidb
             {
                other->init();
                other->start_transaction(tmp_buffer);
-               insert_after(other);
                other->set(_children[i + 1]);
                copy_some(i + 1, _size);
                other->append(get_key(i), 0);
