@@ -197,6 +197,15 @@ namespace psibase
          return {u, _receiver};
       }
 
+      /// Emit events
+      ///
+      /// The following examples use the example definitions in [Defining Events](#defining-events). After you have defined your events, you can use `emit` to emit them. Examples:
+      ///
+      /// - `auto eventA = emit().history().myEvent(a, s);`
+      /// - `auto eventB = emit().ui().updateDisplay();`
+      /// - `auto eventC = emit().merkle().credit(from, to, amount);`
+      ///
+      /// These functions return a `psibase::EventNumber`, aka `uint64_t`, which uniquely identifies the event. This number supports lookup; see [Contract::events].
       EventEmitter<DerivedContract> emit() const
       {
          return EventEmitter<DerivedContract>(_receiver);
