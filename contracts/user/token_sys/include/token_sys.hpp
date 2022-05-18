@@ -10,6 +10,10 @@
 #include "token_tables.hpp"
 #include "types.hpp"
 
+/* Boot notes:
+ * NFT and token manualDebit flags should be set for the account holding this contract
+*/
+
 namespace UserContract
 {
 
@@ -54,6 +58,7 @@ namespace UserContract
 
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
+      SymbolRecord        getSymbol(TID tokenId);
       bool                exists(TID tokenId);
       BalanceRecord       getBalance(TID tokenId, psibase::AccountNumber account);
       SharedBalanceRecord getSharedBal(TID                    tokenId,
@@ -62,7 +67,7 @@ namespace UserContract
       TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
       bool                getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag);
 
-      void mapSymbol(SID symbolId, TID tokenId);
+      void mapSymbol(TID tokenId, SID symbolId);
 
      private:
       tables db{contract};
@@ -83,6 +88,7 @@ namespace UserContract
             void setUnrecallable(TID tokenId, Account setter) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
             void configChanged(Account account, psibase::NamedBit_t flag, bool enable) {}
+            void symbolMapped(TID tokenId, Account account, SID symbolId) {}
             //};
 
             //struct Ui
@@ -113,18 +119,20 @@ namespace UserContract
       method(debit, tokenId, sender, amount, memo),
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
+      method(getSymbol, tokenId),
       method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getConfig, account, flag),
       method(mapSymbol, symbolId, tokenId)
     );
-   PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
+   PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
       method(created, tokenId, creator, precision, maxSupply),
       method(minted, tokenId, minter, amount, receiver, memo),
       method(setUnrecallable, tokenId, setter),
       method(burned, tokenId, burner, amount),
       method(configChanged, account, flag, enable),
+      method(symbolMapped, tokenId, account, symbolId),
    //);
    //PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
       method(credited, tokenId, sender, receiver, amount, memo),

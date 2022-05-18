@@ -39,6 +39,13 @@ namespace UserContract
       static constexpr std::string_view error_divzero   = "division by zero in Quantity arithmetic";
 
       constexpr explicit Quantity(Quantity_t q) : value{q} {}
+      constexpr explicit Quantity(double q)
+      {
+         auto quantity = static_cast<Quantity_t>(q);
+         psibase::check(static_cast<double>(quantity) == q, error_overflow);
+
+         value = quantity;
+      }
       Quantity() = default;
 
       operator Quantity_t() { return value; }
@@ -73,19 +80,19 @@ namespace UserContract
 
       constexpr bool operator==(const Quantity& other) const = default;
 
-      constexpr auto operator<=>(const int& other) const
+      constexpr auto operator<=>(const Quantity_t& other) const { return value <=> other; }
+
+      bool operator==(const Quantity_t& otherValue) const { return value == otherValue; }
+
+      constexpr auto operator<=>(const double& other) const
       {
          return value <=> static_cast<Quantity_t>(other);
       }
 
-      bool operator==(const int& otherValue) const
+      bool operator==(const double& otherValue) const
       {
-         return static_cast<Quantity_t>(otherValue) == value;
+         return value == static_cast<Quantity_t>(otherValue);
       }
-
-      constexpr auto operator<=>(const Quantity_t& other) const { return value <=> other; }
-
-      bool operator==(const Quantity_t& otherValue) const { return otherValue == value; }
    };  // namespace UserContract
    PSIO_REFLECT(Quantity, value);
 

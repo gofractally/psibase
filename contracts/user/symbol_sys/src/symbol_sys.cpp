@@ -5,13 +5,27 @@
 using namespace UserContract;
 using namespace psibase;
 
-SID SymbolSys::purchase(Ticker newSymbol, Quantity maxCost)
+void SymbolSys::create(SID newSymbol, Quantity maxDebit)
 {
    // NOP
-   return 0;
 }
 
-SymbolRecord SymbolSys::getSymbol(SID symbolId)
+void SymbolSys::buysymbol(SID symbol)
+{
+   // NOP
+}
+
+void SymbolSys::listSymbol(SID symbol, Quantity price)
+{
+   // NOP
+}
+
+void SymbolSys::unlistSymbol(SID symbol)
+{
+   // NOP
+}
+
+SymbolRecord SymbolSys::getSymbol(SID symbol)
 {
    // NOP
    return {};
@@ -19,7 +33,12 @@ SymbolRecord SymbolSys::getSymbol(SID symbolId)
 
 Quantity SymbolSys::getPrice(uint8_t numChars)
 {
-   return Quantity{1000};
+   return Quantity{1'000e8};
+}
+
+bool SymbolSys::exists(SID symbol)
+{
+   return false;
 }
 
 PSIBASE_DISPATCH(UserContract::SymbolSys)

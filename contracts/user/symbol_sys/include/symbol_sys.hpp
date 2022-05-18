@@ -17,6 +17,12 @@
  * 
 */
 
+/* Boot notes:
+ * NFT and token manualDebit flags should be set for the account holding this contract
+ * The contract will use a default set of parameters for symbol pricing adjustment rates, floors, etc.
+ *    Configure these settings if desired.
+*/
+
 namespace UserContract
 {
 
@@ -26,20 +32,18 @@ namespace UserContract
      public:
       static constexpr auto contract = psibase::AccountNumber("symbol-sys");
 
-      SID purchase(Ticker newSymbol, Quantity maxCost);
-      // void buysymbol(psibase::AccountNumber buyer, std::string symbol);
-      // void sellsymbol(std::string symbol, int64_t price);
-      // void withdraw(psibase::AccountNumber owner, int64_t amount);
-      // void setsalefee(uint32_t fee);
-      // void setsym(uint32_t symlen,
-      //             int64_t  price,
-      //             int64_t  floor,
-      //             uint32_t increase_thresold,
-      //             uint32_t decrease_threshold,
-      //             uint32_t window);
-      // void setowner(psibase::AccountNumber owner, std::string sym, std::string memo);
+      // Set the fee taken by the network on all symbol sales
+      //void setNetworkFee(uint8_t salePct);
+      //void setAdjustRates(uint8_t increasePct, uint8_t decreasePct);
+      //void configSymType(uint8_t symbolLength, Quantity startPrice, Quantity floorPrice, uint8_t targetCreatedPerDay);
 
-      SymbolRecord getSymbol(SID symbolId);
+      void create(SID newSymbol, Quantity maxDebit);
+      void buysymbol(SID symbol);
+      void listSymbol(SID symbol, Quantity price);
+      void unlistSymbol(SID symbol);
+
+      SymbolRecord getSymbol(SID symbol);
+      bool         exists(SID symbol);
       Quantity     getPrice(uint8_t numChars);
 
      private:
@@ -48,8 +52,12 @@ namespace UserContract
 
    // clang-format off
    PSIO_REFLECT(SymbolSys,
-       method(purchase, newSymbol, maxCost),
-       method(getSymbol, symbolId),
+       method(create, newSymbol, maxDebit),
+       method(buysymbol, symbol),
+       method(listSymbol, symbol, price),
+       method(unlistSymbol, symbol),
+       method(getSymbol, symbol),
+       method(exists, symbol),
        method(getPrice, numChars)
    );
    // clang-format on

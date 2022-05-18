@@ -1,4 +1,5 @@
 #include "token_sys.hpp"
+#include "symbol_sys.hpp"
 #include "token_errors.hpp"
 
 #include <contracts/system/account_sys.hpp>
@@ -14,7 +15,6 @@ using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 // For helpers
 #include <concepts>
 #include <limits>
-
 namespace
 {
    template <std::integral T>
@@ -43,7 +43,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    TID newId = (tokenIdx.begin() == tokenIdx.end()) ? 1 : (*(--tokenIdx.end())).id + 1;
 
    check(TokenRecord::isValidKey(newId), invalidTokenId);
-   check(maxSupply > 0, supplyGt0);
+   check(maxSupply.value > 0, supplyGt0);
 
    auto nftId = nftContract.mint();
    nftContract.credit(nftId, creator, "Nft for new token ID: " + std::to_string(newId));
@@ -67,7 +67,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver, const_
    auto balance     = getBalance(tokenId, receiver);
    auto nftContract = at<NftSys>();
 
-   check(amount > 0, quantityGt0);
+   check(amount.value > 0, quantityGt0);
    check(nftContract.exists(token.ownerNft), missingRequiredAuth);
    check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
    check(not sumExceeds(token.currentSupply.value, amount.value, token.maxSupply.value),
@@ -103,7 +103,7 @@ void TokenSys::burn(TID tokenId, Quantity amount)
    auto token   = getToken(tokenId);
    auto balance = getBalance(tokenId, sender);
 
-   check(amount > 0, quantityGt0);
+   check(amount.value > 0, quantityGt0);
    check(balance.balance >= amount.value, insufficientBalance);
 
    balance.balance -= amount.value;
@@ -139,8 +139,8 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    auto sender  = get_sender();
    auto balance = getBalance(tokenId, sender);
 
-   check(amount > 0, quantityGt0);
-   check(amount <= balance, insufficientBalance);
+   check(amount.value > 0, quantityGt0);
+   check(amount.value <= balance.balance, insufficientBalance);
 
    balance.balance -= amount.value;
    db.open<BalanceTable_t>().put(balance);
@@ -249,6 +249,18 @@ TokenRecord TokenSys::getToken(TID tokenId)
    return *tokenOpt;
 }
 
+SymbolRecord TokenSys::getSymbol(TID tokenId)
+{
+   auto tokenTable = db.open<TokenTable_t>();
+   auto tokenIdx   = tokenTable.get_index<0>();
+   auto tokenOpt   = tokenIdx.get(tokenId);
+
+   psibase::check(tokenOpt.has_value(), tokenDNE);
+   psibase::check(tokenOpt->symbolId != SID{0}, noMappedSymbol);
+
+   return at<SymbolSys>().getSymbol(tokenOpt->symbolId);
+}
+
 bool TokenSys::exists(TID tokenId)
 {
    return db.open<TokenTable_t>().get_index<0>().get(tokenId).has_value();
@@ -342,9 +354,10 @@ void TokenSys::_checkAccountValid(psibase::AccountNumber account)
    check(account != AccountNumber{0}, invalidAccount);
 }
 
-void TokenSys::mapSymbol(SID symbolId, TID tokenId)
+void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 {
    // NOP
+   // symbolMapped(tokenId, get_sender(), symbolId)
 }
 
 PSIBASE_DISPATCH(UserContract::TokenSys)
