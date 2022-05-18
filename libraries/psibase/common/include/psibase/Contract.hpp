@@ -36,9 +36,34 @@ namespace psibase
    ///              method(somethingElse, x, y))
    /// ```
    ///
+   /// #### Calling other contracts
+   ///
+   /// [Actor] supports calling other contracts. [Contract::at] and [Contract::as] simplify obtaining an actor.
+   ///
+   /// To call another contract:
+   ///
+   /// ```c++
+   /// auto result = at<OtherContractClass>(otherContractAccount).someMethod(args...);
+   /// ```
+   ///
+   /// To call into this contract recursively:
+   ///
+   /// ```c++
+   /// auto result = at<>().someMethod(args...);
+   /// ```
+   ///
+   /// You rarely need to do this. It has higher overhead than simply calling your own functions directly.
+   ///
    /// #### Defining events
    ///
+   /// See the following for a description of the various types of events:
+   /// - [DbId::historyEvent]
+   /// - [DbId::uiEvent]
+   /// - [DbId::merkleEvent]
+   ///
    /// To define events for a contract, declare the event functions as below, then reflect them using the macros below. Skip any macro for event types you do not have.
+   ///
+   /// TODO: Merkle events aren't implemented yet
    ///
    /// ```c++
    /// struct MyContract: psibase::Contract<MyContract>

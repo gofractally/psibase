@@ -91,6 +91,8 @@ namespace psibase
 
       /// Events which go into the merkle tree
       ///
+      /// TODO: not implemented
+      ///
       /// Contracts may produce these events during transactions and may read them
       /// up to 1 hour (configurable) after they were produced, or they reach finality,
       /// which ever is longer.

@@ -26,6 +26,7 @@ enum Kind {
     Namespace,
     Function,
     Enum,
+    EnumConstant,
     Struct,
 }
 
@@ -58,6 +59,9 @@ fn convert_children<'a, 'tu>(items: &'a mut Vec<Item<'tu>>, current: usize, enti
             }
             EntityKind::EnumDecl => {
                 convert_child(items, current, child, Kind::Enum, false);
+            }
+            EntityKind::EnumConstantDecl => {
+                convert_child(items, current, child, Kind::EnumConstant, false);
             }
             EntityKind::FunctionDecl => {
                 convert_child(items, current, child, Kind::Function, false);
