@@ -9,14 +9,6 @@
 #include "symbol_tables.hpp"
 #include "types.hpp"
 
-/* 04/18/2022
- * James and Dan call notes:
- * Symbols are still handled by symbol table, 32 bit symbols, only uppercase, no numbers
- * Symbols are mapped to NIDs, which can be burned in the NFT contract, but the symbol table will always hold on to Symbol->NID mapping
- * Symbol IDs can be specified in a separate action on the token contract to permanently map the symbol to the token (burns underlying NFT)
- * 
-*/
-
 /* Boot notes:
  * NFT and token manualDebit flags should be set for the account holding this contract
  * The contract will use a default set of parameters for symbol pricing adjustment rates, floors, etc.
@@ -32,8 +24,6 @@ namespace UserContract
      public:
       static constexpr auto contract = psibase::AccountNumber("symbol-sys");
 
-      // Set the fee taken by the network on all symbol sales
-      //void setNetworkFee(uint8_t salePct);
       //void setAdjustRates(uint8_t increasePct, uint8_t decreasePct);
       //void configSymType(uint8_t symbolLength, Quantity startPrice, Quantity floorPrice, uint8_t targetCreatedPerDay);
 

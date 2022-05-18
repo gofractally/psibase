@@ -40,13 +40,6 @@ namespace
 
 }  // namespace
 
-/* Todo:
- *    Code review token tables - Add event storage
- *    Code review UserContext class in Tester
- *    Add test cases for verifying events were emitted properly in this and nft tests
- *    Benchmark when possible
-*/
-
 SCENARIO("Creating a token")
 {
    GIVEN("An empty chain with user Alice")
@@ -141,40 +134,29 @@ SCENARIO("Minting tokens")
 
       THEN("Bob may not mint them")
       {
-         auto mint = b.mint(tokenId, 1'000e8, bob, memo);
+         auto mint = b.mint(tokenId, 1'000e8, memo);
          CHECK(mint.failed(missingRequiredAuth));
       }
       THEN("Alice may not mint them with an invalid token ID")
       {
-         auto mint = a.mint(999, 1'000e8, alice, memo);
+         auto mint = a.mint(999, 1'000e8, memo);
          CHECK(mint.failed(invalidTokenId));
-      }
-      THEN("Alice may not mint them to an invalid Account")
-      {
-         auto mint = a.mint(tokenId, 1'000e8, "notreal"_a, memo);
-         CHECK(mint.failed(invalidAccount));
       }
       THEN("Alice may not mint more tokens than are allowed by the specified max supply")
       {
-         CHECK(a.mint(tokenId, 1'000'000'001e8, alice, memo).failed(maxSupplyExceeded));
+         CHECK(a.mint(tokenId, 1'000'000'001e8, memo).failed(maxSupplyExceeded));
       }
       THEN("Alice may mint new tokens")
       {
-         auto mint1 = a.mint(tokenId, 1'000e8, alice, memo);
-         auto mint2 = a.mint(tokenId, 1'000e8, bob, memo);
-         CHECK(mint1.succeeded());
-         CHECK(mint2.succeeded());
+         Quantity quantity{1'000e8};
+         auto     mint = a.mint(tokenId, quantity, memo);
+         CHECK(mint.succeeded());
 
          AND_THEN("The tokens were allocated accordingly")
          {
-            auto getBalanceAlice = a.getBalance(tokenId, alice);
-            auto getBalanceBob   = b.getBalance(tokenId, bob);
-
-            CHECK(getBalanceAlice.succeeded());
-            CHECK(getBalanceAlice.returnVal().balance == 1000e8);
-
-            CHECK(getBalanceBob.succeeded());
-            CHECK(getBalanceBob.returnVal().balance == 1000e8);
+            auto getBalance = a.getBalance(tokenId, alice);
+            CHECK(getBalance.succeeded());
+            CHECK(getBalance.returnVal().balance == quantity);
          }
          AND_THEN("Storage was billed correctly")
          {  //
@@ -211,7 +193,8 @@ SCENARIO("Recalling tokens")
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      a.mint(tokenId, 1'000e8, bob, memo);
+      a.mint(tokenId, 1'000e8, memo);
+      a.credit(tokenId, bob, 1'000e8, memo);
 
       THEN("The token is recallable by default")
       {
@@ -279,31 +262,35 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Bob may mint new tokens")
          {  //
-            CHECK(b.mint(tokenId, 1'000e8, bob, memo).succeeded());
+            CHECK(b.mint(tokenId, 1'000e8, memo).succeeded());
          }
          THEN("Alice may not mint new tokens")
          {
-            CHECK(a.mint(tokenId, 1'000e8, alice, memo).failed(missingRequiredAuth));
+            CHECK(a.mint(tokenId, 1'000e8, memo).failed(missingRequiredAuth));
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            b.mint(tokenId, 1'000e8, bob, memo);
+            b.mint(tokenId, 1'000e8, memo);
             CHECK(a.recall(tokenId, bob, 1'000e8, memo).failed(missingRequiredAuth));
          }
          THEN("Bob may recall Alice's tokens")
          {
-            b.mint(tokenId, 1'000e8, alice, memo);
-            CHECK(b.recall(tokenId, alice, 1'000e8, memo).succeeded());
+            Quantity q{1'000e8};
+            b.mint(tokenId, q, memo);
+            b.credit(tokenId, alice, q, memo);
+            CHECK(b.recall(tokenId, alice, q, memo).succeeded());
          }
       }
       WHEN("Alice burns the issuer NFT")
       {
-         a.mint(tokenId, 1'000e8, bob, memo);
+         Quantity quantity{1'000e8};
+         a.mint(tokenId, quantity, memo);
+         a.credit(tokenId, bob, quantity, memo);
          alice.at<NftSys>().burn(nft.id);
 
          THEN("Alice may not mint new tokens")
          {
-            CHECK(a.mint(tokenId, 1'000e8, alice, memo).failed(missingRequiredAuth));
+            CHECK(a.mint(tokenId, quantity, memo).failed(missingRequiredAuth));
          }
          THEN("Alice may not credit the issuer NFT to anyone")
          {
@@ -311,7 +298,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, 1'000e8, memo).failed(missingRequiredAuth));
+            CHECK(a.recall(tokenId, bob, quantity, memo).failed(missingRequiredAuth));
          }
          THEN("Alice may not update the token inflation")
          {  //
@@ -338,8 +325,8 @@ SCENARIO("Burning tokens")
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto mint    = a.mint(tokenId, 100e8, alice, memo);
-      auto mint2   = a.mint(tokenId, 100e8, bob, memo);
+      auto mint    = a.mint(tokenId, 200e8, memo);
+      a.credit(tokenId, bob, 100e8, memo);
 
       THEN("Alice may not burn 101 tokens")
       {
@@ -480,8 +467,8 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto mint    = a.mint(tokenId, 100e8, alice, memo);
-      auto mint2   = a.mint(tokenId, 100e8, bob, memo);
+      auto mint    = a.mint(tokenId, 200e8, memo);
+      a.credit(tokenId, bob, 100e8, memo);
 
       THEN("Alice may not credit Bob 101 tokens")
       {
@@ -549,8 +536,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto mint    = a.mint(tokenId, 100e8, alice, memo);
-      auto mint2   = a.mint(tokenId, 100e8, bob, memo);
+
+      a.mint(tokenId, 200e8, memo);
+      a.credit(tokenId, bob, 100e8, memo);
 
       AND_GIVEN("Alice turns on manual-debit")
       {
@@ -680,12 +668,12 @@ SCENARIO("Mapping a symbol to a token")
       // Mint token used for purchasing symbols
       auto aliceBalance = 1'000'000e8;
       auto sysToken     = a.create(8, aliceBalance).returnVal();
-      a.mint(sysToken, aliceBalance, alice, memo);
+      a.mint(sysToken, aliceBalance, memo);
 
       // Mint a second token
       t.start_block();
       auto newToken = a.create(8, aliceBalance).returnVal();
-      a.mint(newToken, aliceBalance, alice, memo);
+      a.mint(newToken, aliceBalance, memo);
 
       // Purchase the symbol and claim the owner NFT
       auto symbolCost = alice.at<SymbolSys>().getPrice(3).returnVal();

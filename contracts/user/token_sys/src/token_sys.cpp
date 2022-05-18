@@ -60,11 +60,11 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    return newId;
 }
 
-void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver, const_view<String> memo)
+void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
 {
    auto sender      = get_sender();
    auto token       = getToken(tokenId);
-   auto balance     = getBalance(tokenId, receiver);
+   auto balance     = getBalance(tokenId, sender);
    auto nftContract = at<NftSys>();
 
    check(amount.value > 0, quantityGt0);
@@ -78,7 +78,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, AccountNumber receiver, const_
    db.open<TokenTable_t>().put(token);
    db.open<BalanceTable_t>().put(balance);
 
-   emit().ui().minted(tokenId, sender, amount, receiver, memo);
+   emit().ui().minted(tokenId, sender, amount, memo);
 }
 
 void TokenSys::setUnrecallable(TID tokenId)
@@ -240,6 +240,12 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    emit().ui().recalled(tokenId, from, amount, memo);
 }
 
+void TokenSys::mapSymbol(TID tokenId, SID symbolId)
+{
+   // NOP
+   // symbolMapped(tokenId, get_sender(), symbolId)
+}
+
 TokenRecord TokenSys::getToken(TID tokenId)
 {
    auto tokenTable = db.open<TokenTable_t>();
@@ -353,12 +359,6 @@ void TokenSys::_checkAccountValid(psibase::AccountNumber account)
 {
    check(at<account_sys>().exists(account), invalidAccount);
    check(account != AccountNumber{0}, invalidAccount);
-}
-
-void TokenSys::mapSymbol(TID tokenId, SID symbolId)
-{
-   // NOP
-   // symbolMapped(tokenId, get_sender(), symbolId)
 }
 
 PSIBASE_DISPATCH(UserContract::TokenSys)

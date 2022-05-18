@@ -12,13 +12,6 @@ using namespace psibase;
 using namespace UserContract;
 using namespace UserContract::Errors;
 
-/***** Questions *****
- * How should symbol pricing be updated?
- * Prices different for different number of characters?
- * How does the symbol contract bill users? It must use a "system" token?
- * 
-*/
-
 namespace
 {
    constexpr bool storageBillingImplemented = false;
@@ -54,8 +47,8 @@ SCENARIO("Buying a symbol")
       auto b     = bob.at<SymbolSys>();
 
       auto tokenId = alice.at<TokenSys>().create(8, 1'000'000e8).returnVal();
-      alice.at<TokenSys>().mint(tokenId, 10'000e8, alice, memo);
-      alice.at<TokenSys>().mint(tokenId, 10'000e8, bob, memo);
+      alice.at<TokenSys>().mint(tokenId, 20'000e8, memo);
+      alice.at<TokenSys>().credit(tokenId, bob, 10'000e8, memo);
 
       t.start_block();
 
@@ -63,6 +56,15 @@ SCENARIO("Buying a symbol")
       {
          CHECK(a.getSymbol(SID{0}).failed(symbolDNE));
          CHECK(a.getSymbol(SID{1}).failed(symbolDNE));
+      }
+      THEN("Alice cannot buy a symbol with numbers")
+      {  //
+         CHECK(false);
+      }
+      THEN("Alice cannot buy a symbol with lowercase letters")
+      {  //
+         auto test = SID{"ABC"_a};
+         CHECK(false);
       }
       THEN("Alice can buy a symbol")
       {
@@ -127,7 +129,7 @@ SCENARIO("Buying a symbol")
          }
          THEN("Alice cannot buy the same symbol")
          {
-            t.start_block();  // Preventing duplicate transaction detection
+            t.start_block();
             auto create = a.create("abc"_a, quantity);
             CHECK(create.failed(symbolUnavailable));
          }
@@ -155,7 +157,7 @@ SCENARIO("Measuring price increases")
       auto aliceBalance = 1'000'000e8;
 
       auto tokenId = alice.at<TokenSys>().create(8, aliceBalance).returnVal();
-      alice.at<TokenSys>().mint(tokenId, aliceBalance, alice, memo);
+      alice.at<TokenSys>().mint(tokenId, aliceBalance, memo);
 
       t.start_block();
 
@@ -259,7 +261,7 @@ SCENARIO("Using symbol ownership NFT")
       // Mint token used for purchasing symbols
       auto aliceBalance = 1'000'000e8;
       auto sysToken     = alice.at<TokenSys>().create(8, aliceBalance).returnVal();
-      alice.at<TokenSys>().mint(sysToken, aliceBalance, alice, memo);
+      alice.at<TokenSys>().mint(sysToken, aliceBalance, memo);
 
       // Create the symbol and claim the owner NFT
       auto symbolCost = a.getPrice(3).returnVal();
@@ -309,8 +311,8 @@ SCENARIO("Buying and selling symbols")
       auto sysSupply   = 1'000'000e8;
       auto sysToken    = alice.at<TokenSys>().create(8, sysSupply).returnVal();
       auto userBalance = 100'000e8;
-      alice.at<TokenSys>().mint(sysToken, userBalance, alice, memo);
-      alice.at<TokenSys>().mint(sysToken, userBalance, bob, memo);
+      alice.at<TokenSys>().mint(sysToken, 2 * userBalance, memo);
+      alice.at<TokenSys>().credit(sysToken, bob, userBalance, memo);
 
       // Create system symbol
       auto sysSymbol  = SID{"sys"_a};
@@ -357,7 +359,7 @@ SCENARIO("Buying and selling symbols")
          {
             t.start_block();
             auto newToken = alice.at<TokenSys>().create(8, userBalance).returnVal();
-            alice.at<TokenSys>().mint(newToken, userBalance, alice, memo);
+            alice.at<TokenSys>().mint(newToken, userBalance, memo);
             auto newTokenId = alice.at<TokenSys>().getToken(newToken).returnVal().id;
 
             alice.at<TokenSys>().mapSymbol(newTokenId, symbol);

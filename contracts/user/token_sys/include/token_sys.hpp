@@ -25,10 +25,7 @@ namespace UserContract
       static constexpr auto contract = psibase::AccountNumber("token-sys");
 
       TID  create(Precision precision, Quantity maxSupply);
-      void mint(TID                               tokenId,
-                Quantity                          amount,
-                psibase::AccountNumber            receiver,
-                psio::const_view<psibase::String> memo);
+      void mint(TID tokenId, Quantity amount, psio::const_view<psibase::String> memo);
 
       void setUnrecallable(TID tokenId);
 
@@ -55,6 +52,7 @@ namespace UserContract
                   psibase::AccountNumber            from,
                   Quantity                          amount,
                   psio::const_view<psibase::String> memo);
+      void mapSymbol(TID tokenId, SID symbolId);
 
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
@@ -66,8 +64,6 @@ namespace UserContract
                                        psibase::AccountNumber debitor);
       TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
       bool                getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag);
-
-      void mapSymbol(TID tokenId, SID symbolId);
 
      private:
       tables db{contract};
@@ -84,7 +80,7 @@ namespace UserContract
          struct Ui  // History <-- Todo - Change back to History
          {
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
-            void minted(TID tokenId, Account minter, Quantity amount, Account receiver, StringView memo) {}
+            void minted(TID tokenId, Account minter, Quantity amount, StringView memo) {}
             void setUnrecallable(TID tokenId, Account setter) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
             void configChanged(Account account, psibase::NamedBit_t flag, bool enable) {}
@@ -109,7 +105,7 @@ namespace UserContract
    // clang-format off
    PSIO_REFLECT(TokenSys,
       method(create, precision, maxSupply),
-      method(mint, tokenId, amount, receiver, memo),
+      method(mint, tokenId, amount, memo),
       method(setUnrecallable, tokenId, flag),
       
       method(burn, tokenId, amount),
@@ -128,7 +124,7 @@ namespace UserContract
     );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
       method(created, tokenId, creator, precision, maxSupply),
-      method(minted, tokenId, minter, amount, receiver, memo),
+      method(minted, tokenId, minter, amount, memo),
       method(setUnrecallable, tokenId, setter),
       method(burned, tokenId, burner, amount),
       method(configChanged, account, flag, enable),
