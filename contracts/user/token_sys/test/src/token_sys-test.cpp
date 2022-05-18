@@ -682,7 +682,6 @@ SCENARIO("Mapping a symbol to a token")
       alice.at<SymbolSys>().create(symbolId, symbolCost);
       auto symbolRecord = alice.at<SymbolSys>().getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
-      alice.at<NftSys>().debit(nftId, memo);
 
       THEN("Bob is unable to map the symbol to the token")
       {
@@ -719,6 +718,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       THEN("Alice is able to map the symbol to the token")
       {
+         alice.at<NftSys>().credit(nftId, TokenSys::contract, memo);
          CHECK(a.mapSymbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
@@ -738,6 +738,17 @@ SCENARIO("Mapping a symbol to a token")
          {
             auto symbolRecord2 = alice.at<SymbolSys>().getSymbol(symbolId).returnVal();
             CHECK(symbolRecord == symbolRecord2);
+         }
+
+         THEN("Alice may not map a new symbol to the same token")
+         {
+            a.credit(sysToken, SymbolSys::contract, symbolCost, memo);
+            auto newSymbol = "bcd"_a;
+            alice.at<SymbolSys>().create(newSymbol, symbolCost);
+            auto newNft = alice.at<SymbolSys>().getSymbol(newSymbol).returnVal().ownerNft;
+
+            alice.at<NftSys>().credit(newNft, TokenSys::contract, memo);
+            CHECK(a.mapSymbol(newToken, newSymbol).failed(tokenHasSymbol));
          }
       }
    }

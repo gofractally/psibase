@@ -12,12 +12,6 @@ using psio::const_view;
 using std::string;
 using system_contract::account_sys;
 
-namespace stubs
-{
-   // Replace with auth calls when available
-   bool require_auth(AccountNumber acc) { return true; }
-}  // namespace stubs
-
 namespace
 {
    constexpr auto manualDebitBit = NftHolderRecord::Configurations::getIndex("manualDebit"_m);

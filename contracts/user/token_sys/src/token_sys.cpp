@@ -242,8 +242,22 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
 
 void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 {
-   // NOP
-   // symbolMapped(tokenId, get_sender(), symbolId)
+   //auto symbol = at<SymbolSys>().getSymbol(symbolId);
+   // auto nftId =
+
+   // Check that the token exists
+   // Check that the token doesn't already have a mapping
+   // Check that the token nft exists
+   // Check that sender own the token nft
+
+   // Check that the symbol exists
+   // Check that the symbol nft exists
+   // Check that TokenSys own the symbol nft
+
+   // Store mapping
+   // Destroy symbol NFT
+
+   // Emit mapped event
 }
 
 TokenRecord TokenSys::getToken(TID tokenId)

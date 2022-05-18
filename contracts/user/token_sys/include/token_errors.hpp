@@ -15,5 +15,6 @@ namespace UserContract
       constexpr std::string_view supplyGt0           = "Max supply must be greater than 0";
       constexpr std::string_view quantityGt0         = "Quantity must be greater than 0";
       constexpr std::string_view noMappedSymbol      = "Token has no mapped symbol";
+      constexpr std::string_view tokenHasSymbol      = "Token already has a symbol";
    }  // namespace Errors
 }  // namespace UserContract
