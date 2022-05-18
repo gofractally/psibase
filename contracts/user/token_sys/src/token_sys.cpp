@@ -165,18 +165,19 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
 
 void TokenSys::uncredit(TID                tokenId,
                         AccountNumber      receiver,
-                        Quantity           amount,
+                        Quantity           maxAmount,
                         const_view<String> memo)
 {
    auto sender          = get_sender();
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
    auto creditorBalance = getBalance(tokenId, sender);
+   auto uncreditAmt     = std::min(maxAmount.value, sharedBalance.balance);
 
-   check(amount.value > 0, quantityGt0);
-   check(sharedBalance.balance >= amount.value, insufficientBalance);
+   check(maxAmount.value > 0, quantityGt0);
+   check(sharedBalance.balance > 0, insufficientBalance);
 
-   sharedBalance.balance -= amount.value;
-   creditorBalance.balance += amount.value;
+   sharedBalance.balance -= uncreditAmt;
+   creditorBalance.balance += uncreditAmt;
 
    if (sharedBalance.balance == 0)
    {
@@ -188,7 +189,7 @@ void TokenSys::uncredit(TID                tokenId,
    }
    db.open<BalanceTable_t>().put(creditorBalance);
 
-   emit().ui().uncredited(tokenId, sender, receiver, amount, memo);
+   emit().ui().uncredited(tokenId, sender, receiver, uncreditAmt, memo);
 }
 
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)

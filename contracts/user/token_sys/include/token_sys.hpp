@@ -45,7 +45,7 @@ namespace UserContract
                   psio::const_view<psibase::String> memo);
       void uncredit(TID                               tokenId,
                     psibase::AccountNumber            receiver,
-                    Quantity                          amount,
+                    Quantity                          maxAmount,
                     psio::const_view<psibase::String> memo);
       void debit(TID                               tokenId,
                  psibase::AccountNumber            sender,
@@ -115,7 +115,7 @@ namespace UserContract
       method(burn, tokenId, amount),
       method(setConfig, flag, enable),
       method(credit, tokenId, receiver, amount, memo),
-      method(uncredit, tokenId, receiver, amount, memo),
+      method(uncredit, tokenId, receiver, maxAmount, memo),
       method(debit, tokenId, sender, amount, memo),
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),

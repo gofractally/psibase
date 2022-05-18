@@ -596,29 +596,28 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
                   CHECK(50e8 == b.getSharedBal(tokenId, bob, alice).returnVal().balance);
                }
             }
-            THEN("Bob may not uncredit 51 tokens")
+            THEN("Bob may try to uncredit 51 tokens, but will only uncredit 50")
             {
-               CHECK(b.uncredit(tokenId, alice, 51e8, memo).failed(insufficientBalance));
-               CHECK(false);
-               // Todo: Actually, the uncredit amount should be a "max"
-               //   That way, people can credit, perform action that debits an unknown amount,
-               //    and uncredit in the same transaction.
-               // This also implies that the uncredit action should succeed even if the sharedBalance is 0.
+               CHECK(50e8 == b.getBalance(tokenId, bob).returnVal().balance);
+               CHECK(b.uncredit(tokenId, alice, 51e8, memo).succeeded());
+               CHECK(100e8 == b.getBalance(tokenId, bob).returnVal().balance);
             }
             THEN("Bob may uncredit 25 tokens")
             {
                CHECK(b.uncredit(tokenId, alice, 25e8, memo).succeeded());
                t.start_block();
-               AND_THEN("Bob may not uncredit 26 tokens")
-               {
-                  CHECK(b.uncredit(tokenId, alice, 26e8, memo).failed(insufficientBalance));
-               }
+
                AND_THEN("Bob may uncredit 25 tokens")
                {
                   CHECK(b.uncredit(tokenId, alice, 25e8, memo).succeeded());
                   AND_THEN("Bob owns 0 tokens in his shared balance with Alice")
                   {
                      CHECK(0e8 == b.getSharedBal(tokenId, bob, alice).returnVal().balance);
+
+                     AND_THEN("Bob may not uncredit any tokens")
+                     {
+                        CHECK(b.uncredit(tokenId, alice, 1e8, memo).failed(insufficientBalance));
+                     }
                   }
                }
                AND_THEN("Alice may not debit 26 tokens")
