@@ -38,7 +38,7 @@ namespace system_contract
          auto json = psio::convert_to_json(obj);
          return RpcReplyData{
              .contentType = "application/json",
-             .reply       = {json.begin(), json.end()},
+             .body        = {json.begin(), json.end()},
          };
       };
 
@@ -49,7 +49,7 @@ namespace system_contract
          {
             return RpcReplyData{
                 .contentType = content->contentType,
-                .reply       = content->content,
+                .body        = content->content,
             };
          }
 

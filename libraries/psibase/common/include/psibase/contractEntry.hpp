@@ -27,8 +27,8 @@ namespace psibase
    struct RpcReplyData
    {
       std::string       contentType;
-      std::vector<char> reply;
+      std::vector<char> body;
    };
-   PSIO_REFLECT(RpcReplyData, contentType, reply)
+   PSIO_REFLECT(RpcReplyData, contentType, body)
 
 }  // namespace psibase

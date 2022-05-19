@@ -75,6 +75,7 @@ RUN cd /root \
     && chmod 700 rustup.sh \
     && ./rustup.sh -y --no-modify-path \
     && /opt/cargo/bin/cargo install mdbook \
+    && /opt/cargo/bin/cargo install mdbook-svgbob2 \
     && /opt/cargo/bin/cargo install sccache \
     && chmod -R 777 $RUSTUP_HOME \
     && chmod -R 777 $CARGO_HOME \

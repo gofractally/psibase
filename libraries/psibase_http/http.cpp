@@ -323,7 +323,7 @@ namespace psibase::http
                return send(
                    error(bhttp::status::not_found,
                          "The resource '" + req.target().to_string() + "' was not found.\n"));
-            return send(ok(std::move(result->reply), result->contentType.c_str()));
+            return send(ok(std::move(result->body), result->contentType.c_str()));
          }
          else if (req.target() == "/native/push_boot" && req.method() == bhttp::verb::post &&
                   server.http_config->push_boot_async)

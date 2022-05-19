@@ -74,7 +74,7 @@ namespace system_contract
          {
             return psibase::RpcReplyData{
                 .contentType = content->contentType,
-                .reply       = content->content,
+                .body        = content->content,
             };
          }
       }
@@ -87,7 +87,7 @@ namespace system_contract
                 psio::gql_query(QueryRoot(), {request.body.data(), request.body.size()}, {});
             return psibase::RpcReplyData{
                 .contentType = "application/json",
-                .reply       = {result.data(), result.data() + result.size()},  // TODO: avoid copy
+                .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
             };
          }
       }

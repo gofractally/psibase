@@ -36,7 +36,7 @@ namespace psibase
          auto json = psio::convert_to_json(obj);
          return RpcReplyData{
              .contentType = "application/json",
-             .reply       = {json.begin(), json.end()},
+             .body        = {json.begin(), json.end()},
          };
       };
 
@@ -47,7 +47,7 @@ namespace psibase
          {
             return RpcReplyData{
                 .contentType = content->contentType,
-                .reply       = content->content,
+                .body        = content->content,
             };
          }
          if (request.target == "/common/thiscontract")
@@ -74,7 +74,7 @@ namespace psibase
                 "}\n";
             return RpcReplyData{
                 .contentType = "text/javascript",
-                .reply       = {js.begin(), js.end()},
+                .body        = {js.begin(), js.end()},
             };
          }
          if (request.target == "/common/rootdomain.mjs")
@@ -87,7 +87,7 @@ namespace psibase
                 "}\n";
             return RpcReplyData{
                 .contentType = "text/javascript",
-                .reply       = {js.begin(), js.end()},
+                .body        = {js.begin(), js.end()},
             };
          }
       }
@@ -103,7 +103,7 @@ namespace psibase
             psio::from_json(trx, jstream);
             return RpcReplyData{
                 .contentType = "application/octet-stream",
-                .reply       = psio::convert_to_frac(trx),
+                .body        = psio::convert_to_frac(trx),
             };
          }
       }

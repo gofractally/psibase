@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:5e9cf7b832db69880f3c5bd0fb9a5263da51695a"
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:3382926c582eb5edebd4cf19b449cf46d32ab421"
   LIBMDBX_MIRROR_PRIVATE_KEY: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
 
 jobs:

@@ -1,6 +1,7 @@
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
 #include "contracts/system/account_sys.hpp"
 

@@ -18,14 +18,14 @@ namespace psibase
          {
             return RpcReplyData{
                 .contentType = "text/html",
-                .reply       = {simpleUIMainPage, simpleUIMainPage + strlen(simpleUIMainPage)},
+                .body        = {simpleUIMainPage, simpleUIMainPage + strlen(simpleUIMainPage)},
             };
          }
          if (request.target == "/action_templates")
          {
             return RpcReplyData{
                 .contentType = "application/json",
-                .reply       = generateActionJsonTemplate<T>(),
+                .body        = generateActionJsonTemplate<T>(),
             };
          }
       }
@@ -38,7 +38,7 @@ namespace psibase
             {
                return RpcReplyData{
                    .contentType = "application/octet-stream",
-                   .reply       = std::move(*result),
+                   .body        = std::move(*result),
                };
             }
          }
