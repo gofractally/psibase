@@ -31,12 +31,12 @@ PSIO_REFLECT(WebContentRow, path, contentType, content)
 
 namespace system_contract
 {
-   std::optional<rpc_reply_data> rpc_account_sys::serveSys(rpc_request_data request)
+   std::optional<RpcReplyData> rpc_account_sys::serveSys(RpcRequestData request)
    {
       auto to_json = [](const auto& obj)
       {
          auto json = psio::convert_to_json(obj);
-         return rpc_reply_data{
+         return RpcReplyData{
              .contentType = "application/json",
              .reply       = {json.begin(), json.end()},
          };
@@ -47,7 +47,7 @@ namespace system_contract
          auto content = kvGet<WebContentRow>(webContentKey(getReceiver(), request.target));
          if (!!content)
          {
-            return rpc_reply_data{
+            return RpcReplyData{
                 .contentType = content->contentType,
                 .reply       = content->content,
             };

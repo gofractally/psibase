@@ -1,7 +1,7 @@
 #pragma once
 
 #include <psibase/actionJsonTemplate.hpp>
-#include <psibase/contract_entry.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/fracpackActionFromJson.hpp>
 
 namespace psibase
@@ -10,20 +10,20 @@ namespace psibase
        R"(<html><div id="root"></div><script src="/common/SimpleUI.mjs" type="module"></script></html>)";
 
    template <typename T, bool IncludeRoot>
-   std::optional<rpc_reply_data> serveSimpleUI(rpc_request_data& request)
+   std::optional<RpcReplyData> serveSimpleUI(RpcRequestData& request)
    {
       if (request.method == "GET")
       {
          if (IncludeRoot && request.target == "/")
          {
-            return rpc_reply_data{
+            return RpcReplyData{
                 .contentType = "text/html",
                 .reply       = {simpleUIMainPage, simpleUIMainPage + strlen(simpleUIMainPage)},
             };
          }
          if (request.target == "/action_templates")
          {
-            return rpc_reply_data{
+            return RpcReplyData{
                 .contentType = "application/json",
                 .reply       = generateActionJsonTemplate<T>(),
             };
@@ -36,7 +36,7 @@ namespace psibase
             if (auto result = fracpackActionFromJson<T>(  //
                     std::string_view{request.target}.substr(13), request.body))
             {
-               return rpc_reply_data{
+               return RpcReplyData{
                    .contentType = "application/octet-stream",
                    .reply       = std::move(*result),
                };
@@ -49,7 +49,7 @@ namespace psibase
    template <typename Derived, bool IncludeRoot = true>
    struct SimpleUI
    {
-      std::optional<rpc_reply_data> serveSys(rpc_request_data request) const
+      std::optional<RpcReplyData> serveSys(RpcRequestData request) const
       {
          return serveSimpleUI<Derived, IncludeRoot>(request);
       }

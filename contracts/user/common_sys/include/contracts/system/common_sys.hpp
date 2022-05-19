@@ -1,6 +1,6 @@
 #pragma once
 #include <psibase/Contract.hpp>
-#include <psibase/contract_entry.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/nativeTables.hpp>
 
 namespace psibase
@@ -9,7 +9,7 @@ namespace psibase
    {
       static constexpr auto contract = psibase::AccountNumber("common-sys");
 
-      auto serveSys(rpc_request_data request) -> std::optional<rpc_reply_data>;
+      auto serveSys(RpcRequestData request) -> std::optional<RpcReplyData>;
       void uploadSys(psio::const_view<std::string>       path,
                      psio::const_view<std::string>       contentType,
                      psio::const_view<std::vector<char>> content);

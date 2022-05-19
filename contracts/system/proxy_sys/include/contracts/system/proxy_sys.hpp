@@ -1,6 +1,6 @@
 #pragma once
 #include <psibase/Contract.hpp>
-#include <psibase/contract_entry.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/nativeTables.hpp>
 
 namespace psibase
@@ -8,7 +8,7 @@ namespace psibase
    // Contracts which serve http implement this
    struct ServerInterface
    {
-      std::optional<rpc_reply_data> serveSys(rpc_request_data request);
+      std::optional<RpcReplyData> serveSys(RpcRequestData request);
    };
    PSIO_REFLECT(ServerInterface, method(serveSys, request))
 

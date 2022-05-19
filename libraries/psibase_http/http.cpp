@@ -7,7 +7,7 @@
 
 #include "psibase/http.hpp"
 #include "psibase/TransactionContext.hpp"
-#include "psibase/contract_entry.hpp"
+#include "psibase/contractEntry.hpp"
 
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/io_service.hpp>
@@ -285,7 +285,7 @@ namespace psibase::http
                   host != server.http_config->host && host.ends_with(server.http_config->host) &&
                       !req.target().starts_with("/native"))
          {
-            rpc_request_data data;
+            RpcRequestData data;
             if (req.method() == bhttp::verb::get)
                data.method = "GET";
             else if (req.method() == bhttp::verb::post)
@@ -293,10 +293,10 @@ namespace psibase::http
             else
                return send(error(bhttp::status::bad_request,
                                  "Unsupported HTTP-method for " + req.target().to_string() + "\n"));
-            data.host      = {host.begin(), host.size()};
-            data.root_host = server.http_config->host;
-            data.target    = req.target().to_string();
-            data.body      = std::move(req.body());
+            data.host     = {host.begin(), host.size()};
+            data.rootHost = server.http_config->host;
+            data.target   = req.target().to_string();
+            data.body     = std::move(req.body());
 
             // TODO: time limit
             auto          system = server.sharedState->getSystemContext();
@@ -318,7 +318,7 @@ namespace psibase::http
             tc.execServe(action, atrace);
             // TODO: option to print this
             // printf("%s\n", prettyTrace(atrace).c_str());
-            auto result = psio::convert_from_frac<std::optional<rpc_reply_data>>(atrace.rawRetval);
+            auto result = psio::convert_from_frac<std::optional<RpcReplyData>>(atrace.rawRetval);
             if (!result)
                return send(
                    error(bhttp::status::not_found,

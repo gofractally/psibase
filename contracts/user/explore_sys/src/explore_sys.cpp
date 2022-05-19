@@ -65,14 +65,14 @@ PSIO_REFLECT(  //
 
 namespace system_contract
 {
-   std::optional<psibase::rpc_reply_data> explore_sys::serveSys(psibase::rpc_request_data request)
+   std::optional<psibase::RpcReplyData> explore_sys::serveSys(psibase::RpcRequestData request)
    {
       if (request.method == "GET")
       {
          auto content = kvGet<WebContentRow>(webContentKey(getReceiver(), request.target));
          if (!!content)
          {
-            return psibase::rpc_reply_data{
+            return psibase::RpcReplyData{
                 .contentType = content->contentType,
                 .reply       = content->content,
             };
@@ -85,7 +85,7 @@ namespace system_contract
          {
             auto result =
                 psio::gql_query(QueryRoot(), {request.body.data(), request.body.size()}, {});
-            return psibase::rpc_reply_data{
+            return psibase::RpcReplyData{
                 .contentType = "application/json",
                 .reply       = {result.data(), result.data() + result.size()},  // TODO: avoid copy
             };

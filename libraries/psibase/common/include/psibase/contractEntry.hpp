@@ -6,29 +6,29 @@ namespace psibase
 {
    static constexpr auto proxyContractNum = AccountNumber("proxy-sys");
 
-   struct verify_data
+   struct VerifyData
    {
-      Checksum256       transaction_hash;
+      Checksum256       transactionHash;
       Claim             claim;
       std::vector<char> proof;
    };
-   PSIO_REFLECT(verify_data, transaction_hash, claim, proof)
+   PSIO_REFLECT(VerifyData, transactionHash, claim, proof)
 
-   struct rpc_request_data
+   struct RpcRequestData
    {
       std::string       host;
-      std::string       root_host;
+      std::string       rootHost;
       std::string       method;
       std::string       target;
       std::vector<char> body;
    };
-   PSIO_REFLECT(rpc_request_data, host, root_host, method, target, body)
+   PSIO_REFLECT(RpcRequestData, host, rootHost, method, target, body)
 
-   struct rpc_reply_data
+   struct RpcReplyData
    {
       std::string       contentType;
       std::vector<char> reply;
    };
-   PSIO_REFLECT(rpc_reply_data, contentType, reply)
+   PSIO_REFLECT(RpcReplyData, contentType, reply)
 
 }  // namespace psibase

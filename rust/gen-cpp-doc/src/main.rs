@@ -716,6 +716,7 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/libraries/psibase/contract/include"),
         &("-I".to_owned() + repo_path + "/libraries/psio/consthash/include"),
         &("-I".to_owned() + repo_path + "/libraries/psio/include"),
+        &("-I".to_owned() + repo_path + "/contracts/system/proxy_sys/include"),
     ]);
     parser.skip_function_bodies(true);
     parser.keep_going(true);

@@ -42,7 +42,7 @@ namespace psibase
    {
       auto act = getCurrentAction();
       // TODO: use a view
-      auto req = psio::convert_from_frac<rpc_request_data>(act.rawData);
+      auto req = psio::convert_from_frac<RpcRequestData>(act.rawData);
 
       std::string contractName;
 
@@ -51,9 +51,9 @@ namespace psibase
          contractName = "common-sys";
 
       // subdomain
-      else if (req.host.size() > req.root_host.size() + 1 && req.host.ends_with(req.root_host) &&
-               req.host[req.host.size() - req.root_host.size() - 1] == '.')
-         contractName.assign(req.host.begin(), req.host.end() - req.root_host.size() - 1);
+      else if (req.host.size() > req.rootHost.size() + 1 && req.host.ends_with(req.rootHost) &&
+               req.host[req.host.size() - req.rootHost.size() - 1] == '.')
+         contractName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
 
       // root domain
       else

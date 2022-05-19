@@ -3,7 +3,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
-#include <psibase/contract_entry.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psio/from_bin.hpp>
 
 namespace psibase
@@ -142,8 +142,8 @@ namespace psibase
       {
          auto&       claim = self.signedTransaction.transaction.claims[i];
          auto&       proof = self.signedTransaction.proofs[i];
-         verify_data data{
-             .transaction_hash = id,
+         VerifyData data{
+             .transactionHash = id,
              .claim            = claim,
              .proof            = proof,
          };

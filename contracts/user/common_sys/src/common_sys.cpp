@@ -29,12 +29,12 @@ PSIO_REFLECT(WebContentRow, path, contentType, content)
 
 namespace psibase
 {
-   std::optional<rpc_reply_data> common_sys::serveSys(rpc_request_data request)
+   std::optional<RpcReplyData> common_sys::serveSys(RpcRequestData request)
    {
       auto to_json = [](const auto& obj)
       {
          auto json = psio::convert_to_json(obj);
-         return rpc_reply_data{
+         return RpcReplyData{
              .contentType = "application/json",
              .reply       = {json.begin(), json.end()},
          };
@@ -45,7 +45,7 @@ namespace psibase
          auto content = kvGet<WebContentRow>(webContentKey(getReceiver(), request.target));
          if (!!content)
          {
-            return rpc_reply_data{
+            return RpcReplyData{
                 .contentType = content->contentType,
                 .reply       = content->content,
             };
@@ -53,39 +53,39 @@ namespace psibase
          if (request.target == "/common/thiscontract")
          {
             std::string contractName;
-            if (request.host.size() > request.root_host.size() + 1 &&
-                request.host.ends_with(request.root_host) &&
-                request.host[request.host.size() - request.root_host.size() - 1] == '.')
+            if (request.host.size() > request.rootHost.size() + 1 &&
+                request.host.ends_with(request.rootHost) &&
+                request.host[request.host.size() - request.rootHost.size() - 1] == '.')
                contractName.assign(request.host.begin(),
-                                   request.host.end() - request.root_host.size() - 1);
+                                   request.host.end() - request.rootHost.size() - 1);
             else
                contractName = "common-sys";
             return to_json(contractName);
          }
          if (request.target == "/common/rootdomain")
-            return to_json(request.root_host);
+            return to_json(request.rootHost);
          if (request.target == "/common/rootdomain.js")
          {
-            auto js = "const rootdomain = '" + request.root_host + "';\n";
+            auto js = "const rootdomain = '" + request.rootHost + "';\n";
             js +=
                 "function siblingUrl(contract, path) {\n"
                 "    return location.protocol + '//' + (contract ? contract + '.' : '') +\n"
                 "           rootdomain + ':' + location.port + '/' + (path || '');\n"
                 "}\n";
-            return rpc_reply_data{
+            return RpcReplyData{
                 .contentType = "text/javascript",
                 .reply       = {js.begin(), js.end()},
             };
          }
          if (request.target == "/common/rootdomain.mjs")
          {
-            auto js = "export const rootdomain = '" + request.root_host + "';\n";
+            auto js = "export const rootdomain = '" + request.rootHost + "';\n";
             js +=
                 "export function siblingUrl(contract, path) {\n"
                 "    return location.protocol + '//' + (contract ? contract + '.' : '') +\n"
                 "           rootdomain + ':' + location.port + '/' + (path || '');\n"
                 "}\n";
-            return rpc_reply_data{
+            return RpcReplyData{
                 .contentType = "text/javascript",
                 .reply       = {js.begin(), js.end()},
             };
@@ -101,7 +101,7 @@ namespace psibase
             psio::json_token_stream jstream{request.body.data()};
             SignedTransaction       trx;
             psio::from_json(trx, jstream);
-            return rpc_reply_data{
+            return RpcReplyData{
                 .contentType = "application/octet-stream",
                 .reply       = psio::convert_to_frac(trx),
             };

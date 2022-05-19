@@ -6,7 +6,7 @@
 #include <contracts/system/transaction_sys.hpp>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/TransactionContext.hpp>
-#include <psibase/contract_entry.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/http.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
