@@ -710,13 +710,14 @@ fn parse<'tu>(
         &("-I".to_owned() + &wasi_sdk_prefix + "/lib/clang/13.0.0/include"),
         &("-I".to_owned() + repo_path + "/build/wasm/boost"),
         &("-I".to_owned() + repo_path + "/build/wasm/deps/include"),
+        &("-I".to_owned() + repo_path + "/contracts/system/proxy_sys/include"),
+        &("-I".to_owned() + repo_path + "/contracts/user/common_sys/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/external/simdjson/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/common/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/contract/include"),
         &("-I".to_owned() + repo_path + "/libraries/psio/consthash/include"),
         &("-I".to_owned() + repo_path + "/libraries/psio/include"),
-        &("-I".to_owned() + repo_path + "/contracts/system/proxy_sys/include"),
     ]);
     parser.skip_function_bodies(true);
     parser.keep_going(true);

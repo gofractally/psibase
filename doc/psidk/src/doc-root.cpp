@@ -1,5 +1,6 @@
 #define GENERATING_DOCUMENTATION
 
+#include <contracts/system/common_sys.hpp>
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/Contract.hpp>
 #include <psibase/Table.hpp>

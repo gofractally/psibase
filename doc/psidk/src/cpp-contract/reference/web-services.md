@@ -3,9 +3,9 @@
 - [Routing](#routing)
 - [Registration](#registration)
 - [psibase::ServerInterface]
-- [psibase::ServerUploadInterface]
 - [psibase::RpcRequestData]
 - [psibase::RpcReplyData]
+- [psibase::ServerUploadInterface]
 
 ## Routing
 
@@ -20,9 +20,9 @@
          |
          v
   +--------------+          +----------------+
- /                \  no    / domain begins    \
-/  target begins   \ ---> /  with a registered \
-\  with "/common?" /      \  contract name?    /
+ /                \  no    /                  \
+/  target begins   \ ---> /  on a subdomain?   \
+\  with "/common?" /      \                    /
  \                /        \                  /
   +--------------+          +----------------+
          | yes                no |      | yes
@@ -36,24 +36,21 @@
       +-----------------+       +------------------+
 ```
 
-`psinode` passes most HTTP requests to the `proxy-sys` contract. It then routes requests to the appropriate contract's `serveSys` action (see diagram). The contracts run in RPC mode. This prevents them from writing to the database, but allows them to read data they normally can't; see [psibase::DbId].
+`psinode` passes most HTTP requests to the [psibase::proxy_sys] contract. It then routes requests to the appropriate contract's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The contracts run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
-`serveSys` can do any of the following:
-
-- Return `std::nullopt` to signal not found. psinode produces a 404 response in this case.
-- Abort. psinode produces a 500 response with the contract's abort message.
-- Return a [psibase::RpcReplyData]. psinode produces a 200 response with the body and contentType returned.
+[psibase::common_sys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
 ## Registration
 
-Contracts which wish to serve HTTP requests need to register using the `proxy-sys` contract's `registerServer` action. Contracts may register themselves, e.g. during an initialization action, or may be registered manually.
+Contracts which wish to serve HTTP requests need to register using the [psibase::proxy_sys] contract's [psibase::proxy_sys::registerServer] action. There are multiple ways to do this:
 
-- `psibase install` has a `--register-proxy` option (shortcut `-p`) that can do this while installing the contract
+- `psibase install` has a `--register-proxy` option (shortcut `-p`) that can do this while installing the contract.
 - `psibase register-proxy` can also do it. TODO: implement `psibase register-proxy`.
+- A contract may call `registerServer` during its own initialization action.
 
 A contract doesn't have to serve HTTP requests itself; it may delegate this to another contract during registration.
 
 {{#cpp-doc ::psibase::ServerInterface}}
-{{#cpp-doc ::psibase::ServerUploadInterface}}
 {{#cpp-doc ::psibase::RpcRequestData}}
 {{#cpp-doc ::psibase::RpcReplyData}}
+{{#cpp-doc ::psibase::ServerUploadInterface}}
