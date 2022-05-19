@@ -33,7 +33,7 @@ namespace psibase
    template <typename Contract>
    void dispatch(AccountNumber sender, AccountNumber receiver)
    {
-      Contract contract;  // TODO: Make this static?
+      Contract contract;
       contract.dispatchSetSenderReceiver(sender, receiver);
       auto act = getCurrentActionView();
 
