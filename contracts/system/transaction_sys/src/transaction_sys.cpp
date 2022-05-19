@@ -25,7 +25,7 @@ namespace system_contract
          return stat->head->header.blockNum;
       return 1;  // next block (currently being produced) is 2 (genesis)
    }
-   psibase::TimePointSec transaction_sys::blockTime() const
+   psibase::TimePointSec transaction_sys::headBlockTime() const
    {
       auto& stat = getStatus();
       if (stat && stat->head)
