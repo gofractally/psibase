@@ -10,7 +10,7 @@ namespace psibase
        R"(<html><div id="root"></div><script src="/common/SimpleUI.mjs" type="module"></script></html>)";
 
    template <typename T, bool IncludeRoot>
-   std::optional<RpcReplyData> serveSimpleUI(RpcRequestData& request)
+   std::optional<RpcReplyData> simpleUI(RpcRequestData& request)
    {
       if (request.method == "GET")
       {
@@ -44,14 +44,5 @@ namespace psibase
          }
       }
       return std::nullopt;
-   }  // serveSimpleUI
-
-   template <typename Derived, bool IncludeRoot = true>
-   struct SimpleUI
-   {
-      std::optional<RpcReplyData> serveSys(RpcRequestData request) const
-      {
-         return serveSimpleUI<Derived, IncludeRoot>(request);
-      }
-   };
+   }  // simpleUI
 }  // namespace psibase

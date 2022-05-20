@@ -7,6 +7,7 @@
   - [psibase::RpcRequestData]
   - [psibase::RpcReplyData]
   - [psibase::StorageInterface]
+- [Helpers](#helpers)
 
 ## Routing
 
@@ -66,3 +67,13 @@ Contracts which serve HTML implement these interfaces:
 {{#cpp-doc ::psibase::RpcRequestData}}
 {{#cpp-doc ::psibase::RpcReplyData}}
 {{#cpp-doc ::psibase::StorageInterface}}
+
+## Helpers
+
+- [psibase::simpleUI]
+- [psibase::fracpackActionFromJson]
+- [psibase::generateActionJsonTemplate]
+
+{{#cpp-doc ::psibase::simpleUI}}
+{{#cpp-doc ::psibase::fracpackActionFromJson}}
+{{#cpp-doc ::psibase::generateActionJsonTemplate}}
