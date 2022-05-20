@@ -4,7 +4,7 @@
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psibase/simpleUI.hpp>
+#include <psibase/serveSimpleUI.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
 
@@ -72,7 +72,7 @@ namespace system_contract
          }
       }
 
-      return psibase::simpleUI<account_sys, false>(request);
+      return psibase::serveSimpleUI<account_sys, false>(request);
    }  // serveSys
 
    void rpc_account_sys::storeSys(psio::const_view<std::string>       path,

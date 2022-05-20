@@ -1,6 +1,6 @@
 #include <psibase/Contract.hpp>
 #include <psibase/dispatch.hpp>
-#include <psibase/simpleUI.hpp>
+#include <psibase/serveSimpleUI.hpp>
 
 struct ExampleContract : psibase::Contract<ExampleContract>
 {
@@ -10,9 +10,9 @@ struct ExampleContract : psibase::Contract<ExampleContract>
    // This action serves HTTP requests
    std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
    {
-      // simpleUI serves UI files to the browser and
+      // serveSimpleUI serves UI files to the browser and
       // provides an RPC interface for preparing transactions.
-      return simpleUI<ExampleContract, true>(request);
+      return serveSimpleUI<ExampleContract, true>(request);
    }
 };
 

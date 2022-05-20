@@ -8,6 +8,9 @@
   - [psibase::RpcReplyData]
   - [psibase::StorageInterface]
 - [Helpers](#helpers)
+  - [psibase::serveSimpleUI]
+  - [psibase::serveActionTemplates]
+  - [psibase::servePackAction]
 
 ## Routing
 
@@ -70,10 +73,36 @@ Contracts which serve HTML implement these interfaces:
 
 ## Helpers
 
-- [psibase::simpleUI]
-- [psibase::fracpackActionFromJson]
-- [psibase::generateActionJsonTemplate]
+These functions help implement basic functionality:
 
-{{#cpp-doc ::psibase::simpleUI}}
-{{#cpp-doc ::psibase::fracpackActionFromJson}}
-{{#cpp-doc ::psibase::generateActionJsonTemplate}}
+- [psibase::serveSimpleUI]
+- [psibase::serveActionTemplates]
+- [psibase::servePackAction]
+
+Here's a common pattern for using them:
+
+```c++
+std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
+{
+   if (auto result = psibase::serveActionTemplates<ExampleContract>(request))
+      return result;
+
+   if (auto result = psibase::servePackAction<ExampleContract>(request))
+      return result;
+
+   if (request.method == "GET" && request.target == "/")
+   {
+      static const char helloWorld[] = "Hello World";
+      return psibase::RpcReplyData{
+            .contentType = "text/plain",
+            .body        = {helloWorld, helloWorld + strlen(helloWorld)},
+      };
+   }
+
+   return std::nullopt;
+}
+```
+
+{{#cpp-doc ::psibase::serveSimpleUI}}
+{{#cpp-doc ::psibase::serveActionTemplates}}
+{{#cpp-doc ::psibase::servePackAction}}

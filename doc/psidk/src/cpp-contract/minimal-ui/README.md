@@ -55,7 +55,7 @@ There are 2 common suffixes used by psibase contracts:
 - psinode forwards most http requests to the [`proxy-sys` contract](../../system-contract/proxy-sys.md).
 - If the URL begins with `/common`, [`proxy-sys`](../../system-contract/proxy-sys.md) forwards the request to the [`common-sys` contract](../../system-contract/common-sys.md). [`common-sys`](../../system-contract/common-sys.md) provides shared resources, such as js library code and an RPC request handler for packing transactions.
 - [`proxy-sys`](../../system-contract/proxy-sys.md) looks at the request domain. If it begins with the name of a registered contract, it calls that contract's `serveSys` action to process the request.
-- [psibase::simpleUI] handles the following requests:
+- [psibase::serveSimpleUI] handles the following requests:
   - `GET /` returns a minimal html file which references the `/common/SimpleUI.mjs` script. This script generates the UI dynamically.
   - `GET /action_templates` returns a template json structure (below). This lets the UI know which actions are available and sample values for their arguments. This isn't a schema; it's only suitable for simple cases.
   - `POST /pack_action/add` accepts the arguments for the `add` action as a JSON object, converts it to binary, and returns the result.
