@@ -2,10 +2,11 @@
 
 - [Routing](#routing)
 - [Registration](#registration)
-- [psibase::ServerInterface]
-- [psibase::RpcRequestData]
-- [psibase::RpcReplyData]
-- [psibase::ServerUploadInterface]
+- [Interfaces](#interfaces)
+  - [psibase::ServerInterface]
+  - [psibase::RpcRequestData]
+  - [psibase::RpcReplyData]
+  - [psibase::StorageInterface]
 
 ## Routing
 
@@ -36,9 +37,11 @@
       +-----------------+       +------------------+
 ```
 
-`psinode` passes most HTTP requests to the [psibase::proxy_sys] contract. It then routes requests to the appropriate contract's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The contracts run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
+`psinode` passes most HTTP requests to the [psibase::proxy_sys] contract, which then routes requests to the appropriate contract's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The contracts run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
 [psibase::common_sys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
+
+`psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Contracts don't serve these.
 
 ## Registration
 
@@ -50,7 +53,16 @@ Contracts which wish to serve HTTP requests need to register using the [psibase:
 
 A contract doesn't have to serve HTTP requests itself; it may delegate this to another contract during registration.
 
+## Interfaces
+
+Contracts which serve HTML implement these interfaces:
+
+- [psibase::ServerInterface] (required)
+  - [psibase::RpcRequestData]
+  - [psibase::RpcReplyData]
+- [psibase::StorageInterface] (optional)
+
 {{#cpp-doc ::psibase::ServerInterface}}
 {{#cpp-doc ::psibase::RpcRequestData}}
 {{#cpp-doc ::psibase::RpcReplyData}}
-{{#cpp-doc ::psibase::ServerUploadInterface}}
+{{#cpp-doc ::psibase::StorageInterface}}

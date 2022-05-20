@@ -75,9 +75,9 @@ namespace system_contract
       return psibase::serveSimpleUI<account_sys, false>(request);
    }  // serveSys
 
-   void rpc_account_sys::uploadSys(psio::const_view<std::string>       path,
-                                   psio::const_view<std::string>       contentType,
-                                   psio::const_view<std::vector<char>> content)
+   void rpc_account_sys::storeSys(psio::const_view<std::string>       path,
+                                  psio::const_view<std::string>       contentType,
+                                  psio::const_view<std::vector<char>> content)
    {
       check(getSender() == getReceiver(), "wrong sender");
 
@@ -94,7 +94,7 @@ namespace system_contract
           .content     = std::move(c),
       };
       kvPut(row.key(getReceiver()), row);
-   }  // uploadSys
+   }  // storeSys
 
 }  // namespace system_contract
 

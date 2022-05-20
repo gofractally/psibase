@@ -111,9 +111,9 @@ namespace psibase
       return std::nullopt;
    }  // common_sys::serveSys
 
-   void common_sys::uploadSys(psio::const_view<std::string>       path,
-                              psio::const_view<std::string>       contentType,
-                              psio::const_view<std::vector<char>> content)
+   void common_sys::storeSys(psio::const_view<std::string>       path,
+                             psio::const_view<std::string>       contentType,
+                             psio::const_view<std::vector<char>> content)
    {
       check(getSender() == getReceiver(), "wrong sender");
 

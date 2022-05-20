@@ -2,6 +2,7 @@
 
 - [psibase::Contract]
   - [Defining a contract](#defining-a-contract)
+  - [Reserved action names](#reserved-action-names)
   - [Calling other contracts](#calling-other-contracts)
   - [Defining events](#defining-events)
   - [Recursion safety](#recursion-safety)

@@ -11,11 +11,9 @@ namespace psibase
       static constexpr auto contract = psibase::AccountNumber("common-sys");
 
       auto serveSys(RpcRequestData request) -> std::optional<RpcReplyData>;
-      void uploadSys(psio::const_view<std::string>       path,
-                     psio::const_view<std::string>       contentType,
-                     psio::const_view<std::vector<char>> content);
+      void storeSys(psio::const_view<std::string>       path,
+                    psio::const_view<std::string>       contentType,
+                    psio::const_view<std::vector<char>> content);
    };
-   PSIO_REFLECT(common_sys,
-                method(serveSys, request),
-                method(uploadSys, path, contentType, content))
+   PSIO_REFLECT(common_sys, method(serveSys, request), method(storeSys, path, contentType, content))
 }  // namespace psibase

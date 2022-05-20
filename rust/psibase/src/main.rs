@@ -224,7 +224,7 @@ async fn push_transaction(
     Ok(())
 }
 
-fn upload_sys(
+fn store_sys(
     contract: &str,
     path: &str,
     content_type: &str,
@@ -233,7 +233,7 @@ fn upload_sys(
     action_json(
         contract,
         contract,
-        "uploadSys",
+        "storeSys",
         &to_hex(
             bridge::ffi::pack_upload_sys(&format!(
                 r#"{{
@@ -299,7 +299,7 @@ async fn upload(
 ) -> Result<(), anyhow::Error> {
     let signed_json = signed_transaction_json(&transaction_json(
         &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
-        &[upload_sys(
+        &[store_sys(
             contract,
             path,
             content_type,

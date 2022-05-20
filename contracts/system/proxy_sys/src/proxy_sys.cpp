@@ -67,7 +67,7 @@ namespace psibase
 
       // TODO: avoid repacking (both directions)
       psibase::Actor<ServerInterface> iface(act.contract, reg->rpcContract);
-      setRetval(iface.serveSys(req).unpack());
+      setRetval(iface.serveSys(std::move(req)).unpack());
    }  // serve()
 
 }  // namespace psibase
