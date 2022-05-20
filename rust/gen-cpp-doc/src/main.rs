@@ -724,11 +724,14 @@ fn parse<'tu>(
     Ok(parser.parse()?)
 }
 
-fn modify_book(book: &mut mdbook::book::Book, re: Regex, mut items: Vec<Item>) {
+fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
+    let cpp_doc_re = Regex::new(r"[{][{] *#cpp-doc +(::[^ ]+)+ *[}][}]").unwrap();
+    // I got lazy here. ` within the diagram will cause svg_bob_re to not match.
+    let svg_bob_re = Regex::new(r"```svgbob([^`]+)```").unwrap();
     for item in book.iter() {
         match item {
             BookItem::Chapter(chapter) => {
-                for capture in re.captures_iter(&chapter.content) {
+                for capture in cpp_doc_re.captures_iter(&chapter.content) {
                     let path = capture.get(1).unwrap().as_str();
                     set_urls(chapter, &mut items, path);
                 }
@@ -746,10 +749,19 @@ fn modify_book(book: &mut mdbook::book::Book, re: Regex, mut items: Vec<Item>) {
     });
     book.for_each_mut(|item: &mut BookItem| match item {
         BookItem::Chapter(chapter) => {
-            chapter.content = re
+            chapter.content = cpp_doc_re
                 .replace_all(&chapter.content, |caps: &Captures| {
                     let path = caps.get(1).unwrap().as_str();
                     generate_documentation(&items, path)
+                })
+                .to_string();
+            // We're doing svgbob substitution ourselves since
+            // * mdbook-svgbob has issues
+            // * mdbook-svgbob2 borked the formatting in some of our .md files
+            chapter.content = svg_bob_re
+                .replace_all(&chapter.content, |caps: &Captures| {
+                    let markup = caps.get(1).unwrap().as_str();
+                    format!("<pre class=\"svgbob\">{}</pre>", svgbob::to_svg(markup))
                 })
                 .to_string();
         }
@@ -759,7 +771,6 @@ fn modify_book(book: &mut mdbook::book::Book, re: Regex, mut items: Vec<Item>) {
 }
 
 fn main() -> Result<(), anyhow::Error> {
-    let re = Regex::new(r"[{][{] *#cpp-doc +(::[^ ]+)+ *[}][}]").unwrap();
     let args = Args::parse();
     if args.command.is_some() {
         return Ok(());
@@ -775,7 +786,7 @@ fn main() -> Result<(), anyhow::Error> {
     let tu = parse(&index, repo_path)?;
     // dump(&tu.get_entity(), 0);
     let items = get_items(&tu);
-    modify_book(&mut book, re, items);
+    modify_book(&mut book, items);
     serde_json::to_writer(io::stdout(), &book)?;
     Ok(())
 }

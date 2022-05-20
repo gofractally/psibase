@@ -8,6 +8,3 @@ title = "psidk"
 command = "../../build/rust/release/gen-cpp-doc"
 # command = "../../rust/target/debug/gen-cpp-doc"
 after = ["links","index"]
-
-[preprocessor.svgbob2]
-after = ["gen-cpp-doc"]
