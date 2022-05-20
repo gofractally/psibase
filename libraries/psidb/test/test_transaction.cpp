@@ -50,6 +50,45 @@ TEST_CASE("persistence large value", "[persistence]")
    }
 }
 
+TEST_CASE("stable checkpoint", "[persistence]")
+{
+   tmp_file file;
+
+   std::vector<std::pair<std::string, std::string>> data = {{"a", "v1"}, {"b", "v2"}};
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+
+      for (auto [key, value] : data)
+      {
+         auto trx = db.start_transaction();
+         trx.insert(key, value);
+         trx.commit();
+         db.async_flush();
+      }
+   }
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+      std::size_t     i = 0;
+      for (const auto& checkpoint : db.stable_checkpoints())
+      {
+         CHECK(i < data.size());
+         auto                                             cursor = checkpoint.get_cursor();
+         std::vector<std::pair<std::string, std::string>> contents;
+         cursor.lower_bound("");
+         while (cursor.valid())
+         {
+            contents.emplace_back(cursor.get_key(), cursor.get_value());
+            cursor.next();
+         }
+         auto expected = data;
+         expected.resize(i + 1);
+         CHECK(contents == expected);
+         ++i;
+      }
+      CHECK(i == 2);
+   }
+}
+
 TEST_CASE("abort", "[abort]")
 {
    tmp_file file;

@@ -24,6 +24,12 @@ auto make_kv(int i)
    return std::pair{std::to_string(i), std::to_string(i * 1024)};
 }
 
+template <typename T, typename U>
+std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& p)
+{
+   return os << "{ " << p.first << ", " << p.second << " }";
+}
+
 #define CHECK_CURSOR(cursor, k, v)         \
    do                                      \
    {                                       \

@@ -62,6 +62,7 @@ psidb::page_manager::page_manager(const char* filename, std::size_t num_pages)
 
 psidb::page_manager::~page_manager()
 {
+   sync_flush();
    _write_queue.interrupt();
    _write_worker.join();
    if (fd != -1)
@@ -390,6 +391,15 @@ bool psidb::page_manager::write_tree(page_id                      page,
    }
 }
 
+void psidb::page_manager::sync_flush()
+{
+   while (_syncing.load(std::memory_order_acquire))
+   {
+      _syncing.wait(true, std::memory_order_relaxed);
+   }
+   try_flush();
+}
+
 void psidb::page_manager::start_flush()
 {
    std::vector<checkpoint_ptr> all_checkpoints;
@@ -681,6 +691,7 @@ void psidb::page_manager::prepare_header(database_header*                   head
       header->checkpoints[i] = root->_root;
       // TODO: flush all tables
       prepare_flush(header->checkpoints[i].table_roots[0]);
+      ++i;
    }
    header->num_checkpoints  = roots.size();
    header->auto_checkpoints = auto_checkpoints;
@@ -693,13 +704,8 @@ void psidb::page_manager::write_header(const std::vector<checkpoint_ptr>& checkp
                                        std::size_t                        auto_checkpoints,
                                        checkpoint_freelist_location       checkpoint_freelist)
 {
-   // first: write
    database_header tmp;
    auto [freelist, freelist_pages] = _file_allocator.flush(_allocator);
-   tmp.freelist                    = freelist;
-   tmp.freelist_size               = freelist_pages;
-   tmp.checkpoint_freelist         = checkpoint_freelist.page;
-   tmp.checkpoint_freelist_size    = checkpoint_freelist.size;
    // needs to be after the allocator is flushed
    _file_allocator.deallocate(checkpoint_freelist.page, checkpoint_freelist.size);
    // TODO: skip the copy if the header is not valid (after creating a new
@@ -711,6 +717,10 @@ void psidb::page_manager::write_header(const std::vector<checkpoint_ptr>& checkp
       throw std::system_error{errno, std::system_category(), "fdatasync"};
    }
    prepare_header(&tmp, checkpoints, auto_checkpoints);
+   tmp.freelist                 = freelist;
+   tmp.freelist_size            = freelist_pages;
+   tmp.checkpoint_freelist      = checkpoint_freelist.page;
+   tmp.checkpoint_freelist_size = checkpoint_freelist.size;
    tmp.set_checksum();
    write_page(&tmp, header_page);
    // TODO: On linux pwritev2 with RWF_DSYNC can sync just the data written
@@ -720,6 +730,7 @@ void psidb::page_manager::write_header(const std::vector<checkpoint_ptr>& checkp
       throw std::system_error{errno, std::system_category(), "fdatasync"};
    }
    _syncing.store(false, std::memory_order_release);
+   _syncing.notify_one();
 }
 
 psidb::checkpoint_data::checkpoint_data(page_manager* self, const checkpoint_root& value)

@@ -24,6 +24,7 @@ namespace psidb
       }
       // clone_version is irrevelent if we never write.
       transaction start_read() { return {&_storage, _storage.get_head(), 0}; }
+      auto        stable_checkpoints() const { return _storage.get_stable_checkpoints(); }
       void        async_flush(bool stable = true) { _storage.async_flush(stable); }
       auto        get_stats() const { return _storage.get_stats(); }
       std::size_t checkpoints() const { return _storage.checkpoints(); }

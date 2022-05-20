@@ -207,4 +207,6 @@ namespace psidb
       version_type  version = 0;
    };
 
+   inline cursor checkpoint::get_cursor() const { return cursor{_root->_self, *this}; }
+
 }  // namespace psidb

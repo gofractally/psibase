@@ -177,40 +177,64 @@ namespace psidb
          }
          if (last_commit->_durable)
          {
-            if (_flush_stable)
+            if (last_commit != _auto_checkpoint)
             {
                _stable_checkpoints.push_back(last_commit);
-               _auto_checkpoint.reset();
             }
-            else
-            {
-               _auto_checkpoint = last_commit;
-            }
-            start_flush();
+            try_flush();
          }
-#if 0
-         if (_allocator.should_gc())
-         {
-            run_gc();
-         }
-#endif
-         //_gc_manager.process_gc(_allocator, _file_allocator);
       }
       void abort_transaction(checkpoint&& c)
       {
          assert(c._root.get() == &_active_checkpoints.back());
          c._root.reset();
       }
+      // Starts a flush if a flush is not alread in progress
+      void try_flush()
+      {
+         if (_syncing.exchange(true, std::memory_order_relaxed) == false)
+         {
+            start_flush();
+            if (_auto_checkpoint)
+            {
+               _auto_checkpoint->_durable = false;
+            }
+            _auto_checkpoint = std::move(_next_auto_checkpoint);
+         }
+      }
       void async_flush(bool stable = true)
       {
-         // FIXME: automatically ignoring multiple flushes
-         // is probably a bad idea.  At the very least, it interacts
-         // badly with stable.
-         if (_syncing.exchange(true, std::memory_order_relaxed))
-         {
-            return;
-         }
          head->_durable = true;
+         if (stable)
+         {
+            // A stable checkpoint will cause pending auto checkpoints to be dropped
+            if (_auto_checkpoint)
+            {
+               _auto_checkpoint->_durable = false;
+               _auto_checkpoint.reset();
+            }
+            if (_next_auto_checkpoint)
+            {
+               _next_auto_checkpoint->_durable = false;
+               _next_auto_checkpoint.reset();
+            }
+         }
+         else
+         {
+            // If we have a scheduled auto checkpoint, don't replace it.
+            if (!_auto_checkpoint)
+            {
+               _auto_checkpoint = head;
+            }
+            else
+            {
+               if (_next_auto_checkpoint)
+               {
+                  _next_auto_checkpoint->_durable = false;
+               }
+               _next_auto_checkpoint = head;
+            }
+         }
          if (head == last_commit)
          {
             if (_flush_version != head->_root.version)
@@ -221,13 +245,8 @@ namespace psidb
                if (stable)
                {
                   _stable_checkpoints.push_back(head);
-                  _auto_checkpoint.reset();
                }
-               else
-               {
-                  _auto_checkpoint = head;
-               }
-               start_flush();
+               try_flush();
             }
          }
          else
@@ -243,6 +262,15 @@ namespace psidb
          auto pos = std::find(_stable_checkpoints.begin(), _stable_checkpoints.end(), c._root);
          assert(pos != _stable_checkpoints.end());
          _stable_checkpoints.erase(pos);
+      }
+      std::vector<checkpoint> get_stable_checkpoints() const
+      {
+         std::vector<checkpoint> result;
+         for (auto c : _stable_checkpoints)
+         {
+            result.push_back(std::move(c));
+         }
+         return result;
       }
       version_type flush_version() const { return _flush_version; }
       // Mark a page as dirty.
@@ -408,6 +436,7 @@ namespace psidb
           const std::vector<checkpoint_ptr>& all_checkpoints,
           const std::shared_ptr<void>&       refcount);
       void start_flush();
+      void sync_flush();
 
       // Raw file io
       void read_page(void* out, page_id id, std::size_t count = 1);
@@ -468,9 +497,10 @@ namespace psidb
       boost::intrusive::list<checkpoint_data> _active_checkpoints;
       std::mutex                              _commit_mutex;
       std::vector<checkpoint_ptr>             _stable_checkpoints;
-      checkpoint_ptr                          _auto_checkpoint = nullptr;
-      checkpoint_ptr                          last_commit      = nullptr;
-      checkpoint_ptr                          head             = nullptr;
+      checkpoint_ptr                          _auto_checkpoint      = nullptr;
+      checkpoint_ptr                          _next_auto_checkpoint = nullptr;
+      checkpoint_ptr                          last_commit           = nullptr;
+      checkpoint_ptr                          head                  = nullptr;
 
       std::thread _write_worker{[this]() { write_worker(); }};
    };
