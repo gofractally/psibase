@@ -89,6 +89,60 @@ TEST_CASE("stable checkpoint", "[persistence]")
    }
 }
 
+TEST_CASE("stable checkpoint allocation", "[persistence]")
+{
+   tmp_file file;
+
+   std::vector<std::pair<std::string, std::string>> data;
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+
+      for (std::size_t i = 0; i < 100; ++i)
+      {
+         auto trx          = db.start_transaction();
+         auto [key, value] = make_kv(i);
+         data.push_back({key, value});
+         trx.insert(key, value);
+         trx.commit();
+         db.async_flush();
+         db.sync();
+         if (i >= 5)
+         {
+            db.delete_stable_checkpoint(db.stable_checkpoints()[0]);
+            // 2 header pages
+            // 1 free list
+            // 1 checkpoint data
+            // 6 active checkpoints
+            CHECK(db.get_stats().file.used == 10);
+            if (i >= 6)
+            {
+               // 1 previous free list
+               // 1 previous checkpoint data
+               // 1 previous checkpoint
+               CHECK(db.get_stats().file.total == 13);
+            }
+         }
+      }
+   }
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+      // 5 checkpoints
+      CHECK(db.get_stats().file.used == 9);
+      CHECK(db.get_stats().file.total == 13);
+      std::size_t     i = 95;
+      for (const auto& checkpoint : db.stable_checkpoints())
+      {
+         CHECK(i < data.size());
+         auto expected = data;
+         expected.resize(i + 1);
+         std::sort(expected.begin(), expected.end());
+         CHECK_STATE(checkpoint, expected);
+         ++i;
+      }
+      CHECK(i == 100);
+   }
+}
+
 TEST_CASE("abort", "[abort]")
 {
    tmp_file file;

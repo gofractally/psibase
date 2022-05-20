@@ -40,3 +40,17 @@ std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& p)
          CHECK(cursor.get_value() == (v)); \
       }                                    \
    } while (false)
+
+#define CHECK_STATE(trx, expected)                                                  \
+   do                                                                               \
+   {                                                                                \
+      auto                                             cursor = (trx).get_cursor(); \
+      std::vector<std::pair<std::string, std::string>> contents;                    \
+      cursor.lower_bound("");                                                       \
+      while (cursor.valid())                                                        \
+      {                                                                             \
+         contents.emplace_back(cursor.get_key(), cursor.get_value());               \
+         cursor.next();                                                             \
+      }                                                                             \
+      CHECK(contents == (expected));                                                \
+   } while (false)

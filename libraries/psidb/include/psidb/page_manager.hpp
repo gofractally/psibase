@@ -255,6 +255,12 @@ namespace psidb
             _flush_pending = true;
          }
       }
+      void sync()
+      {
+         while (_syncing)
+         {
+         }
+      }
       // Removes a stable checkpoint.  The checkpoint may continue
       // to exist until the database is synced.
       void delete_stable_checkpoint(const checkpoint& c)
