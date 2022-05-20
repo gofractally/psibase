@@ -40,7 +40,7 @@ psibase install -i example example.wasm
 
 Even though other contracts may call into our contract's `add` and `multiply` methods,
 we haven't provided end users with a way to construct transactions which use them.
-That's the topic of the next section, [Minimal User Interface](../minimal-ui/index.html).
+That's the topic of the next section, [Minimal User Interface](../minimal-ui/).
 
 ## Homework
 

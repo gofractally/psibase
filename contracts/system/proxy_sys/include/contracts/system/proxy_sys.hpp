@@ -12,7 +12,7 @@ namespace psibase
    /// - Else if there's a subdomain and it references a registered contract, then route the request to that contract.
    /// - Else route the request to [common_sys]; this handles the chain's main domain.
    ///
-   /// See [Web Services](../../cpp-contract/reference/web-services.html) for more detail, including how to write contracts which serve HTTP requests.
+   /// See [Web Services](../cpp-contract/reference/web-services.md) for more detail, including how to write contracts which serve HTTP requests.
    ///
    /// #### serve export (not an action)
    ///

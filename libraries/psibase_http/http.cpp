@@ -423,7 +423,7 @@ namespace psibase::http
             // Build the path to the requested file
             std::string path = path_cat(server.http_config->static_dir, req.target());
             if (req.target().back() == '/')
-               path.append("index.html");
+               path.append("index.md");
 
             // Attempt to open the file
             beast::error_code            ec;

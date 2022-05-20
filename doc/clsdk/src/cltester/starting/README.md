@@ -4,24 +4,25 @@
 
 To simplify testing, the contract's class definition and table definitions should be in a header file.
 
-This example is based on the [Debug Example](../../contract/debug/index.html), but has these additions:
+This example is based on the [Debug Example](../../contract/debug/), but has these additions:
 
-* The contract source is now split into `testable.hpp` and `testable.cpp`
-* CMakeLists.txt has a new rule to build `tests.wasm` from `tests.cpp` (below)
-* `launch.json` now launches the test cases in cltester instead of starting nodeos
+- The contract source is now split into `testable.hpp` and `testable.cpp`
+- CMakeLists.txt has a new rule to build `tests.wasm` from `tests.cpp` (below)
+- `launch.json` now launches the test cases in cltester instead of starting nodeos
 
 The files:
 
-* [testable.hpp](testable.hpp)
-* [testable.cpp](testable.cpp)
-* [CMakeLists.txt](CMakeLists.txt)
-* [.vscode/c_cpp_properties.json](.vscode/c_cpp_properties.json)
-* [.vscode/settings.json](.vscode/settings.json)
-* [.vscode/launch.json](.vscode/launch.json)
+- [testable.hpp](testable.hpp)
+- [testable.cpp](testable.cpp)
+- [CMakeLists.txt](CMakeLists.txt)
+- [.vscode/c_cpp_properties.json](.vscode/c_cpp_properties.json)
+- [.vscode/settings.json](.vscode/settings.json)
+- [.vscode/launch.json](.vscode/launch.json)
 
 ## Simple test case
 
 `tests.cpp`:
+
 ```cpp
 {{#include tests.cpp}}
 ```
