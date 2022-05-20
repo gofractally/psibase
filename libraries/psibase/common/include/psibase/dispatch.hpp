@@ -33,9 +33,22 @@ namespace psibase
    template <typename Contract>
    void dispatch(AccountNumber sender, AccountNumber receiver)
    {
-      Contract contract;  // TODO: Make this static?
+      auto act          = getCurrentActionView();
+      auto makeContract = [&]()
+      {
+         if constexpr (std::is_constructible<Contract, psio::shared_view_ptr<psibase::Action>>{})
+         {
+            return Contract{act};
+         }
+         else
+         {
+            return Contract{};
+         }
+      };
+      auto contract{makeContract()};
+
+      //Contract contract;  // TODO: Make this static?
       contract.dispatch_set_sender_receiver(sender, receiver);
-      auto act = getCurrentActionView();
 
       bool called = psio::reflect<Contract>::get_by_name(
           act->method()->value(),
@@ -80,8 +93,5 @@ namespace psibase
       psibase::dispatch<CONTRACT>(sender, receiver);                                      \
    }                                                                                      \
    extern "C" void __wasm_call_ctors();                                                   \
-   extern "C" void start(psibase::AccountNumber this_contract)                            \
-   {                                                                                      \
-      __wasm_call_ctors();                                                                \
-   }
+   extern "C" void start(psibase::AccountNumber this_contract) { __wasm_call_ctors(); }
 \
