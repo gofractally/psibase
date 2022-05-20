@@ -79,11 +79,17 @@ namespace psidb
          modified_nodes.clear();
       }
 
-      void on_delete(page_header* p) { obsolete_nodes.push_back(p); }
+      void on_delete(page_header* p)
+      {
+         if (p->id != 0)
+         {
+            obsolete_nodes.push_back({p->version, p->id});
+         }
+      }
 
       void on_copy(node_ptr ptr)
       {
-         obsolete_nodes.push_back(_db->translate_page_address(
+         on_delete(_db->translate_page_address(
              _db->translate_page_address(ptr->load(std::memory_order_relaxed))->prev));
          modified_nodes.push_back(ptr);
       }
@@ -97,7 +103,7 @@ namespace psidb
       checkpoint    _checkpoint;
       version_type  _clone_version;
       // list of pages obsoleted by this transaction
-      std::vector<page_header*> obsolete_nodes;
+      std::vector<obsolete_page> obsolete_nodes;
       // list of pages created by this transaction
       std::vector<node_ptr> modified_nodes;
    };

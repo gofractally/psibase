@@ -21,7 +21,14 @@ namespace psidb
 
    class page_manager;
 
-   struct checkpoint_data : boost::intrusive::list_base_hook<>
+   struct obsolete_page
+   {
+      version_type version;
+      page_id      page;
+   };
+
+   struct checkpoint_data : boost::intrusive::list_base_hook<>,
+                            std::enable_shared_from_this<checkpoint_data>
    {
       checkpoint_data(page_manager* self, const checkpoint_root& value);
       // Creates a new checkpoint based on the head checkpoint
@@ -30,13 +37,18 @@ namespace psidb
       page_manager*   _self;
       checkpoint_root _root;
 
+      // true if this checkpoint should be written to disk.
+      bool _durable = false;
+      // true if this checkpoint has not been written to disk
+      bool _dirty = true;
+
       // Pages that are used by this checkpoint, but not by any later checkpoint.
       // When a checkpoint is deleted, this list is merged into the previous checkpoint.
       // Optimized for few large transactions.
       // A mergeable priority queue would be faster for many small transactions.
-      std::vector<std::vector<page_header*>> _pages_to_free;
+      std::vector<std::vector<obsolete_page>> _pages_to_free;
 
-      void add_free_pages(std::vector<page_header*>&& pages);
+      void add_free_pages(std::vector<obsolete_page>&& pages);
       // Free all pages more recent than version
       void free_pages(version_type version);
       void splice_pages(checkpoint_data& other);
@@ -145,16 +157,11 @@ namespace psidb
             _flush_version = head->_root.version;
             _flush_pending = false;
             _dirty_flag    = switch_dirty_flag(_dirty_flag);
-            // TODO: should this be in async_flush?
-            if (head == last_commit)
-            {
-               start_flush(head, _flush_stable);
-            }
          }
          head.reset(new checkpoint_data(this));
          return {head};
       }
-      void commit_transaction(const checkpoint& c, std::vector<page_header*>&& obsolete_pages)
+      void commit_transaction(const checkpoint& c, std::vector<obsolete_page>&& obsolete_pages)
       {
          {
             std::lock_guard l{_checkpoint_mutex};
@@ -168,9 +175,18 @@ namespace psidb
             std::lock_guard l{_commit_mutex};
             last_commit = c._root;
          }
-         if (last_commit->_root.version == _flush_version)
+         if (last_commit->_durable)
          {
-            start_flush(c._root, _flush_stable);
+            if (_flush_stable)
+            {
+               _stable_checkpoints.push_back(last_commit);
+               _auto_checkpoint.reset();
+            }
+            else
+            {
+               _auto_checkpoint = last_commit;
+            }
+            start_flush();
          }
 #if 0
          if (_allocator.should_gc())
@@ -194,6 +210,7 @@ namespace psidb
          {
             return;
          }
+         head->_durable = true;
          if (head == last_commit)
          {
             if (_flush_version != head->_root.version)
@@ -201,14 +218,31 @@ namespace psidb
                _flush_version = head->_root.version;
                _flush_pending = false;
                _dirty_flag    = switch_dirty_flag(_dirty_flag);
-               start_flush(head, stable);
+               if (stable)
+               {
+                  _stable_checkpoints.push_back(head);
+                  _auto_checkpoint.reset();
+               }
+               else
+               {
+                  _auto_checkpoint = head;
+               }
+               start_flush();
             }
          }
          else
          {
-            _flush_stable  = stable;
+            _flush_stable  = true;
             _flush_pending = true;
          }
+      }
+      // Removes a stable checkpoint.  The checkpoint may continue
+      // to exist until the database is synced.
+      void delete_stable_checkpoint(const checkpoint& c)
+      {
+         auto pos = std::find(_stable_checkpoints.begin(), _stable_checkpoints.end(), c._root);
+         assert(pos != _stable_checkpoints.end());
+         _stable_checkpoints.erase(pos);
       }
       version_type flush_version() const { return _flush_version; }
       // Mark a page as dirty.
@@ -235,8 +269,8 @@ namespace psidb
          std::uint32_t         size;
          union
          {
-            const char* data;
-            page_id     page;
+            char*   data;
+            page_id page;
          };
       };
       value_reference clone_value(std::string_view data)
@@ -248,7 +282,7 @@ namespace psidb
          void* copy = _allocator.allocate(data.size());
          std::memcpy(copy, data.data(), data.size());
          return {value_reference_flags::memory, 0, static_cast<std::uint32_t>(data.size()),
-                 static_cast<const char*>(copy)};
+                 static_cast<char*>(copy)};
       }
 
       // A lock must be held around:
@@ -299,6 +333,7 @@ namespace psidb
       }
 
       void queue_gc(page_header* node);
+      void queue_gc(obsolete_page);
       struct stats
       {
          file_allocator::stats file;
@@ -348,12 +383,19 @@ namespace psidb
       page_header* read_page(node_ptr ptr, page_id id);
       void         evict_page(node_ptr ptr);
 
+      struct checkpoint_freelist_location
+      {
+         page_id       page;
+         std::uint32_t size;
+      };
+
       // Write dirty pages back to the filesystem
       void write_worker();
       void queue_write(page_id dest, page_header* src, const std::shared_ptr<void>& refcount);
       void write_pages(page_id                      dest,
-                       const void*                  src,
+                       void*                        src,
                        std::size_t                  count,
+                       bool                         temporary,
                        const std::shared_ptr<void>& refcount);
       void write_page(page_header*                 page,
                       page_flags                   dirty_flag,
@@ -362,24 +404,34 @@ namespace psidb
                       version_type                 version,
                       page_flags                   dirty_flag,
                       const std::shared_ptr<void>& refcount);
-      void start_flush(const std::shared_ptr<checkpoint_data>& ptr, bool stable);
+      checkpoint_freelist_location write_checkpoint_freelist(
+          const std::vector<checkpoint_ptr>& all_checkpoints,
+          const std::shared_ptr<void>&       refcount);
+      void start_flush();
 
       // Raw file io
       void read_page(void* out, page_id id, std::size_t count = 1);
       void write_page(const void* in, page_id id);
 
       // Database header ops
+      void read_checkpoint_freelist(void* data);
       void read_header(database_header* header);
       void read_header();
       void prepare_flush(page_id& root);
-      void prepare_header(database_header* header, const checkpoint_ptr& root);
-      void write_header(const checkpoint_ptr& root, bool stable);
+      void prepare_header(database_header*                   header,
+                          const std::vector<checkpoint_ptr>& roots,
+                          std::size_t                        auto_checkpoints);
+      void write_header(const std::vector<checkpoint_ptr>& checkpoints,
+                        std::size_t                        auto_checkpoints,
+                        checkpoint_freelist_location       checkpoint_freelist);
 
       struct write_queue_element
       {
          std::int64_t dest;
-         const void*  src;
+         void*        src;
          std::size_t  size;
+         // Whether the src buffer should be deallocated
+         bool temporary;
          // completion handler
          std::shared_ptr<void> counter;
       };
@@ -415,9 +467,10 @@ namespace psidb
       mutable std::mutex                      _checkpoint_mutex;
       boost::intrusive::list<checkpoint_data> _active_checkpoints;
       std::mutex                              _commit_mutex;
-      checkpoint_ptr                          stable_checkpoint = nullptr;
-      checkpoint_ptr                          last_commit       = nullptr;
-      checkpoint_ptr                          head              = nullptr;
+      std::vector<checkpoint_ptr>             _stable_checkpoints;
+      checkpoint_ptr                          _auto_checkpoint = nullptr;
+      checkpoint_ptr                          last_commit      = nullptr;
+      checkpoint_ptr                          head             = nullptr;
 
       std::thread _write_worker{[this]() { write_worker(); }};
    };

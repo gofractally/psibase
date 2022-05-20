@@ -24,6 +24,11 @@ namespace psidb
       void    initialize(std::uint32_t reserved_pages);
       page_id allocate(std::size_t size);
       void    deallocate(page_id id, std::size_t size);
+      // Cause pages to be written as free at the next flush, but does not allow them to be reused.
+      // Useful for live but non-durable checkpoints that reference pages on disk.
+      // TODO: implement.  Failure to implement this can cause a permanent
+      // memory leak after a crash.
+      void deallocate_temp(page_id, std::size_t size) {}
       // Writes the free list to the the file.
       // After calling flush, no pages may be allocated or deallocated until the
       // database header is durably written to the file.

@@ -63,7 +63,7 @@ TEST_CASE("thread tests", "[thread]")
          trx.erase("");
          trx.insert("", {reinterpret_cast<const char*>(&i), sizeof(i)});
          trx.commit();
-         //db.async_flush(true);
+         db.async_flush(false);
          auto stats = db.get_stats();
          std::osyncstream(std::cout)
              << "memory used: " << stats.memory.used << " / " << stats.memory.total
