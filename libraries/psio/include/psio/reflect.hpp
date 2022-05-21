@@ -148,6 +148,9 @@ namespace psio
       using value_type = T;
    };
 
+   template <typename T>
+   constexpr bool is_std_vector_v = is_std_vector<T>::value;
+
    template <typename>
    struct is_std_optional : std::false_type
    {
@@ -160,7 +163,7 @@ namespace psio
    };
 
    template <typename T>
-   using is_std_optional_v = typename is_std_optional<T>::value;
+   constexpr bool is_std_optional_v = is_std_optional<T>::value;
 
    template <typename>
    struct is_std_unique_ptr : std::false_type
@@ -173,6 +176,9 @@ namespace psio
       using value_type = T;
    };
 
+   template <typename T>
+   constexpr bool is_std_unique_ptr_v = is_std_unique_ptr<T>::value;
+
    template <typename>
    struct is_std_reference_wrapper : std::false_type
    {
@@ -183,6 +189,9 @@ namespace psio
    {
       using value_type = T;
    };
+
+   template <typename T>
+   constexpr bool is_std_reference_wrapper_v = is_std_reference_wrapper<T>::value;
 
    template <typename>
    struct is_std_array : std::false_type
@@ -197,26 +206,7 @@ namespace psio
    };
 
    template <typename T>
-   inline constexpr bool is_optional()
-   {
-      return is_std_optional<T>::value;
-   }
-   template <typename T>
-   inline constexpr bool is_unique_ptr()
-   {
-      return is_std_unique_ptr<T>::value;
-   }
-   template <typename T>
-   inline constexpr bool is_reference_wrapper()
-   {
-      return is_std_reference_wrapper<T>::value;
-   }
-
-   template <typename T>
-   constexpr bool is_array()
-   {
-      return is_std_array<T>::value;
-   }
+   constexpr bool is_std_array_v = is_std_array<T>::value;
 
    template <typename>
    struct is_std_variant : std::false_type
@@ -239,6 +229,9 @@ namespace psio
       constexpr static const uint16_t num_types = sizeof...(T);
    };
 
+   template <typename T>
+   constexpr bool is_std_variant_v = is_std_variant<T>::value;
+
    template <typename>
    struct is_std_tuple : std::false_type
    {
@@ -258,6 +251,9 @@ namespace psio
       }
    };
 
+   template <typename T>
+   constexpr bool is_std_tuple_v = is_std_tuple<T>::value;
+
    template <typename>
    struct is_std_map : std::false_type
    {
@@ -273,6 +269,10 @@ namespace psio
          return n;
       }
    };
+
+   template <typename T>
+   constexpr bool is_std_map_v = is_std_map<T>::value;
+
    template <typename T>
    struct remove_cvref
    {

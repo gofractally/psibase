@@ -363,7 +363,7 @@ namespace psio
    {
       if constexpr (std::is_same_v<bool, T>)
          return 1;
-      else if constexpr (is_array<T>())
+      else if constexpr (is_std_array_v<T>)
       {
          if constexpr (may_use_heap<typename is_std_array<T>::value_type>())
          {

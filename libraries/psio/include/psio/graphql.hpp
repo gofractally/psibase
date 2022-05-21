@@ -532,7 +532,7 @@ namespace psio
          if (i >= arg_names.size())
             return error("mismatched arg names"), false;
 
-         constexpr bool is_opt = is_optional<remove_cvref_t<decltype(std::get<i>(args))>>();
+         constexpr bool is_opt = is_std_optional_v<remove_cvref_t<decltype(std::get<i>(args))>>;
          if (input_stream.current_value != std::data(arg_names)[i])
             return gql_parse_args<i + 1>(args, filled, found, input_stream, error, arg_names);
          input_stream.skip();
@@ -608,7 +608,8 @@ namespace psio
 
    template <typename T, typename OS, typename E>
    auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
-       -> std::enable_if_t<is_std_optional<T>() || std::is_pointer<T>() || is_unique_ptr<T>(), bool>
+       -> std::enable_if_t<is_std_optional<T>() || std::is_pointer<T>() || is_std_unique_ptr<T>(),
+                           bool>
    {
       if (value)
          return gql_query(*value, input_stream, output_stream, error);
@@ -618,7 +619,7 @@ namespace psio
 
    template <typename T, typename OS, typename E>
    auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
-       -> std::enable_if_t<is_reference_wrapper<T>(), bool>
+       -> std::enable_if_t<is_std_reference_wrapper_v<T>, bool>
    {
       return gql_query(value.get(), input_stream, output_stream, error);
    }
