@@ -35,6 +35,12 @@ namespace psio
       return true;
    }
 
+   template <std::size_t Size>
+   constexpr bool use_json_string_for_gql(std::array<signed char, Size>*)
+   {
+      return true;
+   }
+
    template <typename T>
    auto get_gql_name(T*) -> std::enable_if_t<use_json_string_for_gql((T*)nullptr), const char*>
    {
@@ -69,7 +75,7 @@ namespace psio
    template <typename Raw>
    std::string generate_gql_partial_name(Raw*)
    {
-      using T = std::decay_t<Raw>;
+      using T = remove_cvref_t<Raw>;
       if constexpr (std::is_same_v<T, bool>)
          return "Boolean";
       else if constexpr (std::is_integral_v<T>)
@@ -114,11 +120,10 @@ namespace psio
          return generate_gql_partial_name((Raw*)nullptr) + "!";
    }
 
-   /*
    template <typename Raw, typename S>
    void fill_gql_schema(Raw*, S& stream, std::set<std::type_index>& defined_types)
    {
-      using T = std::remove_cvref<Raw>;
+      using T = std::remove_cvref_t<Raw>;
       if constexpr (is_std_optional<T>())
          fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types);
       else if constexpr (std::is_pointer<T>())
@@ -128,61 +133,68 @@ namespace psio
          fill_gql_schema((typename T::element_type*)nullptr, stream, defined_types);
       else if constexpr (is_std_reference_wrapper_v<T>)
          fill_gql_schema((typename T::type*)nullptr, stream, defined_types);
- //     else if constexpr (eosio::is_serializable_container<T>()) // e.g. is std::vector<T>
- //        fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types);
-      else if constexpr (eosio::reflection::has_for_each_field_v<T> && !has_get_gql_name<T>::value)
+      else if constexpr (is_std_vector_v<T>)
+         fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types);
+      else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
       {
          if (defined_types.insert(typeid(T)).second)
          {
-            eosio::for_each_field<T>(
-                [&](const char*, auto member)
+            reflect<T>::for_each(
+                [&](const psio::meta& meta, auto member)
                 {
-                   fill_gql_schema((std::remove_cvref<decltype(member((T*)nullptr))>*)nullptr,
-                                   stream, defined_types);
-                });
-            eosio::for_each_method<T>(
-                [&](const char* name, auto member, auto... arg_names)
-                {
-                   using mf  = eosio::member_fn<decltype(member)>;
-                   using ret = std::remove_cvref<typename mf::return_type>;
-                   if constexpr (mf::is_const)
+                   using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!MemPtr::isFunction)
                    {
-                      eosio::for_each_named_type(
-                          [&](auto* p, const char*) {  //
-                             fill_gql_schema(p, stream, defined_types);
-                          },
-                          typename mf::arg_types{}, arg_names...);
-                      fill_gql_schema((ret*)nullptr, stream, defined_types);
+                      fill_gql_schema((remove_cvref_t<typename MemPtr::ValueType>*)nullptr, stream,
+                                      defined_types);
+                   }
+                });
+            reflect<T>::for_each(
+                [&](const psio::meta& meta, auto member)
+                {
+                   using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (MemPtr::isConstFunction)
+                   {
+                      forEachType(typename MemPtr::ArgTypes{},
+                                  [&](auto* p) {  //
+                                     fill_gql_schema(p, stream, defined_types);
+                                  });
+                      fill_gql_schema((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr,
+                                      stream, defined_types);
                    }
                 });
             write_str("type ", stream);
             write_str(generate_gql_partial_name((Raw*)nullptr), stream);
             write_str(" {\n", stream);
-            eosio::for_each_field<T>(
-                [&](const char* name, auto member)
+            reflect<T>::for_each(
+                [&](const psio::meta& meta, auto member)
                 {
-                   write_str("    ", stream);
-                   write_str(name, stream);
-                   write_str(": ", stream);
-                   write_str(generate_gql_whole_name(
-                                 (std::remove_cvref<decltype(member((T*)nullptr))>*)nullptr),
-                             stream);
-                   write_str("\n", stream);
-                });
-            eosio::for_each_method<T>(
-                [&](const char* name, auto member, auto... arg_names)
-                {
-                   using mf  = eosio::member_fn<decltype(member)>;
-                   using ret = std::remove_cvref<typename mf::return_type>;
-                   if constexpr (mf::is_const)
+                   using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!MemPtr::isFunction)
                    {
                       write_str("    ", stream);
-                      write_str(name, stream);
-                      if constexpr (mf::arg_types::size > 0)
+                      write_str(meta.name, stream);
+                      write_str(": ", stream);
+                      write_str(generate_gql_whole_name(
+                                    (std::remove_cvref_t<typename MemPtr::ValueType>*)nullptr),
+                                stream);
+                      write_str("\n", stream);
+                   }
+                });
+            reflect<T>::for_each(
+                [&](const psio::meta& meta, auto member)
+                {
+                   using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (MemPtr::isConstFunction)
+                   {
+                      write_str("    ", stream);
+                      write_str(meta.name, stream);
+                      if constexpr (MemPtr::numArgs > 0)
                       {
                          write_str("(", stream);
                          bool first = true;
-                         eosio::for_each_named_type(
+                         forEachNamedType(  //
+                             typename MemPtr::ArgTypes{}, meta.param_names,
                              [&](auto* p, const char* name)
                              {
                                 if (!first)
@@ -191,19 +203,20 @@ namespace psio
                                 write_str(": ", stream);
                                 write_str(generate_gql_whole_name(p), stream);
                                 first = false;
-                             },
-                             typename mf::arg_types{}, arg_names...);
+                             });
                          write_str(")", stream);
                       }
                       write_str(": ", stream);
-                      write_str(generate_gql_whole_name((ret*)nullptr), stream);
+                      write_str(generate_gql_whole_name(
+                                    (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr),
+                                stream);
                       write_str("\n", stream);
                    }
                 });
             write_str("}\n", stream);
          }
       }
-   }
+   }  // fill_gql_schema
 
    template <typename Raw, typename S>
    void fill_gql_schema(Raw*, S& stream)
@@ -215,15 +228,14 @@ namespace psio
    template <typename T>
    std::string get_gql_schema(T* p = nullptr)
    {
-      eosio::size_stream ss;
+      size_stream ss;
       fill_gql_schema((T*)nullptr, ss);
-      std::string             result(ss.size, 0);
-      eosio::fixed_buf_stream fbs(result.data(), result.size());
+      std::string      result(ss.size, 0);
+      fixed_buf_stream fbs(result.data(), result.size());
       fill_gql_schema((T*)nullptr, fbs);
-      eosio::check(fbs.pos == fbs.end, eosio::error_to_str(eosio::stream_error::underrun));
+      check(fbs.pos == fbs.end, error_to_str(stream_error::underrun));
       return result;
    }
-*/
 
    struct gql_stream
    {
@@ -429,6 +441,7 @@ namespace psio
       return error("expected String");
    }
 
+   // TODO: schema support for these types as inputs
    template <typename T, typename E>
    auto gql_parse_arg(T& arg, gql_stream& input_stream, const E& error)
        -> std::enable_if_t<reflect<T>::is_struct, bool>
@@ -447,9 +460,9 @@ namespace psio
             return error("expected :");
          input_stream.skip();
 
-         // TODO: don't hash the name; the real names could be made easily available
-         bool found = reflect<T>::get_by_name(hash_name(field_name), [&](const meta& m, auto mptr)
-                                              { gql_parse_arg(arg.*mptr, input_stream, error); });
+         bool found =
+             reflect<T>::get_by_name(hash_name(field_name), [&](const meta& m, auto member)
+                                     { gql_parse_arg(arg.*member(&arg), input_stream, error); });
 
          if (!ok)
             return false;
@@ -679,11 +692,11 @@ namespace psio
             input_stream.skip();
          }
 
-         found = reflect<T>::get_by_name(
-             // TODO: don't hash the name; the real names could be made easily available
+         reflect<T>::get_by_name(
              hash_name(field_name),
-             [&](const meta& m, auto mptr)
+             [&](const meta& m, auto member)
              {
+                using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
                 if (first)
                 {
                    increase_indent(output_stream);
@@ -697,12 +710,15 @@ namespace psio
                 to_json(alias, output_stream);
                 write_colon(output_stream);
 
-                if constexpr (std::is_member_object_pointer_v<decltype(mptr)>)
+                if constexpr (!MemPtr::isFunction)
                 {
-                   ok &= gql_query(value.*mptr, input_stream, output_stream, error);
+                   found = true;
+                   ok &= gql_query(value.*member(&value), input_stream, output_stream, error);
                 }
-                else  /// member function
+                else if constexpr (MemPtr::isConstFunction)
                 {
+                   found                         = true;
+                   auto mptr                     = member(&value);
                    using args_tuple              = decltype(args_as_tuple(mptr));
                    static constexpr int num_args = std::tuple_size_v<args_tuple>;
                    args_tuple           args;

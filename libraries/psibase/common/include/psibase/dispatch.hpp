@@ -39,8 +39,9 @@ namespace psibase
 
       bool called = psio::reflect<Contract>::get_by_name(
           act->method()->value(),
-          [&](auto meta, auto member_func)
+          [&](auto meta, auto member)
           {
+             auto member_func  = member(&contract);
              using result_type = decltype(psio::result_of(member_func));
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));

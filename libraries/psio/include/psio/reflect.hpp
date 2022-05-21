@@ -282,6 +282,63 @@ namespace psio
    template <typename T>
    using remove_cvref_t = typename remove_cvref<T>::type;
 
+   template <typename... Ts>
+   struct TypeList
+   {
+      static constexpr int size = sizeof...(Ts);
+   };
+
+   template <typename T>
+   struct MemberPtrType;
+
+   template <typename V, typename T>
+   struct MemberPtrType<V(T::*)>
+   {
+      static constexpr bool isFunction      = false;
+      static constexpr bool isConstFunction = false;
+      using ValueType                       = V;
+   };
+
+   template <typename R, typename T, typename... Args>
+   struct MemberPtrType<R (T::*)(Args...)>
+   {
+      static constexpr bool isFunction      = true;
+      static constexpr bool isConstFunction = false;
+      static constexpr int  numArgs         = sizeof...(Args);
+      using ClassType                       = T;
+      using ReturnType                      = R;
+      using ArgTypes                        = TypeList<Args...>;
+   };
+
+   template <typename R, typename T, typename... Args>
+   struct MemberPtrType<R (T::*)(Args...) const>
+   {
+      static constexpr bool isFunction      = true;
+      static constexpr bool isConstFunction = true;
+      static constexpr int  numArgs         = sizeof...(Args);
+      using ClassType                       = T;
+      using ReturnType                      = R;
+      using ArgTypes                        = TypeList<Args...>;
+   };
+
+   template <typename F, typename... Args>
+   void forEachType(TypeList<Args...>, F&& f)
+   {
+      (f((remove_cvref_t<Args>*)nullptr), ...);
+   }
+
+   template <typename F, typename... Args>
+   void forEachNamedType(TypeList<Args...>, std::initializer_list<const char*> names, F&& f)
+   {
+      size_t i = 0;
+      auto   g = [&](auto* p)
+      {
+         f(p, i < names.size() ? names.begin()[i] : nullptr);
+         ++i;
+      };
+      (g((remove_cvref_t<Args>*)nullptr), ...);
+   }
+
 }  // namespace psio
 
 // TODO: not legal to add new definitions to std namespace
@@ -468,19 +525,24 @@ namespace std
       (void)lambda(&STRUCT::PSIO_GET_IDENT(elem));                          \
       return true;
 
-#define PSIO_GET_MEMBER_BY_NAME(r, STRUCT, i, elem)                                               \
-   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                                \
-      (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)),                   \
-                                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)}, \
-                              &STRUCT::PSIO_GET_IDENT(elem));                                     \
+#define PSIO_GET_MEMBER_BY_NAME(r, STRUCT, i, elem)                                             \
+   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                              \
+      (void)lambda(                                                                             \
+          psio::meta{                                                                           \
+              .name                              = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)),    \
+                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)},               \
+              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem)) \
+              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });           \
       return true;
 
-#define PSIO_GET_METHOD_BY_NAME(r, STRUCT, elem)                                              \
-   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                            \
-      (void)lambda(                                                                           \
-          psio::meta{.name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)),                        \
-                                                .param_names = {PSIO_GET_QUOTED_ARGS(elem)}}, \
-                     &STRUCT::PSIO_GET_IDENT(elem));                                          \
+#define PSIO_GET_METHOD_BY_NAME(r, STRUCT, elem)                                                  \
+   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                                \
+      (void)lambda(                                                                               \
+          psio::meta{                                                                             \
+              .name                                   = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), \
+                                         .param_names = {PSIO_GET_QUOTED_ARGS(elem)}},            \
+              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem))   \
+              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });             \
       return true;
 
 #define PSIO_MEMBER_POINTER_IMPL1(s, STRUCT, elem) &STRUCT::PSIO_GET_IDENT(elem)

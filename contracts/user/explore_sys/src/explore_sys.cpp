@@ -77,6 +77,14 @@ namespace system_contract
                 .body        = content->content,
             };
          }
+         if (request.target == "/graphql_schema")
+         {
+            auto result = psio::get_gql_schema<QueryRoot>();
+            return psibase::RpcReplyData{
+                .contentType = "text",                                          // TODO
+                .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
+            };
+         }
       }
 
       if (request.method == "POST")
