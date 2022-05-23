@@ -301,7 +301,10 @@ namespace psibase
       /// Construct with prefix
       ///
       /// `prefix` identifies the range of database keys that the index occupies.
-      explicit TableIndex(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
+      TableIndex(std::vector<char>&& prefix, bool is_secondary)
+          : prefix(std::move(prefix)), is_secondary(is_secondary)
+      {
+      }
 
       /// Get iterator to first object
       KvIterator<T> begin() const
@@ -315,7 +318,7 @@ namespace psibase
       KvIterator<T> end() const
       {
          auto copy = prefix;
-         return KvIterator<T>(std::move(copy), prefix.size(), is_secondary());
+         return KvIterator<T>(std::move(copy), prefix.size(), is_secondary);
       }
 
       /// Get iterator to first object with `key >= k`
@@ -330,7 +333,7 @@ namespace psibase
          KeyView       key_base{{prefix.data(), prefix.size()}};
          auto          key = psio::convert_to_key(std::tie(key_base, k));
          result_handle res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
-         KvIterator<T> result(std::move(key), prefix.size(), is_secondary());
+         KvIterator<T> result(std::move(key), prefix.size(), is_secondary);
          result.move_to(res);
          return result;
       }
@@ -358,7 +361,7 @@ namespace psibase
             key.pop_back();
          }
          result_handle res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
-         KvIterator<T> result(std::move(key), prefix.size(), is_secondary());
+         KvIterator<T> result(std::move(key), prefix.size(), is_secondary);
          result.move_to(res);
          return result;
       }
@@ -375,7 +378,7 @@ namespace psibase
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
          auto    key = psio::convert_to_key(std::tie(key_base, k));
-         return TableIndex<T, KeySuffix<K2, K>>(std::move(key));
+         return TableIndex<T, KeySuffix<K2, K>>(std::move(key), is_secondary);
       }
 
       /// Look up object by key
@@ -394,7 +397,7 @@ namespace psibase
          }
          buffer.resize(res);
          raw::getResult(buffer.data(), buffer.size(), 0);
-         if (is_secondary())
+         if (is_secondary)
          {
             res = raw::kvGet(db, buffer.data(), buffer.size());
             buffer.resize(res);
@@ -404,12 +407,9 @@ namespace psibase
       }
 
      private:
-      bool is_secondary() const
-      {
-         return prefix[sizeof(AccountNumber) + sizeof(std::uint16_t)] != 0;
-      }
       static constexpr DbId db = DbId::contract;
       std::vector<char>     prefix;
+      bool                  is_secondary;
    };
 
    template <auto V>
@@ -608,7 +608,7 @@ namespace psibase
              std::remove_cvref_t<decltype(std::invoke(key_extractor::value, std::declval<T>()))>;
          auto index_prefix = prefix;
          index_prefix.push_back(static_cast<char>(Idx));
-         return TableIndex<T, key_type>(std::move(index_prefix));
+         return TableIndex<T, key_type>(std::move(index_prefix), Idx > 0);
       }
 
      private:
