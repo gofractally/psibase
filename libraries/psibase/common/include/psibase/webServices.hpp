@@ -53,6 +53,8 @@ namespace psibase
       /// - `content`: file content
       ///
       /// The `psibase upload` command uses this action.
+      ///
+      /// [storeContent] simplifies implementing this.
       //
       // Note: intentionally doesn't use psio::const_view, since that complicates documentation.
       //       implementations of this interface may, of course, use it.

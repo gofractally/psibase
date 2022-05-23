@@ -11,6 +11,9 @@
   - [psibase::serveSimpleUI]
   - [psibase::serveActionTemplates]
   - [psibase::servePackAction]
+  - [psibase::WebContentRow]
+  - [psibase::storeContent]
+  - [psibase::serveContent]
   - [psibase::serveGraphQL]
 
 ## Routing
@@ -74,14 +77,17 @@ Contracts which serve HTML implement these interfaces:
 
 ## Helpers
 
-These functions help implement basic functionality:
+These help implement basic functionality:
 
 - [psibase::serveSimpleUI]
 - [psibase::serveActionTemplates]
 - [psibase::servePackAction]
+- [psibase::WebContentRow]
+- [psibase::storeContent]
+- [psibase::serveContent]
 - [psibase::serveGraphQL]
 
-Here's a common pattern for using them:
+Here's a common pattern for using these functions:
 
 ```c++
 std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
@@ -108,4 +114,7 @@ std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
 {{#cpp-doc ::psibase::serveSimpleUI}}
 {{#cpp-doc ::psibase::serveActionTemplates}}
 {{#cpp-doc ::psibase::servePackAction}}
+{{#cpp-doc ::psibase::WebContentRow}}
+{{#cpp-doc ::psibase::storeContent}}
+{{#cpp-doc ::psibase::serveContent}}
 {{#cpp-doc ::psibase::serveGraphQL}}
