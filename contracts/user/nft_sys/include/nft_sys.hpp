@@ -17,6 +17,7 @@ namespace UserContract
       using tables = psibase::contract_tables<NftTable_t, NftHolderTable_t, CreditTable_t>;
       static constexpr auto contract = psibase::AccountNumber("nft-sys");
 
+      void init();
       NID  mint();
       void burn(NID nftId);
       void credit(NID                               nftId,
@@ -24,13 +25,14 @@ namespace UserContract
                   psio::const_view<psibase::String> memo);
       void uncredit(NID nftId, psio::const_view<psibase::String> memo);
       void debit(NID nftId, psio::const_view<psibase::String> memo);
-      void manualDebit(bool enable);
+      void setConfig(psibase::NamedBit_t flag, bool enable);
 
       // Read-only:
       NftRecord       getNft(NID nftId);
       NftHolderRecord getNftHolder(psibase::AccountNumber account);
       CreditRecord    getCredRecord(NID nftId);
       bool            exists(NID nftId);
+      bool            getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag);
 
      private:
       tables db{contract};
@@ -45,8 +47,7 @@ namespace UserContract
          {
             void minted(NID nftId, Account issuer) {}
             void burned(NID nftId) {}
-            void disabledManDeb(Account account) {}
-            void enabledManDeb(Account account) {}
+            void configChanged(Account account, psibase::NamedBit_t flag, bool enable) {}
             //};
 
             //struct Ui
@@ -64,24 +65,25 @@ namespace UserContract
 
    // clang-format off
    PSIO_REFLECT(NftSys, 
+      method(init),
       method(mint), 
       method(burn, nftId),
       method(credit, nftId, receiver, memo),
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
-      method(manualDebit, enable),
+      method(setConfig, flag, enable),
 
       method(getNft, nftId),
       method(getNftHolder, account),
       method(getCredRecord, nftid),
-      method(exists, nftId)
+      method(exists, nftId),
+      method(getConfig, account, flag)
    );
 
    PSIBASE_REFLECT_UI_EVENTS(NftSys, // Todo - change to _HISTORY_ once more than UI events are supported
       method(minted, nftId, issuer),
       method(burned, nftId),
-      method(disabledManDeb, account),
-      method(enabledManDeb, account),
+      method(configChanged, account, flag, enable),
    //);
 
    //PSIBASE_REFLECT_UI_EVENTS(NftSys, 

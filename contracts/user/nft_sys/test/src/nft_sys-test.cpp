@@ -29,7 +29,7 @@ namespace
       static constexpr int64_t update            = 100;
    };
 
-   constexpr auto manualDebitBit = NftHolderRecord::Configurations::getIndex("manualDebit"_m);
+   constexpr auto manualDebit = "manualDebit"_m;
 }  // namespace
 
 SCENARIO("Minting & burning nfts")
@@ -138,19 +138,12 @@ SCENARIO("Transferring NFTs")
 
       THEN("Bob is configured to use auto-debit by default")
       {
-         auto getNftHolder = b.getNftHolder(bob);
-         CHECK(getNftHolder.succeeded());
-
-         auto isManualDebit = getNftHolder.returnVal().config.get(manualDebitBit);
-         CHECK(not isManualDebit);
+         CHECK(b.getConfig(bob, manualDebit).returnVal() == false);
       }
       THEN("Bob is able to opt in to manual-debit")
       {
-         auto manualDebit = b.manualDebit(true);
-         CHECK(manualDebit.succeeded());
-
-         auto isManualDebit = b.getNftHolder(bob).returnVal().config.get(manualDebitBit);
-         CHECK(isManualDebit);
+         CHECK(b.setConfig(manualDebit, true).succeeded());
+         CHECK(true == b.getConfig(bob, manualDebit).returnVal());
 
          AND_THEN("Storage billing is updated correctly")
          {  //
@@ -238,7 +231,7 @@ SCENARIO("Transferring NFTs")
          }
          WHEN("Bob opts in to manual-debit")
          {
-            b.manualDebit(true);
+            b.setConfig(manualDebit, true);
 
             AND_WHEN("Alice credits the NFT to Bob")
             {

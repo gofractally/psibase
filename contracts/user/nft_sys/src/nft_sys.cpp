@@ -12,9 +12,11 @@ using psio::const_view;
 using std::string;
 using system_contract::account_sys;
 
-namespace
+void NftSys::init()
 {
-   constexpr auto manualDebitBit = NftHolderRecord::Configurations::getIndex("manualDebit"_m);
+   // TODO
+   // Turn on manualDebit for this and tokens
+   // Assert init called in constructor
 }
 
 NID NftSys::mint()
@@ -55,7 +57,8 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
    auto                   record       = getNft(nftId);
    psibase::AccountNumber sender       = get_sender();
    CreditRecord           creditRecord = getCredRecord(nftId);
-   auto                   isTransfer   = not getNftHolder(receiver).config.get(manualDebitBit);
+   auto manualDebitFlag                = NftHolderRecord::Configurations::getIndex("manualDebit"_m);
+   bool isTransfer                     = not getNftHolder(receiver).config.get(manualDebitFlag);
 
    check(record.owner == sender, Errors::missingRequiredAuth);
    check(receiver != record.owner, Errors::creditorIsDebitor);
@@ -112,23 +115,19 @@ void NftSys::debit(NID nftId, const_view<String> memo)
    emit().ui().transferred(nftId, creditor, debiter, memo);
 }
 
-void NftSys::manualDebit(bool enable)
+void NftSys::setConfig(psibase::NamedBit_t flag, bool enable)
 {
-   auto record = getNftHolder(get_sender());
+   auto record  = getNftHolder(get_sender());
+   auto bit     = NftHolderRecord::Configurations::getIndex(flag);
+   bool flagSet = getNftHolder(get_sender()).config.get(bit);
 
-   check(record.config.get(manualDebitBit) != enable, Errors::redundantUpdate);
+   check(flagSet != enable, Errors::redundantUpdate);
 
-   record.config.set(manualDebitBit);
+   record.config.set(bit, enable);
+
    db.open<NftHolderTable_t>().put(record);
 
-   if (enable)
-   {
-      emit().ui().enabledManDeb(get_sender());
-   }
-   else
-   {
-      emit().ui().disabledManDeb(get_sender());
-   }
+   emit().ui().configChanged(get_sender(), flag, enable);
 }
 
 NftRecord NftSys::getNft(NID nftId)
@@ -136,6 +135,7 @@ NftRecord NftSys::getNft(NID nftId)
    auto nftRecord = db.open<NftTable_t>().get_index<0>().get(nftId);
    bool exists    = nftRecord.has_value();
 
+   // Todo
    if (false)  // if (nftId < nextAvailableID()) // Then the NFt definitely existed at one point
    {
       check(exists, Errors::nftBurned);
@@ -184,6 +184,20 @@ CreditRecord NftSys::getCredRecord(NID nftId)
 bool NftSys::exists(NID nftId)
 {
    return db.open<NftTable_t>().get_index<0>().get(nftId).has_value();
+}
+
+bool NftSys::getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag)
+{
+   auto hodler = db.open<NftHolderTable_t>().get_index<0>().get(account);
+   if (hodler.has_value() == false)
+   {
+      return false;
+   }
+   else
+   {
+      auto bit = NftHolderRecord::Configurations::getIndex(flag);
+      return (*hodler).config.get(bit);
+   }
 }
 
 PSIBASE_DISPATCH(UserContract::NftSys)
