@@ -20,13 +20,14 @@ namespace psibase
    /// [psibase::proxy_sys] receives it via its `serve` exported function.
    struct RpcRequestData
    {
-      std::string       host;      ///< Fully-qualified domain name
-      std::string       rootHost;  ///< host, but without contract subdomain
-      std::string       method;    ///< "GET" or "POST"
-      std::string       target;    ///< Absolute path, e.g. "/index.js"
-      std::vector<char> body;      ///< Request body, e.g. POST data
+      std::string       host;         ///< Fully-qualified domain name
+      std::string       rootHost;     ///< host, but without contract subdomain
+      std::string       method;       ///< "GET" or "POST"
+      std::string       target;       ///< Absolute path, e.g. "/index.js"
+      std::string       contentType;  ///< "application/json", "text/html", ...
+      std::vector<char> body;         ///< Request body, e.g. POST data
    };
-   PSIO_REFLECT(RpcRequestData, host, rootHost, method, target, body)
+   PSIO_REFLECT(RpcRequestData, host, rootHost, method, target, contentType, body)
 
    /// An RPC reply
    ///

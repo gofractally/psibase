@@ -3,6 +3,7 @@
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/KVGraphQLConnection.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/serveGraphQL.hpp>
 
 using table_num = uint16_t;
 
@@ -67,35 +68,16 @@ namespace system_contract
 {
    std::optional<psibase::RpcReplyData> explore_sys::serveSys(psibase::RpcRequestData request)
    {
+      if (auto result = psibase::serveGraphQL(request, [] { return QueryRoot{}; }))
+         return result;
+
       if (request.method == "GET")
       {
-         auto content = kvGet<WebContentRow>(webContentKey(getReceiver(), request.target));
-         if (!!content)
+         if (auto content = kvGet<WebContentRow>(webContentKey(getReceiver(), request.target)))
          {
             return psibase::RpcReplyData{
                 .contentType = content->contentType,
                 .body        = content->content,
-            };
-         }
-         if (request.target == "/graphql_schema")
-         {
-            auto result = psio::get_gql_schema<QueryRoot>();
-            return psibase::RpcReplyData{
-                .contentType = "text",                                          // TODO
-                .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
-            };
-         }
-      }
-
-      if (request.method == "POST")
-      {
-         if (request.target == "/graphql")
-         {
-            auto result =
-                psio::gql_query(QueryRoot(), {request.body.data(), request.body.size()}, {});
-            return psibase::RpcReplyData{
-                .contentType = "application/json",
-                .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
             };
          }
       }

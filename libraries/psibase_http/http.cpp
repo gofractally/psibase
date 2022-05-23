@@ -293,10 +293,11 @@ namespace psibase::http
             else
                return send(error(bhttp::status::bad_request,
                                  "Unsupported HTTP-method for " + req.target().to_string() + "\n"));
-            data.host     = {host.begin(), host.size()};
-            data.rootHost = server.http_config->host;
-            data.target   = req.target().to_string();
-            data.body     = std::move(req.body());
+            data.host        = {host.begin(), host.size()};
+            data.rootHost    = server.http_config->host;
+            data.target      = req.target().to_string();
+            data.contentType = (std::string)req[bhttp::field::content_type];
+            data.body        = std::move(req.body());
 
             // TODO: time limit
             auto          system = server.sharedState->getSystemContext();

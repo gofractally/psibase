@@ -11,6 +11,7 @@
   - [psibase::serveSimpleUI]
   - [psibase::serveActionTemplates]
   - [psibase::servePackAction]
+  - [psibase::serveGraphQL]
 
 ## Routing
 
@@ -78,6 +79,7 @@ These functions help implement basic functionality:
 - [psibase::serveSimpleUI]
 - [psibase::serveActionTemplates]
 - [psibase::servePackAction]
+- [psibase::serveGraphQL]
 
 Here's a common pattern for using them:
 
@@ -106,3 +108,4 @@ std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
 {{#cpp-doc ::psibase::serveSimpleUI}}
 {{#cpp-doc ::psibase::serveActionTemplates}}
 {{#cpp-doc ::psibase::servePackAction}}
+{{#cpp-doc ::psibase::serveGraphQL}}

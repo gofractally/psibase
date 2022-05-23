@@ -6,5 +6,6 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeFunctions.hpp>
+#include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <psibase/webServices.hpp>
