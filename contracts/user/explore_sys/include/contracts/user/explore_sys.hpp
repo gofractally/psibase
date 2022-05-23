@@ -10,9 +10,7 @@ namespace system_contract
       static constexpr auto contract = psibase::proxyContractNum;
 
       auto serveSys(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
-      void storeSys(psio::const_view<std::string>       path,
-                    psio::const_view<std::string>       contentType,
-                    psio::const_view<std::vector<char>> content);
+      void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
    PSIO_REFLECT(explore_sys,
                 method(serveSys, request),

@@ -3,25 +3,10 @@
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/KVGraphQLConnection.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 
-using table_num = uint16_t;
-
-static constexpr table_num web_content_table = 1;
-
-inline auto webContentKey(psibase::AccountNumber thisContract, std::string_view path)
-{
-   return std::tuple{thisContract, web_content_table, path};
-}
-struct WebContentRow
-{
-   std::string       path        = {};
-   std::string       contentType = {};
-   std::vector<char> content     = {};
-
-   auto key(psibase::AccountNumber thisContract) { return webContentKey(thisContract, path); }
-};
-PSIO_REFLECT(WebContentRow, path, contentType, content)
+using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
 struct Block
 {
@@ -70,42 +55,17 @@ namespace system_contract
    {
       if (auto result = psibase::serveGraphQL(request, [] { return QueryRoot{}; }))
          return result;
-
-      if (request.method == "GET")
-      {
-         if (auto content = kvGet<WebContentRow>(webContentKey(getReceiver(), request.target)))
-         {
-            return psibase::RpcReplyData{
-                .contentType = content->contentType,
-                .body        = content->content,
-            };
-         }
-      }
-
+      if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
+         return result;
       return std::nullopt;
-   }  // explore_sys::proxy_sys
-
-   void explore_sys::storeSys(psio::const_view<std::string>       path,
-                              psio::const_view<std::string>       contentType,
-                              psio::const_view<std::vector<char>> content)
-   {
-      psibase::check(getSender() == getReceiver(), "wrong sender");
-
-      // TODO
-      auto              size = content.size();
-      std::vector<char> c(size);
-      for (size_t i = 0; i < size; ++i)
-         c[i] = content[i];
-
-      // TODO: avoid copies before pack
-      WebContentRow row{
-          .path        = path,
-          .contentType = contentType,
-          .content     = std::move(c),
-      };
-      kvPut(row.key(getReceiver()), row);
    }
 
+   void explore_sys::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   {
+      psibase::check(getSender() == getReceiver(), "wrong sender");
+      psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
+                            Tables{getReceiver()});
+   }
 }  // namespace system_contract
 
 PSIBASE_DISPATCH(system_contract::explore_sys)

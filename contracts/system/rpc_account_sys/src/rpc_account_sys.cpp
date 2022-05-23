@@ -4,30 +4,15 @@
 #include <contracts/system/proxy_sys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/serveContent.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
 
 static constexpr bool enable_print = false;
 
-using table_num = uint16_t;
 using namespace psibase;
-
-static constexpr table_num web_content_table = 1;
-
-inline auto webContentKey(AccountNumber thisContract, std::string_view path)
-{
-   return std::tuple{thisContract, web_content_table, path};
-}
-struct WebContentRow
-{
-   std::string       path        = {};
-   std::string       contentType = {};
-   std::vector<char> content     = {};
-
-   auto key(AccountNumber thisContract) { return webContentKey(thisContract, path); }
-};
-PSIO_REFLECT(WebContentRow, path, contentType, content)
+using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
 namespace system_contract
 {
@@ -44,15 +29,6 @@ namespace system_contract
 
       if (request.method == "GET")
       {
-         auto content = kvGet<WebContentRow>(webContentKey(getReceiver(), request.target));
-         if (!!content)
-         {
-            return RpcReplyData{
-                .contentType = content->contentType,
-                .body        = content->content,
-            };
-         }
-
          if (request.target == "/accounts")
          {
             std::vector<AccountRow> rows;
@@ -72,29 +48,21 @@ namespace system_contract
          }
       }
 
-      return psibase::serveSimpleUI<account_sys, false>(request);
+      if (auto result = psibase::serveSimpleUI<account_sys, false>(request))
+         return result;
+      if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
+         return result;
+      return std::nullopt;
    }  // serveSys
 
-   void rpc_account_sys::storeSys(psio::const_view<std::string>       path,
-                                  psio::const_view<std::string>       contentType,
-                                  psio::const_view<std::vector<char>> content)
+   void rpc_account_sys::storeSys(std::string       path,
+                                  std::string       contentType,
+                                  std::vector<char> content)
    {
-      check(getSender() == getReceiver(), "wrong sender");
-
-      // TODO
-      auto              size = content.size();
-      std::vector<char> c(size);
-      for (size_t i = 0; i < size; ++i)
-         c[i] = content[i];
-
-      // TODO: avoid copies before pack
-      WebContentRow row{
-          .path        = path,
-          .contentType = contentType,
-          .content     = std::move(c),
-      };
-      kvPut(row.key(getReceiver()), row);
-   }  // storeSys
+      psibase::check(getSender() == getReceiver(), "wrong sender");
+      psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
+                            Tables{getReceiver()});
+   }
 
 }  // namespace system_contract
 
