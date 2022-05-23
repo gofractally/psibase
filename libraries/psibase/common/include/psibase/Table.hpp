@@ -666,11 +666,11 @@ namespace psibase
          return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(std::move(key_prefix));
       }
 
-      /// Open by type
+      /// Open by table type
       ///
-      /// This gets a table by the type of data it stores.
+      /// This gets a table by the table's type.
       ///
-      /// e.g. `auto table = MyContractTables{myContractAccount}.open<MyType>();`
+      /// e.g. `auto table = MyContractTables{myContractAccount}.open<MyTable>();`
       ///
       /// Returns a [Table].
       template <typename T>
