@@ -129,7 +129,7 @@ TEST_CASE("stable checkpoint allocation", "[persistence]")
       // 5 checkpoints
       CHECK(db.get_stats().file.used == 9);
       CHECK(db.get_stats().file.total == 13);
-      std::size_t     i = 95;
+      std::size_t i = 95;
       for (const auto& checkpoint : db.stable_checkpoints())
       {
          CHECK(i < data.size());
@@ -140,6 +140,50 @@ TEST_CASE("stable checkpoint allocation", "[persistence]")
          ++i;
       }
       CHECK(i == 100);
+   }
+}
+
+TEST_CASE("basic eviction", "[persistence]")
+{
+   tmp_file file;
+
+   psidb::database db(file.native_handle(), 1024);
+
+   {
+      auto trx = db.start_transaction();
+      for (int i = 0; i < 200; ++i)
+      {
+         auto [k, v] = make_kv(i);
+         trx.insert(k, v);
+      }
+      trx.commit();
+      db.async_flush();
+      db.sync();
+   }
+
+   // N.B. This test will eventually need to be updated,
+   // because it depends on the simple eviction algorithm.
+   // These two calls to full_gc will need to be replaced
+   // with "wait for a while" however that is defined.
+   //
+   // run the garbage collector to clear all the accessed flags
+   db.full_gc();
+   // run the garbage collector again to evict pages
+   db.full_gc();
+
+   // After eviction, only the root is held in memory
+   CHECK(db.get_stats().memory.used == 1);
+
+   // Make sure that evicted pages can be loaded again
+   {
+      auto trx    = db.start_read();
+      auto cursor = trx.get_cursor();
+      for (int i = 0; i < 200; ++i)
+      {
+         auto [k, v] = make_kv(i);
+         cursor.lower_bound(k);
+         CHECK_CURSOR(cursor, k, v);
+      }
    }
 }
 

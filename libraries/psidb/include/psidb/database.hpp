@@ -31,6 +31,7 @@ namespace psidb
       auto get_stats() const { return _storage.get_stats(); }
       std::size_t checkpoints() const { return _storage.checkpoints(); }
 
+      void full_gc() { _storage.run_gc(); }
       void run_gc_loop() { _storage.run_gc_loop(); }
       void stop_gc() { _storage.stop_gc(); }
       void print_summary() { _storage.print_summary(); }

@@ -86,7 +86,8 @@ void* psidb::page_manager::read_pages(page_id& id, std::size_t count)
 
    if (is_memory_page(id))
    {
-      return translate_page_address(id);
+      auto result = translate_page_address(id);
+      return result;
    }
 
    void* result = _allocator.allocate(count * page_size);
@@ -135,7 +136,9 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
       // read/evict conflict????  This will always result in ABA
       //   and is undetectable.  Not yet sure whether it's a problem.
       ptr->store(id, std::memory_order_release);
-      return translate_page_address(id);
+      auto result = translate_page_address(id);
+      result->access();
+      return result;
    }
 
    id = *ptr;
@@ -397,7 +400,8 @@ void psidb::page_manager::sync_flush()
    {
       _syncing.wait(true, std::memory_order_relaxed);
    }
-   try_flush();
+   // FIXME: this is used in the destructor.  also write uncommitted transactions.
+   async_flush(false);
 }
 
 void psidb::page_manager::start_flush()

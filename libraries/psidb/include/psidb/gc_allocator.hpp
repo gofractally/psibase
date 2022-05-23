@@ -17,6 +17,7 @@ namespace psidb
 
    struct page_leaf;
    struct page_internal_node;
+   class page_map;
    // During a collection cycle, a node can have 3 possible states
    // - new: allocated after the collection phase started, but not reached by the gc
    // - marked: Seen by the gc scan
@@ -100,10 +101,10 @@ namespace psidb
       {
          std::vector<version_type> versions;
       };
-      void  sweep(cycle&&);
+      void  sweep(cycle&&, page_map&);
       cycle start_cycle();
       void  scan_root(cycle& data, page_header* header);
-      void  scan(cycle& data, node_ptr ptr);
+      bool  scan(cycle& data, node_ptr ptr);
       void  mark_copy(page_header* src, page_header* dest)
       {
          // What happens if _gc_flag is flipped concurrently?
@@ -114,7 +115,8 @@ namespace psidb
          //   would prevent scanning.
          // - If gc is not currently executing, then all pages are either new or marked.
          //   No additional check is required to avoid unnecessary queueing.
-         if (!src || is_marked(src) || is_new(src))
+         if (!src || src->type == page_type::leaf || is_marked(src) || is_new(src) ||
+             is_evicted(src))
          {
             mark_new(dest);
          }
@@ -136,6 +138,7 @@ namespace psidb
       {
          set_gc_flag(header, _gc_flag.load(std::memory_order_relaxed) | 2);
       }
+      void mark_evicted(page_header* header) { set_gc_flag(header, 0xFE); }
       void mark_free(page_header* header) { set_gc_flag(header, 0xFF); }
       bool is_marked(page_header* header)
       {
@@ -146,12 +149,13 @@ namespace psidb
          return get_gc_flag(header) == (_gc_flag.load(std::memory_order_relaxed) | 2);
       }
       bool is_free(page_header* header) { return get_gc_flag(header) == 0xFF; }
+      bool is_evicted(page_header* header) { return get_gc_flag(header) == 0xFE; }
       // Returns true if the page has not been accessed recently
       bool is_old(page_header* header);
       bool is_dirty(page_header* header);
-      void scan_prev(cycle& data, page_header* page);
-      void scan_children(cycle& data, page_internal_node* node);
-      void scan_children(cycle& data, page_leaf*);
+      bool scan_prev(cycle& data, page_header* page);
+      bool scan_children(cycle& data, page_internal_node* node);
+      bool scan_children(cycle& data, page_leaf*);
       bool page_is_live(cycle& data, page_header* page, version_type end_version);
 
       struct scoped_lock
@@ -166,15 +170,12 @@ namespace psidb
 
       struct stats
       {
-         std::size_t used;
-         std::size_t total;
+         std::size_t   used;
+         std::size_t   total;
+         std::size_t   limit;
+         std::uint64_t total_evicted;
       };
-      stats get_stats() const
-      {
-         return {static_cast<std::size_t>(reinterpret_cast<char*>(_unused) -
-                                          reinterpret_cast<char*>(_base)),
-                 _size};
-      }
+      stats get_stats() const;
       // Blocks until the gc should run
       bool gc_wait()
       {
@@ -234,6 +235,9 @@ namespace psidb
       bool                                         _stopped = false;
       std::atomic<gc_flag_type>                    _gc_flag;
       shared_value                                 _gc_mutex;
+
+      // statistics
+      std::uint64_t _eviction_count = 0;
 
       //
       std::mutex                _scan_queue_mutex;

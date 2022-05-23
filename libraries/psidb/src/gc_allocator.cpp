@@ -14,6 +14,8 @@ using namespace psidb;
 #define DEBUG_PRINT(...) ((void)0)
 #endif
 
+//#define DEBUG_ALLOC
+
 static node_ptr get_prev(page_header* header)
 {
    return node_ptr{header, &header->prev};
@@ -32,9 +34,11 @@ psidb::gc_allocator::~gc_allocator()
    ::munmap(_base, _size);
 }
 
-void psidb::gc_allocator::sweep(cycle&& c)
+void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
 {
    // process any queued nodes
+   int extra_cycles = 0;
+   int extra_nodes  = 0;
    while (true)
    {
       // Block until all any copies that have started finish.
@@ -50,13 +54,16 @@ void psidb::gc_allocator::sweep(cycle&& c)
       {
          break;
       }
+      ++extra_cycles;
       // wait to make sure that the queued nodes are initialized
       _gc_mutex.store(_gc_mutex.load(std::memory_order_relaxed) ^ 1);
       for (auto ptr : queue)
       {
          scan_root(c, ptr);
+         ++extra_nodes;
       }
    }
+   //std::osyncstream(std::cout) << "extra cycles: " << extra_cycles << ", extra nodes: " << extra_nodes << std::endl;
 
    c.versions.clear();
 
@@ -69,8 +76,25 @@ void psidb::gc_allocator::sweep(cycle&& c)
         iter < end;
         iter = reinterpret_cast<page_header*>(reinterpret_cast<char*>(iter) + page_size))
    {
+      if (is_evicted(iter))
+      {
+         // erase from page map
+         auto pos = pm.lock(iter->id);
+         if (iter->should_evict())
+         {
+            pos.erase();
+            ++_eviction_count;
+         }
+         else
+         {
+            mark(iter);
+         }
+      }
       if (!is_marked(iter) && !is_free(iter) && !is_new(iter))
       {
+#ifdef DEBUG_ALLOC
+         std::memset(iter, 0xCC, page_size);
+#endif
          mark_free(iter);
          DEBUG_PRINT("freeing page: " << get_id(iter) << " v" << iter->version << std::endl);
          page_id id = null_page;
@@ -88,6 +112,7 @@ void psidb::gc_allocator::sweep(cycle&& c)
       }
       else if (!is_free(iter))
       {
+         iter->clear_access();
          ++used_pages;
       }
    }
@@ -126,40 +151,33 @@ void psidb::gc_allocator::scan_root(cycle& data, page_header* page)
    }
 }
 
-void psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
+bool psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
 {
    // decide whether to move the page...
    //
    auto id = *ptr;
    if (is_memory_page(id))
    {
-      page_header* page = translate_page_address(id);
-      if (!is_marked(page))
+      page_header* page  = translate_page_address(id);
+      bool         evict = is_evicted(page);
+      if (!is_marked(page) && !evict)
       {
          DEBUG_PRINT("scanning page: " << id << std::endl);
-         visit([&](auto* p) { scan_children(data, p); }, page);
-         scan_prev(data, page);
+         evict = visit([&](auto* p) { return scan_children(data, p); }, page);
+         evict &= scan_prev(data, page);
       }
-      if (is_old(page))
+      if (evict)
       {
-         if (!is_dirty(page))
-         {
-            ptr->store(page->id, std::memory_order_relaxed);
-         }
-         else
-         {
-            // For now, don't write back.  The checkpoint manager is responsible for that
-            // and pages will never remain dirty indefinitely.  In fact, we could probably
-            // fold is_dirty into is_old.
-            mark(page);
-         }
+         mark_evicted(page);
+         ptr->store(page->id, std::memory_order_relaxed);
       }
       else
       {
          mark(page);
       }
+      return evict;
    }
-   // for now, ignore file pages
+   return true;
 }
 bool psidb::gc_allocator::is_old(page_header* header)
 {
@@ -169,8 +187,9 @@ bool psidb::gc_allocator::is_dirty(page_header* header)
 {
    return true;
 }
-void psidb::gc_allocator::scan_prev(cycle& data, page_header* page)
+bool psidb::gc_allocator::scan_prev(cycle& data, page_header* page)
 {
+   bool result = true;
    if (node_ptr prev = get_prev(page))
    {
       page_id id = *prev;
@@ -185,7 +204,7 @@ void psidb::gc_allocator::scan_prev(cycle& data, page_header* page)
          if (page_is_live(data, prev_page, page->version))
          {
             DEBUG_PRINT("prev: " << get_id(page) << " -> " << id << std::endl);
-            scan(data, prev);
+            result &= scan(data, prev);
             break;
          }
          else
@@ -200,17 +219,23 @@ void psidb::gc_allocator::scan_prev(cycle& data, page_header* page)
          }
       }
    }
+   return result;
 }
 
-void psidb::gc_allocator::scan_children(cycle& data, page_internal_node* node)
+bool psidb::gc_allocator::scan_children(cycle& data, page_internal_node* node)
 {
+   bool result = true;
    for (std::size_t i = 0; i <= node->_size; ++i)
    {
-      scan(data, node->child(i));
+      result &= scan(data, node->child(i));
    }
+   return result;
 }
 
-void psidb::gc_allocator::scan_children(cycle& data, page_leaf*) {}
+bool psidb::gc_allocator::scan_children(cycle& data, page_leaf* node)
+{
+   return node->should_evict();
+}
 
 // A page is live if there is an active checkpoint after its creation,
 // but before its removal.
@@ -220,4 +245,19 @@ bool psidb::gc_allocator::page_is_live(cycle& data, page_header* page, version_t
    auto pos         = std::lower_bound(data.versions.begin(), data.versions.end(), low_version);
    // Newly created checkpoints are considered live
    return pos == data.versions.end() || *pos < end_version;
+}
+
+gc_allocator::stats psidb::gc_allocator::get_stats() const
+{
+   auto total =
+       static_cast<std::size_t>(reinterpret_cast<char*>(_unused) - reinterpret_cast<char*>(_base));
+   std::size_t used = 0;
+   for (std::size_t i = 0; i < total / page_size; ++i)
+   {
+      if (_page_flags[i].load(std::memory_order_relaxed) != 0xFF)
+      {
+         ++used;
+      }
+   }
+   return {used * page_size, total, _size, _eviction_count};
 }

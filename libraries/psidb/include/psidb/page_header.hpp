@@ -35,17 +35,22 @@ namespace psidb
 
    struct page_header
    {
-      page_type                 type;
-      page_flags                flags;
-      std::atomic<bool>         dirty0;
-      std::atomic<bool>         dirty1;
-      std::atomic<gc_flag_type> gc_flag;
-      page_id                   id;
-      std::atomic<page_id>      prev;
-      version_type              version;
+      page_type            type;
+      page_flags           flags;
+      std::atomic<bool>    dirty0;
+      std::atomic<bool>    dirty1;
+      std::atomic<uint8_t> accessed;
+      page_id              id;
+      std::atomic<page_id> prev;
+      version_type         version;
       // The oldest version in the list formed by prev
       version_type min_version;
-      bool         is_dirty(page_flags f) const
+      // TODO: accessed can be a counter to keep frequently used pages
+      // in memory longer.
+      void access() { accessed.store(1, std::memory_order_relaxed); }
+      void clear_access() { accessed.store(0, std::memory_order_relaxed); }
+      bool should_evict() { return accessed.load(std::memory_order_relaxed) == 0 && id != 0; }
+      bool is_dirty(page_flags f) const
       {
          if (f == page_flags::dirty0)
          {

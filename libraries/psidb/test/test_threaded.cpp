@@ -63,12 +63,13 @@ TEST_CASE("thread tests", "[thread]")
          trx.erase("");
          trx.insert("", {reinterpret_cast<const char*>(&i), sizeof(i)});
          trx.commit();
-         db.async_flush(false);
+         //db.async_flush(false);
          auto stats = db.get_stats();
          std::osyncstream(std::cout)
-             << "memory used: " << stats.memory.used << " / " << stats.memory.total
-             << ", checkpoints: " << stats.checkpoints << ", disk used: " << stats.file.used
-             << " / " << stats.file.total << std::endl;
+             << "memory: " << stats.memory.used / psidb::page_size << " / "
+             << stats.memory.total / psidb::page_size << ", checkpoints: " << stats.checkpoints
+             << ", disk: " << stats.file.used << " / " << stats.file.total
+             << ", evict: " << stats.memory.total_evicted << std::endl;
       }
       done = true;
    };

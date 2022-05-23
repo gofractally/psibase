@@ -55,6 +55,7 @@ namespace psidb
                }
             }
          }
+         leaf.get_parent<page_leaf>()->access();
       }
       void back()
       {
@@ -106,6 +107,7 @@ namespace psidb
             stack[depth++] = node;
             p              = get_page(node);
          }
+         leaf.get_parent<page_leaf>()->access();
       }
       void put(transaction& trx, std::string_view key, std::string_view value)
       {
@@ -132,6 +134,7 @@ namespace psidb
          if (p->get_offset(leaf) != 0)
          {
             leaf = p->child(p->get_offset(leaf) - 1);
+            leaf.get_parent<page_leaf>()->access();
             return true;
          }
          for (std::size_t i = depth; i > 0; --i)
@@ -143,6 +146,7 @@ namespace psidb
                auto l       = db->gc_lock();
                stack[i - 1] = node->child(offset - 1);
                back(i, get_page(stack[i - 1]));
+               leaf.get_parent<page_leaf>()->access();
                return true;
             }
          }

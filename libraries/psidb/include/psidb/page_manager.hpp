@@ -363,7 +363,7 @@ namespace psidb
          {
             _allocator.scan_root(cycle, root);
          }
-         _allocator.sweep(std::move(cycle));
+         _allocator.sweep(std::move(cycle), _page_map);
       }
 
       void queue_gc(page_header* node);
