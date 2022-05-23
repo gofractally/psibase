@@ -2027,7 +2027,7 @@ namespace psio
 
       operator std::array<T, S>() const
       {
-         input_stream     in(pos, pos + 0xfffffff);  /// TOOD: maintain real end
+         input_stream     in(pos, pos + 0xfffffff);  /// TODO: maintain real end
          std::array<T, S> tmp;
          fracunpack<std::array<T, S>>(tmp, in);
          return tmp;
@@ -2067,7 +2067,7 @@ namespace psio
 
       operator std::array<T, S>() const
       {
-         input_stream     in(pos, pos + 0xfffffff);  /// TOOD: maintain real end
+         input_stream     in(pos, pos + 0xfffffff);  /// TODO: maintain real end
          std::array<T, S> tmp;
          fracunpack<std::array<T, S>>(tmp, in);
          return tmp;
@@ -2124,7 +2124,7 @@ namespace psio
 
       operator std::vector<T>() const
       {
-         input_stream   in(pos, pos + 0xfffffff);  /// TOOD: maintain real end
+         input_stream   in(pos, pos + 0xfffffff);  /// TODO: maintain real end
          std::vector<T> tmp;
          fracunpack<std::vector<T>>(tmp, in);
          return tmp;
@@ -2149,7 +2149,7 @@ namespace psio
       operator T() const
       {
          input_stream in(this->psio_get_proxy().buffer,
-                         this->psio_get_proxy().buffer + 0xfffffff);  /// TOOD: maintain real end
+                         this->psio_get_proxy().buffer + 0xfffffff);  /// TODO: maintain real end
          T            tmp;
          fracunpack<T>(tmp, in);
          return tmp;
@@ -2170,7 +2170,7 @@ namespace psio
       operator T() const
       {
          input_stream in(this->psio_get_proxy().buffer,
-                         this->psio_get_proxy().buffer + 0xfffffff);  /// TOOD: maintain real end
+                         this->psio_get_proxy().buffer + 0xfffffff);  /// TODO: maintain real end
          T            tmp;
          fracunpack<T>(tmp, in);
          return tmp;
@@ -2308,7 +2308,7 @@ namespace psio
 
       operator std::variant<Ts...>() const
       {
-         input_stream        in(pos, pos + 0xfffffff);  /// TOOD: maintain real end
+         input_stream        in(pos, pos + 0xfffffff);  /// TODO: maintain real end
          std::variant<Ts...> tmp;
          fracunpack<std::variant<Ts...>>(tmp, in);
          return tmp;
@@ -2351,7 +2351,7 @@ namespace psio
 
       operator std::variant<Ts...>() const
       {
-         input_stream        in(pos, pos + 0xfffffff);  /// TOOD: maintain real end
+         input_stream        in(pos, pos + 0xfffffff);  /// TODO: maintain real end
          std::variant<Ts...> tmp;
          fracunpack<std::variant<Ts...>>(tmp, in);
          return tmp;
