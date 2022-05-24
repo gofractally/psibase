@@ -151,6 +151,9 @@ namespace psibase
       /// preincrement (++it)
       ///
       /// This moves the iterator forward.
+      ///
+      /// The iterator has circular semantics. If you increment an end iterator, then it
+      /// moves to the beginning of the index, or back to end again if empty.
       KvIterator& operator++()
       {
          ++base;
@@ -160,6 +163,9 @@ namespace psibase
       /// postincrement (it++)
       ///
       /// This moves the iterator forward.
+      ///
+      /// The iterator has circular semantics. If you increment an end iterator, then it
+      /// moves to the beginning of the index, or back to end again if empty.
       ///
       /// Note: postincrement (`it++`) and postdecrement (`it--`) have higher
       /// overhead than preincrement (`++it`) and predecrement (`--it`).
@@ -173,6 +179,9 @@ namespace psibase
       /// predecrement (--it)
       ///
       /// This moves the iterator backward.
+      ///
+      /// The iterator has circular semantics. If you decrement an end iterator, then it
+      /// moves to the last item in the index, or back to end again if empty.
       KvIterator& operator--()
       {
          --base;
@@ -182,6 +191,9 @@ namespace psibase
       /// postdecrement (it--)
       ///
       /// This moves the iterator backward.
+      ///
+      /// The iterator has circular semantics. If you decrement an end iterator, then it
+      /// moves to the last item in the index, or back to end again if empty.
       ///
       /// Note: postincrement (`it++`) and postdecrement (`it--`) have higher
       /// overhead than preincrement (`++it`) and predecrement (`--it`).
