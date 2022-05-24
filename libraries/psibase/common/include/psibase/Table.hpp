@@ -16,11 +16,6 @@
 
 namespace psibase
 {
-   struct result_handle
-   {
-      int size;
-   };
-
    // Eventually replace uses with <=> once the standard library
    // catches up with C++20
    template <typename T>
@@ -37,8 +32,16 @@ namespace psibase
    class kv_raw_iterator
    {
      public:
-      kv_raw_iterator(std::vector<char>&& key, std::size_t prefix_size, bool is_secondary)
-          : key(std::move(key)), prefix_size(prefix_size), is_secondary(is_secondary)
+      kv_raw_iterator(DbId                db,
+                      std::vector<char>&& key,
+                      std::size_t         prefix_size,
+                      bool                is_secondary,
+                      bool                is_end)
+          : db(db),
+            key(std::move(key)),
+            prefix_size(prefix_size),
+            is_secondary(is_secondary),
+            is_end(is_end)
       {
          check(prefix_size <= this->key.size(), "prefix is longer than key");
       }
@@ -102,7 +105,7 @@ namespace psibase
       {
          return (lhs <=> rhs) == std::weak_ordering::equivalent;
       }
-      void move_to(result_handle res) { set(res.size); }
+      void move_to(int res) { set(res); }
 
      private:
       void set(int sz)
@@ -120,11 +123,11 @@ namespace psibase
             key.resize(prefix_size);
          }
       }
-      static constexpr DbId db = DbId::contract;
-      std::vector<char>     key;
-      std::size_t           prefix_size;
-      bool                  is_end       = true;
-      bool                  is_secondary = false;
+      DbId              db;
+      std::vector<char> key;
+      std::size_t       prefix_size;
+      bool              is_secondary = false;
+      bool              is_end       = true;
    };
 
    /// An iterator into a [TableIndex]
@@ -137,14 +140,20 @@ namespace psibase
      public:
       /// constructor
       ///
+      /// * `db` identifies the database the table lives in.
       /// * See the "Key" column of [Data format](#data-format); the `key` field contains this.
       /// * `prefixSize` is the number of bytes within `key` which covers the index's prefix (includes the index number byte).
       /// * `isSecondary` is true if this iterator is for a secondary index.
+      /// * `isEnd` is true if this iterator points past the end.
       ///
       /// You don't need this constructor in most cases; use [TableIndex::begin], [TableIndex::end],
       /// [TableIndex::lower_bound], or [TableIndex::upper_bound] instead.
-      KvIterator(std::vector<char>&& key, std::size_t prefixSize, bool isSecondary)
-          : base(std::move(key), prefixSize, isSecondary)
+      KvIterator(DbId                db,
+                 std::vector<char>&& key,
+                 std::size_t         prefixSize,
+                 bool                isSecondary,
+                 bool                isEnd)
+          : base(db, std::move(key), prefixSize, isSecondary, isEnd)
       {
       }
 
@@ -203,6 +212,18 @@ namespace psibase
          --*this;
          return result;
       }
+
+      /// Move iterator (raw)
+      ///
+      /// This moves the iterator to the most-recent location found by
+      /// [raw::kvGreaterEqual], [raw::kvLessThan], or [raw::kvMax].
+      ///
+      /// `result` is the return value of the raw call.
+      ///
+      /// You don't need this function in most cases; use [TableIndex::begin], [TableIndex::end],
+      /// [TableIndex::lower_bound], [TableIndex::upper_bound], or the iterator's increment or
+      /// decrement operators instead.
+      void moveTo(int result) { base.move_to(result); }
 
       /// get object
       ///
@@ -313,8 +334,8 @@ namespace psibase
       /// Construct with prefix
       ///
       /// `prefix` identifies the range of database keys that the index occupies.
-      TableIndex(std::vector<char>&& prefix, bool is_secondary)
-          : prefix(std::move(prefix)), is_secondary(is_secondary)
+      TableIndex(DbId db, std::vector<char>&& prefix, bool is_secondary)
+          : db(db), prefix(std::move(prefix)), is_secondary(is_secondary)
       {
       }
 
@@ -330,7 +351,7 @@ namespace psibase
       KvIterator<T> end() const
       {
          auto copy = prefix;
-         return KvIterator<T>(std::move(copy), prefix.size(), is_secondary);
+         return KvIterator<T>(db, std::move(copy), prefix.size(), is_secondary, true);
       }
 
       /// Get iterator to first object with `key >= k`
@@ -344,9 +365,9 @@ namespace psibase
       {
          KeyView       key_base{{prefix.data(), prefix.size()}};
          auto          key = psio::convert_to_key(std::tie(key_base, k));
-         result_handle res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
-         KvIterator<T> result(std::move(key), prefix.size(), is_secondary);
-         result.move_to(res);
+         auto          res = raw::kvGreaterEqual(db, key.data(), key.size(), prefix.size());
+         KvIterator<T> result(db, std::move(key), prefix.size(), is_secondary, true);
+         result.moveTo(res);
          return result;
       }
 
@@ -372,9 +393,9 @@ namespace psibase
             }
             key.pop_back();
          }
-         result_handle res = {raw::kvGreaterEqual(key.data(), key.size(), prefix.size())};
-         KvIterator<T> result(std::move(key), prefix.size(), is_secondary);
-         result.move_to(res);
+         auto          res = raw::kvGreaterEqual(db, key.data(), key.size(), prefix.size());
+         KvIterator<T> result(db, std::move(key), prefix.size(), is_secondary, true);
+         result.moveTo(res);
          return result;
       }
 
@@ -390,7 +411,7 @@ namespace psibase
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
          auto    key = psio::convert_to_key(std::tie(key_base, k));
-         return TableIndex<T, KeySuffix<K2, K>>(std::move(key), is_secondary);
+         return TableIndex<T, KeySuffix<K2, K>>(db, std::move(key), is_secondary);
       }
 
       /// Look up object by key
@@ -419,9 +440,9 @@ namespace psibase
       }
 
      private:
-      static constexpr DbId db = DbId::contract;
-      std::vector<char>     prefix;
-      bool                  is_secondary;
+      DbId              db;
+      std::vector<char> prefix;
+      bool              is_secondary;
    };
 
    template <auto V>
@@ -500,12 +521,12 @@ namespace psibase
       /// The prefix separates this table's data from other tables; see [Data format](#data-format).
       ///
       /// This version of the constructor copies the data within `prefix`.
-      explicit Table(KeyView prefix) : prefix(prefix.data.begin(), prefix.data.end()) {}
+      Table(DbId db, KeyView prefix) : db(db), prefix(prefix.data.begin(), prefix.data.end()) {}
 
       /// Construct table with prefix
       ///
       /// The prefix separates this table's data from other tables; see [Data format](#data-format).
-      explicit Table(std::vector<char>&& prefix) : prefix(std::move(prefix)) {}
+      Table(DbId db, std::vector<char>&& prefix) : db(db), prefix(std::move(prefix)) {}
 
       /// Store `value` into the table
       ///
@@ -620,7 +641,7 @@ namespace psibase
              std::remove_cvref_t<decltype(std::invoke(key_extractor::value, std::declval<T>()))>;
          auto index_prefix = prefix;
          index_prefix.push_back(static_cast<char>(Idx));
-         return TableIndex<T, key_type>(std::move(index_prefix), Idx > 0);
+         return TableIndex<T, key_type>(db, std::move(index_prefix), Idx > 0);
       }
 
      private:
@@ -629,8 +650,8 @@ namespace psibase
          KeyView key_base{{prefix.data(), prefix.size()}};
          return psio::convert_to_key(std::tie(key_base, idx, k));
       }
-      static constexpr DbId db = DbId::contract;
-      std::vector<char>     prefix;
+      DbId              db;
+      std::vector<char> prefix;
    };
 
    // TODO: allow tables to be forward declared.  The simplest method is:
@@ -675,7 +696,8 @@ namespace psibase
       auto open() const
       {
          std::vector<char> key_prefix = psio::convert_to_key(std::tuple(account, Table));
-         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(std::move(key_prefix));
+         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(DbId::contract,
+                                                                             std::move(key_prefix));
       }
 
       /// Open by table type

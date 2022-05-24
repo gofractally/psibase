@@ -65,6 +65,10 @@ export async function postArrayBuffer(url, arrayBuffer) {
     }));
 }
 
+export async function getText(url) {
+    return await (await get(url)).text();
+}
+
 export async function getJson(url) {
     return await (await get(url)).json();
 }
