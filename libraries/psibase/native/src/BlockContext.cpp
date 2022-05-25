@@ -53,7 +53,7 @@ namespace psibase
          }
          else
          {
-            current.header.time.seconds = status->head->header.time.seconds + 1;
+            current.header.time.seconds = status->head->header.time.seconds + blockTimeSec;
          }
       }
       else
@@ -167,6 +167,19 @@ namespace psibase
       {
          trace.error = e.what();
          throw;
+      }
+   }
+
+   psibase::TimePointSec BlockContext::getHeadBlockTime()
+   {
+      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+      if (!status || !(status->head))
+      {
+         return psibase::TimePointSec{0};
+      }
+      else
+      {
+         return status->head->header.time;
       }
    }
 
