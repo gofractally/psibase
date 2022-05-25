@@ -670,13 +670,7 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
     }
 
     fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        let dynamic_size = if Self::USE_HEAP {
-            T::FIXED_SIZE * N as u32
-        } else {
-            Self::FIXED_SIZE
-        };
-
-        let hp = *pos as u64 + dynamic_size as u64;
+        let hp = *pos as u64 + T::FIXED_SIZE as u64 * N as u64;
         let mut heap_pos = hp as u32;
         if heap_pos as u64 != hp {
             return Err(Error::ReadPastEnd);
@@ -699,13 +693,7 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let dynamic_size = if Self::USE_HEAP {
-            T::FIXED_SIZE * N as u32
-        } else {
-            Self::FIXED_SIZE
-        };
-
-        let hp = *pos as u64 + dynamic_size as u64;
+        let hp = *pos as u64 + T::FIXED_SIZE as u64 * N as u64;
         let mut heap_pos = hp as u32;
         if heap_pos as u64 != hp {
             return Err(Error::ReadPastEnd);
