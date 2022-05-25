@@ -2,6 +2,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -328,7 +329,7 @@ namespace psio
    }
 
    template <typename F, typename... Args>
-   void forEachNamedType(TypeList<Args...>, std::initializer_list<const char*> names, F&& f)
+   void forEachNamedType(TypeList<Args...>, std::span<const char* const> names, F&& f)
    {
       size_t i = 0;
       auto   g = [&](auto* p)
