@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psibase/Table.hpp>
 #include <psibase/contractEntry.hpp>
 #include <psibase/nativeFunctions.hpp>
 #include <psio/graphql_connection.hpp>
@@ -67,5 +68,61 @@ namespace psibase
       }
 
       return std::nullopt;
+   }  // serveGraphQL
+
+   template <psio::FixedString ConnectionName,
+             psio::FixedString EdgeName,
+             typename T,
+             typename K,
+             typename GetKey>
+   struct QueryIndexImpl
+   {
+      psibase::TableIndex<T, K> index;
+      GetKey                    getKey;
+
+      auto operator()(const std::optional<K>&           gt,
+                      const std::optional<K>&           ge,
+                      const std::optional<K>&           lt,
+                      const std::optional<K>&           le,
+                      std::optional<uint32_t>           first,
+                      std::optional<uint32_t>           last,
+                      const std::optional<std::string>& before,
+                      const std::optional<std::string>& after) const
+      {
+         return psio::makeConnection<psio::Connection<T, ConnectionName, EdgeName>, K>(
+             gt, ge, lt, le, first, last, before, after,
+             index.begin(),                                       //
+             index.end(),                                         //
+             [](auto& it) { ++it; },                              //
+             [](auto& it) { --it; },                              //
+             [&](auto& it) { return std::invoke(getKey, *it); },  //
+             [](auto& it) { return *it; },                        //
+             [&](auto& k) { return index.lower_bound(k); },       //
+             [&](auto& k) { return index.upper_bound(k); });      //
+      }
+   };
+
+   template <psio::FixedString ConnectionName,
+             psio::FixedString EdgeName,
+             typename T,
+             typename K,
+             typename GetKey>
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
+       QueryIndexImpl<ConnectionName, EdgeName, T, K, GetKey>*)
+   {
+      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
    }
+
+   template <psio::FixedString ConnectionName,
+             psio::FixedString EdgeName,
+             typename T,
+             typename K,
+             typename GetKey>
+   QueryIndexImpl<ConnectionName, EdgeName, T, K, GetKey> queryIndex(
+       psibase::TableIndex<T, K> index,
+       GetKey                    getKey)
+   {
+      return {std::move(index), getKey};
+   }
+
 }  // namespace psibase

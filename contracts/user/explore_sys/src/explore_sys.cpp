@@ -1,50 +1,24 @@
 #include "contracts/user/explore_sys.hpp"
 
 #include <contracts/system/proxy_sys.hpp>
-#include <psibase/KVGraphQLConnection.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 
 using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
-struct Block
-{
-   std::shared_ptr<psibase::Block> block;
-
-   const auto& header() const { return block->header; }
-   const auto& transactions() const { return block->transactions; }
-};
-PSIO_REFLECT(Block, method(header), method(transactions))
-
-using BlockConnection = psio::Connection<Block, "BlockConnection", "BlockEdge">;
-
 struct QueryRoot
 {
-   // TODO: avoid reading full blocks
-   auto blocks(const std::optional<psibase::BlockNum>& gt,
-               const std::optional<psibase::BlockNum>& ge,
-               const std::optional<psibase::BlockNum>& lt,
-               const std::optional<psibase::BlockNum>& le,
-               std::optional<uint32_t>                 first,
-               std::optional<uint32_t>                 last,
-               const std::optional<std::string>&       before,
-               const std::optional<std::string>&       after) const
+   auto blocks() const
    {
-      return psibase::makeKVConnection<BlockConnection, psibase::Block>(
-          gt, ge, lt, le, first, last, before, after, psibase::DbId::blockLog, psibase::BlockNum(0),
-          ~psibase::BlockNum(0), 0,
-          [](auto& block) {  //
-             return block.header.blockNum;
-          },
-          [](auto& p) {  //
-             return Block{p};
-          });
-   }  // blocks()
+      psibase::TableIndex<psibase::Block, uint32_t> index{psibase::DbId::blockLog, {}, false};
+      return psibase::queryIndex<"BlockConnection", "BlockEdge">(
+          std::move(index), [](const auto& x) { return x.header.blockNum; });
+   }
 };
 PSIO_REFLECT(  //
     QueryRoot,
-    method(blocks, gt, ge, lt, le, first, last, before, after))
+    method(blocks))
 
 namespace system_contract
 {
