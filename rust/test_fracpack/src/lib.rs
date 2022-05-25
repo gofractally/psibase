@@ -72,12 +72,23 @@ pub struct OuterStruct {
     pub field_option_str: Option<String>,
     pub field_option_f32: Option<f32>,
     pub field_option_f64: Option<f64>,
+    pub field_option_sws: Option<SimpleWithString>,
+    pub field_option_sns: Option<SimpleWithNoString>,
     pub field_option_inner: Option<InnerStruct>,
     pub field_option_u_inner: Option<DefWontChangeInnerStruct>,
     pub field_o_o_i8: Option<Option<i8>>,
     pub field_o_o_str: Option<Option<String>>,
     pub field_o_o_str2: Option<Option<String>>,
     pub field_o_o_inner: Option<Option<InnerStruct>>,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(definition_will_not_change)]
+pub struct SimpleWithNoString {
+    pub a: u32,
+    pub b: u64,
+    pub c: u16,
+    pub f: f32,
 }
 
 #[derive(Fracpack, Debug, PartialEq)]

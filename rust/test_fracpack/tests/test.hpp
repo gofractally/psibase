@@ -72,6 +72,29 @@ PSIO_REFLECT(InnerStruct,
              inner_option_vec_u16,
              inner_o_vec_o_u16)
 
+struct SimpleWithString
+{
+   uint32_t    a;
+   uint64_t    b;
+   uint16_t    c;
+   std::string s;
+   float       f;
+
+   auto operator<=>(const SimpleWithString& b) const = default;
+};
+PSIO_REFLECT(SimpleWithString, definitionWillNotChange(), a, b, c, s, f)
+
+struct SimpleWithNoString
+{
+   uint32_t a;
+   uint64_t b;
+   uint16_t c;
+   float    f;
+
+   auto operator<=>(const SimpleWithNoString& b) const = default;
+};
+PSIO_REFLECT(SimpleWithNoString, definitionWillNotChange(), a, b, c, f)
+
 struct OuterStruct
 {
    uint8_t                                   field_u8;
@@ -99,6 +122,8 @@ struct OuterStruct
    std::optional<std::string>                field_option_str;
    std::optional<float>                      field_option_f32;
    std::optional<double>                     field_option_f64;
+   std::optional<SimpleWithString>           field_option_sws;
+   std::optional<SimpleWithNoString>         field_option_sns;
    std::optional<InnerStruct>                field_option_inner;
    std::optional<DefWontChangeInnerStruct>   field_option_u_inner;
    std::optional<std::optional<int8_t>>      field_o_o_i8;
@@ -134,6 +159,8 @@ PSIO_REFLECT(OuterStruct,
              field_option_str,
              field_option_f32,
              field_option_f64,
+             field_option_sws,
+             field_option_sns,
              field_option_inner,
              field_option_u_inner,
              field_o_o_i8,
@@ -141,7 +168,6 @@ PSIO_REFLECT(OuterStruct,
              field_o_o_str2,
              field_o_o_inner)
 
-void round_tripz(rust::Slice<const uint8_t> blob);
 void round_trip_outer_struct(size_t index, rust::Slice<const uint8_t> blob);
 void round_trip_outer_struct_field(size_t                     index,
                                    rust::Str                  field_name,

@@ -51,6 +51,8 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_option_str: Some("".to_string()),
             field_option_f32: Some(-17.5),
             field_option_f64: None,
+            field_option_sws: None,
+            field_option_sns: None,
             field_option_inner: None,
             field_option_u_inner: None,
             field_o_o_i8: None,
@@ -123,6 +125,19 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_option_str: Some("hi kl lmnop".to_string()),
             field_option_f32: None,
             field_option_f64: Some(12.0),
+            field_option_sws: Some(SimpleWithString {
+                a: 0x0a,
+                b: 0x0b,
+                c: 0x0c,
+                s: "hi".to_string(),
+                f: 1.23,
+            }),
+            field_option_sns: Some(SimpleWithNoString {
+                a: 0xaa,
+                b: 0xbb,
+                c: 0xcc,
+                f: 4.56,
+            }),
             field_option_inner: Some(InnerStruct {
                 inner_u32: 1234,
                 var: Some(Variant::ItemU32(0)),
@@ -207,6 +222,8 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_option_str: Some("hi kl lmnop".to_string()),
             field_option_f32: None,
             field_option_f64: Some(12.0),
+            field_option_sws: None,
+            field_option_sns: None,
             field_option_inner: Some(InnerStruct {
                 inner_u32: 1234,
                 var: Some(Variant::ItemU32(0)),
@@ -255,6 +272,8 @@ fn round_trip_field<T: fracpack::PackableOwned + PartialEq + std::fmt::Debug>(
     let mut packed = Vec::<u8>::new();
     field.pack(&mut packed);
 
+    println!("packed > {}", hex::encode(&packed[..]).to_uppercase());
+
     T::verify_no_extra(&packed[..]).unwrap();
 
     let unpacked = T::unpack(&packed[..], &mut 0).unwrap();
@@ -295,6 +314,10 @@ fn round_trip_fields(index: usize, obj: &OuterStruct) {
     do_rt!(index, obj, field_option_str);
     do_rt!(index, obj, field_option_f32);
     do_rt!(index, obj, field_option_f64);
+    do_rt!(index, obj, field_option_sws);
+    println!("comparing sns");
+    do_rt!(index, obj, field_option_sns);
+    println!("compared sns");
     do_rt!(index, obj, field_option_inner);
     do_rt!(index, obj, field_o_o_i8);
     do_rt!(index, obj, field_o_o_str);

@@ -41,6 +41,8 @@ OuterStruct tests1_data[] = {
         .field_option_str     = ""s,
         .field_option_f32     = Some(-17.5),
         .field_option_f64     = None,
+        .field_option_sws     = None,
+        .field_option_sns     = None,
         .field_option_inner   = None,
         .field_option_u_inner = None,
         .field_o_o_i8         = None,
@@ -116,6 +118,8 @@ OuterStruct tests1_data[] = {
         .field_option_str = "hi kl lmnop"s,
         .field_option_f32 = None,
         .field_option_f64 = Some(12.0),
+        .field_option_sws = SimpleWithString{.a = 0x0a, .b = 0x0b, .c = 0x0c, .s = "hi", .f = 1.23},
+        .field_option_sns = SimpleWithNoString{.a = 0xaa, .b = 0xbb, .c = 0xcc, .f = 4.56},
         .field_option_inner =
             InnerStruct{
                 .inner_u32            = 1234,
@@ -207,6 +211,8 @@ OuterStruct tests1_data[] = {
         .field_option_str = "hi kl lmnop"s,
         .field_option_f32 = None,
         .field_option_f64 = Some(12.0),
+        .field_option_sws = None,
+        .field_option_sns = None,
         .field_option_inner =
             InnerStruct{
                 .inner_u32            = 1234,
@@ -313,6 +319,8 @@ void round_trip_outer_struct_field(size_t                     index,
    HANDLE(field_option_str);
    HANDLE(field_option_f32);
    HANDLE(field_option_f64);
+   HANDLE(field_option_sws);
+   HANDLE(field_option_sns);
    HANDLE(field_option_inner);
    HANDLE(field_option_u_inner);
    HANDLE(field_o_o_i8);

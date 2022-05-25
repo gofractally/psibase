@@ -236,21 +236,22 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             }
             fn option_fixed_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
                 match opt {
-                    Some(x) => Self::embedded_fixed_pack(x, dest),
+                    Some(x) => dest.extend_from_slice(&0_u32.to_le_bytes()),
                     None => dest.extend_from_slice(&1u32.to_le_bytes()),
                 }
             }
             fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
                 match opt {
                     Some(x) => {
-                        Self::embedded_fixed_repack(x, fixed_pos, heap_pos, dest)
+                        dest[fixed_pos as usize..fixed_pos as usize + 4]
+                            .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
                     }
                     None => (),
                 }
             }
             fn option_variable_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
                 match opt {
-                    Some(x) => Self::embedded_variable_pack(x, dest),
+                    Some(x) => Self::pack(&x, dest),
                     None => (),
                 }
             }
@@ -259,27 +260,30 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 fixed_pos: &mut u32,
                 heap_pos: &mut u32,
             ) -> fracpack::Result<Option<Self>> {
+                let orig_pos = *fixed_pos;
                 let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(None);
                 }
-                *fixed_pos -= 4;
-                Ok(Some(<Self as fracpack::Packable>::embedded_unpack(
-                    src, fixed_pos, heap_pos,
-                )?))
+                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                    return Err(fracpack::Error::BadOffset);
+                }
+                Ok(Some(Self::unpack(src, heap_pos)?))
             }
             fn option_verify(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
                 heap_pos: &mut u32,
             ) -> fracpack::Result<()> {
+                let orig_pos = *fixed_pos;
                 let offset = <u32 as fracpack::Packable>::unpack(src, fixed_pos)?;
                 if offset == 1 {
                     return Ok(());
                 }
-
-                *fixed_pos -= 4;
-                <Self as fracpack::Packable>::embedded_verify(src, fixed_pos, heap_pos)
+                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                    return Err(fracpack::Error::BadOffset);
+                }
+                Self::verify(src, heap_pos)
             }
         }
     })
