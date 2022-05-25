@@ -81,9 +81,73 @@ namespace psidb
 
       void on_delete(page_header* p)
       {
+         // What if the page is written later...
+         // events that affect page status:
+         // - write (memory -> both)
+         // - evict (both -> disk)
+         // - gc (memory -> free)
+         // - free (both -> memory, disk -> none)
+         // - load (disk -> both)
+         //
+         // possible page states:
+         // memory, disk, both, free
+         //
+         // Storing p will fail on evict/gc
+         // Storing p->id will fail at write
+         //
+         // possible solutions:
+         // - lock freed pages in memory
+         //   Downside: uses more memory, How do we know when to unpin?
+         // - ensure that pages have assigned page numbers before building new transactions
+         //   Downside: reduces potential flush parallelism
+         // - Hybrid: lock freed pages in memory iff they have not been written yet
+         //   Downside: Extra complexity and still doesn't free pages as early as possible
+         // - gc scans and fixes active transactions
+         //   Downside: Major concurrency headache
+         // - fixup checkpoints on write
+         //   Downside: requires mapping page->last checkpoint
+         //
+         // extreme case: what if a page is scheduled to be written, but still
+         // hasn't been written when it gets freed.
+         //
+         // Proposal:
+         // - A page has two additional states:
+         //   - locked: The page is referenced by the free list associated with a live checkpoint
+         //   - obsolete: The page should be freed as soon as it is written to disk
+         // additional behavior:
+         // - write: if obsolete, deallocate after writing
+         // - evict: ignore if locked
+         // - gc: ignore if locked
+         // - free: {locked,memory}->obsolete, {}
+         //
+         // In addition, every operation that checks the version
+         // will attempt to transition {locked,both}->unlocked,
+         // and adjust the node.
+         //
+         // Invariants:
+         // - A memory page is locked iff it is referenced by an obsolete_page
+         // - A page can be referenced by at most one obsolete_page
+         // - A page that is part of any disk checkpoint is either
+         //   - xxx: not written to disk and referenced by a disk checkpoint (checkpoints that have queued writes cannot be deleted)
+         //   - live: written to disk and referenced by a live disk checkpoint
+         //   - dead: written to disk but not referenced by any checkpoint
+         //   - ghost: written to disk but only referenced by volatile checkpoints
+         //
+         // write: {live,dirty} -> live
+         // evict: requires not dirty.
+         // gc: requires not dirty.
+         // free: {live,dirty,locked} -> {live,dirty,obsolete}
+         //       {}
          if (p->id != 0)
          {
             obsolete_nodes.push_back({p->version, p->id});
+         }
+         else if (
+             p->version <=
+             _clone_version)  // FIXME: this is actually the last written version, which happens to be the same as _clone_version.  Consider renaming.
+         {
+            _db->pin_page(p);
+            obsolete_nodes.push_back({p->version, _db->get_id(p)});
          }
       }
 

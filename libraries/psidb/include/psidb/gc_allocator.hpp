@@ -105,6 +105,10 @@ namespace psidb
       cycle start_cycle();
       void  scan_root(cycle& data, page_header* header);
       bool  scan(cycle& data, node_ptr ptr);
+      void  rescan_root(page_header* header);
+      void  rescan(node_ptr ptr);
+      void  rescan_children(page_internal_node* node);
+      void  rescan_children(page_leaf*);
       void  mark_copy(page_header* src, page_header* dest)
       {
          // What happens if _gc_flag is flipped concurrently?
@@ -122,8 +126,16 @@ namespace psidb
          }
          else
          {
-            mark_old(dest);
-            queue_scan(dest);
+            if (_rescanning.load(std::memory_order_relaxed))
+            {
+               rescan_root(src);
+               mark_new(dest);
+            }
+            else
+            {
+               mark_old(dest);
+               queue_scan(dest);
+            }
          }
       }
       void mark(page_header* header)
@@ -235,6 +247,7 @@ namespace psidb
       bool                                         _stopped = false;
       std::atomic<gc_flag_type>                    _gc_flag;
       shared_value                                 _gc_mutex;
+      std::atomic<bool>                            _rescanning;
 
       // statistics
       std::uint64_t _eviction_count = 0;

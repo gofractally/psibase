@@ -39,6 +39,7 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
    // process any queued nodes
    int extra_cycles = 0;
    int extra_nodes  = 0;
+   _rescanning.store(true, std::memory_order_release);
    while (true)
    {
       // Block until all any copies that have started finish.
@@ -63,7 +64,12 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
          ++extra_nodes;
       }
    }
-   //std::osyncstream(std::cout) << "extra cycles: " << extra_cycles << ", extra nodes: " << extra_nodes << std::endl;
+   std::osyncstream(std::cout) << "extra cycles: " << extra_cycles
+                               << ", extra nodes: " << extra_nodes << std::endl;
+
+   // FIXME: This store must become visible to other threads no later than the
+   // next switch of _gc_flag.  Therefore _gc_flag needs to use acquire/release.
+   _rescanning.store(false, std::memory_order_release);
 
    c.versions.clear();
 
@@ -90,7 +96,7 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
             mark(iter);
          }
       }
-      if (!is_marked(iter) && !is_free(iter) && !is_new(iter))
+      if (!is_marked(iter) && !is_free(iter) && !is_new(iter) && !iter->is_pinned())
       {
 #ifdef DEBUG_ALLOC
          std::memset(iter, 0xCC, page_size);
@@ -151,6 +157,18 @@ void psidb::gc_allocator::scan_root(cycle& data, page_header* page)
    }
 }
 
+// Rescanning ensures that all pointers to evicted pages
+// are relinked.
+void psidb::gc_allocator::rescan_root(page_header* page)
+{
+   if (!is_marked(page))
+   {
+      visit([&](auto* p) { rescan_children(p); }, page);
+      rescan(get_prev(page));
+      mark(page);
+   }
+}
+
 bool psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
 {
    // decide whether to move the page...
@@ -178,6 +196,19 @@ bool psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
       return evict;
    }
    return true;
+}
+
+void psidb::gc_allocator::rescan(node_ptr ptr)
+{
+   auto id = *ptr;
+   if (is_memory_page(id))
+   {
+      page_header* page = translate_page_address(id);
+      if (is_evicted(page))
+      {
+         ptr->store(page->id, std::memory_order_relaxed);
+      }
+   }
 }
 bool psidb::gc_allocator::is_old(page_header* header)
 {
@@ -232,10 +263,20 @@ bool psidb::gc_allocator::scan_children(cycle& data, page_internal_node* node)
    return result;
 }
 
+void psidb::gc_allocator::rescan_children(page_internal_node* node)
+{
+   for (std::size_t i = 0; i <= node->_size; ++i)
+   {
+      rescan(node->child(i));
+   }
+}
+
 bool psidb::gc_allocator::scan_children(cycle& data, page_leaf* node)
 {
    return node->should_evict();
 }
+
+void psidb::gc_allocator::rescan_children(page_leaf* node) {}
 
 // A page is live if there is an active checkpoint after its creation,
 // but before its removal.

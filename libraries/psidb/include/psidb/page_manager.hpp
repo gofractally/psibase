@@ -132,6 +132,8 @@ namespace psidb
          page_header* result = static_cast<page_header*>(_allocator.allocate_page(src));
          return {result, get_id(result)};
       }
+      void pin_page(page_header* page) { page->pin(); }
+      void unpin_page(page_header* page) { page->unpin(); }
       void set_root(const checkpoint& c, int db, page_id new_root)
       {
          c._root->_root.table_roots[db] = new_root;
@@ -204,6 +206,12 @@ namespace psidb
       }
       void async_flush(bool stable = true)
       {
+         if (head->_durable)
+         {
+            // TODO: if stable promote auto checkpoint to stable
+            try_flush();
+            return;
+         }
          head->_durable = true;
          if (stable)
          {
@@ -246,8 +254,8 @@ namespace psidb
                {
                   _stable_checkpoints.push_back(head);
                }
-               try_flush();
             }
+            try_flush();
          }
          else
          {
@@ -279,9 +287,16 @@ namespace psidb
          return result;
       }
       version_type flush_version() const { return _flush_version; }
+      // A page is dirty at a checkpoint iff it or any child has a version in
+      // the range (ck->previous_durable, ck->version]
+      //
+      // We are now creating a full clone at each durable checkpoint,
+      // avoiding the need to track per-page dirty flags.
+      //
       // Mark a page as dirty.
       void touch_page(page_header* page, version_type version)
       {
+#if 0
          if (version > _flush_version)
          {
             page->set_dirty(_dirty_flag, true);
@@ -290,6 +305,7 @@ namespace psidb
          {
             page->set_dirty(switch_dirty_flag(_dirty_flag), true);
          }
+#endif
       }
       enum value_reference_flags : std::uint16_t
       {
@@ -431,12 +447,10 @@ namespace psidb
                        std::size_t                  count,
                        bool                         temporary,
                        const std::shared_ptr<void>& refcount);
-      void write_page(page_header*                 page,
-                      page_flags                   dirty_flag,
-                      const std::shared_ptr<void>& refcount);
+      void write_page(page_header* page, const std::shared_ptr<void>& refcount);
       bool write_tree(page_id                      page,
                       version_type                 version,
-                      page_flags                   dirty_flag,
+                      version_type                 prev_version,
                       const std::shared_ptr<void>& refcount);
       checkpoint_freelist_location write_checkpoint_freelist(
           const std::vector<checkpoint_ptr>& all_checkpoints,
@@ -503,10 +517,11 @@ namespace psidb
       boost::intrusive::list<checkpoint_data> _active_checkpoints;
       std::mutex                              _commit_mutex;
       std::vector<checkpoint_ptr>             _stable_checkpoints;
-      checkpoint_ptr                          _auto_checkpoint      = nullptr;
-      checkpoint_ptr                          _next_auto_checkpoint = nullptr;
-      checkpoint_ptr                          last_commit           = nullptr;
-      checkpoint_ptr                          head                  = nullptr;
+      checkpoint_ptr                          _last_durable_checkpoint = nullptr;
+      checkpoint_ptr                          _auto_checkpoint         = nullptr;
+      checkpoint_ptr                          _next_auto_checkpoint    = nullptr;
+      checkpoint_ptr                          last_commit              = nullptr;
+      checkpoint_ptr                          head                     = nullptr;
 
       std::thread _write_worker{[this]() { write_worker(); }};
    };

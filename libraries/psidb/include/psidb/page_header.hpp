@@ -40,6 +40,7 @@ namespace psidb
       std::atomic<bool>    dirty0;
       std::atomic<bool>    dirty1;
       std::atomic<uint8_t> accessed;
+      std::atomic<bool>    pinned;
       page_id              id;
       std::atomic<page_id> prev;
       version_type         version;
@@ -50,6 +51,9 @@ namespace psidb
       void access() { accessed.store(1, std::memory_order_relaxed); }
       void clear_access() { accessed.store(0, std::memory_order_relaxed); }
       bool should_evict() { return accessed.load(std::memory_order_relaxed) == 0 && id != 0; }
+      void pin() { pinned.store(1, std::memory_order_relaxed); }
+      void unpin() { pinned.store(0, std::memory_order_release); }
+      bool is_pinned() const { return pinned.load(std::memory_order_acquire); }
       bool is_dirty(page_flags f) const
       {
          if (f == page_flags::dirty0)

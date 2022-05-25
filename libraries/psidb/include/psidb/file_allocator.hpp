@@ -38,8 +38,9 @@ namespace psidb
       void         load(page_id root, std::uint32_t num_pages, gc_allocator& alloc);
       struct stats
       {
-         std::size_t used;
-         std::size_t total;
+         std::size_t   used;
+         std::size_t   total;
+         std::uint64_t cumulative;
       };
       stats get_stats() const;
 
@@ -52,5 +53,6 @@ namespace psidb
       free_segment              previous_root = {};
       std::vector<free_segment> freelist;
       std::vector<free_segment> next_freelist;
+      std::uint64_t             _total_allocations = 0;
    };
 }  // namespace psidb

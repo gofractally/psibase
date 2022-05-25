@@ -177,7 +177,21 @@ void page_manager::queue_gc(page_header* node)
 
 void page_manager::queue_gc(obsolete_page page)
 {
-   _file_allocator.deallocate(page.page, 1);
+   if (is_memory_page(page.page))
+   {
+      auto p = translate_page_address(page.page);
+      unpin_page(p);
+      if (p->id)
+      {
+         _file_allocator.deallocate(p->id, 1);
+      }
+      // If the page is still queued for writing, then we shouldn't get
+      // here at all, because the write checkpoint is still alive.
+   }
+   else
+   {
+      _file_allocator.deallocate(page.page, 1);
+   }
 }
 
 void psidb::page_manager::write_worker()
@@ -231,14 +245,11 @@ void psidb::page_manager::evict_page(node_ptr ptr) {
 }
 #endif
 
-void psidb::page_manager::write_page(page_header*                 page,
-                                     page_flags                   dirty_flag,
-                                     const std::shared_ptr<void>& refcount)
+void psidb::page_manager::write_page(page_header* page, const std::shared_ptr<void>& refcount)
 {
    auto dest = allocate_file_page();
    _page_map.store(dest, get_id(page));
    page->id = dest;
-   page->set_dirty(dirty_flag, false);
    queue_write(dest, page, refcount);
 }
 
@@ -266,7 +277,7 @@ static void fix_data_reference(std::string_view value,
 
 bool psidb::page_manager::write_tree(page_id                      page,
                                      version_type                 version,
-                                     page_flags                   dirty_flag,
+                                     version_type                 prev_version,
                                      const std::shared_ptr<void>& refcount)
 {
    // This requires the invariant that if a node is on
@@ -286,7 +297,7 @@ bool psidb::page_manager::write_tree(page_id                      page,
          page = header->prev.load(std::memory_order_acquire);
          continue;
       }
-      if (!header->is_dirty(dirty_flag))
+      if (header->version <= prev_version)
       {
          return false;
       }
@@ -296,11 +307,11 @@ bool psidb::page_manager::write_tree(page_id                      page,
          for (auto& child : static_cast<page_internal_node*>(header)->get_children())
          {
             result |=
-                write_tree(child.load(std::memory_order_acquire), version, dirty_flag, refcount);
+                write_tree(child.load(std::memory_order_acquire), version, prev_version, refcount);
          }
          if (result)
          {
-            write_page(header, dirty_flag, refcount);
+            write_page(header, refcount);
          }
          return result;
       }
@@ -382,12 +393,12 @@ bool psidb::page_manager::write_tree(page_id                      page,
                }
             }
             write_pages(data_base_page, data_pages, pages, false, refcount);
-            write_page(header, dirty_flag, refcount);
+            write_page(header, refcount);
 #endif
          }
          else
          {
-            write_page(header, dirty_flag, refcount);
+            write_page(header, refcount);
          }
          return true;
       }
@@ -442,16 +453,23 @@ void psidb::page_manager::start_flush()
       checkpoint_copy.push_back(_auto_checkpoint);
    }
    // TODO: only convert to shared_ptr<void> once
-   auto refcount  = std::make_shared<finish_flush>(this, checkpoint_copy, !!_auto_checkpoint);
-   auto write_one = [&](const checkpoint_ptr& ptr)
+   auto refcount     = std::make_shared<finish_flush>(this, checkpoint_copy, !!_auto_checkpoint);
+   auto prev_version = _last_durable_checkpoint ? _last_durable_checkpoint->_root.version : 0;
+   auto write_one    = [&](const checkpoint_ptr& ptr)
    {
       if (ptr->_dirty)
       {
+         // TODO: This version tracking can completely replace ptr->_dirty
+         assert(ptr->_root.version > prev_version);
          // TODO: flush all tables
          auto* c = &ptr->_root;
-         // TODO: dirty flag is obsolete, remove and replace it.
-         write_tree(c->table_roots[0], c->version, switch_dirty_flag(_dirty_flag), refcount);
-         ptr->_dirty = false;
+         write_tree(c->table_roots[0], c->version, prev_version, refcount);
+         ptr->_dirty  = false;
+         prev_version = c->version;
+      }
+      else
+      {
+         assert(ptr->_root.version <= prev_version);
       }
    };
    for (auto& ptr : _stable_checkpoints)
@@ -461,6 +479,11 @@ void psidb::page_manager::start_flush()
    if (_auto_checkpoint)
    {
       write_one(_auto_checkpoint);
+      _last_durable_checkpoint = _auto_checkpoint;
+   }
+   else
+   {
+      _last_durable_checkpoint = _stable_checkpoints.back();
    }
    refcount->checkpoint_freelist = write_checkpoint_freelist(all_checkpoints, refcount);
 }
@@ -571,6 +594,7 @@ void psidb::page_manager::read_header()
    {
       head = last_commit;
    }
+   _last_durable_checkpoint = head;
    if (tmp.checkpoint_freelist)
    {
       // TODO: RAII
@@ -664,10 +688,26 @@ page_manager::checkpoint_freelist_location psidb::page_manager::write_checkpoint
          saved_checkpoint_version = checkpoint->_root.version;
          saved_checkpoint_obsolete.clear();
       }
-      for (const auto& v : checkpoint->_pages_to_free)
+      for (auto& v : checkpoint->_pages_to_free)
       {
-         for (auto [version, page] : v)
+         for (auto& [version, page] : v)
          {
+            if (is_memory_page(page))
+            {
+               auto p = translate_page_address(page);
+               if (p->id)
+               {
+                  page = p->id;
+                  unpin_page(p);
+               }
+               else
+               {
+                  // We have written all checkpoints up to the current.  Therefore,
+                  // if p->id is not set by now, the page will never be written to disk.
+                  // TODO: erase from v
+                  continue;
+               }
+            }
             if (version > saved_checkpoint_version)
             {
                _file_allocator.deallocate_temp(page, 1);
@@ -708,6 +748,8 @@ void psidb::page_manager::write_header(const std::vector<checkpoint_ptr>& checkp
                                        std::size_t                        auto_checkpoints,
                                        checkpoint_freelist_location       checkpoint_freelist)
 {
+   std::osyncstream(std::cout) << "writing header: checkpoints: " << checkpoints.size()
+                               << std::endl;
    database_header tmp;
    auto [freelist, freelist_pages] = _file_allocator.flush(_allocator);
    // needs to be after the allocator is flushed

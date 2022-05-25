@@ -36,6 +36,7 @@ page_id psidb::file_allocator::allocate_unlocked(std::size_t num_pages)
          auto result = iter->start;
          iter->start += num_pages;
          iter->size -= num_pages;
+         _total_allocations += num_pages;
          return result;
       }
    }
@@ -222,6 +223,7 @@ file_allocator::stats psidb::file_allocator::get_stats() const
          available += free.size;
       }
    }
-   result.used = result.total - available;
+   result.used       = result.total - available;
+   result.cumulative = _total_allocations;
    return result;
 }

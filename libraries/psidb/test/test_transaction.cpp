@@ -172,7 +172,7 @@ TEST_CASE("basic eviction", "[persistence]")
    db.full_gc();
 
    // After eviction, only the root is held in memory
-   CHECK(db.get_stats().memory.used == 1);
+   CHECK(db.get_stats().memory.used == psidb::page_size);
 
    // Make sure that evicted pages can be loaded again
    {
