@@ -17,10 +17,7 @@ struct Block
 };
 PSIO_REFLECT(Block, method(header), method(transactions))
 
-using BlockEdge       = psio::Edge<Block>;
-using BlockConnection = psio::Connection<Block>;
-PSIO_REFLECT_GQL_EDGE(BlockEdge)
-PSIO_REFLECT_GQL_CONNECTION(BlockConnection)
+using BlockConnection = psio::Connection<Block, "BlockConnection", "BlockEdge">;
 
 struct QueryRoot
 {
