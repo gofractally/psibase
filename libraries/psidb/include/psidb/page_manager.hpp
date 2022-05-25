@@ -39,8 +39,6 @@ namespace psidb
 
       // true if this checkpoint should be written to disk.
       bool _durable = false;
-      // true if this checkpoint has not been written to disk
-      bool _dirty = true;
 
       // Pages that are used by this checkpoint, but not by any later checkpoint.
       // When a checkpoint is deleted, this list is merged into the previous checkpoint.
@@ -158,7 +156,6 @@ namespace psidb
          {
             _flush_version = head->_root.version;
             _flush_pending = false;
-            _dirty_flag    = switch_dirty_flag(_dirty_flag);
          }
          head.reset(new checkpoint_data(this));
          return {head};
@@ -249,7 +246,6 @@ namespace psidb
             {
                _flush_version = head->_root.version;
                _flush_pending = false;
-               _dirty_flag    = switch_dirty_flag(_dirty_flag);
                if (stable)
                {
                   _stable_checkpoints.push_back(head);
@@ -287,26 +283,6 @@ namespace psidb
          return result;
       }
       version_type flush_version() const { return _flush_version; }
-      // A page is dirty at a checkpoint iff it or any child has a version in
-      // the range (ck->previous_durable, ck->version]
-      //
-      // We are now creating a full clone at each durable checkpoint,
-      // avoiding the need to track per-page dirty flags.
-      //
-      // Mark a page as dirty.
-      void touch_page(page_header* page, version_type version)
-      {
-#if 0
-         if (version > _flush_version)
-         {
-            page->set_dirty(_dirty_flag, true);
-         }
-         else
-         {
-            page->set_dirty(switch_dirty_flag(_dirty_flag), true);
-         }
-#endif
-      }
       enum value_reference_flags : std::uint16_t
       {
          file,
@@ -408,22 +384,6 @@ namespace psidb
 
       using checkpoint_ptr = std::shared_ptr<checkpoint_data>;
 
-      page_flags switch_dirty_flag(page_flags f)
-      {
-         if (f == page_flags::dirty0)
-         {
-            return page_flags::dirty1;
-         }
-         else if (f == page_flags::dirty1)
-         {
-            return page_flags::dirty0;
-         }
-         else
-         {
-            __builtin_unreachable();
-         }
-      }
-
       page_id allocate_file_page();
       page_id allocate_file_pages(std::size_t count);
 
@@ -503,7 +463,6 @@ namespace psidb
       int                               fd = -1;
       file_allocator                    _file_allocator;
       page_map                          _page_map;
-      page_flags                        _dirty_flag    = page_flags::dirty0;
       bool                              _flush_pending = false;
       bool                              _flush_stable  = true;
       version_type                      _flush_version = 0;

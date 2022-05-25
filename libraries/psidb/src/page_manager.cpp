@@ -32,13 +32,11 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages)
    if (file_info.st_size == 0)
    {
       // initialize new database
-      auto [page, id]   = allocate_page(nullptr);
-      page->type        = page_type::leaf;
-      page->id          = 0;
-      page->version     = 1;
-      page->min_version = page->version;
+      auto [page, id] = allocate_page(nullptr);
+      page->type      = page_type::leaf;
+      page->id        = 0;
+      page->version   = 1;
       page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
-      touch_page(page, page->version);
       static_cast<page_leaf*>(page)->clear();
 
       checkpoint_root h = {};
@@ -457,19 +455,12 @@ void psidb::page_manager::start_flush()
    auto prev_version = _last_durable_checkpoint ? _last_durable_checkpoint->_root.version : 0;
    auto write_one    = [&](const checkpoint_ptr& ptr)
    {
-      if (ptr->_dirty)
+      if (ptr->_root.version > prev_version)
       {
-         // TODO: This version tracking can completely replace ptr->_dirty
-         assert(ptr->_root.version > prev_version);
          // TODO: flush all tables
          auto* c = &ptr->_root;
          write_tree(c->table_roots[0], c->version, prev_version, refcount);
-         ptr->_dirty  = false;
          prev_version = c->version;
-      }
-      else
-      {
-         assert(ptr->_root.version <= prev_version);
       }
    };
    for (auto& ptr : _stable_checkpoints)
@@ -570,7 +561,6 @@ void psidb::page_manager::read_header()
    for (std::uint32_t i = 0; i < tmp.num_checkpoints; ++i)
    {
       checkpoint_ptr c{new checkpoint_data(this, tmp.checkpoints[i])};
-      c->_dirty = false;
       if (i < tmp.num_checkpoints - tmp.auto_checkpoints)
       {
          c->_durable = true;
@@ -748,8 +738,8 @@ void psidb::page_manager::write_header(const std::vector<checkpoint_ptr>& checkp
                                        std::size_t                        auto_checkpoints,
                                        checkpoint_freelist_location       checkpoint_freelist)
 {
-   std::osyncstream(std::cout) << "writing header: checkpoints: " << checkpoints.size()
-                               << std::endl;
+   //std::osyncstream(std::cout) << "writing header: checkpoints: " << checkpoints.size()
+   //                            << std::endl;
    database_header tmp;
    auto [freelist, freelist_pages] = _file_allocator.flush(_allocator);
    // needs to be after the allocator is flushed

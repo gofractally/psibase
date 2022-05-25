@@ -56,13 +56,10 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       key = p->split(static_cast<page_leaf*>(new_page), p->get_offset(leaf), key, value, flags);
       new_page->id = 0;
       new_page->access();
-      static_cast<page_header*>(new_page)->type        = page_type::leaf;
-      static_cast<page_header*>(new_page)->version     = version;
-      static_cast<page_header*>(new_page)->min_version = version;
-      static_cast<page_header*>(new_page)->prev.store(gc_allocator::null_page,
-                                                      std::memory_order_relaxed);
+      new_page->type    = page_type::leaf;
+      new_page->version = version;
+      new_page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
       child = new_page_id;
-      db->touch_page(new_page, version);
    }
    // Insert into internal nodes
    for (std::size_t i = depth; i > 0; --i)
@@ -78,13 +75,10 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       key = p->split(static_cast<page_internal_node*>(new_page), p->get_offset(pos), key, child);
       new_page->id = 0;
       new_page->access();
-      static_cast<page_internal_node*>(new_page)->type        = page_type::node;
-      static_cast<page_internal_node*>(new_page)->version     = version;
-      static_cast<page_internal_node*>(new_page)->min_version = version;
-      static_cast<page_header*>(new_page)->prev.store(gc_allocator::null_page,
-                                                      std::memory_order_relaxed);
+      new_page->type    = page_type::node;
+      new_page->version = version;
+      new_page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
       child = new_page_id;
-      db->touch_page(new_page, version);
    }
    // Create a new root, increasing the depth of the tree
    {
@@ -93,13 +87,10 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       static_cast<page_internal_node*>(new_page)->set(db->get_root_id(c, 0), key, child);
       new_page->id = 0;
       new_page->access();
-      static_cast<page_internal_node*>(new_page)->type        = page_type::node;
-      static_cast<page_internal_node*>(new_page)->version     = version;
-      static_cast<page_internal_node*>(new_page)->min_version = version;
-      static_cast<page_header*>(new_page)->prev.store(gc_allocator::null_page,
-                                                      std::memory_order_relaxed);
+      new_page->type    = page_type::node;
+      new_page->version = version;
+      new_page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
       db->set_root(c, 0, new_page_id);
-      db->touch_page(new_page, version);
    }
 }
 
@@ -140,12 +131,10 @@ Page* psidb::cursor::maybe_clone(transaction& trx, Ptr& node, std::size_t i)
       copy->id   = 0;
       copy->access();
       copy->prev.store(db->get_id(p), std::memory_order_release);
-      copy->version     = version;
-      copy->min_version = p->min_version;
+      copy->version = version;
       relink_after_copy(trx, i, copy_id);
       node = static_cast<Page*>(copy)->child(p->get_offset(node));
       p    = static_cast<Page*>(copy);
-      db->touch_page(copy, version);
    }
    return p;
 }

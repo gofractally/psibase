@@ -64,8 +64,8 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
          ++extra_nodes;
       }
    }
-   std::osyncstream(std::cout) << "extra cycles: " << extra_cycles
-                               << ", extra nodes: " << extra_nodes << std::endl;
+   //std::osyncstream(std::cout) << "extra cycles: " << extra_cycles
+   //                        << ", extra nodes: " << extra_nodes << std::endl;
 
    // FIXME: This store must become visible to other threads no later than the
    // next switch of _gc_flag.  Therefore _gc_flag needs to use acquire/release.
