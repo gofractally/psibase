@@ -53,7 +53,7 @@ namespace psibase
          }
          else
          {
-            current.header.time.seconds = status->head->header.time.seconds + blockTimeSec;
+            current.header.time.seconds = status->head->header.time.seconds + 1;
          }
       }
       else

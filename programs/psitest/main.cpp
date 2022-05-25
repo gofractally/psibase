@@ -162,8 +162,8 @@ struct test_chain
                         "time skipped in seconds must fit in 32 bits");
          skipAdditional = static_cast<uint32_t>(skipSeconds);
       }
-      psibase::TimePointSec skippedTime{blockContext->getHeadBlockTime().seconds +
-                                        psibase::BlockContext::blockTimeSec + skipAdditional};
+      psibase::TimePointSec skippedTime{blockContext->getHeadBlockTime().seconds + 1 +
+                                        skipAdditional};
 
       blockContext->start(skippedTime);
    }

@@ -49,7 +49,6 @@ namespace psibase
                 bool                                     enableUndo,
                 bool                                     commit);
 
-      psibase::TimePointSec     getHeadBlockTime();
-      static constexpr uint32_t blockTimeSec = 1;
+      psibase::TimePointSec getHeadBlockTime();
    };  // BlockContext
 }  // namespace psibase
