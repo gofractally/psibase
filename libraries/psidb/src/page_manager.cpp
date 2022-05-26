@@ -114,10 +114,10 @@ psidb::page_header* psidb::page_manager::read_page(page_id& id)
       return translate_page_address(id);
    }
 
-   std::osyncstream(std::cout) << "reading page: " << id << std::endl;
-
    auto [page, num] = allocate_page(nullptr);
    page             = new (page) page_internal_node;
+
+   //std::osyncstream(std::cout) << "reading page: " << id << " -> " << num << std::endl;
 
    read_page(page, id);
    ++_pages_read;
@@ -154,7 +154,7 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
    auto [page, num] = allocate_page(nullptr);
    page             = new (page) page_internal_node;
 
-   std::osyncstream(std::cout) << "reading page: " << id << " -> " << num << std::endl;
+   //std::osyncstream(std::cout) << "reading page: " << id << " -> " << num << std::endl;
 
    read_page(page, id);
    ++_pages_read;
@@ -214,7 +214,36 @@ void psidb::page_manager::write_worker()
       write_queue_element next;
       if (!_write_queue.pop(next))
          return;
-      auto [dest, src, size, temporary, data] = next;
+      auto [dest, src, size, type, data] = next;
+      if (type == page_type::node)
+      {
+         alignas(page_size) page_internal_node node;
+
+         assert(size == page_size);
+         std::memcpy(&node, src, page_size);
+         // FIXME: should be unpinned after write completes, because
+         // the page cannot be read until after the write completes.
+         // Alternate: lock page table entry until write completes.
+         static_cast<page_internal_node*>(src)->unpin();
+         // Update all links in the local copy
+         node.prev.store(gc_allocator::null_page, std::memory_order_relaxed);
+         for (std::size_t i = 0; i <= node._size; ++i)
+         {
+            node_ptr child    = node.child(i);
+            page_id  child_id = child->load(std::memory_order_relaxed);
+            if (is_memory_page(child_id))
+            {
+               auto id = translate_page_address(child_id)->id;
+               assert(id != 0);
+               child->store(id, std::memory_order_relaxed);
+            }
+         }
+         src = &node;
+      }
+      else if (type == page_type::leaf)
+      {
+         static_cast<page_leaf*>(src)->unpin();
+      }
       do
       {
          ssize_t res = pwrite(fd, src, size, dest);
@@ -234,7 +263,7 @@ void psidb::page_manager::write_worker()
             dest += res;
          }
       } while (size != 0);
-      if (temporary)
+      if (type == page_type::temp)
       {
          _allocator.deallocate(next.src, next.size);
       }
@@ -245,7 +274,7 @@ void psidb::page_manager::queue_write(page_id                      dest,
                                       page_header*                 src,
                                       const std::shared_ptr<void>& refcount)
 {
-   _write_queue.push({get_file_offset(dest), src, page_size, false, refcount});
+   _write_queue.push({get_file_offset(dest), src, page_size, src->type, refcount});
 }
 
 #if 0
@@ -264,6 +293,12 @@ void psidb::page_manager::write_page(page_header* page, const std::shared_ptr<vo
    assert(page->id == 0);
    auto dest = allocate_file_page();
    _page_map.store(dest, get_id(page));
+   // FIXME: pin is not quite the right semantics.
+   // we need to ensure that the page is not evicted.
+   // Pin does not prevent the page from being reloaded from
+   // disk...
+   page->pin();
+   // TODO: must be store release (pin state must be visible)
    page->id = dest;
    queue_write(dest, page, refcount);
 }
@@ -271,10 +306,10 @@ void psidb::page_manager::write_page(page_header* page, const std::shared_ptr<vo
 void psidb::page_manager::write_pages(page_id                      dest,
                                       void*                        src,
                                       std::size_t                  count,
-                                      bool                         temporary,
+                                      page_type                    type,
                                       const std::shared_ptr<void>& refcount)
 {
-   _write_queue.push({get_file_offset(dest), src, page_size * count, temporary, refcount});
+   _write_queue.push({get_file_offset(dest), src, page_size * count, type, refcount});
 }
 
 static void fix_data_reference(std::string_view value,
@@ -348,8 +383,8 @@ bool psidb::page_manager::write_tree(page_id                      page,
                   // pages += (ref.size + page_size - 1)/page_size;
                   current_page_size = page_size;
                   auto page         = allocate_file_pages((ref.size + page_size - 1) / page_size);
-                  write_pages(page, ref.data, (ref.size + page_size - 1) / page_size, false,
-                              refcount);
+                  write_pages(page, ref.data, (ref.size + page_size - 1) / page_size,
+                              page_type::data, refcount);
                   fix_data_reference(value, page, 0, ref.size);
                }
                else if (ref.size + current_page_size > page_size)
@@ -407,7 +442,7 @@ bool psidb::page_manager::write_tree(page_id                      page,
                   }
                }
             }
-            write_pages(data_base_page, data_pages, pages, false, refcount);
+            write_pages(data_base_page, data_pages, pages, page_type::temp, refcount);
             write_page(header, refcount);
 #endif
          }
@@ -727,7 +762,7 @@ page_manager::checkpoint_freelist_location psidb::page_manager::write_checkpoint
       }
    }
    page_id page = _file_allocator.allocate(num_pages);
-   write_pages(page, data, num_pages, true, refcount);
+   write_pages(page, data, num_pages, page_type::temp, refcount);
    return {page, static_cast<uint32_t>(num_pages)};
 }
 

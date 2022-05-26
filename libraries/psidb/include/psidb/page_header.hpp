@@ -17,9 +17,13 @@ namespace psidb
 
    enum class page_type : std::uint8_t
    {
-      node,
-      leaf,
-      free
+      // Types that are part of the file format and must remain stable
+      node = 0,
+      leaf = 1,
+      data = 2,
+      // Additional types used in memory only
+      free,
+      temp
    };
 
    enum class page_flags : std::uint8_t
@@ -36,7 +40,7 @@ namespace psidb
       page_type            type;
       page_flags           flags;
       std::atomic<uint8_t> accessed;
-      std::atomic<bool>    pinned;
+      std::atomic<uint8_t> pinned;
       std::atomic<bool>    mutex;
       page_id              id;
       std::atomic<page_id> prev;
@@ -54,9 +58,9 @@ namespace psidb
       void access() { accessed.store(1, std::memory_order_relaxed); }
       void clear_access() { accessed.store(0, std::memory_order_relaxed); }
       bool should_evict() { return accessed.load(std::memory_order_relaxed) == 0 && id != 0; }
-      void pin() { pinned.store(1, std::memory_order_relaxed); }
-      void unpin() { pinned.store(0, std::memory_order_release); }
-      bool is_pinned() const { return pinned.load(std::memory_order_acquire); }
+      void pin() { pinned.fetch_add(1, std::memory_order_relaxed); }
+      void unpin() { pinned.fetch_sub(1, std::memory_order_release); }
+      bool is_pinned() const { return pinned.load(std::memory_order_acquire) != 0; }
       void lock()
       {
          while (mutex.exchange(true, std::memory_order_acquire))

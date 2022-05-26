@@ -415,7 +415,7 @@ namespace psidb
       void write_pages(page_id                      dest,
                        void*                        src,
                        std::size_t                  count,
-                       bool                         temporary,
+                       page_type                    type,
                        const std::shared_ptr<void>& refcount);
       void write_page(page_header* page, const std::shared_ptr<void>& refcount);
       bool write_tree(page_id                      page,
@@ -449,8 +449,7 @@ namespace psidb
          std::int64_t dest;
          void*        src;
          std::size_t  size;
-         // Whether the src buffer should be deallocated
-         bool temporary;
+         page_type    type;
          // completion handler
          std::shared_ptr<void> counter;
       };

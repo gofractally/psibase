@@ -50,6 +50,34 @@ TEST_CASE("persistence large value", "[persistence]")
    }
 }
 
+TEST_CASE("persistence many", "[persistence]")
+{
+   tmp_file file;
+
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+
+      auto trx = db.start_transaction();
+      for (int i = 0; i < 400; ++i)
+      {
+         auto [k, v] = make_kv(i);
+         trx.insert(k, v);
+      }
+      trx.commit();
+   }
+   {
+      psidb::database db(::dup(file.native_handle()), 1024);
+      auto            trx    = db.start_transaction();
+      auto            cursor = trx.get_cursor();
+      for (int i = 0; i < 400; ++i)
+      {
+         auto [k, v] = make_kv(i);
+         cursor.lower_bound(k);
+         CHECK_CURSOR(cursor, k, v);
+      }
+   }
+}
+
 TEST_CASE("stable checkpoint", "[persistence]")
 {
    tmp_file file;
