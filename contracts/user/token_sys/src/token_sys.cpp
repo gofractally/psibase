@@ -39,7 +39,7 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable_t>().get_index<0>().get((uint8_t)0);
+      auto initRecord = db.open<InitTable_t>().getIndex<0>().get((uint8_t)0);
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -47,7 +47,7 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
 void TokenSys::init()
 {
    auto initTable = db.open<InitTable_t>();
-   auto init      = (initTable.get_index<0>().get((uint8_t)0));
+   auto init      = (initTable.getIndex<0>().get((uint8_t)0));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{(uint8_t)0});
 
@@ -64,9 +64,9 @@ void TokenSys::init()
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
 {
-   auto creator     = get_sender();
+   auto creator     = getSender();
    auto tokenTable  = db.open<TokenTable_t>();
-   auto tokenIdx    = tokenTable.get_index<0>();
+   auto tokenIdx    = tokenTable.getIndex<0>();
    auto nftContract = at<NftSys>();
 
    // Todo - replace with auto incrementing when available
@@ -95,7 +95,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
 
 void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
 {
-   auto sender      = get_sender();
+   auto sender      = getSender();
    auto token       = getToken(tokenId);
    auto balance     = getBalance(tokenId, sender);
    auto nftContract = at<NftSys>();
@@ -116,7 +116,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
 
 void TokenSys::setUnrecallable(TID tokenId)
 {
-   auto sender          = get_sender();
+   auto sender          = getSender();
    auto token           = getToken(tokenId);
    auto nftContract     = at<NftSys>();
    auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
@@ -132,7 +132,7 @@ void TokenSys::setUnrecallable(TID tokenId)
 
 void TokenSys::burn(TID tokenId, Quantity amount)
 {
-   auto sender  = get_sender();
+   auto sender  = getSender();
    auto token   = getToken(tokenId);
    auto balance = getBalance(tokenId, sender);
 
@@ -155,7 +155,7 @@ void TokenSys::burn(TID tokenId, Quantity amount)
 
 void TokenSys::setConfig(psibase::NamedBit_t flag, bool enable)
 {
-   auto sender  = get_sender();
+   auto sender  = getSender();
    auto hodler  = getTokenHolder(sender);
    auto flagBit = TokenHolderRecord::Configurations::getIndex(flag);
 
@@ -169,7 +169,7 @@ void TokenSys::setConfig(psibase::NamedBit_t flag, bool enable)
 
 void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
 {
-   auto sender  = get_sender();
+   auto sender  = getSender();
    auto balance = getBalance(tokenId, sender);
 
    check(amount.value > 0, quantityGt0);
@@ -201,7 +201,7 @@ void TokenSys::uncredit(TID                tokenId,
                         Quantity           maxAmount,
                         const_view<String> memo)
 {
-   auto sender          = get_sender();
+   auto sender          = getSender();
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
    auto creditorBalance = getBalance(tokenId, sender);
    auto uncreditAmt     = std::min(maxAmount.value, sharedBalance.balance);
@@ -227,7 +227,7 @@ void TokenSys::uncredit(TID                tokenId,
 
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
 {
-   auto receiver        = get_sender();  //The action sender is the token receiver
+   auto receiver        = getSender();  //The action sender is the token receiver
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
    auto receiverBalance = getBalance(tokenId, receiver);
 
@@ -252,7 +252,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
 void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
 {
-   auto sender          = get_sender();
+   auto sender          = getSender();
    auto token           = getToken(tokenId);
    auto fromBalance     = getBalance(tokenId, from);
    auto nftContract     = at<NftSys>();
@@ -296,7 +296,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 TokenRecord TokenSys::getToken(TID tokenId)
 {
    auto tokenTable = db.open<TokenTable_t>();
-   auto tokenIdx   = tokenTable.get_index<0>();
+   auto tokenIdx   = tokenTable.getIndex<0>();
    auto tokenOpt   = tokenIdx.get(tokenId);
    psibase::check(tokenOpt.has_value(), invalidTokenId);
 
@@ -306,7 +306,7 @@ TokenRecord TokenSys::getToken(TID tokenId)
 SymbolRecord TokenSys::getSymbol(TID tokenId)
 {
    auto tokenTable = db.open<TokenTable_t>();
-   auto tokenIdx   = tokenTable.get_index<0>();
+   auto tokenIdx   = tokenTable.getIndex<0>();
    auto tokenOpt   = tokenIdx.get(tokenId);
 
    psibase::check(tokenOpt.has_value(), tokenDNE);
@@ -317,13 +317,13 @@ SymbolRecord TokenSys::getSymbol(TID tokenId)
 
 bool TokenSys::exists(TID tokenId)
 {
-   return db.open<TokenTable_t>().get_index<0>().get(tokenId).has_value();
+   return db.open<TokenTable_t>().getIndex<0>().get(tokenId).has_value();
 }
 
 BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
 {
    auto balanceTable = db.open<BalanceTable_t>();
-   auto balanceIdx   = balanceTable.get_index<0>();
+   auto balanceIdx   = balanceTable.getIndex<0>();
    auto balanceOpt   = balanceIdx.get(BalanceKey_t{account, tokenId});
 
    BalanceRecord record;
@@ -347,7 +347,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
                                            AccountNumber debitor)
 {
    auto               sharedBalanceTable = db.open<SharedBalanceTable_t>();
-   auto               sbIdx              = sharedBalanceTable.get_index<0>();
+   auto               sbIdx              = sharedBalanceTable.getIndex<0>();
    SharedBalanceKey_t key                = {creditor, debitor, tokenId};
    auto               sbOpt              = sbIdx.get(key);
 
@@ -372,7 +372,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
 TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
 {
    auto acTable = db.open<TokenHolderTable_t>();
-   auto acIdx   = acTable.get_index<0>();
+   auto acIdx   = acTable.getIndex<0>();
    auto acOpt   = acIdx.get(account);
 
    TokenHolderRecord record;
@@ -391,7 +391,7 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
 
 bool TokenSys::getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag)
 {
-   auto hodler = db.open<TokenHolderTable_t>().get_index<0>().get(account);
+   auto hodler = db.open<TokenHolderTable_t>().getIndex<0>().get(account);
    if (hodler.has_value() == false)
    {
       return false;

@@ -1,4 +1,4 @@
-import { postTextGetJson } from './rpc.mjs';
+import { postGraphQLGetJson } from './rpc.mjs';
 
 // Returns: {
 //     isLoading,   // Is the query in progress?
@@ -34,7 +34,7 @@ export function useGraphQLQuery(url, query, extraDependency) {
                 let fetchId = state.fetchId;
                 if (url && query) {
                     try {
-                        let queryResult = await postTextGetJson(url, query);
+                        let queryResult = await postGraphQLGetJson(url, query);
                         if (state.mounted && fetchId == state.fetchId) {
                             setCachedQueryResult({
                                 ...queryResult,

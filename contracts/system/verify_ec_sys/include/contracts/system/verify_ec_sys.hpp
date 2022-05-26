@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/intrinsic.hpp>
+#include <psibase/nativeFunctions.hpp>
 
 namespace system_contract
 {

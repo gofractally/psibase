@@ -3,7 +3,7 @@
 #include <cctype>
 #include <compare>
 #include <psibase/AccountNumber.hpp>
-#include <psibase/table.hpp>
+#include <psibase/Table.hpp>
 #include <psibase/time.hpp>
 #include <string>
 #include "types.hpp"
@@ -32,7 +32,7 @@ namespace UserContract
                 createCounter,
                 lastPriceUpdateTime);
    using SymbolLengthTable_t =
-       psibase::table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
+       psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
 
    struct PriceAdjustmentRecord
    {
@@ -42,7 +42,7 @@ namespace UserContract
    };
    PSIO_REFLECT(PriceAdjustmentRecord, key, increasePct, decreasePct);
    using PriceAdjustmentSingleton_t =
-       psibase::table<PriceAdjustmentRecord, &PriceAdjustmentRecord::key>;
+       psibase::Table<PriceAdjustmentRecord, &PriceAdjustmentRecord::key>;
 
    struct SaleDetails
    {
@@ -68,6 +68,6 @@ namespace UserContract
       friend std::strong_ordering operator<=>(const SymbolRecord&, const SymbolRecord&) = default;
    };
    PSIO_REFLECT(SymbolRecord, symbolId, ownerNft, saleDetails);
-   using SymbolTable_t = psibase::table<SymbolRecord, &SymbolRecord::symbolId>;
+   using SymbolTable_t = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
 
 }  // namespace UserContract

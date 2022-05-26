@@ -1,7 +1,7 @@
 #include <secp256k1_preallocated.h>
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/check.hpp>
-#include <psibase/contract_entry.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psio/from_bin.hpp>
 
 using namespace psibase;
@@ -25,7 +25,7 @@ extern "C" [[clang::export_name("verify")]] void verify()
    check(context, "verify_ec_sys not fully built");
 
    auto act     = getCurrentAction();
-   auto data    = psio::convert_from_frac<verify_data>(act.rawData);
+   auto data    = psio::convert_from_frac<VerifyData>(act.rawData);
    auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.rawData);  // TODO: verify no extra
    auto sig     = psio::convert_from_frac<Signature>(data.proof);          // TODO: verify no extra
 
@@ -48,7 +48,7 @@ extern "C" [[clang::export_name("verify")]] void verify()
 
    check(
        secp256k1_ecdsa_verify(context, &normalized,
-                              reinterpret_cast<const unsigned char*>(data.transaction_hash.data()),
+                              reinterpret_cast<const unsigned char*>(data.transactionHash.data()),
                               &parsed_pub_key) == 1,
        "incorrect signature");
 }

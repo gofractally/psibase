@@ -2,7 +2,7 @@
 
 #include <compare>
 #include <psibase/Contract.hpp>
-#include <psibase/table.hpp>
+#include <psibase/Table.hpp>
 #include <string_view>
 
 #include "symbol_errors.hpp"
@@ -20,10 +20,10 @@ namespace UserContract
    class SymbolSys : public psibase::Contract<SymbolSys>
    {
      public:
-      using tables                   = psibase::contract_tables<SymbolTable_t,
-                                              SymbolLengthTable_t,
-                                              PriceAdjustmentSingleton_t,
-                                              psibase::InitTable_t>;
+      using tables                   = psibase::ContractTables<SymbolTable_t,
+                                             SymbolLengthTable_t,
+                                             PriceAdjustmentSingleton_t,
+                                             psibase::InitTable_t>;
       static constexpr auto contract = psibase::AccountNumber("symbol-sys");
 
       SymbolSys(psio::shared_view_ptr<psibase::Action> action);

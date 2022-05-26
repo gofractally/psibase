@@ -20,11 +20,11 @@ namespace UserContract
    class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
-      using tables                      = psibase::contract_tables<TokenTable_t,
-                                              BalanceTable_t,
-                                              SharedBalanceTable_t,
-                                              TokenHolderTable_t,
-                                              psibase::InitTable_t>;
+      using tables                      = psibase::ContractTables<TokenTable_t,
+                                             BalanceTable_t,
+                                             SharedBalanceTable_t,
+                                             TokenHolderTable_t,
+                                             psibase::InitTable_t>;
       static constexpr auto contract    = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken    = TID{1};
       static constexpr auto sysTokenSym = SID{"PSI"};

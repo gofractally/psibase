@@ -21,6 +21,8 @@ namespace UserContract
       Precision(uint8_t p) : value{p} {}
       Precision() : Precision(0) {}
 
+      // TODO: fracpack doesn't enforce yet
+      // TODO: from_json doesn't enforce yet
       static void fracpack_validate(Precision p)
       {
          psibase::check(PRECISION_MIN <= p.value && p.value >= PRECISION_MAX, error_invalid);

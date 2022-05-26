@@ -352,6 +352,7 @@ namespace psio
 
 }  // namespace psio
 
+// TODO: not legal to add new definitions to std namespace
 namespace std
 {
    namespace

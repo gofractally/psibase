@@ -1,18 +1,15 @@
 #pragma once
 #include <psibase/Contract.hpp>
-#include <psibase/contract_entry.hpp>
-#include <psibase/nativeTables.hpp>
+#include <psibase/contractEntry.hpp>
 
 namespace system_contract
 {
    struct rpc_account_sys : public psibase::Contract<rpc_account_sys>
    {
-      auto serveSys(psibase::rpc_request_data request) -> std::optional<psibase::rpc_reply_data>;
-      void uploadSys(psio::const_view<std::string>       path,
-                     psio::const_view<std::string>       contentType,
-                     psio::const_view<std::vector<char>> content);
+      auto serveSys(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
+      void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
    PSIO_REFLECT(rpc_account_sys,
                 method(serveSys, request),
-                method(uploadSys, path, contentType, content))
+                method(storeSys, path, contentType, content))
 }  // namespace system_contract

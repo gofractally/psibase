@@ -162,31 +162,31 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
             action_json("account-sys", "account-sys", "startup", &startup()?)?,
             // common-sys
             reg_rpc("common-sys", "common-sys")?,
-            upload_sys(
+            store_sys(
                 "common-sys",
                 "/",
                 "text/html",
                 include_bytes!("../../../contracts/user/common_sys/ui/index.html"),
             )?,
-            upload_sys(
+            store_sys(
                 "common-sys",
                 "/common/rpc.mjs",
                 "text/javascript",
                 include_bytes!("../../../contracts/user/common_sys/common/rpc.mjs"),
             )?,
-            upload_sys(
+            store_sys(
                 "common-sys",
                 "/common/useGraphQLQuery.mjs",
                 "text/javascript",
                 include_bytes!("../../../contracts/user/common_sys/common/useGraphQLQuery.mjs"),
             )?,
-            upload_sys(
+            store_sys(
                 "common-sys",
                 "/common/SimpleUI.mjs",
                 "text/javascript",
                 include_bytes!("../../../contracts/user/common_sys/common/SimpleUI.mjs"),
             )?,
-            upload_sys(
+            store_sys(
                 "common-sys",
                 "/ui/index.js",
                 "text/javascript",
@@ -194,13 +194,13 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
             )?,
             // account-sys
             reg_rpc("account-sys", "account-rpc")?,
-            upload_sys(
+            store_sys(
                 "account-rpc",
                 "/",
                 "text/html",
                 include_bytes!("../../../contracts/system/rpc_account_sys/ui/index.html"),
             )?,
-            upload_sys(
+            store_sys(
                 "account-rpc",
                 "/ui/index.js",
                 "text/javascript",
@@ -208,13 +208,13 @@ pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), any
             )?,
             // explore-sys
             reg_rpc("explore-sys", "explore-sys")?,
-            upload_sys(
+            store_sys(
                 "explore-sys",
                 "/",
                 "text/html",
                 include_bytes!("../../../contracts/user/explore_sys/ui/index.html"),
             )?,
-            upload_sys(
+            store_sys(
                 "explore-sys",
                 "/ui/index.js",
                 "text/javascript",

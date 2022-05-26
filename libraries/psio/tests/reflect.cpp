@@ -1,12 +1,12 @@
 #include <boost/core/demangle.hpp>
 #include <catch2/catch.hpp>
-#include <psio/reflect.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/schema.hpp>
 #include <iostream>
+#include <psio/fracpack.hpp>
+#include <psio/reflect.hpp>
+#include <psio/schema.hpp>
 
-#include <psio/varint.hpp>
 #include <psio/json/any.hpp>
+#include <psio/varint.hpp>
 
 #include <psio/bytes.hpp>
 #include <psio/to_json/map.hpp>
@@ -15,53 +15,59 @@
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 
-struct sync_call_proxy {
-   sync_call_proxy( uint32_t s, uint32_t r ):sender(s),receiver(r){}
+struct sync_call_proxy
+{
+   sync_call_proxy(uint32_t s, uint32_t r) : sender(s), receiver(r) {}
 
    uint32_t sender;
    uint32_t receiver;
 
    template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
-   auto call( Args&&... args )const {
-      std::cout <<"call sender: " << sender <<"  receiver: "<< receiver <<"\n";
-//      (std::cout<< ... << args);
+   auto call(Args&&... args) const
+   {
+      std::cout << "call sender: " << sender << "  receiver: " << receiver << "\n";
+      //      (std::cout<< ... << args);
 
       using member_class = decltype(psio::class_of_member(MemberPtr));
-      using param_tuple = decltype( psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
-      using arg_var = decltype(psio::tuple_to_variant(psio::get_tuple_args(psio::reflect<member_class>::member_pointers())));
-      
+      using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
+      using arg_var      = decltype(psio::tuple_to_variant(
+               psio::get_tuple_args(psio::reflect<member_class>::member_pointers())));
+
       /// construct tuple from args as defined by MemberPtr and constructed from args
       /// serialize... dispatch... read result as shared_view_ptr<>
-      return psio::shared_view_ptr<arg_var>( arg_var(std::in_place_index_t<idx>(), param_tuple(args..., 999999)) );
+      return psio::shared_view_ptr<arg_var>(
+          arg_var(std::in_place_index_t<idx>(), param_tuple(args..., 999999)));
    }
 };
 
-
-struct myobj {
-   std::string hello;
-   std::vector<std::string> hellostr;
-   std::optional<std::string> optstr;
+struct myobj
+{
+   std::string                             hello;
+   std::vector<std::string>                hellostr;
+   std::optional<std::string>              optstr;
    std::vector<std::optional<std::string>> hellooptstr;
-   uint64_t in;
-   std::optional<uint64_t> oin;
+   uint64_t                                in;
+   std::optional<uint64_t>                 oin;
 };
-PSIO_REFLECT( myobj, hello, hellostr, optstr, hellooptstr, in, oin );
+PSIO_REFLECT(myobj, hello, hellostr, optstr, hellooptstr, in, oin);
 
-class contr {
-   public:
-      int buy( int quantity, psio::const_view<myobj> hi ) { 
-    //     base_contract::get_sender();
-    //     base_contract::get_receiver();
+class contr
+{
+  public:
+   int buy(int quantity, psio::const_view<myobj> hi)
+   {
+      //     base_contract::getSender();
+      //     base_contract::get_receiver();
 
-    //     std::cout << "  buy " << quantity << " " << hi.hello<<"\n";
-         return 22; 
-      }
-      int sell( int quantity, int token ) {
-         std::cout <<" sell " << quantity << " " << token << "\n";
-         return 33;
-      }
+      //     std::cout << "  buy " << quantity << " " << hi.hello<<"\n";
+      return 22;
+   }
+   int sell(int quantity, int token)
+   {
+      std::cout << " sell " << quantity << " " << token << "\n";
+      return 33;
+   }
 };
-
 
 /*
 PSIO_REFLECT_PB( contr,
@@ -69,13 +75,12 @@ PSIO_REFLECT_PB( contr,
    (sell, 1, quantity, token)
 )
 */
-PSIO_REFLECT( //
-   contr,
-   method(buy, quantity, hi),
-   method(sell, quantity, token)
-)
+PSIO_REFLECT(  //
+    contr,
+    method(buy, quantity, hi),
+    method(sell, quantity, token))
 
-   /*
+/*
 template<typename T>
 struct actor : public psio::reflect<T>::template proxy<sync_call_proxy> {
    using base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
@@ -86,18 +91,17 @@ struct actor : public psio::reflect<T>::template proxy<sync_call_proxy> {
 };
 */
 
-
-
-TEST_CASE( "contract_proxy" ) {
-  // actor<contr> prox( 1, 2 );
-  // auto x = prox.buy( 3, myobj{.hello="world"} );
+TEST_CASE("contract_proxy")
+{
+   // actor<contr> prox( 1, 2 );
+   // auto x = prox.buy( 3, myobj{.hello="world"} );
 
    contr c;
 
    psio::translator<contr> tr;
 
-   std::cout << tr.get_json_schema() <<"\n";
-   std::cout << tr.get_gql_schema() <<"\n";
+   std::cout << tr.get_json_schema() << "\n";
+   std::cout << tr.get_gql_schema() << "\n";
 
    /*
    block_reint( [&](){
@@ -119,7 +123,6 @@ TEST_CASE( "contract_proxy" ) {
    //set_sender( c, sender );
    //set_receiver( c, receiver);
    //c.base_contract::set_sender(...)
-
 
    /*
    x->visit( [&]( auto tview ){
@@ -143,9 +146,9 @@ TEST_CASE( "contract_proxy" ) {
    tup.x;
    */
 }
-TEST_CASE( "schema" ) {
-  psio::schema apischema;
-  apischema.generate<contr>();
-  std::cout << "flat schema: " << format_json(apischema) << "\n";
-
+TEST_CASE("schema")
+{
+   psio::schema apischema;
+   apischema.generate<contr>();
+   std::cout << "flat schema: " << format_json(apischema) << "\n";
 }

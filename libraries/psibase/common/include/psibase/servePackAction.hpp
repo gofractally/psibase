@@ -30,8 +30,8 @@ namespace psibase
 
    // TODO: detect missing non-optional args
    template <typename T>
-   std::optional<std::vector<char>> fracpackActionFromJson(std::string_view   name,
-                                                           std::vector<char>& json)
+   std::optional<std::vector<char>> fracpackActionFromJson(std::string_view name,
+                                                           std::string_view json)
    {
       std::optional<std::vector<char>> result;
       psio::reflect<T>::for_each(
@@ -44,9 +44,10 @@ namespace psibase
                 {
                    using param_tuple = decltype(psio::tuple_remove_view(
                        psio::args_as_tuple(std::declval<MemPtr>())));
-                   param_tuple params{};
-                   json.push_back(0);
-                   psio::json_token_stream stream{json.data()};
+                   param_tuple       params{};
+                   std::vector<char> j{json.begin(), json.end()};
+                   j.push_back(0);
+                   psio::json_token_stream stream{j.data()};
                    from_json_object(  //
                        stream,
                        [&](std::string_view k)
@@ -61,4 +62,35 @@ namespace psibase
           });
       return result;
    }
+
+   /// Handle `/pack_action/` request
+   ///
+   /// If `request` is a POST to `/pack_action/x`, where `x` is an action
+   /// on `Contract`, then this parses a JSON object containing the arguments
+   /// to `x`, packs them using frackpac, and returns the result as an
+   /// `application/octet-stream`.
+   ///
+   /// If `request` doesn't match the above, or the action name is not found,
+   /// then this returns `std::nullopt`.
+   template <typename Contract>
+   std::optional<RpcReplyData> servePackAction(const RpcRequestData& request)
+   {
+      if (request.method == "POST")
+      {
+         if (request.target.starts_with("/pack_action/"))
+         {
+            if (auto result = fracpackActionFromJson<Contract>(  //
+                    std::string_view{request.target}.substr(13),
+                    std::string_view{request.body.data(), request.body.size()}))
+            {
+               return RpcReplyData{
+                   .contentType = "application/octet-stream",
+                   .body        = std::move(*result),
+               };
+            }
+         }
+      }
+      return std::nullopt;
+   }
+
 }  // namespace psibase

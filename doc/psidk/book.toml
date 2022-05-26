@@ -8,3 +8,7 @@ title = "psidk"
 command = "../../build/rust/release/gen-cpp-doc"
 # command = "../../rust/target/debug/gen-cpp-doc"
 after = ["links","index"]
+
+[output.html]
+
+#[output.linkcheck]

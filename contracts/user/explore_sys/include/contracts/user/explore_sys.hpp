@@ -1,6 +1,6 @@
 #pragma once
 #include <psibase/Contract.hpp>
-#include <psibase/contract_entry.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/nativeTables.hpp>
 
 namespace system_contract
@@ -9,12 +9,10 @@ namespace system_contract
    {
       static constexpr auto contract = psibase::proxyContractNum;
 
-      auto serveSys(psibase::rpc_request_data request) -> std::optional<psibase::rpc_reply_data>;
-      void uploadSys(psio::const_view<std::string>       path,
-                     psio::const_view<std::string>       contentType,
-                     psio::const_view<std::vector<char>> content);
+      auto serveSys(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
+      void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
    PSIO_REFLECT(explore_sys,
                 method(serveSys, request),
-                method(uploadSys, path, contentType, content))
+                method(storeSys, path, contentType, content))
 }  // namespace system_contract

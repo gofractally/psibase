@@ -3,8 +3,7 @@
 namespace psio
 {
 
-// TODO: rename; this is incredibly dangerous; the name should reflect that.
-#define FRACPACK __attribute__((packed, aligned(1)))
+#define EXTREME_DANGER_UNALIGNED_PACKED __attribute__((packed, aligned(1)))
 
    /**
      *  Reading from a char* is potentially unaligned, so we always cast
@@ -12,8 +11,11 @@ namespace psio
      *  might be unaligned.
      */
    // TODO: rename; this is incredibly dangerous; the name should reflect that.
+   // TODO: better: remove this struct and use a template function which
+   //       makes the danger go away:
+   //          T f<T>(const char*)
    template <typename T>
-   struct FRACPACK unaligned_type
+   struct EXTREME_DANGER_UNALIGNED_PACKED unaligned_type
    {
       T val;
 

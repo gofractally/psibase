@@ -6,7 +6,7 @@ Test cases can use the same database facilities (read-only) that contracts use. 
 
 The tables in the example contract use a single scope. This makes it possible to iterate through all of the content in a table. The token contract uses a different scope for each user. This makes iteration infeasible. Instead, the test code has to explicitly specify each account to list the accounts' balances.
 
-This extends the test cases in [Token Support](../token/index.html):
+This extends the test cases in [Token Support](../token/):
 
 ```c++
 void dump_tokens(const std::vector<name> owners)

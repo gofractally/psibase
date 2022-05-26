@@ -2,7 +2,7 @@
 #include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/DefaultTestChain.hpp>
 
-#include <psibase/contract_entry.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
 

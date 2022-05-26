@@ -35,6 +35,16 @@ export async function postText(url, text) {
     }));
 }
 
+export async function postGraphQL(url, graphql) {
+    return await throwIfError(await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/graphql'
+        },
+        body: graphql,
+    }));
+}
+
 export async function postJson(url, json) {
     return await throwIfError(await fetch(url, {
         method: 'POST',
@@ -55,12 +65,20 @@ export async function postArrayBuffer(url, arrayBuffer) {
     }));
 }
 
+export async function getText(url) {
+    return await (await get(url)).text();
+}
+
 export async function getJson(url) {
     return await (await get(url)).json();
 }
 
 export async function postTextGetJson(url, text) {
     return await (await postText(url, text)).json();
+}
+
+export async function postGraphQLGetJson(url, graphQL) {
+    return await (await postGraphQL(url, graphQL)).json();
 }
 
 export async function postJsonGetJson(url, json) {

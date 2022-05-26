@@ -16,23 +16,120 @@ namespace psio
    };
    PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
 
-   template <typename Node>
+   template <typename Node, FixedString EdgeName>
    struct Edge
    {
       Node        node;
       std::string cursor;
    };
-#define PSIO_REFLECT_GQL_EDGE(TYPE) PSIO_REFLECT(TYPE, node, cursor)
 
-   template <typename Node>
+   template <typename Node, FixedString EdgeName>
+   constexpr const char* get_type_name(const Edge<Node, EdgeName>*)
+   {
+      return EdgeName.c_str();
+   }
+
+   struct ReflectEdge
+   {
+      static constexpr bool is_defined = true;
+      static constexpr bool is_struct  = true;
+      template <typename L>
+      constexpr inline static void for_each(L&& lambda)
+      {
+         {
+            auto off = ~uint64_t(0);
+            (void)lambda(psio::meta{.name = "node", .offset = off, .number = 0 + 1},
+                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::node)
+                         { return &psio::remove_cvref_t<decltype(*p)>::node; });
+         }
+         {
+            auto off = ~uint64_t(0);
+            (void)lambda(psio::meta{.name = "cursor", .offset = off, .number = 1 + 1},
+                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::cursor)
+                         { return &psio::remove_cvref_t<decltype(*p)>::cursor; });
+         }
+      }
+      template <typename L>
+      inline static bool get_by_name(uint64_t n, L&& lambda)
+      {
+         switch (n)
+         {
+            case psio::hash_name("node"):
+               (void)lambda(psio::meta{.name = "node", .number = 0 + 1},
+                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::node)
+                            { return &psio::remove_cvref_t<decltype(*p)>::node; });
+               return true;
+            case psio::hash_name("cursor"):
+               (void)lambda(psio::meta{.name = "cursor", .number = 1 + 1},
+                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::cursor)
+                            { return &psio::remove_cvref_t<decltype(*p)>::cursor; });
+               return true;
+         }
+         return false;
+      }
+   };  // ReflectEdge
+
+   template <typename Node, FixedString EdgeName>
+   ReflectEdge get_reflect_impl(const Edge<Node, EdgeName>&);
+
+   template <typename Node, FixedString ConnectionName, FixedString EdgeName>
    struct Connection
    {
       using NodeType = Node;
-      std::vector<Edge<Node>> edges;
-      PageInfo                pageInfo;
+      using Edge     = psio::Edge<Node, EdgeName>;
+
+      std::vector<Edge> edges;
+      PageInfo          pageInfo;
    };
 
-#define PSIO_REFLECT_GQL_CONNECTION(TYPE) PSIO_REFLECT(TYPE, edges, pageInfo)
+   template <typename Node, FixedString ConnectionName, FixedString EdgeName>
+   constexpr const char* get_type_name(const Connection<Node, ConnectionName, EdgeName>*)
+   {
+      return ConnectionName.c_str();
+   }
+
+   struct ReflectConnection
+   {
+      static constexpr bool is_defined = true;
+      static constexpr bool is_struct  = true;
+      template <typename L>
+      constexpr inline static void for_each(L&& lambda)
+      {
+         {
+            auto off = ~uint64_t(0);
+            (void)lambda(psio::meta{.name = "edges", .offset = off, .number = 0 + 1},
+                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::edges)
+                         { return &psio::remove_cvref_t<decltype(*p)>::edges; });
+         }
+         {
+            auto off = ~uint64_t(0);
+            (void)lambda(psio::meta{.name = "pageInfo", .offset = off, .number = 1 + 1},
+                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::pageInfo)
+                         { return &psio::remove_cvref_t<decltype(*p)>::pageInfo; });
+         }
+      }
+      template <typename L>
+      inline static bool get_by_name(uint64_t n, L&& lambda)
+      {
+         switch (n)
+         {
+            case psio::hash_name("edges"):
+               (void)lambda(psio::meta{.name = "edges", .number = 0 + 1},
+                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::edges)
+                            { return &psio::remove_cvref_t<decltype(*p)>::edges; });
+               return true;
+            case psio::hash_name("pageInfo"):
+               (void)lambda(psio::meta{.name = "pageInfo", .number = 1 + 1},
+                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::pageInfo)
+                            { return &psio::remove_cvref_t<decltype(*p)>::pageInfo; });
+               return true;
+         }
+         return false;
+      }
+   };  // ReflectConnection
+
+   template <typename Node, FixedString ConnectionName, FixedString EdgeName>
+   ReflectConnection get_reflect_impl(const Connection<Node, ConnectionName, EdgeName>&);
 
    // To enable cursors to function correctly, container must not have duplicate keys
    template <typename Connection,
@@ -106,8 +203,7 @@ namespace psio
       {
          auto bin    = convert_to_bin(iterToKey(it));
          auto cursor = to_hex(bin);
-         result.edges.push_back(
-             Edge<typename Connection::NodeType>{iterToNode(it), std::move(cursor)});
+         result.edges.push_back(typename Connection::Edge{iterToNode(it), std::move(cursor)});
       };
 
       if (last && !first)

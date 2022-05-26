@@ -30,7 +30,7 @@ psibase provides commands for booting a chain, creating accounts, installing con
 
 - `-a` or `--api` tells it which api endpoint to connect to. This defaults to `http://psibase.127.0.0.1.sslip.io:8080/`.
 - `boot` boots an empty chain; see below
-- `install` installs a contract; see [Basic Contract](../cpp-contract/basic/index.html)
+- `install` installs a contract; see [Basic Contract](../cpp-contract/basic/)
 
 ## Booting a chain
 

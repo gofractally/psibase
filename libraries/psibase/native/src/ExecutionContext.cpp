@@ -249,7 +249,7 @@ namespace psibase
          if (transactionContext.blockContext.isReadOnly ||
              (contractAccount.flags & AccountRow::isSubjective))
          {
-            if (db == uint32_t(DbId::event))
+            if (db == uint32_t(DbId::historyEvent))
                return (DbId)db;
             if (db == uint32_t(DbId::uiEvent))
                return (DbId)db;
@@ -308,7 +308,7 @@ namespace psibase
          check(!(contractAccount.flags & AccountRow::isSubjective),
                "contract may not write this db, or must use another intrinsic");
 
-         if (db == uint32_t(DbId::event))
+         if (db == uint32_t(DbId::historyEvent))
             return (DbId)db;
          if (db == uint32_t(DbId::uiEvent))
             return (DbId)db;
@@ -511,8 +511,8 @@ namespace psibase
 
          auto&    dbStatus = transactionContext.blockContext.databaseStatus;
          uint64_t indexNumber;
-         if (db == uint32_t(DbId::event))
-            indexNumber = dbStatus.nextEventNumber++;
+         if (db == uint32_t(DbId::historyEvent))
+            indexNumber = dbStatus.nextHistoryEventNumber++;
          else if (db == uint32_t(DbId::uiEvent))
             indexNumber = dbStatus.nextUIEventNumber++;
          else

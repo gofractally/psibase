@@ -4,23 +4,109 @@
 
 namespace psibase
 {
+   /// Identify database to operate on
+   ///
+   /// Native functions expose a set of databases which serve
+   /// various purposes. This enum identifies which database to
+   /// use when invoking those functions.
    enum class DbId : uint32_t
    {
-      contract,             // Contract tables
-      nativeConstrained,    // Native tables which enforce constraints during write
-      nativeUnconstrained,  // Native tables which don't enforce constraints during write
-      subjective,           // Data that is not part of consensus
-      writeOnly,            // Write-only during transactions. Readable during RPC,
-                            //   also subjectively writable by node operator.
-      blockLog,             // Not available during transactions. Readable during RPC.
-      event,                // Events
+      /// Contracts should store their tables here
+      ///
+      /// The first 64 bits of the key match the contract.
+      contract,
 
-      /* designed for change events built on queries most recent finalized block,
-       * and for user interfaces that want to subscribe to activity. Not readable by contracts
-       */
-      uiEvent,      // Events that are erased once block that produced them becomes final
-      merkleEvent,  // Events that go into merkle tree, readable for 1 hour (configurable) or finality which ever is longer
-      historyEvent  // Events that go into long-term subjective history
+      /// Data for RPC
+      ///
+      /// Write-only during transactions, and read-only during RPC.
+      /// Individual nodes may modify this database, expire data from this
+      /// database, or wipe it entirely at will.
+      writeOnly,
+
+      /// Data that is not part of consensus
+      ///
+      /// Only accessible to subjective contracts during transactions,
+      /// but readable by all contracts during RPC. Individual nodes may
+      /// modify this database or wipe it entirely at will.
+      subjective,
+
+      /// Tables used by native code
+      ///
+      /// This database enforces constraints during write. Only
+      /// writable by priviledged contracts, but readable by all
+      /// contracts.
+      nativeConstrained,
+
+      /// Tables used by native code
+      ///
+      /// This database doesn't enforce constraints during write.
+      /// Only writable by priviledged contracts, but readable by all
+      /// contracts.
+      nativeUnconstrained,
+
+      /// Block log
+      ///
+      /// Transactions don't have access to this, but RPC does.
+      blockLog,
+
+      /// Long-term history event storage
+      ///
+      /// Write-only during transactions, and read-only during RPC.
+      /// Individual nodes may modify this database, expire data from this
+      /// database, or wipe it entirely at will.
+      ///
+      /// TODO: this policy may eventually change to allow time-limited
+      /// read access during transactions.
+      ///
+      /// Key is an auto-incremented, 64-bit unsigned number.
+      ///
+      /// Value must begin with:
+      /// * 32 bit: block number
+      /// * 64 bit: contract
+      ///
+      /// Only usable with these native functions:
+      /// * [kvPutSequential]
+      /// * [kvGetSequential]
+      historyEvent,
+
+      /// Short-term history event storage
+      ///
+      /// These events are erased once the block that produced them becomes final.
+      /// They notify user interfaces which subscribe to activity.
+      ///
+      /// Write-only during transactions, and read-only during RPC.
+      /// Individual nodes may modify this database, expire data from this
+      /// database, or wipe it entirely at will.
+      ///
+      /// Key is an auto-incremented, 64-bit unsigned number.
+      ///
+      /// Value must begin with:
+      /// * 32 bit: block number
+      /// * 64 bit: contract
+      ///
+      /// Only usable with these native functions:
+      /// * [kvPutSequential]
+      /// * [kvGetSequential]
+      uiEvent,
+
+      /// Events which go into the merkle tree
+      ///
+      /// TODO: not implemented
+      ///
+      /// Contracts may produce these events during transactions and may read them
+      /// up to 1 hour (configurable) after they were produced, or they reach finality,
+      /// which ever is longer.
+      ///
+      /// Key is an auto-incremented, 64-bit unsigned number.
+      ///
+      /// Value must begin with:
+      /// * 32 bit: block number
+      /// * 64 bit: contract
+      ///
+      /// Only usable with these native functions:
+      /// * [kvPutSequential]
+      /// * [kvGetSequential]
+      merkleEvent,
    };
 
    struct KvResourceKey

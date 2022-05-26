@@ -1,6 +1,6 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
-#include <psibase/intrinsic.hpp>
+#include <psibase/nativeFunctions.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
@@ -8,7 +8,7 @@ namespace psibase
    /*
    namespace detail
    {
-      struct FRACPACK raw_variant_view
+      struct raw_variant_view
       {
          uint8_t  action_idx;
          uint32_t size;
@@ -47,13 +47,13 @@ namespace psibase
       };
       auto contract{makeContract()};
 
-      //Contract contract;  // TODO: Make this static?
-      contract.dispatch_set_sender_receiver(sender, receiver);
+      contract.dispatchSetSenderReceiver(sender, receiver);
 
       bool called = psio::reflect<Contract>::get_by_name(
           act->method()->value(),
-          [&](auto meta, auto member_func)
+          [&](auto meta, auto member)
           {
+             auto member_func  = member(&contract);
              using result_type = decltype(psio::result_of(member_func));
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));

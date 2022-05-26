@@ -2,6 +2,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -113,6 +114,49 @@ namespace psio
    template <typename R, typename C, typename... Args>
    void result_of_member(R (C::*)(Args...));
 
+   template <unsigned N>
+   struct FixedString
+   {
+      char buf[N + 1]{};
+
+      constexpr FixedString(const char (&s)[N + 1])
+      {
+         for (unsigned i = 0; i < N; ++i)
+            buf[i] = s[i];
+      }
+
+      template <unsigned N1, unsigned N2>
+      constexpr FixedString(const FixedString<N1>& a, const FixedString<N2>& b)
+      {
+         static_assert(N == N1 + N2);
+         for (unsigned i = 0; i < N1; ++i)
+            buf[i] = a.buf[i];
+         for (unsigned i = 0; i < N2; ++i)
+            buf[N1 + i] = b.buf[i];
+      }
+
+      constexpr operator const char*() const { return buf; }
+      constexpr operator const decltype(buf) & () const { return buf; }
+      constexpr operator std::string_view() const { return buf; }
+
+      constexpr const char* c_str() const { return buf; }
+      constexpr size_t      size() const { return N; }
+   };
+   template <unsigned N>
+   FixedString(char const (&)[N]) -> FixedString<N - 1>;
+
+   template <unsigned N1, unsigned N2>
+   constexpr FixedString<N1 + N2> operator+(const FixedString<N1>& a, const FixedString<N2>& b)
+   {
+      return {a, b};
+   }
+
+   template <unsigned N1, unsigned N2>
+   constexpr FixedString<N1 + N2 - 1> operator+(const FixedString<N1>& a, const char (&b)[N2])
+   {
+      return {a, FixedString{b}};
+   }
+
    struct meta
    {
       const char*                        name;
@@ -148,6 +192,9 @@ namespace psio
       using value_type = T;
    };
 
+   template <typename T>
+   constexpr bool is_std_vector_v = is_std_vector<T>::value;
+
    template <typename>
    struct is_std_optional : std::false_type
    {
@@ -160,7 +207,7 @@ namespace psio
    };
 
    template <typename T>
-   using is_std_optional_v = typename is_std_optional<T>::value;
+   constexpr bool is_std_optional_v = is_std_optional<T>::value;
 
    template <typename>
    struct is_std_unique_ptr : std::false_type
@@ -173,6 +220,9 @@ namespace psio
       using value_type = T;
    };
 
+   template <typename T>
+   constexpr bool is_std_unique_ptr_v = is_std_unique_ptr<T>::value;
+
    template <typename>
    struct is_std_reference_wrapper : std::false_type
    {
@@ -183,6 +233,9 @@ namespace psio
    {
       using value_type = T;
    };
+
+   template <typename T>
+   constexpr bool is_std_reference_wrapper_v = is_std_reference_wrapper<T>::value;
 
    template <typename>
    struct is_std_array : std::false_type
@@ -197,26 +250,7 @@ namespace psio
    };
 
    template <typename T>
-   inline constexpr bool is_optional()
-   {
-      return is_std_optional<T>::value;
-   }
-   template <typename T>
-   inline constexpr bool is_unique_ptr()
-   {
-      return is_std_unique_ptr<T>::value;
-   }
-   template <typename T>
-   inline constexpr bool is_reference_wrapper()
-   {
-      return is_std_reference_wrapper<T>::value;
-   }
-
-   template <typename T>
-   constexpr bool is_array()
-   {
-      return is_std_array<T>::value;
-   }
+   constexpr bool is_std_array_v = is_std_array<T>::value;
 
    template <typename>
    struct is_std_variant : std::false_type
@@ -239,6 +273,9 @@ namespace psio
       constexpr static const uint16_t num_types = sizeof...(T);
    };
 
+   template <typename T>
+   constexpr bool is_std_variant_v = is_std_variant<T>::value;
+
    template <typename>
    struct is_std_tuple : std::false_type
    {
@@ -258,6 +295,9 @@ namespace psio
       }
    };
 
+   template <typename T>
+   constexpr bool is_std_tuple_v = is_std_tuple<T>::value;
+
    template <typename>
    struct is_std_map : std::false_type
    {
@@ -273,6 +313,10 @@ namespace psio
          return n;
       }
    };
+
+   template <typename T>
+   constexpr bool is_std_map_v = is_std_map<T>::value;
+
    template <typename T>
    struct remove_cvref
    {
@@ -281,6 +325,96 @@ namespace psio
 
    template <typename T>
    using remove_cvref_t = typename remove_cvref<T>::type;
+
+   template <typename... Ts>
+   struct TypeList
+   {
+      static constexpr int size = sizeof...(Ts);
+   };
+
+   template <typename... Ts>
+   std::tuple<Ts...> TupleFromTypeListImpl(TypeList<Ts...>&&);
+   template <typename T>
+   using TupleFromTypeList = decltype(TupleFromTypeListImpl(std::declval<T>()));
+
+   template <typename T>
+   struct MemberPtrType;
+
+   template <typename V, typename T>
+   struct MemberPtrType<V(T::*)>
+   {
+      static constexpr bool isFunction      = false;
+      static constexpr bool isConstFunction = false;
+      using ValueType                       = V;
+   };
+
+   template <typename R, typename T, typename... Args>
+   struct MemberPtrType<R (T::*)(Args...)>
+   {
+      static constexpr bool isFunction      = true;
+      static constexpr bool isConstFunction = false;
+      static constexpr int  numArgs         = sizeof...(Args);
+      using ClassType                       = T;
+      using ReturnType                      = R;
+      using ArgTypes                        = TypeList<Args...>;
+      using SimplifiedArgTypes              = TypeList<std::remove_cvref_t<Args>...>;
+   };
+
+   template <typename R, typename T, typename... Args>
+   struct MemberPtrType<R (T::*)(Args...) const>
+   {
+      static constexpr bool isFunction      = true;
+      static constexpr bool isConstFunction = true;
+      static constexpr int  numArgs         = sizeof...(Args);
+      using ClassType                       = T;
+      using ReturnType                      = R;
+      using ArgTypes                        = TypeList<Args...>;
+      using SimplifiedArgTypes              = TypeList<std::remove_cvref_t<Args>...>;
+   };
+
+   // Not really a member, but usable via std::invoke
+   template <typename R, typename T, typename... Args>
+   struct MemberPtrType<R (*)(T&, Args...)>
+   {
+      static constexpr bool isFunction      = true;
+      static constexpr bool isConstFunction = false;
+      static constexpr int  numArgs         = sizeof...(Args);
+      using ClassType                       = T;
+      using ReturnType                      = R;
+      using ArgTypes                        = TypeList<Args...>;
+      using SimplifiedArgTypes              = TypeList<std::remove_cvref_t<Args>...>;
+   };
+
+   // Not really a member, but usable via std::invoke
+   template <typename R, typename T, typename... Args>
+   struct MemberPtrType<R (*)(const T&, Args...)>
+   {
+      static constexpr bool isFunction      = true;
+      static constexpr bool isConstFunction = true;
+      static constexpr int  numArgs         = sizeof...(Args);
+      using ClassType                       = T;
+      using ReturnType                      = R;
+      using ArgTypes                        = TypeList<Args...>;
+      using SimplifiedArgTypes              = TypeList<std::remove_cvref_t<Args>...>;
+   };
+
+   template <typename F, typename... Args>
+   void forEachType(TypeList<Args...>, F&& f)
+   {
+      (f((remove_cvref_t<Args>*)nullptr), ...);
+   }
+
+   template <typename F, typename... Args>
+   void forEachNamedType(TypeList<Args...>, std::span<const char* const> names, F&& f)
+   {
+      size_t i = 0;
+      auto   g = [&](auto* p)
+      {
+         f(p, i < names.size() ? names.begin()[i] : nullptr);
+         ++i;
+      };
+      (g((remove_cvref_t<Args>*)nullptr), ...);
+   }
 
 }  // namespace psio
 
@@ -468,19 +602,24 @@ namespace std
       (void)lambda(&STRUCT::PSIO_GET_IDENT(elem));                          \
       return true;
 
-#define PSIO_GET_MEMBER_BY_NAME(r, STRUCT, i, elem)                                               \
-   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                                \
-      (void)lambda(psio::meta{.name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)),                   \
-                                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)}, \
-                              &STRUCT::PSIO_GET_IDENT(elem));                                     \
+#define PSIO_GET_MEMBER_BY_NAME(r, STRUCT, i, elem)                                             \
+   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                              \
+      (void)lambda(                                                                             \
+          psio::meta{                                                                           \
+              .name                              = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)),    \
+                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)},               \
+              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem)) \
+              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });           \
       return true;
 
-#define PSIO_GET_METHOD_BY_NAME(r, STRUCT, elem)                                              \
-   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                            \
-      (void)lambda(                                                                           \
-          psio::meta{.name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)),                        \
-                                                .param_names = {PSIO_GET_QUOTED_ARGS(elem)}}, \
-                     &STRUCT::PSIO_GET_IDENT(elem));                                          \
+#define PSIO_GET_METHOD_BY_NAME(r, STRUCT, elem)                                                  \
+   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                                \
+      (void)lambda(                                                                               \
+          psio::meta{                                                                             \
+              .name                                   = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), \
+                                         .param_names = {PSIO_GET_QUOTED_ARGS(elem)}},            \
+              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem))   \
+              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });             \
       return true;
 
 #define PSIO_MEMBER_POINTER_IMPL1(s, STRUCT, elem) &STRUCT::PSIO_GET_IDENT(elem)
@@ -538,7 +677,7 @@ namespace std
          BOOST_PP_SEQ_FOR_EACH(PSIO_REQ_COMPRESS, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__));     \
          return !allowHashedMethods;                                                              \
       }                                                                                           \
-      static inline constexpr const char* name() { return BOOST_PP_STRINGIZE(STRUCT); }           \
+      static constexpr psio::FixedString name = BOOST_PP_STRINGIZE(STRUCT);                       \
       typedef std::tuple<BOOST_PP_IIF(                                                            \
           BOOST_PP_CHECK_EMPTY(PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)),                           \
           PSIO_EMPTY,                                                                             \

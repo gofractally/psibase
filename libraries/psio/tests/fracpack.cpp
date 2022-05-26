@@ -49,7 +49,7 @@
  *  packed as if by memcpy. This requires that the struct is reflected
  *  in the same order.
  */
-struct FRACPACK simple
+struct EXTREME_DANGER_UNALIGNED_PACKED simple
 {
    uint32_t a;
    uint64_t b;
@@ -93,7 +93,7 @@ struct req_align_simple
 };
 PSIO_REFLECT(req_align_simple, definitionWillNotChange(), a, b, c, d)
 
-struct FRACPACK mixed_simple
+struct EXTREME_DANGER_UNALIGNED_PACKED mixed_simple
 {
    uint32_t a;
    uint64_t b;
@@ -137,7 +137,7 @@ struct varstrextra
 };
 PSIO_REFLECT(varstrextra, definitionWillNotChange(), v)
 
-struct FRACPACK test_view
+struct EXTREME_DANGER_UNALIGNED_PACKED test_view
 {
    uint32_t size;
    uint16_t heap;      // 4
@@ -162,7 +162,7 @@ TEST_CASE("variant")
    REQUIRE(p.validate(unknown));
    REQUIRE(not unknown);
 
-   struct FRACPACK expected_view
+   struct EXTREME_DANGER_UNALIGNED_PACKED expected_view
    {
       uint32_t v_offset = 4;
       uint8_t  v_type   = 0;
@@ -239,7 +239,7 @@ TEST_CASE("fracpack-not-final-nest")
 
    nested_not_final_struct nfs{.a = 123, .nest = {.a = 456, .b = 789, .c = 321}};
 
-   struct FRACPACK expected_view
+   struct EXTREME_DANGER_UNALIGNED_PACKED expected_view
    {
       uint32_t a           = 123;
       uint32_t nest_offset = 4;
@@ -505,13 +505,13 @@ TEST_CASE("fracpack_vector_str")
    REQUIRE(u.test[1] == "bc|");
 }
 
-struct FRACPACK inner
+struct EXTREME_DANGER_UNALIGNED_PACKED inner
 {
    uint32_t a;
    uint32_t b;
 };
 PSIO_REFLECT(inner, definitionWillNotChange(), a, b)
-struct FRACPACK outer
+struct EXTREME_DANGER_UNALIGNED_PACKED outer
 {
    inner    in;
    uint32_t c;
@@ -555,7 +555,7 @@ TEST_CASE("vectorstruct")
 {
    vecstruct test{.vs = {{.c = 1}, {.c = 2}, {.c = 3}}};
 
-   struct FRACPACK expected_view
+   struct EXTREME_DANGER_UNALIGNED_PACKED expected_view
    {
       uint16_t heap   = 4;
       uint32_t offset = 4;
@@ -1102,7 +1102,7 @@ TEST_CASE("vector_inline")
 {
    REQUIRE(not psio::can_memcpy<simple_non_memcpy>());  /// because reflect is opposite
 
-   struct FRACPACK testlayout
+   struct EXTREME_DANGER_UNALIGNED_PACKED testlayout
    {
       uint16_t heap        = 4;
       uint32_t data_offset = 4;
@@ -1134,7 +1134,7 @@ PSIO_REFLECT(vec_optional, data);
 
 TEST_CASE("vector_optional")
 {
-   struct FRACPACK testlayout
+   struct EXTREME_DANGER_UNALIGNED_PACKED testlayout
    {
       uint16_t heap        = 4;
       uint32_t data_offset = 4;
@@ -1166,7 +1166,7 @@ TEST_CASE("optional_optional")
 
    psio::shared_view_ptr<oo_type> p2(oo_type(optional<simple_non_memcpy>({1, 2, 3})));
 
-   struct FRACPACK testlayout
+   struct EXTREME_DANGER_UNALIGNED_PACKED testlayout
    {
       uint32_t outer_opt = 4;
       uint32_t inner_opt = 4;
@@ -1181,7 +1181,7 @@ TEST_CASE("optional_optional")
 
    psio::shared_view_ptr<oo_type> p3{oo_type(optional<simple_non_memcpy>())};
 
-   struct FRACPACK testlayout3
+   struct EXTREME_DANGER_UNALIGNED_PACKED testlayout3
    {
       uint32_t outer_opt = 4;
       uint32_t inner_opt = 1;
@@ -1253,8 +1253,8 @@ TEST_CASE("vec_struct_string")
 
 TEST_CASE("opt_empty_string")
 {
-   auto            v = psio::convert_to_frac(std::optional<std::string>(""));
-   struct FRACPACK expected_view
+   auto                                   v = psio::convert_to_frac(std::optional<std::string>(""));
+   struct EXTREME_DANGER_UNALIGNED_PACKED expected_view
    {
       uint32_t size = 0;
    };
@@ -1299,7 +1299,7 @@ static const auto None = std::nullopt;
 
 using Variant = std::variant<uint32_t, std::string>;
 
-struct FRACPACK expected_view
+struct EXTREME_DANGER_UNALIGNED_PACKED expected_view
 {
    uint16_t outer_heap                = 8;
    uint32_t offset_to_field_inner     = 8;
@@ -1583,7 +1583,7 @@ TEST_CASE("OuterStruct")
       p.unpack();
    }
    {
-      struct FRACPACK expected_view
+      struct EXTREME_DANGER_UNALIGNED_PACKED expected_view
       {
          uint16_t heap_start       = 5;     // 0
          uint8_t  field_u8         = 0xff;  // 2

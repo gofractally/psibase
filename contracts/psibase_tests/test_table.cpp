@@ -1,4 +1,4 @@
-#include <psibase/table.hpp>
+#include <psibase/Table.hpp>
 #include <variant>
 
 using namespace psibase;
@@ -12,7 +12,7 @@ namespace table_test
       friend std::strong_ordering operator<=>(const S0&, const S0&) = default;
    };
    PSIO_REFLECT(S0, key, value)
-   using table0 = table<S0, &S0::key>;
+   using table0 = Table<S0, &S0::key>;
 
    struct S1
    {
@@ -22,7 +22,7 @@ namespace table_test
       friend std::strong_ordering operator<=>(const S1&, const S1&) = default;
    };
    PSIO_REFLECT(S1, key1, key2, value);
-   using table1 = table<S1, &S1::key1, &S1::key2>;
+   using table1 = Table<S1, &S1::key1, &S1::key2>;
 
    struct S2
    {
@@ -33,15 +33,15 @@ namespace table_test
       friend std::strong_ordering operator<=>(const S2&, const S2&) = default;
    };
    PSIO_REFLECT(S2, key1, key2, value, method(compound_key));
-   using table2 = table<S2, &S2::key1, &S2::compound_key>;
+   using table2 = Table<S2, &S2::key1, &S2::compound_key>;
 
-   using test_tables = contract_tables<table0, table1, table2>;
+   using test_tables = ContractTables<table0, table1, table2>;
 
    void test0(AccountNumber this_contract)
    {
       test_tables t{this_contract};
       auto        t0   = t.open<table0>();
-      auto        idx0 = t0.get_index<0>();
+      auto        idx0 = t0.getIndex<0>();
       t0.put(S0{0, 1});
       check(idx0.get(0) == S0{0, 1}, "get after create");
       t0.put(S0{0, 2});
@@ -54,8 +54,8 @@ namespace table_test
    {
       test_tables t{this_contract};
       auto        t1   = t.open<table1>();
-      auto        idx0 = t1.get_index<0>();
-      auto        idx1 = t1.get_index<1>();
+      auto        idx0 = t1.getIndex<0>();
+      auto        idx1 = t1.getIndex<1>();
       t1.put(S1{0, 1, 2});
       check(idx0.get(0) == S1{0, 1, 2}, "get0");
       check(idx1.get(1) == S1{0, 1, 2}, "get1");
@@ -69,7 +69,7 @@ namespace table_test
    {
       test_tables t{this_contract};
       auto        t2   = t.open<table2>();
-      auto        idx1 = t2.get_index<1>();
+      auto        idx1 = t2.getIndex<1>();
       t2.put(S2{0, 1, 2});
       t2.put(S2{3, 1, 4});
       t2.put(S2{5, 6, 7});
@@ -88,7 +88,7 @@ namespace table_test
    {
       test_tables t{this_contract};
       auto        t0   = t.open<table0>();
-      auto        idx0 = t0.get_index<0>();
+      auto        idx0 = t0.getIndex<0>();
       t0.put(S0{0, 1});
       t0.put(S0{2, 3});
       t0.erase(0);
@@ -101,8 +101,8 @@ namespace table_test
    {
       test_tables t{this_contract};
       auto        t1   = t.open<table1>();
-      auto        idx0 = t1.get_index<0>();
-      auto        idx1 = t1.get_index<1>();
+      auto        idx0 = t1.getIndex<0>();
+      auto        idx1 = t1.getIndex<1>();
       t1.put(S1{0, 1, 2});
       t1.put(S1{3, 4, 5});
       t1.erase(0);

@@ -9,12 +9,20 @@ namespace psibase
 {
    using BlockNum = uint32_t;
 
+   /// A synchronous call
+   ///
+   /// An Action represents a synchronous call between contracts.
+   /// It is the argument to [call] and can be fetched using
+   /// [getCurrentAction].
+   ///
+   /// [Transaction] also contains actions requested by the
+   /// transaction authorizers.
    struct Action
    {
-      AccountNumber     sender;
-      AccountNumber     contract;
-      MethodNumber      method;
-      std::vector<char> rawData;
+      AccountNumber     sender;    ///< Account sending the action
+      AccountNumber     contract;  ///< Contract to execute the action
+      MethodNumber      method;    ///< Contract method to execute
+      std::vector<char> rawData;   ///< Data for the method
    };
    PSIO_REFLECT(Action, sender, contract, method, rawData)
 
@@ -46,19 +54,7 @@ namespace psibase
    };
    PSIO_REFLECT(Claim, contract, rawData)
 
-   /* mark this as definitionWillNotChange() and put it in memory order that
-    * has no padding nor alignment requirements so these fields
-    * can be effeciently memcpy 
-    *
-    * - do not add any fields that may allocate memory 
-    *
-    *   Tapos = Transactions as Proof of Stake
-    */
-   // TODO Dan: __attribute__((packed, aligned(1))) causes UB in to_json, from_json,
-   //           the TimePointSec comparison operator, fracpack if the memcpy
-   //           optimization ever gets disabled (e.g. its condition for enabling fails
-   //           to trigger), to_bin, from_bin, and more; see Todd for details
-   struct FRACPACK Tapos
+   struct Tapos
    {
       static constexpr uint16_t do_not_broadcast = 1u << 0;
 

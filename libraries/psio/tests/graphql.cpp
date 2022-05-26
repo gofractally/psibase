@@ -17,10 +17,7 @@ struct Account
    std::string lastName;
 };
 PSIO_REFLECT(Account, firstName, lastName)
-using ChainAccountConnection = psio::Connection<Account>;
-using AccountEdge            = psio::Edge<Account>;
-PSIO_REFLECT_GQL_EDGE(AccountEdge)
-PSIO_REFLECT_GQL_CONNECTION(ChainAccountConnection)
+using ChainAccountConnection = psio::Connection<Account, "AccountConnection", "AccountEdge">;
 
 struct Root
 {
