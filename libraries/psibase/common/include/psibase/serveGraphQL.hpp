@@ -3,7 +3,8 @@
 #include <psibase/Table.hpp>
 #include <psibase/contractEntry.hpp>
 #include <psibase/nativeFunctions.hpp>
-#include <psio/graphql_connection.hpp>
+#include <psio/graphql.hpp>
+#include <psio/to_hex.hpp>
 
 namespace psibase
 {
@@ -33,7 +34,7 @@ namespace psibase
       auto doit = [&](std::string_view query, std::string_view variables)
       {
          auto result = psio::gql_query(getRoot(), query, {});
-         return psibase::RpcReplyData{
+         return RpcReplyData{
              .contentType = "application/json",
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
          };
@@ -48,7 +49,7 @@ namespace psibase
       else if (request.method == "GET")
       {
          auto result = psio::get_gql_schema<std::remove_cvref_t<decltype(getRoot())>>();
-         return psibase::RpcReplyData{
+         return RpcReplyData{
              .contentType = "text",                                          // TODO
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
          };
@@ -70,18 +71,176 @@ namespace psibase
       return std::nullopt;
    }  // serveGraphQL
 
-   template <typename Connection, typename T, typename Key>
-   Connection makeConnection(const psibase::TableIndex<T, Key>& index,
-                             const std::optional<Key>&          gt,
-                             const std::optional<Key>&          ge,
-                             const std::optional<Key>&          lt,
-                             const std::optional<Key>&          le,
-                             std::optional<uint32_t>            first,
-                             std::optional<uint32_t>            last,
-                             const std::optional<std::string>&  before,
-                             const std::optional<std::string>&  after)
+   struct PageInfo
    {
-      using Iter      = typename psibase::KvIterator<T>;
+      bool        hasPreviousPage = false;
+      bool        hasNextPage     = false;
+      std::string startCursor;
+      std::string endCursor;
+   };
+   PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
+
+   template <typename Node, psio::FixedString EdgeName>
+   struct Edge
+   {
+      Node        node;
+      std::string cursor;
+   };
+
+   template <typename Node, psio::FixedString EdgeName>
+   constexpr const char* get_type_name(const Edge<Node, EdgeName>*)
+   {
+      return EdgeName.c_str();
+   }
+
+   struct ReflectEdge
+   {
+      static constexpr bool is_defined = true;
+      static constexpr bool is_struct  = true;
+      template <typename L>
+      constexpr inline static void for_each(L&& lambda)
+      {
+         {
+            auto off = ~uint64_t(0);
+            (void)lambda(psio::meta{.name = "node", .offset = off, .number = 0 + 1},
+                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::node)
+                         { return &psio::remove_cvref_t<decltype(*p)>::node; });
+         }
+         {
+            auto off = ~uint64_t(0);
+            (void)lambda(psio::meta{.name = "cursor", .offset = off, .number = 1 + 1},
+                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::cursor)
+                         { return &psio::remove_cvref_t<decltype(*p)>::cursor; });
+         }
+      }
+      template <typename L>
+      inline static bool get_by_name(uint64_t n, L&& lambda)
+      {
+         switch (n)
+         {
+            case psio::hash_name("node"):
+               (void)lambda(psio::meta{.name = "node", .number = 0 + 1},
+                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::node)
+                            { return &psio::remove_cvref_t<decltype(*p)>::node; });
+               return true;
+            case psio::hash_name("cursor"):
+               (void)lambda(psio::meta{.name = "cursor", .number = 1 + 1},
+                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::cursor)
+                            { return &psio::remove_cvref_t<decltype(*p)>::cursor; });
+               return true;
+         }
+         return false;
+      }
+   };  // ReflectEdge
+
+   template <typename Node, psio::FixedString EdgeName>
+   ReflectEdge get_reflect_impl(const Edge<Node, EdgeName>&);
+
+   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
+   struct Connection
+   {
+      using NodeType = Node;
+      using Edge     = Edge<Node, EdgeName>;
+
+      std::vector<Edge> edges;
+      PageInfo          pageInfo;
+   };
+
+   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
+   constexpr const char* get_type_name(const Connection<Node, ConnectionName, EdgeName>*)
+   {
+      return ConnectionName.c_str();
+   }
+
+   struct ReflectConnection
+   {
+      static constexpr bool is_defined = true;
+      static constexpr bool is_struct  = true;
+      template <typename L>
+      constexpr inline static void for_each(L&& lambda)
+      {
+         {
+            auto off = ~uint64_t(0);
+            (void)lambda(psio::meta{.name = "edges", .offset = off, .number = 0 + 1},
+                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::edges)
+                         { return &psio::remove_cvref_t<decltype(*p)>::edges; });
+         }
+         {
+            auto off = ~uint64_t(0);
+            (void)lambda(psio::meta{.name = "pageInfo", .offset = off, .number = 1 + 1},
+                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::pageInfo)
+                         { return &psio::remove_cvref_t<decltype(*p)>::pageInfo; });
+         }
+      }
+      template <typename L>
+      inline static bool get_by_name(uint64_t n, L&& lambda)
+      {
+         switch (n)
+         {
+            case psio::hash_name("edges"):
+               (void)lambda(psio::meta{.name = "edges", .number = 0 + 1},
+                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::edges)
+                            { return &psio::remove_cvref_t<decltype(*p)>::edges; });
+               return true;
+            case psio::hash_name("pageInfo"):
+               (void)lambda(psio::meta{.name = "pageInfo", .number = 1 + 1},
+                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::pageInfo)
+                            { return &psio::remove_cvref_t<decltype(*p)>::pageInfo; });
+               return true;
+         }
+         return false;
+      }
+   };  // ReflectConnection
+
+   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
+   ReflectConnection get_reflect_impl(const Connection<Node, ConnectionName, EdgeName>&);
+
+   /// GraphQL Pagination through TableIndex
+   ///
+   /// You rarely need to call this directly; see [the example](#makeconnection-example).
+   ///
+   /// Template arguments:
+   /// - `Connection`: [Connection]
+   /// - `T`: Type stored in index
+   /// - `Key`: Key in index
+   ///
+   /// Arguments:
+   /// - `index`: `TableIndex` to paginate through
+   /// - `gt`: Restrict range to keys greater than this
+   /// - `ge`: Restrict range to keys greater than or equal to this
+   /// - `lt`: Restrict range to keys less than to this
+   /// - `le`: Restrict range to keys less than or equal to this
+   /// - `first`: Stop after including this many items at the beginning of the range
+   /// - `last`: Stop after including this many items at the end of the range
+   /// - `before`: Opaque cursor value. Resume paging; include keys before this point
+   /// - `after`: Opaque cursor value. Resume paging; include keys after this point
+   ///
+   /// By default, `makeConnection` pages through the entire index's range.
+   /// `gt`, `ge`, `lt`, and `le` restrict the range. They can be used in any
+   /// combination (set intersection).
+   ///
+   /// `first`, `last`, `before`, `after`, [Connection], and
+   /// [Edge] match the GraphQL Cursor Connections Specification
+   /// (aka GraphQL Pagination). `first` and `after` page through the
+   /// range defined above in the forward direction. `last` and `before`
+   /// page through the range defined above in the reverse direction.
+   /// Combining `first` with `last` isn't recommended, but matches the
+   /// behavior in the specification.
+   ///
+   /// #### makeConnection example
+   ///
+   ///
+   template <typename Connection, typename T, typename Key>
+   Connection makeConnection(const TableIndex<T, Key>&         index,
+                             const std::optional<Key>&         gt,
+                             const std::optional<Key>&         ge,
+                             const std::optional<Key>&         lt,
+                             const std::optional<Key>&         le,
+                             std::optional<uint32_t>           first,
+                             std::optional<uint32_t>           last,
+                             const std::optional<std::string>& before,
+                             const std::optional<std::string>& after)
+   {
       auto keyFromHex = [&](const std::optional<std::string>& s) -> std::vector<char>
       {
          std::vector<char> bytes;
@@ -108,9 +267,9 @@ namespace psibase
       auto it  = rangeBegin;
       auto end = rangeEnd;
       if (auto key = keyFromHex(after); !key.empty())
-         it = std::clamp(index.upper_bound(psibase::KeyView{key}), rangeBegin, rangeEnd);
+         it = std::clamp(index.upper_bound(KeyView{key}), rangeBegin, rangeEnd);
       if (auto key = keyFromHex(before); !key.empty())
-         end = std::clamp(index.lower_bound(psibase::KeyView{key}), rangeBegin, rangeEnd);
+         end = std::clamp(index.lower_bound(KeyView{key}), rangeBegin, rangeEnd);
       end = std::max(it, end);
 
       Connection result;
@@ -151,15 +310,15 @@ namespace psibase
    }  // makeConnection
 
    template <typename T, typename K>
-   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(psibase::TableIndex<T, K>*)
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(TableIndex<T, K>*)
    {
       return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
    }
 
    template <typename T, typename K>
-   constexpr auto gql_callable_fn(const psibase::TableIndex<T, K>*)
+   constexpr auto gql_callable_fn(const TableIndex<T, K>*)
    {
-      using Connection = psio::Connection<  //
+      using Connection = Connection<  //
           T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
       return makeConnection<Connection, T, K>;
    }  // gql_callable_fn
