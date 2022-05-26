@@ -183,7 +183,7 @@ bool psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
          evict &= scan_prev(data, page);
          if (evict)
          {
-            PRINT("evicting page: " << id << std::endl);
+            DEBUG_PRINT("evicting page: " << id << std::endl);
          }
       }
       if (evict)
@@ -238,16 +238,16 @@ bool psidb::gc_allocator::scan_prev(cycle& data, page_header* page)
          min_version = prev_page->version;
          if (page_is_live(data, prev_page, page->version))
          {
-            PRINT("prev: " << get_id(page) << " -> " << id << std::endl);
+            DEBUG_PRINT("prev: " << get_id(page) << " -> " << id << std::endl);
             result &= scan(data, prev);
             break;
          }
          else
          {
             auto new_id = prev_page->prev.load(std::memory_order_relaxed);
-            PRINT("dropping page: " << id << ", version [" << prev_page->version << ","
-                                    << page->version << ") " << get_id(page) << " -> " << new_id
-                                    << std::endl);
+            DEBUG_PRINT("dropping page: " << id << ", version [" << prev_page->version << ","
+                                          << page->version << ") " << get_id(page) << " -> "
+                                          << new_id << std::endl);
             id = new_id;
             assert(id != get_id(page));
             prev->store(id, std::memory_order_relaxed);

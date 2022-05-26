@@ -70,7 +70,8 @@ TEST_CASE("thread tests", "[thread]")
              << stats.memory.total / psidb::page_size << ", checkpoints: " << stats.checkpoints
              << ", disk: " << stats.file.used << " / " << stats.file.total
              << ", evict: " << stats.memory.total_evicted << ", writes: " << stats.file.cumulative
-             << std::endl;
+             << " reads: " << stats.pages_read << " head: " << stats.head_pages
+             << ", obsolete: " << stats.obsolete_disk_pages << std::endl;
       }
       done = true;
    };
@@ -128,9 +129,11 @@ TEST_CASE("thread tests", "[thread]")
    //db.start_transaction().commit();
    //db.start_transaction().commit();
    auto stats = db.get_stats();
-   std::cout << "memory used: " << stats.memory.used << " / " << stats.memory.total
-             << ", checkpoints: " << stats.checkpoints << ", disk used: " << stats.file.used
-             << " / " << stats.file.total << std::endl;
+   std::cout << "memory: " << stats.memory.used / psidb::page_size << " / "
+             << stats.memory.total / psidb::page_size << ", checkpoints: " << stats.checkpoints
+             << ", disk: " << stats.file.used << " / " << stats.file.total
+             << " head: " << stats.head_pages << ", obsolete: " << stats.obsolete_disk_pages
+             << std::endl;
    db.stop_gc();
    gc_thread.join();
 }

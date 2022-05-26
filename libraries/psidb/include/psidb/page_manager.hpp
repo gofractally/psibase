@@ -365,11 +365,21 @@ namespace psidb
          file_allocator::stats file;
          gc_allocator::stats   memory;
          std::size_t           checkpoints;
+         // The number of pages used by the current head
+         std::size_t head_pages;
+         // The number of disk pages that are not used by the current head
+         std::size_t   obsolete_disk_pages;
+         std::uint64_t pages_read;
       };
       stats get_stats() const
       {
-         return {_file_allocator.get_stats(), _allocator.get_stats(), checkpoints()};
+         // HACK:
+         auto mthis = const_cast<page_manager*>(this);
+         return {_file_allocator.get_stats(), _allocator.get_stats(),  checkpoints(),
+                 mthis->count_head(),         mthis->count_obsolete(), _pages_read};
       }
+      std::size_t count_head();
+      std::size_t count_obsolete();
       std::size_t checkpoints() const
       {
          std::lock_guard l{_checkpoint_mutex};
@@ -468,6 +478,8 @@ namespace psidb
       version_type                      _flush_version = 0;
       std::atomic<bool>                 _syncing       = false;
       shared_queue<write_queue_element> _write_queue;
+
+      std::atomic<std::uint64_t> _pages_read;
 
       // What do we need:
       // - iterate over uncommitted transactions in order

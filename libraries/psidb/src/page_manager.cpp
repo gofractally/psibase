@@ -91,6 +91,7 @@ void* psidb::page_manager::read_pages(page_id& id, std::size_t count)
    void* result = _allocator.allocate(count * page_size);
 
    read_page(result, id, count);
+   _pages_read += count;
 
    auto new_id = get_id(static_cast<page_header*>(result));
 
@@ -119,6 +120,7 @@ psidb::page_header* psidb::page_manager::read_page(page_id& id)
    page             = new (page) page_internal_node;
 
    read_page(page, id);
+   ++_pages_read;
 
    id = num;
    pos.store(num);
@@ -155,6 +157,7 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
    std::osyncstream(std::cout) << "reading page: " << id << " -> " << num << std::endl;
 
    read_page(page, id);
+   ++_pages_read;
 
    page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
    page->access();
@@ -860,6 +863,44 @@ void psidb::checkpoint_data::splice_pages(checkpoint_data& other)
          _pages_to_free.push_back(std::move(v));
       }
    }
+}
+
+std::size_t psidb::page_manager::count_head()
+{
+   auto do_count = [this](auto&& count, page_header* root) -> std::size_t
+   {
+      std::size_t result = 1;
+      if (root->type == page_type::node)
+      {
+         auto n = static_cast<page_internal_node*>(root);
+         for (std::size_t i = 0; i <= n->_size; ++i)
+         {
+            result += count(count, get_page(n->child(i)));
+         }
+      }
+      return result;
+   };
+   return do_count(do_count, get_page(head->_root.table_roots[0]));
+}
+
+std::size_t psidb::page_manager::count_obsolete()
+{
+   std::size_t     result = 0;
+   std::lock_guard l{_checkpoint_mutex};
+   for (auto& c : _active_checkpoints)
+   {
+      for (const auto& v : c._pages_to_free)
+      {
+         for (const auto& [version, page] : v)
+         {
+            if (!is_memory_page(page) || translate_page_address(page)->id)
+            {
+               ++result;
+            }
+         }
+      }
+   }
+   return result;
 }
 
 void psidb::page_manager::print_summary()
