@@ -54,8 +54,7 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       }
       auto [new_page, new_page_id] = db->allocate_page(p);
       key = p->split(static_cast<page_leaf*>(new_page), p->get_offset(leaf), key, value, flags);
-      new_page->id = 0;
-      new_page->access();
+      new_page->init_header();
       new_page->type    = page_type::leaf;
       new_page->version = version;
       new_page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
@@ -73,8 +72,7 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       // FIXME: Handle allocation failure
       auto [new_page, new_page_id] = db->allocate_page(p);
       key = p->split(static_cast<page_internal_node*>(new_page), p->get_offset(pos), key, child);
-      new_page->id = 0;
-      new_page->access();
+      new_page->init_header();
       new_page->type    = page_type::node;
       new_page->version = version;
       new_page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
@@ -85,8 +83,7 @@ void psidb::cursor::insert(transaction& trx, std::string_view key, std::string_v
       auto [new_page, new_page_id] = db->allocate_page(nullptr);
       static_cast<page_internal_node*>(new_page)->init();
       static_cast<page_internal_node*>(new_page)->set(db->get_root_id(c, 0), key, child);
-      new_page->id = 0;
-      new_page->access();
+      new_page->init_header();
       new_page->type    = page_type::node;
       new_page->version = version;
       new_page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
@@ -126,10 +123,9 @@ Page* psidb::cursor::maybe_clone(transaction& trx, Ptr& node, std::size_t i)
       // clone p
       auto [copy, copy_id] = db->allocate_page(p);
       copy                 = new (copy) Page;
+      copy->init_header();
       p->copy(static_cast<Page*>(copy));
       copy->type = p->type;
-      copy->id   = 0;
-      copy->access();
       copy->prev.store(db->get_id(p), std::memory_order_release);
       copy->version = version;
       relink_after_copy(trx, i, copy_id);

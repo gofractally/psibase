@@ -24,6 +24,7 @@ namespace psidb
 
    enum class page_flags : std::uint8_t
    {
+      unwritable = 1
    };
 
    using gc_flag_type = std::uint8_t;
@@ -36,9 +37,18 @@ namespace psidb
       page_flags           flags;
       std::atomic<uint8_t> accessed;
       std::atomic<bool>    pinned;
+      std::atomic<bool>    mutex;
       page_id              id;
       std::atomic<page_id> prev;
       version_type         version;
+      void                 init_header()
+      {
+         flags = {};
+         id    = 0;
+         accessed.store(1, std::memory_order_relaxed);
+         pinned.store(false, std::memory_order_relaxed);
+         mutex.store(false, std::memory_order_relaxed);
+      }
       // TODO: accessed can be a counter to keep frequently used pages
       // in memory longer.
       void access() { accessed.store(1, std::memory_order_relaxed); }
@@ -47,6 +57,18 @@ namespace psidb
       void pin() { pinned.store(1, std::memory_order_relaxed); }
       void unpin() { pinned.store(0, std::memory_order_release); }
       bool is_pinned() const { return pinned.load(std::memory_order_acquire); }
+      void lock()
+      {
+         while (mutex.exchange(true, std::memory_order_acquire))
+         {
+            mutex.wait(true);
+         }
+      }
+      void unlock()
+      {
+         mutex.store(false, std::memory_order_release);
+         mutex.notify_one();
+      }
    };
 
 }  // namespace psidb

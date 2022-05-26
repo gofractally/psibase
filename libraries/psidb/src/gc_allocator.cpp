@@ -8,6 +8,8 @@ using namespace psidb;
 
 //#define GC_LOG
 
+#define PRINT(...) std::osyncstream(std::cout) << __VA_ARGS__
+
 #ifdef GC_LOG
 #define DEBUG_PRINT(...) std::osyncstream(std::cout) << __VA_ARGS__
 #else
@@ -161,12 +163,8 @@ void psidb::gc_allocator::scan_root(cycle& data, page_header* page)
 // are relinked.
 void psidb::gc_allocator::rescan_root(page_header* page)
 {
-   if (!is_marked(page))
-   {
-      visit([&](auto* p) { rescan_children(p); }, page);
-      rescan(get_prev(page));
-      mark(page);
-   }
+   visit([&](auto* p) { rescan_children(p); }, page);
+   rescan(get_prev(page));
 }
 
 bool psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
@@ -183,11 +181,16 @@ bool psidb::gc_allocator::scan(cycle& data, node_ptr ptr)
          DEBUG_PRINT("scanning page: " << id << std::endl);
          evict = visit([&](auto* p) { return scan_children(data, p); }, page);
          evict &= scan_prev(data, page);
+         if (evict)
+         {
+            PRINT("evicting page: " << id << std::endl);
+         }
       }
       if (evict)
       {
          mark_evicted(page);
-         ptr->store(page->id, std::memory_order_relaxed);
+         //ptr.get_parent<page_internal_node>()->store(ptr, id, page->id);
+         ptr->store(page->id);
       }
       else
       {
@@ -230,23 +233,24 @@ bool psidb::gc_allocator::scan_prev(cycle& data, page_header* page)
       {
          assert(id != get_id(page));
          page_header* prev_page = translate_page_address(id);
+         assert(prev_page->type != page_type::free);
          assert(prev_page->version < min_version);
          min_version = prev_page->version;
          if (page_is_live(data, prev_page, page->version))
          {
-            DEBUG_PRINT("prev: " << get_id(page) << " -> " << id << std::endl);
+            PRINT("prev: " << get_id(page) << " -> " << id << std::endl);
             result &= scan(data, prev);
             break;
          }
          else
          {
             auto new_id = prev_page->prev.load(std::memory_order_relaxed);
-            DEBUG_PRINT("dropping page: " << id << ", version [" << prev_page->version << ","
-                                          << page->version << ") " << get_id(page) << " -> "
-                                          << new_id << std::endl);
+            PRINT("dropping page: " << id << ", version [" << prev_page->version << ","
+                                    << page->version << ") " << get_id(page) << " -> " << new_id
+                                    << std::endl);
             id = new_id;
             assert(id != get_id(page));
-            prev->store(id);
+            prev->store(id, std::memory_order_relaxed);
          }
       }
    }
@@ -256,6 +260,10 @@ bool psidb::gc_allocator::scan_prev(cycle& data, page_header* page)
 bool psidb::gc_allocator::scan_children(cycle& data, page_internal_node* node)
 {
    bool result = true;
+   // TODO: avoid locking around the recursive scan.  It won't cause
+   // deadlock, because the data structure is acyclic, but it can
+   // cause a long pause in the writer.
+   std::lock_guard l{*node};
    for (std::size_t i = 0; i <= node->_size; ++i)
    {
       result &= scan(data, node->child(i));

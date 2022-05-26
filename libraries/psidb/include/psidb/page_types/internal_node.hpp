@@ -39,7 +39,6 @@ namespace psidb
    struct page_internal_node : page_header
    {
       using relink_record = char;
-      shared_value _mutex;
       std::uint8_t _size;
       std::uint8_t _key_words;
 
@@ -57,9 +56,8 @@ namespace psidb
          constexpr std::uint16_t size() const { return shifted_size * 16; }
       };
 
-      static constexpr std::size_t header_size = sizeof(page_header) + sizeof(_mutex) +
-                                                 sizeof(_size) + sizeof(_key_words) +
-                                                 sizeof(page_id);
+      static constexpr std::size_t header_size =
+          sizeof(page_header) + sizeof(_size) + sizeof(_key_words) + sizeof(page_id);
       static constexpr std::size_t min_key_size     = 16;
       static constexpr std::size_t fixed_entry_size = sizeof(page_id) + sizeof(key_storage);
       static constexpr std::size_t min_entry_size   = min_key_size + fixed_entry_size;
@@ -74,13 +72,13 @@ namespace psidb
                 padding * sizeof(key_storage)];
 
       // Construct a new object
-      void init() { _mutex.init(); }
+      void init()
+      { /*_mutex.init();*/
+      }
 
-      // queue must point to the begining of an array that
-      // contains at least capacity+1 elements.
-      void start_transaction(relink_record* queue) {}
+      void start_transaction(relink_record* queue) { lock(); }
       // queue must be the same as the queue that was passed to start_transaction
-      void end_transaction(relink_record* queue) {}
+      void end_transaction(relink_record* queue) { unlock(); }
 
       // accessors
       std::string_view get_key(key_storage k) const

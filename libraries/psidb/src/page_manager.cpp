@@ -34,8 +34,8 @@ psidb::page_manager::page_manager(int fd, std::size_t num_pages)
       // initialize new database
       auto [page, id] = allocate_page(nullptr);
       page->type      = page_type::leaf;
-      page->id        = 0;
-      page->version   = 1;
+      page->init_header();
+      page->version = 1;
       page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
       static_cast<page_leaf*>(page)->clear();
 
@@ -113,6 +113,8 @@ psidb::page_header* psidb::page_manager::read_page(page_id& id)
       return translate_page_address(id);
    }
 
+   std::osyncstream(std::cout) << "reading page: " << id << std::endl;
+
    auto [page, num] = allocate_page(nullptr);
    page             = new (page) page_internal_node;
 
@@ -150,8 +152,14 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
    auto [page, num] = allocate_page(nullptr);
    page             = new (page) page_internal_node;
 
+   std::osyncstream(std::cout) << "reading page: " << id << " -> " << num << std::endl;
+
    read_page(page, id);
 
+   page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
+   page->access();
+   page->pinned.store(false, std::memory_order_relaxed);
+   page->mutex.store(false, std::memory_order_relaxed);
    ptr->store(num, std::memory_order_release);
    pos.store(num);
 
@@ -182,6 +190,10 @@ void page_manager::queue_gc(obsolete_page page)
       if (p->id)
       {
          _file_allocator.deallocate(p->id, 1);
+      }
+      else
+      {
+         p->flags = page_flags::unwritable;
       }
       // If the page is still queued for writing, then we shouldn't get
       // here at all, because the write checkpoint is still alive.
@@ -245,6 +257,8 @@ void psidb::page_manager::evict_page(node_ptr ptr) {
 
 void psidb::page_manager::write_page(page_header* page, const std::shared_ptr<void>& refcount)
 {
+   assert(page->flags != page_flags::unwritable);
+   assert(page->id == 0);
    auto dest = allocate_file_page();
    _page_map.store(dest, get_id(page));
    page->id = dest;
