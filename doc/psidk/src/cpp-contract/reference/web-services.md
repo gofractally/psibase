@@ -15,6 +15,10 @@
   - [psibase::storeContent]
   - [psibase::serveContent]
   - [psibase::serveGraphQL]
+  - [psibase::makeConnection]
+    - [psibase::PageInfo]
+    - [psibase::Edge]
+    - [psibase::Connection]
 
 ## Routing
 
@@ -86,6 +90,10 @@ These help implement basic functionality:
 - [psibase::storeContent]
 - [psibase::serveContent]
 - [psibase::serveGraphQL]
+- [psibase::makeConnection]
+  - [psibase::PageInfo]
+  - [psibase::Edge]
+  - [psibase::Connection]
 
 Here's a common pattern for using these functions:
 
@@ -118,3 +126,7 @@ std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
 {{#cpp-doc ::psibase::storeContent}}
 {{#cpp-doc ::psibase::serveContent}}
 {{#cpp-doc ::psibase::serveGraphQL}}
+{{#cpp-doc ::psibase::makeConnection}}
+{{#cpp-doc ::psibase::PageInfo}}
+{{#cpp-doc ::psibase::Edge}}
+{{#cpp-doc ::psibase::Connection}}

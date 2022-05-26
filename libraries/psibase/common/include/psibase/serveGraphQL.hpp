@@ -24,16 +24,19 @@ namespace psibase
    /// * `POST /graphql` with `Content-Type = application/graphql`: Run query that's in body and return JSON result.
    /// * `POST /graphql` with `Content-Type = application/json`: Body contains a JSON object of the form `{"query"="..."}`. Run query and return JSON result.
    ///
-   /// `getRoot` should return a reflected object which becomes the query root.
-   /// Reflection on that object exposes both fields and **const** methods to be queried.
-   /// Fields may be any reflected struct. Const methods may return any reflected struct.
-   /// They should return objects by value.
-   template <typename F>
-   std::optional<RpcReplyData> serveGraphQL(const RpcRequestData& request, F getRoot)
+   /// `queryRoot` should be a reflected object; this shows up in GraphQL as the root
+   /// `Query` type. GraphQL exposes both fields and **const** methods. Fields may be
+   /// any reflected struct. Const methods may return any reflected struct. They should
+   /// return objects by value.
+   ///
+   /// See [makeConnection example](#makeconnection-example).
+   template <typename QueryRoot>
+   std::optional<RpcReplyData> serveGraphQL(const RpcRequestData& request,
+                                            const QueryRoot&      queryRoot)
    {
       auto doit = [&](std::string_view query, std::string_view variables)
       {
-         auto result = psio::gql_query(getRoot(), query, {});
+         auto result = psio::gql_query(queryRoot, query, {});
          return RpcReplyData{
              .contentType = "application/json",
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
@@ -48,7 +51,7 @@ namespace psibase
          return doit(request.target.substr(pos + 7), {});
       else if (request.method == "GET")
       {
-         auto result = psio::get_gql_schema<std::remove_cvref_t<decltype(getRoot())>>();
+         auto result = psio::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
          return RpcReplyData{
              .contentType = "text",                                          // TODO
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
@@ -71,6 +74,10 @@ namespace psibase
       return std::nullopt;
    }  // serveGraphQL
 
+   /// GraphQL support for paging
+   ///
+   /// This lets the query clients know when more data is available and
+   /// what cursor values can be used to fetch that data.
    struct PageInfo
    {
       bool        hasPreviousPage = false;
@@ -80,6 +87,10 @@ namespace psibase
    };
    PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
 
+   /// GraphQL support for paging
+   ///
+   /// `node` contains the row data. `cursor` identifies where in the
+   /// table the node is located.
    template <typename Node, psio::FixedString EdgeName>
    struct Edge
    {
@@ -136,6 +147,10 @@ namespace psibase
    template <typename Node, psio::FixedString EdgeName>
    ReflectEdge get_reflect_impl(const Edge<Node, EdgeName>&);
 
+   /// GraphQL support for paging
+   ///
+   /// `edges` contain the matching rows. `pageInfo` gives clients information
+   /// needed to resume paging.
    template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
    struct Connection
    {
@@ -205,7 +220,7 @@ namespace psibase
    /// - `Key`: Key in index
    ///
    /// Arguments:
-   /// - `index`: `TableIndex` to paginate through
+   /// - `index`: [TableIndex] to paginate through
    /// - `gt`: Restrict range to keys greater than this
    /// - `ge`: Restrict range to keys greater than or equal to this
    /// - `lt`: Restrict range to keys less than to this
@@ -219,7 +234,7 @@ namespace psibase
    /// `gt`, `ge`, `lt`, and `le` restrict the range. They can be used in any
    /// combination (set intersection).
    ///
-   /// `first`, `last`, `before`, `after`, [Connection], and
+   /// `first`, `last`, `before`, `after`, [PageInfo], [Connection], and
    /// [Edge] match the GraphQL Cursor Connections Specification
    /// (aka GraphQL Pagination). `first` and `after` page through the
    /// range defined above in the forward direction. `last` and `before`
@@ -229,7 +244,118 @@ namespace psibase
    ///
    /// #### makeConnection example
    ///
+   /// This demonstrates exposing a table's contents via GraphQL. This example
+   /// doesn't include a way to fill the table; that's left as an exercise to the
+   /// reader. Hint: contract-based RPC and GraphQL only support read-only
+   /// operations; you must use actions to write to a table.
    ///
+   /// ```c++
+   /// #include <psibase/Contract.hpp>
+   /// #include <psibase/dispatch.hpp>
+   /// #include <psibase/serveGraphQL.hpp>
+   /// #include <psibase/serveSimpleUI.hpp>
+   ///
+   /// struct MyType
+   /// {
+   ///    uint32_t    primaryKey;
+   ///    std::string secondaryKey;
+   ///    std::string moreData;
+   ///
+   ///    std::string someFn(std::string arg1, std::string arg2) const
+   ///    {
+   ///       return arg1 + secondaryKey + arg2 + moreData;
+   ///    }
+   /// };
+   /// PSIO_REFLECT(MyType,
+   ///    primaryKey, secondaryKey, moreData,
+   ///    method(someFn, arg1, arg2))
+   ///
+   /// using MyTable  = psibase::Table<
+   ///    MyType, &MyType::primaryKey, &MyType::secondaryKey>;
+   /// using MyTables = psibase::ContractTables<MyTable>;
+   ///
+   /// struct Query
+   /// {
+   ///    psibase::AccountNumber contract;
+   ///
+   ///    auto rowsByPrimary() const {
+   ///       return MyTables{contract}.open<MyTable>().getIndex<0>();
+   ///    }
+   ///    auto rowsBySecondary() const {
+   ///       return MyTables{contract}.open<MyTable>().getIndex<1>();
+   ///    }
+   /// };
+   /// PSIO_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
+   ///
+   /// struct ExampleContract : psibase::Contract<ExampleContract>
+   /// {
+   ///    std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
+   ///    {
+   ///       if (auto result = psibase::serveSimpleUI<ExampleContract, true>(request))
+   ///          return result;
+   ///       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
+   ///          return result;
+   ///       return std::nullopt;
+   ///    }
+   /// };
+   /// PSIO_REFLECT(ExampleContract, method(serveSys, request))
+   ///
+   /// PSIBASE_DISPATCH(ExampleContract)
+   /// ```
+   ///
+   /// This example doesn't call `makeConnection` directly; it's automatic.
+   /// If a member function on a query object:
+   ///
+   /// - is `const`, and
+   /// - is reflected, and
+   /// - has no arguments, and
+   /// - returns a [TableIndex]
+   ///
+   /// then the system exposes that function to GraphQL as a function which
+   /// takes `gt`, `ge`, `lt`, `le`, `first`, `last`, `before`, and `after`.
+   /// The system calls `makeConnection` automatically.
+   ///
+   /// [serveGraphQL] generates this GraphQL schema and processes queries which
+   /// conform to it:
+   ///
+   /// ```
+   /// type MyType {
+   ///     primaryKey: Float!
+   ///     secondaryKey: String!
+   ///     moreData: String!
+   ///     someFn(arg1: String! arg2: String!): String!
+   /// }
+   /// type PageInfo {
+   ///     hasPreviousPage: Boolean!
+   ///     hasNextPage: Boolean!
+   ///     startCursor: String!
+   ///     endCursor: String!
+   /// }
+   /// type MyTypeEdge {
+   ///     node: MyType!
+   ///     cursor: String!
+   /// }
+   /// type MyTypeConnection {
+   ///     edges: [MyTypeEdge!]!
+   ///     pageInfo: PageInfo!
+   /// }
+   /// type Query {
+   ///     rowsByPrimary(
+   ///          gt: Float ge: Float lt: Float le: Float
+   ///          first: Float last: Float
+   ///          before: String after: String): MyTypeConnection!
+   ///     rowsBySecondary(
+   ///          gt: String ge: String lt: String le: String
+   ///          first: Float last: Float
+   ///          before: String after: String): MyTypeConnection!
+   /// }
+   /// ```
+   ///
+   /// Things of note:
+   /// - `rowsByPrimary` and `rowsBySecondary` automatically have `makeConnection`'s arguments.
+   /// - `MyTypeEdge` and `MyTypeConnection` are automatically generated from `MyType`.
+   /// - Returned rows (`MyType`) include MyType's fields and the `someFn` method. Only `const` methods are exposed.
+   /// - [serveGraphQL] automatically chooses GraphQL types which cover the range of numeric types. When no suitable match is found (e.g. no GraphQL type covers the range of `int64_t`), it falls back to `String`.
    template <typename Connection, typename T, typename Key>
    Connection makeConnection(const TableIndex<T, Key>&         index,
                              const std::optional<Key>&         gt,

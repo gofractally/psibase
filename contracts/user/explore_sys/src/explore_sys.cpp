@@ -7,7 +7,7 @@
 
 using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
-struct QueryRoot
+struct Query
 {
    auto blocks() const
    {
@@ -15,14 +15,14 @@ struct QueryRoot
    }
 };
 PSIO_REFLECT(  //
-    QueryRoot,
+    Query,
     method(blocks))
 
 namespace system_contract
 {
    std::optional<psibase::RpcReplyData> explore_sys::serveSys(psibase::RpcRequestData request)
    {
-      if (auto result = psibase::serveGraphQL(request, [] { return QueryRoot{}; }))
+      if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
          return result;
