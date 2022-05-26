@@ -5,10 +5,6 @@
 #include "nft_errors.hpp"
 #include "nft_tables.hpp"
 
-/* Boot notes:
- * NFT and token manualDebit flags should be set for the account holding this contract
-*/
-
 namespace UserContract
 {
    class NftSys : public psibase::Contract<NftSys>

@@ -9,12 +9,6 @@
 #include "symbol_tables.hpp"
 #include "types.hpp"
 
-/* Boot notes:
- * NFT and token manualDebit flags should be set for the account holding this contract
- * The contract will use a default set of parameters for symbol pricing adjustment rates, floors, etc.
- *    Configure these settings if desired.
-*/
-
 namespace UserContract
 {
    class SymbolSys : public psibase::Contract<SymbolSys>

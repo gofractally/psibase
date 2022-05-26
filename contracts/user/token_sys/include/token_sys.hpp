@@ -10,10 +10,6 @@
 #include "token_tables.hpp"
 #include "types.hpp"
 
-/* Boot notes:
- * NFT and token manualDebit flags should be set for the account holding this contract
-*/
-
 namespace UserContract
 {
 
