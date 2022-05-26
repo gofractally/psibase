@@ -114,6 +114,49 @@ namespace psio
    template <typename R, typename C, typename... Args>
    void result_of_member(R (C::*)(Args...));
 
+   template <unsigned N>
+   struct FixedString
+   {
+      char buf[N + 1]{};
+
+      constexpr FixedString(const char (&s)[N + 1])
+      {
+         for (unsigned i = 0; i < N; ++i)
+            buf[i] = s[i];
+      }
+
+      template <unsigned N1, unsigned N2>
+      constexpr FixedString(const FixedString<N1>& a, const FixedString<N2>& b)
+      {
+         static_assert(N == N1 + N2);
+         for (unsigned i = 0; i < N1; ++i)
+            buf[i] = a.buf[i];
+         for (unsigned i = 0; i < N2; ++i)
+            buf[N1 + i] = b.buf[i];
+      }
+
+      constexpr operator const char*() const { return buf; }
+      constexpr operator const decltype(buf) & () const { return buf; }
+      constexpr operator std::string_view() const { return buf; }
+
+      constexpr const char* c_str() const { return buf; }
+      constexpr size_t      size() const { return N; }
+   };
+   template <unsigned N>
+   FixedString(char const (&)[N]) -> FixedString<N - 1>;
+
+   template <unsigned N1, unsigned N2>
+   constexpr FixedString<N1 + N2> operator+(const FixedString<N1>& a, const FixedString<N2>& b)
+   {
+      return {a, b};
+   }
+
+   template <unsigned N1, unsigned N2>
+   constexpr FixedString<N1 + N2 - 1> operator+(const FixedString<N1>& a, const char (&b)[N2])
+   {
+      return {a, FixedString{b}};
+   }
+
    struct meta
    {
       const char*                        name;
@@ -289,6 +332,11 @@ namespace psio
       static constexpr int size = sizeof...(Ts);
    };
 
+   template <typename... Ts>
+   std::tuple<Ts...> TupleFromTypeListImpl(TypeList<Ts...>&&);
+   template <typename T>
+   using TupleFromTypeList = decltype(TupleFromTypeListImpl(std::declval<T>()));
+
    template <typename T>
    struct MemberPtrType;
 
@@ -309,6 +357,7 @@ namespace psio
       using ClassType                       = T;
       using ReturnType                      = R;
       using ArgTypes                        = TypeList<Args...>;
+      using SimplifiedArgTypes              = TypeList<std::remove_cvref_t<Args>...>;
    };
 
    template <typename R, typename T, typename... Args>
@@ -320,6 +369,33 @@ namespace psio
       using ClassType                       = T;
       using ReturnType                      = R;
       using ArgTypes                        = TypeList<Args...>;
+      using SimplifiedArgTypes              = TypeList<std::remove_cvref_t<Args>...>;
+   };
+
+   // Not really a member, but usable via std::invoke
+   template <typename R, typename T, typename... Args>
+   struct MemberPtrType<R (*)(T&, Args...)>
+   {
+      static constexpr bool isFunction      = true;
+      static constexpr bool isConstFunction = false;
+      static constexpr int  numArgs         = sizeof...(Args);
+      using ClassType                       = T;
+      using ReturnType                      = R;
+      using ArgTypes                        = TypeList<Args...>;
+      using SimplifiedArgTypes              = TypeList<std::remove_cvref_t<Args>...>;
+   };
+
+   // Not really a member, but usable via std::invoke
+   template <typename R, typename T, typename... Args>
+   struct MemberPtrType<R (*)(const T&, Args...)>
+   {
+      static constexpr bool isFunction      = true;
+      static constexpr bool isConstFunction = true;
+      static constexpr int  numArgs         = sizeof...(Args);
+      using ClassType                       = T;
+      using ReturnType                      = R;
+      using ArgTypes                        = TypeList<Args...>;
+      using SimplifiedArgTypes              = TypeList<std::remove_cvref_t<Args>...>;
    };
 
    template <typename F, typename... Args>
@@ -601,7 +677,7 @@ namespace std
          BOOST_PP_SEQ_FOR_EACH(PSIO_REQ_COMPRESS, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__));     \
          return !allowHashedMethods;                                                              \
       }                                                                                           \
-      static inline constexpr const char* name() { return BOOST_PP_STRINGIZE(STRUCT); }           \
+      static constexpr psio::FixedString name = BOOST_PP_STRINGIZE(STRUCT);                       \
       typedef std::tuple<BOOST_PP_IIF(                                                            \
           BOOST_PP_CHECK_EMPTY(PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)),                           \
           PSIO_EMPTY,                                                                             \

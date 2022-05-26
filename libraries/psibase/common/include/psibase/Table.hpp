@@ -106,6 +106,16 @@ namespace psibase
          return (lhs <=> rhs) == std::weak_ordering::equivalent;
       }
       void move_to(int res) { set(res); }
+      void move_to(std::span<const char> keyWithoutPrefix)
+      {
+         key.resize(prefix_size);
+         key.insert(key.end(), keyWithoutPrefix.begin(), keyWithoutPrefix.end());
+         is_end = !keyWithoutPrefix.empty();
+      }
+      std::span<const char> keyWithoutPrefix() const
+      {
+         return {key.data() + prefix_size, key.size() - prefix_size};
+      }
 
      private:
       void set(int sz)
@@ -213,7 +223,7 @@ namespace psibase
          return result;
       }
 
-      /// Move iterator (raw)
+      /// Move iterator
       ///
       /// This moves the iterator to the most-recent location found by
       /// [raw::kvGreaterEqual], [raw::kvLessThan], or [raw::kvMax].
@@ -224,6 +234,17 @@ namespace psibase
       /// [TableIndex::lower_bound], [TableIndex::upper_bound], or the iterator's increment or
       /// decrement operators instead.
       void moveTo(int result) { base.move_to(result); }
+
+      /// Move iterator
+      ///
+      /// This moves the iterator to `k`. `k` does not include the prefix.
+      /// May be used for GraphQL cursors.
+      void moveTo(std::span<const char> k) { base.move_to(k); }
+
+      /// Get serialized key without prefix
+      ///
+      /// The returned value can be passed to `moveTo`, e.g. for GraphQL cursors.
+      std::span<const char> keyWithoutPrefix() const { return base.keyWithoutPrefix(); }
 
       /// get object
       ///
@@ -290,7 +311,7 @@ namespace psibase
 
    template <typename T, typename U>
    concept compatible_key_prefix_unqual =
-       std::same_as<T, U> || compatible_tuple_prefix<T, U>::value;
+       std::same_as<T, U> || compatible_tuple_prefix<T, U>::value || std::same_as<T, KeyView>;
    template <typename T, typename U>
    concept CompatibleKeyPrefix =
        compatible_key_prefix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;

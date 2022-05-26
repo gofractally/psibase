@@ -11,9 +11,7 @@ struct QueryRoot
 {
    auto blocks() const
    {
-      psibase::TableIndex<psibase::Block, uint32_t> index{psibase::DbId::blockLog, {}, false};
-      return psibase::queryIndex<"BlockConnection", "BlockEdge">(
-          std::move(index), [](const auto& x) { return x.header.blockNum; });
+      return psibase::TableIndex<psibase::Block, uint32_t>{psibase::DbId::blockLog, {}, false};
    }
 };
 PSIO_REFLECT(  //

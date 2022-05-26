@@ -70,59 +70,98 @@ namespace psibase
       return std::nullopt;
    }  // serveGraphQL
 
-   template <psio::FixedString ConnectionName,
-             psio::FixedString EdgeName,
-             typename T,
-             typename K,
-             typename GetKey>
-   struct QueryIndexImpl
+   template <typename Connection, typename T, typename Key>
+   Connection makeConnection(const psibase::TableIndex<T, Key>& index,
+                             const std::optional<Key>&          gt,
+                             const std::optional<Key>&          ge,
+                             const std::optional<Key>&          lt,
+                             const std::optional<Key>&          le,
+                             std::optional<uint32_t>            first,
+                             std::optional<uint32_t>            last,
+                             const std::optional<std::string>&  before,
+                             const std::optional<std::string>&  after)
    {
-      psibase::TableIndex<T, K> index;
-      GetKey                    getKey;
-
-      auto operator()(const std::optional<K>&           gt,
-                      const std::optional<K>&           ge,
-                      const std::optional<K>&           lt,
-                      const std::optional<K>&           le,
-                      std::optional<uint32_t>           first,
-                      std::optional<uint32_t>           last,
-                      const std::optional<std::string>& before,
-                      const std::optional<std::string>& after) const
+      using Iter      = typename psibase::KvIterator<T>;
+      auto keyFromHex = [&](const std::optional<std::string>& s) -> std::vector<char>
       {
-         return psio::makeConnection<psio::Connection<T, ConnectionName, EdgeName>, K>(
-             gt, ge, lt, le, first, last, before, after,
-             index.begin(),                                       //
-             index.end(),                                         //
-             [](auto& it) { ++it; },                              //
-             [](auto& it) { --it; },                              //
-             [&](auto& it) { return std::invoke(getKey, *it); },  //
-             [](auto& it) { return *it; },                        //
-             [&](auto& k) { return index.lower_bound(k); },       //
-             [&](auto& k) { return index.upper_bound(k); });      //
-      }
-   };
+         std::vector<char> bytes;
+         if (!s || s->empty())
+            return bytes;
+         bytes.reserve(s->size() / 2);
+         if (!psio::from_hex(*s, bytes))
+            bytes.clear();
+         return bytes;
+      };
 
-   template <psio::FixedString ConnectionName,
-             psio::FixedString EdgeName,
-             typename T,
-             typename K,
-             typename GetKey>
-   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
-       QueryIndexImpl<ConnectionName, EdgeName, T, K, GetKey>*)
+      auto rangeBegin = index.begin();
+      auto rangeEnd   = index.end();
+      if (ge)
+         rangeBegin = std::max(rangeBegin, index.lower_bound(*ge));
+      if (gt)
+         rangeBegin = std::max(rangeBegin, index.upper_bound(*gt));
+      if (le)
+         rangeEnd = std::min(rangeEnd, index.upper_bound(*le));
+      if (lt)
+         rangeEnd = std::min(rangeEnd, index.lower_bound(*lt));
+      rangeEnd = std::max(rangeBegin, rangeEnd);
+
+      auto it  = rangeBegin;
+      auto end = rangeEnd;
+      if (auto key = keyFromHex(after); !key.empty())
+         it = std::clamp(index.upper_bound(psibase::KeyView{key}), rangeBegin, rangeEnd);
+      if (auto key = keyFromHex(before); !key.empty())
+         end = std::clamp(index.lower_bound(psibase::KeyView{key}), rangeBegin, rangeEnd);
+      end = std::max(it, end);
+
+      Connection result;
+      auto       add_edge = [&](const auto& it)
+      {
+         auto cursor = psio::to_hex(it.keyWithoutPrefix());
+         result.edges.push_back(typename Connection::Edge{*it, std::move(cursor)});
+      };
+
+      if (last && !first)
+      {
+         result.pageInfo.hasNextPage = end != rangeEnd;
+         while (it != end && (*last)-- > 0)
+            add_edge(--end);
+         result.pageInfo.hasPreviousPage = end != rangeBegin;
+         std::reverse(result.edges.begin(), result.edges.end());
+      }
+      else
+      {
+         result.pageInfo.hasPreviousPage = it != rangeBegin;
+         for (; it != end && (!first || (*first)-- > 0); ++it)
+            add_edge(it);
+         result.pageInfo.hasNextPage = it != rangeEnd;
+         if (last && *last < result.edges.size())
+         {
+            result.pageInfo.hasPreviousPage = true;
+            result.edges.erase(result.edges.begin(),
+                               result.edges.begin() + (result.edges.size() - *last));
+         }
+      }
+
+      if (!result.edges.empty())
+      {
+         result.pageInfo.startCursor = result.edges.front().cursor;
+         result.pageInfo.endCursor   = result.edges.back().cursor;
+      }
+      return result;
+   }  // makeConnection
+
+   template <typename T, typename K>
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(psibase::TableIndex<T, K>*)
    {
       return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
    }
 
-   template <psio::FixedString ConnectionName,
-             psio::FixedString EdgeName,
-             typename T,
-             typename K,
-             typename GetKey>
-   QueryIndexImpl<ConnectionName, EdgeName, T, K, GetKey> queryIndex(
-       psibase::TableIndex<T, K> index,
-       GetKey                    getKey)
+   template <typename T, typename K>
+   constexpr auto gql_callable_fn(const psibase::TableIndex<T, K>*)
    {
-      return {std::move(index), getKey};
-   }
+      using Connection = psio::Connection<  //
+          T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
+      return makeConnection<Connection, T, K>;
+   }  // gql_callable_fn
 
 }  // namespace psibase

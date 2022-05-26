@@ -31,7 +31,7 @@ namespace psio
       return s;
    }
 
-   std::string to_hex(const std::vector<char>& bytes)
+   std::string to_hex(const std::span<const char>& bytes)
    {
       std::string out;
       out.resize(bytes.size() * 2);

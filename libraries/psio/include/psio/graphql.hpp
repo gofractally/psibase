@@ -132,9 +132,9 @@ namespace psio
       if constexpr (MemPtr::numArgs == 0 &&
                     gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
-         fill_gql_schema_fn_types(
-             (MemberPtrType<decltype(&MemPtr::ReturnType::operator())>*)nullptr, stream,
-             defined_types);
+         fill_gql_schema_fn_types((MemberPtrType<decltype(gql_callable_fn(
+                                       (typename MemPtr::ReturnType*)nullptr))>*)nullptr,
+                                  stream, defined_types);
       }
       else
       {
@@ -157,7 +157,8 @@ namespace psio
       {
          return fill_gql_schema_fn(
              (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr,                      //
-             (MemberPtrType<decltype(&MemPtr::ReturnType::operator())>*)nullptr,              //
+             (MemberPtrType<decltype(gql_callable_fn(                                         //
+                  (typename MemPtr::ReturnType*)nullptr))>*)nullptr,                          //
              name,                                                                            //
              *gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr),  //
              stream);
@@ -720,13 +721,14 @@ namespace psio
                      OS&                          output_stream,
                      const E&                     error)
    {
-      using args_tuple              = decltype(args_as_tuple(mptr));
+      using args_tuple = TupleFromTypeList<typename MemberPtrType<MPtr>::SimplifiedArgTypes>;
       static constexpr int num_args = std::tuple_size_v<args_tuple>;
       using ReturnType              = std::remove_cvref_t<typename MemberPtrType<MPtr>::ReturnType>;
       if constexpr (num_args == 0 && gql_callable_args((ReturnType*)nullptr))
       {
          return gql_query_fn((value.*mptr)(), *gql_callable_args((ReturnType*)nullptr),
-                             &ReturnType::operator(), input_stream, output_stream, error);
+                             gql_callable_fn((ReturnType*)nullptr), input_stream, output_stream,
+                             error);
       }
       else
       {
@@ -755,8 +757,8 @@ namespace psio
                if (!filled[i])
                   return error("function missing required arg '" +
                                std::string(std::data(argNames)[i]) + "'");
-         auto result =
-             std::apply([&](auto&&... args) { return (value.*mptr)(std::move(args)...); }, args);
+         auto result = std::apply(
+             [&](auto&&... args) { return std::invoke(mptr, value, std::move(args)...); }, args);
          if (!gql_query(result, input_stream, output_stream, error))
             return false;
          return true;

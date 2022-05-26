@@ -7,20 +7,6 @@
 
 namespace psio
 {
-   template <unsigned N>
-   struct FixedString
-   {
-      char buf[N + 1]{};
-      constexpr FixedString(char const* s)
-      {
-         for (unsigned i = 0; i < N; ++i)
-            buf[i] = s[i];
-      }
-      const char* c_str() const { return buf; }
-   };
-   template <unsigned N>
-   FixedString(char const (&)[N]) -> FixedString<N - 1>;
-
    struct PageInfo
    {
       bool        hasPreviousPage = false;
