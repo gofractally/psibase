@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 
 #include <contracts/system/account_sys.hpp>
+#include <contracts/system/common_errors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psio/fracpack.hpp>
 #include <string>
@@ -43,6 +44,8 @@ SCENARIO("Minting & burning nfts")
 
       auto a = alice.at<NftSys>();
       auto b = bob.at<NftSys>();
+
+      a.init();
 
       THEN("Alice can mint an NFT")
       {
@@ -135,6 +138,8 @@ SCENARIO("Transferring NFTs")
       auto a = alice.at<NftSys>();
       auto b = bob.at<NftSys>();
       auto c = charlie.at<NftSys>();
+
+      a.init();
 
       THEN("Bob is configured to use auto-debit by default")
       {

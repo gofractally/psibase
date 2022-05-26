@@ -38,7 +38,7 @@ namespace UserContract
       static constexpr std::string_view error_underflow = "underflow in Quantity arithmetic";
       static constexpr std::string_view error_divzero   = "division by zero in Quantity arithmetic";
 
-      constexpr explicit Quantity(Quantity_t q) : value{q} {}
+      constexpr Quantity(Quantity_t q) : value{q} {}
       constexpr explicit Quantity(double q)
       {
          auto quantity = static_cast<Quantity_t>(q);

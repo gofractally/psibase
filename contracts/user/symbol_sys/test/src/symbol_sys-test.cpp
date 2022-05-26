@@ -1,7 +1,11 @@
 #define CATCH_CONFIG_MAIN
 #include <psio/fracpack.hpp>
 
+// Remove me
+#include <contracts/system/transaction_sys.hpp>
+
 #include <contracts/system/account_sys.hpp>
+#include <contracts/system/common_errors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 
 #include "nft_sys.hpp"
@@ -21,16 +25,17 @@ namespace
        {NftSys::contract, "nft_sys.wasm"},
        {SymbolSys::contract, "symbol_sys.wasm"}};
 
-   const psibase::String memo{"memo"};
+   const String memo{"memo"};
+   const TID    sysToken{TokenSys::sysToken};
 
    using Quantity_t = Quantity::Quantity_t;
 
    namespace SymbolPricing
    {
-      const auto initialPrice           = static_cast<Quantity_t>(1'000e8);
-      const int  increaseRatePct        = 5;
-      const int  decreaseRatePct        = 5;
-      const int  targetNrSymbolsPerHour = 1;
+      const auto initialPrice          = static_cast<Quantity_t>(1'000e8);
+      const int  increaseRatePct       = 5;
+      const int  decreaseRatePct       = 5;
+      const int  targetNrSymbolsPerDay = 24;
    }  // namespace SymbolPricing
 
 }  // namespace
@@ -46,59 +51,66 @@ SCENARIO("Buying a symbol")
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<SymbolSys>();
 
-      auto tokenId = alice.at<TokenSys>().create(8, 1'000'000e8).returnVal();
-      alice.at<TokenSys>().mint(tokenId, 20'000e8, memo);
-      alice.at<TokenSys>().credit(tokenId, bob, 10'000e8, memo);
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
+
+      auto tokenContract = t.as(TokenSys::contract).at<TokenSys>();
+      tokenContract.mint(sysToken, 20'000e8, memo);
+      tokenContract.credit(sysToken, alice, 10'000e8, memo);
+      tokenContract.credit(sysToken, bob, 10'000e8, memo);
 
       t.start_block();
 
       THEN("Alice cannot create a symbol with numbers")
-      {  //
+      {
          Quantity quantity{SymbolPricing::initialPrice};
-         alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
-         auto symbolId = "AB1"_a;
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
+         auto symbolId = AccountNumber{"ab1"};
+         CHECK(AccountNumber{"ab1"}.value != 0);
+
          CHECK(a.create(symbolId, quantity).failed(invalidSymbol));
       }
-      THEN("Alice cannot create a symbol with lowercase letters")
-      {  //
+      THEN("Alice cannot create a symbol with uppercase letters")
+      {
          Quantity quantity{SymbolPricing::initialPrice};
-         alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
-         auto symbolId = "AbC"_a;
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
+         auto symbolId = SID{"aBc"};
          CHECK(a.create(symbolId, quantity).failed(invalidSymbol));
       }
       THEN("Alice cannot create a symbol with fewer than 3 characters")
       {
          Quantity quantity{SymbolPricing::initialPrice};
-         alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
-         auto symbolId = "AB"_a;
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
+         auto symbolId = SID{"ab"};
          CHECK(a.create(symbolId, quantity).failed(invalidSymbol));
       }
       THEN("Alice cannot create a symbol with greater than 7 characters")
       {
          Quantity quantity{SymbolPricing::initialPrice};
-         alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
-         auto symbolId = "ABCDEFGH"_a;
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
+         auto symbolId = SID{"abcdefgh"};
          CHECK(a.create(symbolId, quantity).failed(invalidSymbol));
       }
       THEN("Alice can create a symbol")
       {
          Quantity quantity{SymbolPricing::initialPrice};
-         alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
 
-         auto symbolId = "ABC"_a;
+         CHECK(quantity == a.getPrice(3).returnVal());
+
+         auto symbolId = SID{"abc"};
          auto create   = a.create(symbolId, quantity);
          CHECK(create.succeeded());
 
          auto getSymbol = a.getSymbol(symbolId);
          CHECK(getSymbol.succeeded());
 
-         auto ownerNftId = getSymbol.returnVal().ownerNft;
-         auto debit      = alice.at<NftSys>().debit(ownerNftId, memo);
-         CHECK(debit.succeeded());
-
          AND_THEN("Alice owns the symbol")
          {
-            auto getNft = alice.at<NftSys>().getNft(ownerNftId);
+            auto ownerNftId = getSymbol.returnVal().ownerNft;
+            auto getNft     = alice.at<NftSys>().getNft(ownerNftId);
             CHECK(getNft.succeeded());
 
             auto nft = getNft.returnVal();
@@ -113,14 +125,14 @@ SCENARIO("Buying a symbol")
          AND_THEN("Alice-Symbol shared balance is updated accordingly")
          {
             auto getSharedBalance =
-                alice.at<TokenSys>().getSharedBal(tokenId, alice, NftSys::contract);
+                alice.at<TokenSys>().getSharedBal(sysToken, alice, NftSys::contract);
             CHECK(getSharedBalance.succeeded());
             CHECK(getSharedBalance.returnVal().balance == 0);
          }
 
          AND_THEN("Alice cannot create the same symbol again")
          {
-            alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
+            alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
             CHECK(a.create(symbolId, quantity).failed(symbolAlreadyExists));
          }
 
@@ -129,35 +141,35 @@ SCENARIO("Buying a symbol")
             CHECK(storageBillingImplemented);
          }
       }
-      WHEN("Alice buys a symbol")
+      WHEN("Alice creates a symbol")
       {
          auto quantity{SymbolPricing::initialPrice};
-         alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
-         auto symbolId = "ABC"_a;
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
+         auto symbolId = SID{"abc"};
          a.create(symbolId, quantity);
          auto nftId = a.getSymbol(symbolId).returnVal().ownerNft;
          alice.at<NftSys>().debit(nftId, memo);
 
-         THEN("Bob cannot buy the same symbol")
+         THEN("Bob cannot create the same symbol")
          {
-            auto credit = bob.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
+            auto credit = bob.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
             REQUIRE(credit.succeeded());
 
-            auto create = b.create("ABC"_a, quantity);
-            CHECK(create.failed(symbolUnavailable));
+            auto create = b.create(SID{"abc"}, quantity);
+            CHECK(create.failed(symbolAlreadyExists));
          }
-         THEN("Alice cannot buy the same symbol")
+         THEN("Alice cannot create the same symbol")
          {
             t.start_block();
-            auto create = a.create("ABC"_a, quantity);
-            CHECK(create.failed(symbolUnavailable));
+            auto create = a.create(SID{"abc"}, quantity);
+            CHECK(create.failed(symbolAlreadyExists));
          }
          THEN("Bob can buy a different symbol")
          {
-            auto credit = bob.at<TokenSys>().credit(tokenId, SymbolSys::contract, quantity, memo);
+            auto credit = bob.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
             REQUIRE(credit.succeeded());
 
-            auto create = b.create("ABC"_a, quantity);
+            auto create = b.create(SID{"bcd"}, quantity);
             CHECK(create.succeeded());
          }
       }
@@ -173,20 +185,27 @@ SCENARIO("Measuring price increases")
       auto alice = t.as(t.add_account("alice"_a));
       auto a     = alice.at<SymbolSys>();
 
-      auto aliceBalance = 1'000'000e8;
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
 
-      auto tokenId = alice.at<TokenSys>().create(8, aliceBalance).returnVal();
-      alice.at<TokenSys>().mint(tokenId, aliceBalance, memo);
+      auto aliceBalance  = 1'000'000e8;
+      auto tokenContract = t.as(TokenSys::contract).at<TokenSys>();
+      tokenContract.mint(sysToken, aliceBalance, memo);
+      tokenContract.credit(sysToken, alice, aliceBalance, memo);
 
       t.start_block();
 
       std::vector<SID> tickers{
           // 25 tickers
-          "ABC"_a, "ABF"_a, "ABI"_a, "ABL"_a, "ABO"_a, "ABR"_a, "ABU"_a, "ABX"_a, "ABZ"_a,
-          "ABD"_a, "ABG"_a, "ABJ"_a, "ABM"_a, "ABP"_a, "ABS"_a, "ABV"_a, "ABY"_a, "AZZ"_a,
-          "ABE"_a, "ABH"_a, "ABK"_a, "ABN"_a, "ABQ"_a, "ABT"_a, "ABW"_a,
+          SID{"abc"}, SID{"abg"}, SID{"abk"}, SID{"abo"}, SID{"abs"}, SID{"abv"}, SID{"aby"},
+          SID{"abd"}, SID{"abh"}, SID{"abl"}, SID{"abp"}, SID{"abt"}, SID{"abw"}, SID{"abz"},
+          SID{"abe"}, SID{"abi"}, SID{"abm"}, SID{"abq"}, SID{"abu"}, SID{"abx"}, SID{"acc"},
+          SID{"abf"}, SID{"abj"}, SID{"abn"}, SID{"abr"},
       };
 
+      auto secondsInDay   = (1'000 * 60 * 60 * 24);
       auto incrementPrice = [](Quantity_t starting)
       {
          int updateVal = 100 + SymbolPricing::increaseRatePct;
@@ -203,66 +222,77 @@ SCENARIO("Measuring price increases")
       {
          auto quantity{SymbolPricing::initialPrice};
 
-         alice.at<TokenSys>().credit(tokenId, SymbolSys::contract, 2 * quantity, memo);
-         auto getSharedBalance =
-             alice.at<TokenSys>().getSharedBal(tokenId, alice, NftSys::contract);
-         CHECK(getSharedBalance.returnVal().balance == SymbolPricing::initialPrice);
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, 2 * quantity, memo);
 
          CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
-         a.create("ABC"_a, quantity);
+
+         auto create = a.create(SID{"abc"}, quantity);
+         CHECK(create.succeeded());
 
          AND_THEN("Buying another symbol is the same price")
          {
             CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
-            a.create("BCD"_a, quantity);
+            a.create(SID{"bcd"}, quantity);
             auto balance = alice.at<TokenSys>()
-                               .getSharedBal(tokenId, alice, NftSys::contract)
+                               .getSharedBal(sysToken, alice, NftSys::contract)
                                .returnVal()
                                .balance;
             CHECK(balance == 0);
          }
       }
-      THEN("The price remains stable if sold symbols per hour is targetNrSymbolsPerHour")
+      THEN("The price remains stable if sold symbols per day is targetNrSymbolsPerDay")
       {
-         CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
+         auto symbolDetails = a.getSymbolType(3).returnVal();
+         CHECK(symbolDetails.activePrice == SymbolPricing::initialPrice);
          auto quantity{SymbolPricing::initialPrice};
 
-         // Unit test needs to be udpated if the target nr symbols per hour is not 1.
-         CHECK(SymbolPricing::targetNrSymbolsPerHour == 1);
+         // If per day target is updated, unit test needs to be updated
+         CHECK(SymbolPricing::targetNrSymbolsPerDay == symbolDetails.targetCreatedPerDay);
+
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, 24 * quantity, memo);
 
          bool costConstant = true;
          for (int i = 0; i < 24 && costConstant; ++i)
          {
+            // Todo: Verify they are being created by checking a.getSymbolType(3).returnVal().createCounter;
             a.create(tickers[i], quantity);
             t.start_block();
 
-            costConstant = a.getPrice(3).returnVal() == SymbolPricing::initialPrice;
+            costConstant = (a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
          }
          CHECK(costConstant);
 
          AND_THEN("The price for the first create that exceeds the desired rate is higher")
          {
-            auto nextPrice = incrementPrice(SymbolPricing::initialPrice);
+            alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
 
+            // Create the 25th symbol within 24 hours, causing the price to increase
+            CHECK(a.getSymbolType(3).returnVal().createCounter == 24);
+            auto create = a.create(tickers[24], quantity);
+            CHECK(create.succeeded());
+            t.start_block();
+
+            CHECK(a.getSymbolType(3).returnVal().createCounter == 0);
+
+            auto nextPrice = incrementPrice(SymbolPricing::initialPrice);
             CHECK(a.getPrice(3).returnVal() == nextPrice);
          }
       }
       THEN("The price decreases if less than x are sold over 24 hours")
       {
          CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
-         t.start_block((1'000 * 60 * 24) + 1);  // More than a full day has passed
+         t.start_block(secondsInDay + 10'000);  // 10 seconds more than a full day has passed
 
          auto nextPrice = decrementPrice(SymbolPricing::initialPrice);
          CHECK(a.getPrice(3).returnVal() == nextPrice);
-      }
-      THEN("The price decreases even more if too few are sold over 48 hours")
-      {
-         CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
-         t.start_block((1'000 * 60 * 24 * 2) + 1);  // More than two full days has passed
 
-         auto nextPrice = decrementPrice(SymbolPricing::initialPrice);
-         nextPrice      = decrementPrice(nextPrice);
-         CHECK(a.getPrice(3).returnVal() == nextPrice);
+         AND_THEN("The price decreases even more if too few are sold over 48 hours")
+         {
+            t.start_block(secondsInDay + 10'000);  // More than two full days has passed
+
+            nextPrice = decrementPrice(nextPrice);
+            CHECK(a.getPrice(3).returnVal() == nextPrice);
+         }
       }
    }
 }
@@ -277,15 +307,21 @@ SCENARIO("Using symbol ownership NFT")
       auto bob   = t.as(t.add_account("bob"_a));
       auto a     = alice.at<SymbolSys>();
 
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
+
       // Mint token used for purchasing symbols
-      auto aliceBalance = 1'000'000e8;
-      auto sysToken     = alice.at<TokenSys>().create(8, aliceBalance).returnVal();
-      alice.at<TokenSys>().mint(sysToken, aliceBalance, memo);
+      auto aliceBalance  = 1'000'000e8;
+      auto tokenContract = t.as(TokenSys::contract).at<TokenSys>();
+      tokenContract.mint(sysToken, 20'000e8, memo);
+      tokenContract.credit(sysToken, alice, aliceBalance, memo);
 
       // Create the symbol and claim the owner NFT
       auto symbolCost = a.getPrice(3).returnVal();
       alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, symbolCost, memo);
-      auto symbolId = "ABC"_a;
+      auto symbolId = SID{"abc"};
       a.create(symbolId, symbolCost);
       auto symbolRecord = a.getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
@@ -326,15 +362,20 @@ SCENARIO("Buying and selling symbols")
       auto alice = t.as(t.add_account("alice"_a));
       auto bob   = t.as(t.add_account("bob"_a));
 
-      // Create the system token and fund Alice and Bob
-      auto sysSupply   = 1'000'000e8;
-      auto sysToken    = alice.at<TokenSys>().create(8, sysSupply).returnVal();
-      auto userBalance = 100'000e8;
-      alice.at<TokenSys>().mint(sysToken, 2 * userBalance, memo);
-      alice.at<TokenSys>().credit(sysToken, bob, userBalance, memo);
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
+
+      // Fund Alice and Bob with the system token
+      auto userBalance   = 1'000'000e8;
+      auto tokenContract = t.as(TokenSys::contract).at<TokenSys>();
+      tokenContract.mint(sysToken, 2 * userBalance, memo);
+      tokenContract.credit(sysToken, alice, userBalance, memo);
+      tokenContract.credit(sysToken, bob, userBalance, memo);
 
       // Create system symbol
-      auto sysSymbol  = SID{"SYS"_a};
+      auto sysSymbol  = SID{"sys"};
       auto numChars   = sysSymbol.str().size();
       auto symbolCost = alice.at<SymbolSys>().getPrice(numChars).returnVal();
       alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, symbolCost, memo);
@@ -347,7 +388,7 @@ SCENARIO("Buying and selling symbols")
 
       WHEN("Alice creates a symbol")
       {
-         auto symbol = SID{"ABC"_a};
+         auto symbol = SID{"abc"};
          alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, symbolCost, memo);
          alice.at<SymbolSys>().create(symbol, symbolCost);
 
@@ -397,7 +438,7 @@ SCENARIO("Buying and selling symbols")
 
             THEN("Alice cannot buy the symbol")
             {
-               CHECK(alice.at<SymbolSys>().buysymbol(symbol).failed(buyerIsSeller));
+               CHECK(alice.at<SymbolSys>().buySymbol(symbol).failed(buyerIsSeller));
             }
 
             THEN("Bob cannot unlist the symbol")
@@ -407,27 +448,22 @@ SCENARIO("Buying and selling symbols")
             THEN("Alice can unlist the symbol")
             {
                CHECK(alice.at<SymbolSys>().unlistSymbol(symbol).succeeded());
-
-               AND_THEN("Alice can debit the symbol")
-               {
-                  CHECK(alice.at<NftSys>().debit(symbolNft, memo).succeeded());
-               }
             }
             THEN("Bob cannot buy the symbol for less than the list price")
             {
                bob.at<TokenSys>().credit(sysToken, SymbolSys::contract, listPrice / 2, memo);
-               auto buySymbol = bob.at<SymbolSys>().buysymbol(symbol);
-               CHECK(buySymbol.failed(insufficientFunds));
+               auto buySymbol = bob.at<SymbolSys>().buySymbol(symbol);
+               CHECK(buySymbol.failed(insufficientBalance));
             }
             THEN("Bob can buy the symbol")
             {
                bob.at<TokenSys>().credit(sysToken, SymbolSys::contract, listPrice, memo);
-               CHECK(bob.at<SymbolSys>().buysymbol(symbol).succeeded());
+               CHECK(bob.at<SymbolSys>().buySymbol(symbol).succeeded());
             }
             AND_WHEN("Bob buys the symbol")
             {
                bob.at<TokenSys>().credit(sysToken, SymbolSys::contract, listPrice, memo);
-               bob.at<SymbolSys>().buysymbol(symbol);
+               bob.at<SymbolSys>().buySymbol(symbol);
 
                THEN("Bob owns the symbol")
                {
@@ -440,7 +476,7 @@ SCENARIO("Buying and selling symbols")
                THEN("The symbol is no longer for sale")
                {
                   auto symbolRecord = alice.at<SymbolSys>().getSymbol(symbol).returnVal();
-                  CHECK(symbolRecord.salePrice == 0e8);
+                  CHECK(symbolRecord.saleDetails.salePrice == 0e8);
                }
                THEN("Bob can reslist the symbol")
                {

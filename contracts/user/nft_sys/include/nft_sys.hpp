@@ -14,8 +14,11 @@ namespace UserContract
    class NftSys : public psibase::Contract<NftSys>
    {
      public:
-      using tables = psibase::contract_tables<NftTable_t, NftHolderTable_t, CreditTable_t>;
+      using tables = psibase::
+          contract_tables<NftTable_t, NftHolderTable_t, CreditTable_t, psibase::InitTable_t>;
       static constexpr auto contract = psibase::AccountNumber("nft-sys");
+
+      NftSys(psio::shared_view_ptr<psibase::Action> action);
 
       void init();
       NID  mint();
@@ -45,6 +48,7 @@ namespace UserContract
 
          struct Ui  // Todo - change to History, once more than UI events are supported
          {
+            void initialized() {}
             void minted(NID nftId, Account issuer) {}
             void burned(NID nftId) {}
             void configChanged(Account account, psibase::NamedBit_t flag, bool enable) {}
@@ -81,6 +85,7 @@ namespace UserContract
    );
 
    PSIBASE_REFLECT_UI_EVENTS(NftSys, // Todo - change to _HISTORY_ once more than UI events are supported
+      method(initialized),
       method(minted, nftId, issuer),
       method(burned, nftId),
       method(configChanged, account, flag, enable),

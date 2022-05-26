@@ -1,6 +1,7 @@
 #include "nft_sys.hpp"
 
 #include <contracts/system/account_sys.hpp>
+#include <contracts/system/common_errors.hpp>
 #include <psibase/Bitset.hpp>
 #include <psibase/actor.hpp>
 #include <psibase/dispatch.hpp>
@@ -8,15 +9,32 @@
 
 using namespace psibase;
 using namespace UserContract;
+using namespace Errors;
 using psio::const_view;
 using std::string;
 using system_contract::account_sys;
 
+NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
+{
+   MethodNumber m{action->method()->value().get()};
+   if (m != MethodNumber{"init"})
+   {
+      auto initRecord = db.open<InitTable_t>().get_index<0>().get((uint8_t)0);
+      check(initRecord.has_value(), uninitialized);
+   }
+}
+
 void NftSys::init()
 {
+   auto initTable = db.open<InitTable_t>();
+   auto init      = (initTable.get_index<0>().get((uint8_t)0));
+   check(not init.has_value(), alreadyInit);
+   initTable.put(InitializedRecord{});
+
    // TODO
    // Turn on manualDebit for this and tokens
-   // Assert init called in constructor
+
+   emit().ui().initialized();
 }
 
 NID NftSys::mint()
@@ -28,7 +46,7 @@ NID NftSys::mint()
    // Todo - replace with auto incrementing when available
    auto newId = (nftIdx.begin() == nftIdx.end()) ? 1 : (*(--nftIdx.end())).id + 1;
 
-   check(NftRecord::isValidKey(newId), "Nft ID invalid");
+   check(NftRecord::isValidKey(newId), invalidNftId);
 
    nftTable.put(NftRecord{
        .id     = newId,   //
@@ -45,7 +63,7 @@ void NftSys::burn(NID nftId)
 {
    auto record = getNft(nftId);
 
-   check(record.owner == get_sender(), Errors::missingRequiredAuth);
+   check(record.owner == get_sender(), missingRequiredAuth);
 
    db.open<NftTable_t>().erase(nftId);
 
@@ -60,9 +78,9 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
    auto manualDebitFlag                = NftHolderRecord::Configurations::getIndex("manualDebit"_m);
    bool isTransfer                     = not getNftHolder(receiver).config.get(manualDebitFlag);
 
-   check(record.owner == sender, Errors::missingRequiredAuth);
-   check(receiver != record.owner, Errors::creditorIsDebitor);
-   check(creditRecord.debitor == account_sys::nullAccount, Errors::alreadyCredited);
+   check(record.owner == sender, missingRequiredAuth);
+   check(receiver != record.owner, creditorIsDebitor);
+   check(creditRecord.debitor == account_sys::nullAccount, alreadyCredited);
 
    if (isTransfer)
    {
@@ -89,8 +107,8 @@ void NftSys::uncredit(NID nftId, const_view<String> memo)
    psibase::AccountNumber sender       = get_sender();
    auto                   creditRecord = getCredRecord(nftId);
 
-   check(creditRecord.debitor != account_sys::nullAccount, Errors::uncreditRequiresCredit);
-   check(record.owner == sender, Errors::creditorAction);
+   check(creditRecord.debitor != account_sys::nullAccount, uncreditRequiresCredit);
+   check(record.owner == sender, creditorAction);
 
    db.open<CreditTable_t>().erase(nftId);
 
@@ -104,8 +122,8 @@ void NftSys::debit(NID nftId, const_view<String> memo)
    auto creditor     = record.owner;
    auto creditRecord = getCredRecord(nftId);
 
-   check(creditRecord.debitor != account_sys::nullAccount, Errors::debitRequiresCredit);
-   check(creditRecord.debitor == debiter, Errors::missingRequiredAuth);
+   check(creditRecord.debitor != account_sys::nullAccount, debitRequiresCredit);
+   check(creditRecord.debitor == debiter, missingRequiredAuth);
 
    record.owner = debiter;
 
@@ -121,7 +139,7 @@ void NftSys::setConfig(psibase::NamedBit_t flag, bool enable)
    auto bit     = NftHolderRecord::Configurations::getIndex(flag);
    bool flagSet = getNftHolder(get_sender()).config.get(bit);
 
-   check(flagSet != enable, Errors::redundantUpdate);
+   check(flagSet != enable, redundantUpdate);
 
    record.config.set(bit, enable);
 
@@ -138,11 +156,11 @@ NftRecord NftSys::getNft(NID nftId)
    // Todo
    if (false)  // if (nftId < nextAvailableID()) // Then the NFt definitely existed at one point
    {
-      check(exists, Errors::nftBurned);
+      check(exists, nftBurned);
    }
    else
    {
-      check(exists, Errors::nftDNE);
+      check(exists, nftDNE);
    }
 
    return *nftRecord;
@@ -158,8 +176,8 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
    }
    else
    {
-      check(account != account_sys::nullAccount, Errors::invalidAccount);
-      check(at<account_sys>().exists(account), Errors::invalidAccount);
+      check(account != account_sys::nullAccount, invalidAccount);
+      check(at<account_sys>().exists(account), invalidAccount);
 
       return NftHolderRecord{account};
    }
@@ -175,7 +193,7 @@ CreditRecord NftSys::getCredRecord(NID nftId)
    }
    else
    {
-      check(exists(nftId), Errors::nftDNE);
+      check(exists(nftId), nftDNE);
 
       return CreditRecord{nftId, account_sys::nullAccount};
    }

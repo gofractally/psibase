@@ -3,6 +3,7 @@
 #include "token_sys.hpp"
 #include "symbol_sys.hpp"
 
+#include <contracts/system/common_errors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
@@ -49,6 +50,11 @@ SCENARIO("Creating a token")
       auto alice = t.as(t.add_account("alice"_a));
       auto a     = alice.at<TokenSys>();
       auto bob   = t.as(t.add_account("bob"_a));
+
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
 
       THEN("Alice may create a token")
       {
@@ -130,6 +136,11 @@ SCENARIO("Minting tokens")
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<TokenSys>();
 
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
+
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
 
       THEN("Bob may not mint them")
@@ -191,6 +202,11 @@ SCENARIO("Recalling tokens")
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<TokenSys>();
 
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
+
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       a.mint(tokenId, 1'000e8, memo);
@@ -240,6 +256,11 @@ SCENARIO("Interactions with the Issuer NFT")
       auto a     = alice.at<TokenSys>();
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<TokenSys>();
+
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -323,6 +344,11 @@ SCENARIO("Burning tokens")
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<TokenSys>();
 
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
+
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e8, memo);
@@ -402,6 +428,11 @@ SCENARIO("Toggling manual-debit")
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<TokenSys>();
 
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
+
       THEN("Alice and Bob both have manualDebit disabled")
       {
          auto isManualDebit1 = a.getConfig(alice, manualDebit);
@@ -464,6 +495,11 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       auto a     = alice.at<TokenSys>();
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<TokenSys>();
+
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -533,6 +569,11 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
       auto a     = alice.at<TokenSys>();
       auto bob   = t.as(t.add_account("bob"_a));
       auto b     = bob.at<TokenSys>();
+
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -664,6 +705,11 @@ SCENARIO("Mapping a symbol to a token")
       auto bob   = t.as(t.add_account("bob"_a));
       auto a     = alice.at<TokenSys>();
       auto b     = bob.at<TokenSys>();
+
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
 
       // Mint token used for purchasing symbols
       auto aliceBalance = 1'000'000e8;

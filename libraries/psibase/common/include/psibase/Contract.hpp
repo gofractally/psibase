@@ -3,12 +3,21 @@
 #include <concepts>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/actor.hpp>
+#include <psibase/table.hpp>
 
 namespace psibase
 {
    template <typename T>
    concept DefinesContract =
        std::same_as<std::decay_t<decltype(T::contract)>, psibase::AccountNumber>;
+
+   // A table to use if your contract needs to be initialized
+   struct InitializedRecord
+   {
+      uint8_t key{0};  // Initialized if a record exists
+   };
+   PSIO_REFLECT(InitializedRecord, key);
+   using InitTable_t = table<InitializedRecord, &InitializedRecord::key>;
 
    /** all contracts should derive from psibase::Contract */
    template <typename DerivedContract>

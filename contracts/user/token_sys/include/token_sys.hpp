@@ -20,11 +20,21 @@ namespace UserContract
    class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
-      using tables = psibase::
-          contract_tables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t, TokenHolderTable_t>;
-      static constexpr auto contract = psibase::AccountNumber("token-sys");
+      using tables                      = psibase::contract_tables<TokenTable_t,
+                                              BalanceTable_t,
+                                              SharedBalanceTable_t,
+                                              TokenHolderTable_t,
+                                              psibase::InitTable_t>;
+      static constexpr auto contract    = psibase::AccountNumber("token-sys");
+      static constexpr auto sysToken    = TID{1};
+      static constexpr auto sysTokenSym = SID{"PSI"};
 
-      TID  create(Precision precision, Quantity maxSupply);
+      TokenSys(psio::shared_view_ptr<psibase::Action> action);
+
+      void init();
+
+      TID create(Precision precision, Quantity maxSupply);
+
       void mint(TID tokenId, Quantity amount, psio::const_view<psibase::String> memo);
 
       void setUnrecallable(TID tokenId);
@@ -40,18 +50,22 @@ namespace UserContract
                   psibase::AccountNumber            receiver,
                   Quantity                          amount,
                   psio::const_view<psibase::String> memo);
+
       void uncredit(TID                               tokenId,
                     psibase::AccountNumber            receiver,
                     Quantity                          maxAmount,
                     psio::const_view<psibase::String> memo);
+
       void debit(TID                               tokenId,
                  psibase::AccountNumber            sender,
                  Quantity                          amount,
                  psio::const_view<psibase::String> memo);
+
       void recall(TID                               tokenId,
                   psibase::AccountNumber            from,
                   Quantity                          amount,
                   psio::const_view<psibase::String> memo);
+
       void mapSymbol(TID tokenId, SID symbolId);
 
       // Read-only interface:
@@ -79,6 +93,7 @@ namespace UserContract
          // clang-format off
          struct Ui  // History <-- Todo - Change back to History
          {
+            void initialized() {}
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
             void minted(TID tokenId, Account minter, Quantity amount, StringView memo) {}
             void setUnrecallable(TID tokenId, Account setter) {}
@@ -104,6 +119,7 @@ namespace UserContract
 
    // clang-format off
    PSIO_REFLECT(TokenSys,
+      method(init),
       method(create, precision, maxSupply),
       method(mint, tokenId, amount, memo),
       method(setUnrecallable, tokenId, flag),
@@ -123,6 +139,7 @@ namespace UserContract
       method(mapSymbol, symbolId, tokenId)
     );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
+      method(initialized),
       method(created, tokenId, creator, precision, maxSupply),
       method(minted, tokenId, minter, amount, memo),
       method(setUnrecallable, tokenId, setter),
