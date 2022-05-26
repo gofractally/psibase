@@ -222,7 +222,7 @@ namespace psidb
       }
       bool insert(node_ptr pos, std::string_view key, page_id p)
       {
-         if (_key_words * 16 + key.size() > sizeof(_buf))
+         if (_key_words * 16 + key.size() > sizeof(_buf) || _size >= capacity)
          {
             return false;
          }
