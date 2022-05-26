@@ -234,16 +234,27 @@ namespace psidb
       }
       leaf_ptr lower_bound(std::string_view key)
       {
-         // TODO: binary search
-         std::uint16_t i = 0;
-         for (; i < size; ++i)
+         std::uint16_t low = 0, high = size;
+         while (low + 1 < high)
          {
-            if (key <= unpad(get_key(i)))
+            auto mid = low + (high - low) / 2;
+            if (key <= unpad(get_key(mid)))
             {
-               break;
+               high = mid;
+            }
+            else
+            {
+               low = mid;
             }
          }
-         return {this, key_values + i};
+         if (key <= unpad(get_key(low)))
+         {
+            return {this, key_values + low};
+         }
+         else
+         {
+            return {this, key_values + high};
+         }
       }
    };
 

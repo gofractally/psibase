@@ -274,15 +274,27 @@ namespace psidb
 
       node_ptr lower_bound(std::string_view key)
       {
-         std::uint16_t i = 0;
-         for (; i < _size; ++i)
+         std::uint16_t low = 0, high = _size;
+         while (low + 1 < high)
          {
-            if (key < unpad(get_key(i)))
+            auto mid = low + (high - low) / 2;
+            if (key < unpad(get_key(mid)))
             {
-               break;
+               high = mid;
+            }
+            else
+            {
+               low = mid;
             }
          }
-         return {this, _children + i};
+         if (key < unpad(get_key(low)))
+         {
+            return {this, _children + low};
+         }
+         else
+         {
+            return {this, _children + high};
+         }
       }
    };
 
