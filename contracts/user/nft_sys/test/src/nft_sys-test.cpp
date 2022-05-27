@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 
 #include <contracts/system/account_sys.hpp>
+#include <contracts/system/common_errors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psio/fracpack.hpp>
 #include <string>
@@ -29,7 +30,7 @@ namespace
       static constexpr int64_t update            = 100;
    };
 
-   constexpr auto manualDebitBit = NftHolderRecord::Configurations::getIndex("manualDebit"_m);
+   constexpr auto manualDebit = "manualDebit"_m;
 }  // namespace
 
 SCENARIO("Minting & burning nfts")
@@ -43,6 +44,8 @@ SCENARIO("Minting & burning nfts")
 
       auto a = alice.at<NftSys>();
       auto b = bob.at<NftSys>();
+
+      a.init();
 
       THEN("Alice can mint an NFT")
       {
@@ -78,7 +81,7 @@ SCENARIO("Minting & burning nfts")
 
             AND_THEN("The NFT no longer exists")
             {  //
-               CHECK(a.getNft(nft1.id).failed(nftDNE));
+               CHECK(a.getNft(nft1.id).failed(nftBurned));
             }
             AND_THEN("Storage billing was correctly updated")
             {  //
@@ -136,21 +139,16 @@ SCENARIO("Transferring NFTs")
       auto b = bob.at<NftSys>();
       auto c = charlie.at<NftSys>();
 
+      a.init();
+
       THEN("Bob is configured to use auto-debit by default")
       {
-         auto getNftHolder = b.getNftHolder(bob);
-         CHECK(getNftHolder.succeeded());
-
-         auto isManualDebit = getNftHolder.returnVal().config.get(manualDebitBit);
-         CHECK(not isManualDebit);
+         CHECK(b.getConfig(bob, manualDebit).returnVal() == false);
       }
       THEN("Bob is able to opt in to manual-debit")
       {
-         auto manualDebit = b.manualDebit(true);
-         CHECK(manualDebit.succeeded());
-
-         auto isManualDebit = b.getNftHolder(bob).returnVal().config.get(manualDebitBit);
-         CHECK(isManualDebit);
+         CHECK(b.setConfig(manualDebit, true).succeeded());
+         CHECK(true == b.getConfig(bob, manualDebit).returnVal());
 
          AND_THEN("Storage billing is updated correctly")
          {  //
@@ -238,7 +236,7 @@ SCENARIO("Transferring NFTs")
          }
          WHEN("Bob opts in to manual-debit")
          {
-            b.manualDebit(true);
+            b.setConfig(manualDebit, true);
 
             AND_WHEN("Alice credits the NFT to Bob")
             {

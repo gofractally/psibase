@@ -135,7 +135,7 @@ struct test_chain
       sys = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
-   test_chain(const test_chain&)            = delete;
+   test_chain(const test_chain&) = delete;
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
@@ -150,11 +150,22 @@ struct test_chain
 
    void start_block(int64_t skip_miliseconds = 0)
    {
-      // TODO: time control
       // TODO: undo control
       finish_block();
       blockContext = std::make_unique<psibase::BlockContext>(*sys, true, true);
-      blockContext->start();
+
+      uint32_t skipAdditional = 0;
+      if (skip_miliseconds != 0)
+      {
+         uint64_t skipSeconds = skip_miliseconds / 1000;
+         psibase::check(skipSeconds <= std::numeric_limits<uint32_t>::max(),
+                        "time skipped in seconds must fit in 32 bits");
+         skipAdditional = static_cast<uint32_t>(skipSeconds);
+      }
+      psibase::TimePointSec skippedTime{blockContext->getHeadBlockTime().seconds + 1 +
+                                        skipAdditional};
+
+      blockContext->start(skippedTime);
    }
 
    void start_if_needed()

@@ -48,5 +48,7 @@ namespace psibase
                 std::optional<std::chrono::microseconds> initialWatchdogLimit,
                 bool                                     enableUndo,
                 bool                                     commit);
+
+      psibase::TimePointSec getHeadBlockTime();
    };  // BlockContext
 }  // namespace psibase

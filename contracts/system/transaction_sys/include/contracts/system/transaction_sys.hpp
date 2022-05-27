@@ -16,7 +16,7 @@ namespace system_contract
           psibase::AccountRow::allowSudo | psibase::AccountRow::allowWriteNative;
 
       psibase::BlockNum     headBlockNum() const;
-      psibase::TimePointSec blockTime() const;
+      psibase::TimePointSec headBlockTime() const;
 
       // TODO: move to another contract
       uint8_t setCode(psibase::AccountNumber contract,
@@ -25,5 +25,8 @@ namespace system_contract
                       std::vector<char>      code);
    };
 
-   PSIO_REFLECT(transaction_sys, method(setCode, contact, vmType, vmVersion, code))
+   PSIO_REFLECT(transaction_sys,
+                method(setCode, contact, vmType, vmVersion, code),
+                method(headBlockNum),
+                method(headBlockTime))
 }  // namespace system_contract

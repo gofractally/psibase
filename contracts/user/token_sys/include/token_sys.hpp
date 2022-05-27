@@ -4,9 +4,10 @@
 #include <psibase/String.hpp>
 #include <psibase/check.hpp>
 #include <string>
-#include "errors.hpp"
-#include "tables.hpp"
+#include "symbol_tables.hpp"
+#include "token_errors.hpp"
 #include "token_sys.hpp"
+#include "token_tables.hpp"
 #include "types.hpp"
 
 namespace UserContract
@@ -15,15 +16,22 @@ namespace UserContract
    class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
-      using tables = psibase::
-          ContractTables<TokenTable_t, BalanceTable_t, SharedBalanceTable_t, TokenHolderTable_t>;
-      static constexpr auto contract = psibase::AccountNumber("token-sys");
+      using tables                      = psibase::ContractTables<TokenTable_t,
+                                             BalanceTable_t,
+                                             SharedBalanceTable_t,
+                                             TokenHolderTable_t,
+                                             InitTable_t>;
+      static constexpr auto contract    = psibase::AccountNumber("token-sys");
+      static constexpr auto sysToken    = TID{1};
+      static constexpr auto sysTokenSym = SID{"PSI"};
 
-      TID  create(Precision precision, Quantity maxSupply);
-      void mint(TID                               tokenId,
-                Quantity                          amount,
-                psibase::AccountNumber            receiver,
-                psio::const_view<psibase::String> memo);
+      TokenSys(psio::shared_view_ptr<psibase::Action> action);
+
+      void init();
+
+      TID create(Precision precision, Quantity maxSupply);
+
+      void mint(TID tokenId, Quantity amount, psio::const_view<psibase::String> memo);
 
       void setUnrecallable(TID tokenId);
 
@@ -38,21 +46,27 @@ namespace UserContract
                   psibase::AccountNumber            receiver,
                   Quantity                          amount,
                   psio::const_view<psibase::String> memo);
+
       void uncredit(TID                               tokenId,
                     psibase::AccountNumber            receiver,
-                    Quantity                          amount,
+                    Quantity                          maxAmount,
                     psio::const_view<psibase::String> memo);
+
       void debit(TID                               tokenId,
                  psibase::AccountNumber            sender,
                  Quantity                          amount,
                  psio::const_view<psibase::String> memo);
+
       void recall(TID                               tokenId,
                   psibase::AccountNumber            from,
                   Quantity                          amount,
                   psio::const_view<psibase::String> memo);
 
+      void mapSymbol(TID tokenId, SID symbolId);
+
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
+      SID                 getTokenSymbol(TID tokenId);
       bool                exists(TID tokenId);
       BalanceRecord       getBalance(TID tokenId, psibase::AccountNumber account);
       SharedBalanceRecord getSharedBal(TID                    tokenId,
@@ -75,11 +89,13 @@ namespace UserContract
          // clang-format off
          struct Ui  // History <-- Todo - Change back to History
          {
+            void initialized() {}
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
-            void minted(TID tokenId, Account minter, Quantity amount, Account receiver, StringView memo) {}
+            void minted(TID tokenId, Account minter, Quantity amount, StringView memo) {}
             void setUnrecallable(TID tokenId, Account setter) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
             void configChanged(Account account, psibase::NamedBit_t flag, bool enable) {}
+            void symbolMapped(TID tokenId, Account account, SID symbolId) {}
             //};
 
             //struct Ui
@@ -99,28 +115,33 @@ namespace UserContract
 
    // clang-format off
    PSIO_REFLECT(TokenSys,
+      method(init),
       method(create, precision, maxSupply),
-      method(mint, tokenId, amount, receiver, memo),
+      method(mint, tokenId, amount, memo),
       method(setUnrecallable, tokenId, flag),
       
       method(burn, tokenId, amount),
       method(setConfig, flag, enable),
       method(credit, tokenId, receiver, amount, memo),
-      method(uncredit, tokenId, receiver, amount, memo),
+      method(uncredit, tokenId, receiver, maxAmount, memo),
       method(debit, tokenId, sender, amount, memo),
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
+      method(getTokenSymbol, tokenId),
       method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
-      method(getConfig, account, flag)
+      method(getConfig, account, flag),
+      method(mapSymbol, symbolId, tokenId)
     );
-   PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
+   PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
+      method(initialized),
       method(created, tokenId, creator, precision, maxSupply),
-      method(minted, tokenId, minter, amount, receiver, memo),
+      method(minted, tokenId, minter, amount, memo),
       method(setUnrecallable, tokenId, setter),
       method(burned, tokenId, burner, amount),
       method(configChanged, account, flag, enable),
+      method(symbolMapped, tokenId, account, symbolId),
    //);
    //PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
       method(credited, tokenId, sender, receiver, amount, memo),

@@ -170,4 +170,17 @@ namespace psibase
       }
    }
 
+   psibase::TimePointSec BlockContext::getHeadBlockTime()
+   {
+      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+      if (!status || !(status->head))
+      {
+         return psibase::TimePointSec{0};
+      }
+      else
+      {
+         return status->head->header.time;
+      }
+   }
+
 }  // namespace psibase

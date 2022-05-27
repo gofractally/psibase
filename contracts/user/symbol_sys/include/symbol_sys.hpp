@@ -5,56 +5,88 @@
 #include <psibase/Table.hpp>
 #include <string_view>
 
-#include "nft_sys.hpp"
+#include "symbol_errors.hpp"
+#include "symbol_tables.hpp"
+#include "types.hpp"
 
-/* 04/18/2022
- * James and Dan call notes:
- * Symbols are still handled by symbol table, 32 bit symbols, only uppercase, no numbers
- * Symbols are mapped to NIDs, which can be burned in the NFT contract, but the symbol table will always hold on to Symbol->NID mapping
- * Symbol IDs can be specified in a separate action on the token contract to permanently map the symbol to the token (burns underlying NFT)
- * 
-*/
-
-namespace symbol_sys
+namespace UserContract
 {
-   struct symbol_row
-   {
-      UserContract::NID nft_id;
-      std::string       symbol_name;
-
-      friend std::strong_ordering operator<=>(const symbol_row&, const symbol_row&) = default;
-   };
-   PSIO_REFLECT(symbol_row, symbol_name, nft_id);
-
-   using symbol_table_t = psibase::Table<symbol_row, &symbol_row::nft_id>;
-
-   using tables = psibase::ContractTables<symbol_table_t>;
-   class symbol_contract : public psibase::Contract<symbol_contract>
+   class SymbolSys : public psibase::Contract<SymbolSys>
    {
      public:
-      static constexpr auto contract = psibase::AccountNumber("symbol-sys");
+      using tables                         = psibase::ContractTables<SymbolTable_t,
+                                             SymbolLengthTable_t,
+                                             PriceAdjustmentSingleton_t,
+                                             InitTable_t>;
+      static constexpr auto contract       = psibase::AccountNumber("symbol-sys");
+      static constexpr auto sysTokenSymbol = SID{"psi"};
 
-      // Mutate
-      void create(psibase::AccountNumber owner, int64_t max_supply);
-      void purchase(psibase::AccountNumber buyer, std::string newsymbol, int64_t amount);
-      void buysymbol(psibase::AccountNumber buyer, std::string symbol);
-      void sellsymbol(std::string symbol, int64_t price);
-      void withdraw(psibase::AccountNumber owner, int64_t amount);
-      void setsalefee(uint32_t fee);
-      void setsym(uint32_t symlen,
-                  int64_t  price,
-                  int64_t  floor,
-                  uint32_t increase_thresold,
-                  uint32_t decrease_threshold,
-                  uint32_t window);
-      void setowner(psibase::AccountNumber owner, std::string sym, std::string memo);
+      SymbolSys(psio::shared_view_ptr<psibase::Action> action);
+
+      //void setAdjustRates(uint8_t increasePct, uint8_t decreasePct);
+      //void configSymType(uint8_t symbolLength, Quantity startPrice, Quantity floorPrice, uint8_t targetCreatedPerDay);
+
+      void init();
+
+      void create(SID newSymbol, Quantity maxDebit);
+      void listSymbol(SID symbol, Quantity price);
+      void buySymbol(SID symbol);
+      void unlistSymbol(SID symbol);
+
+      SymbolRecord       getSymbol(SID symbol);
+      bool               exists(SID symbol);
+      Quantity           getPrice(size_t numChars);
+      SymbolLengthRecord getSymbolType(size_t numChars);
+
+      void updatePrices();
 
      private:
       tables db{contract};
+
+     public:
+      struct Events
+      {
+         using Account    = psibase::AccountNumber;
+         using StringView = psio::const_view<psibase::String>;
+
+         // clang-format off
+         struct Ui  // History <-- Todo - Change back to History
+         {
+            void initialized() {}
+            void symCreated(SID symbol, Account owner, Quantity cost) {}
+            void symListed(SID symbol, Account seller, Quantity cost) {}
+            void symSold(SID symbol, Account buyer, Account seller, Quantity cost) {}
+            void symUnlisted(SID symbol, Account owner) {}
+            //};
+
+            //struct Ui{};
+
+            //struct Merkle{};
+         };
+      };
+      // clang-format on
    };
 
-   PSIO_REFLECT(  //
-       symbol_contract,
-       method(create, owner, max_supply));
+   // clang-format off
+   PSIO_REFLECT(SymbolSys,
+      method(init),
+      method(create, newSymbol, maxDebit),
+      method(buySymbol, symbol),
+      method(listSymbol, symbol, price),
+      method(unlistSymbol, symbol),
+      method(getSymbol, symbol),
+      method(exists, symbol),
+      method(getPrice, numChars),
+      method(getSymbolType, numChars),
+      method(updatePrices)
+   );
+   PSIBASE_REFLECT_UI_EVENTS(SymbolSys,
+      method(initialized),
+      method(symCreated, symbol, owner, cost),
+      method(symListed, symbol, seller, cost),
+      method(symSold, symbol, buyer, seller, cost),
+      method(symUnlisted, symbol, owner)
+   );
+   // clang-format on
 
-}  // namespace symbol_sys
+}  // namespace UserContract

@@ -7,6 +7,7 @@
 #include <psibase/Table.hpp>
 
 #include "nft_sys.hpp"
+#include "symbol_tables.hpp"
 #include "types.hpp"
 
 namespace UserContract
@@ -48,6 +49,7 @@ namespace UserContract
       Precision          precision;
       Quantity           currentSupply;
       Quantity           maxSupply;
+      SID                symbolId;
 
       using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"}>;
 
@@ -64,8 +66,17 @@ namespace UserContract
 
       auto operator<=>(const TokenRecord&) const = default;
    };
-   PSIO_REFLECT(TokenRecord, id, ownerNft, inflation, config, precision, currentSupply, maxSupply);
+   PSIO_REFLECT(TokenRecord,
+                id,
+                ownerNft,
+                inflation,
+                config,
+                precision,
+                currentSupply,
+                maxSupply,
+                symbolId);
    using TokenTable_t = psibase::Table<TokenRecord, &TokenRecord::id>;
+   // Todo - add symbolId as secondary index when possible
 
    struct BalanceKey_t
    {
@@ -81,15 +92,7 @@ namespace UserContract
       BalanceKey_t key;
       uint64_t     balance;
 
-      auto           operator<=>(const BalanceRecord&) const = default;
-      constexpr auto operator<=>(const int& other) const
-      {
-         return balance <=> static_cast<uint64_t>(other);
-      }
-      constexpr bool operator==(const int& other) const
-      {
-         return balance == static_cast<uint64_t>(other);
-      }
+      auto operator<=>(const BalanceRecord&) const = default;
    };
    PSIO_REFLECT(BalanceRecord, key, balance);
    using BalanceTable_t = psibase::Table<BalanceRecord, &BalanceRecord::key>;
@@ -109,15 +112,7 @@ namespace UserContract
       SharedBalanceKey_t key;
       uint64_t           balance;
 
-      auto           operator<=>(const SharedBalanceRecord&) const = default;
-      constexpr auto operator<=>(const int& other) const
-      {
-         return balance <=> static_cast<uint64_t>(other);
-      }
-      constexpr bool operator==(const int& other) const
-      {
-         return balance == static_cast<uint64_t>(other);
-      }
+      auto operator<=>(const SharedBalanceRecord&) const = default;
    };
    PSIO_REFLECT(SharedBalanceRecord, key, balance);
    using SharedBalanceTable_t = psibase::Table<SharedBalanceRecord, &SharedBalanceRecord::key>;

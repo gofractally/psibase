@@ -29,22 +29,22 @@ namespace psibase
    template <uint8_t nrBits>
    concept validNrBits = std::integral<typename BitsetTypeMap<nrBits>::inner_t>;
 
-   template <uint8_t nrBits>
-
    // TODO: consider adding std::bitset to fracpack, to_json, and from_json instead
+   template <uint8_t nrBits>
    struct Bitset
    {
       static_assert(validNrBits<nrBits>, "Unsupported Bitset size. Supported sizes: 8, 16, 32, 64");
 
-      using Bitset_t                   = typename BitsetTypeMap<nrBits>::inner_t;
+      using Bitset_t = typename BitsetTypeMap<nrBits>::inner_t;
       // TODO: rename; UPPERCASE_IS_FOR_MACROS_ONLY
-      static constexpr size_t MAX_BITS = std::numeric_limits<Bitset_t>::digits;
-      Bitset_t                bits     = 0;
+      static constexpr size_t maxBits = std::numeric_limits<Bitset_t>::digits;
+      static constexpr auto   one     = static_cast<Bitset_t>(1);
+      Bitset_t                bits    = 0;
 
       bool get(std::size_t pos) const
       {
          _check(pos);
-         return static_cast<bool>((bits & (1 << pos)) >> pos);
+         return static_cast<bool>((bits & (one << pos)) >> pos);
       }
 
       void set(std::size_t pos, bool value = true)
@@ -52,17 +52,17 @@ namespace psibase
          _check(pos);
          if (value)
          {
-            bits |= (1 << pos);
+            bits |= (one << pos);
          }
          else
          {
-            bits &= ~(1 << pos);
+            bits &= ~(one << pos);
          }
       }
 
       void _check(std::size_t pos) const
       {
-         psibase::check(pos < MAX_BITS, "out-of-bounds access in bitset");
+         psibase::check(pos < maxBits, "out-of-bounds access in bitset");
       }
 
       constexpr auto operator<=>(const Bitset<nrBits>&) const = default;
@@ -77,11 +77,11 @@ namespace psibase
    PSIO_REFLECT(Bitset_64, bits);
 
    using NamedBit_t = psibase::MethodNumber;
-   template <psibase::MethodNumber... Args>
+   template <NamedBit_t... Args>
    class NamedBits
    {
      public:
-      static const size_t      nrBits  = sizeof...(Args);
+      static const size_t nrBits = sizeof...(Args);
       // TODO: rename; UPPERCASE_IS_FOR_MACROS_ONLY
       static constexpr uint8_t INVALID = std::numeric_limits<uint8_t>::max();
 

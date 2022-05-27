@@ -1,7 +1,6 @@
 function(add_user_contract suffix name)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC
-        contract/include
         include
         ../common_sys/include
         ../exchange_sys/include
@@ -24,6 +23,7 @@ function(add_user_test suffix name)
     add_executable(${TARGET} ${ARGN})
     target_include_directories(${TARGET} PUBLIC
       ../include
+      ../../common_sys/include
       ../../name_sys/include
       ../../nft_sys/include
       ../../symbol_sys/include
