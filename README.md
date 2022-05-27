@@ -21,7 +21,7 @@ Set the `WASI_SDK_PREFIX` environment variable before building (see architecture
 git submodule update --init --recursive
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RUST=yes ..
 make -j $(nproc)
 ctest -j $(nproc)
 ```
@@ -30,40 +30,28 @@ The built product lives in `build/clsdk`.
 
 To speed up builds, use `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache`
 
-### Ubuntu 20.04
+### Ubuntu 22.04
 
 ```sh
-sudo apt-get update
-sudo apt-get install -yq software-properties-common
-sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
 sudo apt-get update
 sudo apt-get install -yq    \
     autoconf                \
     binaryen                \
     build-essential         \
     ccache                  \
+    clang                   \
     cmake                   \
-    g++-11                  \
-    gcc-11                  \
+    curl                    \
     git                     \
-    libcurl4-openssl-dev    \
-    libgbm-dev              \
-    libgmp-dev              \
-    libnss3-dev             \
+    libclang-dev            \
     libssl-dev              \
-    libstdc++-11-dev        \
     libtool                 \
-    libusb-1.0-0-dev        \
+    llvm-dev                \
     pkg-config              \
+    python-is-python3       \
     wget                    \
-    zstd
 
-update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
-update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
-update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-11 100
-update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-11 100
-
-export WASI_SDK_PREFIX=~/work/wasi-sdk-12.0
+export WASI_SDK_PREFIX=~/work/wasi-sdk-14.0
 export PATH=~/work/node-v14.16.0-linux-x64/bin:$PATH
 
 cd ~/work
@@ -74,13 +62,13 @@ cd boost_1_78_0
 sudo ./b2 --prefix=/usr/local --build-dir=build variant=release --with-chrono --with-date_time --with-filesystem --with-iostreams --with-program_options --with-system --with-test install
 
 cd ~/work
-wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-sdk-12.0-linux.tar.gz
-tar xf wasi-sdk-12.0-linux.tar.gz
+wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz
+tar xf wasi-sdk-14.0-linux.tar.gz
 
 cd ~/work
-wget https://nodejs.org/dist/v14.16.0/node-v14.16.0-linux-x64.tar.xz
-tar xf node-v14.16.0-linux-x64.tar.xz
-npm i -g yarn
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+cargo install mdbook mdbook-linkcheck
 ```
 
 ### Mac (Monterey 12.1)
