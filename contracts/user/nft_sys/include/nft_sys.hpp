@@ -10,8 +10,8 @@ namespace UserContract
    class NftSys : public psibase::Contract<NftSys>
    {
      public:
-      using tables = psibase::
-          ContractTables<NftTable_t, NftHolderTable_t, CreditTable_t, psibase::InitTable_t>;
+      using tables =
+          psibase::ContractTables<NftTable_t, NftHolderTable_t, CreditTable_t, InitTable_t>;
 
       static constexpr auto contract = psibase::AccountNumber("nft-sys");
 

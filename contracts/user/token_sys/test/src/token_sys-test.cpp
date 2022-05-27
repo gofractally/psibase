@@ -148,10 +148,10 @@ SCENARIO("Minting tokens")
          auto mint = b.mint(tokenId, 1'000e8, memo);
          CHECK(mint.failed(missingRequiredAuth));
       }
-      THEN("Alice may not mint them with an invalid token ID")
+      THEN("Alice may not mint them with a nonexistent token ID")
       {
          auto mint = a.mint(999, 1'000e8, memo);
-         CHECK(mint.failed(invalidTokenId));
+         CHECK(mint.failed(tokenDNE));
       }
       THEN("Alice may not mint more tokens than are allowed by the specified max supply")
       {
@@ -711,21 +711,23 @@ SCENARIO("Mapping a symbol to a token")
       alice.at<TokenSys>().init();
       alice.at<SymbolSys>().init();
 
-      // Mint token used for purchasing symbols
-      auto aliceBalance = 1'000'000e8;
-      auto sysToken     = a.create(8, aliceBalance).returnVal();
-      a.mint(sysToken, aliceBalance, memo);
+      // SymbolSys is currently the last owner of system token
+      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
+      auto userBalance   = 1'000'000e8;
+      auto sysToken      = TokenSys::sysToken;
+      tokenContract.mint(sysToken, userBalance, memo);
+      tokenContract.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
       t.start_block();
-      auto newToken = a.create(8, aliceBalance).returnVal();
-      a.mint(newToken, aliceBalance, memo);
+      auto newToken = a.create(8, userBalance).returnVal();
+      a.mint(newToken, userBalance, memo);
 
       // Purchase the symbol and claim the owner NFT
       auto symbolCost = alice.at<SymbolSys>().getPrice(3).returnVal();
       a.credit(sysToken, SymbolSys::contract, symbolCost, memo);
-      auto symbolId = "abc"_a;
-      alice.at<SymbolSys>().create(symbolId, symbolCost);
+      auto symbolId     = "abc"_a;
+      auto create       = alice.at<SymbolSys>().create(symbolId, symbolCost);
       auto symbolRecord = alice.at<SymbolSys>().getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
 
@@ -749,7 +751,7 @@ SCENARIO("Mapping a symbol to a token")
 
          THEN("Alice is unable to map the symbol to the token")
          {
-            CHECK(a.mapSymbol(newToken, symbolId).failed(missingTokenIssuerAuth));
+            CHECK(a.mapSymbol(newToken, symbolId).failed(missingRequiredAuth));
          }
       }
       THEN("Alice is unable to map a symbol to a nonexistent token")
@@ -769,7 +771,7 @@ SCENARIO("Mapping a symbol to a token")
 
          AND_THEN("The token ID mapping exists")
          {
-            CHECK(a.getSymbol(newToken).returnVal().symbolId == symbolId);
+            CHECK(a.getTokenSymbol(newToken).returnVal() == symbolId);
          }
          AND_THEN("Storage cost is updated accordingly")
          {  //
@@ -778,6 +780,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       WHEN("Alice maps the symbol to the token")
       {
+         alice.at<NftSys>().credit(nftId, TokenSys::contract, memo);
          a.mapSymbol(newToken, symbolId);
 
          THEN("The symbol record is identical")

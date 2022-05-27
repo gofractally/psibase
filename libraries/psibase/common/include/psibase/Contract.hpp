@@ -11,14 +11,6 @@ namespace psibase
    concept DefinesContract =
        std::same_as<std::decay_t<decltype(T::contract)>, psibase::AccountNumber>;
 
-   // A table to use if your contract needs to be initialized
-   struct InitializedRecord
-   {
-      uint8_t key{0};  // Initialized if a record exists
-   };
-   PSIO_REFLECT(InitializedRecord, key);
-   using InitTable_t = Table<InitializedRecord, &InitializedRecord::key>;
-
    /// Contracts should inherit from this
    ///
    /// Template arguments:

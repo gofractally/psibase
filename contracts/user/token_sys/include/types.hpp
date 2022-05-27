@@ -25,7 +25,7 @@ namespace UserContract
       // TODO: from_json doesn't enforce yet
       static void fracpack_validate(Precision p)
       {
-         psibase::check(PRECISION_MIN <= p.value && p.value >= PRECISION_MAX, error_invalid);
+         psibase::check(PRECISION_MIN <= p.value && p.value <= PRECISION_MAX, error_invalid);
       }
 
       friend std::strong_ordering operator<=>(const Precision&, const Precision&) = default;

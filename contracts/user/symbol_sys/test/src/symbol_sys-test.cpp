@@ -56,7 +56,7 @@ SCENARIO("Buying a symbol")
       alice.at<TokenSys>().init();
       alice.at<SymbolSys>().init();
 
-      auto tokenContract = t.as(TokenSys::contract).at<TokenSys>();
+      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
       tokenContract.mint(sysToken, 20'000e8, memo);
       tokenContract.credit(sysToken, alice, 10'000e8, memo);
       tokenContract.credit(sysToken, bob, 10'000e8, memo);
@@ -96,7 +96,8 @@ SCENARIO("Buying a symbol")
       THEN("Alice can create a symbol")
       {
          Quantity quantity{SymbolPricing::initialPrice};
-         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
+         auto credit = alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
+         CHECK(credit.succeeded());
 
          CHECK(quantity == a.getPrice(3).returnVal());
 
@@ -191,7 +192,7 @@ SCENARIO("Measuring price increases")
       alice.at<SymbolSys>().init();
 
       auto aliceBalance  = 1'000'000e8;
-      auto tokenContract = t.as(TokenSys::contract).at<TokenSys>();
+      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
       tokenContract.mint(sysToken, aliceBalance, memo);
       tokenContract.credit(sysToken, alice, aliceBalance, memo);
 
@@ -242,39 +243,43 @@ SCENARIO("Measuring price increases")
       }
       THEN("The price remains stable if sold symbols per day is targetNrSymbolsPerDay")
       {
+         t.start_block(secondsInDay + 10'000);  // Start a new day (price will drop once)
+         auto cost{decrementPrice(SymbolPricing::initialPrice)};
+
          auto symbolDetails = a.getSymbolType(3).returnVal();
-         CHECK(symbolDetails.activePrice == SymbolPricing::initialPrice);
-         auto quantity{SymbolPricing::initialPrice};
+         CHECK(symbolDetails.createCounter == 0);
+         CHECK(symbolDetails.activePrice.value == cost);
 
          // If per day target is updated, unit test needs to be updated
          CHECK(SymbolPricing::targetNrSymbolsPerDay == symbolDetails.targetCreatedPerDay);
 
-         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, 24 * quantity, memo);
+         alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, 24 * cost, memo);
 
-         bool costConstant = true;
-         for (int i = 0; i < 24 && costConstant; ++i)
+         bool      costConstant = true;
+         const int numSymbols   = 24;
+         for (int i = 0; i < numSymbols && costConstant; ++i)
          {
-            // Todo: Verify they are being created by checking a.getSymbolType(3).returnVal().createCounter;
-            a.create(tickers[i], quantity);
+            a.create(tickers[i], cost);
             t.start_block();
 
-            costConstant = (a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
+            costConstant = (a.getPrice(3).returnVal() == cost);
          }
          CHECK(costConstant);
+         CHECK(numSymbols == a.getSymbolType(3).returnVal().createCounter);
 
          AND_THEN("The price for the first create that exceeds the desired rate is higher")
          {
-            alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, quantity, memo);
+            alice.at<TokenSys>().credit(sysToken, SymbolSys::contract, cost, memo);
 
             // Create the 25th symbol within 24 hours, causing the price to increase
             CHECK(a.getSymbolType(3).returnVal().createCounter == 24);
-            auto create = a.create(tickers[24], quantity);
+            auto create = a.create(tickers[24], cost);
             CHECK(create.succeeded());
             t.start_block();
 
             CHECK(a.getSymbolType(3).returnVal().createCounter == 0);
 
-            auto nextPrice = incrementPrice(SymbolPricing::initialPrice);
+            auto nextPrice = incrementPrice(cost);
             CHECK(a.getPrice(3).returnVal() == nextPrice);
          }
       }
@@ -314,7 +319,7 @@ SCENARIO("Using symbol ownership NFT")
 
       // Mint token used for purchasing symbols
       auto aliceBalance  = 1'000'000e8;
-      auto tokenContract = t.as(TokenSys::contract).at<TokenSys>();
+      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
       tokenContract.mint(sysToken, 20'000e8, memo);
       tokenContract.credit(sysToken, alice, aliceBalance, memo);
 
@@ -369,7 +374,7 @@ SCENARIO("Buying and selling symbols")
 
       // Fund Alice and Bob with the system token
       auto userBalance   = 1'000'000e8;
-      auto tokenContract = t.as(TokenSys::contract).at<TokenSys>();
+      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
       tokenContract.mint(sysToken, 2 * userBalance, memo);
       tokenContract.credit(sysToken, alice, userBalance, memo);
       tokenContract.credit(sysToken, bob, userBalance, memo);

@@ -39,7 +39,7 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable_t>().getIndex<0>().get((uint8_t)0);
+      auto initRecord = db.open<InitTable_t>().getIndex<0>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -47,9 +47,9 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
 void TokenSys::init()
 {
    auto initTable = db.open<InitTable_t>();
-   auto init      = (initTable.getIndex<0>().get((uint8_t)0));
+   auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
-   initTable.put(InitializedRecord{(uint8_t)0});
+   initTable.put(InitializedRecord{});
 
    // Configure manual debit for self and NFT
    at<TokenSys>().setConfig(manualDebit, true);
@@ -57,7 +57,10 @@ void TokenSys::init()
 
    // Create system token
    auto tid = at<TokenSys>().create(Precision{8}, Quantity{1'000'000'000e8});
-   check(tid == TID{1}, sysTokenId);
+   check(tid == TID{1}, wrongSysTokenId);
+
+   auto tokenNft = getToken(tid).ownerNft;
+   at<NftSys>().credit(tokenNft, SymbolSys::contract, "Passing system token ownership");
 
    emit().ui().initialized();
 }
@@ -72,6 +75,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    // Todo - replace with auto incrementing when available
    TID newId = (tokenIdx.begin() == tokenIdx.end()) ? 1 : (*(--tokenIdx.end())).id + 1;
 
+   Precision::fracpack_validate(precision);  // Todo remove if/when happens automatically
    check(TokenRecord::isValidKey(newId), invalidTokenId);
    check(maxSupply.value > 0, supplyGt0);
 
@@ -275,22 +279,33 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
 
 void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 {
-   //auto symbol = at<SymbolSys>().getSymbol(symbolId);
-   // auto nftId =
+   auto sender      = getSender();
+   auto symbol      = at<SymbolSys>().getSymbol(symbolId);
+   auto token       = getToken(tokenId);
+   NID  nft         = symbol->ownerNft();
+   auto nftContract = at<NftSys>();
 
-   // Check that the token exists
-   // Check that the token doesn't already have a mapping
-   // Check that the token nft exists
-   // Check that sender own the token nft
+   check(nft != NID{0}, symbolDNE);
+   check(nftContract.exists(nft), missingRequiredAuth);
+   check(token.symbolId == SID{0}, tokenHasSymbol);
+   check(token.ownerNft != NID{0}, missingRequiredAuth);
+   check(nftContract.exists(token.ownerNft), missingRequiredAuth);
+   check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
+   check(token.symbolId == SID{0}, tokenHasSymbol);
 
-   // Check that the symbol exists
-   // Check that the symbol nft exists
-   // Check that TokenSys own the symbol nft
+   // Take ownership of the symbol owner NFT
+   auto debitMemo = "Mapping symbol " + symbolId.str() + " to token " + std::to_string(tokenId);
+   nftContract.debit(nft, debitMemo);
 
    // Store mapping
-   // Destroy symbol NFT
+   token.symbolId = symbolId;
+   db.open<TokenTable_t>().put(token);
+
+   // Destroy symbol owner NFT, it can never be used or traded again
+   nftContract.burn(nft);
 
    // Emit mapped event
+   emit().ui().symbolMapped(tokenId, sender, symbolId);
 }
 
 TokenRecord TokenSys::getToken(TID tokenId)
@@ -298,21 +313,17 @@ TokenRecord TokenSys::getToken(TID tokenId)
    auto tokenTable = db.open<TokenTable_t>();
    auto tokenIdx   = tokenTable.getIndex<0>();
    auto tokenOpt   = tokenIdx.get(tokenId);
-   psibase::check(tokenOpt.has_value(), invalidTokenId);
+   psibase::check(tokenOpt.has_value(), tokenDNE);
 
    return *tokenOpt;
 }
 
-SymbolRecord TokenSys::getSymbol(TID tokenId)
+SID TokenSys::getTokenSymbol(TID tokenId)
 {
-   auto tokenTable = db.open<TokenTable_t>();
-   auto tokenIdx   = tokenTable.getIndex<0>();
-   auto tokenOpt   = tokenIdx.get(tokenId);
+   auto token = getToken(tokenId);
+   psibase::check(token.symbolId != SID{0}, noMappedSymbol);
 
-   psibase::check(tokenOpt.has_value(), tokenDNE);
-   psibase::check(tokenOpt->symbolId != SID{0}, noMappedSymbol);
-
-   return at<SymbolSys>().getSymbol(tokenOpt->symbolId);
+   return token.symbolId;
 }
 
 bool TokenSys::exists(TID tokenId)

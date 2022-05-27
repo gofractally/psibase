@@ -40,7 +40,7 @@ SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable_t>().getIndex<0>().get((uint8_t)0);
+      auto initRecord = db.open<InitTable_t>().getIndex<0>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -48,7 +48,7 @@ SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
 void SymbolSys::init()
 {
    auto initTable = db.open<InitTable_t>();
-   auto init      = (initTable.getIndex<0>().get((uint8_t)0));
+   auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
@@ -65,11 +65,12 @@ void SymbolSys::init()
       s.activePrice = s.activePrice * 2 / 3;
       return s;
    };
-   auto symLengthTable = db.open<SymbolLengthTable_t>();
-   auto s              = SymbolLengthRecord{.symbolLength        = 3,
-                                            .targetCreatedPerDay = 24,
-                                            .floorPrice{(Quantity_t)100e8},
-                                            .activePrice{(Quantity_t)1000e8}};
+   auto       symLengthTable = db.open<SymbolLengthTable_t>();
+   Quantity_t initialPrice   = (Quantity_t)1000e8;
+   auto       s              = SymbolLengthRecord{.symbolLength        = 3,
+                                                  .targetCreatedPerDay = 24,
+                                                  .floorPrice{(Quantity_t)100e8},
+                                                  .activePrice{initialPrice}};
    symLengthTable.put(s);           // Length 3
    symLengthTable.put(nextSym(s));  // Length 4
    symLengthTable.put(nextSym(s));  // Length 5
@@ -81,6 +82,18 @@ void SymbolSys::init()
    constexpr uint8_t increasePct              = 5;
    constexpr uint8_t decreasePct              = increasePct;
    priceAdjustmentSingleton.put(PriceAdjustmentRecord{0, increasePct, decreasePct});
+
+   // Create system token symbol
+   at<SymbolSys>().create(sysTokenSymbol, initialPrice);
+
+   // Offer system token symbol
+   auto symbolOwnerNft = getSymbol(sysTokenSymbol);
+   at<NftSys>().credit(symbolOwnerNft.ownerNft, TokenSys::contract,
+                       "System token symbol ownership nft");
+   at<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
+
+   // Todo - Pass token owner NFT on to the system token subcontract that
+   //        imposes additional restrictions on the system token
 
    emit().ui().initialized();
 }
@@ -96,15 +109,22 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    auto cost    = symType.activePrice;
 
    check(newSym.ownerNft == 0, symbolAlreadyExists);
+   check(cost <= maxDebit, insufficientBalance);
 
    // Debit the sender the cost of the new symbol
    auto debitMemo = "This transfer created the new symbol: " + symString;
-   at<TokenSys>().debit(TokenSys::sysToken, sender, cost, debitMemo);
+   if (sender != contract)
+   {
+      at<TokenSys>().debit(TokenSys::sysToken, sender, cost, debitMemo);
+   }
 
    // Mint and offer ownership NFT
    newSym.ownerNft    = at<NftSys>().mint();
    auto nftCreditMemo = "This NFT conveys ownership of symbol: " + symString;
-   at<NftSys>().credit(newSym.ownerNft, sender, nftCreditMemo);
+   if (sender != contract)
+   {
+      at<NftSys>().credit(newSym.ownerNft, sender, nftCreditMemo);
+   }
 
    // Update symbol type statistics
    symType.createCounter++;
@@ -209,10 +229,11 @@ Quantity SymbolSys::getPrice(size_t numChars)
 
 SymbolLengthRecord SymbolSys::getSymbolType(size_t numChars)
 {
+   check(canCast<uint8_t>(numChars), invalidSymbol);
+   auto key = static_cast<uint8_t>(numChars);
+
    updatePrices();
 
-   check(canCast<uint8_t>(numChars), invalidSymbol);
-   auto key        = static_cast<uint8_t>(numChars);
    auto symbolType = db.open<SymbolLengthTable_t>().getIndex<0>().get(key);
    check(symbolType.has_value(), invalidSymbol);
 

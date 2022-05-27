@@ -8,6 +8,19 @@ namespace UserContract
 {
    using NID = uint32_t;
 
+   // This structure is shared between several User contracts that need a
+   //   flag to track initialization
+   struct SingletonKey
+   {
+   };
+   PSIO_REFLECT(SingletonKey);
+   struct InitializedRecord
+   {
+      SingletonKey key;
+   };
+   PSIO_REFLECT(InitializedRecord, key);
+   using InitTable_t = psibase::Table<InitializedRecord, &InitializedRecord::key>;
+
    struct NftHolderRecord
    {
       psibase::AccountNumber account;

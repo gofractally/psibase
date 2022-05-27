@@ -20,7 +20,7 @@ namespace UserContract
                                              BalanceTable_t,
                                              SharedBalanceTable_t,
                                              TokenHolderTable_t,
-                                             psibase::InitTable_t>;
+                                             InitTable_t>;
       static constexpr auto contract    = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken    = TID{1};
       static constexpr auto sysTokenSym = SID{"PSI"};
@@ -66,7 +66,7 @@ namespace UserContract
 
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
-      SymbolRecord        getSymbol(TID tokenId);
+      SID                 getTokenSymbol(TID tokenId);
       bool                exists(TID tokenId);
       BalanceRecord       getBalance(TID tokenId, psibase::AccountNumber account);
       SharedBalanceRecord getSharedBal(TID                    tokenId,
@@ -127,7 +127,7 @@ namespace UserContract
       method(debit, tokenId, sender, amount, memo),
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
-      method(getSymbol, tokenId),
+      method(getTokenSymbol, tokenId),
       method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),

@@ -18,7 +18,7 @@ NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable_t>().getIndex<0>().get((uint8_t)0);
+      auto initRecord = db.open<InitTable_t>().getIndex<0>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -26,7 +26,7 @@ NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
 void NftSys::init()
 {
    auto initTable = db.open<InitTable_t>();
-   auto init      = (initTable.getIndex<0>().get((uint8_t)0));
+   auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 

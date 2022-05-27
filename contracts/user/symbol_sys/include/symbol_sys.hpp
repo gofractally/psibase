@@ -14,11 +14,12 @@ namespace UserContract
    class SymbolSys : public psibase::Contract<SymbolSys>
    {
      public:
-      using tables                   = psibase::ContractTables<SymbolTable_t,
+      using tables                         = psibase::ContractTables<SymbolTable_t,
                                              SymbolLengthTable_t,
                                              PriceAdjustmentSingleton_t,
-                                             psibase::InitTable_t>;
-      static constexpr auto contract = psibase::AccountNumber("symbol-sys");
+                                             InitTable_t>;
+      static constexpr auto contract       = psibase::AccountNumber("symbol-sys");
+      static constexpr auto sysTokenSymbol = SID{"psi"};
 
       SymbolSys(psio::shared_view_ptr<psibase::Action> action);
 
