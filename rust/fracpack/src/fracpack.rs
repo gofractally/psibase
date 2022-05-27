@@ -1,3 +1,8 @@
+// TODO: fix reading structs and tuples which have unknown fields
+// TODO: option to allow/disallow unknown fields during verify and unpack
+// TODO: rename misnamed "heap_size"
+// TODO: remove unnecessary "<xxx as Packable>"
+
 use custom_error::custom_error;
 use std::mem;
 
