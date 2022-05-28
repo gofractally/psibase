@@ -81,13 +81,17 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             quote! {<#ty as fracpack::Packable>::FIXED_SIZE}
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
-    let use_heap = fields
-        .iter()
-        .map(|field| {
-            let ty = &field.ty;
-            quote! {<#ty as fracpack::Packable>::USE_HEAP}
-        })
-        .fold(quote! {false}, |acc, new| quote! {#acc || #new});
+    let use_heap = if !opts.definition_will_not_change {
+        quote! {true}
+    } else {
+        fields
+            .iter()
+            .map(|field| {
+                let ty = &field.ty;
+                quote! {<#ty as fracpack::Packable>::USE_HEAP}
+            })
+            .fold(quote! {false}, |acc, new| quote! {#acc || #new})
+    };
     let positions: Vec<syn::Ident> = fields
         .iter()
         .map(|field| {
