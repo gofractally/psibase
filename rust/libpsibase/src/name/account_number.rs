@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use super::constants::*;
 use super::{
     account_to_number_converter::AccountToNumberConverter,
@@ -19,7 +21,8 @@ use std::{num::ParseIntError, str::FromStr};
 /// use libpsibase::AccountNumber;
 /// let hello = AccountNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, psi_macros::Fracpack, Serialize, Deserialize)]
+#[fracpack(definition_will_not_change)]
 pub struct AccountNumber {
     pub value: u64,
 }

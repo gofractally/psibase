@@ -1,7 +1,11 @@
+use std::{num::ParseIntError, str::FromStr};
+
 use anyhow::{Context, Result};
 use chrono::{Duration, SecondsFormat, Utc};
 use clap::{Parser, Subcommand};
 use custom_error::custom_error;
+use fracpack::Packable;
+use libpsibase::{AccountNumber, Action, MethodNumber};
 use reqwest::Url;
 use serde_json::Value;
 
@@ -183,6 +187,21 @@ fn reg_rpc(contract: &str, rpc_contract: &str) -> Result<String, anyhow::Error> 
     )
 }
 
+fn reg_rpc2(contract: &str, rpc_contract: &str) -> Result<Action, anyhow::Error> {
+    // todo: should we convert this action data to a proper struct?
+    let data = (
+        AccountNumber::from_str(contract)?,
+        AccountNumber::from_str(rpc_contract)?,
+    );
+
+    Ok(Action {
+        sender: AccountNumber::from_str(contract)?,
+        contract: AccountNumber::from_str("proxy-sys")?,
+        method: MethodNumber::from_str("registerServer")?,
+        raw_data: data.packed_bytes(),
+    })
+}
+
 async fn push_transaction_impl(
     args: &Args,
     client: reqwest::Client,
@@ -248,6 +267,23 @@ fn store_sys(
             .as_slice(),
         ),
     )
+}
+
+fn store_sys2(
+    contract: &str,
+    path: &str,
+    content_type: &str,
+    content: &[u8],
+) -> Result<Action, anyhow::Error> {
+    // todo: should we convert this action data to a proper struct?
+    let data = (path.to_string(), content_type.to_string(), content.to_vec());
+
+    Ok(Action {
+        sender: AccountNumber::from_str(contract)?,
+        contract: AccountNumber::from_str(contract)?,
+        method: MethodNumber::from_str("storeSys")?,
+        raw_data: data.packed_bytes(),
+    })
 }
 
 async fn install(

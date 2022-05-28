@@ -52,6 +52,13 @@ pub trait Packable<'a>: Sized {
         heap_pos: &mut u32,
     ) -> Result<Option<Self>>;
     fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()>;
+
+    /// Helper method to create a new vector of "fracpacked" bytes, since it's a common operation
+    fn packed_bytes(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        self.pack(&mut bytes);
+        bytes
+    }
 } // Packable
 
 fn read_u8_arr<const SIZE: usize>(src: &[u8], pos: &mut u32) -> Result<[u8; SIZE]> {
