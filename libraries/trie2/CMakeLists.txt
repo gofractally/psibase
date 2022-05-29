@@ -12,33 +12,21 @@ set(MDBX_OUTPUT_DIR ${CMAKE_BINARY_DIR}/mdbx)
 set(MDBX_BUILD_TIMESTAMP unknown)
 add_subdirectory(../../external/libmdbx libmdbx)
 
-add_executable( test db.cpp tdb.cpp palloc.cpp )
+add_executable( test database.cpp ring_alloc.cpp object_arena.cpp t2.cpp  )
 target_link_libraries( test PUBLIC ${LINUX_LIBS} Threads::Threads )
 target_compile_options( test PUBLIC -msse4.1 )
 target_include_directories( test PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
 set_property( TARGET test PROPERTY CXX_STANDARD 20 )
 
-add_executable( bigdb db.cpp big.cpp palloc.cpp )
+
+add_executable( bigdb ring_alloc.cpp database.cpp object_arena.cpp big.cpp  )
 target_link_libraries( bigdb PUBLIC ${LINUX_LIBS} Threads::Threads )
 target_compile_options( bigdb PUBLIC -msse4.1 )
 target_include_directories( bigdb PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
-
-
 set_property( TARGET bigdb PROPERTY CXX_STANDARD 20 )
 
-add_executable( big-lmdbx big-lmdbx.cpp )
-target_link_libraries( big-lmdbx PUBLIC  ${LINUX_LIBS} Threads::Threads mdbx-static )
-target_compile_options( big-lmdbx PUBLIC -msse4.1 )
-target_include_directories( big-lmdbx PUBLIC 
-    ${Boost_INCLUDE_DIRS} 
-    ${CMAKE_CURRENT_SOURCE_DIR}/include 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include
-    ../../external/libmdbx
-)
-set_property( TARGET big-lmdbx PROPERTY CXX_STANDARD 20 )
-
-add_executable( bigbmit db.cpp bigbmi.cpp palloc.cpp )
-target_link_libraries( bigbmit PUBLIC ${LINUX_LIBS} Threads::Threads )
-target_compile_options( bigbmit PUBLIC -msse4.1 -O3)
-target_include_directories( bigbmit PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
-set_property( TARGET bigbmit PROPERTY CXX_STANDARD 20 )
+add_executable( swaptest database.cpp swap.cpp ring_alloc.cpp object_arena.cpp  )
+target_link_libraries( swaptest PUBLIC ${LINUX_LIBS} Threads::Threads )
+target_compile_options( swaptest PUBLIC -msse4.1 )
+target_include_directories( swaptest PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
+set_property( TARGET swaptest PROPERTY CXX_STANDARD 20 )
