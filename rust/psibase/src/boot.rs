@@ -165,58 +165,58 @@ fn common_startup_trx() -> Result<SignedTransaction, anyhow::Error> {
 
     let actions = vec![
         startup_action,
-        reg_rpc2("common-sys", "common-sys")?,
-        store_sys2(
+        reg_rpc("common-sys", "common-sys")?,
+        store_sys(
             "common-sys",
             "/",
             "text/html",
             include_bytes!("../../../contracts/user/common_sys/ui/index.html"),
         )?,
-        store_sys2(
+        store_sys(
             "common-sys",
             "/common/rpc.mjs",
             "text/javascript",
             include_bytes!("../../../contracts/user/common_sys/common/rpc.mjs"),
         )?,
-        store_sys2(
+        store_sys(
             "common-sys",
             "/common/useGraphQLQuery.mjs",
             "text/javascript",
             include_bytes!("../../../contracts/user/common_sys/common/useGraphQLQuery.mjs"),
         )?,
-        store_sys2(
+        store_sys(
             "common-sys",
             "/common/SimpleUI.mjs",
             "text/javascript",
             include_bytes!("../../../contracts/user/common_sys/common/SimpleUI.mjs"),
         )?,
-        store_sys2(
+        store_sys(
             "common-sys",
             "/ui/index.js",
             "text/javascript",
             include_bytes!("../../../contracts/user/common_sys/ui/index.js"),
         )?,
-        reg_rpc2("account-sys", "account-rpc")?,
-        store_sys2(
+        reg_rpc("account-sys", "account-rpc")?,
+        store_sys(
             "account-rpc",
             "/",
             "text/html",
             include_bytes!("../../../contracts/system/rpc_account_sys/ui/index.html"),
         )?,
-        store_sys2(
+        store_sys(
             "account-rpc",
             "/ui/index.js",
             "text/javascript",
             include_bytes!("../../../contracts/system/rpc_account_sys/ui/index.js"),
         )?,
-        reg_rpc2("explore-sys", "explore-sys")?,
-        store_sys2(
+        reg_rpc("explore-sys", "explore-sys")?,
+        store_sys(
             "explore-sys",
             "/",
             "text/html",
             include_bytes!("../../../contracts/user/explore_sys/ui/index.html"),
         )?,
-        store_sys2(
+        store_sys(
             "explore-sys",
             "/ui/index.js",
             "text/javascript",

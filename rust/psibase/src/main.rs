@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use chrono::{Duration, SecondsFormat, Utc};
+use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
 use custom_error::custom_error;
 use fracpack::Packable;
@@ -12,7 +12,6 @@ use serde_json::Value;
 use std::str::FromStr;
 
 mod boot;
-mod bridge;
 
 custom_error! { Error
     BadResponseFormat   = "Invalid response format from server",
@@ -131,52 +130,7 @@ fn set_code_action(account: &str, wasm: Vec<u8>) -> Result<Action, anyhow::Error
     })
 }
 
-// TODO: replace with struct
-fn action_json(
-    sender: &str,
-    contract: &str,
-    method: &str,
-    raw_data: &str,
-) -> Result<String, anyhow::Error> {
-    Ok(format!(
-        r#"{{
-            "sender": {},
-            "contract": {},
-            "method": {},
-            "rawData": {}
-        }}"#,
-        serde_json::to_string(sender)?,
-        serde_json::to_string(contract)?,
-        serde_json::to_string(method)?,
-        serde_json::to_string(raw_data)?
-    ))
-}
-
-// TODO: replace with struct
-fn transaction_json(expiration: &str, actions: &[String]) -> Result<String, anyhow::Error> {
-    Ok(format!(
-        r#"{{
-            "tapos": {{
-                "expiration": {}
-            }},
-            "actions": [{}]
-        }}"#,
-        serde_json::to_string(expiration)?,
-        actions.join(",")
-    ))
-}
-
-// TODO: replace with struct
-fn signed_transaction_json(trx: &str) -> Result<String, anyhow::Error> {
-    Ok(format!(
-        r#"{{
-            "transaction": {}
-        }}"#,
-        trx
-    ))
-}
-
-fn reg_rpc2(contract: &str, rpc_contract: &str) -> Result<Action, anyhow::Error> {
+fn reg_rpc(contract: &str, rpc_contract: &str) -> Result<Action, anyhow::Error> {
     // todo: should we convert this action data to a proper struct?
     let data = (
         AccountNumber::from_str(contract)?,
@@ -237,32 +191,6 @@ fn store_sys(
     path: &str,
     content_type: &str,
     content: &[u8],
-) -> Result<String, anyhow::Error> {
-    action_json(
-        contract,
-        contract,
-        "storeSys",
-        &to_hex(
-            bridge::ffi::pack_upload_sys(&format!(
-                r#"{{
-                    "path": {},
-                    "contentType": {},
-                    "content": {}
-                }}"#,
-                serde_json::to_string(path)?,
-                serde_json::to_string(content_type)?,
-                serde_json::to_string(&to_hex(content))?
-            ))
-            .as_slice(),
-        ),
-    )
-}
-
-fn store_sys2(
-    contract: &str,
-    path: &str,
-    content_type: &str,
-    content: &[u8],
 ) -> Result<Action, anyhow::Error> {
     // todo: should we convert this action data to a proper struct?
     let data = (path.to_string(), content_type.to_string(), content.to_vec());
@@ -315,7 +243,7 @@ async fn install(
     actions.push(set_code_action(account, wasm)?);
 
     if register_proxy {
-        actions.push(reg_rpc2(account, account)?);
+        actions.push(reg_rpc(account, account)?);
     }
 
     let trx = wrap_basic_trx(actions);
@@ -332,17 +260,15 @@ async fn upload(
     content_type: &str,
     filename: &str,
 ) -> Result<(), anyhow::Error> {
-    let signed_json = signed_transaction_json(&transaction_json(
-        &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
-        &[store_sys(
-            contract,
-            path,
-            content_type,
-            &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
-        )?],
-    )?)?;
-    let packed_signed = bridge::ffi::pack_signed_transaction(&signed_json);
-    push_transaction(args, client, packed_signed.as_slice().into()).await?;
+    let actions = vec![store_sys(
+        contract,
+        path,
+        content_type,
+        &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
+    )?];
+    let trx = wrap_basic_trx(actions);
+
+    push_transaction(args, client, trx.packed_bytes()).await?;
     println!("Ok");
     Ok(())
 }
