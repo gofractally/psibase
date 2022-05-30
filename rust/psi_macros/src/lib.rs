@@ -6,7 +6,7 @@ use proc_macro_error::proc_macro_error;
 mod contract_macro;
 mod fracpack_macro;
 
-#[proc_macro_derive(Fracpack)]
+#[proc_macro_derive(Fracpack, attributes(fracpack))]
 pub fn derive_fracpack(input: TokenStream) -> TokenStream {
     fracpack_macro_impl(input)
 }

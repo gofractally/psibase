@@ -6,6 +6,8 @@ fn main() {
         .file("../../external/simdjson/simdjson.cpp")
         .flag("-std=gnu++2a")
         .flag("-Wno-sign-compare") // TODO
+        .flag("-Wno-missing-field-initializers") // TODO
+        .flag("-Wno-unused-local-typedef") // TODO
         .flag("-Wno-ambiguous-reversed-operator") // TODO
         .include(Path::new("../../libraries/psio/include"))
         .include(Path::new("../../libraries/psio/consthash/include"))

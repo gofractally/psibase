@@ -1,3 +1,9 @@
+// #![feature(structural_match)]
+// #![feature(core_intrinsics)]
+// #![feature(core_panic)]
+// #![feature(fmt_internals)]
+// #![feature(print_internals)]
+
 pub mod bridge;
 
 use psi_macros::Fracpack;
@@ -8,6 +14,25 @@ pub enum Variant {
     ItemU32(u32),
     ItemStr(String),
     // ItemOptStr(Option<String>),  TODO: broken in C++
+}
+
+#[derive(Fracpack, PartialEq, Debug)]
+#[fracpack(definition_will_not_change)]
+pub struct DefWontChangeInnerStruct {
+    pub field_bool: bool,
+    pub field_u32: u32,
+    pub field_var: Variant,
+    pub field_i16: i16,
+    pub field_o_var: Option<Variant>,
+    pub field_str: String,
+    pub field_a_i16_3: [i16; 3],
+    pub field_f32: f32,
+    pub field_o_v_i8: Option<Vec<i8>>,
+    pub field_a_s_2: [String; 2],
+    pub field_f64: f64,
+    pub field_o_str: Option<String>,
+    pub field_v_u16: Vec<u16>,
+    pub field_i32: i32,
 }
 
 #[derive(Fracpack, PartialEq, Debug)]
@@ -34,6 +59,7 @@ pub struct OuterStruct {
     pub field_f32: f32,
     pub field_f64: f64,
     pub field_inner: InnerStruct,
+    pub field_u_inner: DefWontChangeInnerStruct,
     pub field_v_inner: Vec<InnerStruct>,
     pub field_option_u8: Option<u8>,
     pub field_option_u16: Option<u16>,
@@ -46,9 +72,81 @@ pub struct OuterStruct {
     pub field_option_str: Option<String>,
     pub field_option_f32: Option<f32>,
     pub field_option_f64: Option<f64>,
+    pub field_option_sws: Option<SimpleWithString>,
+    pub field_option_sns: Option<SimpleWithNoString>,
     pub field_option_inner: Option<InnerStruct>,
+    pub field_option_u_inner: Option<DefWontChangeInnerStruct>,
     pub field_o_o_i8: Option<Option<i8>>,
     pub field_o_o_str: Option<Option<String>>,
     pub field_o_o_str2: Option<Option<String>>,
     pub field_o_o_inner: Option<Option<InnerStruct>>,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(definition_will_not_change)]
+pub struct SimpleWithNoString {
+    pub a: u32,
+    pub b: u64,
+    pub c: u16,
+    pub f: f32,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(definition_will_not_change)]
+pub struct SimpleWithString {
+    pub a: u32,
+    pub b: u64,
+    pub c: u16,
+    pub s: String,
+    pub f: f32,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+pub struct ParentStruct {
+    pub oa: u32,
+    pub ob: u64,
+    pub oc: u16,
+    pub ar: [i16; 3],
+    pub is: SimpleWithString,
+    pub vu32: Vec<u32>,
+    pub ar_s: [String; 3],
+    pub z: bool,
+    pub s: String,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+pub struct OuterSimpleArray {
+    pub oa: u32,
+    pub ob: u64,
+    pub oc: u16,
+    pub arrs: [String; 3],
+    pub s: String,
+    pub sti163: ThreeElementsFixedStruct,
+    pub ari163: [i16; 3],
+    pub z: bool,
+}
+
+// TODO: check arrays, tuples, bool, char,
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(definition_will_not_change)]
+pub struct UnextensibleWithOptions {
+    pub a: u32,
+    pub opt_a: Option<u32>,
+    pub b: u64,
+    pub opt_b: Option<u64>,
+    pub c: u16,
+    pub opt_c: Option<u16>,
+    pub s: String,
+    pub opt_s: Option<String>,
+    pub f: f32,
+    pub opt_f: Option<f32>,
+}
+
+#[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(definition_will_not_change)]
+pub struct ThreeElementsFixedStruct {
+    pub element_1: i16,
+    pub element_2: i16,
+    pub element_3: i16,
 }
