@@ -716,7 +716,7 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
         if Self::USE_HEAP {
             dest.extend_from_slice(&0_u32.to_le_bytes());
         } else {
-            Self::pack(&self, dest);
+            Self::pack(self, dest);
         }
     }
 
@@ -729,7 +729,7 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
 
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
         if Self::USE_HEAP {
-            Self::pack(&self, dest);
+            Self::pack(self, dest);
         }
     }
 
@@ -761,7 +761,7 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
         dest.extend_from_slice(&1u32.to_le_bytes())
     }
     fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-        if let Some(_) = opt {
+        if opt.is_some() {
             dest[fixed_pos as usize..fixed_pos as usize + 4]
                 .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes())
         }
