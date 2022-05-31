@@ -17,6 +17,7 @@
     - [Magic Numbers](cpp-contract/reference/magic-numbers.md)
     - [Native Functions](cpp-contract/reference/native-functions.md)
 - [Rust Contracts]()
+- [HTTP and Javascript](http.md)
 - [System Contracts]()
   - [common-sys](system-contract/common-sys.md)
   - [proxy-sys](system-contract/proxy-sys.md)

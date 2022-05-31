@@ -279,11 +279,7 @@ namespace psibase::http
             return send(ok_no_content());
          }
 
-         // TODO: simplify rule for separating native vs contract
-         else if (req.target() == "/" || req.target().starts_with("/rpc") ||
-                  req.target().starts_with("/common") || req.target().starts_with("/ui") ||
-                  host != server.http_config->host && host.ends_with(server.http_config->host) &&
-                      !req.target().starts_with("/native"))
+         else if (!req.target().starts_with("/native"))
          {
             RpcRequestData data;
             if (req.method() == bhttp::verb::get)
@@ -365,6 +361,7 @@ namespace psibase::http
          else if (req.target() == "/native/push_transaction" && req.method() == bhttp::verb::post &&
                   server.http_config->push_transaction_async)
          {
+            // TODO: prevent an http timeout from disconnecting or reporting a failure when the transaction was successful
             server.http_config->push_transaction_async(
                 std::move(req.body()),
                 [error, ok, session = send.self.derived_session().shared_from_this(),
@@ -412,6 +409,8 @@ namespace psibase::http
          }
          else
          {
+            // TODO: remove this code?
+
             // Make sure we can handle the method
             if (req.method() != bhttp::verb::get && req.method() != bhttp::verb::head)
                return send(bad_request("Unknown HTTP-method"));
