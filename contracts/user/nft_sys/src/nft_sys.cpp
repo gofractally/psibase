@@ -132,7 +132,7 @@ void NftSys::debit(NID nftId, const_view<String> memo)
    emit().ui().transferred(nftId, creditor, debiter, memo);
 }
 
-void NftSys::setConfig(psibase::NamedBit_t flag, bool enable)
+void NftSys::setUserConf(psibase::NamedBit_t flag, bool enable)
 {
    auto sender  = getSender();
    auto record  = getNftHolder(sender);
@@ -145,7 +145,7 @@ void NftSys::setConfig(psibase::NamedBit_t flag, bool enable)
 
    db.open<NftHolderTable_t>().put(record);
 
-   emit().ui().configChanged(sender, flag, enable);
+   emit().ui().userConfSet(sender, flag, enable);
 }
 
 NftRecord NftSys::getNft(NID nftId)
@@ -204,7 +204,7 @@ bool NftSys::exists(NID nftId)
    return db.open<NftTable_t>().getIndex<0>().get(nftId).has_value();
 }
 
-bool NftSys::getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag)
+bool NftSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit_t flag)
 {
    auto hodler = db.open<NftHolderTable_t>().getIndex<0>().get(account);
    if (hodler.has_value() == false)

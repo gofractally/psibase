@@ -51,7 +51,7 @@ namespace UserContract
       Quantity           maxSupply;
       SID                symbolId;
 
-      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"}>;
+      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"}, psibase::NamedBit_t{"untradeable"}, psibase::NamedBit_t{"frozen"}>;
 
       static bool isValidKey(TID tokenId)
       {

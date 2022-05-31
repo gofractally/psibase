@@ -30,8 +30,17 @@ namespace
       return sumOverflows(addend1, addend2) || addend1 + addend2 > limit;
    }
 
-   constexpr auto unrecallable = "unrecallable"_m;
-   constexpr auto manualDebit  = "manualDebit"_m;
+   namespace userConfig
+   {
+      constexpr auto manualDebit = psibase::NamedBit_t{"manualDebit"};
+   }
+
+   namespace tokenConfig
+   {
+      constexpr auto unrecallable = psibase::NamedBit_t{"unrecallable"};
+      constexpr auto untradeable  = psibase::NamedBit_t{"untradeable"};
+   }  // namespace tokenConfig
+
 }  // namespace
 
 TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
@@ -46,23 +55,30 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
 
 void TokenSys::init()
 {
+   // Set initialized flag
    auto initTable = db.open<InitTable_t>();
    auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
+   emit().ui().initialized();
+
+   auto tokContract = at<TokenSys>();
+   auto nftContract = at<NftSys>();
 
    // Configure manual debit for self and NFT
-   at<TokenSys>().setConfig(manualDebit, true);
-   at<NftSys>().setConfig(manualDebit, true);
+   tokContract.setUserConf(userConfig::manualDebit, true);
+   nftContract.setUserConf(userConfig::manualDebit, true);
 
    // Create system token
-   auto tid = at<TokenSys>().create(Precision{8}, Quantity{1'000'000'000e8});
+   auto tid = tokContract.create(Precision{8}, Quantity{1'000'000'000e8});
    check(tid == TID{1}, wrongSysTokenId);
 
-   auto tokenNft = getToken(tid).ownerNft;
-   at<NftSys>().credit(tokenNft, SymbolSys::contract, "Passing system token ownership");
+   // Make system token default untradeable
+   tokContract.setTokenConf(tid, tokenConfig::untradeable, true);
 
-   emit().ui().initialized();
+   // Pass system token ownership to symbol contract
+   auto tNft = getToken(tid).ownerNft;
+   nftContract.credit(tNft, SymbolSys::contract, "Passing system token ownership");
 }
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
@@ -99,14 +115,12 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
 
 void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
 {
-   auto sender      = getSender();
-   auto token       = getToken(tokenId);
-   auto balance     = getBalance(tokenId, sender);
-   auto nftContract = at<NftSys>();
+   auto sender  = getSender();
+   auto token   = getToken(tokenId);
+   auto balance = getBalance(tokenId, sender);
 
    check(amount.value > 0, quantityGt0);
-   check(nftContract.exists(token.ownerNft), missingRequiredAuth);
-   check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
+   check(_isSenderIssuer(tokenId), missingRequiredAuth);
    check(not sumExceeds(token.currentSupply.value, amount.value, token.maxSupply.value),
          maxSupplyExceeded);
 
@@ -116,22 +130,6 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
    db.open<BalanceTable_t>().put(balance);
 
    emit().ui().minted(tokenId, sender, amount, memo);
-}
-
-void TokenSys::setUnrecallable(TID tokenId)
-{
-   auto sender          = getSender();
-   auto token           = getToken(tokenId);
-   auto nftContract     = at<NftSys>();
-   auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
-
-   check(nftContract.exists(token.ownerNft), missingRequiredAuth);
-   check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
-
-   token.config.set(unrecallableBit, true);
-   db.open<TokenTable_t>().put(token);
-
-   emit().ui().setUnrecallable(tokenId, sender);
 }
 
 void TokenSys::burn(TID tokenId, Quantity amount)
@@ -157,7 +155,7 @@ void TokenSys::burn(TID tokenId, Quantity amount)
    emit().ui().burned(tokenId, sender, amount);
 }
 
-void TokenSys::setConfig(psibase::NamedBit_t flag, bool enable)
+void TokenSys::setUserConf(psibase::NamedBit_t flag, bool enable)
 {
    auto sender  = getSender();
    auto hodler  = getTokenHolder(sender);
@@ -168,24 +166,47 @@ void TokenSys::setConfig(psibase::NamedBit_t flag, bool enable)
    hodler.config.set(flagBit, enable);
    db.open<TokenHolderTable_t>().put(hodler);
 
-   emit().ui().configChanged(sender, flag, enable);
+   emit().ui().userConfSet(sender, flag, enable);
+}
+
+void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit_t flag, bool enable)
+{
+   check(_isSenderIssuer(tokenId), missingRequiredAuth);
+   if (flag == tokenConfig::unrecallable)
+   {
+      check(enable, invalidConfigUpdate);
+   }
+
+   auto token     = getToken(tokenId);
+   auto flagIndex = TokenRecord::Configurations::getIndex(flag);
+
+   token.config.set(flagIndex, enable);
+   db.open<TokenTable_t>().put(token);
+
+   emit().ui().tokenConfSet(tokenId, getSender(), flag, enable);
 }
 
 void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
 {
-   auto sender  = getSender();
-   auto balance = getBalance(tokenId, sender);
+   auto sender      = getSender();
+   auto balance     = getBalance(tokenId, sender);
+   auto token       = getToken(tokenId);
+   auto untradeable = getTokenConf(tokenId, tokenConfig::untradeable);
 
    check(amount.value > 0, quantityGt0);
    check(amount.value <= balance.balance, insufficientBalance);
+   if (not _isSenderIssuer(tokenId))
+   {  // Token issuer may still distribute untradeable tokens
+      check(untradeable == false, tokenUntradeable);
+   }
 
    balance.balance -= amount.value;
    db.open<BalanceTable_t>().put(balance);
 
    emit().ui().credited(tokenId, sender, receiver, amount, memo);
-   auto manualDebitFlag = TokenHolderConfig::getIndex("manualDebit"_m);
-   bool manualDebit     = getTokenHolder(receiver).config.get(manualDebitFlag);
-   if (manualDebit)
+   auto manualDebitFlag = TokenHolderConfig::getIndex(userConfig::manualDebit);
+   bool manualDebitBit  = getTokenHolder(receiver).config.get(manualDebitFlag);
+   if (manualDebitBit)
    {
       auto sharedBalance = getSharedBal(tokenId, sender, receiver);
       sharedBalance.balance += amount.value;
@@ -259,11 +280,9 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    auto sender          = getSender();
    auto token           = getToken(tokenId);
    auto fromBalance     = getBalance(tokenId, from);
-   auto nftContract     = at<NftSys>();
-   auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
+   auto unrecallableBit = TokenRecord::Configurations::getIndex(tokenConfig::unrecallable);
 
-   check(nftContract.exists(token.ownerNft), missingRequiredAuth);
-   check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
+   check(_isSenderIssuer(tokenId), missingRequiredAuth);
    check(not token.config.get(unrecallableBit), tokenUnrecallable);
    check(amount.value > 0, quantityGt0);
    check(fromBalance.balance >= amount.value, insufficientBalance);
@@ -280,29 +299,25 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
 void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 {
    auto sender      = getSender();
-   auto symbol      = at<SymbolSys>().getSymbol(symbolId);
+   auto symbol      = at<SymbolSys>().getSymbol(symbolId).unpack();
    auto token       = getToken(tokenId);
-   NID  nft         = symbol->ownerNft();
    auto nftContract = at<NftSys>();
 
-   check(nft != NID{0}, symbolDNE);
-   check(nftContract.exists(nft), missingRequiredAuth);
+   check(symbol.ownerNft != NID{0}, symbolDNE);
+   check(nftContract.exists(symbol.ownerNft), missingRequiredAuth);
    check(token.symbolId == SID{0}, tokenHasSymbol);
-   check(token.ownerNft != NID{0}, missingRequiredAuth);
-   check(nftContract.exists(token.ownerNft), missingRequiredAuth);
-   check(nftContract.getNft(token.ownerNft)->owner() == sender, missingRequiredAuth);
-   check(token.symbolId == SID{0}, tokenHasSymbol);
+   check(_isSenderIssuer(tokenId), missingRequiredAuth);
 
    // Take ownership of the symbol owner NFT
    auto debitMemo = "Mapping symbol " + symbolId.str() + " to token " + std::to_string(tokenId);
-   nftContract.debit(nft, debitMemo);
+   nftContract.debit(symbol.ownerNft, debitMemo);
 
    // Store mapping
    token.symbolId = symbolId;
    db.open<TokenTable_t>().put(token);
 
    // Destroy symbol owner NFT, it can never be used or traded again
-   nftContract.burn(nft);
+   nftContract.burn(symbol.ownerNft);
 
    // Emit mapped event
    emit().ui().symbolMapped(tokenId, sender, symbolId);
@@ -400,7 +415,7 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
    return record;
 }
 
-bool TokenSys::getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag)
+bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit_t flag)
 {
    auto hodler = db.open<TokenHolderTable_t>().getIndex<0>().get(account);
    if (hodler.has_value() == false)
@@ -413,10 +428,27 @@ bool TokenSys::getConfig(psibase::AccountNumber account, psibase::NamedBit_t fla
    }
 }
 
+bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit_t flag)
+{
+   auto token     = getToken(tokenId);
+   auto flagIndex = TokenRecord::Configurations::getIndex(flag);
+
+   return token.config.get(flagIndex);
+}
+
 void TokenSys::_checkAccountValid(psibase::AccountNumber account)
 {
    check(at<account_sys>().exists(account), invalidAccount);
    check(account != AccountNumber{0}, invalidAccount);
+}
+
+bool TokenSys::_isSenderIssuer(TID tokenId)
+{
+   auto token       = getToken(tokenId);
+   auto nftContract = at<NftSys>();
+
+   return nftContract.exists(token.ownerNft) &&
+          nftContract.getNft(token.ownerNft)->owner() == getSender();
 }
 
 PSIBASE_DISPATCH(UserContract::TokenSys)

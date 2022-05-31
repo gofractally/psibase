@@ -33,14 +33,13 @@ namespace UserContract
 
       void mint(TID tokenId, Quantity amount, psio::const_view<psibase::String> memo);
 
-      void setUnrecallable(TID tokenId);
-
       //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
       //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
 
       void burn(TID tokenId, Quantity amount);
 
-      void setConfig(psibase::NamedBit_t flag, bool enable);
+      void setUserConf(psibase::NamedBit_t flag, bool enable);
+      void setTokenConf(TID tokenId, psibase::NamedBit_t flag, bool enable);
 
       void credit(TID                               tokenId,
                   psibase::AccountNumber            receiver,
@@ -64,6 +63,8 @@ namespace UserContract
 
       void mapSymbol(TID tokenId, SID symbolId);
 
+      void setCustomTok(TID tokenId, psibase::AccountNumber contract) {}
+
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
       SID                 getTokenSymbol(TID tokenId);
@@ -73,12 +74,14 @@ namespace UserContract
                                        psibase::AccountNumber creditor,
                                        psibase::AccountNumber debitor);
       TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
-      bool                getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag);
+      bool                getUserConf(psibase::AccountNumber account, psibase::NamedBit_t flag);
+      bool                getTokenConf(TID tokenId, psibase::NamedBit_t flag);
 
      private:
       tables db{contract};
 
       void _checkAccountValid(psibase::AccountNumber account);
+      bool _isSenderIssuer(TID tokenId);
 
      public:
       struct Events
@@ -92,9 +95,9 @@ namespace UserContract
             void initialized() {}
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
             void minted(TID tokenId, Account minter, Quantity amount, StringView memo) {}
-            void setUnrecallable(TID tokenId, Account setter) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
-            void configChanged(Account account, psibase::NamedBit_t flag, bool enable) {}
+            void userConfSet(Account account, psibase::NamedBit_t flag, bool enable) {}
+            void tokenConfSet(TID tokenId, Account setter, psibase::NamedBit_t flag, bool enable) {}
             void symbolMapped(TID tokenId, Account account, SID symbolId) {}
             //};
 
@@ -118,10 +121,10 @@ namespace UserContract
       method(init),
       method(create, precision, maxSupply),
       method(mint, tokenId, amount, memo),
-      method(setUnrecallable, tokenId, flag),
       
       method(burn, tokenId, amount),
-      method(setConfig, flag, enable),
+      method(setUserConf, flag, enable),
+      method(setTokenConf, tokenId, flag, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, maxAmount, memo),
       method(debit, tokenId, sender, amount, memo),
@@ -131,16 +134,18 @@ namespace UserContract
       method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
-      method(getConfig, account, flag),
-      method(mapSymbol, symbolId, tokenId)
+      method(getUserConf, account, flag),
+      method(getTokenConf, tokenId, flag),
+      method(mapSymbol, symbolId, tokenId),
+      method(setCustomTok, tokenId, contract)
     );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
       method(initialized),
       method(created, tokenId, creator, precision, maxSupply),
       method(minted, tokenId, minter, amount, memo),
-      method(setUnrecallable, tokenId, setter),
       method(burned, tokenId, burner, amount),
-      method(configChanged, account, flag, enable),
+      method(userConfSet, account, flag, enable),
+      method(tokenConfSet, tokenId, setter, flag, enable),
       method(symbolMapped, tokenId, account, symbolId),
    //);
    //PSIBASE_REFLECT_UI_EVENTS(TokenSys, 

@@ -17,5 +17,7 @@ namespace UserContract
       constexpr std::string_view noMappedSymbol      = "Token has no mapped symbol";
       constexpr std::string_view tokenHasSymbol      = "Token already has a symbol";
       constexpr std::string_view wrongSysTokenId     = "System token must have TID: 1";
+      constexpr std::string_view invalidConfigUpdate = "Invalid configuration update";
+      constexpr std::string_view tokenUntradeable    = "Token untradeable";
    }  // namespace Errors
 }  // namespace UserContract
