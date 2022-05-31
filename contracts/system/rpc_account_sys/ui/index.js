@@ -57,7 +57,7 @@ async function newAccount(name, authContract, addMsg, clearMsg) {
                 actions: [action],
             },
         };
-        const trace = await pushedSignedTransaction(signedTrx);
+        const trace = await pushedSignedTransaction('', signedTrx);
 
         addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {

@@ -6,23 +6,21 @@ export class RPCError extends Error {
 }
 
 export async function throwIfError(response) {
-    if (!response.ok) {
-        const text = await response.text();
-        let json;
-        try {
-            json = JSON.parse(text);
-        } catch {
-            throw new RPCError(text);
-        }
-        if (json?.error?.what)
-            throw new RPCError(json.error.what);
-        throw new RPCError(text);
-    }
+    if (!response.ok)
+        throw new RPCError(await response.text());
     return response;
 }
 
-export async function get(url, text) {
+export async function get(url) {
     return await throwIfError(await fetch(url, { method: 'GET' }));
+}
+
+export async function getText(url) {
+    return await (await get(url)).text();
+}
+
+export async function getJson(url) {
+    return await (await get(url)).json();
 }
 
 export async function postText(url, text) {
@@ -65,14 +63,6 @@ export async function postArrayBuffer(url, arrayBuffer) {
     }));
 }
 
-export async function getText(url) {
-    return await (await get(url)).text();
-}
-
-export async function getJson(url) {
-    return await (await get(url)).json();
-}
-
 export async function postTextGetJson(url, text) {
     return await (await postText(url, text)).json();
 }
@@ -97,19 +87,19 @@ export async function postArrayBufferGetJson(url, arrayBuffer) {
     return await (await postArrayBuffer(url, arrayBuffer)).json();
 }
 
-export async function packSignedTransaction(signedTransaction) {
-    return await postJsonGetArrayBuffer('/common/pack/SignedTransaction', signedTransaction);
+export async function packSignedTransaction(baseUrl, signedTransaction) {
+    return await postJsonGetArrayBuffer(baseUrl + '/common/pack/SignedTransaction', signedTransaction);
 }
 
-export async function pushPackedTransaction(packed) {
-    const trace = await postArrayBufferGetJson('/native/push_transaction', packed);
+export async function pushPackedTransaction(baseUrl, packed) {
+    const trace = await postArrayBufferGetJson(baseUrl + '/native/push_transaction', packed);
     if (trace.error)
         throw new RPCError(trace.error, trace);
     return trace;
 }
 
-export async function pushedSignedTransaction(signedTransaction) {
-    return await pushPackedTransaction(await packSignedTransaction(signedTransaction));
+export async function pushedSignedTransaction(baseUrl, signedTransaction) {
+    return await pushPackedTransaction(baseUrl, await packSignedTransaction(baseUrl, signedTransaction));
 }
 
 export function uint8ArrayToHex(data) {

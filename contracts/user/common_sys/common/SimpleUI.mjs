@@ -18,7 +18,7 @@ async function pushTransaction(transaction, addMsg, clearMsg) {
                 '/pack_action/' + action.method, action.data)));
             addMsg('rawData: ' + action.rawData);
         }
-        const trace = await pushedSignedTransaction({ transaction });
+        const trace = await pushedSignedTransaction('', { transaction });
         addMsg('\nPushed\n');
         addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {

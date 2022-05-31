@@ -41,23 +41,6 @@ using unixs = boost::asio::local::stream_protocol;  // from <boost/asio/local/st
 using namespace std::literals;
 using std::chrono::steady_clock;  // To create explicit timer
 
-struct error_info
-{
-   int64_t          code    = {};
-   std::string      name    = {};
-   std::string      what    = {};
-   std::vector<int> details = {};
-};
-PSIO_REFLECT(error_info, code, name, what, details)
-
-struct error_results
-{
-   uint16_t    code    = {};
-   std::string message = {};
-   error_info  error   = {};
-};
-PSIO_REFLECT(error_results, code, message, error)
-
 namespace psibase::http
 {
    // Report a failure
@@ -471,22 +454,8 @@ namespace psibase::http
       }
       catch (const std::exception& e)
       {
-         try
-         {
-            // elog("query failed: ${s}", ("s", e.what()));
-            error_results err;
-            err.code       = (uint16_t)bhttp::status::internal_server_error;
-            err.message    = "Internal Service Error";
-            err.error.name = "exception";
-            err.error.what = e.what();
-            return send(error(bhttp::status::internal_server_error, psio::convert_to_json(err),
-                              "application/json"));
-         }
-         catch (...)
-         {  //
-            return send(error(bhttp::status::internal_server_error,
-                              "failure reporting exception failure\n"));
-         }
+         return send(
+             error(bhttp::status::internal_server_error, "exception: " + std::string(e.what())));
       }
       catch (...)
       {
