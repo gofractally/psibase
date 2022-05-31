@@ -71,6 +71,17 @@ namespace psibase
 
       if (request.method == "POST")
       {
+         if (request.target == "/common/pack/Transaction")
+         {
+            request.body.push_back(0);
+            psio::json_token_stream jstream{request.body.data()};
+            Transaction             trx;
+            psio::from_json(trx, jstream);
+            return RpcReplyData{
+                .contentType = "application/octet-stream",
+                .body        = psio::convert_to_frac(trx),
+            };
+         }
          if (request.target == "/common/pack/SignedTransaction")
          {
             request.body.push_back(0);

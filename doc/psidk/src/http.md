@@ -51,14 +51,15 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 The [common-sys contract](system-contract/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
-| Request                               | Description                                                                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `GET /common/thiscontract`            | Returns a JSON string containing the contract associated with the domain. If it's the root domain, returns `"common-sys"` |
-| `GET /common/rootdomain`              | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                     |
-| `GET /common/rootdomain.js`           | See below.                                                                                                                |
-| `GET /common/rootdomain.mjs`          | See below.                                                                                                                |
-| `POST /common/pack/SignedTransaction` | [Packs a transaction](#pack-transaction)                                                                                  |
-| `GET /common/<other>`                 | [Common files](#common-files)                                                                                             |
+| Method | URL                              | Description                                                                                                               |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/common/thiscontract`           | Returns a JSON string containing the contract associated with the domain. If it's the root domain, returns `"common-sys"` |
+| `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                     |
+| `GET`  | `/common/rootdomain.js`          | See below.                                                                                                                |
+| `GET`  | `/common/rootdomain.mjs`         | See below.                                                                                                                |
+| `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction)                                                                                  |
+| `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction)                                                                           |
+| `GET`  | `/common/<other>`                | [Common files](#common-files)                                                                                             |
 
 `GET /common/rootdomain.js` returns a script like the following:
 
@@ -86,16 +87,65 @@ export function siblingUrl(contract, path) {
 
 Example uses:
 
-- `siblingUrl('', '/foo/bar')`: URL to `/foo/bar` on the root domain
-- `siblingUrl('other-contract', '/foo/bar')`: URL to `/foo/bar` on the `other-contract` domain
+- `siblingUrl('', '/foo/bar')`: Gets URL to `/foo/bar` on the root domain
+- `siblingUrl('other-contract', '/foo/bar')`: Gets URL to `/foo/bar` on the `other-contract` domain
 
 ### Pack transaction
 
-TODO
+`/common/pack/Transaction` and `/common/pack/SignedTransaction` use fracpack to convert unsigned and signed transactions to binary. They accept JSON as input and return the binary data.
+
+`Transaction` has these fields:
+
+```
+{
+  "tapos": {
+    "expiration": "..." // When transaction expires (UTC)
+                        // Example value: "2022-05-31T21:32:23Z"
+                        // Use `new Date(...)` to generate the correct format.
+  },
+  "actions": [],        // See Action
+  "claims": []          // See Claim
+}
+```
+
+TODO: document additional tapos fields once they're operational
+
+`SignedTransaction` has these fields:
+
+```
+{
+  "transaction": {},    // See Transaction above
+  "proofs": []          // See Proof
+}
+```
+
+`Action` has these fields. See [Packing actions](#packing-actions).
+
+```
+{
+  "sender": "...",      // The account name authorizing the action
+  "contract": "...",    // The contract name to receive the action
+  "method": "...",      // The method name of the action
+  "rawData": "..."      // Hex string containing action data (arguments)
+}
+```
+
+`Claim` has these fields. See [Signing](#signing) to fill claims and proofs.
+
+```
+{
+  "contract": "...",    // The contract which verifies the proof meets
+                        // the claim, e.g. "verify-ec-sys"
+  "rawData": "..."      // Hex string containing the claim data.
+                        // e.g. `verify-ec-sys` expects a public key.
+}
+```
+
+`Proof` is a hex string containing data which proves the claim. e.g. `verify-ec-sys` expects a signature. See [Signing](#signing) to fill claims and proofs.
 
 ### Common files
 
-`common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action. `psibase boot` installs the following files:
+`common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). `psibase boot` installs this default set of files while booting the chain:
 
 | Path                          | Description                                 |
 | ----------------------------- | ------------------------------------------- |
@@ -136,11 +186,16 @@ TODO
 
 ##### Transactions
 
-| Function                                 | Description                                                                                                                                                                                             |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packSignedTransaction(baseUrl, trx)`    | Async function. Packs a transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                              |
-| `pushPackedTransaction(baseUrl, packed)` | Async function. Pushes a transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction). |
-| `pushedSignedTransaction(baseUrl, trx)`  | Async function. Packs then pushes a transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                 |
+| Function                                 | Description                                                                                                                                                                                                           |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packTransaction(baseUrl, trx)`          | Async function. Packs a transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                            |
+| `packSignedTransaction(baseUrl, trx)`    | Async function. Packs a signed transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                     |
+| `pushPackedTransaction(baseUrl, packed)` | Async function. Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction). |
+| `pushedSignedTransaction(baseUrl, trx)`  | Async function. Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                        |
+
+#### Signing
+
+TODO
 
 #### React GraphQL hooks
 
@@ -151,5 +206,9 @@ TODO
 TODO
 
 ## Contract-provided services
+
+TODO
+
+### Packing actions
 
 TODO
