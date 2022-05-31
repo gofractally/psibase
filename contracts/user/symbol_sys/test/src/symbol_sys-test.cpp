@@ -25,8 +25,9 @@ namespace
        {NftSys::contract, "nft_sys.wasm"},
        {SymbolSys::contract, "symbol_sys.wasm"}};
 
-   const String memo{"memo"};
-   const TID    sysToken{TokenSys::sysToken};
+   const String   memo{"memo"};
+   const TID      sysToken{TokenSys::sysToken};
+   constexpr auto untradeable = "untradeable"_m;
 
    using Quantity_t = Quantity::Quantity_t;
 
@@ -56,10 +57,11 @@ SCENARIO("Buying a symbol")
       alice.at<TokenSys>().init();
       alice.at<SymbolSys>().init();
 
-      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
-      tokenContract.mint(sysToken, 20'000e8, memo);
-      tokenContract.credit(sysToken, alice, 10'000e8, memo);
-      tokenContract.credit(sysToken, bob, 10'000e8, memo);
+      auto sysIssuer = t.as(SymbolSys::contract).at<TokenSys>();
+      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.mint(sysToken, 20'000e8, memo);
+      sysIssuer.credit(sysToken, alice, 10'000e8, memo);
+      sysIssuer.credit(sysToken, bob, 10'000e8, memo);
 
       t.start_block();
 
@@ -191,10 +193,11 @@ SCENARIO("Measuring price increases")
       alice.at<TokenSys>().init();
       alice.at<SymbolSys>().init();
 
-      auto aliceBalance  = 1'000'000e8;
-      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
-      tokenContract.mint(sysToken, aliceBalance, memo);
-      tokenContract.credit(sysToken, alice, aliceBalance, memo);
+      auto aliceBalance = 1'000'000e8;
+      auto sysIssuer    = t.as(SymbolSys::contract).at<TokenSys>();
+      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.mint(sysToken, aliceBalance, memo);
+      sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
       t.start_block();
 
@@ -318,10 +321,11 @@ SCENARIO("Using symbol ownership NFT")
       alice.at<SymbolSys>().init();
 
       // Mint token used for purchasing symbols
-      auto aliceBalance  = 1'000'000e8;
-      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
-      tokenContract.mint(sysToken, 20'000e8, memo);
-      tokenContract.credit(sysToken, alice, aliceBalance, memo);
+      auto aliceBalance = 1'000'000e8;
+      auto sysIssuer    = t.as(SymbolSys::contract).at<TokenSys>();
+      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.mint(sysToken, 20'000e8, memo);
+      sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
       // Create the symbol and claim the owner NFT
       auto symbolCost = a.getPrice(3).returnVal();
@@ -373,11 +377,12 @@ SCENARIO("Buying and selling symbols")
       alice.at<SymbolSys>().init();
 
       // Fund Alice and Bob with the system token
-      auto userBalance   = 1'000'000e8;
-      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
-      tokenContract.mint(sysToken, 2 * userBalance, memo);
-      tokenContract.credit(sysToken, alice, userBalance, memo);
-      tokenContract.credit(sysToken, bob, userBalance, memo);
+      auto userBalance = 1'000'000e8;
+      auto sysIssuer   = t.as(SymbolSys::contract).at<TokenSys>();
+      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.mint(sysToken, 2 * userBalance, memo);
+      sysIssuer.credit(sysToken, alice, userBalance, memo);
+      sysIssuer.credit(sysToken, bob, userBalance, memo);
 
       // Create system symbol
       auto sysSymbol  = SID{"sys"};
