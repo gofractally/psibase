@@ -63,8 +63,6 @@ namespace UserContract
 
       void mapSymbol(TID tokenId, SID symbolId);
 
-      void setCustomTok(TID tokenId, psibase::AccountNumber contract) {}
-
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
       SID                 getTokenSymbol(TID tokenId);
@@ -136,8 +134,7 @@ namespace UserContract
       method(getSharedBal, tokenId, creditor, debitor),
       method(getUserConf, account, flag),
       method(getTokenConf, tokenId, flag),
-      method(mapSymbol, symbolId, tokenId),
-      method(setCustomTok, tokenId, contract)
+      method(mapSymbol, symbolId, tokenId)
     );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
       method(initialized),
