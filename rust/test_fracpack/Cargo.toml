@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 cxx = "1.0"
 fracpack = { version = "0.1.0", path = "../fracpack" }
+hex = "0.3.1"
 psi_macros = { version = "0.1.0", path = "../psi_macros" }
 
 [build-dependencies]

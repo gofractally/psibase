@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
 
