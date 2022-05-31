@@ -42,8 +42,8 @@ namespace psidb
       void         deallocate(void* ptr, std::size_t size) { return ::operator delete(ptr); }
       page_header* allocate_page(page_header* src)
       {
-         // Only one thread will allocate new pages -- WRONG because reader threads load from disk
-         auto result = _head;
+         std::lock_guard l{_allocate_mutex};
+         auto            result = _head;
          if (result == nullptr)
          {
             _head = result = _free_pool.exchange(nullptr, std::memory_order_acquire);
@@ -126,8 +126,20 @@ namespace psidb
          }
          else
          {
-            if (_rescanning.load(std::memory_order_relaxed))
+            // The prior loads or _gc_flag in is_marked/is_new.
+            std::atomic_thread_fence(std::memory_order_acquire);
+            // acquire to ensure that eviction marks are visible to rescan_root
+            if (_rescanning.load(std::memory_order_acquire))
             {
+               // - If this thread's barrier entry happens before the initial gc thread barrier,
+               //   then _rescanning must be false, because of the acquire fence above.
+               // - If the final gc thread barrier happens before this thread's barrier entry,
+               //   then all reachable pages are either marked or new and no reachable pages
+               //   are evicted.  i.e. we can't get here.
+               // - If this thread's barrier entry happens before the final gc thread barrier,
+               //   then all evicted pages are marked as evicted and this thread's barrier
+               //   exit will also happen before the final gc thread barrier.  Therefore,
+               //   nothing will be freed before this function returns and rescan_root is safe.
                rescan_root(src);
                mark_new(dest);
             }
@@ -219,11 +231,11 @@ namespace psidb
      private:
       void set_gc_flag(page_header* header, gc_flag_type value)
       {
-         _page_flags[get_id(header)].store(value, std::memory_order_relaxed);
+         _page_flags[get_id(header)].store(value, std::memory_order_release);
       }
       gc_flag_type get_gc_flag(page_header* header)
       {
-         return _page_flags[get_id(header)].load(std::memory_order_relaxed);
+         return _page_flags[get_id(header)].load(std::memory_order_acquire);
       }
       void queue_scan(page_header* header)
       {
@@ -238,6 +250,7 @@ namespace psidb
       // TODO: separate data accessed by the garbage collector
       // from data modified on every allocation.
       page_header*                                 _head = nullptr;
+      std::mutex                                   _allocate_mutex;
       std::unique_ptr<std::atomic<gc_flag_type>[]> _page_flags;
       void*                                        _unused;
       std::atomic<page_header*>                    _free_pool;

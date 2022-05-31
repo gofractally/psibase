@@ -55,7 +55,11 @@ namespace psidb
       }
       // TODO: accessed can be a counter to keep frequently used pages
       // in memory longer.
-      void access() { accessed.store(1, std::memory_order_relaxed); }
+      void access()
+      {
+         accessed.store(1, std::memory_order_relaxed);
+         assert(type != page_type::free);
+      }
       void clear_access() { accessed.store(0, std::memory_order_relaxed); }
       bool should_evict() { return accessed.load(std::memory_order_relaxed) == 0 && id != 0; }
       void pin() { pinned.fetch_add(1, std::memory_order_relaxed); }

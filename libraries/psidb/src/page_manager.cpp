@@ -133,10 +133,6 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
    if (pos)
    {
       id = *pos;
-      // TODO: what if ptr was modified after we checked it?
-      // read/read conflict is excluded by the page lock
-      // read/evict conflict????  This will always result in ABA
-      //   and is undetectable.  Not yet sure whether it's a problem.
       ptr->store(id, std::memory_order_release);
       auto result = translate_page_address(id);
       result->access();
@@ -157,6 +153,7 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
    //std::osyncstream(std::cout) << "reading page: " << id << " -> " << num << std::endl;
 
    read_page(page, id);
+   assert(page->type != page_type::free && true);
    ++_pages_read;
 
    page->prev.store(gc_allocator::null_page, std::memory_order_relaxed);
@@ -165,6 +162,8 @@ psidb::page_header* psidb::page_manager::read_page(node_ptr ptr, page_id id)
    page->mutex.store(false, std::memory_order_relaxed);
    ptr->store(num, std::memory_order_release);
    pos.store(num);
+
+   //std::osyncstream(std::cout) << "read page: " << id << " -> " << num << std::endl;
 
    return page;
 }
@@ -215,16 +214,12 @@ void psidb::page_manager::write_worker()
       if (!_write_queue.pop(next))
          return;
       auto [dest, src, size, type, data] = next;
+      alignas(page_size) page_internal_node node;
       if (type == page_type::node)
       {
-         alignas(page_size) page_internal_node node;
-
          assert(size == page_size);
          std::memcpy(&node, src, page_size);
-         // FIXME: should be unpinned after write completes, because
-         // the page cannot be read until after the write completes.
-         // Alternate: lock page table entry until write completes.
-         static_cast<page_internal_node*>(src)->unpin();
+         assert(node.type != page_type::free);
          // Update all links in the local copy
          node.prev.store(gc_allocator::null_page, std::memory_order_relaxed);
          for (std::size_t i = 0; i <= node._size; ++i)
@@ -239,10 +234,6 @@ void psidb::page_manager::write_worker()
             }
          }
          src = &node;
-      }
-      else if (type == page_type::leaf)
-      {
-         static_cast<page_leaf*>(src)->unpin();
       }
       do
       {
@@ -266,6 +257,10 @@ void psidb::page_manager::write_worker()
       if (type == page_type::temp)
       {
          _allocator.deallocate(next.src, next.size);
+      }
+      if (type == page_type::node || type == page_type::leaf)
+      {
+         static_cast<page_leaf*>(src)->unpin();
       }
    }
 }
@@ -902,6 +897,7 @@ void psidb::checkpoint_data::splice_pages(checkpoint_data& other)
 
 std::size_t psidb::page_manager::count_head()
 {
+   auto l        = _allocator.lock();
    auto do_count = [this](auto&& count, page_header* root) -> std::size_t
    {
       std::size_t result = 1;

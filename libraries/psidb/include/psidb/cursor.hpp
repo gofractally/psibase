@@ -55,7 +55,7 @@ namespace psidb
                }
             }
          }
-         leaf.get_parent<page_leaf>()->access();
+         access();
       }
       void back()
       {
@@ -107,7 +107,7 @@ namespace psidb
             stack[depth++] = node;
             p              = get_page(node);
          }
-         leaf.get_parent<page_leaf>()->access();
+         access();
       }
       void put(transaction& trx, std::string_view key, std::string_view value)
       {
@@ -134,7 +134,7 @@ namespace psidb
          if (p->get_offset(leaf) != 0)
          {
             leaf = p->child(p->get_offset(leaf) - 1);
-            leaf.get_parent<page_leaf>()->access();
+            access();
             return true;
          }
          for (std::size_t i = depth; i > 0; --i)
@@ -146,7 +146,7 @@ namespace psidb
                auto l       = db->gc_lock();
                stack[i - 1] = node->child(offset - 1);
                back(i, get_page(stack[i - 1]));
-               leaf.get_parent<page_leaf>()->access();
+               access();
                return true;
             }
          }
@@ -189,6 +189,14 @@ namespace psidb
       }
 
      private:
+      void access()
+      {
+         for (std::size_t i = 0; i < depth; ++i)
+         {
+            stack[i].get_parent<page_internal_node>()->access();
+         }
+         leaf.get_parent<page_leaf>()->access();
+      }
       template <typename Page, typename Ptr>
       Page*        maybe_clone(transaction& trx, Ptr& node, std::size_t i);
       void         relink_after_copy(transaction& trx, std::size_t depth, page_id page);

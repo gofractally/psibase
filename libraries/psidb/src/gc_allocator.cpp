@@ -42,6 +42,7 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
    int extra_cycles = 0;
    int extra_nodes  = 0;
    _rescanning.store(true, std::memory_order_release);
+   DEBUG_PRINT("rescan" << std::endl);
    while (true)
    {
       // Block until all any copies that have started finish.
@@ -66,12 +67,15 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
          ++extra_nodes;
       }
    }
+   //
+   // All updates to links to evicted pages happen before the final
+   // barrier returns.
+
    //std::osyncstream(std::cout) << "extra cycles: " << extra_cycles
    //                        << ", extra nodes: " << extra_nodes << std::endl;
 
-   // FIXME: This store must become visible to other threads no later than the
-   // next switch of _gc_flag.  Therefore _gc_flag needs to use acquire/release.
-   _rescanning.store(false, std::memory_order_release);
+   _rescanning.store(false, std::memory_order_relaxed);
+   DEBUG_PRINT("sweep");
 
    c.versions.clear();
 
@@ -84,6 +88,7 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
         iter < end;
         iter = reinterpret_cast<page_header*>(reinterpret_cast<char*>(iter) + page_size))
    {
+      bool evicted = false;
       if (is_evicted(iter))
       {
          // erase from page map
@@ -92,9 +97,12 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
          {
             pos.erase();
             ++_eviction_count;
+            evicted = true;
+            DEBUG_PRINT("evict page: " << get_id(iter) << " v" << iter->version << std::endl);
          }
          else
          {
+            DEBUG_PRINT("resurrect page: " << get_id(iter) << " v" << iter->version << std::endl);
             mark(iter);
          }
       }
@@ -103,6 +111,22 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
 #ifdef DEBUG_ALLOC
          std::memset(iter, 0xCC, page_size);
 #endif
+         if (!evicted && iter->id)
+         {
+            auto pos = pm.lock(iter->id);
+            if (iter->should_evict())
+            {
+               pos.erase();
+               evicted = true;
+            }
+            else
+            {
+               iter->clear_access();
+               ++used_pages;
+               continue;
+            }
+         }
+         assert(evicted || !iter->id);
          mark_free(iter);
          DEBUG_PRINT("freeing page: " << get_id(iter) << " v" << iter->version << std::endl);
          page_id id = null_page;
@@ -115,8 +139,12 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
             id = get_id(new_head);
          }
          iter->type = page_type::free;
+         // This does not even need to be atomic, because prev will not
+         // be accessed by other threads before it is made available
+         // when the list is swapped into _free_pool.
          iter->prev.store(id, std::memory_order_relaxed);
          new_head = iter;
+         assert(!iter->accessed);
       }
       else if (!is_free(iter))
       {
@@ -124,6 +152,7 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
          ++used_pages;
       }
    }
+   DEBUG_PRINT("sweep done" << std::endl);
    gc_set_threshold(used_pages / 2);
    if (last)
    {
@@ -131,7 +160,10 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
       {
          auto old_head = _free_pool.load(std::memory_order_relaxed);
          auto old_id   = old_head ? get_id(old_head) : null_page;
+         // Atomic store not required
          last->prev.store(old_id, std::memory_order_relaxed);
+         // The only valid change that another thread can make is to set _free_pool to nullptr
+         // release is required to synchronize the whole list.
          if (_free_pool.compare_exchange_weak(old_head, new_head, std::memory_order_release))
          {
             break;
@@ -142,9 +174,10 @@ void psidb::gc_allocator::sweep(cycle&& c, page_map& pm)
 
 gc_allocator::cycle psidb::gc_allocator::start_cycle()
 {
-   _gc_flag.store(_gc_flag.load(std::memory_order_relaxed) ^ 1, std::memory_order_relaxed);
+   _gc_flag.store(_gc_flag.load(std::memory_order_relaxed) ^ 1, std::memory_order_release);
    // Ensure that the flag is propagated to all threads that might allocate
    _gc_mutex.store(_gc_mutex.load(std::memory_order_relaxed) ^ 1);
+   DEBUG_PRINT("gc start" << std::endl);
    return {};
 }
 
