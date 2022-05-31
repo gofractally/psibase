@@ -25,14 +25,14 @@ namespace UserContract
                   psio::const_view<psibase::String> memo);
       void uncredit(NID nftId, psio::const_view<psibase::String> memo);
       void debit(NID nftId, psio::const_view<psibase::String> memo);
-      void setConfig(psibase::NamedBit_t flag, bool enable);
+      void setUserConf(psibase::NamedBit_t flag, bool enable);
 
       // Read-only:
       NftRecord       getNft(NID nftId);
       NftHolderRecord getNftHolder(psibase::AccountNumber account);
       CreditRecord    getCredRecord(NID nftId);
       bool            exists(NID nftId);
-      bool            getConfig(psibase::AccountNumber account, psibase::NamedBit_t flag);
+      bool            getUserConf(psibase::AccountNumber account, psibase::NamedBit_t flag);
 
      private:
       tables db{contract};
@@ -48,7 +48,7 @@ namespace UserContract
             void initialized() {}
             void minted(NID nftId, Account issuer) {}
             void burned(NID nftId) {}
-            void configChanged(Account account, psibase::NamedBit_t flag, bool enable) {}
+            void userConfSet(Account account, psibase::NamedBit_t flag, bool enable) {}
             //};
 
             //struct Ui
@@ -72,20 +72,20 @@ namespace UserContract
       method(credit, nftId, receiver, memo),
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
-      method(setConfig, flag, enable),
+      method(setUserConf, flag, enable),
 
       method(getNft, nftId),
       method(getNftHolder, account),
       method(getCredRecord, nftid),
       method(exists, nftId),
-      method(getConfig, account, flag)
+      method(getUserConf, account, flag)
    );
 
    PSIBASE_REFLECT_UI_EVENTS(NftSys, // Todo - change to _HISTORY_ once more than UI events are supported
       method(initialized),
       method(minted, nftId, issuer),
       method(burned, nftId),
-      method(configChanged, account, flag, enable),
+      method(userConfSet, account, flag, enable),
    //);
 
    //PSIBASE_REFLECT_UI_EVENTS(NftSys, 

@@ -18,7 +18,6 @@ namespace
 {
    constexpr bool storageBillingImplemented     = false;
    constexpr bool inflationLimitsImplemented    = false;
-   constexpr bool tokenSymbolsSupported         = false;
    constexpr bool eventEmissionTestingSupported = false;
    constexpr bool customTokensSupported         = false;
 
@@ -38,8 +37,58 @@ namespace
 
    constexpr auto manualDebit  = "manualDebit"_m;
    constexpr auto unrecallable = "unrecallable"_m;
+   constexpr auto untradeable  = "untradeable"_m;
 
 }  // namespace
+
+SCENARIO("Using system token")
+{
+   GIVEN("An empty chain with user Alice")
+   {
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<TokenSys>();
+      auto bob   = t.as(t.add_account("bob"_a));
+
+      // Initialize user contracts
+      alice.at<NftSys>().init();
+      alice.at<TokenSys>().init();
+      alice.at<SymbolSys>().init();
+
+      auto sysIssuer   = t.as(SymbolSys::contract).at<TokenSys>();
+      auto userBalance = 1'000'000e8;
+      auto sysToken    = TokenSys::sysToken;
+      sysIssuer.mint(sysToken, userBalance, memo);
+
+      THEN("The system token is untradeable by default")
+      {
+         auto isUntradeable = a.getTokenConf(sysToken, untradeable);
+         CHECK(isUntradeable.succeeded());
+         CHECK(isUntradeable.returnVal() == true);
+      }
+      THEN("The system token issuer is able to credit the system token")
+      {
+         CHECK(sysIssuer.credit(sysToken, alice, userBalance, memo).succeeded());
+      }
+      sysIssuer.credit(sysToken, alice, userBalance, memo);
+
+      THEN("Alice cannot credit system tokens to anyone")
+      {
+         CHECK(a.credit(sysToken, bob, userBalance / 2, memo).failed(tokenUntradeable));
+      }
+
+      THEN("The issuer is able to make the token tradeable")
+      {
+         CHECK(sysIssuer.setTokenConf(sysToken, untradeable, false).succeeded());
+
+         AND_THEN("Alice may credit system tokens to anyone")
+         {
+            CHECK(a.credit(sysToken, bob, userBalance / 2, memo).succeeded());
+         }
+      }
+   }
+}
 
 SCENARIO("Creating a token")
 {
@@ -233,7 +282,7 @@ SCENARIO("Recalling tokens")
       }
       THEN("The token issuer may turn off recallability")
       {
-         CHECK(a.setUnrecallable(tokenId).succeeded());
+         CHECK(a.setTokenConf(tokenId, unrecallable, true).succeeded());
 
          auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
          CHECK(a.getToken(tokenId).returnVal().config.get(unrecallableBit));
@@ -241,6 +290,10 @@ SCENARIO("Recalling tokens")
          AND_THEN("Alice may not recall Bob's tokens")
          {
             CHECK(a.recall(tokenId, bob, 1'000e8, memo).failed(tokenUnrecallable));
+         }
+         AND_THEN("The token issuer may not re-enable recallability")
+         {
+            CHECK(a.setTokenConf(tokenId, unrecallable, false).failed(invalidConfigUpdate));
          }
       }
    }
@@ -327,7 +380,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not update the token recallability")
          {
-            CHECK(a.setUnrecallable(tokenId).failed(missingRequiredAuth));
+            CHECK(a.setTokenConf(tokenId, unrecallable, true).failed(missingRequiredAuth));
          }
       }
    }
@@ -435,50 +488,50 @@ SCENARIO("Toggling manual-debit")
 
       THEN("Alice and Bob both have manualDebit disabled")
       {
-         auto isManualDebit1 = a.getConfig(alice, manualDebit);
+         auto isManualDebit1 = a.getUserConf(alice, manualDebit);
          REQUIRE(isManualDebit1.succeeded());
          CHECK(isManualDebit1.returnVal() == false);
 
-         auto isManualDebit2 = a.getConfig(bob, manualDebit);
+         auto isManualDebit2 = a.getUserConf(bob, manualDebit);
          REQUIRE(isManualDebit2.succeeded());
          CHECK(isManualDebit2.returnVal() == false);
       }
       THEN("Alice may enable manual-debit")
       {  //
-         CHECK(a.setConfig(manualDebit, true).succeeded());
+         CHECK(a.setUserConf(manualDebit, true).succeeded());
       }
       WHEN("Alice enabled manual-debit")
       {
-         a.setConfig(manualDebit, true);
+         a.setUserConf(manualDebit, true);
 
          THEN("Alice has manual-debit enabled")
          {  //
-            CHECK(a.getConfig(alice, manualDebit).returnVal() == true);
+            CHECK(a.getUserConf(alice, manualDebit).returnVal() == true);
          }
          THEN("Bob still has manual-debit disabled")
          {  //
-            CHECK(a.getConfig(bob, manualDebit).returnVal() == false);
+            CHECK(a.getUserConf(bob, manualDebit).returnVal() == false);
          }
          THEN("Alice may not enable manual-debit again")
          {
-            CHECK(a.setConfig(manualDebit, true).failed(redundantUpdate));
+            CHECK(a.setUserConf(manualDebit, true).failed(redundantUpdate));
 
             AND_THEN("But Bob may enable manual-debit")
             {  //
-               CHECK(b.setConfig(manualDebit, true).succeeded());
+               CHECK(b.setUserConf(manualDebit, true).succeeded());
             }
          }
          THEN("Alice may disable manual-debit")
          {  //
-            CHECK(a.setConfig(manualDebit, false).succeeded());
+            CHECK(a.setUserConf(manualDebit, false).succeeded());
 
             AND_THEN("Alice has manual-debit disabled")
             {  //
-               CHECK(a.getConfig(alice, manualDebit).returnVal() == false);
+               CHECK(a.getUserConf(alice, manualDebit).returnVal() == false);
             }
             AND_THEN("Bob still has manual-debit disabled")
             {
-               CHECK(a.getConfig(bob, manualDebit).returnVal() == false);
+               CHECK(a.getUserConf(bob, manualDebit).returnVal() == false);
             }
          }
       }
@@ -583,7 +636,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 
       AND_GIVEN("Alice turns on manual-debit")
       {
-         a.setConfig(manualDebit, true);
+         a.setUserConf(manualDebit, true);
 
          THEN("Alice may credit Bob 50 tokens")
          {
@@ -711,12 +764,13 @@ SCENARIO("Mapping a symbol to a token")
       alice.at<TokenSys>().init();
       alice.at<SymbolSys>().init();
 
-      // SymbolSys is currently the last owner of system token
-      auto tokenContract = t.as(SymbolSys::contract).at<TokenSys>();
-      auto userBalance   = 1'000'000e8;
-      auto sysToken      = TokenSys::sysToken;
-      tokenContract.mint(sysToken, userBalance, memo);
-      tokenContract.credit(sysToken, alice, userBalance, memo);
+      // Issue system tokens
+      auto sysIssuer   = t.as(SymbolSys::contract).at<TokenSys>();
+      auto userBalance = 1'000'000e8;
+      auto sysToken    = TokenSys::sysToken;
+      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.mint(sysToken, userBalance, memo);
+      sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
       t.start_block();
@@ -813,4 +867,17 @@ TEST_CASE("Testing custom tokens")
    // Test a custom token contract that uses the main token contract
    //    hooks to customize distribution or other behavior.
    CHECK(customTokensSupported);
+
+   GIVEN("A custom token contract")
+   {
+      THEN("It can't register with the main token contract without the token owner NFT") {}
+      THEN("It can register with the token contract if it does own the token owner NFT")
+      {
+         AND_THEN("Storage costs are updated accordingly") {}
+      }
+      WHEN("It registers with the main token contract")
+      {  //
+         // Verify that all the various hooks can be called.
+      }
+   }
 }

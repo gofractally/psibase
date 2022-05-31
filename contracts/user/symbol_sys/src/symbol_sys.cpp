@@ -53,8 +53,8 @@ void SymbolSys::init()
    initTable.put(InitializedRecord{});
 
    // Configure manualDebit
-   at<TokenSys>().setConfig("manualDebit"_m, true);
-   at<NftSys>().setConfig("manualDebit"_m, true);
+   at<TokenSys>().setUserConf("manualDebit"_m, true);
+   at<NftSys>().setUserConf("manualDebit"_m, true);
 
    // Configure default symbol length records to establish initial prices
    auto nextSym = [](SymbolLengthRecord& s)
@@ -91,9 +91,6 @@ void SymbolSys::init()
    at<NftSys>().credit(symbolOwnerNft.ownerNft, TokenSys::contract,
                        "System token symbol ownership nft");
    at<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
-
-   // Todo - Pass token owner NFT on to the system token subcontract that
-   //        imposes additional restrictions on the system token
 
    emit().ui().initialized();
 }

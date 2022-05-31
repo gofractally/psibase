@@ -143,12 +143,12 @@ SCENARIO("Transferring NFTs")
 
       THEN("Bob is configured to use auto-debit by default")
       {
-         CHECK(b.getConfig(bob, manualDebit).returnVal() == false);
+         CHECK(b.getUserConf(bob, manualDebit).returnVal() == false);
       }
       THEN("Bob is able to opt in to manual-debit")
       {
-         CHECK(b.setConfig(manualDebit, true).succeeded());
-         CHECK(true == b.getConfig(bob, manualDebit).returnVal());
+         CHECK(b.setUserConf(manualDebit, true).succeeded());
+         CHECK(true == b.getUserConf(bob, manualDebit).returnVal());
 
          AND_THEN("Storage billing is updated correctly")
          {  //
@@ -236,7 +236,7 @@ SCENARIO("Transferring NFTs")
          }
          WHEN("Bob opts in to manual-debit")
          {
-            b.setConfig(manualDebit, true);
+            b.setUserConf(manualDebit, true);
 
             AND_WHEN("Alice credits the NFT to Bob")
             {
