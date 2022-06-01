@@ -1,12 +1,17 @@
 use anyhow::{Context, Result};
-use chrono::{Duration, SecondsFormat, Utc};
+use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
 use custom_error::custom_error;
+use fracpack::Packable;
+use libpsibase::{
+    AccountNumber, Action, MethodNumber, SignedTransaction, Tapos, TimePointSec, Transaction,
+};
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::str::FromStr;
 
 mod boot;
-mod bridge;
 
 custom_error! { Error
     BadResponseFormat   = "Invalid response format from server",
@@ -81,106 +86,63 @@ fn to_hex(bytes: &[u8]) -> String {
     String::from_utf8(result).unwrap()
 }
 
-// TODO: replace
-fn new_account(
-    account: &str,
-    auth_contract: &str,
-    require_new: bool,
-) -> Result<String, anyhow::Error> {
-    Ok(to_hex(
-        bridge::ffi::pack_new_account(&format!(
-            r#"{{
-                "account": {},
-                "authContract": {},
-                "require_new": {}
-            }}"#,
-            serde_json::to_string(account)?,
-            serde_json::to_string(auth_contract)?,
-            if require_new { "true" } else { "false" }
-        ))
-        .as_slice(),
-    ))
+#[derive(Serialize, Deserialize, psi_macros::Fracpack)]
+pub struct NewAccountAction {
+    pub account: AccountNumber,
+    pub auth_contract: AccountNumber,
+    pub require_new: bool,
 }
 
-// TODO: replace
-fn set_code(contract: &str, code: &str) -> Result<String, anyhow::Error> {
-    Ok(to_hex(
-        bridge::ffi::pack_set_code(&format!(
-            r#"{{
-                "contract": {},
-                "vmType": 0,
-                "vmVersion": 0,
-                "code": {}
-            }}"#,
-            serde_json::to_string(contract)?,
-            serde_json::to_string(code)?
-        ))
-        .as_slice(),
-    ))
+fn new_account_action(account: &str) -> Result<Action, anyhow::Error> {
+    let new_account_action = NewAccountAction {
+        account: AccountNumber::from_str(account)?,
+        auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+        require_new: false,
+    };
+    Ok(Action {
+        sender: AccountNumber::from_str("account-sys")?,
+        contract: AccountNumber::from_str("account-sys")?,
+        method: MethodNumber::from_str("newAccount")?,
+        raw_data: new_account_action.packed_bytes(),
+    })
 }
 
-// TODO: replace with struct
-fn action_json(
-    sender: &str,
-    contract: &str,
-    method: &str,
-    raw_data: &str,
-) -> Result<String, anyhow::Error> {
-    Ok(format!(
-        r#"{{
-            "sender": {},
-            "contract": {},
-            "method": {},
-            "rawData": {}
-        }}"#,
-        serde_json::to_string(sender)?,
-        serde_json::to_string(contract)?,
-        serde_json::to_string(method)?,
-        serde_json::to_string(raw_data)?
-    ))
+#[derive(Serialize, Deserialize, psi_macros::Fracpack)]
+pub struct SetCodeAction {
+    pub contract: AccountNumber,
+    pub vm_type: i8,
+    pub vm_version: i8,
+    pub code: Vec<u8>,
 }
 
-// TODO: replace with struct
-fn transaction_json(expiration: &str, actions: &[String]) -> Result<String, anyhow::Error> {
-    Ok(format!(
-        r#"{{
-            "tapos": {{
-                "expiration": {}
-            }},
-            "actions": [{}]
-        }}"#,
-        serde_json::to_string(expiration)?,
-        actions.join(",")
-    ))
+fn set_code_action(account: &str, wasm: Vec<u8>) -> Result<Action, anyhow::Error> {
+    let set_code_action = SetCodeAction {
+        contract: AccountNumber::from_str(account)?,
+        vm_type: 0,
+        vm_version: 0,
+        code: wasm,
+    };
+    Ok(Action {
+        sender: AccountNumber::from_str(account)?,
+        contract: AccountNumber::from_str("transact-sys")?,
+        method: MethodNumber::from_str("setCode")?,
+        raw_data: set_code_action.packed_bytes(),
+    })
 }
 
-// TODO: replace with struct
-fn signed_transaction_json(trx: &str) -> Result<String, anyhow::Error> {
-    Ok(format!(
-        r#"{{
-            "transaction": {}
-        }}"#,
-        trx
-    ))
-}
+fn reg_rpc(contract: &str, rpc_contract: &str) -> Result<Action, anyhow::Error> {
+    // todo: should we convert this action data to a proper struct?
+    let data = (
+        AccountNumber::from_str(contract)?,
+        AccountNumber::from_str(rpc_contract)?,
+    );
 
-fn reg_rpc(contract: &str, rpc_contract: &str) -> Result<String, anyhow::Error> {
-    action_json(
-        contract,
-        "proxy-sys",
-        "registerServer",
-        &to_hex(
-            bridge::ffi::pack_register_server(&format!(
-                r#"{{
-                    "contract": {},
-                    "rpc_contract": {}
-                }}"#,
-                serde_json::to_string(contract)?,
-                serde_json::to_string(rpc_contract)?,
-            ))
-            .as_slice(),
-        ),
-    )
+    Ok(Action {
+        sender: AccountNumber::from_str(contract)?,
+        contract: AccountNumber::from_str("proxy-sys")?,
+        method: MethodNumber::from_str("registerServer")?,
+        raw_data: data.packed_bytes(),
+    })
 }
 
 async fn push_transaction_impl(
@@ -229,25 +191,37 @@ fn store_sys(
     path: &str,
     content_type: &str,
     content: &[u8],
-) -> Result<String, anyhow::Error> {
-    action_json(
-        contract,
-        contract,
-        "storeSys",
-        &to_hex(
-            bridge::ffi::pack_upload_sys(&format!(
-                r#"{{
-                    "path": {},
-                    "contentType": {},
-                    "content": {}
-                }}"#,
-                serde_json::to_string(path)?,
-                serde_json::to_string(content_type)?,
-                serde_json::to_string(&to_hex(content))?
-            ))
-            .as_slice(),
-        ),
-    )
+) -> Result<Action, anyhow::Error> {
+    // todo: should we convert this action data to a proper struct?
+    let data = (path.to_string(), content_type.to_string(), content.to_vec());
+
+    Ok(Action {
+        sender: AccountNumber::from_str(contract)?,
+        contract: AccountNumber::from_str(contract)?,
+        method: MethodNumber::from_str("storeSys")?,
+        raw_data: data.packed_bytes(),
+    })
+}
+
+pub fn wrap_basic_trx(actions: Vec<Action>) -> SignedTransaction {
+    let now_plus_10secs = Utc::now() + Duration::seconds(10);
+    let expiration = TimePointSec {
+        seconds: now_plus_10secs.timestamp() as u32,
+    };
+
+    SignedTransaction {
+        transaction: Transaction {
+            tapos: Tapos {
+                expiration,
+                flags: 0,
+                ref_block_prefix: 0,
+                ref_block_num: 0,
+            },
+            actions,
+            claims: vec![],
+        },
+        proofs: vec![],
+    }
 }
 
 async fn install(
@@ -259,32 +233,21 @@ async fn install(
     register_proxy: bool,
 ) -> Result<(), anyhow::Error> {
     let wasm = std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?;
-    let mut actions: Vec<String> = Vec::new();
+
+    let mut actions: Vec<Action> = Vec::new();
+
     if create_insecure_account {
-        actions.push(action_json(
-            "account-sys",
-            "account-sys",
-            "newAccount",
-            &new_account(account, "auth-fake-sys", false)?,
-        )?);
+        actions.push(new_account_action(account)?);
     }
-    actions.push(action_json(
-        account,
-        "transact-sys",
-        "setCode",
-        &set_code(account, &to_hex(&wasm))?,
-    )?);
+
+    actions.push(set_code_action(account, wasm)?);
+
     if register_proxy {
         actions.push(reg_rpc(account, account)?);
     }
-    let signed_json = signed_transaction_json(&transaction_json(
-        &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
-        &actions,
-    )?)?;
-    // println!("{}", signed_json);
-    let packed_signed = bridge::ffi::pack_signed_transaction(&signed_json);
-    // println!("{}", to_hex(packed_signed.as_slice()));
-    push_transaction(args, client, packed_signed.as_slice().into()).await?;
+
+    let trx = wrap_basic_trx(actions);
+    push_transaction(args, client, trx.packed_bytes()).await?;
     println!("Ok");
     Ok(())
 }
@@ -297,17 +260,15 @@ async fn upload(
     content_type: &str,
     filename: &str,
 ) -> Result<(), anyhow::Error> {
-    let signed_json = signed_transaction_json(&transaction_json(
-        &(Utc::now() + Duration::seconds(10)).to_rfc3339_opts(SecondsFormat::Millis, true),
-        &[store_sys(
-            contract,
-            path,
-            content_type,
-            &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
-        )?],
-    )?)?;
-    let packed_signed = bridge::ffi::pack_signed_transaction(&signed_json);
-    push_transaction(args, client, packed_signed.as_slice().into()).await?;
+    let actions = vec![store_sys(
+        contract,
+        path,
+        content_type,
+        &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
+    )?];
+    let trx = wrap_basic_trx(actions);
+
+    push_transaction(args, client, trx.packed_bytes()).await?;
     println!("Ok");
     Ok(())
 }

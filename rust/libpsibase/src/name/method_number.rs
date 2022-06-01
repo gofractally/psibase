@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use super::method_to_number_converter::MethodToNumberConverter;
 use super::{constants::*, number_to_string_converter::NumberToStringConverter};
 use std::{num::ParseIntError, str::FromStr};
@@ -18,7 +20,8 @@ use std::{num::ParseIntError, str::FromStr};
 /// use libpsibase::MethodNumber;
 /// let hello = MethodNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, psi_macros::Fracpack, Serialize, Deserialize)]
+#[fracpack(definition_will_not_change)]
 pub struct MethodNumber {
     pub value: u64,
 }
