@@ -1,5 +1,23 @@
 # HTTP and Javascript
 
+- [Routing and Virtual Hosts](#routing-and-virtual-hosts)
+- - [CORS and authorization](#cors-and-authorization)
+- [Native services](#native-services)
+- - [Push transaction](#push-transaction)
+- - [Boot chain](#boot-chain)
+- [Common contract services](#common-contract-services)
+- - [Pack transaction](#pack-transaction)
+- - [Common files](#common-files)
+- - - [RPC helpers](#rpc-helpers)
+- - - - [Simple RPC wrappers](#simple-rpc-wrappers)
+- - - - [Conversions](#conversions)
+- - - - [Transactions](#transactions)
+- - - [Signing](#signing)
+- - - [React GraphQL hooks](#react-graphql-hooks)
+- [Root services](#root-services)
+- [Contract-provided services](#contract-provided-services)
+- - [Packing actions](#packing-actions)
+
 ## Routing and Virtual Hosts
 
 psinode provides virtual hosting. Domains have 2 categories:
@@ -48,6 +66,15 @@ Future psinode versions may trim the action traces when not in a developer mode.
 `POST /native/push_boot` boots the chain. This is only available when psinode does not have a chain yet. Use the `psibase boot` command to boot a chain. TODO: document the body content.
 
 ## Common contract services
+
+- [Pack transaction](#pack-transaction)
+- [Common files](#common-files)
+- - [RPC helpers](#rpc-helpers)
+- - - [Simple RPC wrappers](#simple-rpc-wrappers)
+- - - [Conversions](#conversions)
+- - - [Transactions](#transactions)
+- - [Signing](#signing)
+- - [React GraphQL hooks](#react-graphql-hooks)
 
 The [common-sys contract](system-contract/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
@@ -144,6 +171,13 @@ TODO: document additional tapos fields once they're operational
 `Proof` is a hex string containing data which proves the claim. e.g. `verify-ec-sys` expects a signature. See [Signing](#signing) to fill claims and proofs.
 
 ### Common files
+
+- [RPC helpers](#rpc-helpers)
+- - [Simple RPC wrappers](#simple-rpc-wrappers)
+- - [Conversions](#conversions)
+- - [Transactions](#transactions)
+- [Signing](#signing)
+- [React GraphQL hooks](#react-graphql-hooks)
 
 `common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). `psibase boot` installs this default set of files while booting the chain:
 
