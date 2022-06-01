@@ -178,7 +178,7 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
 psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& digest)
 {
    static auto context = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
-   auto*       k1      = std::get_if<0>(&key);
+   auto*       k1      = std::get_if<0>(&key.data);
    check(k1, "only k1 currently supported");
 
    secp256k1_ecdsa_signature sig;
@@ -189,7 +189,7 @@ psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& diges
    EccSignature sigdata;
    check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
          "serialize signature failed");
-   return Signature{std::in_place_index<0>, sigdata};
+   return Signature{Signature::variant_type{std::in_place_index<0>, sigdata}};
 }
 
 void psibase::internal_use_do_not_use::hex(const uint8_t* begin,

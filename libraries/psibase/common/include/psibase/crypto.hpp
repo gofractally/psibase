@@ -22,17 +22,29 @@ namespace psibase
       return sha256(bin.data(), bin.size());
    }
 
-   // TODO: wrap variant in struct to prevent type ambiguities (variant<array, array>)
    using EccPublicKey = std::array<uint8_t, 33>;
-   using PublicKey    = std::variant<EccPublicKey, EccPublicKey>;  // k1, r1
+   struct PublicKey
+   {
+      using variant_type = std::variant<EccPublicKey, EccPublicKey>;  // k1, r1
+      variant_type data;
+   };
+   PSIO_REFLECT(PublicKey, definitionWillNotChange(), data)
 
-   // TODO: wrap variant in struct to prevent type ambiguities (variant<array, array>)
    using EccPrivateKey = std::array<uint8_t, 32>;
-   using PrivateKey    = std::variant<EccPrivateKey, EccPrivateKey>;  // k1, r1
+   struct PrivateKey
+   {
+      using variant_type = std::variant<EccPrivateKey, EccPrivateKey>;  // k1, r1
+      variant_type data;
+   };
+   PSIO_REFLECT(PrivateKey, definitionWillNotChange(), data)
 
-   // TODO: wrap variant in struct to prevent type ambiguities (variant<array, array>)
    using EccSignature = std::array<uint8_t, 64>;
-   using Signature    = std::variant<EccSignature, EccSignature>;  // k1, r1
+   struct Signature
+   {
+      using variant_type = std::variant<EccSignature, EccSignature>;  // k1, r1
+      variant_type data;
+   };
+   PSIO_REFLECT(Signature, definitionWillNotChange(), data)
 
    std::string publicKeyToString(const PublicKey& obj);
    PublicKey   publicKeyFromString(std::string_view s);

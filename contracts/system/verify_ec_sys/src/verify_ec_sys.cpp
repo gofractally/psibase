@@ -29,8 +29,8 @@ extern "C" [[clang::export_name("verify")]] void verify()
    auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.rawData);  // TODO: verify no extra
    auto sig     = psio::convert_from_frac<Signature>(data.proof);          // TODO: verify no extra
 
-   auto* k1_pub_key = std::get_if<0>(&pub_key);
-   auto* k1_sig     = std::get_if<0>(&sig);
+   auto* k1_pub_key = std::get_if<0>(&pub_key.data);
+   auto* k1_sig     = std::get_if<0>(&sig.data);
    check(k1_pub_key && k1_sig, "only k1 currently supported");
 
    secp256k1_pubkey parsed_pub_key;
@@ -46,11 +46,10 @@ extern "C" [[clang::export_name("verify")]] void verify()
    secp256k1_ecdsa_signature normalized;
    secp256k1_ecdsa_signature_normalize(context, &normalized, &parsed_sig);
 
-   check(
-       secp256k1_ecdsa_verify(context, &normalized,
-                              reinterpret_cast<const unsigned char*>(data.transactionHash.data()),
-                              &parsed_pub_key) == 1,
-       "incorrect signature");
+   check(secp256k1_ecdsa_verify(context, &normalized,
+                                reinterpret_cast<const unsigned char*>(data.transactionHash.data()),
+                                &parsed_pub_key) == 1,
+         "incorrect signature");
 }
 
 extern "C" void called(AccountNumber this_contract, AccountNumber sender)
