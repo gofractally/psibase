@@ -192,6 +192,12 @@ fn common_startup_trx() -> Result<SignedTransaction, anyhow::Error> {
         )?,
         store_sys(
             "common-sys",
+            "/common/keyConversions.mjs",
+            "text/javascript",
+            include_bytes!("../../../contracts/user/common_sys/common/keyConversions.mjs"),
+        )?,
+        store_sys(
+            "common-sys",
             "/ui/index.js",
             "text/javascript",
             include_bytes!("../../../contracts/user/common_sys/ui/index.js"),
