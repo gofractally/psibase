@@ -304,7 +304,7 @@ namespace psibase::http
                    error(bhttp::status::not_found,
                          "The resource '" + req.target().to_string() + "' was not found.\n"));
             return send(ok(std::move(result->body), result->contentType.c_str()));
-         }
+         }  // !native
          else if (req.target() == "/native/push_boot" && req.method() == bhttp::verb::post &&
                   server.http_config->push_boot_async)
          {
@@ -340,11 +340,13 @@ namespace psibase::http
                 });
             send.pause_read = true;
             return;
-         }
+         }  // push_boot
          else if (req.target() == "/native/push_transaction" && req.method() == bhttp::verb::post &&
                   server.http_config->push_transaction_async)
          {
             // TODO: prevent an http timeout from disconnecting or reporting a failure when the transaction was successful
+            //       but... that could open up a vulnerability (resource starvation) where the client intentionally doesn't
+            //       read and doesn't close the socket.
             server.http_config->push_transaction_async(
                 std::move(req.body()),
                 [error, ok, session = send.self.derived_session().shared_from_this(),
@@ -384,72 +386,11 @@ namespace psibase::http
                 });
             send.pause_read = true;
             return;
-         }
-         else if (server.http_config->static_dir.empty())
+         }  // push_transaction
+         else
          {
             return send(error(bhttp::status::not_found,
                               "The resource '" + req.target().to_string() + "' was not found.\n"));
-         }
-         else
-         {
-            // TODO: remove this code?
-
-            // Make sure we can handle the method
-            if (req.method() != bhttp::verb::get && req.method() != bhttp::verb::head)
-               return send(bad_request("Unknown HTTP-method"));
-
-            // Request path must be absolute and not contain "..".
-            if (req.target().empty() || req.target()[0] != '/' ||
-                req.target().find("..") != beast::string_view::npos)
-               return send(bad_request("Illegal request-target"));
-
-            // Build the path to the requested file
-            std::string path = path_cat(server.http_config->static_dir, req.target());
-            if (req.target().back() == '/')
-               path.append("index.md");
-
-            // Attempt to open the file
-            beast::error_code            ec;
-            bhttp::file_body::value_type body;
-            body.open(path.c_str(), beast::file_mode::scan, ec);
-
-            // Handle the case where the file doesn't exist
-            if (ec == beast::errc::no_such_file_or_directory)
-               return send(not_found(req.target()));
-
-            // Handle an unknown error
-            if (ec)
-               return send(error(bhttp::status::internal_server_error,
-                                 "An error occurred: "s + ec.message()));
-
-            // Cache the size since we need it after the move
-            const auto size = body.size();
-
-            // Respond to HEAD request
-            if (req.method() == bhttp::verb::head)
-            {
-               bhttp::response<bhttp::empty_body> res{bhttp::status::ok, req.version()};
-               res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-               res.set(bhttp::field::content_type, mime_type(path));
-               if (!server.http_config->allow_origin.empty())
-                  res.set(bhttp::field::access_control_allow_origin,
-                          server.http_config->allow_origin);
-               res.content_length(size);
-               res.keep_alive(req.keep_alive());
-               return send(std::move(res));
-            }
-
-            // Respond to GET request
-            bhttp::response<bhttp::file_body> res{
-                std::piecewise_construct, std::make_tuple(std::move(body)),
-                std::make_tuple(bhttp::status::ok, req.version())};
-            res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(bhttp::field::content_type, mime_type(path));
-            if (!server.http_config->allow_origin.empty())
-               res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
-            res.content_length(size);
-            res.keep_alive(req.keep_alive());
-            return send(std::move(res));
          }
       }
       catch (const std::exception& e)

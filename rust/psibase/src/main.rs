@@ -75,7 +75,7 @@ enum Commands {
     },
 }
 
-// TODO: move to lib
+#[allow(dead_code)] // TODO: move to lib if still needed
 fn to_hex(bytes: &[u8]) -> String {
     let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
