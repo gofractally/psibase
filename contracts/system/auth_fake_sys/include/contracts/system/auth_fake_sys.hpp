@@ -1,34 +1,14 @@
 #pragma once
 
-#include <psibase/nativeFunctions.hpp>
-#include <psibase/nativeTables.hpp>
-#include <psio/from_bin.hpp>
-#include <psio/to_bin.hpp>
+#include <psibase/Contract.hpp>
 
-namespace system_contract::auth_fake_sys
+namespace system_contract
 {
-   static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-fake-sys");
-
-   struct auth_check
+   struct AuthFakeSys : psibase::Contract<AuthFakeSys>
    {
-      psibase::Action             action;
-      std::vector<psibase::Claim> claims;
+      static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-fake-sys");
+
+      void checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims);
    };
-   PSIO_REFLECT(auth_check, action, claims)
-
-   using action = std::variant<auth_check>;
-
-#ifdef __wasm__
-   template <typename T, typename R = typename T::return_type>
-   R call(psibase::AccountNumber sender, T args)
-   {
-      auto result = psibase::call(psibase::Action{
-          .sender   = sender,
-          .contract = contract,
-          .rawData  = psio::convert_to_frac(psibase::Action{std::move(args)}),
-      });
-      if constexpr (!std::is_same_v<R, void>)
-         return psio::convert_from_frac<R>(result);
-   }
-#endif
-}  // namespace system_contract::auth_fake_sys
+   PSIO_REFLECT(AuthFakeSys, method(checkAuthSys, action, claims))
+}  // namespace system_contract

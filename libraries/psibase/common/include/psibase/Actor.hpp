@@ -452,12 +452,15 @@ namespace psibase
       using base = typename psio::reflect<T>::template proxy<action_builder_proxy>;
       using base::base;
 
-      auto as(AccountNumber other) const { return transactor(other, base::receiver); }
+      auto as(AccountNumber other) const
+      {
+         return transactor(other, base::psio_get_proxy().receiver);
+      }
 
       template <typename Other, uint64_t OtherReceiver>
       auto at() const
       {
-         return transactor<Other>(base::sender, OtherReceiver);
+         return transactor<Other>(base::psio_get_proxy().sender, OtherReceiver);
       }
 
       auto* operator->() const { return this; }

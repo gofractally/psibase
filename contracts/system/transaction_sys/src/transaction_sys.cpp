@@ -113,30 +113,11 @@ namespace system_contract
          if (!account)
             abortMessage("unknown sender \"" + act.sender.str() + "\"");
 
-         // actor<system_contract::auth_fake_sys> auth(system_contract::transaction_sys::contract,
-         //                                            account->authContract);
-         // auth->authCheck()( act, trx.claims );
-
-         // TODO: assumes same dispatch format (abi) as auth_fake_sys
-         // TODO: avoid inner rawData copy
-         // TODO: authContract needs a way to opt-in to being an auth contract.
-         //       Otherwise, it may misunderstand the action, and worse,
-         //       sender = 1, which provides transaction.sys's authorization
-         //       for a potentially-unknown action.
-         psibase::Action outer = {
-             .sender   = system_contract::transaction_sys::contract,
-             .contract = account->authContract,
-             // TODO: authContract will have to register action #
-             // TODO: rename to checkauth_sys or sys_checkauth
-             // TODO: checkauth return bool
-             .rawData = psio::convert_to_frac(auth_fake_sys::action{auth_fake_sys::auth_check{
-                 .action = act,  // act to be authorized
-                 .claims = trx.claims,
-             }}),
-         };
          if (enable_print)
-            print("call auth_check\n");
-         call(outer);  // TODO: avoid copy (serializing outer)
+            print("call checkAuthSys on ", account->authContract.str(), " for account ",
+                  act.sender.str());
+         Actor<AuthInterface> auth(transaction_sys::contract, account->authContract);
+         auth.checkAuthSys(act, trx.claims);
          if (enable_print)
             print("call action\n");
          call(act);  // TODO: avoid copy (serializing)

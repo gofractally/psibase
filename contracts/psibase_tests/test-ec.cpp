@@ -25,25 +25,19 @@ TEST_CASE("ec")
    DefaultTestChain t;
    auto             test_contract = t.add_contract("test-cntr"_a, "test-cntr.wasm");
 
+   transactor<system_contract::AuthEcSys> ecsys(system_contract::AuthEcSys::contract,
+                                                system_contract::AuthEcSys::contract);
+
    auto alice = t.as(t.add_account(AccountNumber("alice")));
    auto bob   = t.as(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
-
-   // use "real" auth
-   auto sue = t.add_ec_account("sue", pub_key1);
+   auto sue   = t.add_ec_account("sue", pub_key1);
 
    expect(t.pushTransaction(t.make_transaction({{
               .sender   = bob,
               .contract = test_contract,
           }})),
           "sender does not have a public key");
-   expect(t.pushTransaction(t.make_transaction({{
-              .sender   = alice,
-              .contract = system_contract::auth_ec_sys::contract,
-              .rawData  = psio::convert_to_frac(
-                   system_contract::auth_ec_sys::action{system_contract::auth_ec_sys::set_key{
-                       .account = bob,
-                  }}),
-          }})),
+   expect(t.pushTransaction(t.make_transaction({ecsys.as(alice).setKey(bob, PublicKey{})})),
           "wrong sender");
    expect(t.pushTransaction(t.make_transaction({{
               .sender   = sue,

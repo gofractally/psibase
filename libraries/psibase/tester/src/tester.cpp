@@ -30,6 +30,7 @@ namespace
                                uint32_t    filename_size,
                                Alloc_fn    alloc_fn)
    {
+      // TODO: fix memory issue when file not found
       return tester_read_whole_file(filename_begin, filename_size, &alloc_fn,
                                     [](void* cb_alloc_data, size_t size) -> void*
                                     {  //
