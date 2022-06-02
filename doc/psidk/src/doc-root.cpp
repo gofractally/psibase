@@ -1,7 +1,7 @@
 #define GENERATING_DOCUMENTATION
 
+#include <contracts/system/CommonSys.hpp>
 #include <contracts/system/ProxySys.hpp>
-#include <contracts/system/common_sys.hpp>
 #include <psibase/Contract.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>

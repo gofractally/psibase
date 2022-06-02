@@ -711,7 +711,7 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/build/wasm/boost"),
         &("-I".to_owned() + repo_path + "/build/wasm/deps/include"),
         &("-I".to_owned() + repo_path + "/contracts/system/ProxySys/include"),
-        &("-I".to_owned() + repo_path + "/contracts/user/common_sys/include"),
+        &("-I".to_owned() + repo_path + "/contracts/user/CommonSys/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/external/simdjson/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/common/include"),

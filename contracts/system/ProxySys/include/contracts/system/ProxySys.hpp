@@ -8,9 +8,9 @@ namespace psibase
    ///
    /// Rule set:
    /// - If the request references an unregistered subdomain, then abort with a message indicating it needs registration.
-   /// - Else if the target starts with `/common`, then route the request to [common_sys].
+   /// - Else if the target starts with `/common`, then route the request to [CommonSys].
    /// - Else if there's a subdomain and it references a registered contract, then route the request to that contract.
-   /// - Else route the request to [common_sys]; this handles the chain's main domain.
+   /// - Else route the request to [CommonSys]; this handles the chain's main domain.
    ///
    /// See [Web Services](../cpp-contract/reference/web-services.md) for more detail, including how to write contracts which serve HTTP requests.
    ///

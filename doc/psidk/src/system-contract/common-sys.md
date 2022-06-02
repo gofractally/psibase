@@ -1,3 +1,3 @@
 # common-sys
 
-{{#cpp-doc ::psibase::common_sys}}
+{{#cpp-doc ::psibase::CommonSys}}

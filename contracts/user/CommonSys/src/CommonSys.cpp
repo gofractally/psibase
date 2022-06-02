@@ -1,4 +1,4 @@
-#include "contracts/system/common_sys.hpp"
+#include "contracts/system/CommonSys.hpp"
 
 #include <contracts/system/ProxySys.hpp>
 #include <psibase/dispatch.hpp>
@@ -13,7 +13,7 @@ using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
 namespace psibase
 {
-   std::optional<RpcReplyData> common_sys::serveSys(RpcRequestData request)
+   std::optional<RpcReplyData> CommonSys::serveSys(RpcRequestData request)
    {
       auto to_json = [](const auto& obj)
       {
@@ -97,9 +97,9 @@ namespace psibase
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
          return result;
       return std::nullopt;
-   }  // common_sys::serveSys
+   }  // CommonSys::serveSys
 
-   void common_sys::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   void CommonSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
       psibase::check(getSender() == getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
@@ -108,4 +108,4 @@ namespace psibase
 
 }  // namespace psibase
 
-PSIBASE_DISPATCH(psibase::common_sys)
+PSIBASE_DISPATCH(psibase::CommonSys)

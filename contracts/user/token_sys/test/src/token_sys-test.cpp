@@ -3,7 +3,7 @@
 #include "token_sys.hpp"
 #include "symbol_sys.hpp"
 
-#include <contracts/system/common_errors.hpp>
+#include <contracts/system/commonErrors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
