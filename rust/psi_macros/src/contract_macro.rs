@@ -110,6 +110,19 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
                 Ok(())
             }
         }
+
+        #[no_mangle]
+        pub extern "C" fn called(receiver: u64, sender: u64) {
+            let act = get_current_action();
+
+            example_contract::hi();
+        }
+
+        #[no_mangle]
+        pub extern "C" fn start(this_contract: u64) {
+            unsafe { __wasm_call_ctors() };
+        }
+
     } // quote!
     .into()
 } // process_mod
