@@ -87,16 +87,7 @@ void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
 {
    transactor<system_contract::account_sys> asys{system_contract::transaction_sys::contract,
                                                  system_contract::account_sys::contract};
-
-   auto trace = pushTransaction(make_transaction(  //
-       {asys.startup(std::vector<AccountNumber>{
-           system_contract::transaction_sys::contract,
-           system_contract::account_sys::contract,
-           proxyContractNum,
-           system_contract::AuthFakeSys::contract,
-           system_contract::AuthEcSys::contract,
-           system_contract::verify_ec_sys::contract,
-       })}));
+   auto trace = pushTransaction(make_transaction({asys.startup()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system contract accounts");
 }
@@ -129,13 +120,19 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                                                const PublicKey& public_key,
                                                bool             show /* = false */)
 {
-   transactor<system_contract::AuthEcSys> ecsys(system_contract::transaction_sys::contract,
-                                                system_contract::AuthEcSys::contract);
-   auto trace = pushTransaction(make_transaction({ecsys.createAccount(name, public_key)}));
+   transactor<system_contract::account_sys> asys(system_contract::account_sys::contract,
+                                                 system_contract::account_sys::contract);
+   transactor<system_contract::AuthEcSys>   ecsys(system_contract::AuthEcSys::contract,
+                                                  system_contract::AuthEcSys::contract);
+
+   auto trace = pushTransaction(make_transaction({
+       asys.newAccount(name, "auth-fake-sys", true),
+       ecsys.as(name).setKey(public_key),
+       asys.as(name).setAuthCntr(system_contract::AuthEcSys::contract),
+   }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
-   auto& at = get_top_action(trace, 0);
-   return psio::convert_from_frac<AccountNumber>(at.rawRetval);
+   return name;
 }  // add_ec_account()
 
 AccountNumber DefaultTestChain::add_ec_account(const char*      name,

@@ -1,6 +1,7 @@
 #include <contracts/system/account_sys.hpp>
 
 #include <contracts/system/transaction_sys.hpp>
+#include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 
@@ -10,34 +11,41 @@ using namespace psibase;
 
 namespace system_contract
 {
-   using table_num                                     = uint16_t;
-   static constexpr table_num account_sys_status_table = 1;
-
-   inline auto account_sys_status_key()
+   struct Status
    {
-      return std::tuple{account_sys::contract, account_sys_status_table};
-   }
-   struct account_sys_status_row
-   {
-      uint32_t total_accounts = 0;
+      uint32_t totalAccounts = 0;
 
-      static auto key() { return account_sys_status_key(); }
+      std::tuple<> key() const { return {}; }
    };
-   PSIO_REFLECT(account_sys_status_row, total_accounts)
+   PSIO_REFLECT(Status, totalAccounts)
+   using StatusTable = Table<Status, &Status::key>;
 
-   // TODO: remove existing_accounts arg
-   // TODO: scan native table to get total_accounts
-   void account_sys::startup(psio::const_view<std::vector<AccountNumber>> existing_accounts)
+   using Tables = ContractTables<StatusTable>;
+
+   void account_sys::startup()
    {
-      check(!kvGet<account_sys_status_row>(account_sys_status_key()), "already started");
-      auto s = existing_accounts->size();
+      Tables tables{getReceiver()};
+      auto   statusTable = tables.open<StatusTable>();
+      auto   statusIndex = statusTable.getIndex<0>();
+      check(!statusIndex.get(std::tuple{}), "already started");
 
-      kvPut(account_sys_status_key(), account_sys_status_row{.total_accounts = s});
+      uint32_t totalAccounts = 0;
+      auto     accountIndex  = psibase::TableIndex<psibase::AccountRow, std::tuple<>>{
+               psibase::AccountRow::db, psio::convert_to_key(psibase::accountTable), false};
+      for (auto it = accountIndex.begin(); it != accountIndex.end(); ++it)
+         ++totalAccounts;
+
+      statusTable.put({.totalAccounts = totalAccounts});
    }
 
+   // TODO: limit who can create accounts
+   // TODO: limit who can use -sys suffix
    void account_sys::newAccount(AccountNumber name, AccountNumber authContract, bool requireNew)
    {
-      auto status = kvGet<account_sys_status_row>(account_sys_status_key());
+      Tables tables{getReceiver()};
+      auto   statusTable = tables.open<StatusTable>();
+      auto   statusIndex = statusTable.getIndex<0>();
+      auto   status      = statusIndex.get(std::tuple{});
       check(status.has_value(), "not started");
 
       if (enable_print)
@@ -57,14 +65,22 @@ namespace system_contract
       }
       check(exists(authContract), "unknown auth contract");
 
-      status->total_accounts++;
+      ++status->totalAccounts;
       AccountRow account{
           .num          = name,
           .authContract = authContract,
           .flags        = 0,
       };
-      kvPut(status->key(), *status);
+      statusTable.put(*status);
       kvPut(account.db, account.key(), account);
+   }
+
+   void account_sys::setAuthCntr(psibase::AccountNumber authContract)
+   {
+      auto account = kvGet<AccountRow>(AccountRow::db, accountKey(getSender()));
+      check(account.has_value(), "account does not exist");
+      account->authContract = authContract;
+      kvPut(AccountRow::db, account->key(), *account);
    }
 
    bool account_sys::exists(AccountNumber num)

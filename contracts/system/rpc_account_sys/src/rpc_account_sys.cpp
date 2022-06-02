@@ -29,6 +29,7 @@ namespace system_contract
 
       if (request.method == "GET")
       {
+         // TODO: replace with GraphQL
          if (request.target == "/accounts")
          {
             std::vector<AccountRow> rows;

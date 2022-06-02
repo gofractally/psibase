@@ -43,23 +43,11 @@ namespace system_contract
       abortMessage("no matching claim found");
    }
 
-   void AuthEcSys::setKey(psibase::AccountNumber account, psibase::PublicKey key)
+   void AuthEcSys::setKey(psibase::PublicKey key)
    {
-      check(getSender() == account, "wrong sender");
-      auth_row row{account, key};
+      // TODO: charge resources? provide for free with all accounts?
+      auth_row row{getSender(), key};
       kvPut(row.key(), row);
-   }
-
-   psibase::AccountNumber AuthEcSys::createAccount(psibase::AccountNumber name,
-                                                   psibase::PublicKey     publicKey)
-   {
-      if (enable_print)
-         writeConsole("account_sys::create_account");
-      psibase::Actor<account_sys> asys(getReceiver(), account_sys::contract);
-      asys.newAccount(name, getReceiver(), true);
-      auth_row row{AccountNumber{name}, publicKey};
-      kvPut(row.key(), row);
-      return name;
    }
 }  // namespace system_contract
 

@@ -13,10 +13,11 @@ namespace system_contract
       static constexpr uint64_t               contractFlags = psibase::AccountRow::allowWriteNative;
       static constexpr psibase::AccountNumber nullAccount   = psibase::AccountNumber(0);
 
-      void startup(psio::const_view<std::vector<psibase::AccountNumber>> existing_accounts);
+      void startup();
       void newAccount(psibase::AccountNumber name,
                       psibase::AccountNumber authContract,
                       bool                   requireNew);
+      void setAuthCntr(psibase::AccountNumber authContract);
       bool exists(psibase::AccountNumber num);
 
       struct Events
@@ -37,5 +38,6 @@ namespace system_contract
    PSIO_REFLECT(account_sys,
                 method(startup, existing_accounts),
                 method(newAccount, name, authContract, requireNew),
+                method(setAuthCntr, name, authContract),
                 method(exists, num))
 }  // namespace system_contract

@@ -37,8 +37,6 @@ TEST_CASE("ec")
               .contract = test_contract,
           }})),
           "sender does not have a public key");
-   expect(t.pushTransaction(t.make_transaction({ecsys.as(alice).setKey(bob, PublicKey{})})),
-          "wrong sender");
    expect(t.pushTransaction(t.make_transaction({{
               .sender   = sue,
               .contract = test_contract,
@@ -90,5 +88,15 @@ TEST_CASE("ec")
                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key1, priv_key2}}),
-          "incorrect signature", true);
+          "incorrect signature");
+
+   expect(t.pushTransaction(t.make_transaction({ecsys.as(sue).setKey(pub_key2)}),
+                            {{pub_key1, priv_key1}}));
+
+   expect(t.pushTransaction(t.make_transaction({{
+                                .sender   = sue,
+                                .contract = test_contract,
+                                .rawData  = psio::convert_to_frac(test_cntr::payload{}),
+                            }}),
+                            {{pub_key2, priv_key2}}));
 }  // ec
