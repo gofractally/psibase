@@ -1,7 +1,6 @@
 #include "contracts/system/common_sys.hpp"
 
-#include <contracts/system/account_sys.hpp>
-#include <contracts/system/proxy_sys.hpp>
+#include <contracts/system/ProxySys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serveContent.hpp>

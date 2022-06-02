@@ -53,7 +53,7 @@ enum Commands {
         #[clap(short = 'i', long)]
         create_insecure_account: bool,
 
-        /// Register the contract with proxy_sys. This allows the contract to host a
+        /// Register the contract with ProxySys. This allows the contract to host a
         /// website, serve RPC requests, and serve GraphQL requests.
         #[clap(short = 'p', long)]
         register_proxy: bool,

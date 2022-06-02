@@ -1,10 +1,3 @@
-#include <contracts/system/account_sys.hpp>
-#include <contracts/system/auth_ec_sys.hpp>
-#include <contracts/system/auth_fake_sys.hpp>
-#include <contracts/system/proxy_sys.hpp>
-#include <contracts/system/rpc_account_sys.hpp>
-#include <contracts/system/transaction_sys.hpp>
-#include <contracts/system/verify_ec_sys.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/contractEntry.hpp>
 #include <psibase/http.hpp>

@@ -1,6 +1,6 @@
 #include "nft_sys.hpp"
 
-#include <contracts/system/account_sys.hpp>
+#include <contracts/system/AccountSys.hpp>
 #include <contracts/system/common_errors.hpp>
 #include <psibase/Bitset.hpp>
 #include <psibase/dispatch.hpp>
@@ -11,7 +11,7 @@ using namespace UserContract;
 using namespace Errors;
 using psio::const_view;
 using std::string;
-using system_contract::account_sys;
+using system_contract::AccountSys;
 
 NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
 {
@@ -79,7 +79,7 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
 
    check(record.owner == sender, missingRequiredAuth);
    check(receiver != record.owner, creditorIsDebitor);
-   check(creditRecord.debitor == account_sys::nullAccount, alreadyCredited);
+   check(creditRecord.debitor == AccountSys::nullAccount, alreadyCredited);
 
    if (isTransfer)
    {
@@ -106,7 +106,7 @@ void NftSys::uncredit(NID nftId, const_view<String> memo)
    psibase::AccountNumber sender       = getSender();
    auto                   creditRecord = getCredRecord(nftId);
 
-   check(creditRecord.debitor != account_sys::nullAccount, uncreditRequiresCredit);
+   check(creditRecord.debitor != AccountSys::nullAccount, uncreditRequiresCredit);
    check(record.owner == sender, creditorAction);
 
    db.open<CreditTable_t>().erase(nftId);
@@ -121,7 +121,7 @@ void NftSys::debit(NID nftId, const_view<String> memo)
    auto creditor     = record.owner;
    auto creditRecord = getCredRecord(nftId);
 
-   check(creditRecord.debitor != account_sys::nullAccount, debitRequiresCredit);
+   check(creditRecord.debitor != AccountSys::nullAccount, debitRequiresCredit);
    check(creditRecord.debitor == debiter, missingRequiredAuth);
 
    record.owner = debiter;
@@ -176,8 +176,8 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
    }
    else
    {
-      check(account != account_sys::nullAccount, invalidAccount);
-      check(at<account_sys>().exists(account), invalidAccount);
+      check(account != AccountSys::nullAccount, invalidAccount);
+      check(at<AccountSys>().exists(account), invalidAccount);
 
       return NftHolderRecord{account};
    }
@@ -195,7 +195,7 @@ CreditRecord NftSys::getCredRecord(NID nftId)
    {
       check(exists(nftId), nftDNE);
 
-      return CreditRecord{nftId, account_sys::nullAccount};
+      return CreditRecord{nftId, AccountSys::nullAccount};
    }
 }
 

@@ -1,3 +1,3 @@
 # proxy-sys
 
-{{#cpp-doc ::psibase::proxy_sys}}
+{{#cpp-doc ::psibase::ProxySys}}

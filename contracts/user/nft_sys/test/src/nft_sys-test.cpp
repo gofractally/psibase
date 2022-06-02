@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 
-#include <contracts/system/account_sys.hpp>
+#include <contracts/system/AccountSys.hpp>
 #include <contracts/system/common_errors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psio/fracpack.hpp>

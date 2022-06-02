@@ -8,11 +8,11 @@ function(add_user_contract suffix name)
         ../nft_sys/include
         ../symbol_sys/include
         ../token_sys/include
-        ../../system/account_sys/include
-        ../../system/auth_ec_sys/include
-        ../../system/auth_fake_sys/include
-        ../../system/transaction_sys/include
-        ../../system/verify_ec_sys/include
+        ../../system/AccountSys/include
+        ../../system/AuthEcSys/include
+        ../../system/AuthFakeSys/include
+        ../../system/TransactionSys/include
+        ../../system/VerifyEcSys/include
     )
     target_link_libraries(${name}${suffix} PUBLIC contracts_system${suffix} psibase-contract-simple-malloc${suffix})
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
@@ -29,11 +29,11 @@ function(add_user_test suffix name)
       ../../symbol_sys/include
       ../../token_sys/include
       ../../exchange_sys/include
-      ../../../system/account_sys/include
-      ../../../system/auth_ec_sys/include
-      ../../../system/auth_fake_sys/include
-      ../../../system/transaction_sys/include
-      ../../../system/verify_ec_sys/include
+      ../../../system/AccountSys/include
+      ../../../system/AuthEcSys/include
+      ../../../system/AuthFakeSys/include
+      ../../../system/TransactionSys/include
+      ../../../system/VerifyEcSys/include
      ${CMAKE_CURRENT_LIST_DIR})
     target_link_libraries(${TARGET} contracts_system${suffix} psitestlib)
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
@@ -64,7 +64,7 @@ add("-debug")
 if(DEFINED IS_WASM)
     add_subdirectory(common_sys)
     add_subdirectory(exchange_sys)
-    add_subdirectory(explore_sys)
+    add_subdirectory(ExploreSys)
     add_subdirectory(mincon)
     add_subdirectory(name_sys)
     add_subdirectory(nft_sys)

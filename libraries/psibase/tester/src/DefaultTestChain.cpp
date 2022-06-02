@@ -3,13 +3,13 @@
 #include <utility>
 #include <vector>
 
-#include <contracts/system/account_sys.hpp>
-#include <contracts/system/auth_ec_sys.hpp>
-#include <contracts/system/auth_fake_sys.hpp>
-#include <contracts/system/proxy_sys.hpp>
-#include <contracts/system/rpc_account_sys.hpp>
-#include <contracts/system/transaction_sys.hpp>
-#include <contracts/system/verify_ec_sys.hpp>
+#include <contracts/system/AccountSys.hpp>
+#include <contracts/system/AuthEcSys.hpp>
+#include <contracts/system/AuthFakeSys.hpp>
+#include <contracts/system/ProxySys.hpp>
+#include <contracts/system/TransactionSys.hpp>
+#include <contracts/system/VerifyEcSys.hpp>
+#include <psibase/contractEntry.hpp>
 
 using namespace psibase;
 
@@ -41,40 +41,40 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
                  .contracts =  // g.a.d--^ is config file for gen
                 {
                      {
-                         .contract     = system_contract::transaction_sys::contract,
+                         .contract     = system_contract::TransactionSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
-                         .flags        = system_contract::transaction_sys::contractFlags,
-                         .code         = read_whole_file("transaction_sys.wasm"),
+                         .flags        = system_contract::TransactionSys::contractFlags,
+                         .code         = read_whole_file("TransactionSys.wasm"),
                     },
                      {
-                         .contract     = system_contract::account_sys::contract,
+                         .contract     = system_contract::AccountSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
-                         .flags        = system_contract::account_sys::contractFlags,
-                         .code         = read_whole_file("account_sys.wasm"),
+                         .flags        = system_contract::AccountSys::contractFlags,
+                         .code         = read_whole_file("AccountSys.wasm"),
                     },
                      {
                          .contract     = proxyContractNum,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
-                         .code         = read_whole_file("proxy_sys.wasm"),
+                         .code         = read_whole_file("ProxySys.wasm"),
                     },
                      {
                          .contract     = system_contract::AuthFakeSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
-                         .code         = read_whole_file("auth_fake_sys.wasm"),
+                         .code         = read_whole_file("AuthFakeSys.wasm"),
                     },
                      {
                          .contract     = system_contract::AuthEcSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
-                         .code         = read_whole_file("auth_ec_sys.wasm"),
+                         .code         = read_whole_file("AuthEcSys.wasm"),
                     },
                      {
-                         .contract     = system_contract::verify_ec_sys::contract,
+                         .contract     = system_contract::VerifyEcSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
-                         .code         = read_whole_file("verify_ec_sys.wasm"),
+                         .code         = read_whole_file("VerifyEcSys.wasm"),
                     },
                 },
             }),
@@ -85,8 +85,8 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
 
 void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
 {
-   transactor<system_contract::account_sys> asys{system_contract::transaction_sys::contract,
-                                                 system_contract::account_sys::contract};
+   transactor<system_contract::AccountSys> asys{system_contract::TransactionSys::contract,
+                                                system_contract::AccountSys::contract};
    auto trace = pushTransaction(make_transaction({asys.startup()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system contract accounts");
@@ -97,8 +97,8 @@ AccountNumber DefaultTestChain::add_account(
     AccountNumber authContract /* = AccountNumber("auth-fake-sys") */,
     bool          show /* = false */)
 {
-   transactor<system_contract::account_sys> asys(system_contract::transaction_sys::contract,
-                                                 system_contract::account_sys::contract);
+   transactor<system_contract::AccountSys> asys(system_contract::TransactionSys::contract,
+                                                system_contract::AccountSys::contract);
 
    auto trace = pushTransaction(  //
        make_transaction({asys.newAccount(acc, authContract, true)}));
@@ -120,10 +120,10 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                                                const PublicKey& public_key,
                                                bool             show /* = false */)
 {
-   transactor<system_contract::account_sys> asys(system_contract::account_sys::contract,
-                                                 system_contract::account_sys::contract);
-   transactor<system_contract::AuthEcSys>   ecsys(system_contract::AuthEcSys::contract,
-                                                  system_contract::AuthEcSys::contract);
+   transactor<system_contract::AccountSys> asys(system_contract::AccountSys::contract,
+                                                system_contract::AccountSys::contract);
+   transactor<system_contract::AuthEcSys>  ecsys(system_contract::AuthEcSys::contract,
+                                                 system_contract::AuthEcSys::contract);
 
    auto trace = pushTransaction(make_transaction({
        asys.newAccount(name, "auth-fake-sys", true),
@@ -147,8 +147,7 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
                                              bool          show /* = false */)
 {
    add_account(acc, AccountNumber("auth-fake-sys"), show);
-   transactor<system_contract::transaction_sys> tsys{acc,
-                                                     system_contract::transaction_sys::contract};
+   transactor<system_contract::TransactionSys> tsys{acc, system_contract::TransactionSys::contract};
 
    auto trace =
        pushTransaction(make_transaction({{tsys.setCode(acc, 0, 0, read_whole_file(filename))}}));

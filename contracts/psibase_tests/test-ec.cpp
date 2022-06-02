@@ -1,5 +1,5 @@
-#include <contracts/system/auth_ec_sys.hpp>
-#include <contracts/system/verify_ec_sys.hpp>
+#include <contracts/system/AuthEcSys.hpp>
+#include <contracts/system/VerifyEcSys.hpp>
 #include <psibase/DefaultTestChain.hpp>
 
 #include <psibase/contractEntry.hpp>
@@ -49,7 +49,7 @@ TEST_CASE("ec")
        .rawData  = psio::convert_to_frac(test_cntr::payload{}),
    }});
    ec_trx.claims.push_back({
-       .contract = system_contract::verify_ec_sys::contract,
+       .contract = system_contract::VerifyEcSys::contract,
        .rawData  = psio::convert_to_frac(pub_key1),
    });
    expect(t.pushTransaction(ec_trx), "proofs and claims must have same size");

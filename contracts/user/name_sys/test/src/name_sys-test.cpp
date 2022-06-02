@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include <psio/fracpack.hpp>
 
-#include <contracts/system/account_sys.hpp>
+#include <contracts/system/AccountSys.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include "name_sys.hpp"
 

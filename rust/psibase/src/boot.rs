@@ -69,7 +69,7 @@ fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
             flags: 3, // TODO: ?
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/transaction_sys.wasm").to_vec(),
+            code: include_bytes!("../../../build/TransactionSys.wasm").to_vec(),
         },
         GenesisContract {
             contract: AccountNumber::from_str("account-sys")?,
@@ -77,7 +77,7 @@ fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
             flags: 2, // TODO: ?
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/account_sys.wasm").to_vec(),
+            code: include_bytes!("../../../build/AccountSys.wasm").to_vec(),
         },
         GenesisContract {
             contract: AccountNumber::from_str("proxy-sys")?,
@@ -85,7 +85,7 @@ fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/proxy_sys.wasm").to_vec(),
+            code: include_bytes!("../../../build/ProxySys.wasm").to_vec(),
         },
         GenesisContract {
             contract: AccountNumber::from_str("auth-fake-sys")?,
@@ -93,7 +93,7 @@ fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/auth_fake_sys.wasm").to_vec(),
+            code: include_bytes!("../../../build/AuthFakeSys.wasm").to_vec(),
         },
         GenesisContract {
             contract: AccountNumber::from_str("auth-ec-sys")?,
@@ -101,7 +101,7 @@ fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/auth_ec_sys.wasm").to_vec(),
+            code: include_bytes!("../../../build/AuthEcSys.wasm").to_vec(),
         },
         GenesisContract {
             contract: AccountNumber::from_str("verifyec-sys")?,
@@ -109,7 +109,7 @@ fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/verify_ec_sys.wasm").to_vec(),
+            code: include_bytes!("../../../build/VerifyEcSys.wasm").to_vec(),
         },
         GenesisContract {
             contract: AccountNumber::from_str("common-sys")?,
@@ -120,20 +120,20 @@ fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
             code: include_bytes!("../../../build/common_sys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("account-rpc")?, // TODO: need -sys suffix
+            contract: AccountNumber::from_str("raccount-sys")?,
             auth_contract: AccountNumber::from_str("auth-fake-sys")?,
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/rpc_account_sys.wasm").to_vec(),
+            code: include_bytes!("../../../build/RAccountSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("explore-sys")?, // TODO: need -sys suffix
+            contract: AccountNumber::from_str("explore-sys")?,
             auth_contract: AccountNumber::from_str("auth-fake-sys")?,
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/explore_sys.wasm").to_vec(),
+            code: include_bytes!("../../../build/ExploreSys.wasm").to_vec(),
         },
     ];
 
@@ -202,31 +202,31 @@ fn common_startup_trx() -> Result<SignedTransaction, anyhow::Error> {
             "text/javascript",
             include_bytes!("../../../contracts/user/common_sys/ui/index.js"),
         )?,
-        reg_rpc("account-sys", "account-rpc")?,
+        reg_rpc("account-sys", "raccount-sys")?,
         store_sys(
-            "account-rpc",
+            "raccount-sys",
             "/",
             "text/html",
-            include_bytes!("../../../contracts/system/rpc_account_sys/ui/index.html"),
+            include_bytes!("../../../contracts/system/AccountSys/ui/index.html"),
         )?,
         store_sys(
-            "account-rpc",
+            "raccount-sys",
             "/ui/index.js",
             "text/javascript",
-            include_bytes!("../../../contracts/system/rpc_account_sys/ui/index.js"),
+            include_bytes!("../../../contracts/system/AccountSys/ui/index.js"),
         )?,
         reg_rpc("explore-sys", "explore-sys")?,
         store_sys(
             "explore-sys",
             "/",
             "text/html",
-            include_bytes!("../../../contracts/user/explore_sys/ui/index.html"),
+            include_bytes!("../../../contracts/user/ExploreSys/ui/index.html"),
         )?,
         store_sys(
             "explore-sys",
             "/ui/index.js",
             "text/javascript",
-            include_bytes!("../../../contracts/user/explore_sys/ui/index.js"),
+            include_bytes!("../../../contracts/user/ExploreSys/ui/index.js"),
         )?,
     ];
 

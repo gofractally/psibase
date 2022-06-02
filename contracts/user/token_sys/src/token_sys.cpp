@@ -2,7 +2,7 @@
 #include "symbol_sys.hpp"
 #include "token_errors.hpp"
 
-#include <contracts/system/account_sys.hpp>
+#include <contracts/system/AccountSys.hpp>
 #include <contracts/system/common_errors.hpp>
 #include <psibase/dispatch.hpp>
 
@@ -10,7 +10,7 @@ using namespace UserContract;
 using namespace UserContract::Errors;
 using namespace psibase;
 using psio::const_view;
-using system_contract::account_sys;
+using system_contract::AccountSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
 // For helpers
@@ -359,7 +359,7 @@ BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
    }
    else
    {
-      check(at<account_sys>().exists(account), invalidAccount);
+      check(at<AccountSys>().exists(account), invalidAccount);
       check(exists(tokenId), tokenDNE);
 
       record = {.key = {account, tokenId}, .balance = 0};
@@ -438,7 +438,7 @@ bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit_t flag)
 
 void TokenSys::_checkAccountValid(psibase::AccountNumber account)
 {
-   check(at<account_sys>().exists(account), invalidAccount);
+   check(at<AccountSys>().exists(account), invalidAccount);
    check(account != AccountNumber{0}, invalidAccount);
 }
 
