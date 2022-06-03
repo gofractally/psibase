@@ -130,12 +130,9 @@ fn set_code_action(account: &str, wasm: Vec<u8>) -> Result<Action, anyhow::Error
     })
 }
 
-fn reg_rpc(contract: &str, rpc_contract: &str) -> Result<Action, anyhow::Error> {
+fn reg_server(contract: &str, server_contract: &str) -> Result<Action, anyhow::Error> {
     // todo: should we convert this action data to a proper struct?
-    let data = (
-        AccountNumber::from_str(contract)?,
-        AccountNumber::from_str(rpc_contract)?,
-    );
+    let data = (AccountNumber::from_str(server_contract)?,);
 
     Ok(Action {
         sender: AccountNumber::from_str(contract)?,
@@ -243,7 +240,7 @@ async fn install(
     actions.push(set_code_action(account, wasm)?);
 
     if register_proxy {
-        actions.push(reg_rpc(account, account)?);
+        actions.push(reg_server(account, account)?);
     }
 
     let trx = wrap_basic_trx(actions);

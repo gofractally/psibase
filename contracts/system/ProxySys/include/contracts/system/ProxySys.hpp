@@ -30,12 +30,12 @@ namespace psibase
    {
       // TODO: allow contract to register multiple contracts to handle
       //    * sub.dom.ains.contract (what's the use case?)
-      //    * contract/foo/bar/... (maybe not; there's a security issue with that)
+      //    * contract/foo/bar/... (maybe not; there's a potential security issue with that)
 
-      /// Register `contract`'s subdomain
+      /// Register senders's subdomain
       ///
-      /// `rpc_contract` will handle requests to this subdomain.
-      void registerServer(AccountNumber contract, AccountNumber rpc_contract);
+      /// `serverContract` will handle requests to this subdomain.
+      void registerServer(AccountNumber serverContract);
    };
-   PSIO_REFLECT(ProxySys, method(registerServer, contract, rpc_contract))
+   PSIO_REFLECT(ProxySys, method(registerServer, serverContract))
 }  // namespace psibase

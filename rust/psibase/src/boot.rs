@@ -181,7 +181,7 @@ fn common_startup_trx() -> Result<SignedTransaction, anyhow::Error> {
 
     let actions = vec![
         startup_action,
-        reg_rpc("common-sys", "common-sys")?,
+        reg_server("common-sys", "common-sys")?,
         store_sys(
             "common-sys",
             "/",
@@ -218,7 +218,7 @@ fn common_startup_trx() -> Result<SignedTransaction, anyhow::Error> {
             "text/javascript",
             include_bytes!("../../../contracts/user/CommonSys/ui/index.js"),
         )?,
-        reg_rpc("account-sys", "r-account-sys")?,
+        reg_server("account-sys", "r-account-sys")?,
         store_sys(
             "r-account-sys",
             "/",
@@ -231,9 +231,9 @@ fn common_startup_trx() -> Result<SignedTransaction, anyhow::Error> {
             "text/javascript",
             include_bytes!("../../../contracts/system/AccountSys/ui/index.js"),
         )?,
-        reg_rpc("auth-ec-sys", "r-ath-ec-sys")?,
-        reg_rpc("proxy-sys", "r-proxy-sys")?,
-        reg_rpc("explore-sys", "explore-sys")?,
+        reg_server("auth-ec-sys", "r-ath-ec-sys")?,
+        reg_server("proxy-sys", "r-proxy-sys")?,
+        reg_server("explore-sys", "explore-sys")?,
         store_sys(
             "explore-sys",
             "/",

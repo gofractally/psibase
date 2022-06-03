@@ -9,6 +9,7 @@ static constexpr bool enable_print = false;
 
 namespace psibase
 {
+   // TODO: switch to Table wrapper
    using table_num = uint16_t;
 
    static constexpr table_num registered_contract_table = 1;
@@ -19,22 +20,21 @@ namespace psibase
    }
    struct RegisteredContractRow
    {
-      AccountNumber contract    = {};
-      AccountNumber rpcContract = {};
+      AccountNumber contract       = {};
+      AccountNumber serverContract = {};
 
       auto key(AccountNumber this_contract)
       {
          return registeredContractKey(this_contract, contract);
       }
    };
-   PSIO_REFLECT(RegisteredContractRow, contract, rpcContract)
+   PSIO_REFLECT(RegisteredContractRow, contract, serverContract)
 
-   void ProxySys::registerServer(AccountNumber contract, AccountNumber rpcContract)
+   void ProxySys::registerServer(AccountNumber serverContract)
    {
-      check(contract == getSender(), "wrong sender");
       RegisteredContractRow row{
-          .contract    = contract,
-          .rpcContract = rpcContract,
+          .contract       = getSender(),
+          .serverContract = serverContract,
       };
       kvPut(row.key(getReceiver()), row);
    }
@@ -66,7 +66,7 @@ namespace psibase
          abortMessage("contract not registered: " + contract.str());
 
       // TODO: avoid repacking (both directions)
-      psibase::Actor<ServerInterface> iface(act.contract, reg->rpcContract);
+      psibase::Actor<ServerInterface> iface(act.contract, reg->serverContract);
       setRetval(iface.serveSys(std::move(req)).unpack());
    }  // serve()
 
