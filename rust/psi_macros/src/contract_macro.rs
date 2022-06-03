@@ -91,6 +91,9 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
         #[allow(non_camel_case_types)]
         #[allow(non_upper_case_globals)]
         pub mod #iface_mod_name {
+
+            use std::str::FromStr;
+
             pub mod actions {
                 #iface_use
                 use super::super::#impl_mod_name::*;
@@ -100,27 +103,50 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
             pub enum action {
                 #enum_body
             }
-            pub fn dispatch<'a>(src: &'a [u8]) -> fracpack::Result<()> {
+            pub fn dispatch(act: libpsibase::Action) -> fracpack::Result<()> {
                 // TODO: view instead of unpack
                 // TODO: sender
-                let act = <action as fracpack::Packable>::unpack(src, &mut 0)?;
-                let result = match act {
-                    #dispatch_body
-                };
+
+                // TODO: adjust dispatch body
+                // if act.method == libpsibase::MethodNumber::from_str("hi").unwrap() {
+                //     super::example_contract::hi();
+                // } else if act.method == libpsibase::MethodNumber::from_str("add").unwrap() {
+                //     let args = <actions::add as fracpack::Packable>::unpack(act.raw_data, &mut 0)?;
+                //     super::example_contract::add(args.a, args.b);
+                // } else if act.method == libpsibase::MethodNumber::from_str("multiply").unwrap() {
+                //     let args = <actions::multiply as fracpack::Packable>::unpack(act.raw_data, &mut 0)?;
+                //     super::example_contract::multiply(args.a, args.b);
+                // } else {
+                //     libpsibase::abort_message("unknown action method");
+                // }
+                super::example_contract::hi();
                 Ok(())
             }
         }
 
         #[no_mangle]
-        pub extern "C" fn called(receiver: u64, sender: u64) {
-            let act = get_current_action();
+        pub extern "C" fn called(_this_contract: u64, _sender: u64) {
+            write_console("**** called\n");
+            let act = get_current_action(); // >>> throwing unreachable
+            write_console("**** got act\n");
+            #iface_mod_name::dispatch(act);
 
-            example_contract::hi();
+            // TODO: review
+            // with_current_action(|act| {
+            //     #iface_mod_name::dispatch(act)
+            //         .unwrap_or_else(|_| abort_message("unpack action data failed"));
+            // });
+        }
+
+        extern "C" {
+            fn __wasm_call_ctors();
         }
 
         #[no_mangle]
         pub extern "C" fn start(this_contract: u64) {
-            unsafe { __wasm_call_ctors() };
+            unsafe {
+                __wasm_call_ctors();
+            }
         }
 
     } // quote!

@@ -2,52 +2,58 @@ use fracpack::Packable;
 
 pub mod raw {
     extern "C" {
+        pub fn __wasm_call_ctors();
+
+        /// Copy `min(destSize, resultSize - offset)` bytes from
+        /// `result + offset` into `dest` and return `resultSize`
+        ///
+        /// If `offset >= resultSize`, then skip the copy.
+        ///
+        /// Other functions set result.
+        pub fn getResult(dest: *mut u8, dest_size: u32, offset: u32) -> u32;
+
+        /// Copy `min(destSize, key_size)` bytes of the most-recent key into
+        /// dest and return `key_size`
+        ///
+        /// Other functions set the key.
+        pub fn getKey(dest: *mut u8, dest_size: u32) -> u32;
+
         /// Write `message` to console
         ///
         /// Message should be UTF8.
-        pub fn write_console(message: *const u8, len: u32);
+        pub fn writeConsole(message: *const u8, len: u32);
 
         /// Abort with `message`
         ///
         /// Message should be UTF8.
-        pub fn abort_message(message: *const u8, len: u32) -> !;
-
-        /// Copy `min(dest_size, result_size)` bytes of the most-recent result
-        /// into dest and return `result_size`
-        ///
-        /// Other functions set the result.
-        pub fn get_result(dest: *mut u8, dest_size: u32) -> u32;
-
-        /// Copy `min(dest_size, key_size)` bytes of the most-recent key into
-        /// dest and return `key_size`
-        ///
-        /// Other functions set the key.
-        pub fn get_key(dest: *mut u8, dest_size: u32) -> u32;
+        pub fn abortMessage(message: *const u8, len: u32) -> !;
 
         /// Store the currently-executing action into result and return the result size
         ///
-        /// Use [get_result] to get result.
+        /// The result contains a fracpacked [Action]; use [getResult] to get it.
         ///
         /// If the contract, while handling action A, calls itself with action B:
-        ///    * Before the call to B, [get_current_action] returns A.
-        ///    * After the call to B, [get_current_action] returns B.
-        ///    * After B returns, [get_current_action] returns A.
+        /// * Before the call to B, `getCurrentAction()` returns A.
+        /// * After the call to B, `getCurrentAction()` returns B.
+        /// * After B returns, `getCurrentAction()` returns A.
         ///
-        /// Note: The above only applies if the contract uses [call].
-        pub fn get_current_action() -> u32;
+        /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
+        pub fn getCurrentAction() -> u32;
 
         /// Call a contract, store the return value into result, and return the result size
         ///
-        /// Use [get_result] to get result.
-        pub fn call(action: *const u8, len: u32);
+        /// `action` must contain a fracpacked [Action].
+        ///
+        /// Use [getResult] to get result.
+        pub fn call(action: *const u8, len: u32) -> u32;
 
         /// Set the return value of the currently-executing action
-        pub fn set_retval(retval: *const u8, len: u32);
+        pub fn setRetval(retval: *const u8, len: u32);
 
-        /// Set a key-value pair. If key already exists, then replace the existing value
+        /// Set a key-value pair
         ///
-        /// Don't use [get_key] after calling this.
-        pub fn kv_put(
+        /// If key already exists, then replace the existing value.
+        pub fn kvPut(
             db: crate::DbId,
             key: *const u8,
             key_len: u32,
@@ -55,27 +61,34 @@ pub mod raw {
             value_len: u32,
         );
 
-        /// Remove a key-value pair if it exists
+        /// Add a sequentially-numbered record
         ///
-        /// Don't use [get_key] after calling this.
-        pub fn kv_remove(db: crate::DbId, key: *const u8, key_len: u32);
+        /// Returns the id.
+        pub fn kvPutSequential(db: crate::DbId, value: *const u8, value_len: u32) -> u64;
+
+        /// Remove a key-value pair if it exists
+        pub fn kvRemove(db: crate::DbId, key: *const u8, key_len: u32);
 
         /// Get a key-value pair, if any
         ///
         /// If key exists, then sets result to value and returns size. If key does not
-        /// exist, returns `-1` and clears result. Use [get_result] to get result.
+        /// exist, returns `-1` and clears result. Use [getResult] to get result.
+        pub fn kvGet(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+
+        /// Get a sequentially-numbered record
         ///
-        /// Don't use [get_key] after calling this.
-        pub fn kv_get(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+        /// If `id` is available, then sets result to value and returns size. If id does
+        /// not exist, returns -1 and clears result.
+        pub fn kvGetSequential(db: crate::DbId, id: u64) -> u32;
 
         /// Get the first key-value pair which is greater than or equal to the provided
         /// key
         ///
-        /// If one is found, and the first `match_key_size` bytes of the found key
+        /// If one is found, and the first `matchKeySize` bytes of the found key
         /// matches the provided key, then sets result to value and returns size. Also
-        /// sets key. Otherwise returns `-1` and clears result. Use [get_result] to get
-        /// result and [get_key] to get found key.
-        pub fn kv_greater_equal(
+        /// sets key. Otherwise returns `-1` and clears result. Use [getResult] to get
+        /// result and [getKey] to get found key.
+        pub fn kvGreaterEqual(
             db: crate::DbId,
             key: *const u8,
             key_len: u32,
@@ -84,11 +97,11 @@ pub mod raw {
 
         /// Get the key-value pair immediately-before provided key
         ///
-        /// If one is found, and the first `match_key_size` bytes of the found key
+        /// If one is found, and the first `matchKeySize` bytes of the found key
         /// matches the provided key, then sets result to value and returns size.
-        /// Also sets key. Otherwise returns `-1` and clears result. Use [get_result]
-        /// to get result and [get_key] to get found key.
-        pub fn kv_less_than(
+        /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult]
+        /// to get result and [getKey] to get found key.
+        pub fn kvLessThan(
             db: crate::DbId,
             key: *const u8,
             key_len: u32,
@@ -98,9 +111,9 @@ pub mod raw {
         /// Get the maximum key-value pair which has key as a prefix
         ///
         /// If one is found, then sets result to value and returns size. Also sets key.
-        /// Otherwise returns `-1` and clears result. Use [get_result] to get result
-        /// and [get_key] to get found key.
-        pub fn kv_max(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+        /// Otherwise returns `-1` and clears result. Use [getResult] to get result
+        /// and [getKey] to get found key.
+        pub fn kvMax(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
     }
 }
 
@@ -110,7 +123,7 @@ pub mod raw {
 pub fn write_console_bytes(message: &[u8]) {
     unsafe {
         if let Some(first) = message.first() {
-            raw::write_console(first, message.len() as u32);
+            raw::writeConsole(first, message.len() as u32);
         }
     }
 }
@@ -126,9 +139,9 @@ pub fn write_console(message: &str) {
 pub fn abort_message_bytes(message: &[u8]) -> ! {
     unsafe {
         if let Some(first) = message.first() {
-            raw::abort_message(first, message.len() as u32)
+            raw::abortMessage(first, message.len() as u32)
         } else {
-            raw::abort_message(std::ptr::null(), 0)
+            raw::abortMessage(std::ptr::null(), 0)
         }
     }
 }
@@ -150,10 +163,10 @@ pub fn check(condition: bool, message: &str) {
 /// Other functions set the result.
 pub fn get_result_bytes() -> Vec<u8> {
     unsafe {
-        let size = raw::get_result(std::ptr::null_mut(), 0);
+        let size = raw::getResult(std::ptr::null_mut(), 0, 0);
         let mut result = Vec::with_capacity(size as usize);
         if size > 0 {
-            raw::get_result(result.as_mut_ptr(), size);
+            raw::getResult(result.as_mut_ptr(), size, 0);
             result.set_len(size as usize);
         }
         result
@@ -164,13 +177,21 @@ pub fn get_result_bytes() -> Vec<u8> {
 ///
 /// Other functions set the result.
 pub fn get_result_bytes_known_size(size: u32) -> Vec<u8> {
+    write_console(&format!("getting result size {}", size));
     let mut result = Vec::with_capacity(size as usize);
     if size > 0 {
         unsafe {
-            let actual_size = raw::get_result(result.as_mut_ptr(), size);
-            result.set_len(std::cmp::min(size, actual_size) as usize);
+            let actual_size = raw::getResult(result.as_mut_ptr(), size, 0);
+            write_console(&format!("actual result size {}", actual_size));
+            // TODO: actual_size is returning 0 -- should we remove the following line?
+            // result.set_len(std::cmp::min(size, actual_size) as usize);
         }
     }
+    write_console(&format!(
+        "\nresult size {}, result bytes {:?}",
+        result.len(),
+        result
+    )); // TODO: >>> investigate why its always empty!
     result
 }
 
@@ -179,10 +200,10 @@ pub fn get_result_bytes_known_size(size: u32) -> Vec<u8> {
 /// Other functions set the key.
 pub fn get_key() -> Vec<u8> {
     unsafe {
-        let size = raw::get_key(std::ptr::null_mut(), 0);
+        let size = raw::getKey(std::ptr::null_mut(), 0);
         let mut result = Vec::with_capacity(size as usize);
         if size > 0 {
-            raw::get_key(result.as_mut_ptr(), size);
+            raw::getKey(result.as_mut_ptr(), size);
             result.set_len(size as usize);
         }
         result
@@ -200,7 +221,7 @@ pub fn get_key() -> Vec<u8> {
 pub fn get_current_action_bytes() -> Vec<u8> {
     let size;
     unsafe {
-        size = raw::get_current_action();
+        size = raw::getCurrentAction();
     };
     get_result_bytes_known_size(size)
 }
@@ -217,7 +238,9 @@ pub fn get_current_action_bytes() -> Vec<u8> {
 ///
 /// Note: The above only applies if the contract uses [call].
 pub fn get_current_action() -> crate::Action {
+    write_console("getting action bytes");
     let bytes = get_current_action_bytes();
+    write_console(&format!("got action bytes {}\n{:?}", bytes.len(), bytes));
     <crate::Action>::unpack(&bytes[..], &mut 0).unwrap() // unwrap won't panic
 }
 

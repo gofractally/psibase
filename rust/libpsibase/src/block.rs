@@ -18,6 +18,7 @@ pub struct Action {
 pub struct SharedAction<'a> {
     pub sender: AccountNum,
     pub contract: AccountNum,
+    pub method: MethodNumber,
     pub raw_data: &'a [u8],
 }
 
