@@ -107,7 +107,7 @@ namespace trie
       uint32_t version()const{ return _version; }
 
      private:
-      inner_node(const inner_node& in, string_view prefix, object_id val, uint64_t branches, uint32_t version);
+      inner_node( ring_allocator& a, const inner_node& in, string_view prefix, object_id val, uint64_t branches, uint32_t version);
       inner_node(string_view prefix, object_id val, uint64_t branches, uint32_t version);
 
       uint8_t   _prefix_length = 0;
@@ -129,7 +129,7 @@ namespace trie
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
       auto p = a.alloc(alloc_size);
-      return std::make_pair(p.first, new (p.second) inner_node(in, prefix, val, branches, version));
+      return std::make_pair(p.first, new (p.second) inner_node(a, in, prefix, val, branches, version));
    }
 
    inline std::pair<object_id, inner_node*> inner_node::make(ring_allocator&     a,
@@ -157,7 +157,7 @@ namespace trie
    /*
     *  Constructs a copy of in with the branches selected by 'branches'
     */
-   inline inner_node::inner_node(const inner_node& in,
+   inline inner_node::inner_node(ring_allocator& a, const inner_node& in,
                                  string_view       prefix,
                                  object_id         val,
                                  uint64_t          branches,
@@ -173,12 +173,16 @@ namespace trie
       memset(children(), 0, sizeof(object_id) * num_branches());
 
 
+      // TODO: if branches == in.branches() we can just memcpy 
       
       auto common_branches = in._present_bits & branches;
       auto fb              = std::countr_zero(common_branches);
       while (fb < 64)
       {
-         branch(fb) = in.branch(fb);
+         auto b = in.branch(fb);
+         a.retain( b );
+         branch(fb) = b;
+
          common_branches ^= 1ull << fb;
          fb = std::countr_zero(common_branches);
       }

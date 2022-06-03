@@ -43,9 +43,12 @@ namespace trie
       void claim_free();
 
       //  pointer is valid until GC runs
-      char*                      get(id);
+      char* get(id i);
+      template <bool CopyToHot = true>
+      char*                      get_cache(id);  // do not move to hot cache
       uint32_t                   ref(id i) const { return _obj_ids->ref(i); }
       std::pair<uint16_t, char*> get_ref(id i) { return {ref(i), get(i)}; }
+      std::pair<uint16_t, char*> get_ref_no_cache(id i);
 
       enum cache_level_type
       {
@@ -75,15 +78,15 @@ namespace trie
       uint64_t size : 24;  // bytes of data, not including header
       uint64_t id : 40;
 
-      inline bool     is_free_area() const { return size == 0; }
+      inline bool     is_free_area() const { return id == 0; }
       inline uint64_t free_area_size() const { return id; }
       inline uint64_t data_size() const { return size; }
       inline uint32_t data_capacity() const { return (size + 7) & -8; }
       inline char*    data() const { return (char*)(this + 1); }
       inline void     set_free_area_size(uint64_t s)
       {
-         size = 0, id = s;
-         assert(s != 0);
+         size = s, id = 0;
+         assert(s == size);
       }
       inline void set(object_id i, uint32_t numb) { size = numb, id = i.id; }
 
@@ -111,27 +114,79 @@ namespace trie
          // TODO pad these variables to eliminate
          // false sharing when using multiple threads
 
+         void validate()
+         {
+            assert(alloc_p <= end_free_p);
+            assert(swap_p <= alloc_p);
+            assert(alloc_area_size >= get_free_space());
+            //assert(alloc_area_size >= swap_p - end_free_p);
+         }
+
          uint64_t                       size;              // file size, max we can move end to
          int64_t                        total_free_bytes;  // used to track % free
          int64_t                        total_alloc_bytes;
+         int64_t                        total_swapped_bytes;
+         int64_t                        cache_hits = 0;
          bip::offset_ptr<object_header> begin;  // the first obj
          bip::offset_ptr<object_header> end;    // the high water before circle
 
          // the main thread moves this forward as it consumes free space
          // points at a free area
-         bip::offset_ptr<object_header> alloc_cursor;
+         //bip::offset_ptr<object_header> alloc_cursor;
 
          // the swap thread moves this forward as it copies objects to lower levels,
          // points to the next object to be moved to swap or the end of the future
          // free area
-         bip::offset_ptr<object_header> swap_cursor;
+         //bip::offset_ptr<object_header> swap_cursor;
+         //bip::offset_ptr<object_header> end_free_cursor;
 
+         /// these positions only ever increment
+         uint64_t alloc_p;
+         uint64_t swap_p;
+         uint64_t end_free_p;
+         uint64_t alloc_area_size;
+
+         object_header* get_alloc_pos() const
+         {
+            return reinterpret_cast<object_header*>((char*)begin.get() + alloc_p % alloc_area_size);
+         }
+         object_header* get_swap_pos() const
+         {
+            return reinterpret_cast<object_header*>((char*)begin.get() + swap_p % alloc_area_size);
+         }
+         object_header* get_end_free_pos() const
+         {
+            return begin.get() + end_free_p % alloc_area_size;
+         }
+         object_header* get_end_pos() const { return end.get(); }
+         uint64_t       get_free_space() const { return end_free_p - alloc_p; }
+         uint64_t       max_contigous_alloc() const
+         {
+            auto fp = (char*)get_end_free_pos();
+            auto ep = (char*)get_end_pos();
+            //      auto bp = (char*)get_begin_pos();
+            auto ap = (char*)get_alloc_pos();
+
+            if (fp <= ap)
+               return ep - ap;  // + fp - bp;
+            else
+               return fp - ap;
+
+            // potential cursor positions
+            //  [B           A     F  S    E]      F - A
+            //  [B    S      A     F       E]      F - A
+            //  [B  F  S     A             E]      E - A + F - B
+            //  return (char*)get_end_pos() - get_alloc_pos();
+         }
+
+         /*
          inline uint64_t free_space() const;
-         inline void     update_size(uint64_t new_size);
          inline char*    file_begin_pos() const { return (char*)this; }
          inline char*    end_pos() const { return (char*)end.get(); }
-         inline uint32_t capacity() const { return (size + 7) & -8; }
+         inline uint32_t capacity() const { return ((size-sizeof(header)) + 7) & -8; }
+         */
 
+         inline void update_size(uint64_t new_size);
          header(uint64_t size);
       };
 
@@ -140,38 +195,32 @@ namespace trie
                    ring_allocator::cache_level_type lev,
                    bool                             pin = false);
 
-      inline auto    free_space() const { return _head->free_space(); }
-      inline auto&   alloc_cursor() { return _head->alloc_cursor; }
+      inline auto     get_free_space() const { return _head->get_free_space(); }
+      inline auto*    get_alloc_cursor() { return _head->get_alloc_pos(); }
+      inline auto*    get_swap_cursor() { return _head->get_swap_pos(); }
+      inline uint64_t max_contigous_alloc() const { return _head->max_contigous_alloc(); }
+      /*
       inline auto&   swap_cursor() { return _head->swap_cursor; }
-      inline char*   begin_pos() const { return (char*)_head->begin.get(); }
+      inline auto&   end_free_cursor() { return _head->end_free; }
       inline char*   end_pos() const { return (char*)_head->end.get(); }
+      */
+      inline char*   begin_pos() const { return (char*)_head->begin.get(); }
       object_header* get_object(uint64_t offset)
       {
+         ++_head->cache_hits;  // TODO: remove from release
          return reinterpret_cast<object_header*>(begin_pos() + offset);
       }
 
       ring_allocator::cache_level_type level;
 
+      FILE*                               _cfile = nullptr;
+      int                                 _cfileno;
       header*                             _head;
       object_header*                      _begin;
       object_header*                      _end;
       std::unique_ptr<bip::file_mapping>  _file_map;
       std::unique_ptr<bip::mapped_region> _map_region;
    };
-   inline uint64_t managed_ring::header::free_space() const
-   {
-      auto ac = alloc_cursor.get();
-      auto bc = begin.get();
-      auto ec = end.get();
-
-      if (ac == bc)
-         return ac->id;
-
-      if (((char*)ac + ac->id) == (char*)ec)
-         return ac->id + (bc->size == 0 ? bc->id : 0);
-
-      return ac->id;
-   }
 
 }  // namespace trie
 

@@ -10,10 +10,16 @@ namespace trie
       size              = s;
       auto header_size  = (sizeof(*this) + 7) & -8;
       begin             = reinterpret_cast<object_header*>((char*)this + header_size);
-      alloc_cursor      = begin;
-      swap_cursor       = begin;
-      alloc_cursor->set_free_area_size(size - header_size);
+      //alloc_cursor      = begin;
+      //swap_cursor       = begin;
+      //end_free_cursor   = end;
+      // alloc_cursor->set_free_area_size(size - header_size);
       end = reinterpret_cast<object_header*>((char*)this + size);
+
+      alloc_area_size = size - header_size;
+      alloc_p         = 0;
+      swap_p          = 0;
+      end_free_p      = alloc_area_size;
    }
 
    managed_ring::managed_ring(std::filesystem::path            filename,
@@ -60,6 +66,13 @@ namespace trie
          {
             WARN("Attempt to pin memory failed, performance may be impacted");
          }
+      } else {
+         _cfile = fopen( filename.generic_string().c_str(), "rb" );
+         if( not _cfile ) {
+            WARN( "unable to open file ptr" );
+         } else {
+            _cfileno = fileno(_cfile);
+         }
       }
       _begin = _head->begin.get();
       _end   = _head->end.get();
@@ -67,8 +80,17 @@ namespace trie
 
    void managed_ring::header::update_size(uint64_t new_size)
    {
-      if (new_size == size)
-         return;
+      WARN("new size: ", new_size, "  cur size: ", size);
+      if (new_size > size)
+         throw std::runtime_error("cannot grow memory");
+
+      if (new_size < size)
+         throw std::runtime_error("cannot shrink memory");
+
+      /*  TODO: figure out how to update cursors when alloc_area_size changes
+      auto ap = get_alloc_pos();
+      auto dsp = swap_p - alloc_p;
+      auto def = end_free_p - alloc_p;
 
       auto new_end_pos    = file_begin_pos() + new_size;
       auto new_free_space = new_end_pos - end_pos();
@@ -77,8 +99,8 @@ namespace trie
       e->id               = new_free_space;
 
       end = reinterpret_cast<object_header*>(new_end_pos);
+      */
    }
-
 
    ring_allocator::ring_allocator(std::filesystem::path dir, access_mode mode, config cfg)
    {
@@ -111,41 +133,48 @@ namespace trie
       uint32_t round_size = (num_bytes + 7) & -8;  // data padding
       uint64_t used_size  = round_size + sizeof(object_header);
 
-      ring._head->total_alloc_bytes += used_size + 8;
+      //DEBUG( "used size: ", used_size, " num_bytes: ", num_bytes, "  round_size: ", round_size );
+      ring._head->total_alloc_bytes += used_size;
 
-      auto cur = ring.alloc_cursor().get();
-      if (cur->free_area_size() < used_size + 8)  // need 8 for next obj
+      auto* cur        = ring.get_alloc_cursor();
+      auto  max_contig = ring.max_contigous_alloc();
+      if (max_contig < used_size)
       {
-         cur = ring._begin;
-         if (cur->size != 0 or cur->id < used_size + 8)  // need 8 for next obj
+         if (ring.get_free_space() - max_contig < used_size)
          {
-            WARN("cur->size; ", cur->size, "  cur->id: ", cur->id, " used_size: ", used_size);
-            dump();
-            throw std::runtime_error("out of space, run GC or increase DB size");
-            return nullptr;
+            if (ring.get_free_space() >= used_size)
+               throw std::runtime_error("out of contigious space for object size: " +
+                                        std::to_string(used_size));
+            else
+               throw std::runtime_error("out of space for object size: " +
+                                        std::to_string(used_size));
          }
-      }
-      auto next_obj = reinterpret_cast<object_header*>(((char*)cur) + used_size);
-
-      auto free_size = cur->free_area_size() - used_size;
-      next_obj->set_free_area_size(free_size);
-      if (free_size == 8)
-      {
-         WARN("FREE SIZE == 8");
-         if (((char*)next_obj) + 8 == (char*)ring._end)
-         {
-            WARN("OBJ IS AT END... WRAP it..\n");
-            next_obj = ring._begin;
-         }
+         cur->set_free_area_size(max_contig);
+         ring._head->alloc_p += max_contig;
+         cur        = ring.get_alloc_cursor();
+         max_contig = ring.max_contigous_alloc();
       }
 
-      ring.alloc_cursor() = next_obj;
+      /*
+      if (max_contig > used_size)
+      {
+         assert( max_contig - used_size >= 8 );
+         auto next_obj = reinterpret_cast<object_header*>(((char*)cur) + used_size);
+         next_obj->set_free_area_size(max_contig - used_size);
+      }
+      */
 
+      ring._head->alloc_p += used_size;
+      //ring.alloc_cursor() = next_obj;
+
+      assert(cur != ring._head->end.get());
+      assert(num_bytes < 4096);
       cur->set(nid, num_bytes);
       if constexpr (CopyData)
       {
          memcpy(cur->data(), data, num_bytes);
       }
+
       _obj_ids->set(nid, (char*)cur - ring.begin_pos(), ring.level);
 
       return cur->data();
@@ -158,69 +187,57 @@ namespace trie
    {
       auto do_swap = [this](auto* from, auto* to)
       {
-         auto fs     = from->free_space();
-         auto maxs   = from->_head->size;
-         auto target = maxs / 16;  // target a certain amount free
+         SCOPE;
+         auto fs     = from->get_free_space();
+         auto maxs   = from->_head->alloc_area_size;
+         auto target = maxs / 32;  // target a certain amount free
 
          if (target < fs)
             return;
-        // WARN("target: ", target, "  free space: ", fs, " from: ", from->level, " to: ", to->level);
 
+   //      WARN("               ", "target: ", target, "  free space: ", fs, " from: ", from->level, " to: ", to->level);
 
          auto bytes = target - fs;
 
-         uint64_t bytes_swapped = 0;
+         uint64_t bytes_freed = 0;
 
-         auto from_sc = from->swap_cursor().get();
-         auto ac      = from->alloc_cursor().get();
+         uint64_t sp     = from->_head->swap_p;
+         uint64_t fp     = from->_head->end_free_p;
+         uint64_t ap     = from->_head->alloc_p;
 
-         while (from_sc != ac and bytes_swapped < bytes)
+         auto     to_obj = [&](auto p)
          {
-            //    DEBUG("bytes swapped: ", bytes_swapped, " bytes: ", bytes);
-            //    DEBUG("ac - from_sc: ", ac - from_sc);
-            if (from_sc->is_free_area())
-               from_sc = from_sc->end_free();
+            return reinterpret_cast<object_header*>(((char*)from->_head->begin.get()) +
+                                                    (p % from->_head->alloc_area_size));
+         };
 
-            if (from_sc == from->_end)
-               from_sc = from->_begin;
+         auto p = sp;
+         auto end = std::min<uint64_t>(ap, p + bytes);
 
-            uint16_t ref;
-            auto     loc = _obj_ids->get({from_sc->id}, ref);
-            if ((loc.cache == from->level) & ref)
+         while (p < end)  //ap and bytes_freed <bytes )
+         {
+            auto o = to_obj(p);
+            if (o->id == 0) // unused space
             {
-               //      DEBUG("moving data to lower level");
-               alloc<true>(*to, {from_sc->id}, from_sc->size, from_sc->data());
+               p += o->size;
+               assert(o->size != 0);
             }
-            /*
             else
             {
-               if (not ref)
-                  DEBUG("object freed, nothing to move to swap");
-               else
-                  DEBUG("object already moved to another level");
+               uint16_t ref;
+               auto     loc = _obj_ids->get(id{o->id}, ref);
+               if (ref != 0 and from->get_object(loc.offset) == o and loc.cache == from->level) 
+                  alloc<true>(*to, {o->id}, o->size, o->data());
+               p += o->data_capacity() + 8;
             }
-            */
-            auto nxt = from_sc->next();
-
-            bytes_swapped += (char*)nxt - (char*)from_sc;
-            from_sc = nxt;
          }
-         from->_head->total_free_bytes += bytes_swapped;
-
-         from->swap_cursor() = from_sc;
+         from->_head->swap_p = p;
       };
-      //      DEBUG( "PRE SWAP HOT WARM" );
-      //     hot().dump(*_obj_ids);
+
       do_swap(&hot(), &warm());
-      //    hot().dump(*_obj_ids);
-      //   DEBUG( "END SWAP HOT WARM / START WARM TO COOL" );
-      //  warm().dump(*_obj_ids);
       do_swap(&warm(), &cool());
-      // warm().dump(*_obj_ids);
-      //DEBUG( "END WARM TO COOL / STARRT COOL TO COLD" );
-      //   cool().dump(*_obj_ids);
       do_swap(&cool(), &cold());
-      do_swap(&cold(), &cold());
+      //   do_swap(&cold(), &cold());
    }
 
    // updates the free range after swapping, this allows alloc to start
@@ -228,123 +245,211 @@ namespace trie
    // before advancing free space.
    void ring_allocator::claim_free()
    {
-      auto claim = [this](auto* ring)
+      auto claim = [this](auto& ring)
       {
-         auto* alloc_pos = ring->alloc_cursor().get();
-         auto* swap_pos  = ring->swap_cursor().get();
-
-         if (swap_pos > alloc_pos)
-         {
-            //  WARN("growing free area to swap pos");
-            alloc_pos->set_free_area_size((char*)swap_pos - (char*)alloc_pos);
-         }
-         else
-         {  // we must have wrapped
-            // WARN("growing free area to end of file");
-            // TODO: what about leaving space for a NULL obj at the end
-            alloc_pos->set_free_area_size(ring->end_pos() - (char*)alloc_pos);
-            if (ring->_begin != swap_pos)
-            {
-               WARN("creating free area from front to swap pos");
-               ring->_begin->set_free_area_size((char*)swap_pos - ring->begin_pos());
-               //dump();
-            }
-         }
+         // TODO: load relaxed and store relaxed if swapping is being managed by another thread
+         //assert(ring._head->end_free_p <= ring._head->swap_p);
+         ring._head->end_free_p = ring._head->alloc_area_size + ring._head->swap_p;
       };
-      claim(&hot());
-      claim(&warm());
-      claim(&cool());
-      claim(&cold());
+      claim(hot());
+      claim(warm());
+      claim(cool());
+      claim(cold());
    }
 
    void ring_allocator::retain(id i) { _obj_ids->retain(i); }
    void ring_allocator::release(id i) { _obj_ids->release(i); }
 
-   //  pointer is valid until GC runs, reads can read it then check to see if
+   //  pointer is valid until claim_free runs, reads can read it then check to see if
    //  the gc moved past char* while reading then read again at new location
-   char* ring_allocator::get(id i)
+   template <bool CopyToHot>
+   char* ring_allocator::get_cache(id i)
    {
       auto loc = _obj_ids->get(i);
 
       if (loc.cache == hot_cache)
          return hot().get_object(loc.offset)->data();
 
+
+      /*
+      if( loc.cache == cool_cache ) {
+          auto& ring = _levels[loc.cache];
+          if( ring->_cfile ) {
+             char temp_buffer[512];
+             object_header* ob = reinterpret_cast<object_header*>(temp_buffer);;
+             // TODO: this could fail at EOF?
+             auto re = pread( ring->_cfileno,  temp_buffer, sizeof(temp_buffer), loc.offset + ((sizeof(managed_ring::header)+7)&-8) );
+           //  assert( re == sizeof(ob) );
+
+          //   assert( obj->id == ob.id );
+          //   assert( obj->size == ob.size );
+
+             char* ptr = alloc<false>(hot(), id{ob->id}, ob->size);
+
+             if( ob->size < sizeof(temp_buffer)-8 ) {
+                memcpy( ptr, temp_buffer+8, ob->size );
+                return ptr;
+             } else {
+                re = pread( _levels[loc.cache]->_cfileno,  ptr, ob->size, 8+loc.offset + ((sizeof(managed_ring::header)+7)&-8) );
+                assert( re == ob->size );
+             return ptr;
+             }
+          }
+      }
+      */
       auto obj = _levels[loc.cache]->get_object(loc.offset);
 
-      auto ptr = alloc(hot(), id{obj->id}, obj->size);
-      memcpy(ptr, obj->data(), obj->size);
-      return ptr;
+      /// TODO: if size > X do not copy to hot, copy instead to warm
+
+
+      if constexpr (CopyToHot)
+      {
+         if (obj->size > 4096)
+            return obj->data();
+         return alloc<true>(hot(), id{obj->id}, obj->size, obj->data());
+      }
+      else
+      {
+         return obj->data();
+      }
+   }
+   char*                      ring_allocator::get(id i) { return get_cache<true>(i); }
+   std::pair<uint16_t, char*> ring_allocator::get_ref_no_cache(id i)
+   {
+      return {ref(i), get_cache<false>(i)};
    }
 
    void managed_ring::dump(object_db& odb)
    {
-      std::cerr << "size: " << _head->size << "   ";
-      std::cerr << "alloc_cursor free area: " << alloc_cursor()->free_area_size() << "  ";
-      std::cerr << "alloc_cursor pos: " << ((char*)alloc_cursor().get()) - begin_pos() << "   ";
-      std::cerr << "swap_cursor pos: " << ((char*)swap_cursor().get()) - begin_pos() << "  ";
-      std::cerr << "free space: " << free_space() << "\n";
+      std::cerr << "file size: " << _head->size /1024/1024. << " MB  ";
+      std::cerr << "free  space: " << _head->get_free_space()/1024/1024. << " Mb  ";
+      std::cerr << "cache hits: " << _head->cache_hits << "   ";
+      return;
+      /*
+
+
+      std::cerr << "alloc area size: " << _head->alloc_area_size << "   ";
+      std::cerr << "alloc abs pos: " << _head->alloc_p << "   ";
+      std::cerr << "max contig free space: " << _head->max_contigous_alloc() << "   ";
+      std::cerr << "end free  abs pos: " << _head->end_free_p << "   ";
+      std::cerr << "swap abs pos: " << _head->swap_p << "   ";
       std::cerr << "total alloced: " << _head->total_alloc_bytes << "\n";
       std::cerr << "total freed: " << _head->total_free_bytes << "\n";
-      std::cerr << "net : " << (_head->total_alloc_bytes - _head->total_free_bytes)/1024/1024./1024 << " GB\n";
+      std::cerr << "total swapped: " << _head->total_swapped_bytes << "\n";
+      std::cerr << "net : "
+                << (_head->total_alloc_bytes - _head->total_free_bytes) / 1024 / 1024. / 1024
+                << " GB\n";
+      std::cerr << "cache hits: " << _head->cache_hits << "\n";
+      */
 
-      auto print_from = [&,this](auto* ob)
+      auto s = _head->get_swap_pos();
+      auto a = _head->get_alloc_pos();
+      auto f = _head->get_end_free_pos();
+      auto e = _head->end.get();
+      auto b = _head->begin.get();
+
+//      return;
+      //   assert((char*)_head->get_alloc_pos() - begin_pos() == _head->alloc_p);
+
+      WARN("*end - *begin: ", (char*)e - (char*)b);
+      DEBUG("alloc - swap: ", _head->alloc_p - _head->swap_p);
+      DEBUG("*alloc - *swap: ", (char*)a - (char*)s);
+
+      auto totals = (_head->alloc_p - _head->swap_p);
+
+
+      std::string_view red    = "\033[31m";
+      std::string_view megenta= "\033[36m";
+      std::string_view yellow = "\033[33m";
+      std::string_view blue   = "\033[96m";
+      std::string_view cyan   = "\033[36m";
+      std::string_view def    = "\033[0m";
+      switch( level ) {
+         case 0:
+            std::cerr << red << "HOT:  " << def;
+            break;
+         case 1:
+            std::cerr << yellow << "WARM: " << def;
+            break;
+         case 2:
+            std::cerr << blue << "COOL: " << def;
+            break;
+         case 3:
+            std::cerr << blue << "COOL: " << def;
+            break;
+      }
+
+
+      uint64_t sp = _head->swap_p;
+      uint64_t fp = _head->end_free_p;
+      uint64_t ap = _head->alloc_p;
+
+      // sp -> ap = valid objects
+      // ap -> fp = free space
+      // fp -> sp = claim space
+
+      auto to_obj = [&](auto p)
       {
-         auto s     = _head->swap_cursor.get();
-         auto a     = _head->alloc_cursor.get();
-         auto b     = _begin;
-         auto e     = _end;
-         int  count = 0;
-         auto c     = ob;
-         if (c == e)
+         return reinterpret_cast<object_header*>(((char*)_head->begin.get()) +
+                                                 (p % _head->alloc_area_size));
+      };
+
+      assert(_head->get_swap_pos() == to_obj(sp));
+      auto p = sp;
+      while (p != ap)
+      {
+         if (p == sp)
+            std::cerr << blue << "S" << def;
+         if (p == ap)
+            std::cerr << red << "A" << def;
+         if (p == fp)
+            std::cerr << megenta << "F" << def;
+         auto o = to_obj(p);
+         if (o->id == 0)
          {
-            WARN("alloc is at the end!!\n");
+            std::cerr << yellow << "[#0, " << o->size << "]" << def;
+            p += o->size;
+            assert(o->size != 0);
          }
-         if (s == e)
+         else
          {
-            WARN("swap is at the end!!\n");
-         }
-         while (c != e)
-         {
-            if (++count > 10)
-               break;
-            if (c == b)
-               std::cerr << "\033[31mB\033[0m";
-            if (c == e)
-               std::cerr << "\033[31mE\033[0m";
-            if (c == s)
-               std::cerr << "\033[31mS\033[0m";
-            if (c == a)
-               std::cerr << "\033[31mA\033[0m";
-            if (c->is_free_area())
+            uint16_t ref = 5;
+            auto     loc = odb.get({o->id}, ref);
+
+            if (ref == 0)
             {
-               std::cerr << "\033[33m["
-                         << "FREE"
-                         << ", " << c->id << "b]\033[0m";
-               c = c->end_free();
+               std::cerr << megenta << "{ #" << o->id << ", " << o->size << ", r" << ref <<"}" << def;
+            }
+            else if (loc.cache != level)
+            {
+               std::cerr << blue << "( #" << o->id << ", " << o->size << ")" << def;
+            }
+            else if ( get_object( loc.offset ) !=  o )
+            {
+               std::cerr << red << "< #" << o->id << ", " << o->size << ">" << def;
             }
             else
             {
-               uint16_t ref;
-               auto     loc = odb.get({c->id}, ref);
-               if (loc.cache == level and ref)
-                  std::cerr << "[" << c->size << ", #" << c->id << " r" << ref << "]";
-               else if (0 == ref)
-               {
-                  std::cerr << "\033[94m{" << c->size << ", #" << c->id << "f}\033[0m";
-               }
-               else
-               {
-                  std::cerr << "\033[36m(" << c->size << ", #" << c->id << "s)\033[0m";
-               }
-               c = c->next();
+               std::cerr << def << "[ #" << o->id << ", " << o->size << ", r" << ref <<"]" << def;
             }
+            if (o->size == 0)
+            {
+               WARN(" 0 SIZE");
+               return;
+            }
+            p += o->data_capacity() + 8;
          }
-         std::cerr << "\n";
-      };
-         auto a     = _head->alloc_cursor.get();
-         auto b     = _begin;
-      print_from(a);
-      print_from(b);
+      }
+      if (p == sp)
+         std::cerr << blue << "S" << def;
+      if (p == ap)
+         std::cerr << red << "A" << def;
+      std::cerr << "[FREE " << fp - ap << "]";
+      p += fp - ap;
+      if (p == fp)
+         std::cerr << megenta<< "F" << def;
+
+      _head->validate();
    }
 
    void ring_allocator::dump()
@@ -357,7 +462,7 @@ namespace trie
       cool().dump(*_obj_ids);
       std::cerr << "\n============= COLD ================== \n";
       cold().dump(*_obj_ids);
-      std::cerr << "================================= \n";
+//      std::cerr << "================================= \n";
    }
 
 }  // namespace trie

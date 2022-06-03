@@ -25,6 +25,12 @@ target_compile_options( bigdb PUBLIC -msse4.1 )
 target_include_directories( bigdb PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
 set_property( TARGET bigdb PROPERTY CXX_STANDARD 20 )
 
+add_executable( bankdb ring_alloc.cpp database.cpp object_arena.cpp bank.cpp  )
+target_link_libraries( bankdb PUBLIC ${LINUX_LIBS} Threads::Threads )
+target_compile_options( bankdb PUBLIC -msse4.1 )
+target_include_directories( bankdb PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
+set_property( TARGET bankdb PROPERTY CXX_STANDARD 20 )
+
 add_executable( swaptest database.cpp swap.cpp ring_alloc.cpp object_arena.cpp  )
 target_link_libraries( swaptest PUBLIC ${LINUX_LIBS} Threads::Threads )
 target_compile_options( swaptest PUBLIC -msse4.1 )

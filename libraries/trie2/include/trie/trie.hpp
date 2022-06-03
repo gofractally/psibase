@@ -10,11 +10,11 @@ namespace trie
      public:
       struct config
       {
-         uint64_t max_objects = 1000 * 1000ull;
-         uint64_t hot_pages   = 1000 * 1000ull;
-         uint64_t cold_pages  = 4000 * 1000ull;
-         uint64_t big_hot_pages   = 1* 1000ull;
-         uint64_t big_cold_pages  = 4* 1000ull;
+         uint64_t max_objects    = 1000 * 1000ull;
+         uint64_t hot_pages      = 1000 * 1000ull;
+         uint64_t cold_pages     = 4000 * 1000ull;
+         uint64_t big_hot_pages  = 1 * 1000ull;
+         uint64_t big_cold_pages = 4 * 1000ull;
       };
 
       enum access_mode
@@ -60,7 +60,7 @@ namespace trie
          inline T&       operator*() { return *reinterpret_cast<T*>(ptr); }
          inline const T& operator*() const { return *reinterpret_cast<const T*>(ptr); }
 
-         int64_t as_id()const { return _id.id; }
+         int64_t as_id() const { return _id.id; }
 
         private:
          template <typename Other>
@@ -73,24 +73,51 @@ namespace trie
       class session
       {
         public:
-         bool upsert(string_view key, string_view val);
-         bool remove(string_view key);
-         std::optional<string_view> get( string_view key )const;
+         struct iterator
+         {
+            uint32_t key_size() const;
+            uint32_t read_key(char* data, uint32_t data_len) const;
+            string_view value()const;
+            std::string key() const;
+            iterator&   operator++();
+            iterator&   operator--();
+            bool        valid() const { return path.size() > 0; }
+
+           private:
+            friend class session;
+            iterator(const session& s) : _session(&s){};
+            std::vector<std::pair<id, char> > path;
+            const session*                          _session;
+         };
+
+         iterator                   first()const;
+         iterator                   last()const;
+         iterator                   find(string_view key);
+         iterator                   lower_bound(string_view key);
+         bool                       upsert(string_view key, string_view val);
+         bool                       remove(string_view key);
+         std::optional<string_view> get(string_view key) const;
 
          void print();
+         void validate();
          ~session();
 
          void clear();
+
         private:
-         void               print(id n, string_view prefix = "");
-         inline deref<node> get(ring_allocator::id i)const;
-         std::optional<string_view> get( id root, string_view key )const;
-         inline id          set_value(deref<node> n, string_view key, string_view val);
-         inline id          set_inner_value(deref<inner_node> n, string_view val);
-         inline id          combine_value_nodes(string_view k1,
-                                                string_view v1,
-                                                string_view k2,
-                                                string_view v2);
+         void                       validate(id);
+         void                       next(iterator& itr)const;
+         void                       prev(iterator& itr)const;
+         iterator                   find(id n, string_view key);
+         void                       print(id n, string_view prefix = "", std::string k = "");
+         inline deref<node>         get(ring_allocator::id i) const;
+         std::optional<string_view> get(id root, string_view key) const;
+         inline id                  set_value(deref<node> n, string_view key, string_view val);
+         inline id                  set_inner_value(deref<inner_node> n, string_view val);
+         inline id                  combine_value_nodes(string_view k1,
+                                                        string_view v1,
+                                                        string_view k2,
+                                                        string_view v2);
 
          inline id add_child(id root, string_view key, string_view val, bool& inserted);
          inline id remove_child(id root, string_view key, bool& removed);
@@ -100,19 +127,18 @@ namespace trie
                                              string_view       pre,
                                              id                val,
                                              uint64_t          branches);
-         inline void              assign(id& to, id from);
          inline void              release(id);
          inline id                retain(id);
 
          friend class database;
-         session(database& db, uint32_t version) : _db(db), _version(version) {}
-         database& _db;
+         session(database& db, uint32_t version) : _db(&db), _version(version) {}
+         database* _db;
          uint32_t  _version;
       };
 
       session start_revision(uint32_t new_rev, uint32_t prev_rev);
 
-      void    print_stats();
+      void print_stats();
 
      private:
       std::unique_ptr<struct database_impl> my;

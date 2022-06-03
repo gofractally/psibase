@@ -1,6 +1,7 @@
 #include <trie/object_arena.hpp>
 #include <trie/object_db.hpp>
 #include <trie/trie.hpp>
+#include <unordered_set>
 
 int test_object_db()
 {
@@ -231,6 +232,105 @@ void test_object_arena()
    }
    */
 }
+
+void print6( char c ) {
+   for( int i = 5; i >= 0; --i )
+      std::cout << int( (c >> i)&1 );
+}
+void print8( char c ) {
+   for( int i = 7; i >= 0; --i )
+      std::cout << int( (c >> i)&1 );
+}
+
+inline std::string from_key6(const std::string_view sixb)
+{
+ //  for( auto c : sixb ) {print6(c); std::cout <<" ";}
+ //  std::cout <<"\n";
+   std::string out;
+   out.resize((sixb.size() * 6) / 8);
+
+   const char* pos6     = sixb.data();
+   const char* pos6_end = sixb.data() + sixb.size();
+   char* pos8     = out.data();
+
+   while (pos6 + 4 <= pos6_end)
+   {
+      pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
+      pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
+      pos8[2] = (pos6[2] << 6) | pos6[3];         // 2b + 6
+      pos6 += 4;
+      pos8 += 3;
+   }
+   switch (pos6_end - pos6)
+   {
+      case 3:
+         pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
+         pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
+         pos8[2] = (pos6[2] << 6);                   // 2b + 6-0
+         break;
+      case 2:
+         pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
+         pos8[1] = (pos6[1] << 4);  // 4b + 4-0
+         break;
+      case 1:
+         pos8[0] = (pos6[0] << 2);  // 6 + 2-0
+         break;
+   }
+//   for( auto c : out ) { print8(c); std::cout <<" "; }
+//   std::cout << "from_key("<<out<<")\n";
+   return out;
+}
+
+inline std::string to_key6(const std::string_view v)
+{
+//   std::cout << "to_key(" << v <<")\n";
+//   for( auto c : v ) { print8(c); std::cout <<" "; }
+//   std::cout <<"\n";
+
+   auto bits  = v.size() * 8;
+   auto byte6 = (bits + 5) / 6;
+
+   std::string out;
+   out.resize(byte6);
+
+   char* pos6     = out.data();
+   const char* pos8     = v.data();
+   const char* pos8_end = v.data() + v.size();
+
+   while (pos8 + 3 <= pos8_end)
+   {
+      pos6[0] = pos8[0] >> 2;
+      pos6[1] = (pos8[0] & 0x3) << 4 | pos8[1] >> 4;
+      pos6[2] = (pos8[1] & 0xf) << 2 | (pos8[2] >> 6);
+      pos6[3] = pos8[2] & 0x3f;
+      pos8 += 3;
+      pos6 += 4;
+   }
+
+   switch (pos8_end - pos8)
+   {
+      case 2:
+         pos6[0] = pos8[0] >> 2;
+         pos6[1] = (pos8[0] & 0x3) << 4 | pos8[1] >> 4;
+         pos6[2] = (pos8[1] & 0xf) << 2;
+         break;
+      case 1:
+         pos6[0] = pos8[0] >> 2;
+         pos6[1] = (pos8[0] & 0x3) << 4;
+         break;
+      default:
+         break;
+   }
+   return out;
+}
+inline std::string from_key(const std::string& sv)
+{
+   std::string out;
+   out.reserve(sv.size());
+   for (int i = 0; i < sv.size(); ++i)
+      out += sv[i] + 62;
+   return out;
+}
 inline std::string to_key(const std::string_view v)
 {
    std::string s(v.data(), v.size());
@@ -241,14 +341,6 @@ inline std::string to_key(const std::string_view v)
    }
    return s;
 }
-inline std::string from_key(const std::string& sv)
-{
-   std::string out;
-   out.reserve(sv.size());
-   for (int i = 0; i < sv.size(); ++i)
-      out += sv[i] + 62;
-   return out;
-}
 
 void load_key_values(std::vector<std::string>&  keys,
                      std::vector<std::string>&  vals,
@@ -256,6 +348,7 @@ void load_key_values(std::vector<std::string>&  keys,
                      std::optional<std::string> from,
                      std::optional<std::string> to)
 {
+   std::unordered_set<std::string> unique;
    for (auto c : {words})
    {
       std::ifstream in(c);
@@ -267,57 +360,69 @@ void load_key_values(std::vector<std::string>&  keys,
          if (to and str > *to)
             continue;
 
+         if( from_key6(to_key6(str)) != str ) {
+            throw std::runtime_error( "key did not round trip: " + str );
+         }
          vals.push_back(from_key(to_key(str)));
+         auto r = unique.insert(vals.back());
+         if (not r.second)
+         {
+       //     std::cout << vals.back() << " collides " << str << "\n";
+            vals.pop_back();
+            continue;
+         }
          keys.push_back(to_key(str));
       }
    }
 }
 
-void test_trie_remove() {
+void test_trie_remove()
+{
    std::string big;
-   big.resize( 10000 );
-   for( auto& c : big ) {
+   big.resize(10000);
+   for (auto& c : big)
+   {
       c = 'B';
    }
-      trie::database db( "dbdir", trie::database::config{
-                         .max_objects = 1000ull,
-                         .hot_pages  = 100ull,
-                         .cold_pages  = 400ull
-                         }, trie::database::read_write );
-      auto s = db.start_revision( 0, 0 );
-      s.upsert( to_key("hello"), big );
-      s.upsert( to_key("heman"), big );
-      s.upsert( to_key("sheman"), big );
+   trie::database db(
+       "dbdir",
+       trie::database::config{.max_objects = 1000ull, .hot_pages = 100ull, .cold_pages = 400ull},
+       trie::database::read_write);
+   auto s = db.start_revision(0, 0);
+   s.upsert(to_key6("hello"), big);
+   s.upsert(to_key6("heman"), big);
+   s.upsert(to_key6("sheman"), big);
 
-      auto v = s.get( to_key("sheman") );
-      if( v )
-      WARN( "v.size: ", v->size(), " back: ", v->back() );
-      else {
-         WARN( "NOT FOUND" );
-      }
+   auto v = s.get(to_key6("sheman"));
+   if (v)
+      WARN("v.size: ", v->size(), " back: ", v->back());
+   else
+   {
+      WARN("NOT FOUND");
+   }
 
-
-      s.upsert( to_key("hell"), "hell" );
-      s.upsert( to_key("hellb"), "hellb" );
-      s.upsert( to_key("hellbaby"), "hellbaby" );
-      s.print();
-      std::cerr<<"========= REMOVE hello ============\n";
-      s.remove( to_key("hello") );
-      s.print();
-      s.remove( to_key("hello") );
-      s.print();
-      s.upsert( to_key("hello"), "hello" );
-      s.print();
-      s.remove( to_key("hello") );
-      s.print();
-      std::cerr<<"========= REMOVE hellb ============\n";
-      s.remove( to_key("hellb") );
-      s.print();
+   s.upsert(to_key6("hell"), "hell");
+   s.upsert(to_key6("hellb"), "hellb");
+   s.upsert(to_key6("hellbaby"), "hellbaby");
+   s.print();
+   std::cerr << "========= REMOVE hello ============\n";
+   s.remove(to_key6("hello"));
+   s.print();
+   s.remove(to_key6("hello"));
+   s.print();
+   s.upsert(to_key6("hello"), "hello");
+   s.print();
+   s.remove(to_key6("hello"));
+   s.print();
+   std::cerr << "========= REMOVE hellb ============\n";
+   s.remove(to_key6("hellb"));
+   s.print();
 }
 
-void test_trie( int argc, char** argv) {
-   try {
-
+void test_trie(int argc, char** argv)
+{
+   try
+   {
       std::vector<std::string>   keys;
       std::vector<std::string>   values;
       std::optional<std::string> from, to;
@@ -331,17 +436,15 @@ void test_trie( int argc, char** argv) {
       if (argc > 3)
          to = std::string(argv[3]);
 
-
-
       load_key_values(keys, values, argv[1], from, to);
-      std::cerr<< "loaded " << keys.size() << " keys\n";
+      std::cerr << "loaded " << keys.size() << " keys\n";
 
-      trie::database db( "dbdir", trie::database::config{
-                         .max_objects = 100*1000*1000ull,
-                         .hot_pages  = 400*1000ull,
-                         .cold_pages  = 400*4000ull
-                         }, trie::database::read_write );
-      auto s = db.start_revision( 0, 0 );
+      trie::database db("dbdir",
+                        trie::database::config{.max_objects = 2*values.size(),
+                                               .hot_pages   = 1024 * 1024ull,
+                                               .cold_pages  = 1024 * 4000ull},
+                        trie::database::read_write);
+      auto           s = db.start_revision(0, 0);
       /*
       s.print();
       s.upsert( to_key("hello"), "hello" );
@@ -362,73 +465,211 @@ void test_trie( int argc, char** argv) {
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < keys.size(); ++i)
          {
-         //   std::cout << "==================================\n";
+            if( i % 10000 == 999 )
+               db.swap();
+
+            //   std::cout << "==================================\n";
             //DEBUG( "upsert ", values[i] );
             bool in = s.upsert(keys[i], values[i]);
-            if( not in ) {
-               s.print();
-               WARN( "failed to insert: ", values[i] );
+            if (not in)
+            {
+               //   s.print();
+               WARN("failed to insert: ", values[i], "  i = ", i);
+               //  return;
             }
-            assert( in );
-         //   s.print();
-          //  std::cout << "==================================\n";
          }
          auto end   = std::chrono::steady_clock::now();
          auto delta = end - start;
          //std::chrono::duration<double, std::milli>(delta).count();
-         std::cerr << "trie upsert:    " << std::chrono::duration<double, std::milli>(delta).count()
+         std::cerr << "trie insert upsert:    " << std::chrono::duration<double, std::milli>(delta).count()
                    << " ms\n";
       }
       {
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < keys.size(); ++i)
          {
-         //   std::cout << "==================================\n";
+            if( i % 10000 == 999 )
+               db.swap();
+
+            //   std::cout << "==================================\n";
+            //DEBUG( "upsert ", values[i] );
+            bool in = s.upsert(keys[i], values[i]);
+            if (in)
+            {
+               //   s.print();
+               WARN("expected to update: ", values[i], "  i = ", i);
+               //  return;
+            }
+         }
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         //std::chrono::duration<double, std::milli>(delta).count();
+         std::cerr << "trie update upsert:    " << std::chrono::duration<double, std::milli>(delta).count()
+                   << " ms\n";
+      }
+      {
+         auto start = std::chrono::steady_clock::now();
+         for (uint32_t i = 0; i < keys.size(); ++i)
+         {
+            //   std::cout << "==================================\n";
             //DEBUG( "upsert ", values[i] );
             auto in = s.get(keys[i]);
-            if( not in ) {
-               s.print();
-               WARN( "failed to get: ", values[i] );
+            if (not in)
+            {
+                 s.print();
+               WARN("failed to get: ", values[i]);
+               return;
+            } else  {
+            //   WARN("found: ", values[i]);
             }
-            assert( in );
-         //   s.print();
-          //  std::cout << "==================================\n";
+            assert(in);
+            //   s.print();
+            //  std::cout << "==================================\n";
          }
          auto end   = std::chrono::steady_clock::now();
          auto delta = end - start;
          //std::chrono::duration<double, std::milli>(delta).count();
-         std::cerr << "trie get all:    " << std::chrono::duration<double, std::milli>(delta).count()
-                   << " ms\n";
+         std::cerr << "trie get all:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
       }
       {
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < keys.size(); ++i)
          {
-         //   std::cout << "==================================\n";
+            //   std::cout << "==================================\n";
+            //DEBUG( "upsert ", values[i] );
+            auto in = s.find(keys[i]);
+            if (not in.valid())
+            {
+               WARN("failed to find: ", values[i]);
+               return;
+            } else  {
+          //     WARN("found: ", values[i]);
+            }
+            assert(in);
+            //   s.print();
+            //  std::cout << "==================================\n";
+         }
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         //std::chrono::duration<double, std::milli>(delta).count();
+         std::cerr << "trie find all:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
+      }
+      {
+         auto start = std::chrono::steady_clock::now();
+         for (uint32_t i = 0; i < keys.size(); ++i)
+         {
+            //   std::cout << "==================================\n";
+            //DEBUG( "upsert ", values[i] );
+            auto in = s.lower_bound(keys[i]);
+            if (not in.valid())
+            {
+               WARN("failed to lower bound: ", values[i]);
+               return;
+            } else  {
+             //  if( in.key() != keys[i] ) {
+             //     WARN( "unexpected lower bound for ", values[i] );
+             //  }
+         //      WARN("lower found: ", values[i]);
+            }
+            assert(in);
+            //   s.print();
+            //  std::cout << "==================================\n";
+         }
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         //std::chrono::duration<double, std::milli>(delta).count();
+         std::cerr << "trie lower bound all:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
+      }
+  //    s.print();
+
+      {
+         auto start = std::chrono::steady_clock::now();
+         int count = 0;
+         auto itr = s.first();
+         std::cout << from_key(itr.key())<<"\n";;
+         while( itr.valid() ) {
+       //     std::cout << "==================     " <<from_key(itr.key())<<" = " << itr.value() <<"  \n";;
+            ++itr;
+            ++count;
+         }
+
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         std::cerr << "trie itr++ all:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms  "<<count<<" items \n";
+      }
+     // s.print();
+      {
+         auto start = std::chrono::steady_clock::now();
+         int count = 0;
+         auto itr = s.last();
+         std::cout << from_key(itr.key())<<"\n";;
+         while( itr.valid() ) {
+      //      std::cout << "==================     " <<from_key(itr.key())<<" = " << itr.value() <<"  \n";;
+            --itr;
+            ++count;
+         }
+
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         std::cerr << "trie itr-- all:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms  "<<count<<" items \n";
+      }
+      {
+         auto start = std::chrono::steady_clock::now();
+         int count = 0;
+         auto itr = s.first();
+         std::cout << from_key(itr.key())<<"\n";;
+         while( itr.valid() ) {
+            ++itr;
+           // std::cout << from_key(itr.key())<<"\n";;
+            ++count;
+         }
+
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         std::cerr << "trie itr++ all:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms  "<<count<<" items \n";
+      }
+      return;
+
+
+      return;
+      {
+         auto start = std::chrono::steady_clock::now();
+         for (uint32_t i = 0; i < keys.size(); ++i)
+         {
+            //   std::cout << "==================================\n";
             bool r = s.remove(keys[i]);
-            assert( r );
-         //   s.print();
-          //  std::cout << "==================================\n";
+            assert(r);
+            //   s.print();
+            //  std::cout << "==================================\n";
          }
          auto end   = std::chrono::steady_clock::now();
          auto delta = end - start;
          //std::chrono::duration<double, std::milli>(delta).count();
          std::cerr << "trie remove:    " << std::chrono::duration<double, std::milli>(delta).count()
                    << " ms\n";
-          s.print();
+         s.print();
       }
-     // s.print();
-
-   } catch ( const std::exception& e ) {
-      std::cout << e.what() <<"\n";
+      // s.print();
+   }
+   catch (const std::exception& e)
+   {
+      std::cout << e.what() << "\n";
    }
 };
 
 int main(int argc, char** argv)
 {
-   //test_trie(argc,argv);
-   test_trie_remove();
+   std::cerr << from_key6( to_key6( "hel" ) ) <<"\n";
+   std::cerr << from_key6( to_key6( "hell" ) ) <<"\n";
+   test_trie(argc, argv);
+   // test_trie_remove();
    return 0;
-//   test_object_arena();
+   //   test_object_arena();
    return 0;
 }

@@ -160,6 +160,7 @@ namespace trie
    inline void object_db::retain(object_id id)
    {
       auto& obj = _header->objects[id.id];
+      assert( ref(id) > 0 );
       obj.store(obj.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
       //      std::cerr << "    retain id: " << id.id <<"    new count: " << (obj.load() & 0xffff) <<"\n";
    }
@@ -198,7 +199,7 @@ namespace trie
    inline object_db::object_location object_db::get(object_id id)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-      std::atomic_thread_fence(std::memory_order_acquire);
+//      std::atomic_thread_fence(std::memory_order_acquire);
       assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
@@ -209,7 +210,7 @@ namespace trie
    inline object_db::object_location object_db::get(object_id id, uint16_t& ref)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-      std::atomic_thread_fence(std::memory_order_acquire);
+//      std::atomic_thread_fence(std::memory_order_acquire);
      // assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
