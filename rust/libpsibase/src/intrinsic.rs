@@ -158,25 +158,10 @@ pub fn check(condition: bool, message: &str) {
     }
 }
 
-/// Get the most-recent result
-///
-/// Other functions set the result.
-pub fn get_result_bytes() -> Vec<u8> {
-    unsafe {
-        let size = raw::getResult(std::ptr::null_mut(), 0, 0);
-        let mut result = Vec::with_capacity(size as usize);
-        if size > 0 {
-            raw::getResult(result.as_mut_ptr(), size, 0);
-            result.set_len(size as usize);
-        }
-        result
-    }
-}
-
 /// Get the most-recent result when the size is known in advance
 ///
 /// Other functions set the result.
-pub fn get_result_bytes_known_size(size: u32) -> Vec<u8> {
+fn get_result_bytes(size: u32) -> Vec<u8> {
     let mut result = Vec::with_capacity(size as usize);
     if size > 0 {
         unsafe {
@@ -215,7 +200,7 @@ pub fn get_current_action_bytes() -> Vec<u8> {
     unsafe {
         size = raw::getCurrentAction();
     };
-    get_result_bytes_known_size(size)
+    get_result_bytes(size)
 }
 
 /// Get the currently-executing action.
@@ -255,6 +240,6 @@ pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
 }
 
 pub fn set_retval<'a, T: Packable<'a>>(val: &'a T) {
-    let bytes = val.packed_bytes(); // TODO: is there a way to view vs copying to a vec?
+    let bytes = val.packed_bytes();
     unsafe { raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
 }
