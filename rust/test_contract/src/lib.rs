@@ -1,17 +1,11 @@
-// use fracpack::Packable;
-use libpsibase::{
-    abort_message, get_current_action, with_current_action, write_console, Action, MethodNumber,
-    SharedAction,
-};
+use libpsibase::*;
 use psi_macros::contract;
 
 #[contract(example)]
 mod example_contract {
-    use crate::*;
-
     #[action]
     pub fn hi() {
-        write_console("hello!!!");
+        libpsibase::write_console("hello!!!");
     }
 
     #[action]

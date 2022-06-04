@@ -177,21 +177,13 @@ pub fn get_result_bytes() -> Vec<u8> {
 ///
 /// Other functions set the result.
 pub fn get_result_bytes_known_size(size: u32) -> Vec<u8> {
-    write_console(&format!("getting result size {}", size));
     let mut result = Vec::with_capacity(size as usize);
     if size > 0 {
         unsafe {
             let actual_size = raw::getResult(result.as_mut_ptr(), size, 0);
-            write_console(&format!("actual result size {}", actual_size));
-            // TODO: actual_size is returning 0 -- should we remove the following line?
-            // result.set_len(std::cmp::min(size, actual_size) as usize);
+            result.set_len(std::cmp::min(size, actual_size) as usize);
         }
     }
-    write_console(&format!(
-        "\nresult size {}, result bytes {:?}",
-        result.len(),
-        result
-    )); // TODO: >>> investigate why its always empty!
     result
 }
 
@@ -238,9 +230,7 @@ pub fn get_current_action_bytes() -> Vec<u8> {
 ///
 /// Note: The above only applies if the contract uses [call].
 pub fn get_current_action() -> crate::Action {
-    write_console("getting action bytes");
     let bytes = get_current_action_bytes();
-    write_console(&format!("got action bytes {}\n{:?}", bytes.len(), bytes));
     <crate::Action>::unpack(&bytes[..], &mut 0).unwrap() // unwrap won't panic
 }
 
@@ -257,6 +247,14 @@ pub fn get_current_action() -> crate::Action {
 /// Note: The above only applies if the contract uses [call].
 pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
     let bytes = get_current_action_bytes();
+    write_console(&format!("got action bytes {:?}", bytes));
+    // TODO: below line is failing... I believe because unpacking Vec<u8> is different than unpacking &'a [u8]
     let act = <crate::SharedAction>::unpack(&bytes[..], &mut 0).unwrap(); // unwrap won't panic
+    write_console(&format!("unpacked action {}", act.method.to_string()));
     f(act)
+}
+
+pub fn set_retval<'a, T: Packable<'a>>(val: &'a T) {
+    let bytes = val.packed_bytes(); // TODO: is there a way to view vs copying to a vec?
+    unsafe { raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
 }

@@ -91,8 +91,7 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
         #[allow(non_camel_case_types)]
         #[allow(non_upper_case_globals)]
         pub mod #iface_mod_name {
-
-            use std::str::FromStr;
+            use super::*;
 
             pub mod actions {
                 #iface_use
@@ -103,33 +102,35 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
             pub enum action {
                 #enum_body
             }
-            pub fn dispatch(act: libpsibase::Action) -> fracpack::Result<()> {
+            pub fn dispatch(act: Action) -> fracpack::Result<()> {
                 // TODO: view instead of unpack
                 // TODO: sender
 
                 // TODO: adjust dispatch body
-                // if act.method == libpsibase::MethodNumber::from_str("hi").unwrap() {
-                //     super::example_contract::hi();
-                // } else if act.method == libpsibase::MethodNumber::from_str("add").unwrap() {
-                //     let args = <actions::add as fracpack::Packable>::unpack(act.raw_data, &mut 0)?;
-                //     super::example_contract::add(args.a, args.b);
-                // } else if act.method == libpsibase::MethodNumber::from_str("multiply").unwrap() {
-                //     let args = <actions::multiply as fracpack::Packable>::unpack(act.raw_data, &mut 0)?;
-                //     super::example_contract::multiply(args.a, args.b);
-                // } else {
-                //     libpsibase::abort_message("unknown action method");
-                // }
-                super::example_contract::hi();
+                if act.method == MethodNumber::from("hi") {
+                    super::example_contract::hi();
+                } else if act.method == MethodNumber::from("add") {
+                    let args = <actions::add as fracpack::Packable>::unpack(&act.raw_data, &mut 0)?;
+                    let val = super::example_contract::add(args.a, args.b);
+                    set_retval(&val);
+                } else if act.method == MethodNumber::from("multiply") {
+                    let args = <actions::multiply as fracpack::Packable>::unpack(&act.raw_data, &mut 0)?;
+                    let val = super::example_contract::multiply(args.a, args.b);
+                    set_retval(&val);
+                } else {
+                    abort_message(&format!(
+                        "unknown contract action: {}",
+                        act.method.to_string()
+                    ));
+                }
                 Ok(())
             }
         }
 
         #[no_mangle]
         pub extern "C" fn called(_this_contract: u64, _sender: u64) {
-            write_console("**** called\n");
-            let act = get_current_action(); // >>> throwing unreachable
-            write_console("**** got act\n");
-            #iface_mod_name::dispatch(act);
+            let act = get_current_action();
+            #iface_mod_name::dispatch(act).unwrap();
 
             // TODO: review
             // with_current_action(|act| {
