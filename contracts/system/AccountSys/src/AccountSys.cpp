@@ -40,6 +40,7 @@ namespace system_contract
 
    // TODO: limit who can create accounts
    // TODO: limit who can use -sys suffix
+   // TODO: verify name round-trips through strings
    void AccountSys::newAccount(AccountNumber name, AccountNumber authContract, bool requireNew)
    {
       Tables tables{getReceiver()};

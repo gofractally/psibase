@@ -141,7 +141,7 @@ export function publicStringToKeyPair(s) {
 }
 
 // Convert the private key in {keyType, keyPair} to a string
-export function keyPairToPrivateString({ keyType, keyPair }) {
+export function privateKeyPairToString({ keyType, keyPair }) {
     const data = keyPair.getPrivate().toArrayLike(Uint8Array, 'be', 32);
     if (keyType === KeyType.k1)
         return keyToString(data, 'K1', 'PVT_K1_');
@@ -152,7 +152,7 @@ export function keyPairToPrivateString({ keyType, keyPair }) {
 }
 
 // Convert the public key in {keyType, keyPair} to a string
-export function keyPairToPublicString({ keyType, keyPair }) {
+export function publicKeyPairToString({ keyType, keyPair }) {
     const x = keyPair.getPublic().getX().toArray('be', 32);
     const y = keyPair.getPublic().getY().toArray('be', 32);
     const data = [(y[31] & 1) ? 3 : 2].concat(x);
@@ -164,10 +164,22 @@ export function keyPairToPublicString({ keyType, keyPair }) {
         throw new Error('unsupported key type');
 }
 
-// console.log(keyPairToPrivateString(privateStringToKeyPair('PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3')));
-// console.log(keyPairToPublicString(privateStringToKeyPair('PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3')));
-// console.log(keyPairToPublicString(publicStringToKeyPair('PUB_R1_7pGpnu7HZVwi8kiLLDK2MJ6aYYS23eRJYmDXSLq5WZFCN6WEqY')));
+// Convert the private key in {keyType, keyPair} to a Uint8Array
+export function privateKeyPairToUint8Array({ keyType, keyPair }) {
+    return keyPair.getPrivate().toArrayLike(Uint8Array, 'be', 32);
+}
 
-// console.log(keyPairToPrivateString(privateStringToKeyPair('PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V')));
-// console.log(keyPairToPublicString(privateStringToKeyPair('PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V')));
-// console.log(keyPairToPublicString(publicStringToKeyPair('PUB_K1_6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5BoDq63')));
+// Convert the public key in {keyType, keyPair} to a Uint8Array
+export function publicKeyPairToUint8Array({ keyType, keyPair }) {
+    const x = keyPair.getPublic().getX().toArray('be', 32);
+    const y = keyPair.getPublic().getY().toArray('be', 32);
+    return new Uint8Array([(y[31] & 1) ? 3 : 2].concat(x));
+}
+
+// console.log(privateKeyPairToString(privateStringToKeyPair('PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3')));
+// console.log(publicKeyPairToString(privateStringToKeyPair('PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3')));
+// console.log(publicKeyPairToString(publicStringToKeyPair('PUB_R1_7pGpnu7HZVwi8kiLLDK2MJ6aYYS23eRJYmDXSLq5WZFCN6WEqY')));
+
+// console.log(privateKeyPairToString(privateStringToKeyPair('PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V')));
+// console.log(publicKeyPairToString(privateStringToKeyPair('PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V')));
+// console.log(publicKeyPairToString(publicStringToKeyPair('PUB_K1_6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5BoDq63')));

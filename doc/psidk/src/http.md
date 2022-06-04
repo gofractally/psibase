@@ -1,22 +1,23 @@
 # HTTP and Javascript
 
 - [Routing and Virtual Hosts](#routing-and-virtual-hosts)
-- - [CORS and authorization](#cors-and-authorization)
+  - [CORS and authorization](#cors-and-authorization)
 - [Native services](#native-services)
-- - [Push transaction](#push-transaction)
-- - [Boot chain](#boot-chain)
+  - [Push transaction](#push-transaction)
+  - [Boot chain](#boot-chain)
 - [Common contract services](#common-contract-services)
-- - [Pack transaction](#pack-transaction)
-- - [Common files](#common-files)
-- - - [RPC helpers](#rpc-helpers)
-- - - - [Simple RPC wrappers](#simple-rpc-wrappers)
-- - - - [Conversions](#conversions)
-- - - - [Transactions](#transactions)
-- - - [Signing](#signing)
-- - - [React GraphQL hooks](#react-graphql-hooks)
+  - [Pack transaction](#pack-transaction)
+  - [Common files](#common-files)
+    - [RPC helpers](#rpc-helpers)
+      - [Simple RPC wrappers](#simple-rpc-wrappers)
+      - [Conversions](#conversions)
+      - [Transactions](#transactions)
+    - [Key Conversions](#key-conversions)
+    - [Signing](#signing)
+    - [React GraphQL hooks](#react-graphql-hooks)
 - [Root services](#root-services)
 - [Contract-provided services](#contract-provided-services)
-- - [Packing actions](#packing-actions)
+  - [Packing actions](#packing-actions)
 
 ## Routing and Virtual Hosts
 
@@ -69,12 +70,13 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 - [Pack transaction](#pack-transaction)
 - [Common files](#common-files)
-- - [RPC helpers](#rpc-helpers)
-- - - [Simple RPC wrappers](#simple-rpc-wrappers)
-- - - [Conversions](#conversions)
-- - - [Transactions](#transactions)
-- - [Signing](#signing)
-- - [React GraphQL hooks](#react-graphql-hooks)
+  - [RPC helpers](#rpc-helpers)
+    - [Simple RPC wrappers](#simple-rpc-wrappers)
+    - [Conversions](#conversions)
+    - [Transactions](#transactions)
+  - [Key Conversions](#key-conversions)
+  - [Signing](#signing)
+  - [React GraphQL hooks](#react-graphql-hooks)
 
 The [common-sys contract](system-contract/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
@@ -173,9 +175,10 @@ TODO: document additional tapos fields once they're operational
 ### Common files
 
 - [RPC helpers](#rpc-helpers)
-- - [Simple RPC wrappers](#simple-rpc-wrappers)
-- - [Conversions](#conversions)
-- - [Transactions](#transactions)
+  - [Simple RPC wrappers](#simple-rpc-wrappers)
+  - [Conversions](#conversions)
+  - [Transactions](#transactions)
+- [Key Conversions](#key-conversions)
 - [Signing](#signing)
 - [React GraphQL hooks](#react-graphql-hooks)
 
@@ -185,6 +188,7 @@ TODO: document additional tapos fields once they're operational
 | ----------------------------- | ------------------------------------------- |
 | `/common/SimpleUI.mjs`        | Default UI for contracts under development  |
 | `/common/rpc.mjs`             | [RPC helpers](#rpc-helpers)                 |
+| `/common/keyConversions.mjs`  | [Key Conversions](#key-conversions)         |
 | `/common/useGraphQLQuery.mjs` | [React GraphQL hooks](#react-graphql-hooks) |
 
 #### RPC helpers
@@ -226,6 +230,38 @@ TODO: document additional tapos fields once they're operational
 | `packSignedTransaction(baseUrl, trx)`    | Async function. Packs a signed transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                     |
 | `pushPackedTransaction(baseUrl, packed)` | Async function. Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction). |
 | `pushedSignedTransaction(baseUrl, trx)`  | Async function. Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                        |
+
+#### Key Conversions
+
+`/common/keyConversions.mjs` has functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) to and from psibase's text and binary forms. Each function accepts or returns a `{keyType, keyPair}`, where keyType is one of the following values:
+
+```js
+export const KeyType = {
+  k1: 0,
+  r1: 1,
+};
+```
+
+Here are example private and public keys in text form:
+
+```
+PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V
+PUB_K1_6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5BoDq63
+
+PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3
+PUB_R1_7pGpnu7HZVwi8kiLLDK2MJ6aYYS23eRJYmDXSLq5WZFCN6WEqY
+```
+
+TODO: even though the JS library supports both k1 and r1 types, psibase only currently supports k1.
+
+| Function                                         | Description                                                     |
+| ------------------------------------------------ | --------------------------------------------------------------- |
+| `privateStringToKeyPair(s)`                      | Convert a private key in string form to `{keyType, keyPair}`    |
+| `publicStringToKeyPair(s)`                       | Convert a public key in string form to `{keyType, keyPair}`     |
+| `privateKeyPairToString({keyType, keyPair})`     | Convert the private key in `{keyType, keyPair}` to a string     |
+| `publicKeyPairToString({keyType, keyPair})`      | Convert the public key in `{keyType, keyPair}` to a string      |
+| `privateKeyPairToUint8Array({keyType, keyPair})` | Convert the private key in `{keyType, keyPair}` to a Uint8Array |
+| `publicKeyPairToUint8Array({keyType, keyPair})`  | Convert the public key in `{keyType, keyPair}` to a Uint8Array  |
 
 #### Signing
 
