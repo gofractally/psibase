@@ -2,8 +2,6 @@ use fracpack::Packable;
 
 pub mod raw {
     extern "C" {
-        pub fn __wasm_call_ctors();
-
         /// Copy `min(destSize, resultSize - offset)` bytes from
         /// `result + offset` into `dest` and return `resultSize`
         ///
