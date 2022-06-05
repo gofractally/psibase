@@ -193,7 +193,7 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(
-          const Transaction&                                   trx,
+          Transaction                                          trx,
           const std::vector<std::pair<PublicKey, PrivateKey>>& keys = {
               {default_pub_key, default_priv_key}});
 

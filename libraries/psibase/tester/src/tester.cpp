@@ -336,19 +336,17 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
 }
 
 [[nodiscard]] psibase::TransactionTrace psibase::test_chain::pushTransaction(
-    const Transaction&                                   trx,
+    Transaction                                          trx,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
-   SignedTransaction signed_trx;
-   signed_trx.transaction = trx;
    for (auto& [pub, priv] : keys)
-      signed_trx.transaction.claims.push_back({
+      trx.claims.push_back({
           .contract = system_contract::VerifyEcSys::contract,
           .rawData  = psio::convert_to_frac(pub),
       });
-   // TODO: don't pack twice
-   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx.transaction);
-   auto              hash       = sha256(packed_trx.data(), packed_trx.size());
+   SignedTransaction signed_trx;
+   signed_trx.transaction = trx;
+   auto hash              = sha256(signed_trx.transaction.data(), signed_trx.transaction.size());
    for (auto& [pub, priv] : keys)
       signed_trx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
    return pushTransaction(signed_trx);

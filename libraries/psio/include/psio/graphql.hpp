@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <charconv>
+#include <psio/fracpack.hpp>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
 #include <psio/to_json.hpp>
@@ -62,6 +63,12 @@ namespace psio
    }
 
    template <typename T>
+   auto get_gql_name(shared_view_ptr<T>*) -> decltype(get_gql_name((T*)nullptr))
+   {
+      return get_gql_name((T*)nullptr);
+   }
+
+   template <typename T>
    struct has_get_gql_name
    {
      private:
@@ -101,6 +108,8 @@ namespace psio
          return "String";
       else if constexpr (is_std_vector<T>::value)
          return "[" + generate_gql_whole_name((typename T::value_type*)nullptr) + "]";
+      else if constexpr (is_shared_view_ptr<T>::value)
+         return generate_gql_partial_name((T*)nullptr);
       else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
          return get_type_name((T*)nullptr);
       else
@@ -660,6 +669,33 @@ namespace psio
 
    template <typename T, typename OS, typename E>
    auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+       -> std::enable_if_t<std::is_arithmetic_v<T> || std::is_same_v<T, std::string>, bool>;
+
+   template <typename T, typename OS, typename E>
+   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+       -> std::enable_if_t<is_std_optional<T>() || std::is_pointer<T>() || is_std_unique_ptr<T>(),
+                           bool>;
+
+   template <typename T, typename OS, typename E>
+   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+       -> std::enable_if_t<is_std_reference_wrapper_v<T>, bool>;
+
+   template <typename T, typename OS, typename E>
+   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+       -> std::enable_if_t<is_std_vector<T>::value && !use_json_string_for_gql((T*)nullptr), bool>;
+
+   template <typename T, typename OS, typename E>
+   auto gql_query(const shared_view_ptr<T>& value,
+                  gql_stream&               input_stream,
+                  OS&                       output_stream,
+                  const E&                  error);
+
+   template <typename Raw, typename OS, typename E>
+   auto gql_query(const Raw& value, gql_stream& input_stream, OS& output_stream, const E& error)
+       -> std::enable_if_t<reflect<Raw>::is_struct and not has_get_gql_name<Raw>::value, bool>;
+
+   template <typename T, typename OS, typename E>
+   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
        -> std::enable_if_t<std::is_arithmetic_v<T> || std::is_same_v<T, std::string>, bool>
    {
       to_json(value, output_stream);
@@ -711,6 +747,16 @@ namespace psio
       }
       output_stream.write(']');
       return true;
+   }
+
+   template <typename T, typename OS, typename E>
+   auto gql_query(const shared_view_ptr<T>& value,
+                  gql_stream&               input_stream,
+                  OS&                       output_stream,
+                  const E&                  error)
+   {
+      // TODO: validate fracpack
+      return gql_query(value.unpack(), input_stream, output_stream, error);
    }
 
    template <typename Raw, typename MPtr, typename OS, typename E>

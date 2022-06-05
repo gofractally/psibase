@@ -64,6 +64,6 @@ pub struct Transaction {
 
 #[derive(psi_macros::Fracpack, Serialize, Deserialize)]
 pub struct SignedTransaction {
-    pub transaction: Transaction,
+    pub transaction: Vec<u8>, // TODO
     pub proofs: Vec<Vec<u8>>,
 }

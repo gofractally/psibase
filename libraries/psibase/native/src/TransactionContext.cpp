@@ -59,9 +59,12 @@ namespace psibase
 
       if (blockContext.needGenesisAction)
       {
-         check(signedTransaction.transaction.actions.size() == 1,
-               "genesis transaction must have exactly 1 action");
-         execGenesisAction(*this, signedTransaction.transaction.actions[0]);
+         // TODO: full fracpack validate, no unknown, recursive
+         //       might be redundant elsewhere?
+         auto trxView     = *signedTransaction.transaction;
+         auto actionsView = *trxView.actions();
+         check(actionsView.size() == 1, "genesis transaction must have exactly 1 action");
+         execGenesisAction(*this, actionsView[0].get());
          blockContext.needGenesisAction = false;
       }
       else
@@ -115,7 +118,9 @@ namespace psibase
       Action                         action{
                                   .sender   = AccountNumber(),
                                   .contract = trxsys,
-                                  .rawData = psio::convert_to_frac(self.signedTransaction.transaction),
+                                  .rawData  = {self.signedTransaction.transaction.data(),
+                                               self.signedTransaction.transaction.data() +
+                                                   self.signedTransaction.transaction.size()},
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
@@ -132,30 +137,30 @@ namespace psibase
    // TODO: provide execution time to subjective contract, separated from rest of execution time
    static void execVerifyProofs(TransactionContext& self)
    {
-      check(
-          self.signedTransaction.proofs.size() == self.signedTransaction.transaction.claims.size(),
-          "proofs and claims must have same size");
-      // TODO: don't pack transaction twice
-      auto packed_trx = psio::convert_to_frac(self.signedTransaction.transaction);
-      auto id         = sha256(packed_trx.data(), packed_trx.size());
+      // TODO: fracpack validation, allowing new fields in inner transaction. Might be redundant elsewhere?
+      auto trxView    = *self.signedTransaction.transaction;
+      auto claimsView = *trxView.claims();
+      check(self.signedTransaction.proofs.size() == claimsView.size(),
+            "proofs and claims must have same size");
+      auto id = sha256(self.signedTransaction.transaction.data(),
+                       self.signedTransaction.transaction.size());
       for (size_t i = 0; i < self.signedTransaction.proofs.size(); ++i)
       {
-         auto&       claim = self.signedTransaction.transaction.claims[i];
-         auto&       proof = self.signedTransaction.proofs[i];
+         auto&      proof = self.signedTransaction.proofs[i];
          VerifyData data{
              .transactionHash = id,
-             .claim            = claim,
-             .proof            = proof,
+             .claim           = claimsView[i],
+             .proof           = proof,
          };
          Action action{
              .sender   = {},
-             .contract = claim.contract,
+             .contract = data.claim.contract,
              .rawData  = psio::convert_to_frac(data),
          };
          auto& atrace     = self.transactionTrace.actionTraces.emplace_back();
          atrace.action    = action;
          ActionContext ac = {self, action, atrace};
-         auto&         ec = self.getExecutionContext(claim.contract);
+         auto&         ec = self.getExecutionContext(action.contract);
          ec.execVerify(ac);
       }
    }

@@ -216,7 +216,8 @@ pub fn wrap_basic_trx(actions: Vec<Action>) -> SignedTransaction {
             },
             actions,
             claims: vec![],
-        },
+        }
+        .packed_bytes(),
         proofs: vec![],
     }
 }
