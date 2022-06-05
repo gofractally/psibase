@@ -90,7 +90,7 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
                 #action_structs
             }
 
-            pub fn dispatch(act: Action) -> fracpack::Result<()> {
+            pub fn dispatch(act: SharedAction) -> fracpack::Result<()> {
                 // TODO: view instead of unpack
                 // TODO: sender
                 #dispatch_body
@@ -100,14 +100,10 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
 
         #[no_mangle]
         pub extern "C" fn called(_this_contract: u64, _sender: u64) {
-            let act = get_current_action();
-            #iface_mod_name::dispatch(act).unwrap();
-
-            // TODO: review
-            // with_current_action(|act| {
-            //     #iface_mod_name::dispatch(act)
-            //         .unwrap_or_else(|_| abort_message("unpack action data failed"));
-            // });
+            with_current_action(|act| {
+                #iface_mod_name::dispatch(act)
+                    .unwrap_or_else(|_| abort_message("unpack action data failed"));
+            });
         }
 
         extern "C" {

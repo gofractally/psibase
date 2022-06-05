@@ -230,10 +230,7 @@ pub fn get_current_action() -> crate::Action {
 /// Note: The above only applies if the contract uses [call].
 pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
     let bytes = get_current_action_bytes();
-    write_console(&format!("got action bytes {:?}", bytes));
-    // TODO: below line is failing... I believe because unpacking Vec<u8> is different than unpacking &'a [u8]
     let act = <crate::SharedAction>::unpack(&bytes[..], &mut 0).unwrap(); // unwrap won't panic
-    write_console(&format!("unpacked action {}", act.method.to_string()));
     f(act)
 }
 
