@@ -61,7 +61,7 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 process_action_args(f, &mut action_structs, &mut invoke_args);
-                process_dispatch_body(f, &mut dispatch_body, impl_mod_name, invoke_args, fn_index);
+                process_dispatch_body(f, &mut dispatch_body, impl_mod_name, invoke_args);
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
                     f.attrs.remove(i);
                 }
@@ -176,7 +176,6 @@ fn process_dispatch_body(
     dispatch_body: &mut proc_macro2::TokenStream,
     impl_mod_name: &Ident,
     invoke_args: proc_macro2::TokenStream,
-    idx: &usize,
 ) {
     let name = &f.sig.ident;
 
@@ -199,7 +198,7 @@ fn process_dispatch_body(
 
     let method_comparison = quote! { act.method == MethodNumber::from(stringify!(#name)) };
 
-    let if_block = if *idx == 0 {
+    let if_block = if dispatch_body.is_empty() {
         quote! { if }
     } else {
         quote! { else if }

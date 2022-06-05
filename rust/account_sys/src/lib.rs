@@ -43,24 +43,3 @@ mod example_impl {
         abort_message("**** create_account\n");
     }
 }
-
-// #[no_mangle]
-// pub extern "C" fn called(_this_contract: AccountNum, _sender: AccountNum) {
-//     write_console("**** called\n");
-//     with_current_action(|act| {
-//         example_iface::dispatch(act.raw_data)
-//             .unwrap_or_else(|_| abort_message("unpack action data failed"));
-//     });
-// }
-
-// extern "C" {
-//     fn __wasm_call_ctors();
-// }
-
-// #[no_mangle]
-// pub extern "C" fn start(_this_contract: AccountNum) {
-//     unsafe {
-//         __wasm_call_ctors();
-//         write_console("**** start\n");
-//     }
-// }
