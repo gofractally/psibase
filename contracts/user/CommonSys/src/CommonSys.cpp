@@ -46,7 +46,7 @@ namespace psibase
             js +=
                 "function siblingUrl(baseUrl, contract, path) {\n"
                 "    let loc;\n"
-                "    if (baseUrl == null)\n"
+                "    if (!baseUrl)\n"
                 "        loc = location;\n"
                 "    else\n"
                 "        loc = new URL(baseUrl);\n"
@@ -64,7 +64,7 @@ namespace psibase
             js +=
                 "export function siblingUrl(baseUrl, contract, path) {\n"
                 "    let loc;\n"
-                "    if (baseUrl == null)\n"
+                "    if (!baseUrl)\n"
                 "        loc = location;\n"
                 "    else\n"
                 "        loc = new URL(baseUrl);\n"

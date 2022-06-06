@@ -5,6 +5,7 @@
 #include <psio/get_type_name.hpp>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
+#include <psio/to_json.hpp>
 #include <psio/unaligned_type.hpp>
 #include <span>
 
@@ -2531,6 +2532,12 @@ namespace psio
    class shared_view_ptr<void>
    {
    };
+
+   template <typename T, typename S>
+   void to_json(const shared_view_ptr<T>& obj, S& stream)
+   {
+      to_json(obj.unpack(), stream);
+   }
 
    template <typename T, typename S>
    void from_json(shared_view_ptr<T>& obj, S& stream)

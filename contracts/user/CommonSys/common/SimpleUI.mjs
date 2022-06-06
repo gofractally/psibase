@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex, packAndPushSignedTransaction } from './rpc.mjs';
+import { getJson, packAction, packAndPushSignedTransaction } from './rpc.mjs';
 
 await import('https://unpkg.com/react@18/umd/react.production.min.js');
 await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
@@ -11,13 +11,13 @@ const actionTemplates = await getJson('/action_templates');
 async function pushTransaction(transaction, addMsg, clearMsg) {
     try {
         clearMsg();
-        for (let action of transaction.actions) {
+        transaction.actions = await Promise.all(transaction.actions.map(async action => {
             console.log(action);
             addMsg(`packing ${action.method}...`);
-            action.rawData = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
-                '/pack_action/' + action.method, action.data)));
+            action = await packAction(null, action);
             addMsg('rawData: ' + action.rawData);
-        }
+            return action;
+        }));
         const trace = await packAndPushSignedTransaction('', { transaction });
         addMsg('\nPushed\n');
         addMsg(JSON.stringify(trace, null, 4));

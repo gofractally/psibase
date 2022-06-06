@@ -35,30 +35,20 @@ function AccountList(addMsg, clearMsg) {
 async function newAccount(name, authContract, addMsg, clearMsg) {
     try {
         clearMsg();
-        addMsg("Packing action...");
-        const action = {
-            sender: 'account-sys',
-            contract: 'account-sys',
-            method: 'newAccount',
-            rawData: uint8ArrayToHex(new Uint8Array(
-                await postJsonGetArrayBuffer('/pack_action/newAccount', {
-                    name, authContract, requireNew: true
-                }))),
-        };
-
         addMsg("Pushing transaction...");
-        const signedTrx = {
-            // TODO: TAPOS
-            // TODO: Sign
+        const trace = await packAndPushSignedTransaction('', {
             transaction: {
                 tapos: {
                     expiration: new Date(Date.now() + 10_000),
                 },
-                actions: [action],
-            },
-        };
-        const trace = await packAndPushSignedTransaction('', signedTrx);
-
+                actions: [{
+                    sender: 'account-sys',
+                    contract: 'account-sys',
+                    method: 'newAccount',
+                    data: { name, authContract, requireNew: true },
+                }],
+            }
+        });
         addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {
         console.error(e);

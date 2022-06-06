@@ -99,7 +99,7 @@ export const rootdomain = 'psibase.127.0.0.1.sslip.io';
 
 export function siblingUrl(baseUrl, contract, path) {
     let loc;
-    if (baseUrl == null)
+    if (!baseUrl)
         loc = location;
     else
         loc = new URL(baseUrl);
@@ -225,12 +225,14 @@ TODO: document additional tapos fields once they're operational
 
 ##### Transactions
 
-| Function                                       | Description                                                                                                                                                                                                           |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packTransaction(baseUrl, trx)`                | Async function. Packs a transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                            |
-| `packSignedTransaction(baseUrl, trx)`          | Async function. Packs a signed transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                     |
-| `pushPackedSignedTransaction(baseUrl, packed)` | Async function. Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction). |
-| `packAndPushSignedTransaction(baseUrl, trx)`   | Async function. Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                        |
+| Function                                       | Description                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packAction(baseUrl, action)`                  | Async function. Packs an action if needed. Returns a new action. An action is an object with fields `sender`, `contract`, `method`, and either `data` or `rawData`. If `rawData` is present then it's already packed. Otherwise this function uses [Packing actions RPC](#packing-actions) to pack it. |
+| `packActions(baseUrl, actions)`                | Async function. Packs an array of actions.                                                                                                                                                                                                                                                             |
+| `packTransaction(baseUrl, trx)`                | Async function. Packs a transaction. Also packs any actions within it, if needed. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                                                                |
+| `packSignedTransaction(baseUrl, trx)`          | Async function. Packs a signed transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                                                                                                      |
+| `pushPackedSignedTransaction(baseUrl, packed)` | Async function. Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction).                                                                                  |
+| `packAndPushSignedTransaction(baseUrl, trx)`   | Async function. Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                                                                                                         |
 
 #### Key Conversions
 

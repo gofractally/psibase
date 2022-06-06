@@ -91,11 +91,32 @@ export async function postArrayBufferGetJson(url, arrayBuffer) {
     return await (await postArrayBuffer(url, arrayBuffer)).json();
 }
 
-export async function packTransaction(baseUrl, signedTransaction) {
-    return await postJsonGetArrayBuffer(baseUrl.replace(/\/+$/, '') + '/common/pack/Transaction', signedTransaction);
+export async function packAction(baseUrl, action) {
+    let { sender, contract, method, data, rawData } = action;
+    if (!rawData) {
+        rawData = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
+            siblingUrl(baseUrl, contract, '/pack_action/' + method),
+            data)));
+    }
+    return { sender, contract, method, rawData };
+}
+
+export async function packActions(baseUrl, actions) {
+    return await Promise.all(actions.map(action => packAction(baseUrl, action)));
+}
+
+export async function packTransaction(baseUrl, transaction) {
+    return await postJsonGetArrayBuffer(baseUrl.replace(/\/+$/, '') + '/common/pack/Transaction',
+        { ...transaction, actions: await packActions(baseUrl, transaction.actions) });
 }
 
 export async function packSignedTransaction(baseUrl, signedTransaction) {
+    if (typeof signedTransaction.transaction !== 'string')
+        signedTransaction = {
+            ...signedTransaction,
+            transaction: uint8ArrayToHex(new Uint8Array(
+                await packTransaction(baseUrl, signedTransaction.transaction))),
+        };
     return await postJsonGetArrayBuffer(baseUrl.replace(/\/+$/, '') + '/common/pack/SignedTransaction', signedTransaction);
 }
 
