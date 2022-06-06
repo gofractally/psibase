@@ -4,8 +4,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{AccountNumber, MethodNumber, TimePointSec};
 
-pub type AccountNum = u32;
-
 #[derive(psi_macros::Fracpack, Serialize, Deserialize)]
 pub struct Action {
     pub sender: AccountNumber,
@@ -16,8 +14,9 @@ pub struct Action {
 
 #[derive(psi_macros::Fracpack, Serialize, Deserialize)]
 pub struct SharedAction<'a> {
-    pub sender: AccountNum,
-    pub contract: AccountNum,
+    pub sender: AccountNumber,
+    pub contract: AccountNumber,
+    pub method: MethodNumber,
     pub raw_data: &'a [u8],
 }
 

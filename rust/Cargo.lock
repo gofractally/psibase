@@ -2246,6 +2246,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_contract"
+version = "0.1.0"
+dependencies = [
+ "fracpack",
+ "libpsibase",
+ "psi_macros",
+]
+
+[[package]]
 name = "test_fracpack"
 version = "0.1.0"
 dependencies = [
