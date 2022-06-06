@@ -40,37 +40,37 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
             .rawData  = psio::convert_to_frac(GenesisActionData{
                  .contracts =  // g.a.d--^ is config file for gen
                 {
-                     {
+                    {
                          .contract     = system_contract::transaction_sys::contract,
                          .authContract = system_contract::auth_fake_sys::contract,
                          .flags        = system_contract::transaction_sys::contractFlags,
                          .code         = read_whole_file("transaction_sys.wasm"),
                     },
-                     {
+                    {
                          .contract     = system_contract::account_sys::contract,
                          .authContract = system_contract::auth_fake_sys::contract,
                          .flags        = system_contract::account_sys::contractFlags,
                          .code         = read_whole_file("account_sys.wasm"),
                     },
-                     {
-                         .contract     = proxyContractNum,
+                    {
+                         .contract     = proxy_sys::contract,
                          .authContract = system_contract::auth_fake_sys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("proxy_sys.wasm"),
                     },
-                     {
+                    {
                          .contract     = system_contract::auth_fake_sys::contract,
                          .authContract = system_contract::auth_fake_sys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("auth_fake_sys.wasm"),
                     },
-                     {
+                    {
                          .contract     = system_contract::auth_ec_sys::contract,
                          .authContract = system_contract::auth_fake_sys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("auth_ec_sys.wasm"),
                     },
-                     {
+                    {
                          .contract     = system_contract::verify_ec_sys::contract,
                          .authContract = system_contract::auth_fake_sys::contract,
                          .flags        = 0,
@@ -92,7 +92,7 @@ void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
        {asys.startup(std::vector<AccountNumber>{
            system_contract::transaction_sys::contract,
            system_contract::account_sys::contract,
-           proxyContractNum,
+           proxy_sys::contract,
            system_contract::auth_fake_sys::contract,
            system_contract::auth_ec_sys::contract,
            system_contract::verify_ec_sys::contract,
