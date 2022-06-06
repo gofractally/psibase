@@ -44,9 +44,14 @@ namespace psibase
          {
             auto js = "const rootdomain = '" + request.rootHost + "';\n";
             js +=
-                "function siblingUrl(contract, path) {\n"
-                "    return location.protocol + '//' + (contract ? contract + '.' : '') +\n"
-                "           rootdomain + ':' + location.port + '/' + (path || '');\n"
+                "function siblingUrl(baseUrl, contract, path) {\n"
+                "    let loc;\n"
+                "    if (baseUrl == null)\n"
+                "        loc = location;\n"
+                "    else\n"
+                "        loc = new URL(baseUrl);\n"
+                "    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootdomain +\n"
+                "           ':' + loc.port + '/' + (path || '').replace(/^\\/+/, '');\n"
                 "}\n";
             return RpcReplyData{
                 .contentType = "text/javascript",
@@ -57,9 +62,14 @@ namespace psibase
          {
             auto js = "export const rootdomain = '" + request.rootHost + "';\n";
             js +=
-                "export function siblingUrl(contract, path) {\n"
-                "    return location.protocol + '//' + (contract ? contract + '.' : '') +\n"
-                "           rootdomain + ':' + location.port + '/' + (path || '');\n"
+                "export function siblingUrl(baseUrl, contract, path) {\n"
+                "    let loc;\n"
+                "    if (baseUrl == null)\n"
+                "        loc = location;\n"
+                "    else\n"
+                "        loc = new URL(baseUrl);\n"
+                "    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootdomain +\n"
+                "           ':' + loc.port + '/' + (path || '').replace(/^\\/+/, '');\n"
                 "}\n";
             return RpcReplyData{
                 .contentType = "text/javascript",

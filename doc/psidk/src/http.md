@@ -84,40 +84,40 @@ The [common-sys contract](system-contract/common-sys.md) provides services which
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/common/thiscontract`           | Returns a JSON string containing the contract associated with the domain. If it's the root domain, returns `"common-sys"` |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                     |
-| `GET`  | `/common/rootdomain.js`          | See below.                                                                                                                |
-| `GET`  | `/common/rootdomain.mjs`         | See below.                                                                                                                |
+| `GET`  | `/common/rootdomain.js`          | See [rootdomain and siblingUrl](#rootdomain-and-siblingurl)                                                               |
+| `GET`  | `/common/rootdomain.mjs`         | See [rootdomain and siblingUrl](#rootdomain-and-siblingurl)                                                               |
 | `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction)                                                                                  |
 | `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction)                                                                           |
 | `GET`  | `/common/<other>`                | [Common files](#common-files)                                                                                             |
 
-`GET /common/rootdomain.js` returns a script like the following:
-
-```
-const rootdomain = 'psibase.127.0.0.1.sslip.io';
-
-function siblingUrl(contract, path) {
-    return location.protocol + '//' + (contract ? contract + '.' : '') +
-           rootdomain + ':' + location.port + '/' + (path || '');
-}
-```
+### rootdomain and siblingUrl
 
 `GET /common/rootdomain.mjs` returns a script like the following:
 
 ```
 export const rootdomain = 'psibase.127.0.0.1.sslip.io';
 
-export function siblingUrl(contract, path) {
-    return location.protocol + '//' + (contract ? contract + '.' : '') +
-           rootdomain + ':' + location.port + '/' + (path || '');
+export function siblingUrl(baseUrl, contract, path) {
+    let loc;
+    if (baseUrl == null)
+        loc = location;
+    else
+        loc = new URL(baseUrl);
+    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootdomain +
+           ':' + loc.port + '/' + (path || '').replace(/^\/+/, '');
 }
 ```
 
-`siblingUrl` makes it easy for scripts running on webpages served by psinode to reference other contracts' domains. It's not useful for scripts running on webpages served outside of psinode since it relies on `location.protocol` and `location.port`. `location.protocol` and `location.port` allows `siblingUrl` to navigate through reverse proxies, which may change the protocol (e.g. to HTTPS) or port (e.g. to 443).
+`GET /common/rootdomain.js` returns the same thing, but without the `export` keyword.
+
+`siblingUrl` makes it easy for scripts to reference other contracts' domains. It automatically navigates through reverse proxies, which may change the protocol (e.g. to HTTPS) or port (e.g. to 443) from what psinode provides. If `baseUrl` is null or undefined, then this relies on `location.protocol` and `location.port`; this mode is only usable by scripts running on webpages served by psinode.
 
 Example uses:
 
-- `siblingUrl('', '/foo/bar')`: Gets URL to `/foo/bar` on the root domain
-- `siblingUrl('other-contract', '/foo/bar')`: Gets URL to `/foo/bar` on the `other-contract` domain
+- `siblingUrl(null, '', '/foo/bar')`: Gets URL to `/foo/bar` on the root domain. This form is only usable by scripts running on webpages served by psinode.
+- `siblingUrl(null, 'other-contract', '/foo/bar')`: Gets URL to `/foo/bar` on the `other-contract` domain. This form is only usable by scripts running on webpages served by psinode.
+- `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', '', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
+- `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', 'other-contract', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
 
 ### Pack transaction
 
@@ -197,23 +197,24 @@ TODO: document additional tapos fields once they're operational
 
 ##### Simple RPC wrappers
 
-| Function or Type               | Description                                                                                                                                                                                        |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RPCError`                     | Error type. This extends `Error` with a new field, `trace`, which contains the trace returned by [`/native/push_transaction`](#push-transaction), if available.                                    |
-| `throwIfError(response)`       | Throw an `RPCError` if the argument (a Response object) indicates a failure. Doesn't fill `trace` since traces are only present with status 200. Returns the argument (Response) if not a failure. |
-| `get(url)`                     | Async function. fetch/GET. Uses `throwIfError`. Returns Response object if ok.                                                                                                                     |
-| `getJson(url)`                 | Async function. fetch/GET. Uses `throwIfError`. Returns JSON if ok.                                                                                                                                |
-| `getText(url)`                 | Async function. fetch/GET. Uses `throwIfError`. Returns text if ok.                                                                                                                                |
-| `postArrayBuffer(url, data)`   | Async function. fetch/POST ArrayBuffer. Uses `throwIfError`. Returns Response object if ok.                                                                                                        |
-| `postArrayBufferGetJson(data)` | Async function. fetch/POST ArrayBuffer. Uses `throwIfError`. Returns JSON if ok.                                                                                                                   |
-| `postGraphQL(url, data)`       | Async function. fetch/POST GraphQL. Uses `throwIfError`. Returns Response object if ok.                                                                                                            |
-| `postGraphQLGetJson(data)`     | Async function. fetch/POST GraphQL. Uses `throwIfError`. Returns JSON if ok.                                                                                                                       |
-| `postJson(url, data)`          | Async function. fetch/POST JSON. Uses `throwIfError`. Returns Response object if ok.                                                                                                               |
-| `postJsonGetArrayBuffer(data)` | Async function. fetch/POST JSON. Uses `throwIfError`. Returns ArrayBuffer if ok.                                                                                                                   |
-| `postJsonGetJson(data)`        | Async function. fetch/POST JSON. Uses `throwIfError`. Returns JSON if ok.                                                                                                                          |
-| `postJsonGetText(data)`        | Async function. fetch/POST JSON. Uses `throwIfError`. Returns text if ok.                                                                                                                          |
-| `postText(url, data)`          | Async function. fetch/POST text. Uses `throwIfError`. Returns Response object if ok.                                                                                                               |
-| `postTextGetJson(data)`        | Async function. fetch/POST text. Uses `throwIfError`. Returns JSON if ok.                                                                                                                          |
+| Function or Type                      | Description                                                                                                                                                                                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RPCError`                            | Error type. This extends `Error` with a new field, `trace`, which contains the trace returned by [`/native/push_transaction`](#push-transaction), if available.                                    |
+| `throwIfError(response)`              | Throw an `RPCError` if the argument (a Response object) indicates a failure. Doesn't fill `trace` since traces are only present with status 200. Returns the argument (Response) if not a failure. |
+| `siblingUrl(baseUrl, contract, path)` | Reexport of `siblingUrl` from [rootdomain and siblingUrl](#rootdomain-and-siblingurl).                                                                                                             |
+| `get(url)`                            | Async function. fetch/GET. Uses `throwIfError`. Returns Response object if ok.                                                                                                                     |
+| `getJson(url)`                        | Async function. fetch/GET. Uses `throwIfError`. Returns JSON if ok.                                                                                                                                |
+| `getText(url)`                        | Async function. fetch/GET. Uses `throwIfError`. Returns text if ok.                                                                                                                                |
+| `postArrayBuffer(url, data)`          | Async function. fetch/POST ArrayBuffer. Uses `throwIfError`. Returns Response object if ok.                                                                                                        |
+| `postArrayBufferGetJson(data)`        | Async function. fetch/POST ArrayBuffer. Uses `throwIfError`. Returns JSON if ok.                                                                                                                   |
+| `postGraphQL(url, data)`              | Async function. fetch/POST GraphQL. Uses `throwIfError`. Returns Response object if ok.                                                                                                            |
+| `postGraphQLGetJson(data)`            | Async function. fetch/POST GraphQL. Uses `throwIfError`. Returns JSON if ok.                                                                                                                       |
+| `postJson(url, data)`                 | Async function. fetch/POST JSON. Uses `throwIfError`. Returns Response object if ok.                                                                                                               |
+| `postJsonGetArrayBuffer(data)`        | Async function. fetch/POST JSON. Uses `throwIfError`. Returns ArrayBuffer if ok.                                                                                                                   |
+| `postJsonGetJson(data)`               | Async function. fetch/POST JSON. Uses `throwIfError`. Returns JSON if ok.                                                                                                                          |
+| `postJsonGetText(data)`               | Async function. fetch/POST JSON. Uses `throwIfError`. Returns text if ok.                                                                                                                          |
+| `postText(url, data)`                 | Async function. fetch/POST text. Uses `throwIfError`. Returns Response object if ok.                                                                                                               |
+| `postTextGetJson(data)`               | Async function. fetch/POST text. Uses `throwIfError`. Returns JSON if ok.                                                                                                                          |
 
 ##### Conversions
 

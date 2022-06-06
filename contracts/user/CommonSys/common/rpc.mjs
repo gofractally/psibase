@@ -1,3 +1,7 @@
+import { siblingUrl } from '/common/rootdomain.mjs';
+
+export { siblingUrl };
+
 export class RPCError extends Error {
     constructor(message, trace) {
         super(message)
@@ -88,15 +92,15 @@ export async function postArrayBufferGetJson(url, arrayBuffer) {
 }
 
 export async function packTransaction(baseUrl, signedTransaction) {
-    return await postJsonGetArrayBuffer(baseUrl + '/common/pack/Transaction', signedTransaction);
+    return await postJsonGetArrayBuffer(baseUrl.replace(/\/+$/, '') + '/common/pack/Transaction', signedTransaction);
 }
 
 export async function packSignedTransaction(baseUrl, signedTransaction) {
-    return await postJsonGetArrayBuffer(baseUrl + '/common/pack/SignedTransaction', signedTransaction);
+    return await postJsonGetArrayBuffer(baseUrl.replace(/\/+$/, '') + '/common/pack/SignedTransaction', signedTransaction);
 }
 
 export async function pushPackedSignedTransaction(baseUrl, packed) {
-    const trace = await postArrayBufferGetJson(baseUrl + '/native/push_transaction', packed);
+    const trace = await postArrayBufferGetJson(baseUrl.replace(/\/+$/, '') + '/native/push_transaction', packed);
     if (trace.error)
         throw new RPCError(trace.error, trace);
     return trace;
