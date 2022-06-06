@@ -89,8 +89,9 @@ namespace psibase
          for (auto& contract : data.contracts)
          {
             check(contract.contract.value, "account 0 is reserved");
-            check(!db.kvGet<AccountRow>(AccountRow::db, accountKey(contract.contract)),
-                  "account already created");
+            auto accRow = db.kvGet<AccountRow>(AccountRow::db, accountKey(contract.contract));
+            check(!accRow, "account " + std::get<psibase::AccountNumber>(accRow->key()).str() +
+                               " already created");
             AccountRow account{
                 .num          = contract.contract,
                 .authContract = contract.authContract,
@@ -140,12 +141,12 @@ namespace psibase
       auto id         = sha256(packed_trx.data(), packed_trx.size());
       for (size_t i = 0; i < self.signedTransaction.proofs.size(); ++i)
       {
-         auto&       claim = self.signedTransaction.transaction.claims[i];
-         auto&       proof = self.signedTransaction.proofs[i];
+         auto&      claim = self.signedTransaction.transaction.claims[i];
+         auto&      proof = self.signedTransaction.proofs[i];
          VerifyData data{
              .transactionHash = id,
-             .claim            = claim,
-             .proof            = proof,
+             .claim           = claim,
+             .proof           = proof,
          };
          Action action{
              .sender   = {},
