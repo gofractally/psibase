@@ -224,12 +224,12 @@ TODO: document additional tapos fields once they're operational
 
 ##### Transactions
 
-| Function                                 | Description                                                                                                                                                                                                           |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packTransaction(baseUrl, trx)`          | Async function. Packs a transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                            |
-| `packSignedTransaction(baseUrl, trx)`    | Async function. Packs a signed transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                     |
-| `pushPackedTransaction(baseUrl, packed)` | Async function. Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction). |
-| `pushedSignedTransaction(baseUrl, trx)`  | Async function. Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                        |
+| Function                                       | Description                                                                                                                                                                                                           |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packTransaction(baseUrl, trx)`                | Async function. Packs a transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                            |
+| `packSignedTransaction(baseUrl, trx)`          | Async function. Packs a signed transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                     |
+| `pushPackedSignedTransaction(baseUrl, packed)` | Async function. Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction). |
+| `packAndPushSignedTransaction(baseUrl, trx)`   | Async function. Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                        |
 
 #### Key Conversions
 

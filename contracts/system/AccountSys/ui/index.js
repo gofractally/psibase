@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex, pushedSignedTransaction } from '/common/rpc.mjs';
+import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex, packAndPushSignedTransaction } from '/common/rpc.mjs';
 
 await import('https://unpkg.com/react@18/umd/react.production.min.js');
 await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
@@ -57,7 +57,7 @@ async function newAccount(name, authContract, addMsg, clearMsg) {
                 actions: [action],
             },
         };
-        const trace = await pushedSignedTransaction('', signedTrx);
+        const trace = await packAndPushSignedTransaction('', signedTrx);
 
         addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {

@@ -95,15 +95,15 @@ export async function packSignedTransaction(baseUrl, signedTransaction) {
     return await postJsonGetArrayBuffer(baseUrl + '/common/pack/SignedTransaction', signedTransaction);
 }
 
-export async function pushPackedTransaction(baseUrl, packed) {
+export async function pushPackedSignedTransaction(baseUrl, packed) {
     const trace = await postArrayBufferGetJson(baseUrl + '/native/push_transaction', packed);
     if (trace.error)
         throw new RPCError(trace.error, trace);
     return trace;
 }
 
-export async function pushedSignedTransaction(baseUrl, signedTransaction) {
-    return await pushPackedTransaction(baseUrl, await packSignedTransaction(baseUrl, signedTransaction));
+export async function packAndPushSignedTransaction(baseUrl, signedTransaction) {
+    return await pushPackedSignedTransaction(baseUrl, await packSignedTransaction(baseUrl, signedTransaction));
 }
 
 export function uint8ArrayToHex(data) {

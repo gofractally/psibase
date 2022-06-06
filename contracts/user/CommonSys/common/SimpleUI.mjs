@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex, pushedSignedTransaction } from './rpc.mjs';
+import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex, packAndPushSignedTransaction } from './rpc.mjs';
 
 await import('https://unpkg.com/react@18/umd/react.production.min.js');
 await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
@@ -18,7 +18,7 @@ async function pushTransaction(transaction, addMsg, clearMsg) {
                 '/pack_action/' + action.method, action.data)));
             addMsg('rawData: ' + action.rawData);
         }
-        const trace = await pushedSignedTransaction('', { transaction });
+        const trace = await packAndPushSignedTransaction('', { transaction });
         addMsg('\nPushed\n');
         addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {

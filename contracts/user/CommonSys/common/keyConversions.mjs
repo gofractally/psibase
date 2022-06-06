@@ -166,14 +166,14 @@ export function publicKeyPairToString({ keyType, keyPair }) {
 
 // Convert the private key in {keyType, keyPair} to a Uint8Array
 export function privateKeyPairToUint8Array({ keyType, keyPair }) {
-    return keyPair.getPrivate().toArrayLike(Uint8Array, 'be', 32);
+    return new Uint8Array([keyType].concat(keyPair.getPrivate().toArray('be', 32)));
 }
 
 // Convert the public key in {keyType, keyPair} to a Uint8Array
 export function publicKeyPairToUint8Array({ keyType, keyPair }) {
     const x = keyPair.getPublic().getX().toArray('be', 32);
     const y = keyPair.getPublic().getY().toArray('be', 32);
-    return new Uint8Array([(y[31] & 1) ? 3 : 2].concat(x));
+    return new Uint8Array([keyType, (y[31] & 1) ? 3 : 2].concat(x));
 }
 
 // console.log(privateKeyPairToString(privateStringToKeyPair('PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3')));
