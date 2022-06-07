@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, packAction, packAndPushSignedTransaction } from './rpc.mjs';
+import { getJson, packAction, signAndPushTransaction } from './rpc.mjs';
 
 await import('https://unpkg.com/react@18/umd/react.production.min.js');
 await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
@@ -8,7 +8,7 @@ const html = htm.bind(React.createElement);
 const contract = await getJson('/common/thiscontract');
 const actionTemplates = await getJson('/action_templates');
 
-async function pushTransaction(transaction, addMsg, clearMsg) {
+async function pushTransaction(transaction, keys, addMsg, clearMsg) {
     try {
         clearMsg();
         transaction.actions = await Promise.all(transaction.actions.map(async action => {
@@ -18,7 +18,7 @@ async function pushTransaction(transaction, addMsg, clearMsg) {
             addMsg('rawData: ' + action.rawData);
             return action;
         }));
-        const trace = await packAndPushSignedTransaction('', { transaction });
+        const trace = await signAndPushTransaction('', transaction, keys);
         addMsg('\nPushed\n');
         addMsg(JSON.stringify(trace, null, 4));
     } catch (e) {
@@ -67,14 +67,22 @@ function ActionButtons({ setTrx }) {
 
 function App() {
     const [trx, setTrx] = React.useState('');
+    const [keys, setKeys] = React.useState('');
     const { msg, addMsg, clearMsg } = useMsg();
+    const pushTrx = e =>
+        pushTransaction(
+            JSON.parse(trx),
+            keys.split('\n').map(s => s.trim()).filter(s => s), addMsg, clearMsg
+        );
     return html`<div>
         <h1>${contract}</h1>
         <h2>Transaction</h2>
         <div><${ActionButtons} setTrx=${setTrx}/></div>
         <textarea rows=20 cols=80 value=${trx} onChange=${e => setTrx(e.target.value)}></textarea>
+        <h3>Private Keys</h3>
+        <textarea rows=3 cols=80 value=${keys} onChange=${e => setKeys(e.target.value)}></textarea>
         <div>
-            <button onClick=${e => pushTransaction(JSON.parse(trx), addMsg, clearMsg)}>Push Transaction</button>
+            <button onClick=${pushTrx}>Push Transaction</button>
         </div>
         <h2>Messages</h2>
         <pre style=${{ border: '1px solid' }}><code>${msg}</code></pre>

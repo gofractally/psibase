@@ -1,4 +1,6 @@
 import { siblingUrl } from '/common/rootdomain.mjs';
+import { privateStringToKeyPair, publicKeyPairToFracpack, signatureToFracpack } from '/common/keyConversions.mjs';
+import hashJs from 'https://cdn.skypack.dev/hash.js';
 
 export { siblingUrl };
 
@@ -131,28 +133,50 @@ export async function packAndPushSignedTransaction(baseUrl, signedTransaction) {
     return await pushPackedSignedTransaction(baseUrl, await packSignedTransaction(baseUrl, signedTransaction));
 }
 
+export async function signTransaction(baseUrl, transaction, privateKeys) {
+    const keys = (privateKeys || []).map(k => {
+        if (typeof k === 'string')
+            return privateStringToKeyPair(k);
+        else
+            return k;
+    });
+    const claims = keys.map(k => ({
+        contract: 'verifyec-sys',
+        rawData: uint8ArrayToHex(publicKeyPairToFracpack(k))
+    }));
+    transaction = new Uint8Array(await packTransaction(baseUrl, { ...transaction, claims }));
+    const digest = new hashJs.sha256().update(transaction).digest();
+    const proofs = keys.map(k =>
+        uint8ArrayToHex(signatureToFracpack({
+            keyType: k.keyType,
+            signature: k.keyPair.sign(digest),
+        }))
+    );
+    return { transaction: uint8ArrayToHex(transaction), proofs };
+}
+
+export async function signAndPushTransaction(baseUrl, transaction, privateKeys) {
+    return await packAndPushSignedTransaction(baseUrl, await signTransaction(baseUrl, transaction, privateKeys));
+}
+
 export function uint8ArrayToHex(data) {
     let result = '';
-    for (const x of data) {
+    for (const x of data)
         result += ('00' + x.toString(16)).slice(-2);
-    }
     return result.toUpperCase();
 };
 
 export function hexToUint8Array(hex) {
-    if (typeof hex !== 'string') {
+    if (typeof hex !== 'string')
         throw new Error('Expected string containing hex digits');
-    }
-    if (hex.length % 2) {
+    if (hex.length % 2)
         throw new Error('Odd number of hex digits');
-    }
     const l = hex.length / 2;
     const result = new Uint8Array(l);
     for (let i = 0; i < l; ++i) {
         const x = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
-        if (Number.isNaN(x)) {
+        if (Number.isNaN(x))
             throw new Error('Expected hex string');
-        }
         result[i] = x;
     }
     return result;

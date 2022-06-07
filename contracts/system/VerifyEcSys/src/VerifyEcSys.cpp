@@ -24,10 +24,15 @@ extern "C" [[clang::export_name("verify")]] void verify()
 {
    check(context, "VerifyEcSys not fully built");
 
-   auto act     = getCurrentAction();
-   auto data    = psio::convert_from_frac<VerifyData>(act.rawData);
-   auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.rawData);  // TODO: verify no extra
-   auto sig     = psio::convert_from_frac<Signature>(data.proof);          // TODO: verify no extra
+   auto act  = getCurrentAction();
+   auto data = psio::convert_from_frac<VerifyData>(act.rawData);
+
+   check(psio::fracvalidate<PublicKey>(data.claim.rawData).valid_and_known(),
+         "Claim has invalid format");
+   auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.rawData);
+
+   check(psio::fracvalidate<Signature>(data.proof).valid_and_known(), "Proof has invalid format");
+   auto sig = psio::convert_from_frac<Signature>(data.proof);
 
    auto* k1_pub_key = std::get_if<0>(&pub_key.data);
    auto* k1_sig     = std::get_if<0>(&sig.data);

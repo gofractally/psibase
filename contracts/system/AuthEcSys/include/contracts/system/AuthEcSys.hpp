@@ -13,5 +13,5 @@ namespace system_contract
    };
    PSIO_REFLECT(AuthEcSys,  //
                 method(checkAuthSys, action, claims),
-                method(setKey, account, key))
+                method(setKey, key))
 }  // namespace system_contract

@@ -1116,6 +1116,12 @@ namespace psio
    check_stream fracvalidate(const char* b, const char* e);
 
    template <typename T>
+   check_stream fracvalidate(const std::span<const char>& v)
+   {
+      return fracvalidate<T>(v.begin(), v.end());
+   }
+
+   template <typename T>
    check_stream fracvalidate(const char* b, size_t s)
    {
       return fracvalidate<T>(b, b + s);
@@ -1287,6 +1293,7 @@ namespace psio
     * @pre b is valid pointer
     * @pre e > b
     */
+   // TODO: incorrectly validates PsiBase::PublicKey when variant's size field is smaller than it should be
    template <typename T>
    check_stream fracvalidate(const char* b, const char* e)
    {

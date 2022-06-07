@@ -39,12 +39,13 @@ namespace system_contract
       for (auto& claim : claims)
          if (claim.contract == VerifyEcSys::contract && claim.rawData == expected)
             return;
-      abortMessage("no matching claim found");
+      abortMessage("sender has not signed with key " + publicKeyToString(row->pubkey));
    }
 
    void AuthEcSys::setKey(psibase::PublicKey key)
    {
       // TODO: charge resources? provide for free with all accounts?
+      check(key.data.index() == 0, "only k1 currently supported");
       auth_row row{getSender(), key};
       kvPut(row.key(), row);
    }

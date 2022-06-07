@@ -164,13 +164,13 @@ TODO: document additional tapos fields once they're operational
 ```
 {
   "contract": "...",    // The contract which verifies the proof meets
-                        // the claim, e.g. "verify-ec-sys"
+                        // the claim, e.g. "verifyec-sys"
   "rawData": "..."      // Hex string containing the claim data.
-                        // e.g. `verify-ec-sys` expects a public key.
+                        // e.g. `verifyec-sys` expects a public key.
 }
 ```
 
-`Proof` is a hex string containing data which proves the claim. e.g. `verify-ec-sys` expects a signature. See [Signing](#signing) to fill claims and proofs.
+`Proof` is a hex string containing data which proves the claim. e.g. `verifyec-sys` expects a signature. See [Signing](#signing) to fill claims and proofs.
 
 ### Common files
 
@@ -236,7 +236,7 @@ TODO: document additional tapos fields once they're operational
 
 #### Key Conversions
 
-`/common/keyConversions.mjs` has functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) to and from psibase's text and binary forms. Each function accepts or returns a `{keyType, keyPair}`, where keyType is one of the following values:
+`/common/keyConversions.mjs` has functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text and fracpack forms. Each function accepts or returns a `{keyType, keyPair}` or `{keyType, signature}`, where keyType is one of the following values:
 
 ```js
 export const KeyType = {
@@ -257,14 +257,14 @@ PUB_R1_7pGpnu7HZVwi8kiLLDK2MJ6aYYS23eRJYmDXSLq5WZFCN6WEqY
 
 TODO: even though the JS library supports both k1 and r1 types, psibase only currently supports k1.
 
-| Function                                         | Description                                                     |
-| ------------------------------------------------ | --------------------------------------------------------------- |
-| `privateStringToKeyPair(s)`                      | Convert a private key in string form to `{keyType, keyPair}`    |
-| `publicStringToKeyPair(s)`                       | Convert a public key in string form to `{keyType, keyPair}`     |
-| `privateKeyPairToString({keyType, keyPair})`     | Convert the private key in `{keyType, keyPair}` to a string     |
-| `publicKeyPairToString({keyType, keyPair})`      | Convert the public key in `{keyType, keyPair}` to a string      |
-| `privateKeyPairToUint8Array({keyType, keyPair})` | Convert the private key in `{keyType, keyPair}` to a Uint8Array |
-| `publicKeyPairToUint8Array({keyType, keyPair})`  | Convert the public key in `{keyType, keyPair}` to a Uint8Array  |
+| Function                                      | Description                                                                        |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `privateStringToKeyPair(s)`                   | Convert a private key in string form to `{keyType, keyPair}`                       |
+| `publicStringToKeyPair(s)`                    | Convert a public key in string form to `{keyType, keyPair}`                        |
+| `privateKeyPairToString({keyType, keyPair})`  | Convert the private key in `{keyType, keyPair}` to a string                        |
+| `publicKeyPairToString({keyType, keyPair})`   | Convert the public key in `{keyType, keyPair}` to a string                         |
+| `publicKeyPairToFracpack({keyType, keyPair})` | Convert the public key in `{keyType, keyPair}` to fracpack format in a Uint8Array  |
+| `signatureToFracpack({keyType, signature})`   | Convert the signature in `{keyType, signature}` to fracpack format in a Uint8Array |
 
 #### Signing
 

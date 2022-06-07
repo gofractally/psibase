@@ -164,16 +164,27 @@ export function publicKeyPairToString({ keyType, keyPair }) {
         throw new Error('unsupported key type');
 }
 
-// Convert the private key in {keyType, keyPair} to a Uint8Array
-export function privateKeyPairToUint8Array({ keyType, keyPair }) {
-    return new Uint8Array([keyType].concat(keyPair.getPrivate().toArray('be', 32)));
-}
-
-// Convert the public key in {keyType, keyPair} to a Uint8Array
-export function publicKeyPairToUint8Array({ keyType, keyPair }) {
+// Convert the public key in {keyType, keyPair} to fracpack format
+export function publicKeyPairToFracpack({ keyType, keyPair }) {
     const x = keyPair.getPublic().getX().toArray('be', 32);
     const y = keyPair.getPublic().getY().toArray('be', 32);
-    return new Uint8Array([keyType, (y[31] & 1) ? 3 : 2].concat(x));
+    return new Uint8Array([
+        4, 0, 0, 0,         // offset to variant
+        keyType,            // variant index
+        33, 0, 0, 0,        // variant size
+        (y[31] & 1) ? 3 : 2 // inner array begins here
+    ].concat(x));
+}
+
+// Convert the signature in {keyType, signature} to fracpack format
+export function signatureToFracpack({ keyType, signature }) {
+    const r = signature.r.toArray('be', 32);
+    const s = signature.s.toArray('be', 32);
+    return new Uint8Array([
+        4, 0, 0, 0,         // offset to variant
+        keyType,            // variant index
+        64, 0, 0, 0,        // variant size
+    ].concat(r, s));
 }
 
 // console.log(privateKeyPairToString(privateStringToKeyPair('PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3')));

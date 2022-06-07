@@ -32,21 +32,34 @@ function AccountList(addMsg, clearMsg) {
     )}</tbody></table>`
 }
 
-async function newAccount(name, authContract, addMsg, clearMsg) {
+async function newAccount(name, pubkey, addMsg, clearMsg) {
     try {
         clearMsg();
         addMsg("Pushing transaction...");
+        let actions = [{
+            sender: 'account-sys',
+            contract: 'account-sys',
+            method: 'newAccount',
+            data: { name, authContract: 'auth-fake-sys', requireNew: true },
+        }];
+        if (pubkey)
+            actions = actions.concat([{
+                sender: name,
+                contract: 'auth-ec-sys',
+                method: 'setKey',
+                data: { key: pubkey },
+            }, {
+                sender: name,
+                contract: 'account-sys',
+                method: 'setAuthCntr',
+                data: { authContract: 'auth-ec-sys' },
+            }]);
         const trace = await packAndPushSignedTransaction('', {
             transaction: {
                 tapos: {
                     expiration: new Date(Date.now() + 10_000),
                 },
-                actions: [{
-                    sender: 'account-sys',
-                    contract: 'account-sys',
-                    method: 'newAccount',
-                    data: { name, authContract, requireNew: true },
-                }],
+                actions,
             }
         });
         addMsg(JSON.stringify(trace, null, 4));
@@ -63,7 +76,7 @@ async function newAccount(name, authContract, addMsg, clearMsg) {
 
 function AccountForm(addMsg, clearMsg) {
     const [name, setName] = React.useState('');
-    const [authContract, setAuthContract] = React.useState('auth-fake-sys');
+    const [pubkey, setPubkey] = React.useState('');
     return html`<div>
         <table><tbody>
             <tr>
@@ -71,12 +84,12 @@ function AccountForm(addMsg, clearMsg) {
                 <td><input type="text" value=${name} onChange=${e => setName(e.target.value)}></input></td>
             </tr>
             <tr>
-                <td>Auth Contract</td>
-                <td><input type="text" value=${authContract} onChange=${e => setAuthContract(e.target.value)}></input></td>
+                <td>Public Key</td>
+                <td><input type="text" value=${pubkey} onChange=${e => setPubkey(e.target.value)}></input></td>
             </tr>
             <tr>
                 <td></td>
-                <td><button onClick=${e => newAccount(name, authContract, addMsg, clearMsg)}>Create Account</button></td>
+                <td><button onClick=${e => newAccount(name, pubkey, addMsg, clearMsg)}>Create Account</button></td>
             </tr>
         </tbody></table>
     </div>`

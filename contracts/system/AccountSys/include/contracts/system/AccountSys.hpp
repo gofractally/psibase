@@ -38,6 +38,6 @@ namespace system_contract
    PSIO_REFLECT(AccountSys,
                 method(startup, existing_accounts),
                 method(newAccount, name, authContract, requireNew),
-                method(setAuthCntr, name, authContract),
+                method(setAuthCntr, authContract),
                 method(exists, num))
 }  // namespace system_contract
