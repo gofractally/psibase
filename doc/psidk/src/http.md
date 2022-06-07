@@ -1,25 +1,24 @@
 # HTTP and Javascript
 
 - [TLDR: Pushing a transaction](#tldr-pushing-a-transaction)
-- [Routing and Virtual Hosts](#routing-and-virtual-hosts)
-  - [CORS and authorization](#cors-and-authorization)
+- [Routing and Virtual Hosts (http)](#routing-and-virtual-hosts-http)
+  - [CORS and authorization (http)](#cors-and-authorization-http)
 - [Native services](#native-services)
-  - [Push transaction](#push-transaction)
-  - [Boot chain](#boot-chain)
+  - [Push transaction (http)](#push-transaction-http)
+  - [Boot chain (http)](#boot-chain-http)
 - [Common contract services](#common-contract-services)
-  - [rootdomain and siblingUrl](#rootdomain-and-siblingurl)
-  - [Pack transaction](#pack-transaction)
-  - [Common files](#common-files)
-    - [RPC helpers](#rpc-helpers)
-      - [Simple RPC wrappers](#simple-rpc-wrappers)
-      - [Conversions](#conversions)
-      - [Transactions](#transactions)
-      - [Signing](#signing)
-    - [Key Conversions](#key-conversions)
-    - [React GraphQL hooks](#react-graphql-hooks)
+  - [Common files (http)](#common-files-http)
+  - [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js)
+  - [Pack transaction (http)](#pack-transaction-http)
+  - [Simple RPC wrappers (js)](#simple-rpc-wrappers-js)
+  - [Conversions (js)](#conversions-js)
+  - [Transactions (js)](#transactions-js)
+  - [Signing (js)](#signing-js)
+  - [Key Conversions (js)](#key-conversions-js)
+  - [React GraphQL hooks (js)](#react-graphql-hooks-js)
 - [Root services](#root-services)
 - [Contract-provided services](#contract-provided-services)
-  - [Packing actions](#packing-actions)
+  - [Packing actions (http)](#packing-actions-http)
 
 ## TLDR: Pushing a transaction
 
@@ -86,7 +85,7 @@ try {
 }
 ```
 
-## Routing and Virtual Hosts
+## Routing and Virtual Hosts (http)
 
 psinode provides virtual hosting. Domains have 2 categories:
 
@@ -103,7 +102,7 @@ psinode provides virtual hosting. Domains have 2 categories:
 
 The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys contract](system-contract/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct chains and by individual node operators.
 
-### CORS and authorization
+### CORS and authorization (http)
 
 psinode always accepts CORS requests, since services would break without it. psinode does not currently handle any HTTP authentication or authorization.
 
@@ -111,9 +110,9 @@ psinode always accepts CORS requests, since services would break without it. psi
 
 psinode's native code handles any target which begins with `/native`, regardless of domain. Targets which begin with `/native` but aren't recognized produce a 404.
 
-### Push transaction
+### Push transaction (http)
 
-`POST /native/push_transaction` pushes a transaction. The user must pack the transaction using fracpack and pass in the binary as the request body. See [Pack transaction](#pack-transaction) for an RPC request which packs transactions. TODO: describe how to pack without using RPC; currently waiting for the transaction format to stabilize, for schema support, and for WASM ABI support.
+`POST /native/push_transaction` pushes a transaction. The user must pack the transaction using fracpack and pass in the binary as the request body. See [Pack transaction (http)](#pack-transaction-http) for an RPC request which packs transactions. TODO: describe how to pack without using RPC; currently waiting for the transaction format to stabilize, for schema support, and for WASM ABI support.
 
 If the transaction succeeds, or if the transaction fails but a trace is available, then psinode returns a 200 reply with a JSON body (below). If the transaction fails and a trace is not available, then it returns a 500 error with an appropriate message.
 
@@ -125,26 +124,25 @@ If the transaction succeeds, or if the transaction fails but a trace is availabl
 }
 ```
 
-If a transaction succeeds (above), the transaction may or may not make it into a block. If it does, it may get forked back out. TODO: add lifetime tracking and reporting to psinode.
+If a transaction succeeds, the transaction may or may not make it into a block. If it makes it into a block, it may get forked back out. TODO: add lifetime tracking and reporting to psinode.
 
 Future psinode versions may trim the action traces when not in a developer mode.
 
-### Boot chain
+### Boot chain (http)
 
 `POST /native/push_boot` boots the chain. This is only available when psinode does not have a chain yet. Use the `psibase boot` command to boot a chain. TODO: document the body content.
 
 ## Common contract services
 
-- [rootdomain and siblingUrl](#rootdomain-and-siblingurl)
-- [Pack transaction](#pack-transaction)
-- [Common files](#common-files)
-  - [RPC helpers](#rpc-helpers)
-    - [Simple RPC wrappers](#simple-rpc-wrappers)
-    - [Conversions](#conversions)
-    - [Transactions](#transactions)
-    - [Signing](#signing)
-  - [Key Conversions](#key-conversions)
-  - [React GraphQL hooks](#react-graphql-hooks)
+- [Common files (http)](#common-files-http)
+- [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js)
+- [Pack transaction (http)](#pack-transaction-http)
+- [Simple RPC wrappers (js)](#simple-rpc-wrappers-js)
+- [Conversions (js)](#conversions-js)
+- [Transactions (js)](#transactions-js)
+- [Signing (js)](#signing-js)
+- [Key Conversions (js)](#key-conversions-js)
+- [React GraphQL hooks (js)](#react-graphql-hooks-js)
 
 The [common-sys contract](system-contract/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
@@ -152,13 +150,24 @@ The [common-sys contract](system-contract/common-sys.md) provides services which
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/common/thiscontract`           | Returns a JSON string containing the contract associated with the domain. If it's the root domain, returns `"common-sys"` |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                     |
-| `GET`  | `/common/rootdomain.js`          | See [rootdomain and siblingUrl](#rootdomain-and-siblingurl)                                                               |
-| `GET`  | `/common/rootdomain.mjs`         | See [rootdomain and siblingUrl](#rootdomain-and-siblingurl)                                                               |
-| `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction)                                                                                  |
-| `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction)                                                                           |
-| `GET`  | `/common/<other>`                | [Common files](#common-files)                                                                                             |
+| `GET`  | `/common/rootdomain.js`          | [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js)                                                           |
+| `GET`  | `/common/rootdomain.mjs`         | [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js)                                                           |
+| `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction-http)                                                                             |
+| `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction-http)                                                                      |
+| `GET`  | `/common/<other>`                | [Common files (http)](#common-files-http)                                                                                 |
 
-### rootdomain and siblingUrl
+### Common files (http)
+
+`common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). `psibase boot` installs this default set of files while booting the chain:
+
+| Path                          | Description                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/common/SimpleUI.mjs`        | Default UI for contracts under development                                                                                                                            |
+| `/common/rpc.mjs`             | [Simple RPC wrappers (js)](#simple-rpc-wrappers-js)<br/>[Conversions (js)](#conversions-js)<br/>[Transactions (js)](#transactions-js)<br/>[Signing (js)](#signing-js) |
+| `/common/keyConversions.mjs`  | [Key Conversions (js)](#key-conversions-js)                                                                                                                           |
+| `/common/useGraphQLQuery.mjs` | [React GraphQL hooks (js)](#react-graphql-hooks-js)                                                                                                                   |
+
+### rootdomain and siblingUrl (js)
 
 `GET /common/rootdomain.mjs` returns a script like the following:
 
@@ -187,7 +196,7 @@ Example uses:
 - `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', '', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
 - `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', 'other-contract', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
 
-### Pack transaction
+### Pack transaction (http)
 
 `/common/pack/Transaction` and `/common/pack/SignedTransaction` use fracpack to convert unsigned and signed transactions to binary. They accept JSON as input and return the binary data.
 
@@ -211,12 +220,14 @@ TODO: document additional tapos fields once they're operational
 
 ```
 {
-  "transaction": {},    // See Transaction above
+  "transaction": {},    // This may be the Transaction object (above),
+                        // or it may be a hex string containing the packed
+                        // transaction.
   "proofs": []          // See Proof
 }
 ```
 
-`Action` has these fields. See [Packing actions](#packing-actions).
+`Action` has these fields. See [Packing actions (http)](#packing-actions-http).
 
 ```
 {
@@ -227,94 +238,80 @@ TODO: document additional tapos fields once they're operational
 }
 ```
 
-`Claim` has these fields. See [Signing](#signing) to fill claims and proofs.
+`Claim` has these fields. See [Signing (js)](#signing-js) to fill claims and proofs.
 
 ```
 {
   "contract": "...",    // The contract which verifies the proof meets
                         // the claim, e.g. "verifyec-sys"
   "rawData": "..."      // Hex string containing the claim data.
-                        // e.g. `verifyec-sys` expects a public key.
+                        // e.g. `verifyec-sys` expects a public key
+                        // in fracpack format.
 }
 ```
 
-`Proof` is a hex string containing data which proves the claim. e.g. `verifyec-sys` expects a signature. See [Signing](#signing) to fill claims and proofs.
+`Proof` is a hex string containing data which proves the claim. e.g. `verifyec-sys`
+expects a signature in fracpack format. See [Signing (js)](#signing-js) to fill
+claims and proofs.
 
-### Common files
-
-- [RPC helpers](#rpc-helpers)
-  - [Simple RPC wrappers](#simple-rpc-wrappers)
-  - [Conversions](#conversions)
-  - [Transactions](#transactions)
-  - [Signing](#signing)
-- [Key Conversions](#key-conversions)
-- [React GraphQL hooks](#react-graphql-hooks)
-
-`common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). `psibase boot` installs this default set of files while booting the chain:
-
-| Path                          | Description                                 |
-| ----------------------------- | ------------------------------------------- |
-| `/common/SimpleUI.mjs`        | Default UI for contracts under development  |
-| `/common/rpc.mjs`             | [RPC helpers](#rpc-helpers)                 |
-| `/common/keyConversions.mjs`  | [Key Conversions](#key-conversions)         |
-| `/common/useGraphQLQuery.mjs` | [React GraphQL hooks](#react-graphql-hooks) |
-
-#### RPC helpers
+### Simple RPC wrappers (js)
 
 `/common/rpc.mjs` exports a set of utilities to aid interacting with psinode's RPC interface.
 
-- [Simple RPC wrappers](#simple-rpc-wrappers)
-- [Conversions](#conversions)
-- [Transactions](#transactions)
-- [Signing](#signing)
+| Function or Type                      |       | Description                                                                                                                                                                                        |
+| ------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RPCError`                            |       | Error type. This extends `Error` with a new field, `trace`, which contains the trace returned by [`/native/push_transaction`](#push-transaction-http), if available.                               |
+| `throwIfError(response)`              |       | Throw an `RPCError` if the argument (a Response object) indicates a failure. Doesn't fill `trace` since traces are only present with status 200. Returns the argument (Response) if not a failure. |
+| `siblingUrl(baseUrl, contract, path)` |       | Reexport of `siblingUrl` from [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js).                                                                                                     |
+| `get(url)`                            | async | fetch/GET. Returns Response object if ok or throws `RPCError`.                                                                                                                                     |
+| `getJson(url)`                        | async | fetch/GET. Returns JSON if ok or throws `RPCError`.                                                                                                                                                |
+| `getText(url)`                        | async | fetch/GET. Returns text if ok or throws `RPCError`.                                                                                                                                                |
+| `postArrayBuffer(url, data)`          | async | fetch/POST ArrayBuffer. Returns Response object if ok or throws `RPCError`.                                                                                                                        |
+| `postArrayBufferGetJson(data)`        | async | fetch/POST ArrayBuffer. Returns JSON if ok or throws `RPCError`.                                                                                                                                   |
+| `postGraphQL(url, data)`              | async | fetch/POST GraphQL. Returns Response object if ok or throws `RPCError`.                                                                                                                            |
+| `postGraphQLGetJson(data)`            | async | fetch/POST GraphQL. Returns JSON if ok or throws `RPCError`.                                                                                                                                       |
+| `postJson(url, data)`                 | async | fetch/POST JSON. Returns Response object if ok or throws `RPCError`.                                                                                                                               |
+| `postJsonGetArrayBuffer(data)`        | async | fetch/POST JSON. Returns ArrayBuffer if ok or throws `RPCError`.                                                                                                                                   |
+| `postJsonGetJson(data)`               | async | fetch/POST JSON. Returns JSON if ok or throws `RPCError`.                                                                                                                                          |
+| `postJsonGetText(data)`               | async | fetch/POST JSON. Returns text if ok or throws `RPCError`.                                                                                                                                          |
+| `postText(url, data)`                 | async | fetch/POST text. Returns Response object if ok or throws `RPCError`.                                                                                                                               |
+| `postTextGetJson(data)`               | async | fetch/POST text. Returns JSON if ok or throws `RPCError`.                                                                                                                                          |
 
-##### Simple RPC wrappers
+### Conversions (js)
 
-| Function or Type                      | Description                                                                                                                                                                                        |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RPCError`                            | Error type. This extends `Error` with a new field, `trace`, which contains the trace returned by [`/native/push_transaction`](#push-transaction), if available.                                    |
-| `throwIfError(response)`              | Throw an `RPCError` if the argument (a Response object) indicates a failure. Doesn't fill `trace` since traces are only present with status 200. Returns the argument (Response) if not a failure. |
-| `siblingUrl(baseUrl, contract, path)` | Reexport of `siblingUrl` from [rootdomain and siblingUrl](#rootdomain-and-siblingurl).                                                                                                             |
-| `get(url)`                            | Async function. fetch/GET. Uses `throwIfError`. Returns Response object if ok.                                                                                                                     |
-| `getJson(url)`                        | Async function. fetch/GET. Uses `throwIfError`. Returns JSON if ok.                                                                                                                                |
-| `getText(url)`                        | Async function. fetch/GET. Uses `throwIfError`. Returns text if ok.                                                                                                                                |
-| `postArrayBuffer(url, data)`          | Async function. fetch/POST ArrayBuffer. Uses `throwIfError`. Returns Response object if ok.                                                                                                        |
-| `postArrayBufferGetJson(data)`        | Async function. fetch/POST ArrayBuffer. Uses `throwIfError`. Returns JSON if ok.                                                                                                                   |
-| `postGraphQL(url, data)`              | Async function. fetch/POST GraphQL. Uses `throwIfError`. Returns Response object if ok.                                                                                                            |
-| `postGraphQLGetJson(data)`            | Async function. fetch/POST GraphQL. Uses `throwIfError`. Returns JSON if ok.                                                                                                                       |
-| `postJson(url, data)`                 | Async function. fetch/POST JSON. Uses `throwIfError`. Returns Response object if ok.                                                                                                               |
-| `postJsonGetArrayBuffer(data)`        | Async function. fetch/POST JSON. Uses `throwIfError`. Returns ArrayBuffer if ok.                                                                                                                   |
-| `postJsonGetJson(data)`               | Async function. fetch/POST JSON. Uses `throwIfError`. Returns JSON if ok.                                                                                                                          |
-| `postJsonGetText(data)`               | Async function. fetch/POST JSON. Uses `throwIfError`. Returns text if ok.                                                                                                                          |
-| `postText(url, data)`                 | Async function. fetch/POST text. Uses `throwIfError`. Returns Response object if ok.                                                                                                               |
-| `postTextGetJson(data)`               | Async function. fetch/POST text. Uses `throwIfError`. Returns JSON if ok.                                                                                                                          |
-
-##### Conversions
+`/common/rpc.mjs` exports these conversion functions.
 
 | Function                | Description                            |
 | ----------------------- | -------------------------------------- |
 | `hexToUint8Array(data)` | Converts a hex string to a Uint8Array. |
 | `uint8ArrayToHex(data)` | Converts a Uint8Array to a hex string. |
 
-##### Transactions
+### Transactions (js)
 
-| Function                                       | Description                                                                                                                                                                                                                                                                                            |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packAction(baseUrl, action)`                  | Async function. Packs an action if needed. Returns a new action. An action is an object with fields `sender`, `contract`, `method`, and either `data` or `rawData`. If `rawData` is present then it's already packed. Otherwise this function uses [Packing actions RPC](#packing-actions) to pack it. |
-| `packActions(baseUrl, actions)`                | Async function. Packs an array of actions.                                                                                                                                                                                                                                                             |
-| `packTransaction(baseUrl, trx)`                | Async function. Packs a transaction. Also packs any actions within it, if needed. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                                                                |
-| `packSignedTransaction(baseUrl, trx)`          | Async function. Packs a signed transaction. Returns ArrayBuffer if ok. See [Pack transaction](#pack-transaction).                                                                                                                                                                                      |
-| `pushPackedSignedTransaction(baseUrl, packed)` | Async function. Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction).                                                                                  |
-| `packAndPushSignedTransaction(baseUrl, trx)`   | Async function. Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                                                                                                         |
+`/common/rpc.mjs` exports these functions for packing and pushing transactions.
 
-##### Signing
+| Function                                       |       | Description                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packAction(baseUrl, action)`                  | async | Packs an action if needed. Returns a new action. An action is an object with fields `sender`, `contract`, `method`, and either `data` or `rawData`. If `rawData` is present then it's already packed. Otherwise this function uses [Packing actions (http)](#packing-actions-http) to pack it. |
+| `packActions(baseUrl, actions)`                | async | Packs an array of actions.                                                                                                                                                                                                                                                                     |
+| `packTransaction(baseUrl, trx)`                | async | Packs a transaction. Also packs any actions within it, if needed. Returns ArrayBuffer if ok or throws `RPCError`. See [Pack transaction (http)](#pack-transaction-http).                                                                                                                       |
+| `packSignedTransaction(baseUrl, trx)`          | async | Packs a signed transaction. Returns ArrayBuffer if ok or throws `RPCError`. See [Pack transaction (http)](#pack-transaction-http).                                                                                                                                                             |
+| `pushPackedSignedTransaction(baseUrl, packed)` | async | Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction (http)](#push-transaction-http).                                                                              |
+| `packAndPushSignedTransaction(baseUrl, trx)`   | async | Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                                                                                                                 |
 
-| Function                                                    | Description                                                                                                                               |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `signTransaction(baseUrl, transaction, privateKeys)`        | Async function. Sign transaction. Returns a new object suitable for passing to `packSignedTransaction` or `packAndPushSignedTransaction`. |
-| `signAndPushTransaction(baseUrl, transaction, privateKeys)` | Async function. Sign, pack, and push transaction.                                                                                         |
+### Signing (js)
 
-`signTransaction` signs a transaction. `baseUrl` must point to within the root domain, one of the contract domains, or be empty or null; see [rootdomain and siblingUrl](#rootdomain-and-siblingurl). `transaction` must have the following form:
+`/common/rpc.mjs` exports these functions for signing and pushing transactions
+
+| Function                                                    |       | Description                                                                                                               |
+| ----------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- |
+| `signTransaction(baseUrl, transaction, privateKeys)`        | async | Sign transaction. Returns a new object suitable for passing to `packSignedTransaction` or `packAndPushSignedTransaction`. |
+| `signAndPushTransaction(baseUrl, transaction, privateKeys)` | async | Sign, pack, and push transaction.                                                                                         |
+
+`signTransaction` signs a transaction; it also packs any actions if needed.
+`baseUrl` must point to within the root domain, one of the contract domains,
+or be empty or null; see [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js).
+`transaction` must have the following form:
 
 ```
 {
@@ -343,11 +340,15 @@ TODO: document additional tapos fields once they're operational
 `privateKeys` is an array which may contain a mix of:
 
 - Private keys in text form, e.g. `"PVT_K1_2bfGi9r..."`
-- `{keyType, keyPair}`. See [Key Conversions](#key-conversions).
+- `{keyType, keyPair}`. See [Key Conversions (js)](#key-conversions-js).
 
-#### Key Conversions
+### Key Conversions (js)
 
-`/common/keyConversions.mjs` has functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text and fracpack forms. Each function accepts or returns a `{keyType, keyPair}` or `{keyType, signature}`, where keyType is one of the following values:
+`/common/keyConversions.mjs` exports functions which convert
+[Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic
+Signature objects to and from psibase's text and fracpack forms. Each function
+accepts or returns a `{keyType, keyPair}` or `{keyType, signature}`, where
+keyType is one of the following values:
 
 ```js
 export const KeyType = {
@@ -377,7 +378,7 @@ TODO: even though the JS library supports both k1 and r1 types, psibase only cur
 | `publicKeyPairToFracpack({keyType, keyPair})` | Convert the public key in `{keyType, keyPair}` to fracpack format in a Uint8Array  |
 | `signatureToFracpack({keyType, signature})`   | Convert the signature in `{keyType, signature}` to fracpack format in a Uint8Array |
 
-#### React GraphQL hooks
+### React GraphQL hooks (js)
 
 TODO
 
@@ -389,6 +390,6 @@ TODO
 
 TODO
 
-### Packing actions
+### Packing actions (http)
 
 TODO
