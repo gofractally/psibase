@@ -1,23 +1,90 @@
 # HTTP and Javascript
 
+- [TLDR: Pushing a transaction](#tldr-pushing-a-transaction)
 - [Routing and Virtual Hosts](#routing-and-virtual-hosts)
   - [CORS and authorization](#cors-and-authorization)
 - [Native services](#native-services)
   - [Push transaction](#push-transaction)
   - [Boot chain](#boot-chain)
 - [Common contract services](#common-contract-services)
+  - [rootdomain and siblingUrl](#rootdomain-and-siblingurl)
   - [Pack transaction](#pack-transaction)
   - [Common files](#common-files)
     - [RPC helpers](#rpc-helpers)
       - [Simple RPC wrappers](#simple-rpc-wrappers)
       - [Conversions](#conversions)
       - [Transactions](#transactions)
+      - [Signing](#signing)
     - [Key Conversions](#key-conversions)
-    - [Signing](#signing)
     - [React GraphQL hooks](#react-graphql-hooks)
 - [Root services](#root-services)
 - [Contract-provided services](#contract-provided-services)
   - [Packing actions](#packing-actions)
+
+## TLDR: Pushing a transaction
+
+This example works directly in the browser without bundling, transpiling, etc.
+
+TODO: npm package which supports bundling
+
+<!-- prettier-ignore -->
+```html
+<!DOCTYPE html>
+<html>
+    <body>
+        See the console
+
+        <!-- type="module" enables es6 imports -->
+        <!-- it also allows using await outside of functions -->
+        <script src="script.mjs" type="module"></script>
+    </body>
+</html>
+```
+
+<!-- prettier-ignore -->
+```js
+// Use these if your script is NOT hosted by psinode:
+import { signAndPushTransaction }
+    from 'http://psibase.127.0.0.1.sslip.io:8080/common/rpc.mjs';
+const baseUrl = 'http://psibase.127.0.0.1.sslip.io:8080';
+
+// Use these if your script is hosted by psinode:
+//    import {signAndPushTransaction} from '/common/rpc.mjs';
+//    const baseUrl = '';
+
+try {
+    const transaction = {
+        tapos: {
+            // expire after 10 seconds
+            expiration: new Date(Date.now() + 10000),
+        },
+        actions: [
+            {
+                sender: "sue",          // account requesting action
+                contract: "example",    // contract executing action
+                method: "add",          // method to execute
+                data: {                 // arguments to method
+                    "a": 0,
+                    "b": 0
+                }
+            }
+        ],
+    };
+    const privateKeys = [
+        'PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V',
+    ];
+
+    // Don't forget the await!
+    const trace = await signAndPushTransaction(baseUrl, transaction, privateKeys);
+
+    console.log("Transaction executed");
+    console.log("\ntrace:", JSON.stringify(trace, null, 4));
+} catch (e) {
+    console.log("Caught exception:", e.message);
+    if (e.trace)
+        console.log(JSON.stringify(e.trace, null, 4));
+}
+```
 
 ## Routing and Virtual Hosts
 
@@ -68,14 +135,15 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 ## Common contract services
 
+- [rootdomain and siblingUrl](#rootdomain-and-siblingurl)
 - [Pack transaction](#pack-transaction)
 - [Common files](#common-files)
   - [RPC helpers](#rpc-helpers)
     - [Simple RPC wrappers](#simple-rpc-wrappers)
     - [Conversions](#conversions)
     - [Transactions](#transactions)
+    - [Signing](#signing)
   - [Key Conversions](#key-conversions)
-  - [Signing](#signing)
   - [React GraphQL hooks](#react-graphql-hooks)
 
 The [common-sys contract](system-contract/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
@@ -110,7 +178,7 @@ export function siblingUrl(baseUrl, contract, path) {
 
 `GET /common/rootdomain.js` returns the same thing, but without the `export` keyword.
 
-`siblingUrl` makes it easy for scripts to reference other contracts' domains. It automatically navigates through reverse proxies, which may change the protocol (e.g. to HTTPS) or port (e.g. to 443) from what psinode provides. If `baseUrl` is null or undefined, then this relies on `location.protocol` and `location.port`; this mode is only usable by scripts running on webpages served by psinode.
+`siblingUrl` makes it easy for scripts to reference other contracts' domains. It automatically navigates through reverse proxies, which may change the protocol (e.g. to HTTPS) or port (e.g. to 443) from what psinode provides. `baseUrl` may point within either the root domain or one of the contract domains. It also may be empty, null, or undefined for scripts running on webpages served by psinode.
 
 Example uses:
 
@@ -178,8 +246,8 @@ TODO: document additional tapos fields once they're operational
   - [Simple RPC wrappers](#simple-rpc-wrappers)
   - [Conversions](#conversions)
   - [Transactions](#transactions)
+  - [Signing](#signing)
 - [Key Conversions](#key-conversions)
-- [Signing](#signing)
 - [React GraphQL hooks](#react-graphql-hooks)
 
 `common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). `psibase boot` installs this default set of files while booting the chain:
@@ -194,6 +262,11 @@ TODO: document additional tapos fields once they're operational
 #### RPC helpers
 
 `/common/rpc.mjs` exports a set of utilities to aid interacting with psinode's RPC interface.
+
+- [Simple RPC wrappers](#simple-rpc-wrappers)
+- [Conversions](#conversions)
+- [Transactions](#transactions)
+- [Signing](#signing)
 
 ##### Simple RPC wrappers
 
@@ -234,6 +307,44 @@ TODO: document additional tapos fields once they're operational
 | `pushPackedSignedTransaction(baseUrl, packed)` | Async function. Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction](#push-transaction).                                                                                  |
 | `packAndPushSignedTransaction(baseUrl, trx)`   | Async function. Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                                                                                                         |
 
+##### Signing
+
+| Function                                                    | Description                                                                                                                               |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `signTransaction(baseUrl, transaction, privateKeys)`        | Async function. Sign transaction. Returns a new object suitable for passing to `packSignedTransaction` or `packAndPushSignedTransaction`. |
+| `signAndPushTransaction(baseUrl, transaction, privateKeys)` | Async function. Sign, pack, and push transaction.                                                                                         |
+
+`signTransaction` signs a transaction. `baseUrl` must point to within the root domain, one of the contract domains, or be empty or null; see [rootdomain and siblingUrl](#rootdomain-and-siblingurl). `transaction` must have the following form:
+
+```
+{
+    tapos: {
+        expiration: "..." // When transaction expires (UTC)
+                          // Example value: "2022-05-31T21:32:23Z"
+                          // Use `new Date(...)` to generate the correct format.
+    },
+    actions: [],        // See below
+}
+```
+
+`Action` has these fields:
+
+```
+{
+  sender: "...",    // The account name authorizing the action
+  contract: "...",  // The contract name to receive the action
+  method: "...",    // The method name of the action
+
+  data: {...},      // Method's arguments. Not needed if `rawData` is present.
+  rawData: "...",   // Hex string containing packed arguments. Not needed if `data` is present.
+}
+```
+
+`privateKeys` is an array which may contain a mix of:
+
+- Private keys in text form, e.g. `"PVT_K1_2bfGi9r..."`
+- `{keyType, keyPair}`. See [Key Conversions](#key-conversions).
+
 #### Key Conversions
 
 `/common/keyConversions.mjs` has functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text and fracpack forms. Each function accepts or returns a `{keyType, keyPair}` or `{keyType, signature}`, where keyType is one of the following values:
@@ -265,10 +376,6 @@ TODO: even though the JS library supports both k1 and r1 types, psibase only cur
 | `publicKeyPairToString({keyType, keyPair})`   | Convert the public key in `{keyType, keyPair}` to a string                         |
 | `publicKeyPairToFracpack({keyType, keyPair})` | Convert the public key in `{keyType, keyPair}` to fracpack format in a Uint8Array  |
 | `signatureToFracpack({keyType, signature})`   | Convert the signature in `{keyType, signature}` to fracpack format in a Uint8Array |
-
-#### Signing
-
-TODO
 
 #### React GraphQL hooks
 
