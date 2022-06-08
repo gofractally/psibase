@@ -2,7 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use super::method_to_number_converter::MethodToNumberConverter;
 use super::{constants::*, number_to_string_converter::NumberToStringConverter};
+use custom_error::custom_error;
 use std::{num::ParseIntError, str::FromStr};
+
+custom_error! { pub MethodNumberError
+    Invalid{s:String} = "Invalid MethodNumber {s}",
+}
 
 /// A contract method number.
 ///
@@ -20,7 +25,7 @@ use std::{num::ParseIntError, str::FromStr};
 /// use libpsibase::MethodNumber;
 /// let hello = MethodNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, psi_macros::Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Copy, Clone, psi_macros::Fracpack, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change)]
 pub struct MethodNumber {
     pub value: u64,
@@ -29,6 +34,14 @@ pub struct MethodNumber {
 impl MethodNumber {
     pub fn new(value: u64) -> Self {
         MethodNumber { value }
+    }
+
+    pub fn from_exact(s: &str) -> Result<Self, MethodNumberError> {
+        let result: Self = s.into();
+        if result.to_string() != s {
+            return Err(MethodNumberError::Invalid { s: s.into() });
+        }
+        Ok(result)
     }
 
     fn has_valid_chars(s: &str) -> bool {

@@ -5,7 +5,12 @@ use super::{
     account_to_number_converter::AccountToNumberConverter,
     number_to_string_converter::NumberToStringConverter,
 };
+use custom_error::custom_error;
 use std::{num::ParseIntError, str::FromStr};
+
+custom_error! { pub AccountNumberError
+    Invalid{s:String} = "Invalid AccountNumber {s}",
+}
 
 /// An account number.
 ///
@@ -21,7 +26,7 @@ use std::{num::ParseIntError, str::FromStr};
 /// use libpsibase::AccountNumber;
 /// let hello = AccountNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, psi_macros::Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Copy, Clone, psi_macros::Fracpack, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change)]
 pub struct AccountNumber {
     pub value: u64,
@@ -30,6 +35,14 @@ pub struct AccountNumber {
 impl AccountNumber {
     pub fn new(value: u64) -> Self {
         AccountNumber { value }
+    }
+
+    pub fn from_exact(s: &str) -> Result<Self, AccountNumberError> {
+        let result: Self = s.into();
+        if result.to_string() != s {
+            return Err(AccountNumberError::Invalid { s: s.into() });
+        }
+        Ok(result)
     }
 
     pub fn has_valid_format(s: &str) -> bool {
