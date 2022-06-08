@@ -1,11 +1,6 @@
-use serde::{Deserialize, Serialize};
-
-use super::constants::*;
-use super::{
-    account_to_number_converter::AccountToNumberConverter,
-    number_to_string_converter::NumberToStringConverter,
-};
 use custom_error::custom_error;
+use libpsibase_names::{account_number_from_str, account_number_to_string};
+use serde::{Deserialize, Serialize};
 use std::{num::ParseIntError, str::FromStr};
 
 custom_error! { pub AccountNumberError
@@ -44,34 +39,6 @@ impl AccountNumber {
         }
         Ok(result)
     }
-
-    pub fn has_valid_format(s: &str) -> bool {
-        let mut chars = s.bytes();
-
-        if chars.len() == 0 {
-            return true;
-        }
-
-        let first_char = chars.next().unwrap();
-        if first_char <= b'9' {
-            return false;
-        }
-
-        let mut char_ascii = first_char as usize;
-        loop {
-            if CHAR_TO_SYMBOL[char_ascii] == 0 {
-                return false;
-            }
-
-            if let Some(next_char) = chars.next() {
-                char_ascii = next_char as usize;
-            } else {
-                break;
-            }
-        }
-
-        true
-    }
 }
 
 impl From<u64> for AccountNumber {
@@ -84,12 +51,9 @@ impl FromStr for AccountNumber {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.is_empty() || s.len() > 18 || !AccountNumber::has_valid_format(s) {
-            return Ok(AccountNumber::default());
-        }
-
-        let value = AccountToNumberConverter::convert(s);
-        Ok(AccountNumber { value })
+        Ok(AccountNumber {
+            value: account_number_from_str(s),
+        })
     }
 }
 
@@ -101,13 +65,7 @@ impl From<&str> for AccountNumber {
 
 impl std::fmt::Display for AccountNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.value == 0 {
-            return f.write_str(""); // TODO: review impl empty string
-        }
-
-        f.write_str(
-            NumberToStringConverter::convert(self.value, &MODEL_CF, &SYMBOL_TO_CHAR).as_str(),
-        )
+        f.write_str(account_number_to_string(self.value).as_str())
     }
 }
 

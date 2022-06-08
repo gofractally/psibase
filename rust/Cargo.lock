@@ -1050,10 +1050,17 @@ version = "0.1.0"
 dependencies = [
  "custom_error",
  "fracpack",
+ "libpsibase_names",
  "psi_macros",
  "ripemd",
- "seahash",
  "serde",
+]
+
+[[package]]
+name = "libpsibase_names"
+version = "0.1.0"
+dependencies = [
+ "seahash",
 ]
 
 [[package]]
