@@ -1,4 +1,5 @@
 mod block;
+mod crypto;
 mod db;
 mod from_bin;
 mod intrinsic;
@@ -7,6 +8,7 @@ mod time;
 mod to_bin;
 
 pub use block::*;
+pub use crypto::*;
 pub use db::*;
 pub use from_bin::*;
 pub use intrinsic::*;
