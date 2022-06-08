@@ -30,9 +30,9 @@ inline std::string to_key6(const std::string_view v)
    std::string out;
    out.resize(byte6);
 
-   char* pos6     = out.data();
-   const char* pos8     = v.data();
-   const char* pos8_end = v.data() + v.size();
+   uint8_t* pos6     = (uint8_t*)out.data();
+   const uint8_t* pos8     = (uint8_t*)v.data();
+   const uint8_t* pos8_end = (uint8_t*)v.data() + v.size();
 
    while (pos8 + 3 <= pos8_end)
    {
@@ -40,6 +40,10 @@ inline std::string to_key6(const std::string_view v)
       pos6[1] = (pos8[0] & 0x3) << 4 | pos8[1] >> 4;
       pos6[2] = (pos8[1] & 0xf) << 2 | (pos8[2] >> 6);
       pos6[3] = pos8[2] & 0x3f;
+      assert( (pos6[0] >> 6) == 0 );
+      assert( (pos6[1] >> 6) == 0 );
+      assert( (pos6[2] >> 6) == 0 );
+      assert( (pos6[3] >> 6) == 0 );
       pos8 += 3;
       pos6 += 4;
    }
@@ -58,8 +62,25 @@ inline std::string to_key6(const std::string_view v)
       default:
          break;
    }
+   assert( (pos6[0] >> 6) == 0 );
+   assert( (pos6[1] >> 6) == 0 );
+   assert( (pos6[2] >> 6) == 0 );
+   assert( (pos6[3] >> 6) == 0 );
    return out;
 }
+
+inline std::string to_key(const std::string_view v)
+{
+   std::string s(v.data(), v.size());
+   for (auto& c : s)
+   {
+      c -= 62;
+      c &= 63;
+   }
+   return s;
+}
+
+
 
 int main(int argc, char** argv)
 {
@@ -68,11 +89,13 @@ int main(int argc, char** argv)
        "big.dir",
        trie::database::config{
            //.max_objects = (5 * total) / 4, .hot_pages = 16 * 1024ull, .cold_pages = 8*1024 * 1024ull},
-           .max_objects = (5 * total) / 4, .hot_pages = 8*256* 1024ull, .cold_pages = 8*1024 * 1024ull},
+           .max_objects = (5 * total) / 4, .hot_pages = 4*256* 1024ull, .cold_pages = 4*1024 * 1024ull},
        //    .max_objects = (5 * total) / 4, .hot_pages =  16*1024ull, .cold_pages = 8*1024 * 1024ull},
        trie::database::read_write);
    db.print_stats();
-   auto s = db.start_revision(0, 0);
+   auto s = db.start_write_revision(0, 0);
+
+
 
    /*
    int count = 0;
@@ -93,28 +116,62 @@ int main(int argc, char** argv)
    auto lstart       = std::chrono::steady_clock::now();
 
    int perc = 1000;
-   int r    = 1;
+   std::atomic<uint64_t> r(1);
+   std::atomic<uint64_t> total_lookups[6];
+   for( auto& t : total_lookups ) t.store(0);
+
+   auto read_loop =  [&](int c) {
+      int v = r.load();
+      auto rs = db.start_read_revision(r-4);
+
+      while( true ) {
+         while( r.load(std::memory_order_relaxed) == v ) {
+            uint64_t h =rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4;
+            auto k = to_key6( std::string_view((char*)&h, sizeof(h)) );
+            auto itr =  rs->lower_bound( k );
+            if( itr.valid() )
+               ++total_lookups[c];
+         }
+         v = r.load();
+         rs = db.start_read_revision(v-4);
+      }
+   };
 
 
+   auto get_total_lookups = [&](){
+      return total_lookups[0].load() + total_lookups[1].load() + total_lookups[2].load() + total_lookups[3].load() + total_lookups[4].load() + total_lookups[5].load();
+   };
+
+   int64_t read_start = 0;
    std::string k;
    for (uint64_t i = 0; i < total; ++i)
    {
       try
       {
-         if (i % (total / 1000000) == 0)
+         if (i % (total / perc) == 1 )
          {
-            db.swap();
+         //   db.swap();
 
-            if (r > 1)
+            ++r;
+            auto v = r.load(std::memory_order_relaxed);
+            if ( v > 1)
             {
-               auto ns = db.start_revision(r, r - 1);
-               ++r;
-               if (r > 10)
+               auto ns = db.start_write_revision(v, v - 1);
+               if (v > 10)
                {
-                  auto old = db.start_revision(r - 10, r - 10);
-                  old.clear();
+                  auto old = db.start_write_revision(v - 10, v - 10);
+                  old->clear();
                }
-               s = ns;
+               s = std::move(ns);
+            }
+            if( v == 6 ) {
+               WARN( "STARTING READ THREADS" );
+               new std::thread( [&](){read_loop(0);} );
+               new std::thread( [&](){read_loop(1);} );
+               new std::thread( [&](){read_loop(2);} );
+               new std::thread( [&](){read_loop(3);} );
+               new std::thread( [&](){read_loop(4);} );
+               new std::thread( [&](){read_loop(5);} );
             }
          }
          // if( r > 10000 ) {
@@ -130,23 +187,31 @@ int main(int argc, char** argv)
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - lstart;
             lstart     = end;
+            auto read_end = get_total_lookups();
+            auto delta_read = read_end - read_start;
+            read_start = read_end;
             std::cerr << "progress " << 100 * double(i) / total << "  "
                       << std::chrono::duration<double, std::milli>(delta).count() << "\n";
             std::cout << (total / perc) /
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)
-                      << " items/sec   " << i << " total  fails " << insert_fails << "\n";
+                      << " items/sec   " << i << " total  reads/sec: " << (delta_read / ((std::chrono::duration<double, std::milli>(delta).count() / 1000)))  <<"\n";
          }
 
          uint64_t v[2];
          uint64_t h =rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4;
       //   h          = bswap(h);
           k = to_key6( std::string_view((char*)&h, sizeof(h)) );
+          /*
+          for( auto c : k ) {
+             assert( 0 == c >> 6 );
+          }
+          */
 
        //  h &= 0x3f3f3f3f3f3f3f3f;
          
          if (i < total )
          {
-            bool inserted = s.upsert(std::string_view(k.data(), k.size()),
+            bool inserted = s->upsert(std::string_view(k.data(), k.size()),
                                      std::string_view((char*)&h, sizeof(h)));
             assert(inserted);
 

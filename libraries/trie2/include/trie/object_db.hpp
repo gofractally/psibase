@@ -5,6 +5,7 @@
 
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
+#include <trie/debug.hpp>
 
 namespace trie
 {
@@ -41,6 +42,11 @@ namespace trie
          // this will allow us to maintain a full 48 bit address space
          uint64_t offset : 46;
          uint64_t cache : 2;
+
+         friend bool operator != ( const object_location& a, const object_location& b ) 
+         {
+            return *reinterpret_cast<const uint64_t*>(&a) != *reinterpret_cast<const uint64_t*>(&b);
+         }
       } __attribute__((packed));
       static_assert(sizeof(object_location) == 6, "unexpected padding");
 
@@ -54,10 +60,10 @@ namespace trie
 
       object_location get(object_id id);
       object_location get(object_id id, uint16_t& ref);
-      void            set(object_id id, object_location loc);
-      inline void     set(object_id id, uint64_t offset, uint64_t cache)
+      bool set(object_id id, object_location loc);
+      inline bool set(object_id id, uint64_t offset, uint64_t cache)
       {
-         set(id, object_location{.offset = offset, .cache = cache});
+         return set(id, object_location{.offset = offset, .cache = cache});
       }
 
      private:
@@ -161,7 +167,8 @@ namespace trie
    {
       auto& obj = _header->objects[id.id];
       assert( ref(id) > 0 );
-      obj.store(obj.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
+      ++obj;
+   //   obj.store(obj.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
       //      std::cerr << "    retain id: " << id.id <<"    new count: " << (obj.load() & 0xffff) <<"\n";
    }
 
@@ -178,7 +185,9 @@ namespace trie
       //   std::cerr << "    id: " << id.id <<"    new count: " << new_count <<"\n";
       if (new_count == 0)
       {
-         obj.store(int64_t(_header->first_free.id) << 16, std::memory_order_relaxed);
+         if( not obj.compare_exchange_strong(val, int64_t(_header->first_free.id) << 16, std::memory_order_relaxed) ) {
+            WARN( "memory race detected on release()" );
+         }
          _header->first_free = id;
          --_header->total_allocated;
          assert(_header->total_allocated >= 0);
@@ -186,7 +195,8 @@ namespace trie
       }
       else
       {
-         obj.store(val - 1, std::memory_order_relaxed);
+         --obj;
+      //   obj.store(val - 1, std::memory_order_relaxed);
          return object_location{.offset = 0, .cache = val >> 16};
       }
    }
@@ -199,31 +209,36 @@ namespace trie
    inline object_db::object_location object_db::get(object_id id)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-//      std::atomic_thread_fence(std::memory_order_acquire);
+      std::atomic_thread_fence(std::memory_order_acquire);
       assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
+      std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
 
    inline object_db::object_location object_db::get(object_id id, uint16_t& ref)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-//      std::atomic_thread_fence(std::memory_order_acquire);
+      std::atomic_thread_fence(std::memory_order_acquire);
      // assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
       ref = val & 0xffff;
+      std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
 
-   inline void object_db::set(object_id id, object_location loc)
+   inline bool object_db::set(object_id id, object_location loc)
    {
       auto&    obj = _header->objects[id.id];
-      uint16_t ref = obj.load(std::memory_order_relaxed) & 0xffff;
-      obj.store(obj_val(loc, ref), std::memory_order_release);
+      auto     old = obj.load(std::memory_order_relaxed);
+      uint16_t ref = old & 0xffff;
+      auto r = obj.compare_exchange_strong(old, obj_val(loc, ref), std::memory_order_release);
+      std::atomic_thread_fence(std::memory_order_release);
+      return r;
    }
 
 };  // namespace trie

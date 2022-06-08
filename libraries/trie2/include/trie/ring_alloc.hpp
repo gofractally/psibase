@@ -1,6 +1,8 @@
 #pragma once
 #include <boost/interprocess/offset_ptr.hpp>
+#include <chrono>
 #include <optional>
+#include <thread>
 #include <trie/object_db.hpp>
 
 namespace trie
@@ -29,6 +31,14 @@ namespace trie
          uint64_t cold_pages = 1000 * 1000ull;
       };
 
+      struct swap_position
+      {
+         swap_position() {}
+         uint64_t _swap_pos[4] = {-1ull, -1ull, -1ull, -1ull};
+      };
+
+      swap_position get_swap_pos() const;
+
       ring_allocator(std::filesystem::path dir, access_mode mode, config cfg);
 
       std::pair<id, char*> alloc(size_t num_bytes);
@@ -40,12 +50,14 @@ namespace trie
       // grows the free area after swap is complete,
       // must synchronize with reader threads, only has work to do
       // if swap has made progress.
-      void claim_free();
+      void claim_free(swap_position sp = swap_position());
 
       //  pointer is valid until GC runs
       char* get(id i);
       template <bool CopyToHot = true>
-      char*                      get_cache(id);  // do not move to hot cache
+      char* get_cache(id);  // do not move to hot cache
+      char* get_cache(id i, std::vector<char>& tmp);
+
       uint32_t                   ref(id i) const { return _obj_ids->ref(i); }
       std::pair<uint16_t, char*> get_ref(id i) { return {ref(i), get(i)}; }
       std::pair<uint16_t, char*> get_ref_no_cache(id i);
@@ -60,16 +72,35 @@ namespace trie
 
       void dump();
 
+      std::function<void()> _try_claim_free;
+      ~ring_allocator()
+      {
+         _done.store(true);
+         _swap_thread->join();
+      }
+
      private:
-      template <bool CopyData = false>
+      template <bool CopyData = false, bool RequireObjLoc=true>
       char* alloc(managed_ring& ring, id nid, uint32_t num_bytes, char* data = nullptr);
 
-      inline managed_ring&          hot() { return *_levels[hot_cache]; }
-      inline managed_ring&          warm() { return *_levels[warm_cache]; }
-      inline managed_ring&          cool() { return *_levels[cool_cache]; }
-      inline managed_ring&          cold() { return *_levels[cold_cache]; }
+      inline managed_ring&          hot() const { return *_levels[hot_cache]; }
+      inline managed_ring&          warm() const { return *_levels[warm_cache]; }
+      inline managed_ring&          cool() const { return *_levels[cool_cache]; }
+      inline managed_ring&          cold() const { return *_levels[cold_cache]; }
       std::unique_ptr<object_db>    _obj_ids;
       std::unique_ptr<managed_ring> _levels[4];
+      std::unique_ptr<std::thread>  _swap_thread;
+      std::atomic<bool>             _done = false;
+
+      void swap_loop()
+      {
+         while (not _done.load(std::memory_order_relaxed))
+         {
+            swap();
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(1ms);
+         }
+      }
    };
 
    struct object_header
@@ -141,27 +172,42 @@ namespace trie
          //bip::offset_ptr<object_header> end_free_cursor;
 
          /// these positions only ever increment
-         uint64_t alloc_p;
-         uint64_t swap_p;
-         uint64_t end_free_p;
-         uint64_t alloc_area_size;
+         std::atomic<uint64_t> alloc_p;
+         std::atomic<uint64_t> swap_p;  // this could be read by multiple threads
+         std::atomic<uint64_t> end_free_p;
+         uint64_t              alloc_area_size;
 
          object_header* get_alloc_pos() const
          {
-            return reinterpret_cast<object_header*>((char*)begin.get() + alloc_p % alloc_area_size);
+            return reinterpret_cast<object_header*>((char*)begin.get() + alloc_p.load( std::memory_order_relaxed) % alloc_area_size);
          }
          object_header* get_swap_pos() const
          {
-            return reinterpret_cast<object_header*>((char*)begin.get() + swap_p % alloc_area_size);
+            return reinterpret_cast<object_header*>(
+                (char*)begin.get() + swap_p.load(std::memory_order_relaxed) % alloc_area_size);
          }
          object_header* get_end_free_pos() const
          {
             return begin.get() + end_free_p % alloc_area_size;
          }
          object_header* get_end_pos() const { return end.get(); }
-         uint64_t       get_free_space() const { return end_free_p - alloc_p; }
+         uint64_t       get_free_space() const { return end_free_p.load( std::memory_order_relaxed) - alloc_p.load( std::memory_order_relaxed); }
+         uint64_t       get_potential_free_space() const { return swap_p.load( std::memory_order_relaxed) + alloc_area_size - alloc_p.load( std::memory_order_relaxed); }
          uint64_t       max_contigous_alloc() const
          {
+            auto ap =  alloc_p.load();
+            auto ep = end_free_p.load();
+            auto free_space = ep - ap;
+            auto wraped = (ap + free_space) % alloc_area_size;
+            if( (ap % alloc_area_size) > wraped ) {
+               return free_space - wraped;
+            }
+            return free_space;
+
+            /*
+            if( alloc_p.load(std::memory_order_relaxed) == end_free_p.load( std::memory_order_relaxed ) )
+               return 0;
+
             auto fp = (char*)get_end_free_pos();
             auto ep = (char*)get_end_pos();
             //      auto bp = (char*)get_begin_pos();
@@ -171,6 +217,7 @@ namespace trie
                return ep - ap;  // + fp - bp;
             else
                return fp - ap;
+               */
 
             // potential cursor positions
             //  [B           A     F  S    E]      F - A
@@ -221,6 +268,84 @@ namespace trie
       std::unique_ptr<bip::file_mapping>  _file_map;
       std::unique_ptr<bip::mapped_region> _map_region;
    };
+
+   inline ring_allocator::swap_position ring_allocator::get_swap_pos() const
+   {
+      swap_position r;
+      r._swap_pos[0] = hot()._head->swap_p;
+      r._swap_pos[1] = warm()._head->swap_p;
+      r._swap_pos[2] = cool()._head->swap_p;
+      r._swap_pos[3] = cold()._head->swap_p;
+      return r;
+   }
+
+   inline char* ring_allocator::get_cache(id i, std::vector<char>& tmp)
+   {
+      auto cur_size = tmp.size();
+      auto loc      = _obj_ids->get(i);
+      auto old_loc  = loc;
+      do
+      {
+         auto obj = _levels[loc.cache]->get_object(loc.offset);
+         tmp.resize(cur_size + obj->size + 8);
+         memcpy(tmp.data() + cur_size, obj, obj->size + 8);
+         old_loc = loc;
+         loc     = _obj_ids->get(i);
+      } while (loc != old_loc);
+      return tmp.data() + cur_size + 8;
+   }
+
+   //  pointer is valid until claim_free runs, reads can read it then check to see if
+   //  the gc moved past char* while reading then read again at new location
+   template <bool CopyToHot>
+   char* ring_allocator::get_cache(id i)
+   {
+      auto loc = _obj_ids->get(i);
+
+      if (loc.cache == hot_cache)
+         return hot().get_object(loc.offset)->data();
+
+      /*
+      if( loc.cache == cool_cache ) {
+          auto& ring = _levels[loc.cache];
+          if( ring->_cfile ) {
+             char temp_buffer[512];
+             object_header* ob = reinterpret_cast<object_header*>(temp_buffer);;
+             // TODO: this could fail at EOF?
+             auto re = pread( ring->_cfileno,  temp_buffer, sizeof(temp_buffer), loc.offset + ((sizeof(managed_ring::header)+7)&-8) );
+           //  assert( re == sizeof(ob) );
+
+          //   assert( obj->id == ob.id );
+          //   assert( obj->size == ob.size );
+
+             char* ptr = alloc<false>(hot(), id{ob->id}, ob->size);
+
+             if( ob->size < sizeof(temp_buffer)-8 ) {
+                memcpy( ptr, temp_buffer+8, ob->size );
+                return ptr;
+             } else {
+                re = pread( _levels[loc.cache]->_cfileno,  ptr, ob->size, 8+loc.offset + ((sizeof(managed_ring::header)+7)&-8) );
+                assert( re == ob->size );
+             return ptr;
+             }
+          }
+      }
+      */
+      auto obj = _levels[loc.cache]->get_object(loc.offset);
+
+      /// TODO: if size > X do not copy to hot, copy instead to warm
+
+      if constexpr (CopyToHot)
+      {
+         if (obj->size > 4096)
+            return obj->data();
+         return alloc<true,true>(hot(), id{obj->id}, obj->size, obj->data());
+      }
+      else
+      {
+         return obj->data();
+      }
+   }
 
 }  // namespace trie
 

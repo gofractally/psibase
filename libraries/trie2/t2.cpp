@@ -388,12 +388,12 @@ void test_trie_remove()
        "dbdir",
        trie::database::config{.max_objects = 1000ull, .hot_pages = 100ull, .cold_pages = 400ull},
        trie::database::read_write);
-   auto s = db.start_revision(0, 0);
-   s.upsert(to_key6("hello"), big);
-   s.upsert(to_key6("heman"), big);
-   s.upsert(to_key6("sheman"), big);
+   auto s = db.start_write_revision(0, 0);
+   s->upsert(to_key6("hello"), big);
+   s->upsert(to_key6("heman"), big);
+   s->upsert(to_key6("sheman"), big);
 
-   auto v = s.get(to_key6("sheman"));
+   auto v = s->get(to_key6("sheman"));
    if (v)
       WARN("v.size: ", v->size(), " back: ", v->back());
    else
@@ -401,22 +401,22 @@ void test_trie_remove()
       WARN("NOT FOUND");
    }
 
-   s.upsert(to_key6("hell"), "hell");
-   s.upsert(to_key6("hellb"), "hellb");
-   s.upsert(to_key6("hellbaby"), "hellbaby");
-   s.print();
+   s->upsert(to_key6("hell"), "hell");
+   s->upsert(to_key6("hellb"), "hellb");
+   s->upsert(to_key6("hellbaby"), "hellbaby");
+   s->print();
    std::cerr << "========= REMOVE hello ============\n";
-   s.remove(to_key6("hello"));
-   s.print();
-   s.remove(to_key6("hello"));
-   s.print();
-   s.upsert(to_key6("hello"), "hello");
-   s.print();
-   s.remove(to_key6("hello"));
-   s.print();
+   s->remove(to_key6("hello"));
+   s->print();
+   s->remove(to_key6("hello"));
+   s->print();
+   s->upsert(to_key6("hello"), "hello");
+   s->print();
+   s->remove(to_key6("hello"));
+   s->print();
    std::cerr << "========= REMOVE hellb ============\n";
-   s.remove(to_key6("hellb"));
-   s.print();
+   s->remove(to_key6("hellb"));
+   s->print();
 }
 
 void test_trie(int argc, char** argv)
@@ -444,21 +444,22 @@ void test_trie(int argc, char** argv)
                                                .hot_pages   = 1024 * 1024ull,
                                                .cold_pages  = 1024 * 4000ull},
                         trie::database::read_write);
-      auto           s = db.start_revision(0, 0);
+      auto           s = db.start_write_revision(0, 0);
+      auto           rs = db.start_read_revision(0);
       /*
-      s.print();
-      s.upsert( to_key("hello"), "hello" );
-      s.print();
-      s.upsert( to_key("heman"), "heman" );
-      s.print();
-      s.upsert( to_key("sheman"), "sheman" );
-      s.print();
-      s.upsert( to_key("hell"), "hell" );
-      s.print();
-      s.upsert( to_key("hellb"), "hellb" );
-      s.print();
-      s.upsert( to_key("hellbaby"), "hellbaby" );
-      s.print();
+      s->print();
+      s->upsert( to_key("hello"), "hello" );
+      s->print();
+      s->upsert( to_key("heman"), "heman" );
+      s->print();
+      s->upsert( to_key("sheman"), "sheman" );
+      s->print();
+      s->upsert( to_key("hell"), "hell" );
+      s->print();
+      s->upsert( to_key("hellb"), "hellb" );
+      s->print();
+      s->upsert( to_key("hellbaby"), "hellbaby" );
+      s->print();
       */
 
       {
@@ -470,10 +471,10 @@ void test_trie(int argc, char** argv)
 
             //   std::cout << "==================================\n";
             //DEBUG( "upsert ", values[i] );
-            bool in = s.upsert(keys[i], values[i]);
+            bool in = s->upsert(keys[i], values[i]);
             if (not in)
             {
-               //   s.print();
+               //   s->print();
                WARN("failed to insert: ", values[i], "  i = ", i);
                //  return;
             }
@@ -493,10 +494,10 @@ void test_trie(int argc, char** argv)
 
             //   std::cout << "==================================\n";
             //DEBUG( "upsert ", values[i] );
-            bool in = s.upsert(keys[i], values[i]);
+            bool in = s->upsert(keys[i], values[i]);
             if (in)
             {
-               //   s.print();
+               //   s->print();
                WARN("expected to update: ", values[i], "  i = ", i);
                //  return;
             }
@@ -513,17 +514,17 @@ void test_trie(int argc, char** argv)
          {
             //   std::cout << "==================================\n";
             //DEBUG( "upsert ", values[i] );
-            auto in = s.get(keys[i]);
+            auto in = s->get(keys[i]);
             if (not in)
             {
-                 s.print();
+                 s->print();
                WARN("failed to get: ", values[i]);
                return;
             } else  {
             //   WARN("found: ", values[i]);
             }
             assert(in);
-            //   s.print();
+            //   s->print();
             //  std::cout << "==================================\n";
          }
          auto end   = std::chrono::steady_clock::now();
@@ -532,13 +533,39 @@ void test_trie(int argc, char** argv)
          std::cerr << "trie get all:    "
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
       }
+
       {
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < keys.size(); ++i)
          {
             //   std::cout << "==================================\n";
             //DEBUG( "upsert ", values[i] );
-            auto in = s.find(keys[i]);
+            auto in = rs->get(keys[i]);
+            if (not in)
+            {
+                 s->print();
+               WARN("failed to get: ", values[i]);
+               return;
+            } else  {
+            //   WARN("found: ", values[i]);
+            }
+            assert(in);
+            //   s->print();
+            //  std::cout << "==================================\n";
+         }
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         //std::chrono::duration<double, std::milli>(delta).count();
+         std::cerr << "trie get all read session:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
+      }
+      {
+         auto start = std::chrono::steady_clock::now();
+         for (uint32_t i = 0; i < keys.size(); ++i)
+         {
+            //   std::cout << "==================================\n";
+            //DEBUG( "upsert ", values[i] );
+            auto in = s->find(keys[i]);
             if (not in.valid())
             {
                WARN("failed to find: ", values[i]);
@@ -547,7 +574,7 @@ void test_trie(int argc, char** argv)
           //     WARN("found: ", values[i]);
             }
             assert(in);
-            //   s.print();
+            //   s->print();
             //  std::cout << "==================================\n";
          }
          auto end   = std::chrono::steady_clock::now();
@@ -562,7 +589,31 @@ void test_trie(int argc, char** argv)
          {
             //   std::cout << "==================================\n";
             //DEBUG( "upsert ", values[i] );
-            auto in = s.lower_bound(keys[i]);
+            auto in = rs->find(keys[i]);
+            if (not in.valid())
+            {
+               WARN("failed to find: ", values[i]);
+               return;
+            } else  {
+          //     WARN("found: ", values[i]);
+            }
+            assert(in);
+            //   s->print();
+            //  std::cout << "==================================\n";
+         }
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         //std::chrono::duration<double, std::milli>(delta).count();
+         std::cerr << "trie find all read session:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
+      }
+      {
+         auto start = std::chrono::steady_clock::now();
+         for (uint32_t i = 0; i < keys.size(); ++i)
+         {
+            //   std::cout << "==================================\n";
+            //DEBUG( "upsert ", values[i] );
+            auto in = s->lower_bound(keys[i]);
             if (not in.valid())
             {
                WARN("failed to lower bound: ", values[i]);
@@ -574,7 +625,7 @@ void test_trie(int argc, char** argv)
          //      WARN("lower found: ", values[i]);
             }
             assert(in);
-            //   s.print();
+            //   s->print();
             //  std::cout << "==================================\n";
          }
          auto end   = std::chrono::steady_clock::now();
@@ -583,12 +634,39 @@ void test_trie(int argc, char** argv)
          std::cerr << "trie lower bound all:    "
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
       }
-  //    s.print();
+      {
+         auto start = std::chrono::steady_clock::now();
+         for (uint32_t i = 0; i < keys.size(); ++i)
+         {
+            //   std::cout << "==================================\n";
+            //DEBUG( "upsert ", values[i] );
+            auto in = rs->lower_bound(keys[i]);
+            if (not in.valid())
+            {
+               WARN("failed to lower bound: ", values[i]);
+               return;
+            } else  {
+             //  if( in.key() != keys[i] ) {
+             //     WARN( "unexpected lower bound for ", values[i] );
+             //  }
+         //      WARN("lower found: ", values[i]);
+            }
+            assert(in);
+            //   s->print();
+            //  std::cout << "==================================\n";
+         }
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         //std::chrono::duration<double, std::milli>(delta).count();
+         std::cerr << "trie lower bound all read session:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
+      }
+  //    s->print();
 
       {
          auto start = std::chrono::steady_clock::now();
          int count = 0;
-         auto itr = s.first();
+         auto itr = s->first();
          std::cout << from_key(itr.key())<<"\n";;
          while( itr.valid() ) {
        //     std::cout << "==================     " <<from_key(itr.key())<<" = " << itr.value() <<"  \n";;
@@ -601,11 +679,27 @@ void test_trie(int argc, char** argv)
          std::cerr << "trie itr++ all:    "
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms  "<<count<<" items \n";
       }
-     // s.print();
       {
          auto start = std::chrono::steady_clock::now();
          int count = 0;
-         auto itr = s.last();
+         auto itr = rs->first();
+         std::cout << from_key(itr.key())<<"\n";;
+         while( itr.valid() ) {
+       //     std::cout << "==================     " <<from_key(itr.key())<<" = " << itr.value() <<"  \n";;
+            ++itr;
+            ++count;
+         }
+
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         std::cerr << "trie itr++ all read session:    "
+                   << std::chrono::duration<double, std::milli>(delta).count() << " ms  "<<count<<" items \n";
+      }
+     // s->print();
+      {
+         auto start = std::chrono::steady_clock::now();
+         int count = 0;
+         auto itr = s->last();
          std::cout << from_key(itr.key())<<"\n";;
          while( itr.valid() ) {
       //      std::cout << "==================     " <<from_key(itr.key())<<" = " << itr.value() <<"  \n";;
@@ -621,7 +715,7 @@ void test_trie(int argc, char** argv)
       {
          auto start = std::chrono::steady_clock::now();
          int count = 0;
-         auto itr = s.first();
+         auto itr = s->first();
          std::cout << from_key(itr.key())<<"\n";;
          while( itr.valid() ) {
             ++itr;
@@ -643,9 +737,9 @@ void test_trie(int argc, char** argv)
          for (uint32_t i = 0; i < keys.size(); ++i)
          {
             //   std::cout << "==================================\n";
-            bool r = s.remove(keys[i]);
+            bool r = s->remove(keys[i]);
             assert(r);
-            //   s.print();
+            //   s->print();
             //  std::cout << "==================================\n";
          }
          auto end   = std::chrono::steady_clock::now();
@@ -653,9 +747,9 @@ void test_trie(int argc, char** argv)
          //std::chrono::duration<double, std::milli>(delta).count();
          std::cerr << "trie remove:    " << std::chrono::duration<double, std::milli>(delta).count()
                    << " ms\n";
-         s.print();
+         s->print();
       }
-      // s.print();
+      // s->print();
    }
    catch (const std::exception& e)
    {
