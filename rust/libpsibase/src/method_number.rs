@@ -49,6 +49,12 @@ impl From<u64> for MethodNumber {
     }
 }
 
+impl From<ExactMethodNumber> for MethodNumber {
+    fn from(n: ExactMethodNumber) -> Self {
+        MethodNumber { value: n.value }
+    }
+}
+
 impl FromStr for MethodNumber {
     type Err = ParseIntError;
 
@@ -66,6 +72,47 @@ impl From<&str> for MethodNumber {
 }
 
 impl std::fmt::Display for MethodNumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(method_number_to_string(self.value).as_str())
+    }
+}
+
+/// Like MethodNumber, except FromStr requires round-trip conversion
+#[derive(Debug, Default, PartialEq, Copy, Clone, psi_macros::Fracpack, Serialize, Deserialize)]
+#[fracpack(definition_will_not_change)]
+pub struct ExactMethodNumber {
+    pub value: u64,
+}
+
+impl ExactMethodNumber {
+    pub fn new(value: u64) -> Self {
+        ExactMethodNumber { value }
+    }
+}
+
+impl From<u64> for ExactMethodNumber {
+    fn from(n: u64) -> Self {
+        ExactMethodNumber { value: n }
+    }
+}
+
+impl From<MethodNumber> for ExactMethodNumber {
+    fn from(n: MethodNumber) -> Self {
+        ExactMethodNumber { value: n.value }
+    }
+}
+
+impl FromStr for ExactMethodNumber {
+    type Err = MethodNumberError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ExactMethodNumber {
+            value: MethodNumber::from_exact(s)?.value,
+        })
+    }
+}
+
+impl std::fmt::Display for ExactMethodNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(method_number_to_string(self.value).as_str())
     }

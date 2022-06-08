@@ -47,6 +47,12 @@ impl From<u64> for AccountNumber {
     }
 }
 
+impl From<ExactAccountNumber> for AccountNumber {
+    fn from(n: ExactAccountNumber) -> Self {
+        AccountNumber { value: n.value }
+    }
+}
+
 impl FromStr for AccountNumber {
     type Err = ParseIntError;
 
@@ -64,6 +70,47 @@ impl From<&str> for AccountNumber {
 }
 
 impl std::fmt::Display for AccountNumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(account_number_to_string(self.value).as_str())
+    }
+}
+
+/// Like AccountNumber, except FromStr requires exact round-trip conversion
+#[derive(Debug, Default, PartialEq, Copy, Clone, psi_macros::Fracpack, Serialize, Deserialize)]
+#[fracpack(definition_will_not_change)]
+pub struct ExactAccountNumber {
+    pub value: u64,
+}
+
+impl ExactAccountNumber {
+    pub fn new(value: u64) -> Self {
+        ExactAccountNumber { value }
+    }
+}
+
+impl From<u64> for ExactAccountNumber {
+    fn from(n: u64) -> Self {
+        ExactAccountNumber { value: n }
+    }
+}
+
+impl From<AccountNumber> for ExactAccountNumber {
+    fn from(n: AccountNumber) -> Self {
+        ExactAccountNumber { value: n.value }
+    }
+}
+
+impl FromStr for ExactAccountNumber {
+    type Err = AccountNumberError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ExactAccountNumber {
+            value: AccountNumber::from_exact(s)?.value,
+        })
+    }
+}
+
+impl std::fmt::Display for ExactAccountNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(account_number_to_string(self.value).as_str())
     }
