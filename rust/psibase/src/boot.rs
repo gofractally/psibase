@@ -1,12 +1,7 @@
-use std::str::FromStr;
-
 use crate::*;
-
 use fracpack::Packable;
-use libpsibase::{
-    AccountNumber, Action, GenesisActionData, GenesisContract, MethodNumber, SignedTransaction,
-};
-use psi_macros::Fracpack;
+use libpsibase::{AccountNumber, Action, GenesisActionData, GenesisContract, SignedTransaction};
+use psi_macros::{account, Fracpack};
 
 #[derive(Fracpack)]
 struct Startup {
@@ -14,7 +9,7 @@ struct Startup {
 }
 
 pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), anyhow::Error> {
-    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx()?, common_startup_trx()?];
+    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx()];
     push_boot(args, client, new_signed_transactions.packed_bytes()).await?;
     println!("Ok");
     Ok(())
@@ -61,91 +56,91 @@ async fn push_boot(
     Ok(())
 }
 
-fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
+fn boot_trx() -> SignedTransaction {
     let contracts = vec![
         GenesisContract {
-            contract: AccountNumber::from_str("transact-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("transact-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 3, // TODO: ?
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/TransactionSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("account-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("account-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 2, // TODO: ?
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/AccountSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("proxy-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("proxy-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/ProxySys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("auth-fake-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("auth-fake-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/AuthFakeSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("auth-ec-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("auth-ec-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/AuthEcSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("verifyec-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("verifyec-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/VerifyEcSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("common-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("common-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/CommonSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("r-account-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("r-account-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/RAccountSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("r-ath-ec-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("r-ath-ec-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/RAuthEcSys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("r-proxy-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("r-proxy-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../../../build/RProxySys.wasm").to_vec(),
         },
         GenesisContract {
-            contract: AccountNumber::from_str("explore-sys")?,
-            auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+            contract: account!("explore-sys"),
+            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -161,92 +156,92 @@ fn boot_trx() -> Result<SignedTransaction, anyhow::Error> {
     let actions = vec![Action {
         sender: AccountNumber { value: 0 },
         contract: AccountNumber { value: 0 },
-        method: MethodNumber::from_str("boot")?,
+        method: method!("boot"),
         raw_data: genesis_action_data.packed_bytes(),
     }];
 
-    Ok(wrap_basic_trx(actions))
+    wrap_basic_trx(actions)
 }
 
-fn common_startup_trx() -> Result<SignedTransaction, anyhow::Error> {
+fn common_startup_trx() -> SignedTransaction {
     let startup_data = Startup {
         existing_accounts: vec![],
     };
     let startup_action = Action {
-        sender: AccountNumber::from_str("account-sys")?,
-        contract: AccountNumber::from_str("account-sys")?,
-        method: MethodNumber::from_str("startup")?,
+        sender: account!("account-sys"),
+        contract: account!("account-sys"),
+        method: method!("startup"),
         raw_data: startup_data.packed_bytes(),
     };
 
     let actions = vec![
         startup_action,
-        reg_server("common-sys", "common-sys")?,
+        reg_server(account!("common-sys"), account!("common-sys")),
         store_sys(
-            "common-sys",
+            account!("common-sys"),
             "/",
             "text/html",
             include_bytes!("../../../contracts/user/CommonSys/ui/index.html"),
-        )?,
+        ),
         store_sys(
-            "common-sys",
+            account!("common-sys"),
             "/common/rpc.mjs",
             "text/javascript",
             include_bytes!("../../../contracts/user/CommonSys/common/rpc.mjs"),
-        )?,
+        ),
         store_sys(
-            "common-sys",
+            account!("common-sys"),
             "/common/useGraphQLQuery.mjs",
             "text/javascript",
             include_bytes!("../../../contracts/user/CommonSys/common/useGraphQLQuery.mjs"),
-        )?,
+        ),
         store_sys(
-            "common-sys",
+            account!("common-sys"),
             "/common/SimpleUI.mjs",
             "text/javascript",
             include_bytes!("../../../contracts/user/CommonSys/common/SimpleUI.mjs"),
-        )?,
+        ),
         store_sys(
-            "common-sys",
+            account!("common-sys"),
             "/common/keyConversions.mjs",
             "text/javascript",
             include_bytes!("../../../contracts/user/CommonSys/common/keyConversions.mjs"),
-        )?,
+        ),
         store_sys(
-            "common-sys",
+            account!("common-sys"),
             "/ui/index.js",
             "text/javascript",
             include_bytes!("../../../contracts/user/CommonSys/ui/index.js"),
-        )?,
-        reg_server("account-sys", "r-account-sys")?,
+        ),
+        reg_server(account!("account-sys"), account!("r-account-sys")),
         store_sys(
-            "r-account-sys",
+            account!("r-account-sys"),
             "/",
             "text/html",
             include_bytes!("../../../contracts/system/AccountSys/ui/index.html"),
-        )?,
+        ),
         store_sys(
-            "r-account-sys",
+            account!("r-account-sys"),
             "/ui/index.js",
             "text/javascript",
             include_bytes!("../../../contracts/system/AccountSys/ui/index.js"),
-        )?,
-        reg_server("auth-ec-sys", "r-ath-ec-sys")?,
-        reg_server("proxy-sys", "r-proxy-sys")?,
-        reg_server("explore-sys", "explore-sys")?,
+        ),
+        reg_server(account!("auth-ec-sys"), account!("r-ath-ec-sys")),
+        reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
+        reg_server(account!("explore-sys"), account!("explore-sys")),
         store_sys(
-            "explore-sys",
+            account!("explore-sys"),
             "/",
             "text/html",
             include_bytes!("../../../contracts/user/ExploreSys/ui/index.html"),
-        )?,
+        ),
         store_sys(
-            "explore-sys",
+            account!("explore-sys"),
             "/ui/index.js",
             "text/javascript",
             include_bytes!("../../../contracts/user/ExploreSys/ui/index.js"),
-        )?,
+        ),
     ];
 
-    Ok(wrap_basic_trx(actions))
+    wrap_basic_trx(actions)
 }

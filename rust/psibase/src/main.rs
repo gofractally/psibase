@@ -4,12 +4,12 @@ use clap::{Parser, Subcommand};
 use custom_error::custom_error;
 use fracpack::Packable;
 use libpsibase::{
-    AccountNumber, Action, MethodNumber, SignedTransaction, Tapos, TimePointSec, Transaction,
+    AccountNumber, Action, ExactAccountNumber, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
+use psi_macros::{account, method};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::str::FromStr;
 
 mod boot;
 
@@ -42,7 +42,7 @@ enum Commands {
     /// Install a contract
     Install {
         /// Account to install contract on
-        account: String,
+        account: ExactAccountNumber,
 
         /// Filename containing the contract
         filename: String,
@@ -62,7 +62,7 @@ enum Commands {
     /// Upload a file to a contract
     Upload {
         /// Contract to upload to
-        contract: String,
+        contract: ExactAccountNumber,
 
         /// Path to store within contract
         path: String,
@@ -93,18 +93,18 @@ pub struct NewAccountAction {
     pub require_new: bool,
 }
 
-fn new_account_action(account: &str) -> Result<Action, anyhow::Error> {
+fn new_account_action(account: AccountNumber) -> Action {
     let new_account_action = NewAccountAction {
-        account: AccountNumber::from_str(account)?,
-        auth_contract: AccountNumber::from_str("auth-fake-sys")?,
+        account,
+        auth_contract: account!("auth-fake-sys"),
         require_new: false,
     };
-    Ok(Action {
-        sender: AccountNumber::from_str("account-sys")?,
-        contract: AccountNumber::from_str("account-sys")?,
-        method: MethodNumber::from_str("newAccount")?,
+    Action {
+        sender: account!("account-sys"),
+        contract: account!("account-sys"),
+        method: method!("newAccount"),
         raw_data: new_account_action.packed_bytes(),
-    })
+    }
 }
 
 #[derive(Serialize, Deserialize, psi_macros::Fracpack)]
@@ -115,31 +115,31 @@ pub struct SetCodeAction {
     pub code: Vec<u8>,
 }
 
-fn set_code_action(account: &str, wasm: Vec<u8>) -> Result<Action, anyhow::Error> {
+fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
     let set_code_action = SetCodeAction {
-        contract: AccountNumber::from_str(account)?,
+        contract: account,
         vm_type: 0,
         vm_version: 0,
         code: wasm,
     };
-    Ok(Action {
-        sender: AccountNumber::from_str(account)?,
-        contract: AccountNumber::from_str("transact-sys")?,
-        method: MethodNumber::from_str("setCode")?,
+    Action {
+        sender: account,
+        contract: account!("transact-sys"),
+        method: method!("setCode"),
         raw_data: set_code_action.packed_bytes(),
-    })
+    }
 }
 
-fn reg_server(contract: &str, server_contract: &str) -> Result<Action, anyhow::Error> {
+fn reg_server(contract: AccountNumber, server_contract: AccountNumber) -> Action {
     // todo: should we convert this action data to a proper struct?
-    let data = (AccountNumber::from_str(server_contract)?,);
+    let data = (server_contract,);
 
-    Ok(Action {
-        sender: AccountNumber::from_str(contract)?,
-        contract: AccountNumber::from_str("proxy-sys")?,
-        method: MethodNumber::from_str("registerServer")?,
+    Action {
+        sender: contract,
+        contract: account!("proxy-sys"),
+        method: method!("registerServer"),
         raw_data: data.packed_bytes(),
-    })
+    }
 }
 
 async fn push_transaction_impl(
@@ -183,21 +183,14 @@ async fn push_transaction(
     Ok(())
 }
 
-fn store_sys(
-    contract: &str,
-    path: &str,
-    content_type: &str,
-    content: &[u8],
-) -> Result<Action, anyhow::Error> {
-    // todo: should we convert this action data to a proper struct?
+fn store_sys(contract: AccountNumber, path: &str, content_type: &str, content: &[u8]) -> Action {
     let data = (path.to_string(), content_type.to_string(), content.to_vec());
-
-    Ok(Action {
-        sender: AccountNumber::from_str(contract)?,
-        contract: AccountNumber::from_str(contract)?,
-        method: MethodNumber::from_str("storeSys")?,
+    Action {
+        sender: contract,
+        contract,
+        method: method!("storeSys"),
         raw_data: data.packed_bytes(),
-    })
+    }
 }
 
 pub fn wrap_basic_trx(actions: Vec<Action>) -> SignedTransaction {
@@ -225,7 +218,7 @@ pub fn wrap_basic_trx(actions: Vec<Action>) -> SignedTransaction {
 async fn install(
     args: &Args,
     client: reqwest::Client,
-    account: &str,
+    account: AccountNumber,
     filename: &str,
     create_insecure_account: bool,
     register_proxy: bool,
@@ -235,13 +228,13 @@ async fn install(
     let mut actions: Vec<Action> = Vec::new();
 
     if create_insecure_account {
-        actions.push(new_account_action(account)?);
+        actions.push(new_account_action(account));
     }
 
-    actions.push(set_code_action(account, wasm)?);
+    actions.push(set_code_action(account, wasm));
 
     if register_proxy {
-        actions.push(reg_server(account, account)?);
+        actions.push(reg_server(account, account));
     }
 
     let trx = wrap_basic_trx(actions);
@@ -253,7 +246,7 @@ async fn install(
 async fn upload(
     args: &Args,
     client: reqwest::Client,
-    contract: &str,
+    contract: AccountNumber,
     path: &str,
     content_type: &str,
     filename: &str,
@@ -263,15 +256,13 @@ async fn upload(
         path,
         content_type,
         &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
-    )?];
+    )];
     let trx = wrap_basic_trx(actions);
 
     push_transaction(args, client, trx.packed_bytes()).await?;
     println!("Ok");
     Ok(())
 }
-
-/// Upload a file to a contract
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -289,7 +280,7 @@ async fn main() -> Result<(), anyhow::Error> {
             install(
                 &args,
                 client,
-                account,
+                (*account).into(),
                 filename,
                 *create_insecure_account,
                 *register_proxy,
@@ -301,7 +292,17 @@ async fn main() -> Result<(), anyhow::Error> {
             path,
             content_type,
             filename,
-        } => upload(&args, client, contract, path, content_type, filename).await?,
+        } => {
+            upload(
+                &args,
+                client,
+                (*contract).into(),
+                path,
+                content_type,
+                filename,
+            )
+            .await?
+        }
     }
 
     Ok(())
