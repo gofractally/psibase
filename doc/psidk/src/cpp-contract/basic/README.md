@@ -25,15 +25,15 @@ cmake `psidk-cmake-args` ..
 make -j $(nproc)
 ```
 
-## Installing the contract
+## Deploying the contract
 
 This, when run on a local test chain, will:
 
 - Create the `example` account, if it doesn't already exist. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public chains. `-i` is a shortcut for `--create-insecure-account`.
-- Install the `example.wasm` contract on that contract.
+- Deploy the `example.wasm` contract on that contract.
 
 ```sh
-psibase install -i example example.wasm
+psibase deploy -i example example.wasm
 ```
 
 ## Trying the contract

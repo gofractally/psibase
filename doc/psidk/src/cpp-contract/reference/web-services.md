@@ -59,7 +59,7 @@
 
 Contracts which wish to serve HTTP requests need to register using the [psibase::ProxySys] contract's [psibase::ProxySys::registerServer] action. There are multiple ways to do this:
 
-- `psibase install` has a `--register-proxy` option (shortcut `-p`) that can do this while installing the contract.
+- `psibase deploy` has a `--register-proxy` option (shortcut `-p`) that can do this while deploying the contract.
 - `psibase register-proxy` can also do it. TODO: implement `psibase register-proxy`.
 - A contract may call `registerServer` during its own initialization action.
 

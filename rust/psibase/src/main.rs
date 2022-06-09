@@ -39,9 +39,9 @@ enum Commands {
     /// Boot a development chain
     Boot {},
 
-    /// Install a contract
-    Install {
-        /// Account to install contract on
+    /// Deploy a contract
+    Deploy {
+        /// Account to deploy contract on
         account: ExactAccountNumber,
 
         /// Filename containing the contract
@@ -215,7 +215,7 @@ pub fn wrap_basic_trx(actions: Vec<Action>) -> SignedTransaction {
     }
 }
 
-async fn install(
+async fn deploy(
     args: &Args,
     client: reqwest::Client,
     account: AccountNumber,
@@ -271,13 +271,13 @@ async fn main() -> Result<(), anyhow::Error> {
     // TODO: environment variable for url
     match &args.command {
         Commands::Boot {} => boot::boot(&args, client).await?,
-        Commands::Install {
+        Commands::Deploy {
             account,
             filename,
             create_insecure_account,
             register_proxy,
         } => {
-            install(
+            deploy(
                 &args,
                 client,
                 (*account).into(),

@@ -20,7 +20,7 @@ DefaultTestChain::DefaultTestChain(
     : test_chain(snapshot, state_size)
 {
    start_block();
-   installSystemContracts();
+   deploySystemContracts();
    createSysContractAccounts();
 
    for (const auto& c : additionalContracts)
@@ -29,7 +29,7 @@ DefaultTestChain::DefaultTestChain(
    }
 }
 
-void DefaultTestChain::installSystemContracts(bool show /* = false */)
+void DefaultTestChain::deploySystemContracts(bool show /* = false */)
 {
    auto trace = pushTransaction(make_transaction(  //
        {                                           //
@@ -80,7 +80,7 @@ void DefaultTestChain::installSystemContracts(bool show /* = false */)
             }),
         }}));
 
-   check(psibase::show(show, trace) == "", "Failed to install genesis contracts");
+   check(psibase::show(show, trace) == "", "Failed to deploy genesis contracts");
 }
 
 void DefaultTestChain::createSysContractAccounts(bool show /* = false */)

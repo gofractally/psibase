@@ -25,7 +25,7 @@ cmake `psidk-cmake-args` ..
 make -j $(nproc)
 ```
 
-## Installing the contract
+## Deploying the contract
 
 The `--register-proxy` option (shortcut `-p`) registers the contract with the [`proxy-sys` contract](../../system-contract/proxy-sys.md). Registered contracts may:
 
@@ -36,7 +36,7 @@ The `--register-proxy` option (shortcut `-p`) registers the contract with the [`
 [`proxy-sys`](../../system-contract/proxy-sys.md) calls into the contract's `serveSys` action. See [Calling Other Contracts](../calling/) to see how contracts do this.
 
 ```sh
-psibase install -ip example example.wasm
+psibase deploy -ip example example.wasm
 ```
 
 ## Trying the contract
