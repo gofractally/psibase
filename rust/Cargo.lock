@@ -1048,12 +1048,15 @@ checksum = "33a33a362ce288760ec6a508b94caaec573ae7d3bbbd91b87aa0bad4456839db"
 name = "libpsibase"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "custom_error",
  "fracpack",
  "libpsibase_names",
  "psi_macros",
+ "reqwest",
  "ripemd",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -4,7 +4,8 @@ use clap::{Parser, Subcommand};
 use custom_error::custom_error;
 use fracpack::Packable;
 use libpsibase::{
-    AccountNumber, Action, ExactAccountNumber, SignedTransaction, Tapos, TimePointSec, Transaction,
+    push_transaction, AccountNumber, Action, ExactAccountNumber, SignedTransaction, Tapos,
+    TimePointSec, Transaction,
 };
 use psi_macros::{account, method};
 use reqwest::Url;
@@ -28,7 +29,7 @@ struct Args {
         long,
         default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
     )]
-    api: String,
+    api: Url,
 
     #[clap(subcommand)]
     command: Commands,
@@ -142,47 +143,6 @@ fn reg_server(contract: AccountNumber, server_contract: AccountNumber) -> Action
     }
 }
 
-async fn push_transaction_impl(
-    args: &Args,
-    client: reqwest::Client,
-    packed: Vec<u8>,
-) -> Result<(), anyhow::Error> {
-    let mut response = client
-        .post(Url::parse(&args.api)?.join("native/push_transaction")?)
-        .body(packed)
-        .send()
-        .await?;
-    if response.status().is_client_error() {
-        response = response.error_for_status()?;
-    }
-    if response.status().is_server_error() {
-        return Err(anyhow::Error::new(Error::Msg {
-            s: response.text().await?,
-        }));
-    }
-    let text = response.text().await?;
-    let json: Value = serde_json::de::from_str(&text)?;
-    // println!("{:#?}", json);
-    let err = json.get("error").and_then(|v| v.as_str());
-    if let Some(e) = err {
-        if !e.is_empty() {
-            return Err(Error::Msg { s: e.to_string() }.into());
-        }
-    }
-    Ok(())
-}
-
-async fn push_transaction(
-    args: &Args,
-    client: reqwest::Client,
-    packed: Vec<u8>,
-) -> Result<(), anyhow::Error> {
-    push_transaction_impl(args, client, packed)
-        .await
-        .context("Failed to push transaction")?;
-    Ok(())
-}
-
 fn store_sys(contract: AccountNumber, path: &str, content_type: &str, content: &[u8]) -> Action {
     let data = (path.to_string(), content_type.to_string(), content.to_vec());
     Action {
@@ -238,7 +198,7 @@ async fn deploy(
     }
 
     let trx = wrap_basic_trx(actions);
-    push_transaction(args, client, trx.packed_bytes()).await?;
+    push_transaction(&args.api, client, trx.packed_bytes()).await?;
     println!("Ok");
     Ok(())
 }
@@ -259,7 +219,7 @@ async fn upload(
     )];
     let trx = wrap_basic_trx(actions);
 
-    push_transaction(args, client, trx.packed_bytes()).await?;
+    push_transaction(&args.api, client, trx.packed_bytes()).await?;
     println!("Ok");
     Ok(())
 }

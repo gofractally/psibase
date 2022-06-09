@@ -23,7 +23,7 @@ async fn push_boot_impl(
     packed: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
     let mut response = client
-        .post(Url::parse(&args.api)?.join("native/push_boot")?)
+        .post(args.api.join("native/push_boot")?)
         .body(packed)
         .send()
         .await?;
