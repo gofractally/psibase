@@ -30,6 +30,13 @@ pub struct GenesisActionData {
 }
 
 #[derive(psi_macros::Fracpack, Serialize, Deserialize)]
+pub struct SharedGenesisActionData<'a> {
+    pub memo: String,
+    #[serde(borrow)]
+    pub contracts: Vec<SharedGenesisContract<'a>>,
+}
+
+#[derive(psi_macros::Fracpack, Serialize, Deserialize)]
 pub struct GenesisContract {
     pub contract: AccountNumber,
     pub auth_contract: AccountNumber,
@@ -37,6 +44,16 @@ pub struct GenesisContract {
     pub vm_type: u8,
     pub vm_version: u8,
     pub code: Vec<u8>,
+}
+
+#[derive(psi_macros::Fracpack, Serialize, Deserialize)]
+pub struct SharedGenesisContract<'a> {
+    pub contract: AccountNumber,
+    pub auth_contract: AccountNumber,
+    pub flags: u64,
+    pub vm_type: u8,
+    pub vm_version: u8,
+    pub code: &'a [u8],
 }
 
 #[derive(psi_macros::Fracpack, Serialize, Deserialize)]

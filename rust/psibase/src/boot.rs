@@ -1,6 +1,8 @@
 use crate::*;
 use fracpack::Packable;
-use libpsibase::{AccountNumber, Action, GenesisActionData, GenesisContract, SignedTransaction};
+use libpsibase::{
+    AccountNumber, Action, SharedGenesisActionData, SharedGenesisContract, SignedTransaction,
+};
 use psi_macros::{account, Fracpack};
 
 #[derive(Fracpack)]
@@ -58,97 +60,97 @@ async fn push_boot(
 
 fn boot_trx() -> SignedTransaction {
     let contracts = vec![
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("transact-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 3, // TODO: ?
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/TransactionSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/TransactionSys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("account-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 2, // TODO: ?
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/AccountSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/AccountSys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("proxy-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/ProxySys.wasm").to_vec(),
+            code: include_bytes!("../../../build/ProxySys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("auth-fake-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/AuthFakeSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/AuthFakeSys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("auth-ec-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/AuthEcSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/AuthEcSys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("verifyec-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/VerifyEcSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/VerifyEcSys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("common-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/CommonSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/CommonSys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("r-account-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/RAccountSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/RAccountSys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("r-ath-ec-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/RAuthEcSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/RAuthEcSys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("r-proxy-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/RProxySys.wasm").to_vec(),
+            code: include_bytes!("../../../build/RProxySys.wasm"),
         },
-        GenesisContract {
+        SharedGenesisContract {
             contract: account!("explore-sys"),
             auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/ExploreSys.wasm").to_vec(),
+            code: include_bytes!("../../../build/ExploreSys.wasm"),
         },
     ];
 
-    let genesis_action_data = GenesisActionData {
+    let genesis_action_data = SharedGenesisActionData {
         memo: "".to_string(),
         contracts,
     };
