@@ -15,6 +15,7 @@
 
 using namespace psibase;
 using namespace system_contract;
+using namespace ContentTypes;
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts /* = {{}} */,
@@ -196,9 +197,6 @@ AccountNumber DefaultTestChain::add_contract(const char* acc,
 
 void DefaultTestChain::registerSysRpc()
 {
-   std::string html = "text/html";
-   std::string js   = "text/javascript";
-
    auto                  sender = transaction_sys::contract;
    transactor<proxy_sys> proxySys(sender, proxy_sys::contract);
 

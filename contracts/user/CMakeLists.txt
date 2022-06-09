@@ -8,6 +8,7 @@ function(add_user_contract suffix name)
         ../nft_sys/include
         ../symbol_sys/include
         ../token_sys/include
+        ../rpc_token_sys/include
         ../../system/account_sys/include
         ../../system/auth_ec_sys/include
         ../../system/auth_fake_sys/include
@@ -28,6 +29,7 @@ function(add_user_test suffix name)
       ../../nft_sys/include
       ../../symbol_sys/include
       ../../token_sys/include
+      ../../rpc_token_sys/include
       ../../exchange_sys/include
       ../../../system/account_sys/include
       ../../../system/auth_ec_sys/include
@@ -70,6 +72,8 @@ if(DEFINED IS_WASM)
     add_subdirectory(nft_sys)
     add_subdirectory(symbol_sys)
     add_subdirectory(token_sys)
+    add_subdirectory(rpc_token_sys)
+    add_subdirectory(launchTestChain)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

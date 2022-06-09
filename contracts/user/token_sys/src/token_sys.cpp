@@ -4,7 +4,11 @@
 
 #include <contracts/system/account_sys.hpp>
 #include <contracts/system/common_errors.hpp>
+#include <contracts/system/proxy_sys.hpp>
+#include <contracts/user/rpc_token_sys.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/serveContent.hpp>
+#include <psibase/serveGraphQL.hpp>
 
 using namespace UserContract;
 using namespace UserContract::Errors;
@@ -79,6 +83,9 @@ void TokenSys::init()
    // Pass system token ownership to symbol contract
    auto tNft = getToken(tid).ownerNft;
    nftContract.credit(tNft, SymbolSys::contract, "Passing system token ownership");
+
+   // Register proxy
+   at<proxy_sys>().registerServer(contract, RpcTokenSys::contract);
 }
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
