@@ -66,7 +66,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 3, // TODO: ?
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/TransactionSys.wasm"),
+            code: include_bytes!("../boot-image/TransactionSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("account-sys"),
@@ -74,7 +74,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 2, // TODO: ?
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/AccountSys.wasm"),
+            code: include_bytes!("../boot-image/AccountSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("proxy-sys"),
@@ -82,7 +82,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/ProxySys.wasm"),
+            code: include_bytes!("../boot-image/ProxySys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("auth-fake-sys"),
@@ -90,7 +90,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/AuthFakeSys.wasm"),
+            code: include_bytes!("../boot-image/AuthFakeSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("auth-ec-sys"),
@@ -98,7 +98,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/AuthEcSys.wasm"),
+            code: include_bytes!("../boot-image/AuthEcSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("verifyec-sys"),
@@ -106,7 +106,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/VerifyEcSys.wasm"),
+            code: include_bytes!("../boot-image/VerifyEcSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("common-sys"),
@@ -114,7 +114,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/CommonSys.wasm"),
+            code: include_bytes!("../boot-image/CommonSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("r-account-sys"),
@@ -122,7 +122,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/RAccountSys.wasm"),
+            code: include_bytes!("../boot-image/RAccountSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("r-ath-ec-sys"),
@@ -130,7 +130,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/RAuthEcSys.wasm"),
+            code: include_bytes!("../boot-image/RAuthEcSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("r-proxy-sys"),
@@ -138,7 +138,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/RProxySys.wasm"),
+            code: include_bytes!("../boot-image/RProxySys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("explore-sys"),
@@ -146,7 +146,7 @@ fn boot_trx() -> SignedTransaction {
             flags: 0,
             vm_type: 0,
             vm_version: 0,
-            code: include_bytes!("../../../build/ExploreSys.wasm"),
+            code: include_bytes!("../boot-image/ExploreSys.wasm"),
         },
     ];
 
@@ -183,50 +183,50 @@ fn common_startup_trx() -> SignedTransaction {
             account!("common-sys"),
             "/",
             "text/html",
-            include_bytes!("../../../contracts/user/CommonSys/ui/index.html"),
+            include_bytes!("../boot-image/CommonSys/ui/index.html"),
         ),
         store_sys(
             account!("common-sys"),
             "/common/rpc.mjs",
             "text/javascript",
-            include_bytes!("../../../contracts/user/CommonSys/common/rpc.mjs"),
+            include_bytes!("../boot-image/CommonSys/common/rpc.mjs"),
         ),
         store_sys(
             account!("common-sys"),
             "/common/useGraphQLQuery.mjs",
             "text/javascript",
-            include_bytes!("../../../contracts/user/CommonSys/common/useGraphQLQuery.mjs"),
+            include_bytes!("../boot-image/CommonSys/common/useGraphQLQuery.mjs"),
         ),
         store_sys(
             account!("common-sys"),
             "/common/SimpleUI.mjs",
             "text/javascript",
-            include_bytes!("../../../contracts/user/CommonSys/common/SimpleUI.mjs"),
+            include_bytes!("../boot-image/CommonSys/common/SimpleUI.mjs"),
         ),
         store_sys(
             account!("common-sys"),
             "/common/keyConversions.mjs",
             "text/javascript",
-            include_bytes!("../../../contracts/user/CommonSys/common/keyConversions.mjs"),
+            include_bytes!("../boot-image/CommonSys/common/keyConversions.mjs"),
         ),
         store_sys(
             account!("common-sys"),
             "/ui/index.js",
             "text/javascript",
-            include_bytes!("../../../contracts/user/CommonSys/ui/index.js"),
+            include_bytes!("../boot-image/CommonSys/ui/index.js"),
         ),
         reg_server(account!("account-sys"), account!("r-account-sys")),
         store_sys(
             account!("r-account-sys"),
             "/",
             "text/html",
-            include_bytes!("../../../contracts/system/AccountSys/ui/index.html"),
+            include_bytes!("../boot-image/AccountSys/ui/index.html"),
         ),
         store_sys(
             account!("r-account-sys"),
             "/ui/index.js",
             "text/javascript",
-            include_bytes!("../../../contracts/system/AccountSys/ui/index.js"),
+            include_bytes!("../boot-image/AccountSys/ui/index.js"),
         ),
         reg_server(account!("auth-ec-sys"), account!("r-ath-ec-sys")),
         reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
@@ -235,13 +235,13 @@ fn common_startup_trx() -> SignedTransaction {
             account!("explore-sys"),
             "/",
             "text/html",
-            include_bytes!("../../../contracts/user/ExploreSys/ui/index.html"),
+            include_bytes!("../boot-image/ExploreSys/ui/index.html"),
         ),
         store_sys(
             account!("explore-sys"),
             "/ui/index.js",
             "text/javascript",
-            include_bytes!("../../../contracts/user/ExploreSys/ui/index.js"),
+            include_bytes!("../boot-image/ExploreSys/ui/index.js"),
         ),
     ];
 

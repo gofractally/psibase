@@ -66,12 +66,30 @@ endif()
 # TODO: switch default to on
 option(BUILD_RUST "Build rust" OFF)
 if(BUILD_RUST)
+    set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
     ExternalProject_Add(
         rust
         DEPENDS wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND cargo build -r --bin psibase --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+        BUILD_COMMAND   rm -rf ${BOOT_IMAGE}
+        COMMAND         mkdir -p ${BOOT_IMAGE}/AccountSys ${BOOT_IMAGE}/CommonSys ${BOOT_IMAGE}/ExploreSys
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm                    ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthFakeSys.wasm                  ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm                    ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm                     ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm                  ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm                    ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm               ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm                  ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/system/AccountSys/ui    ${BOOT_IMAGE}/AccountSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common   ${BOOT_IMAGE}/CommonSys/common
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/ui       ${BOOT_IMAGE}/CommonSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
+        COMMAND         cargo build -r --bin psibase --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
         INSTALL_COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
         COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
     )
