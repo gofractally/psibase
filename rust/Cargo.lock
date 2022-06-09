@@ -1724,6 +1724,7 @@ name = "psi_macros"
 version = "0.1.0"
 dependencies = [
  "darling",
+ "libpsibase_names",
  "proc-macro-error",
  "proc-macro2",
  "quote",
