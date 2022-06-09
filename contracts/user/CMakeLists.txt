@@ -8,6 +8,7 @@ function(add_user_contract suffix name)
         ../NftSys/include
         ../SymbolSys/include
         ../TokenSys/include
+        ../FractallySys/include
         ../../system/AccountSys/include
         ../../system/AuthEcSys/include
         ../../system/AuthFakeSys/include
@@ -29,6 +30,7 @@ function(add_user_test suffix name)
       ../../NftSys/include
       ../../SymbolSys/include
       ../../TokenSys/include
+      ../../FractallySys/include
       ../../../system/AccountSys/include
       ../../../system/AuthEcSys/include
       ../../../system/AuthFakeSys/include
@@ -70,6 +72,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(NftSys)
     add_subdirectory(SymbolSys)
     add_subdirectory(TokenSys)
+    add_subdirectory(FractallySys)
     add_subdirectory(launchTestChain)
 endif()
 
