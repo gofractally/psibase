@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
 use custom_error::custom_error;
@@ -10,7 +10,6 @@ use libpsibase::{
 use psi_macros::{account, method};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 mod boot;
 
