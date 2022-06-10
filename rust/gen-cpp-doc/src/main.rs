@@ -139,7 +139,7 @@ fn convert_child<'a, 'tu>(
 }
 
 #[allow(dead_code)]
-fn dump_items(items: &Vec<Item>, current: usize, indent: usize) {
+fn dump_items(items: &[Item], current: usize, indent: usize) {
     let item = &items[current];
     eprintln!(
         "{}{:?} {} {}",
@@ -237,13 +237,7 @@ fn has_inline_command(comment: &Option<Comment>, name: &str) -> bool {
 }
 
 // Look up item by path and fill result. There may be multiple matches (e.g. function overloads).
-fn lookup(
-    items: &Vec<Item>,
-    parent: usize,
-    path: &[&str],
-    recursed: bool,
-    result: &mut Vec<usize>,
-) {
+fn lookup(items: &[Item], parent: usize, path: &[&str], recursed: bool, result: &mut Vec<usize>) {
     if path.is_empty() {
         if recursed {
             result.push(parent);
@@ -291,9 +285,9 @@ fn set_urls(chapter: &mdbook::book::Chapter, items: &mut Vec<Item>, path: &str) 
     }
 }
 
-fn set_urls_in_item(items: &mut Vec<Item>, index: usize, chapter_path: &String) {
+fn set_urls_in_item(items: &mut Vec<Item>, index: usize, chapter_path: &str) {
     let item = &mut items[index];
-    item.url = chapter_path.clone() + &local_link(&item.full_name);
+    item.url = chapter_path.to_owned() + &local_link(&item.full_name);
     let children: Vec<usize> = item.children.values().flatten().copied().collect();
     for child in children {
         set_urls_in_item(items, child, chapter_path);
@@ -308,7 +302,7 @@ fn local_link(x: &str) -> String {
 }
 
 // Get link for text of the form "foo" or "foo::bar::baz"
-fn get_link(text: &str, items: &Vec<Item>, parent: usize) -> Option<String> {
+fn get_link(text: &str, items: &[Item], parent: usize) -> Option<String> {
     let mut candidates = Vec::new();
     lookup(
         items,
@@ -332,7 +326,7 @@ fn get_link(text: &str, items: &Vec<Item>, parent: usize) -> Option<String> {
 
 // Replace all occurrences of the form "[foo]" or "[foo::bar::baz]" with a link,
 // if one is found. Leaves "[...](...)" untouched.
-fn replace_bracket_links(text: &str, items: &Vec<Item>, parent: usize) -> String {
+fn replace_bracket_links(text: &str, items: &[Item], parent: usize) -> String {
     let re = Regex::new(r"[\[]([^\]\n]+)[\]]([(][^)]*[)])?").unwrap();
     re.replace_all(text, |caps: &Captures| {
         if caps.get(2).is_some() {
@@ -351,7 +345,7 @@ fn replace_bracket_links(text: &str, items: &Vec<Item>, parent: usize) -> String
 }
 
 // Escape html characters and create links
-fn escape_and_add_links(text: &str, items: &Vec<Item>, parent: usize) -> String {
+fn escape_and_add_links(text: &str, items: &[Item], parent: usize) -> String {
     let re = Regex::new(r"((?:[[:word:]]+(?:::)?)+)").unwrap();
     re.replace_all(&escape_html(text), |caps: &Captures| {
         let str = caps.get(0).unwrap().as_str();
@@ -380,7 +374,7 @@ fn style_fn(text: &str) -> String {
 }
 
 // Generate documentation for matching items
-fn generate_documentation(items: &Vec<Item>, path: &str) -> String {
+fn generate_documentation(items: &[Item], path: &str) -> String {
     let mut found_indexes = Vec::new();
     lookup(
         items,
@@ -407,7 +401,7 @@ fn generate_documentation(items: &Vec<Item>, path: &str) -> String {
     result
 }
 
-fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
+fn document_enum(items: &[Item], index: usize, path: &str, result: &mut String) {
     let item = &items[index];
     let mut def = String::new();
     def.push_str("<pre><code class=\"language-c++\">");
@@ -462,7 +456,7 @@ fn document_enum(items: &Vec<Item>, index: usize, path: &str, result: &mut Strin
     }
 } // document_enum
 
-fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
+fn document_struct(items: &[Item], index: usize, path: &str, result: &mut String) {
     let item = &items[index];
     let mut def = String::new();
     def.push_str(r#"<pre><code class="nohighlight">"#);
@@ -569,7 +563,7 @@ fn document_struct(items: &Vec<Item>, index: usize, path: &str, result: &mut Str
     }
 } // document_struct
 
-fn document_function(items: &Vec<Item>, index: usize, path: &str, result: &mut String) {
+fn document_function(items: &[Item], index: usize, path: &str, result: &mut String) {
     let item = &items[index];
     let mut def = String::new();
     let ty = match item.entity.get_kind() {
