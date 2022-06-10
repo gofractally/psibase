@@ -26,48 +26,51 @@ namespace
        {RpcTokenSys::contract, "rpc_token_sys.wasm"}};
 }  // namespace
 
-SCENARIO("Testing psibase")
+SCENARIO("Testing default psibase chain")
 {
-   GIVEN("An empty chain with user Alice")
-   {
-      DefaultTestChain t(neededContracts);
+   DefaultTestChain t(neededContracts);
 
-      auto        rpcTokenSys = t.as(RpcTokenSys::contract).at<RpcTokenSys>();
-      std::string rpcUiDir    = "../contracts/user/rpc_token_sys/ui/";
-      rpcTokenSys.storeSys("/", ContentTypes::html, read_whole_file(rpcUiDir + "index.html"));
-      rpcTokenSys.storeSys("/ui/index.js", ContentTypes::js,
-                           read_whole_file(rpcUiDir + "index.js"));
+   auto        rpcTokenSys = t.as(RpcTokenSys::contract).at<RpcTokenSys>();
+   std::string rpcUiDir    = "../contracts/user/rpc_token_sys/ui/";
+   rpcTokenSys.storeSys("/", ContentTypes::html, read_whole_file(rpcUiDir + "index.html"));
+   rpcTokenSys.storeSys("/ui/index.js", ContentTypes::js, read_whole_file(rpcUiDir + "index.js"));
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto bob   = t.as(t.add_account("bob"_a));
+   auto alice = t.as(t.add_account("alice"_a));
+   auto bob   = t.as(t.add_account("bob"_a));
 
-      // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+   // Initialize user contracts
+   alice.at<NftSys>().init();
+   alice.at<TokenSys>().init();
+   alice.at<SymbolSys>().init();
 
-      auto sysIssuer   = t.as(SymbolSys::contract).at<TokenSys>();
-      auto userBalance = 1'000'000e8;
-      auto sysToken    = TokenSys::sysToken;
-      sysIssuer.mint(sysToken, userBalance, memo);
+   auto sysIssuer = t.as(SymbolSys::contract).at<TokenSys>();
+   auto sysToken  = TokenSys::sysToken;
 
-      t.start_block();
+   // Let sys token be tradeable
+   sysIssuer.setTokenConf(sysToken, "untradeable"_m, false);
 
-      /****** At t.get_path(): 
+   // Distribute a few tokens
+   auto userBalance = 1'000'000e8;
+   sysIssuer.mint(sysToken, userBalance, memo);
+   sysIssuer.credit(sysToken, alice, 1'000e8, memo);
+   sysIssuer.credit(sysToken, bob, 1'000e8, memo);
+
+   t.start_block();
+
+   /****** At t.get_path(): 
       drwxr-xr-x block_log
       drwxr-xr-x state
       drwxr-xr-x subjective
       drwxr-xr-x write_only
       ******/
 
-      // Make a couple block
-      t.finish_block();
-      t.start_block();
-      t.finish_block();
-      // Run the chain
-      psibase::execute("rm -rf tester_psinode_db");
-      psibase::execute("mkdir tester_psinode_db");
-      psibase::execute("cp -a " + t.get_path() + "/. tester_psinode_db/");
-      psibase::execute("psinode -p -o psibase.127.0.0.1.sslip.io tester_psinode_db");
-   }
+   // Make a couple block
+   t.finish_block();
+   t.start_block();
+   t.finish_block();
+   // Run the chain
+   psibase::execute("rm -rf tester_psinode_db");
+   psibase::execute("mkdir tester_psinode_db");
+   psibase::execute("cp -a " + t.get_path() + "/. tester_psinode_db/");
+   psibase::execute("psinode -p -o psibase.127.0.0.1.sslip.io tester_psinode_db");
 }
