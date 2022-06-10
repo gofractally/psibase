@@ -22,6 +22,32 @@ pub struct PublicKey {
     pub data: PublicKeyEnum,
 }
 
+impl FromStr for PublicKey {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if &s[..7] == "PUB_K1_" {
+            Ok(PublicKey {
+                data: PublicKeyEnum::K1(string_to_key_bytes(&s[7..], "K1")?),
+            })
+        } else if &s[..7] == "PUB_R1_" {
+            Ok(PublicKey {
+                data: PublicKeyEnum::R1(string_to_key_bytes(&s[7..], "R1")?),
+            })
+        } else {
+            Err(Error::ExpectedPublicKey)
+        }
+    }
+}
+
+impl fmt::Display for PublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.data {
+            PublicKeyEnum::K1(data) => write!(f, "PUB_K1_{}", key_to_string(data, "K1")),
+            PublicKeyEnum::R1(data) => write!(f, "PUB_R1_{}", key_to_string(data, "R1")),
+        }
+    }
+}
+
 pub type EccPrivateKey = [u8; 32];
 
 #[derive(Debug, psi_macros::Fracpack)]
@@ -34,6 +60,32 @@ pub enum PrivateKeyEnum {
 #[fracpack(definition_will_not_change)]
 pub struct PrivateKey {
     pub data: PrivateKeyEnum,
+}
+
+impl FromStr for PrivateKey {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if &s[..7] == "PVT_K1_" {
+            Ok(PrivateKey {
+                data: PrivateKeyEnum::K1(string_to_key_bytes(&s[7..], "K1")?),
+            })
+        } else if &s[..7] == "PVT_R1_" {
+            Ok(PrivateKey {
+                data: PrivateKeyEnum::R1(string_to_key_bytes(&s[7..], "R1")?),
+            })
+        } else {
+            Err(Error::ExpectedPrivateKey)
+        }
+    }
+}
+
+impl fmt::Display for PrivateKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.data {
+            PrivateKeyEnum::K1(data) => write!(f, "PVT_K1_{}", key_to_string(data, "K1")),
+            PrivateKeyEnum::R1(data) => write!(f, "PVT_R1_{}", key_to_string(data, "R1")),
+        }
+    }
 }
 
 pub type EccSignature = [u8; 64];
@@ -150,56 +202,4 @@ fn key_to_string(bytes: &[u8], suffix: &str) -> String {
     whole.resize(l + 4, 0);
     whole[l..].copy_from_slice(&ripe_digest[..4]);
     binary_to_base58(&whole)
-}
-
-impl FromStr for PublicKey {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if &s[..7] == "PUB_K1_" {
-            Ok(PublicKey {
-                data: PublicKeyEnum::K1(string_to_key_bytes(&s[7..], "K1")?),
-            })
-        } else if &s[..7] == "PUB_R1_" {
-            Ok(PublicKey {
-                data: PublicKeyEnum::R1(string_to_key_bytes(&s[7..], "R1")?),
-            })
-        } else {
-            Err(Error::ExpectedPublicKey)
-        }
-    }
-}
-
-impl fmt::Display for PublicKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.data {
-            PublicKeyEnum::K1(data) => write!(f, "PUB_K1_{}", key_to_string(data, "K1")),
-            PublicKeyEnum::R1(data) => write!(f, "PUB_R1_{}", key_to_string(data, "R1")),
-        }
-    }
-}
-
-impl FromStr for PrivateKey {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if &s[..7] == "PVT_K1_" {
-            Ok(PrivateKey {
-                data: PrivateKeyEnum::K1(string_to_key_bytes(&s[7..], "K1")?),
-            })
-        } else if &s[..7] == "PVT_R1_" {
-            Ok(PrivateKey {
-                data: PrivateKeyEnum::R1(string_to_key_bytes(&s[7..], "R1")?),
-            })
-        } else {
-            Err(Error::ExpectedPrivateKey)
-        }
-    }
-}
-
-impl fmt::Display for PrivateKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.data {
-            PrivateKeyEnum::K1(data) => write!(f, "PVT_K1_{}", key_to_string(data, "K1")),
-            PrivateKeyEnum::R1(data) => write!(f, "PVT_R1_{}", key_to_string(data, "R1")),
-        }
-    }
 }
