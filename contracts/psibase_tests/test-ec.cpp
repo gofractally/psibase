@@ -41,7 +41,7 @@ TEST_CASE("ec")
               .sender   = sue,
               .contract = test_contract,
           }})),
-          "sender has not signed");
+          "transaction is not signed with key");
 
    auto ec_trx = t.make_transaction({{
        .sender   = sue,
@@ -80,7 +80,7 @@ TEST_CASE("ec")
                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key2, priv_key2}}),
-          "sender has not signed");
+          "transaction is not signed with key");
 
    expect(t.pushTransaction(t.make_transaction({{
                                 .sender   = sue,

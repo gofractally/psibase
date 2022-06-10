@@ -2,6 +2,7 @@
 // TODO: option to allow/disallow unknown fields during verify and unpack
 // TODO: rename misnamed "heap_size"
 // TODO: remove unnecessary "<xxx as Packable>"
+// TODO: support packing references
 
 use custom_error::custom_error;
 use std::mem;

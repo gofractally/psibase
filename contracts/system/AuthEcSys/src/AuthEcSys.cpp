@@ -39,7 +39,7 @@ namespace system_contract
       for (auto& claim : claims)
          if (claim.contract == VerifyEcSys::contract && claim.rawData == expected)
             return;
-      abortMessage("sender has not signed with key " + publicKeyToString(row->pubkey));
+      abortMessage("transaction is not signed with key " + publicKeyToString(row->pubkey));
    }
 
    void AuthEcSys::setKey(psibase::PublicKey key)

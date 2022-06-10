@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 mod boot;
 
 custom_error! { Error
-    BadResponseFormat   = "Invalid response format from server",
     Msg{s:String}       = "{s}",
 }
 
@@ -22,10 +21,12 @@ custom_error! { Error
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    // TODO: load default from environment variable
     /// API Endpoint
     #[clap(
         short = 'a',
         long,
+        value_name = "URL",
         default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
     )]
     api: Url,
@@ -227,7 +228,6 @@ async fn upload(
 async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
-    // TODO: environment variable for url
     match &args.command {
         Commands::Boot {} => boot::boot(&args, client).await?,
         Commands::Deploy {
