@@ -3,7 +3,8 @@ use proc_macro2::Ident;
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
 use syn::{
-    parse, parse_macro_input, AttrStyle, Attribute, FnArg, Item, ItemFn, ItemMod, Pat, Visibility,
+    parse, parse_macro_input, AttrStyle, Attribute, FnArg, Item, ItemFn, ItemMod, Pat, ReturnType,
+    Visibility,
 };
 
 pub fn contract_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -39,7 +40,6 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
     }
     let mut iface_use = proc_macro2::TokenStream::new();
     let mut action_structs = proc_macro2::TokenStream::new();
-    let mut enum_body = proc_macro2::TokenStream::new();
     let mut dispatch_body = proc_macro2::TokenStream::new();
     if let Some((_, items)) = &mut impl_mod.content {
         let mut action_fns: Vec<usize> = Vec::new();
@@ -60,23 +60,14 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
-                process_action(f, &mut action_structs, &mut invoke_args);
-                let name = &f.sig.ident;
-                enum_body = quote! {
-                    #enum_body
-                    #name(actions::#name),
-                };
-                dispatch_body = quote! {
-                    #dispatch_body
-                    action::#name(args) => {
-                        super::#impl_mod_name::#name(#invoke_args);
-                    }
-                };
+                process_action_args(f, &mut action_structs, &mut invoke_args);
+                process_dispatch_body(f, &mut dispatch_body, impl_mod_name, invoke_args);
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
                     f.attrs.remove(i);
                 }
             }
         }
+        add_unknown_action_check_to_dispatch_body(&mut dispatch_body);
     } else {
         abort!(
             impl_mod,
@@ -91,38 +82,61 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
         #[allow(non_camel_case_types)]
         #[allow(non_upper_case_globals)]
         pub mod #iface_mod_name {
+            use super::*;
+
             pub mod actions {
                 #iface_use
                 use super::super::#impl_mod_name::*;
                 #action_structs
             }
-            #[derive(psi_macros::Fracpack)]
-            pub enum action {
-                #enum_body
-            }
-            pub fn dispatch<'a>(src: &'a [u8]) -> fracpack::Result<()> {
+
+            pub fn dispatch(act: SharedAction) -> fracpack::Result<()> {
                 // TODO: view instead of unpack
                 // TODO: sender
-                let act = <action as fracpack::Packable>::unpack(src, &mut 0)?;
-                let result = match act {
-                    #dispatch_body
-                };
+                #dispatch_body
                 Ok(())
             }
         }
+
+        #[no_mangle]
+        pub extern "C" fn called(_this_contract: u64, _sender: u64) {
+            with_current_action(|act| {
+                #iface_mod_name::dispatch(act)
+                    .unwrap_or_else(|_| abort_message("unpack action data failed"));
+            });
+        }
+
+        extern "C" {
+            fn __wasm_call_ctors();
+        }
+
+        #[no_mangle]
+        pub extern "C" fn start(this_contract: u64) {
+            unsafe {
+                __wasm_call_ctors();
+            }
+        }
+
     } // quote!
     .into()
 } // process_mod
 
-fn process_action(
+fn process_action_args(
     f: &ItemFn,
     new_items: &mut proc_macro2::TokenStream,
     invoke_args: &mut proc_macro2::TokenStream,
 ) {
+    // actions must be exposed, hence public
     match f.vis {
         Visibility::Public(_) => (),
         _ => abort!(f, "action must be public"),
     }
+
+    // if action has no args there's no need for action structs
+    if f.sig.inputs.is_empty() {
+        return;
+    }
+
     let mut struct_members = proc_macro2::TokenStream::new();
     for input in f.sig.inputs.iter() {
         match input {
@@ -150,5 +164,61 @@ fn process_action(
         pub struct #fn_name {
             #struct_members
         }
+    }
+}
+
+fn process_dispatch_body(
+    f: &ItemFn,
+    dispatch_body: &mut proc_macro2::TokenStream,
+    impl_mod_name: &Ident,
+    invoke_args: proc_macro2::TokenStream,
+) {
+    let name = &f.sig.ident;
+
+    let args_unpacking = if !invoke_args.is_empty() {
+        quote! { let args = <actions::#name as fracpack::Packable>::unpack(&act.raw_data, &mut 0)?; }
+    } else {
+        quote! {}
+    };
+
+    let action_invoking = if f.sig.output == ReturnType::Default {
+        quote! {
+            super::#impl_mod_name::#name(#invoke_args);
+        }
+    } else {
+        quote! {
+            let val = super::#impl_mod_name::#name(#invoke_args);
+            set_retval(&val);
+        }
+    };
+
+    let method_comparison = quote! { act.method == MethodNumber::from(stringify!(#name)) };
+
+    let if_block = if dispatch_body.is_empty() {
+        quote! { if }
+    } else {
+        quote! { else if }
+    };
+
+    *dispatch_body = quote! {
+        #dispatch_body
+        #if_block #method_comparison {
+            #args_unpacking
+            #action_invoking
+        }
+    };
+}
+
+fn add_unknown_action_check_to_dispatch_body(dispatch_body: &mut proc_macro2::TokenStream) {
+    if !dispatch_body.is_empty() {
+        *dispatch_body = quote! {
+            #dispatch_body
+            else {
+                abort_message(&format!(
+                    "unknown contract action: {}",
+                    act.method.to_string()
+                ));
+            }
+        };
     }
 }

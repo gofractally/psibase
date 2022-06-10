@@ -2,9 +2,9 @@
 #include "symbol_sys.hpp"
 #include "token_errors.hpp"
 
-#include <contracts/system/account_sys.hpp>
-#include <contracts/system/common_errors.hpp>
-#include <contracts/system/proxy_sys.hpp>
+#include <contracts/system/AccountSys.hpp>
+#include <contracts/system/ProxySys.hpp>
+#include <contracts/system/commonErrors.hpp>
 #include <contracts/user/rpc_token_sys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
@@ -14,7 +14,7 @@ using namespace UserContract;
 using namespace UserContract::Errors;
 using namespace psibase;
 using psio::const_view;
-using system_contract::account_sys;
+using system_contract::AccountSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
 // For helpers
@@ -85,7 +85,7 @@ void TokenSys::init()
    nftContract.credit(tNft, SymbolSys::contract, "Passing system token ownership");
 
    // Register proxy
-   at<proxy_sys>().registerServer(contract, RpcTokenSys::contract);
+   at<ProxySys>().registerServer(RpcTokenSys::contract);
 }
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
@@ -366,7 +366,7 @@ BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
    }
    else
    {
-      check(at<account_sys>().exists(account), invalidAccount);
+      check(at<AccountSys>().exists(account), invalidAccount);
       check(exists(tokenId), tokenDNE);
 
       record = {.key = {account, tokenId}, .balance = 0};
@@ -445,7 +445,7 @@ bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit_t flag)
 
 void TokenSys::_checkAccountValid(psibase::AccountNumber account)
 {
-   check(at<account_sys>().exists(account), invalidAccount);
+   check(at<AccountSys>().exists(account), invalidAccount);
    check(account != AccountNumber{0}, invalidAccount);
 }
 

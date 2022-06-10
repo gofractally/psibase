@@ -1,7 +1,7 @@
 #include <psibase/tester.hpp>
 
 #include <secp256k1.h>
-#include <contracts/system/verify_ec_sys.hpp>
+#include <contracts/system/VerifyEcSys.hpp>
 
 namespace
 {
@@ -30,6 +30,7 @@ namespace
                                uint32_t    filename_size,
                                Alloc_fn    alloc_fn)
    {
+      // TODO: fix memory issue when file not found
       return tester_read_whole_file(filename_begin, filename_size, &alloc_fn,
                                     [](void* cb_alloc_data, size_t size) -> void*
                                     {  //
@@ -178,7 +179,7 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
 psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& digest)
 {
    static auto context = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
-   auto*       k1      = std::get_if<0>(&key);
+   auto*       k1      = std::get_if<0>(&key.data);
    check(k1, "only k1 currently supported");
 
    secp256k1_ecdsa_signature sig;
@@ -189,7 +190,7 @@ psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& diges
    EccSignature sigdata;
    check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
          "serialize signature failed");
-   return Signature{std::in_place_index<0>, sigdata};
+   return Signature{Signature::variant_type{std::in_place_index<0>, sigdata}};
 }
 
 void psibase::internal_use_do_not_use::hex(const uint8_t* begin,
@@ -335,19 +336,17 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
 }
 
 [[nodiscard]] psibase::TransactionTrace psibase::test_chain::pushTransaction(
-    const Transaction&                                   trx,
+    Transaction                                          trx,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
-   SignedTransaction signed_trx;
-   signed_trx.transaction = trx;
    for (auto& [pub, priv] : keys)
-      signed_trx.transaction.claims.push_back({
-          .contract = system_contract::verify_ec_sys::contract,
+      trx.claims.push_back({
+          .contract = system_contract::VerifyEcSys::contract,
           .rawData  = psio::convert_to_frac(pub),
       });
-   // TODO: don't pack twice
-   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx.transaction);
-   auto              hash       = sha256(packed_trx.data(), packed_trx.size());
+   SignedTransaction signed_trx;
+   signed_trx.transaction = trx;
+   auto hash              = sha256(signed_trx.transaction.data(), signed_trx.transaction.size());
    for (auto& [pub, priv] : keys)
       signed_trx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
    return pushTransaction(signed_trx);

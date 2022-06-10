@@ -8,13 +8,12 @@ endfunction()
 function(add suffix)
     add_library(contracts_system${suffix} INTERFACE)
     target_include_directories(contracts_system${suffix} INTERFACE
-        account_sys/include
-        auth_ec_sys/include
-        auth_fake_sys/include
-        proxy_sys/include
-        rpc_account_sys/include
-        transaction_sys/include
-        verify_ec_sys/include
+        AccountSys/include
+        AuthEcSys/include
+        AuthFakeSys/include
+        ProxySys/include
+        TransactionSys/include
+        VerifyEcSys/include
     )
 endfunction(add)
 
@@ -22,11 +21,10 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
-    add_subdirectory(account_sys)
-    add_subdirectory(auth_ec_sys)
-    add_subdirectory(auth_fake_sys)
-    add_subdirectory(proxy_sys)
-    add_subdirectory(rpc_account_sys)
-    add_subdirectory(transaction_sys)
-    add_subdirectory(verify_ec_sys)
+    add_subdirectory(AccountSys)
+    add_subdirectory(AuthEcSys)
+    add_subdirectory(AuthFakeSys)
+    add_subdirectory(ProxySys)
+    add_subdirectory(TransactionSys)
+    add_subdirectory(VerifyEcSys)
 endif()

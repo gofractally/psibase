@@ -168,7 +168,7 @@ namespace psibase
       /// Returns an [Actor] for calling `receiver` using the current contract's authority.
       /// This version sets receiver to `Other::contract`; this works if `Other` defined
       /// a const member named `contract` which identifies the account that contract is
-      /// normally installed on.
+      /// normally deployed on.
       ///
       /// Example use:
       ///

@@ -128,13 +128,14 @@ function(add_libs suffix)
     target_include_directories(psitestlib${suffix} INTERFACE
         ${psidk_DIR}/psibase/contract/include
         ${psidk_DIR}/psibase/tester/include
-        ${psidk_DIR}/contracts/system/account_sys/include
-        ${psidk_DIR}/contracts/system/auth_ec_sys/include
-        ${psidk_DIR}/contracts/system/auth_fake_sys/include
-        ${psidk_DIR}/contracts/system/rpc_account_sys/include
-        ${psidk_DIR}/contracts/system/proxy_sys/include
-        ${psidk_DIR}/contracts/system/transaction_sys/include
-        ${psidk_DIR}/contracts/system/verify_ec_sys/include
+        ${psidk_DIR}/contracts/system/AccountSys/include
+        ${psidk_DIR}/contracts/system/AuthEcSys/include
+        ${psidk_DIR}/contracts/system/AuthFakeSys/include
+        ${psidk_DIR}/contracts/system/ProxySys/include
+        ${psidk_DIR}/contracts/system/RAccountSys/include
+        ${psidk_DIR}/contracts/system/RAuthEcSys/include
+        ${psidk_DIR}/contracts/system/TransactionSys/include
+        ${psidk_DIR}/contracts/system/VerifyEcSys/include
     )
     target_link_options(psitestlib${suffix} INTERFACE
         -Wl,--export-table # TODO: remove

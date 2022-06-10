@@ -2,10 +2,10 @@
 #include <psio/fracpack.hpp>
 
 // Remove me
-#include <contracts/system/transaction_sys.hpp>
+#include <contracts/system/TransactionSys.hpp>
 
-#include <contracts/system/account_sys.hpp>
-#include <contracts/system/common_errors.hpp>
+#include <contracts/system/AccountSys.hpp>
+#include <contracts/system/commonErrors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 
 #include "nft_sys.hpp"

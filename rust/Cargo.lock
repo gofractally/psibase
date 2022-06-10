@@ -1048,11 +1048,22 @@ checksum = "33a33a362ce288760ec6a508b94caaec573ae7d3bbbd91b87aa0bad4456839db"
 name = "libpsibase"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "custom_error",
  "fracpack",
+ "libpsibase_names",
  "psi_macros",
- "seahash",
+ "reqwest",
+ "ripemd",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "libpsibase_names"
+version = "0.1.0"
+dependencies = [
+ "seahash",
 ]
 
 [[package]]
@@ -1716,6 +1727,7 @@ name = "psi_macros"
 version = "0.1.0"
 dependencies = [
  "darling",
+ "libpsibase_names",
  "proc-macro-error",
  "proc-macro2",
  "quote",
@@ -1733,6 +1745,7 @@ dependencies = [
  "cxx",
  "cxx-build",
  "fracpack",
+ "libpsibase",
  "psi_macros",
  "reqwest",
  "serde",
@@ -1884,6 +1897,15 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "winreg",
+]
+
+[[package]]
+name = "ripemd"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1facec54cb5e0dc08553501fa740091086d0259ad0067e0d4103448e4cb22ed3"
+dependencies = [
+ "digest 0.10.3",
 ]
 
 [[package]]
@@ -2242,6 +2264,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "test_contract"
+version = "0.1.0"
+dependencies = [
+ "fracpack",
+ "libpsibase",
+ "psi_macros",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@ namespace psibase
    /// An RPC Request
    ///
    /// Most contracts receive this via their `serveSys` action.
-   /// [psibase::proxy_sys] receives it via its `serve` exported function.
+   /// [psibase::ProxySys] receives it via its `serve` exported function.
    struct RpcRequestData
    {
       std::string       host;         ///< Fully-qualified domain name

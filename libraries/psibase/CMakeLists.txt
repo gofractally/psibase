@@ -126,18 +126,17 @@ function(add suffix)
         target_include_directories(psitestlib${suffix} PUBLIC
             contract/include
             tester/include
-            ../../contracts/system/account_sys/include
-            ../../contracts/system/auth_ec_sys/include
-            ../../contracts/system/auth_fake_sys/include
-            ../../contracts/system/rpc_account_sys/include
-            ../../contracts/system/proxy_sys/include
-            ../../contracts/system/transaction_sys/include
-            ../../contracts/system/verify_ec_sys/include
-            ../../contracts/user/common_sys/include
-            ../../contracts/user/explore_sys/include
+            ../../contracts/system/AccountSys/include
+            ../../contracts/system/AuthEcSys/include
+            ../../contracts/system/AuthFakeSys/include
+            ../../contracts/system/ProxySys/include
+            ../../contracts/system/TransactionSys/include
+            ../../contracts/system/VerifyEcSys/include
+            ../../contracts/user/CommonSys/include
+            ../../contracts/user/ExploreSys/include
         )
         target_include_directories(psitestlib${suffix} PRIVATE
-            ../../contracts/system/verify_ec_sys/include
+            ../../contracts/system/VerifyEcSys/include
         )
         target_link_options(psitestlib${suffix} INTERFACE
             -Wl,--export-table # TODO: remove

@@ -12,6 +12,10 @@ namespace psibase
 
    struct TransactionContextImpl;
 
+   // TODO: handle unpacking within TransactionContext?
+   //       * Verify unpack of signed, no extra fields
+   //       * Allow inner Transaction to have extra fields; transaction_sys should verify instead
+   //       Might be redundant elsewhere?
    struct TransactionContext
    {
       BlockContext&                               blockContext;

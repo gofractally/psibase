@@ -79,7 +79,7 @@ namespace psibase
    //       e.g. complication: there are at least 2 different header formats for gzip.
    struct SignedTransaction
    {
-      Transaction transaction;
+      psio::shared_view_ptr<Transaction> transaction;
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
@@ -100,6 +100,7 @@ namespace psibase
    };
    PSIO_REFLECT(BlockHeader, previous, blockNum, time)
 
+   // TODO: switch fields to shared_view_ptr?
    struct Block
    {
       BlockHeader                    header;
@@ -111,14 +112,14 @@ namespace psibase
    /// TODO: you have signed block headers, not signed blocks
    struct SignedBlock
    {
-      Block block;
+      Block block;      // TODO: shared_view_ptr?
       Claim signature;  // TODO: switch to proofs?
    };
    PSIO_REFLECT(SignedBlock, block, signature)
 
    struct BlockInfo
    {
-      BlockHeader header;
+      BlockHeader header;  // TODO: shared_view_ptr?
       Checksum256 blockId;
 
       BlockInfo()                 = default;

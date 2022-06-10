@@ -157,7 +157,8 @@ namespace psibase
          if (commit)
          {
             // TODO: limit billed time in block
-            check(!(trx.transaction.tapos.flags & Tapos::do_not_broadcast),
+            // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
+            check(!(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast),
                   "cannot commit a do_not_broadcast transaction");
             t.session.commit();
             active = true;

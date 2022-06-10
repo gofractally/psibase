@@ -32,8 +32,10 @@ namespace psibase
          using member_class = decltype(psio::class_of_member(MemberPtr));
          using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
 
+         static_assert(std::tuple_size<param_tuple>() <= sizeof...(Args),
+                       "too few arguments passed to method");
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
-                       "insufficient arguments passed to method");
+                       "too many arguments passed to method");
 
          return psibase::Action{sender, receiver, MethodNumber(Name),
                                 psio::convert_to_frac(param_tuple(std::forward<Args>(args)...))};
@@ -452,12 +454,15 @@ namespace psibase
       using base = typename psio::reflect<T>::template proxy<action_builder_proxy>;
       using base::base;
 
-      auto as(AccountNumber other) const { return transactor(other, base::receiver); }
+      auto as(AccountNumber other) const
+      {
+         return transactor(other, base::psio_get_proxy().receiver);
+      }
 
       template <typename Other, uint64_t OtherReceiver>
       auto at() const
       {
-         return transactor<Other>(base::sender, OtherReceiver);
+         return transactor<Other>(base::psio_get_proxy().sender, OtherReceiver);
       }
 
       auto* operator->() const { return this; }

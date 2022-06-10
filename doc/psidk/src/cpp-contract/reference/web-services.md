@@ -49,17 +49,17 @@
       +-----------------+       +------------------+
 ```
 
-`psinode` passes most HTTP requests to the [psibase::proxy_sys] contract, which then routes requests to the appropriate contract's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The contracts run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
+`psinode` passes most HTTP requests to the [psibase::ProxySys] contract, which then routes requests to the appropriate contract's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The contracts run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
-[psibase::common_sys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
+[psibase::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
 `psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Contracts don't serve these.
 
 ## Registration
 
-Contracts which wish to serve HTTP requests need to register using the [psibase::proxy_sys] contract's [psibase::proxy_sys::registerServer] action. There are multiple ways to do this:
+Contracts which wish to serve HTTP requests need to register using the [psibase::ProxySys] contract's [psibase::ProxySys::registerServer] action. There are multiple ways to do this:
 
-- `psibase install` has a `--register-proxy` option (shortcut `-p`) that can do this while installing the contract.
+- `psibase deploy` has a `--register-proxy` option (shortcut `-p`) that can do this while deploying the contract.
 - `psibase register-proxy` can also do it. TODO: implement `psibase register-proxy`.
 - A contract may call `registerServer` during its own initialization action.
 

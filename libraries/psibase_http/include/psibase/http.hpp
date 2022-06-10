@@ -22,7 +22,6 @@ namespace psibase::http
       uint32_t                  max_request_size       = {};
       std::chrono::milliseconds idle_timeout_ms        = {};
       std::string               allow_origin           = {};
-      std::string               static_dir             = {};  // TODO: remove?
       std::string               address                = {};
       unsigned short            port                   = {};
       std::string               unix_path              = {};  // TODO: remove? rename?

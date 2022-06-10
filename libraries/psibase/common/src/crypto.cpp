@@ -133,11 +133,11 @@ namespace psibase
 
    std::string publicKeyToString(const PublicKey& key)
    {
-      if (key.index() == KeyType::k1)
+      if (key.data.index() == KeyType::k1)
       {
          return keyToString(key, "K1", "PUB_K1_");
       }
-      else if (key.index() == KeyType::r1)
+      else if (key.data.index() == KeyType::r1)
       {
          return keyToString(key, "R1", "PUB_R1_");
       }
@@ -173,9 +173,9 @@ namespace psibase
 
    std::string privateKeyToString(const PrivateKey& private_key)
    {
-      if (private_key.index() == KeyType::k1)
+      if (private_key.data.index() == KeyType::k1)
          return keyToString(private_key, "K1", "PVT_K1_");
-      else if (private_key.index() == KeyType::r1)
+      else if (private_key.data.index() == KeyType::r1)
          return keyToString(private_key, "R1", "PVT_R1_");
       else
       {
@@ -208,9 +208,9 @@ namespace psibase
 
    std::string signatureToString(const Signature& signature)
    {
-      if (signature.index() == KeyType::k1)
+      if (signature.data.index() == KeyType::k1)
          return keyToString(signature, "K1", "SIG_K1_");
-      else if (signature.index() == KeyType::r1)
+      else if (signature.data.index() == KeyType::r1)
          return keyToString(signature, "R1", "SIG_R1_");
       else
       {

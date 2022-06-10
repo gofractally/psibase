@@ -1,5 +1,5 @@
-#include <contracts/system/auth_ec_sys.hpp>
-#include <contracts/system/verify_ec_sys.hpp>
+#include <contracts/system/AuthEcSys.hpp>
+#include <contracts/system/VerifyEcSys.hpp>
 #include <psibase/DefaultTestChain.hpp>
 
 #include <psibase/contractEntry.hpp>
@@ -25,11 +25,12 @@ TEST_CASE("ec")
    DefaultTestChain t;
    auto             test_contract = t.add_contract("test-cntr"_a, "test-cntr.wasm");
 
+   transactor<system_contract::AuthEcSys> ecsys(system_contract::AuthEcSys::contract,
+                                                system_contract::AuthEcSys::contract);
+
    auto alice = t.as(t.add_account(AccountNumber("alice")));
    auto bob   = t.as(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
-
-   // use "real" auth
-   auto sue = t.add_ec_account("sue", pub_key1);
+   auto sue   = t.add_ec_account("sue", pub_key1);
 
    expect(t.pushTransaction(t.make_transaction({{
               .sender   = bob,
@@ -37,19 +38,10 @@ TEST_CASE("ec")
           }})),
           "sender does not have a public key");
    expect(t.pushTransaction(t.make_transaction({{
-              .sender   = alice,
-              .contract = system_contract::auth_ec_sys::contract,
-              .rawData  = psio::convert_to_frac(
-                   system_contract::auth_ec_sys::action{system_contract::auth_ec_sys::set_key{
-                       .account = bob,
-                  }}),
-          }})),
-          "wrong sender");
-   expect(t.pushTransaction(t.make_transaction({{
               .sender   = sue,
               .contract = test_contract,
           }})),
-          "no matching claim found");
+          "sender has not signed");
 
    auto ec_trx = t.make_transaction({{
        .sender   = sue,
@@ -57,7 +49,7 @@ TEST_CASE("ec")
        .rawData  = psio::convert_to_frac(test_cntr::payload{}),
    }});
    ec_trx.claims.push_back({
-       .contract = system_contract::verify_ec_sys::contract,
+       .contract = system_contract::VerifyEcSys::contract,
        .rawData  = psio::convert_to_frac(pub_key1),
    });
    expect(t.pushTransaction(ec_trx), "proofs and claims must have same size");
@@ -88,7 +80,7 @@ TEST_CASE("ec")
                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key2, priv_key2}}),
-          "no matching claim found");
+          "sender has not signed");
 
    expect(t.pushTransaction(t.make_transaction({{
                                 .sender   = sue,
@@ -96,5 +88,15 @@ TEST_CASE("ec")
                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key1, priv_key2}}),
-          "incorrect signature", true);
+          "incorrect signature");
+
+   expect(t.pushTransaction(t.make_transaction({ecsys.as(sue).setKey(pub_key2)}),
+                            {{pub_key1, priv_key1}}));
+
+   expect(t.pushTransaction(t.make_transaction({{
+                                .sender   = sue,
+                                .contract = test_contract,
+                                .rawData  = psio::convert_to_frac(test_cntr::payload{}),
+                            }}),
+                            {{pub_key2, priv_key2}}));
 }  // ec

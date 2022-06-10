@@ -207,6 +207,7 @@ namespace psio
          uint8_t               m_last_byte = char_to_symbol[0];
       };
 
+      // TODO: what happened to the _-elimination rule?
       inline constexpr uint64_t method_to_number(std::string_view m_input)
       {
          if (m_input.size() == 0)

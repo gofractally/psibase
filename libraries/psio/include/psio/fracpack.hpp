@@ -1,9 +1,13 @@
 #pragma once
+
 #include <psio/check.hpp>
+#include <psio/from_json.hpp>
 #include <psio/get_type_name.hpp>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
+#include <psio/to_json.hpp>
 #include <psio/unaligned_type.hpp>
+#include <span>
 
 //#include <boost/hana/for_each.hpp>
 
@@ -303,7 +307,7 @@ namespace psio
       else if constexpr (is_std_variant<T>::value)
          return true;
       else if constexpr (is_shared_view_ptr<T>::value)
-         return may_use_heap<is_shared_view_ptr<T>::value_type>();
+         return may_use_heap<typename is_shared_view_ptr<T>::value_type>();
       else if constexpr (std::is_arithmetic_v<T>)
          return false;
       else if constexpr (not psio::reflect<T>::definitionWillNotChange)
@@ -395,7 +399,7 @@ namespace psio
       }
       else if constexpr (is_shared_view_ptr<T>::value)
       {
-         return fracpack_fixed_size<is_shared_view_ptr<T>::value_type>();
+         return fracpack_fixed_size<typename is_shared_view_ptr<T>::value_type>();
       }
       else if constexpr (is_std_optional<T>::value)
       {
@@ -614,7 +618,7 @@ namespace psio
    template <typename T, typename S>
    void fracpack(const shared_view_ptr<T>& v, S& stream)
    {
-      stream.write(v.data(), v.size());
+      stream.write(v.data_with_size_prefix().data(), v.data_with_size_prefix().size());
    }
 
    template <typename S>
@@ -835,7 +839,7 @@ namespace psio
                fracunpack(member, insubstream);
             }
             else
-               member.reset(0);
+               member.reset();
          }
          else if constexpr (is_std_vector<T>::value || std::is_same_v<T, std::string>)
          {
@@ -923,11 +927,11 @@ namespace psio
       }
       else if constexpr (is_shared_view_ptr<T>::value)
       {
-         v.reset(0);
+         v.reset();
          uint32_t size;
          stream.read((char*)&size, sizeof(size));
          v.resize(size);
-         stream.read(v.data() + 4, size);
+         stream.read(v.data(), size);
       }
       else if constexpr (is_std_variant<T>::value)
       {
@@ -1112,6 +1116,12 @@ namespace psio
    check_stream fracvalidate(const char* b, const char* e);
 
    template <typename T>
+   check_stream fracvalidate(const std::span<const char>& v)
+   {
+      return fracvalidate<T>(v.begin(), v.end());
+   }
+
+   template <typename T>
    check_stream fracvalidate(const char* b, size_t s)
    {
       return fracvalidate<T>(b, b + s);
@@ -1283,6 +1293,7 @@ namespace psio
     * @pre b is valid pointer
     * @pre e > b
     */
+   // TODO: incorrectly validates PsiBase::PublicKey when variant's size field is smaller than it should be
    template <typename T>
    check_stream fracvalidate(const char* b, const char* e)
    {
@@ -2176,6 +2187,8 @@ namespace psio
          return tmp;
       }
 
+      T get() const { return (T)(*this); }
+
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
    };
@@ -2447,23 +2460,21 @@ namespace psio
       shared_view_ptr(){};
       bool operator!() const { return _data == nullptr; }
 
-      const auto operator->() const { return view<T>(data()); }
+      const auto operator->() const { return const_view<T>(data()); }
       auto       operator->() { return view<T>(data()); }
 
-      const auto operator*() const { return view<T>(data()); }
+      const auto operator*() const { return const_view<T>(data()); }
       auto       operator*() { return view<T>(data()); }
 
-      /** returns the data with a size prefix */
+      /** returns the data without a size prefix */
       const char* data() const { return _data.get() + 4; }
-      /** returns the data with a size prefix */
+      /** returns the data without a size prefix */
       char* data() { return _data.get() + 4; }
 
-      std::string_view data_with_size_prefix() const
+      std::span<const char> data_with_size_prefix() const
       {
          return std::string_view(_data.get(), size() + sizeof(uint32_t));
       }
-      /** returns the data with a size prefix */
-      //char*       data_with_size_prefix() { return _data.get(); }
 
       /** @return the number of bytes of packed data after the size prefix */
       size_t size() const
@@ -2528,6 +2539,30 @@ namespace psio
    class shared_view_ptr<void>
    {
    };
+
+   template <typename T, typename S>
+   void to_json(const shared_view_ptr<T>& obj, S& stream)
+   {
+      to_json(obj.unpack(), stream);
+   }
+
+   template <typename T, typename S>
+   void from_json(shared_view_ptr<T>& obj, S& stream)
+   {
+      if (stream.peek_token().get().type == json_token_type::type_string)
+      {
+         // TODO: avoid copy
+         std::vector<char> v;
+         from_json(v, stream);
+         obj = {v.data(), v.size()};
+      }
+      else
+      {
+         T inner;
+         from_json(inner, stream);
+         obj = inner;
+      }
+   }
 
    template <typename T, typename R, typename... Args>
    constexpr auto tuple_from_function_args(R (T::*func)(Args...))

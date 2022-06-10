@@ -15,7 +15,7 @@ namespace psibase
           const char*                                               snapshot            = nullptr,
           uint64_t state_size = 1024 * 1024 * 1024);
 
-      void installSystemContracts(bool show = false);
+      void deploySystemContracts(bool show = false);
 
       void createSysContractAccounts(bool show = false);
 

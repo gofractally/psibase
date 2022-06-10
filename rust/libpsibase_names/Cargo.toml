@@ -1,0 +1,8 @@
+[package]
+name = "libpsibase_names"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+seahash = "2.0.0"

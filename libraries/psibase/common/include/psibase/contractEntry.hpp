@@ -14,5 +14,4 @@ namespace psibase
       std::vector<char> proof;
    };
    PSIO_REFLECT(VerifyData, transactionHash, claim, proof)
-
 }  // namespace psibase

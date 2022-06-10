@@ -4,9 +4,9 @@
 
 #include <iostream>
 
-#include <contracts/system/account_sys.hpp>
-#include <contracts/system/common_errors.hpp>
-#include <contracts/system/transaction_sys.hpp>
+#include <contracts/system/AccountSys.hpp>
+#include <contracts/system/TransactionSys.hpp>
+#include <contracts/system/commonErrors.hpp>
 #include <psibase/dispatch.hpp>
 
 using namespace UserContract;
@@ -125,7 +125,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
 
    // Update symbol type statistics
    symType.createCounter++;
-   symType.lastPriceUpdateTime = at<transaction_sys>().headBlockTime();
+   symType.lastPriceUpdateTime = at<TransactionSys>().headBlockTime();
 
    db.open<SymbolTable_t>().put(newSym);
    db.open<SymbolLengthTable_t>().put(symType);
@@ -143,7 +143,7 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
    check(price.value != 0, priceTooLow);
    check(nft != 0, symbolDNE);
    check(seller == nftContract.getNft(nft)->owner(), missingRequiredAuth);
-   check(nftContract.getCredRecord(nft)->debitor() != account_sys::nullAccount,
+   check(nftContract.getCredRecord(nft)->debitor() != AccountSys::nullAccount,
          creditSymbolRequired);
 
    auto debitMemo = "Symbol " + symbol.str() + " is listed for sale.";
@@ -247,7 +247,7 @@ void SymbolSys::updatePrices()
    auto dec                = static_cast<uint64_t>((uint8_t)100 - priceAdjustmentRec.decreasePct);
    auto inc                = static_cast<uint64_t>((uint8_t)100 + priceAdjustmentRec.increasePct);
 
-   auto lastBlockTime = at<transaction_sys>().headBlockTime().unpack();
+   auto lastBlockTime = at<TransactionSys>().headBlockTime().unpack();
    for (auto symbolType : symLengthIndex)
    {
       if (lastBlockTime.seconds - symbolType.lastPriceUpdateTime.seconds > secondsInDay)
