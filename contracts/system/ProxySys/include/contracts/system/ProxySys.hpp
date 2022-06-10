@@ -1,5 +1,6 @@
 #pragma once
 #include <psibase/Contract.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/nativeTables.hpp>
 
 namespace psibase
@@ -28,6 +29,8 @@ namespace psibase
    /// routing contract instead.
    struct ProxySys : psibase::Contract<ProxySys>
    {
+      static constexpr auto contract = psibase::proxyContractNum;
+
       // TODO: allow contract to register multiple contracts to handle
       //    * sub.dom.ains.contract (what's the use case?)
       //    * contract/foo/bar/... (maybe not; there's a potential security issue with that)

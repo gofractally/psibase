@@ -1,12 +1,13 @@
 #pragma once
 
 #include <psibase/Contract.hpp>
+#include <psibase/Rpc.hpp>
 #include <psibase/String.hpp>
 #include <psibase/check.hpp>
+#include <psibase/serveContent.hpp>
 #include <string>
 #include "symbol_tables.hpp"
 #include "token_errors.hpp"
-#include "token_sys.hpp"
 #include "token_tables.hpp"
 #include "types.hpp"
 
@@ -16,11 +17,12 @@ namespace UserContract
    class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
-      using tables                      = psibase::ContractTables<TokenTable_t,
+      using Tables                      = psibase::ContractTables<TokenTable_t,
                                              BalanceTable_t,
                                              SharedBalanceTable_t,
                                              TokenHolderTable_t,
-                                             InitTable_t>;
+                                             InitTable_t,
+                                             psibase::WebContentTable>;
       static constexpr auto contract    = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken    = TID{1};
       static constexpr auto sysTokenSym = SID{"PSI"};
@@ -76,7 +78,7 @@ namespace UserContract
       bool                getTokenConf(TID tokenId, psibase::NamedBit_t flag);
 
      private:
-      tables db{contract};
+      Tables db{contract};
 
       void _checkAccountValid(psibase::AccountNumber account);
       bool _isSenderIssuer(TID tokenId);
@@ -134,7 +136,7 @@ namespace UserContract
       method(getSharedBal, tokenId, creditor, debitor),
       method(getUserConf, account, flag),
       method(getTokenConf, tokenId, flag),
-      method(mapSymbol, symbolId, tokenId)
+      method(mapSymbol, symbolId, tokenId),
     );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
       method(initialized),

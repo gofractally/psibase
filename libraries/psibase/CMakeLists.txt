@@ -132,6 +132,8 @@ function(add suffix)
             ../../contracts/system/ProxySys/include
             ../../contracts/system/TransactionSys/include
             ../../contracts/system/VerifyEcSys/include
+            ../../contracts/user/CommonSys/include
+            ../../contracts/user/ExploreSys/include
         )
         target_include_directories(psitestlib${suffix} PRIVATE
             ../../contracts/system/VerifyEcSys/include

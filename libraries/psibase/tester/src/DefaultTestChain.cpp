@@ -1,17 +1,21 @@
 #include <psibase/DefaultTestChain.hpp>
 
-#include <utility>
-#include <vector>
-
 #include <contracts/system/AccountSys.hpp>
 #include <contracts/system/AuthEcSys.hpp>
 #include <contracts/system/AuthFakeSys.hpp>
+#include <contracts/system/CommonSys.hpp>
 #include <contracts/system/ProxySys.hpp>
+#include <contracts/system/RAccountSys.hpp>
 #include <contracts/system/TransactionSys.hpp>
 #include <contracts/system/VerifyEcSys.hpp>
+#include <contracts/user/ExploreSys.hpp>
 #include <psibase/contractEntry.hpp>
+#include <utility>
+#include <vector>
 
 using namespace psibase;
+using namespace system_contract;
+using namespace ContentTypes;
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts /* = {{}} */,
@@ -22,6 +26,7 @@ DefaultTestChain::DefaultTestChain(
    start_block();
    deploySystemContracts();
    createSysContractAccounts();
+   registerSysRpc();
 
    for (const auto& c : additionalContracts)
    {
@@ -40,41 +45,59 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
             .rawData  = psio::convert_to_frac(GenesisActionData{
                  .contracts =  // g.a.d--^ is config file for gen
                 {
-                     {
+                    {
                          .contract     = system_contract::TransactionSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = system_contract::TransactionSys::contractFlags,
                          .code         = read_whole_file("TransactionSys.wasm"),
                     },
-                     {
+                    {
                          .contract     = system_contract::AccountSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = system_contract::AccountSys::contractFlags,
                          .code         = read_whole_file("AccountSys.wasm"),
                     },
-                     {
-                         .contract     = proxyContractNum,
-                         .authContract = system_contract::AuthFakeSys::contract,
+                    {
+                         .contract     = ProxySys::contract,
+                         .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("ProxySys.wasm"),
                     },
-                     {
+                    {
                          .contract     = system_contract::AuthFakeSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("AuthFakeSys.wasm"),
                     },
-                     {
+                    {
                          .contract     = system_contract::AuthEcSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("AuthEcSys.wasm"),
                     },
-                     {
+                    {
                          .contract     = system_contract::VerifyEcSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("VerifyEcSys.wasm"),
+                    },
+                    {
+                         .contract     = CommonSys::contract,
+                         .authContract = AuthFakeSys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("CommonSys.wasm"),
+                    },
+                    {
+                         .contract     = "account-rpc"_a,
+                         .authContract = AuthFakeSys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("RAccountSys.wasm"),
+                    },
+                    {
+                         .contract     = ExploreSys::contract,
+                         .authContract = AuthFakeSys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("ExploreSys.wasm"),
                     },
                 },
             }),
@@ -147,6 +170,7 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
                                              bool          show /* = false */)
 {
    add_account(acc, AccountNumber("auth-fake-sys"), show);
+
    transactor<system_contract::TransactionSys> tsys{acc, system_contract::TransactionSys::contract};
 
    auto trace =
@@ -162,4 +186,47 @@ AccountNumber DefaultTestChain::add_contract(const char* acc,
                                              bool        show /* = false */)
 {
    return add_contract(AccountNumber(acc), filename, show);
+}
+
+void DefaultTestChain::registerSysRpc()
+{
+   auto r = ProxySys::contract;
+
+   // Register servers
+   std::vector<psibase::Action> a{
+       transactor<ProxySys>{CommonSys::contract, r}.registerServer(CommonSys::contract),
+       transactor<ProxySys>{AccountSys::contract, r}.registerServer("account-rpc"_a),
+       transactor<ProxySys>{ExploreSys::contract, r}.registerServer(ExploreSys::contract)};
+   auto trace = pushTransaction(make_transaction(std::move(a)));
+   check(psibase::show(false, trace) == "", "Failed to register system rpc contracts");
+
+   transactor<CommonSys>   rpcCommon(CommonSys::contract, CommonSys::contract);
+   transactor<RAccountSys> rpcAccount("account-rpc"_a, "account-rpc"_a);
+   transactor<ExploreSys>  rpcExplore(ExploreSys::contract, ExploreSys::contract);
+
+   // Store UI files
+   std::string                  cdir   = "../contracts";
+   std::string                  comDir = cdir + "/user/CommonSys";
+   std::string                  accDir = cdir + "/system/AccountSys";
+   std::string                  expDir = cdir + "/user/ExploreSys";
+   std::vector<psibase::Action> b{
+       // CommonSys
+       rpcCommon.storeSys("/", html, read_whole_file(comDir + "/ui/index.html")),
+       rpcCommon.storeSys("/common/rpc.mjs", js, read_whole_file(comDir + "/common/rpc.mjs")),
+       rpcCommon.storeSys("/common/useGraphQLQuery.mjs", js,
+                          read_whole_file(comDir + "/common/useGraphQLQuery.mjs")),
+       rpcCommon.storeSys("/common/SimpleUI.mjs", js,
+                          read_whole_file(comDir + "/common/SimpleUI.mjs")),
+       rpcCommon.storeSys("/ui/index.js", js, read_whole_file(comDir + "/ui/index.js")),
+
+       // AccountSys
+       rpcAccount.storeSys("/", html, read_whole_file(accDir + "/ui/index.html")),
+       rpcAccount.storeSys("/ui/index.js", js, read_whole_file(accDir + "/ui/index.js")),
+
+       // ExploreSys
+       rpcExplore.storeSys("/", html, read_whole_file(expDir + "/ui/index.html")),
+       rpcExplore.storeSys("/ui/index.js", js, read_whole_file(expDir + "/ui/index.js"))};
+
+   trace = pushTransaction(make_transaction(std::move(b)));
+   check(psibase::show(false, trace) == "", "Failed to add UI files to system rpc contracts");
 }
