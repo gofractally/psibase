@@ -164,7 +164,10 @@ fn boot_trx() -> SignedTransaction {
         raw_data: genesis_action_data.packed_bytes(),
     }];
 
-    wrap_basic_trx(actions)
+    SignedTransaction {
+        transaction: wrap_basic_trx(actions).packed_bytes(),
+        proofs: vec![],
+    }
 }
 
 fn common_startup_trx() -> SignedTransaction {
@@ -247,5 +250,8 @@ fn common_startup_trx() -> SignedTransaction {
         ),
     ];
 
-    wrap_basic_trx(actions)
+    SignedTransaction {
+        transaction: wrap_basic_trx(actions).packed_bytes(),
+        proofs: vec![],
+    }
 }

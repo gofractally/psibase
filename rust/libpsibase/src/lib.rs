@@ -21,3 +21,7 @@ pub use method_number::*;
 pub use rpc::*;
 pub use time::*;
 pub use to_bin::*;
+
+mod libpsibase {
+    pub use crate::*;
+}

@@ -10,7 +10,7 @@ pub fn account_macro_impl(item: TokenStream) -> TokenStream {
     if account_number_to_string(n) != item.value() {
         emit_error!(item, "{} is not a valid AccountNumber", item.value());
     }
-    TokenStream::from(quote! {::libpsibase::AccountNumber::new(#n)})
+    TokenStream::from(quote! {libpsibase::AccountNumber::new(#n)})
 }
 
 pub fn method_macro_impl(item: TokenStream) -> TokenStream {
@@ -19,5 +19,5 @@ pub fn method_macro_impl(item: TokenStream) -> TokenStream {
     if n == 0 && item.value() != "" {
         emit_error!(item, "{} is not a valid MethodNumber", item.value());
     }
-    TokenStream::from(quote! {::libpsibase::MethodNumber::new(#n)})
+    TokenStream::from(quote! {libpsibase::MethodNumber::new(#n)})
 }

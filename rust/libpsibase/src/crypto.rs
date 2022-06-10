@@ -10,6 +10,12 @@ custom_error! {
     ExpectedPrivateKey  = "Expected private key",
 }
 
+#[cfg(not(target_family = "wasm"))]
+custom_error! { pub K1Error
+    OnlyK1              = "Only K1 keys are fully supported",
+    Msg{s:String}       = "{s}",
+}
+
 pub type EccPublicKey = [u8; 33];
 
 #[derive(Debug, Clone, psi_macros::Fracpack)]
@@ -54,6 +60,15 @@ impl fmt::Display for PublicKey {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+impl From<&secp256k1::PublicKey> for PublicKey {
+    fn from(key: &secp256k1::PublicKey) -> Self {
+        Self {
+            data: PublicKeyEnum::K1(key.serialize()),
+        }
+    }
+}
+
 pub type EccPrivateKey = [u8; 32];
 
 #[derive(Debug, Clone, psi_macros::Fracpack)]
@@ -66,6 +81,17 @@ pub enum PrivateKeyEnum {
 #[fracpack(definition_will_not_change)]
 pub struct PrivateKey {
     pub data: PrivateKeyEnum,
+}
+
+impl PrivateKey {
+    #[cfg(not(target_family = "wasm"))]
+    pub fn into_k1(&self) -> Result<secp256k1::SecretKey, K1Error> {
+        match &self.data {
+            PrivateKeyEnum::K1(data) => secp256k1::SecretKey::from_slice(data)
+                .map_err(|e| K1Error::Msg { s: e.to_string() }),
+            PrivateKeyEnum::R1(_) => Err(K1Error::OnlyK1),
+        }
+    }
 }
 
 impl FromStr for PrivateKey {
@@ -98,6 +124,15 @@ impl fmt::Display for PrivateKey {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+impl From<&secp256k1::SecretKey> for PrivateKey {
+    fn from(key: &secp256k1::SecretKey) -> Self {
+        Self {
+            data: PrivateKeyEnum::K1(key.secret_bytes()),
+        }
+    }
+}
+
 pub type EccSignature = [u8; 64];
 
 #[derive(Debug, Clone, psi_macros::Fracpack)]
@@ -110,6 +145,24 @@ pub enum SignatureEnum {
 #[fracpack(definition_will_not_change)]
 pub struct Signature {
     pub data: SignatureEnum,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl From<&secp256k1::ecdsa::Signature> for Signature {
+    fn from(signature: &secp256k1::ecdsa::Signature) -> Self {
+        Self {
+            data: SignatureEnum::K1(signature.serialize_compact()),
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl From<secp256k1::ecdsa::Signature> for Signature {
+    fn from(signature: secp256k1::ecdsa::Signature) -> Self {
+        Self {
+            data: SignatureEnum::K1(signature.serialize_compact()),
+        }
+    }
 }
 
 const BASE58_CHARS: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -212,4 +265,40 @@ fn key_to_string(bytes: &[u8], suffix: &str) -> String {
     whole.resize(l + 4, 0);
     whole[l..].copy_from_slice(&ripe_digest[..4]);
     binary_to_base58(&whole)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn sign_transaction(
+    mut trx: crate::Transaction,
+    keys: &[PrivateKey],
+) -> Result<crate::SignedTransaction, K1Error> {
+    use crate::libpsibase;
+    let keys = keys
+        .iter()
+        .map(|k| k.into_k1())
+        .collect::<Result<Vec<_>, _>>()?;
+    trx.claims = keys
+        .iter()
+        .map(|k| crate::Claim {
+            contract: psi_macros::account!("verifyec-sys"),
+            raw_data: fracpack::Packable::packed_bytes(&PublicKey::from(
+                &secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, k),
+            )),
+        })
+        .collect();
+    let transaction = fracpack::Packable::packed_bytes(&trx);
+    let digest =
+        secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(&transaction);
+    let proofs = keys
+        .iter()
+        .map(|k| {
+            fracpack::Packable::packed_bytes(&Signature::from(
+                secp256k1::SECP256K1.sign_ecdsa(&digest, k),
+            ))
+        })
+        .collect();
+    Ok(crate::SignedTransaction {
+        transaction,
+        proofs,
+    })
 }

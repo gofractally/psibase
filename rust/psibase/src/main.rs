@@ -4,8 +4,8 @@ use clap::{Parser, Subcommand};
 use custom_error::custom_error;
 use fracpack::Packable;
 use libpsibase::{
-    push_transaction, AccountNumber, Action, ExactAccountNumber, SignedTransaction, Tapos,
-    TimePointSec, Transaction,
+    push_transaction, sign_transaction, AccountNumber, Action, ExactAccountNumber, PrivateKey,
+    PublicKey, Tapos, TimePointSec, Transaction,
 };
 use psi_macros::{account, method};
 use reqwest::Url;
@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 mod boot;
 
 custom_error! { Error
+    OneCreateOnly       = "--create-account and --create-insecure-account cannot be used together",
     Msg{s:String}       = "{s}",
 }
 
@@ -31,6 +32,10 @@ struct Args {
     )]
     api: Url,
 
+    /// Sign with this key (repeatable)
+    #[clap(short = 'k', long, value_name = "KEY")]
+    sign: Vec<PrivateKey>,
+
     #[clap(subcommand)]
     command: Commands,
 }
@@ -47,6 +52,11 @@ enum Commands {
 
         /// Filename containing the contract
         filename: String,
+
+        /// Create the account if it doesn't exist. Also set the account to
+        /// authenticate using this key, even if the account already existed.
+        #[clap(short = 'c', long, value_name = "KEY")]
+        create_account: Option<PublicKey>,
 
         /// Create the account if it doesn't exist. The account won't be secured;
         /// anyone can authorize as this account without signing. Caution: this option
@@ -108,6 +118,24 @@ fn new_account_action(account: AccountNumber) -> Action {
     }
 }
 
+fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
+    Action {
+        sender: account,
+        contract: account!("auth-ec-sys"),
+        method: method!("setKey"),
+        raw_data: (key.clone(),).packed_bytes(),
+    }
+}
+
+fn set_auth_contract_action(account: AccountNumber, auth_contract: AccountNumber) -> Action {
+    Action {
+        sender: account,
+        contract: account!("account-sys"),
+        method: method!("setAuthCntr"),
+        raw_data: (auth_contract,).packed_bytes(),
+    }
+}
+
 #[derive(Serialize, Deserialize, psi_macros::Fracpack)]
 pub struct SetCodeAction {
     pub contract: AccountNumber,
@@ -153,25 +181,20 @@ fn store_sys(contract: AccountNumber, path: &str, content_type: &str, content: &
     }
 }
 
-pub fn wrap_basic_trx(actions: Vec<Action>) -> SignedTransaction {
+pub fn wrap_basic_trx(actions: Vec<Action>) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec {
         seconds: now_plus_10secs.timestamp() as u32,
     };
-
-    SignedTransaction {
-        transaction: Transaction {
-            tapos: Tapos {
-                expiration,
-                flags: 0,
-                ref_block_prefix: 0,
-                ref_block_num: 0,
-            },
-            actions,
-            claims: vec![],
-        }
-        .packed_bytes(),
-        proofs: vec![],
+    Transaction {
+        tapos: Tapos {
+            expiration,
+            flags: 0,
+            ref_block_prefix: 0,
+            ref_block_num: 0,
+        },
+        actions,
+        claims: vec![],
     }
 }
 
@@ -180,6 +203,7 @@ async fn deploy(
     client: reqwest::Client,
     account: AccountNumber,
     filename: &str,
+    create_account: &Option<PublicKey>,
     create_insecure_account: bool,
     register_proxy: bool,
 ) -> Result<(), anyhow::Error> {
@@ -187,8 +211,23 @@ async fn deploy(
 
     let mut actions: Vec<Action> = Vec::new();
 
-    if create_insecure_account {
+    if create_account.is_some() && create_insecure_account {
+        return Err(Error::OneCreateOnly.into());
+    }
+
+    if create_account.is_some() || create_insecure_account {
         actions.push(new_account_action(account));
+    }
+
+    // This happens before the set_code as a safety measure.
+    // If the set_code was first, and the user didn't actually
+    // have the matching private key, then the transaction would
+    // lock out the user. Putting this before the set_code causes
+    // the set_code to require the private key, failing the transaction
+    // if the user doesn't have it.
+    if let Some(key) = create_account {
+        actions.push(set_key_action(account, key));
+        actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
     }
 
     actions.push(set_code_action(account, wasm));
@@ -198,7 +237,12 @@ async fn deploy(
     }
 
     let trx = wrap_basic_trx(actions);
-    push_transaction(&args.api, client, trx.packed_bytes()).await?;
+    push_transaction(
+        &args.api,
+        client,
+        sign_transaction(trx, &args.sign)?.packed_bytes(),
+    )
+    .await?;
     println!("Ok");
     Ok(())
 }
@@ -219,7 +263,12 @@ async fn upload(
     )];
     let trx = wrap_basic_trx(actions);
 
-    push_transaction(&args.api, client, trx.packed_bytes()).await?;
+    push_transaction(
+        &args.api,
+        client,
+        sign_transaction(trx, &args.sign)?.packed_bytes(),
+    )
+    .await?;
     println!("Ok");
     Ok(())
 }
@@ -233,6 +282,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Commands::Deploy {
             account,
             filename,
+            create_account,
             create_insecure_account,
             register_proxy,
         } => {
@@ -241,6 +291,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 client,
                 (*account).into(),
                 filename,
+                create_account,
                 *create_insecure_account,
                 *register_proxy,
             )
