@@ -200,14 +200,14 @@ void DefaultTestChain::registerSysRpc()
    auto trace = pushTransaction(make_transaction(std::move(a)));
    check(psibase::show(false, trace) == "", "Failed to register system rpc contracts");
 
-   transactor<CommonSys>       rpcCommon(CommonSys::contract, CommonSys::contract);
+   transactor<CommonSys>   rpcCommon(CommonSys::contract, CommonSys::contract);
    transactor<RAccountSys> rpcAccount("account-rpc"_a, "account-rpc"_a);
-   transactor<ExploreSys>      rpcExplore(ExploreSys::contract, ExploreSys::contract);
+   transactor<ExploreSys>  rpcExplore(ExploreSys::contract, ExploreSys::contract);
 
    // Store UI files
    std::string                  cdir   = "../contracts";
    std::string                  comDir = cdir + "/user/CommonSys";
-   std::string                  accDir = cdir + "/system/RAccountSys";
+   std::string                  accDir = cdir + "/system/AccountSys";
    std::string                  expDir = cdir + "/user/ExploreSys";
    std::vector<psibase::Action> b{
        // CommonSys

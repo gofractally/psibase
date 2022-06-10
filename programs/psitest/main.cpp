@@ -546,7 +546,11 @@ struct callbacks
    {
       file f = fopen(span_str(filename).c_str(), "r");
       if (!f.f)
+      {
+         std::cout << "File " << span_str(filename) << " failed to open\n";
          return false;
+      }
+
       if (fseek(f.f, 0, SEEK_END))
          return false;
       auto size = ftell(f.f);
