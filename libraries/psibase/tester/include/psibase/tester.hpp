@@ -16,9 +16,11 @@ namespace psibase
       R get_return_type(R (C::*f)(Args...) const);
    }  // namespace internal_use_do_not_use
 
-   auto debugCounter = [i = 0](const std::string& prefix = "") mutable {
-      std::cout << "\n" << prefix << " DebugCounter " << ++i << "\n\n";
-   };
+   namespace ContentTypes
+   {
+      const std::string html = "text/html";
+      const std::string js   = "text/javascript";
+   }  // namespace ContentTypes
 
    inline std::string show(bool include, TransactionTrace t)
    {

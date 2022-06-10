@@ -38,5 +38,6 @@ namespace psibase
       AccountNumber add_account(AccountNumber acc,
                                 AccountNumber authContract = AccountNumber("auth-fake-sys"),
                                 bool          show         = false);
+      void          registerSysRpc();
    };
 }  // namespace psibase

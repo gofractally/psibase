@@ -4,6 +4,7 @@
 #include "symbol_sys.hpp"
 
 #include <contracts/system/commonErrors.hpp>
+#include <contracts/user/rpc_token_sys.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>

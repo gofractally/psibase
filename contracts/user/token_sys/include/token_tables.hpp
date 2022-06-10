@@ -51,7 +51,8 @@ namespace UserContract
       Quantity           maxSupply;
       SID                symbolId;
 
-      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"}, psibase::NamedBit_t{"untradeable"}>;
+      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"},
+                                                psibase::NamedBit_t{"untradeable"}>;
 
       static bool isValidKey(TID tokenId)
       {
@@ -129,5 +130,17 @@ namespace UserContract
    };
    PSIO_REFLECT(TokenHolderRecord, account, config);
    using TokenHolderTable_t = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
+
+   struct TokenQuery
+   {
+      auto balances() const
+      {
+         return psibase::TableIndex<BalanceRecord, BalanceKey_t>{
+             psibase::DbId::contract, {}, false};
+      }
+   };
+   PSIO_REFLECT(  //
+       TokenQuery,
+       method(balances))
 
 }  // namespace UserContract

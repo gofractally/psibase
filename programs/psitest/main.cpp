@@ -546,7 +546,11 @@ struct callbacks
    {
       file f = fopen(span_str(filename).c_str(), "r");
       if (!f.f)
+      {
+         std::cout << "File " << span_str(filename) << " failed to open\n";
          return false;
+      }
+
       if (fseek(f.f, 0, SEEK_END))
          return false;
       auto size = ftell(f.f);
@@ -618,10 +622,15 @@ struct callbacks
    // TODO: drop this and add general kv access
    void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
-      test_chain& chain  = assert_chain(chain_index);
-      auto        status = chain.blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
-                                                                     psibase::statusKey());
+      test_chain& chain = assert_chain(chain_index);
 
+      if (!chain.blockContext)
+      {
+         throw std::runtime_error("invalid block context");
+      }
+
+      auto status = chain.blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
+                                                                     psibase::statusKey());
       psibase::BlockInfo bi;
       if (status && status->head)
       {
