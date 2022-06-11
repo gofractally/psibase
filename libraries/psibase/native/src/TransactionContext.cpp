@@ -92,9 +92,8 @@ namespace psibase
          for (auto& contract : data.contracts)
          {
             check(contract.contract.value, "account 0 is reserved");
-            auto accRow = db.kvGet<AccountRow>(AccountRow::db, accountKey(contract.contract));
-            check(!accRow, "account " + std::get<psibase::AccountNumber>(accRow->key()).str() +
-                               " already created");
+            check(!db.kvGet<AccountRow>(AccountRow::db, accountKey(contract.contract)),
+                  "account already created");
             AccountRow account{
                 .num          = contract.contract,
                 .authContract = contract.authContract,
@@ -120,8 +119,8 @@ namespace psibase
                                   .sender   = AccountNumber(),
                                   .contract = trxsys,
                                   .rawData  = {self.signedTransaction.transaction.data(),
-                      self.signedTransaction.transaction.data() +
-                          self.signedTransaction.transaction.size()},
+                                               self.signedTransaction.transaction.data() +
+                                                   self.signedTransaction.transaction.size()},
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action

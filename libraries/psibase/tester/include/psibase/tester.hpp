@@ -16,12 +16,6 @@ namespace psibase
       R get_return_type(R (C::*f)(Args...) const);
    }  // namespace internal_use_do_not_use
 
-   namespace ContentTypes
-   {
-      const std::string html = "text/html";
-      const std::string js   = "text/javascript";
-   }  // namespace ContentTypes
-
    inline std::string show(bool include, TransactionTrace t)
    {
       if (include || t.error)

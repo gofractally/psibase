@@ -6,6 +6,8 @@ namespace system_contract
 {
    struct RProxySys : public psibase::Contract<RProxySys>
    {
+      static constexpr auto contract = psibase::AccountNumber("r-proxy-sys");
+
       auto serveSys(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };

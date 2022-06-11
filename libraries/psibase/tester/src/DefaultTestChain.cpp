@@ -6,6 +6,8 @@
 #include <contracts/system/CommonSys.hpp>
 #include <contracts/system/ProxySys.hpp>
 #include <contracts/system/RAccountSys.hpp>
+#include <contracts/system/RAuthEcSys.hpp>
+#include <contracts/system/RProxySys.hpp>
 #include <contracts/system/TransactionSys.hpp>
 #include <contracts/system/VerifyEcSys.hpp>
 #include <contracts/user/ExploreSys.hpp>
@@ -15,7 +17,6 @@
 
 using namespace psibase;
 using namespace system_contract;
-using namespace ContentTypes;
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts /* = {{}} */,
@@ -88,7 +89,7 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                          .code         = read_whole_file("CommonSys.wasm"),
                     },
                     {
-                         .contract     = "account-rpc"_a,
+                         .contract     = RAccountSys::contract,
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("RAccountSys.wasm"),
@@ -98,6 +99,18 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("ExploreSys.wasm"),
+                    },
+                    {
+                         .contract     = RAuthEcSys::contract,
+                         .authContract = AuthFakeSys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("RAuthEcSys.wasm"),
+                    },
+                    {
+                         .contract     = RProxySys::contract,
+                         .authContract = AuthFakeSys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("RProxySys.wasm"),
                     },
                 },
             }),
@@ -195,13 +208,16 @@ void DefaultTestChain::registerSysRpc()
    // Register servers
    std::vector<psibase::Action> a{
        transactor<ProxySys>{CommonSys::contract, r}.registerServer(CommonSys::contract),
-       transactor<ProxySys>{AccountSys::contract, r}.registerServer("account-rpc"_a),
-       transactor<ProxySys>{ExploreSys::contract, r}.registerServer(ExploreSys::contract)};
+       transactor<ProxySys>{AccountSys::contract, r}.registerServer(RAccountSys::contract),
+       transactor<ProxySys>{ExploreSys::contract, r}.registerServer(ExploreSys::contract),
+       transactor<ProxySys>{AuthEcSys::contract, r}.registerServer(RAuthEcSys::contract),
+       transactor<ProxySys>{ProxySys::contract, r}.registerServer(RProxySys::contract)};
+
    auto trace = pushTransaction(make_transaction(std::move(a)));
    check(psibase::show(false, trace) == "", "Failed to register system rpc contracts");
 
    transactor<CommonSys>   rpcCommon(CommonSys::contract, CommonSys::contract);
-   transactor<RAccountSys> rpcAccount("account-rpc"_a, "account-rpc"_a);
+   transactor<RAccountSys> rpcAccount(RAccountSys::contract, RAccountSys::contract);
    transactor<ExploreSys>  rpcExplore(ExploreSys::contract, ExploreSys::contract);
 
    // Store UI files
@@ -209,6 +225,10 @@ void DefaultTestChain::registerSysRpc()
    std::string                  comDir = cdir + "/user/CommonSys";
    std::string                  accDir = cdir + "/system/AccountSys";
    std::string                  expDir = cdir + "/user/ExploreSys";
+
+   const std::string html = "text/html";
+   const std::string js   = "text/javascript";
+
    std::vector<psibase::Action> b{
        // CommonSys
        rpcCommon.storeSys("/", html, read_whole_file(comDir + "/ui/index.html")),
@@ -217,6 +237,8 @@ void DefaultTestChain::registerSysRpc()
                           read_whole_file(comDir + "/common/useGraphQLQuery.mjs")),
        rpcCommon.storeSys("/common/SimpleUI.mjs", js,
                           read_whole_file(comDir + "/common/SimpleUI.mjs")),
+       rpcCommon.storeSys("/common/keyConversions.mjs", js,
+                          read_whole_file(comDir + "/common/keyConversions.mjs")),
        rpcCommon.storeSys("/ui/index.js", js, read_whole_file(comDir + "/ui/index.js")),
 
        // AccountSys
