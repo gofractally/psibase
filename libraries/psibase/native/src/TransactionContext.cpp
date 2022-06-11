@@ -120,8 +120,8 @@ namespace psibase
                                   .sender   = AccountNumber(),
                                   .contract = trxsys,
                                   .rawData  = {self.signedTransaction.transaction.data(),
-                      self.signedTransaction.transaction.data() +
-                          self.signedTransaction.transaction.size()},
+                                               self.signedTransaction.transaction.data() +
+                                                   self.signedTransaction.transaction.size()},
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action

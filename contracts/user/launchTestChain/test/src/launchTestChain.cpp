@@ -32,8 +32,8 @@ SCENARIO("Testing default psibase chain")
 
    auto        rpcTokenSys = t.as(RpcTokenSys::contract).at<RpcTokenSys>();
    std::string rpcUiDir    = "../contracts/user/rpc_token_sys/ui/";
-   rpcTokenSys.storeSys("/", ContentTypes::html, read_whole_file(rpcUiDir + "index.html"));
-   rpcTokenSys.storeSys("/ui/index.js", ContentTypes::js, read_whole_file(rpcUiDir + "index.js"));
+   rpcTokenSys.storeSys("/", "text/html", read_whole_file(rpcUiDir + "index.html"));
+   rpcTokenSys.storeSys("/ui/index.js", "text/javascript", read_whole_file(rpcUiDir + "index.js"));
 
    auto alice = t.as(t.add_account("alice"_a));
    auto bob   = t.as(t.add_account("bob"_a));

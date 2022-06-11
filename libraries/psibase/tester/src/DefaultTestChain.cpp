@@ -17,7 +17,6 @@
 
 using namespace psibase;
 using namespace system_contract;
-using namespace ContentTypes;
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts /* = {{}} */,
@@ -226,6 +225,10 @@ void DefaultTestChain::registerSysRpc()
    std::string                  comDir = cdir + "/user/CommonSys";
    std::string                  accDir = cdir + "/system/AccountSys";
    std::string                  expDir = cdir + "/user/ExploreSys";
+
+   const std::string html = "text/html";
+   const std::string js   = "text/javascript";
+
    std::vector<psibase::Action> b{
        // CommonSys
        rpcCommon.storeSys("/", html, read_whole_file(comDir + "/ui/index.html")),
