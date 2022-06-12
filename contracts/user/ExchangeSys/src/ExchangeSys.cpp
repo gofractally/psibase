@@ -1,5 +1,4 @@
-#include "ExchangeSys.hpp"
-
+#include <contracts/user/ExchangeSys.hpp>
 #include <psibase/dispatch.hpp>
 
 using namespace ExchangeSys;

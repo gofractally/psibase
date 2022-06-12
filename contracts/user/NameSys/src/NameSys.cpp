@@ -1,5 +1,4 @@
-#include "NameSys.hpp"
-
+#include <contracts/user/NameSys.hpp>
 #include <psibase/dispatch.hpp>
 
 using namespace NameSys;

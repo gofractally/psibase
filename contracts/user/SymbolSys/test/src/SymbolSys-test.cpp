@@ -2,15 +2,15 @@
 #include <psio/fracpack.hpp>
 
 // Remove me
-#include <contracts/system/TransactionSys.hpp>
+// #include <contracts/system/TransactionSys.hpp>
 
 #include <contracts/system/AccountSys.hpp>
 #include <contracts/system/commonErrors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 
-#include "NftSys.hpp"
-#include "SymbolSys.hpp"
-#include "TokenSys.hpp"
+#include "contracts/user/NftSys.hpp"
+#include "contracts/user/SymbolSys.hpp"
+#include "contracts/user/TokenSys.hpp"
 
 using namespace psibase;
 using namespace UserContract;

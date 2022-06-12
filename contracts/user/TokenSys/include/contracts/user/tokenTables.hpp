@@ -2,13 +2,13 @@
 
 #include <array>
 #include <compare>
+#include <contracts/user/tokenTypes.hpp>
 #include <limits>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
 
-#include "NftSys.hpp"
-#include "symbolTables.hpp"
-#include "types.hpp"
+#include "contracts/user/NftSys.hpp"
+#include "contracts/user/symbolTables.hpp"
 
 namespace UserContract
 {

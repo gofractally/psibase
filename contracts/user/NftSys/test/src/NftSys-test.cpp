@@ -7,7 +7,7 @@
 #include <psio/fracpack.hpp>
 #include <string>
 
-#include "NftSys.hpp"
+#include "contracts/user/NftSys.hpp"
 
 using namespace UserContract;
 using namespace UserContract::Errors;

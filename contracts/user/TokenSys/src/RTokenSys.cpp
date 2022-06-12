@@ -1,12 +1,11 @@
-#include "RTokenSys.hpp"
-
+#include <contracts/user/RTokenSys.hpp>
+#include <contracts/user/TokenSys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/print.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <string>
 #include <vector>
-#include "TokenSys.hpp"
 
 using namespace UserContract;
 using namespace std;

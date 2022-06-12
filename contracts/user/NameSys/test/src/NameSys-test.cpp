@@ -3,7 +3,8 @@
 
 #include <contracts/system/AccountSys.hpp>
 #include <psibase/DefaultTestChain.hpp>
-#include "NameSys.hpp"
+
+#include "contracts/user/NameSys.hpp"
 
 using namespace psibase;
 

@@ -6,10 +6,11 @@
 #include <psibase/check.hpp>
 #include <psibase/serveContent.hpp>
 #include <string>
-#include "symbolTables.hpp"
-#include "tokenErrors.hpp"
-#include "tokenTables.hpp"
-#include "types.hpp"
+
+#include <contracts/user/tokenErrors.hpp>
+#include <contracts/user/tokenTables.hpp>
+#include <contracts/user/tokenTypes.hpp>
+#include "contracts/user/symbolTables.hpp"
 
 namespace UserContract
 {

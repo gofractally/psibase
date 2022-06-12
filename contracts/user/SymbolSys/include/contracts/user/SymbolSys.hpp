@@ -1,13 +1,13 @@
 #pragma once
 
 #include <compare>
+#include <contracts/user/symbolErrors.hpp>
+#include <contracts/user/symbolTables.hpp>
 #include <psibase/Contract.hpp>
 #include <psibase/Table.hpp>
 #include <string_view>
 
-#include "symbolErrors.hpp"
-#include "symbolTables.hpp"
-#include "types.hpp"
+#include "contracts/user/tokenTypes.hpp"
 
 namespace UserContract
 {

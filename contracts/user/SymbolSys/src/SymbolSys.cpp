@@ -1,13 +1,11 @@
-#include "SymbolSys.hpp"
-#include "NftSys.hpp"
-#include "TokenSys.hpp"
-
-#include <iostream>
-
 #include <contracts/system/AccountSys.hpp>
 #include <contracts/system/TransactionSys.hpp>
 #include <contracts/system/commonErrors.hpp>
+#include <contracts/user/SymbolSys.hpp>
 #include <psibase/dispatch.hpp>
+
+#include "contracts/user/NftSys.hpp"
+#include "contracts/user/TokenSys.hpp"
 
 using namespace UserContract;
 using namespace psibase;

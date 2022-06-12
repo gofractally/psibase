@@ -6,9 +6,9 @@
 #include <psibase/Table.hpp>
 #include <psibase/time.hpp>
 #include <string>
-#include "types.hpp"
 
-#include "NftSys.hpp"
+#include "contracts/user/NftSys.hpp"
+#include "contracts/user/tokenTypes.hpp"
 
 namespace UserContract
 {
