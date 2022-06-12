@@ -3,12 +3,11 @@ function(add_user_contract suffix name)
     target_include_directories(${name}${suffix} PUBLIC
         include
         ../CommonSys/include
-        ../exchange_sys/include
-        ../name_sys/include
-        ../nft_sys/include
-        ../symbol_sys/include
-        ../token_sys/include
-        ../rpc_token_sys/include
+        ../ExchangeSys/include
+        ../NameSys/include
+        ../NftSys/include
+        ../SymbolSys/include
+        ../TokenSys/include
         ../../system/AccountSys/include
         ../../system/AuthEcSys/include
         ../../system/AuthFakeSys/include
@@ -25,12 +24,11 @@ function(add_user_test suffix name)
     target_include_directories(${TARGET} PUBLIC
       ../include
       ../../CommonSys/include
-      ../../exchange_sys/include
-      ../../name_sys/include
-      ../../nft_sys/include
-      ../../symbol_sys/include
-      ../../token_sys/include
-      ../../rpc_token_sys/include
+      ../../ExchangeSys/include
+      ../../NameSys/include
+      ../../NftSys/include
+      ../../SymbolSys/include
+      ../../TokenSys/include
       ../../../system/AccountSys/include
       ../../../system/AuthEcSys/include
       ../../../system/AuthFakeSys/include
@@ -56,7 +54,7 @@ endfunction()
 function(add suffix)
     add_library(contracts_user${suffix} INTERFACE)
     target_include_directories(contracts_user${suffix} INTERFACE
-        nft_sys/include
+        NftSys/include
     )
 endfunction(add)
 
@@ -65,14 +63,13 @@ add("-debug")
 
 if(DEFINED IS_WASM)
     add_subdirectory(CommonSys)
-    add_subdirectory(exchange_sys)
+    add_subdirectory(ExchangeSys)
     add_subdirectory(ExploreSys)
     add_subdirectory(mincon)
-    add_subdirectory(name_sys)
-    add_subdirectory(nft_sys)
-    add_subdirectory(symbol_sys)
-    add_subdirectory(token_sys)
-    add_subdirectory(rpc_token_sys)
+    add_subdirectory(NameSys)
+    add_subdirectory(NftSys)
+    add_subdirectory(SymbolSys)
+    add_subdirectory(TokenSys)
     add_subdirectory(launchTestChain)
 endif()
 
