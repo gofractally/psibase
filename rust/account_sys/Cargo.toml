@@ -9,7 +9,6 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 fracpack = { version = "0.1.0", path = "../fracpack" }
-psi_macros = { version = "0.1.0", path = "../psi_macros" }
 libpsibase = { version = "0.1.0", path = "../libpsibase" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

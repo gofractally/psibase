@@ -4,10 +4,9 @@ use clap::{Parser, Subcommand};
 use custom_error::custom_error;
 use fracpack::Packable;
 use libpsibase::{
-    push_transaction, sign_transaction, AccountNumber, Action, ExactAccountNumber, PrivateKey,
-    PublicKey, Tapos, TimePointSec, Transaction,
+    account, method, push_transaction, sign_transaction, AccountNumber, Action, ExactAccountNumber,
+    Fracpack, PrivateKey, PublicKey, Tapos, TimePointSec, Transaction,
 };
-use psi_macros::{account, method};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
@@ -97,7 +96,7 @@ fn to_hex(bytes: &[u8]) -> String {
     String::from_utf8(result).unwrap()
 }
 
-#[derive(Serialize, Deserialize, psi_macros::Fracpack)]
+#[derive(Serialize, Deserialize, Fracpack)]
 pub struct NewAccountAction {
     pub account: AccountNumber,
     pub auth_contract: AccountNumber,
@@ -136,7 +135,7 @@ fn set_auth_contract_action(account: AccountNumber, auth_contract: AccountNumber
     }
 }
 
-#[derive(Serialize, Deserialize, psi_macros::Fracpack)]
+#[derive(Serialize, Deserialize, Fracpack)]
 pub struct SetCodeAction {
     pub contract: AccountNumber,
     pub vm_type: i8,

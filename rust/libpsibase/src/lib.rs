@@ -17,6 +17,7 @@ pub use db::*;
 pub use from_bin::*;
 pub use intrinsic::*;
 pub use method_number::*;
+pub use psi_macros::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use time::*;

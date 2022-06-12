@@ -1,6 +1,7 @@
+use crate::Fracpack;
 use serde::{Deserialize, Serialize};
 
-#[derive(psi_macros::Fracpack, Serialize, Deserialize)]
+#[derive(Fracpack, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change)]
 pub struct TimePointSec {
     pub seconds: u32,

@@ -1,3 +1,4 @@
+use crate::Fracpack;
 use custom_error::custom_error;
 use libpsibase_names::{method_number_from_str, method_number_to_string};
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,7 @@ custom_error! { pub MethodNumberError
 /// use libpsibase::MethodNumber;
 /// let hello = MethodNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, Copy, Clone, psi_macros::Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Copy, Clone, Fracpack, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change)]
 pub struct MethodNumber {
     pub value: u64,

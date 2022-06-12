@@ -10,4 +10,3 @@ crate-type = ["cdylib"]
 [dependencies]
 fracpack = { version = "0.1.0", path = "../fracpack" }
 libpsibase = { version = "0.1.0", path = "../libpsibase" }
-psi_macros = { version = "0.1.0", path = "../psi_macros" }

@@ -1,3 +1,4 @@
+use crate::{account, Fracpack};
 use custom_error::custom_error;
 use ripemd::{Digest, Ripemd160};
 use std::{fmt, str::FromStr};
@@ -18,13 +19,13 @@ custom_error! { pub K1Error
 
 pub type EccPublicKey = [u8; 33];
 
-#[derive(Debug, Clone, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 pub enum PublicKeyEnum {
     K1(EccPublicKey),
     R1(EccPublicKey),
 }
 
-#[derive(Debug, Clone, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 #[fracpack(definition_will_not_change)]
 pub struct PublicKey {
     pub data: PublicKeyEnum,
@@ -71,13 +72,13 @@ impl From<&secp256k1::PublicKey> for PublicKey {
 
 pub type EccPrivateKey = [u8; 32];
 
-#[derive(Debug, Clone, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 pub enum PrivateKeyEnum {
     K1(EccPrivateKey),
     R1(EccPrivateKey),
 }
 
-#[derive(Debug, Clone, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 #[fracpack(definition_will_not_change)]
 pub struct PrivateKey {
     pub data: PrivateKeyEnum,
@@ -135,13 +136,13 @@ impl From<&secp256k1::SecretKey> for PrivateKey {
 
 pub type EccSignature = [u8; 64];
 
-#[derive(Debug, Clone, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 pub enum SignatureEnum {
     K1(EccSignature),
     R1(EccSignature),
 }
 
-#[derive(Debug, Clone, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 #[fracpack(definition_will_not_change)]
 pub struct Signature {
     pub data: SignatureEnum,
@@ -280,7 +281,7 @@ pub fn sign_transaction(
     trx.claims = keys
         .iter()
         .map(|k| crate::Claim {
-            contract: psi_macros::account!("verifyec-sys"),
+            contract: account!("verifyec-sys"),
             raw_data: fracpack::Packable::packed_bytes(&PublicKey::from(
                 &secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, k),
             )),
