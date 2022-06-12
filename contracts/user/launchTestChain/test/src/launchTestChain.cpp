@@ -23,17 +23,17 @@ namespace
        {TokenSys::contract, "TokenSys.wasm"},
        {NftSys::contract, "NftSys.wasm"},
        {SymbolSys::contract, "SymbolSys.wasm"},
-       {RpcTokenSys::contract, "RTokenSys.wasm"}};
+       {RTokenSys::contract, "RTokenSys.wasm"}};
 }  // namespace
 
 SCENARIO("Testing default psibase chain")
 {
    DefaultTestChain t(neededContracts);
 
-   auto        rpcTokenSys = t.as(RpcTokenSys::contract).at<RpcTokenSys>();
+   auto        tokenSysRpc = t.as(RTokenSys::contract).at<RTokenSys>();
    std::string rpcUiDir    = "../contracts/user/TokenSys/ui/";
-   rpcTokenSys.storeSys("/", "text/html", read_whole_file(rpcUiDir + "index.html"));
-   rpcTokenSys.storeSys("/ui/index.js", "text/javascript", read_whole_file(rpcUiDir + "index.js"));
+   tokenSysRpc.storeSys("/", "text/html", read_whole_file(rpcUiDir + "index.html"));
+   tokenSysRpc.storeSys("/ui/index.js", "text/javascript", read_whole_file(rpcUiDir + "index.js"));
 
    auto alice = t.as(t.add_account("alice"_a));
    auto bob   = t.as(t.add_account("bob"_a));

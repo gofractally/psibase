@@ -1,10 +1,10 @@
 import {siblingUrl} from '/common/rootdomain.mjs';
-import {useGraphQLPagedQuery} from '/common/useGraphQLQuery.mjs';
+import {getJson} from '/common/rpc.mjs';
 import htm from 'https://unpkg.com/htm@3.1.0?module';
 
 const html = htm.bind(React.createElement);
 
-var tokenHeaders = [{value: 'Symbol'}, {value: 'Balance'}];
+var tokenHeaders = [{value: 'User'}, {value: 'Symbol'}, {value: 'Balance'}];
 
 function Nav()
 {
@@ -40,6 +40,42 @@ function Headers(headers)
    </tr>`;
 }
 
+function useBalances(user)
+{
+   const [balances, setBalances] = React.useState([]);
+
+   React.useEffect(() => {
+      (async () => {
+         try
+         {
+            let b = await getJson('/balances');
+            console.log(b);
+            setBalances(b);
+         }
+         catch (e)
+         {
+            console.error('error');
+            console.error(e.message);
+         }
+      })();
+   }, []);
+   return balances;
+}
+
+function Rows()
+{
+   var balances = useBalances('alice');
+   return balances.map((b) => {
+      return html`
+         <tr>
+            <td>alice</td>
+            <td>${b.key.tokenId}</td>
+            <td>${b.balance}</td>
+         </tr>
+      `;
+   });
+}
+
 function Table()
 {
    return html`
@@ -48,14 +84,7 @@ function Table()
             ${Headers(tokenHeaders)}
          </thead>
          <tbody>
-            <tr>
-               <td>Key</td>
-               <td>Val</td>
-            </tr>
-            <tr>
-               <td>Key</td>
-               <td>Val</td>
-            </tr>
+            ${Rows()}
          </tbody>
       </table>
    `;
@@ -91,28 +120,6 @@ type Query {
 
 
 const App = () => {
-   const query = `{
-           balances(@page@) {
-               pageInfo {
-                   hasPreviousPage
-                   hasNextPage
-                   startCursor
-                   endCursor
-               }
-               edges {
-                   node {
-                       key {
-                          account
-                          tokenId
-                       }
-                       balance
-                   }
-               }
-           }
-       }`;
-   const pagedResult =
-       useGraphQLPagedQuery('/graphql', query, 10, (result) => result.data?.blocks.pageInfo);
-
    return html`
       <div class="ui container">
          ${Nav()}

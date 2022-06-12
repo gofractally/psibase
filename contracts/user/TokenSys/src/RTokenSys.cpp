@@ -20,42 +20,80 @@ namespace
       return RpcReplyData{.contentType = "text/html",
                           .body        = std::vector<char>{d.begin(), d.end()}};
    };
+
 }
 
-struct TokenQuery
-{
-   auto balances() const
-   {  //
-      return TableIndex<BalanceRecord, uint32_t>{DbId::contract, {}, false};
-   }
-};
-PSIO_REFLECT(TokenQuery, method(balances))
+// TODO: Replace queries with gql when it supports more than simple keys
+// struct TokenQuery
+// {
+//    auto balances() const
+//    {  //
+//       return TableIndex<BalanceRecord, decltype(BalanceRecord::key)>{DbId::contract, {}, false};
+//    }
+// };
+// PSIO_REFLECT(TokenQuery, method(balances))
 
-optional<RpcReplyData> RpcTokenSys::serveSys(RpcRequestData request)
+optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
 {
-   if (request.method == "GET" &&
-       (request.target == "/simple" || request.target == "/action_templates"))
-   {
-      if (request.target == "/simple")
-      {
-         request.target = "/";
-      }
-      if (auto result = serveSimpleUI<TokenSys, true>(request))
-         return result;
-   }
+   if (auto result = _serveRestEndpoints(request))
+      return result;
 
    if (auto result = serveContent(request, TokenSys::Tables{getReceiver()}))
       return result;
 
-   if (auto result = serveGraphQL(request, TokenQuery{}))
-      return result;
+   // if (auto result = serveGraphQL(request, TokenQuery{}))
+   //    return result;
    return nullopt;
 }
 
-void RpcTokenSys::storeSys(string path, string contentType, vector<char> content)
+void RTokenSys::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
    storeContent(move(path), move(contentType), move(content), TokenSys::Tables{getReceiver()});
 }
 
-PSIBASE_DISPATCH(UserContract::RpcTokenSys)
+std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& request)
+{
+   auto to_json = [](const auto& obj)
+   {
+      auto json = psio::convert_to_json(obj);
+      return RpcReplyData{
+          .contentType = "application/json",
+          .body        = {json.begin(), json.end()},
+      };
+   };
+
+   if (request.method == "GET")
+   {
+      if (request.target == "/simple" || request.target == "/action_templates")
+      {
+         if (request.target == "/simple")
+         {
+            request.target = "/";
+         }
+         if (auto result = serveSimpleUI<TokenSys, true>(request))
+            return result;
+      }
+      if (request.target == "/balances")
+      {
+         TokenSys::Tables db{TokenSys::contract};
+         auto             idx = db.open<TokenTable_t>().getIndex<0>();
+         check(idx.begin() != idx.end(), "No tokens");
+
+         auto                       balIdx = db.open<BalanceTable_t>().getIndex<0>();
+         std::vector<BalanceRecord> balances;
+         TID                        tokenId = 1;
+         for (auto itr = idx.begin(); itr != idx.end(); ++itr)
+         {
+            balances.push_back(at<TokenSys>().getBalance(tokenId, "alice"_a).unpack());
+            ++tokenId;
+         }
+
+         return to_json(balances);
+      }
+   }
+
+   return std::nullopt;
+}
+
+PSIBASE_DISPATCH(UserContract::RTokenSys)

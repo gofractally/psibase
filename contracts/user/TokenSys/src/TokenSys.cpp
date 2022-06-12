@@ -85,7 +85,7 @@ void TokenSys::init()
    nftContract.credit(tNft, SymbolSys::contract, "Passing system token ownership");
 
    // Register proxy
-   at<ProxySys>().registerServer(RpcTokenSys::contract);
+   at<ProxySys>().registerServer(RTokenSys::contract);
 }
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
