@@ -1,10 +1,10 @@
 #define CATCH_CONFIG_MAIN
 
-#include "symbol_sys.hpp"
-#include "token_sys.hpp"
+#include "RTokenSys.hpp"
+#include "SymbolSys.hpp"
+#include "TokenSys.hpp"
 
 #include <contracts/system/commonErrors.hpp>
-#include <contracts/user/rpc_token_sys.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
@@ -20,10 +20,10 @@ namespace
    const psibase::String memo{"memo"};
 
    const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
-       {TokenSys::contract, "token_sys.wasm"},
-       {NftSys::contract, "nft_sys.wasm"},
-       {SymbolSys::contract, "symbol_sys.wasm"},
-       {RpcTokenSys::contract, "rpc_token_sys.wasm"}};
+       {TokenSys::contract, "TokenSys.wasm"},
+       {NftSys::contract, "NftSys.wasm"},
+       {SymbolSys::contract, "SymbolSys.wasm"},
+       {RpcTokenSys::contract, "RTokenSys.wasm"}};
 }  // namespace
 
 SCENARIO("Testing default psibase chain")
@@ -31,7 +31,7 @@ SCENARIO("Testing default psibase chain")
    DefaultTestChain t(neededContracts);
 
    auto        rpcTokenSys = t.as(RpcTokenSys::contract).at<RpcTokenSys>();
-   std::string rpcUiDir    = "../contracts/user/rpc_token_sys/ui/";
+   std::string rpcUiDir    = "../contracts/user/TokenSys/ui/";
    rpcTokenSys.storeSys("/", "text/html", read_whole_file(rpcUiDir + "index.html"));
    rpcTokenSys.storeSys("/ui/index.js", "text/javascript", read_whole_file(rpcUiDir + "index.js"));
 
