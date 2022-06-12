@@ -6,9 +6,9 @@
 #include <psibase/check.hpp>
 #include <psibase/serveContent.hpp>
 #include <string>
-#include "symbol_tables.hpp"
-#include "token_errors.hpp"
-#include "token_tables.hpp"
+#include "symbolTables.hpp"
+#include "tokenErrors.hpp"
+#include "tokenTables.hpp"
 #include "types.hpp"
 
 namespace UserContract

@@ -2,8 +2,8 @@
 
 #include <psibase/Contract.hpp>
 #include <psibase/String.hpp>
-#include "nft_errors.hpp"
-#include "nft_tables.hpp"
+#include "nftErrors.hpp"
+#include "nftTables.hpp"
 
 namespace UserContract
 {

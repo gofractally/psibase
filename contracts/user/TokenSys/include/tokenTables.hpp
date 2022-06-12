@@ -7,7 +7,7 @@
 #include <psibase/Table.hpp>
 
 #include "NftSys.hpp"
-#include "symbol_tables.hpp"
+#include "symbolTables.hpp"
 #include "types.hpp"
 
 namespace UserContract

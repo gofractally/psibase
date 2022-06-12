@@ -1,6 +1,6 @@
 #include "TokenSys.hpp"
 #include "SymbolSys.hpp"
-#include "token_errors.hpp"
+#include "tokenErrors.hpp"
 
 #include <contracts/system/AccountSys.hpp>
 #include <contracts/system/ProxySys.hpp>

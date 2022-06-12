@@ -5,8 +5,8 @@
 #include <psibase/Table.hpp>
 #include <string_view>
 
-#include "symbol_errors.hpp"
-#include "symbol_tables.hpp"
+#include "symbolErrors.hpp"
+#include "symbolTables.hpp"
 #include "types.hpp"
 
 namespace UserContract
