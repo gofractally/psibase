@@ -3,15 +3,16 @@
 #include <iostream>
 
 struct scope {
+   scope(const scope&) = delete;
    scope(){
       ++indent();
    }
    ~scope() {
       --indent();
    }
-   static int& indent()
+   static std::atomic<int>& indent()
    {
-      static int i = 0;
+      static std::atomic<int> i = 0;
       return i;
    }
 };

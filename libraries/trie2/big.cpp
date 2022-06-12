@@ -3,6 +3,9 @@
 #include <consthash/all.hxx>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <unistd.h>
+#include <random>
 
 #include <trie/trie.hpp>
 
@@ -16,8 +19,10 @@ uint64_t bswap(uint64_t x)
 
 int64_t rand64()
 {
-   return uint64_t(rand()) << 32 | uint64_t(rand());
+   static std::mt19937 gen(-1);
+   return uint64_t(gen())<<32 | gen();
 }
+/*
 inline std::string to_key6(const std::string_view v)
 {
 //   std::cout << "to_key(" << v <<")\n";
@@ -79,6 +84,7 @@ inline std::string to_key(const std::string_view v)
    }
    return s;
 }
+*/
 
 
 
@@ -88,14 +94,20 @@ int main(int argc, char** argv)
    trie::database db(
        "big.dir",
        trie::database::config{
-           //.max_objects = (5 * total) / 4, .hot_pages = 16 * 1024ull, .cold_pages = 8*1024 * 1024ull},
-           .max_objects = (5 * total) / 4, .hot_pages = 4*256* 1024ull, .cold_pages = 4*1024 * 1024ull},
+        //   .max_objects = (1 * total) / 4, .hot_pages = 1 * 1024ull, .cold_pages = 8*124 * 1024ull},
+          .max_objects = (5 * total) / 4, .hot_pages = 33, 
+                                          .warm_pages = 34,
+                                          .cool_pages = 35,
+                                          .cold_pages = 35 },
        //    .max_objects = (5 * total) / 4, .hot_pages =  16*1024ull, .cold_pages = 8*1024 * 1024ull},
        trie::database::read_write);
    db.print_stats();
-   auto s = db.start_write_revision(0, 0);
+   auto s = db.start_write_session();
 
+   std::vector<uint64_t> revisions;
+   revisions.resize(16);
 
+   std::map<std::string,std::string> base;
 
    /*
    int count = 0;
@@ -117,29 +129,68 @@ int main(int argc, char** argv)
 
    int perc = 1000;
    std::atomic<uint64_t> r(1);
-   std::atomic<uint64_t> total_lookups[6];
-   for( auto& t : total_lookups ) t.store(0);
+   struct tlc {
+      alignas(64) std::atomic<uint64_t> total_lookups;
+   };
+   tlc total_lookups[6];
+   for( auto& t : total_lookups ) t.total_lookups.store(0);
+
+   std::atomic<uint64_t> revs[6];
+   for( auto& r : revs ) r.store(0);
 
    auto read_loop =  [&](int c) {
       int v = r.load();
-      auto rs = db.start_read_revision(r-4);
+      auto rs = db.start_read_session();
 
+      std::mt19937 gen(c);
+
+      uint64_t ch = 0;
       while( true ) {
+         rs->set_session_revision( {revisions[(v-4)%16]} );
          while( r.load(std::memory_order_relaxed) == v ) {
-            uint64_t h =rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4;
-            auto k = to_key6( std::string_view((char*)&h, sizeof(h)) );
-            auto itr =  rs->lower_bound( k );
+            uint64_t h = (uint64_t(gen()) << 32) | gen();
+            ch *= 1000999;
+            auto itr =  rs->lower_bound( std::string_view((char*)&h, sizeof(h)) );
             if( itr.valid() )
-               ++total_lookups[c];
+               ++total_lookups[c].total_lookups;
          }
          v = r.load();
-         rs = db.start_read_revision(v-4);
+  //       if( c == 0 )
+  //         WARN( "read revision: ", (v-4)%16 );
+         revs[c].store(v);
+      //   rs = db.start_read_revision(v-4);
       }
    };
 
+/*
+    new std::thread( [&](){
+        auto rs = db.start_read_session();
+         
+        uint64_t last_r = 8;
+        while( true ) {
+           uint64_t min = -1ull;
+           for( auto& r: revs ) {
+               if( r.load() < min )
+                  min = r.load();
+           }
+           if( min > last_r ) {
+         //     WARN( "release revision: ", (min-6)%16, "  r: ", min );
+              rs->release_revision( {revisions[(min-7)%16]} );     
+              revisions[(min-7)%16] = 0;
+              last_r = min;
+           }
+        }
+    });
+    */
+
 
    auto get_total_lookups = [&](){
-      return total_lookups[0].load() + total_lookups[1].load() + total_lookups[2].load() + total_lookups[3].load() + total_lookups[4].load() + total_lookups[5].load();
+      return total_lookups[0].total_lookups.load() + 
+             total_lookups[1].total_lookups.load() + 
+             total_lookups[2].total_lookups.load() + 
+             total_lookups[3].total_lookups.load() + 
+             total_lookups[4].total_lookups.load() + 
+             total_lookups[5].total_lookups.load();
    };
 
    int64_t read_start = 0;
@@ -150,10 +201,13 @@ int main(int argc, char** argv)
       {
          if (i % (total / perc) == 1 )
          {
-         //   db.swap();
 
             ++r;
+     //       s->release_revision( {revisions[r%16]} );
+        //    revisions[r%16] = s->get_session_revision().id;
+        //    s->retain( {revisions[r%16]} );
             auto v = r.load(std::memory_order_relaxed);
+            /*
             if ( v > 1)
             {
                auto ns = db.start_write_revision(v, v - 1);
@@ -164,7 +218,9 @@ int main(int argc, char** argv)
                }
                s = std::move(ns);
             }
+            */
             if( v == 6 ) {
+               /*
                WARN( "STARTING READ THREADS" );
                new std::thread( [&](){read_loop(0);} );
                new std::thread( [&](){read_loop(1);} );
@@ -172,6 +228,7 @@ int main(int argc, char** argv)
                new std::thread( [&](){read_loop(3);} );
                new std::thread( [&](){read_loop(4);} );
                new std::thread( [&](){read_loop(5);} );
+               */
             }
          }
          // if( r > 10000 ) {
@@ -190,17 +247,15 @@ int main(int argc, char** argv)
             auto read_end = get_total_lookups();
             auto delta_read = read_end - read_start;
             read_start = read_end;
-            std::cerr << "progress " << 100 * double(i) / total << "  "
-                      << std::chrono::duration<double, std::milli>(delta).count() << "\n";
-            std::cout << (total / perc) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)
-                      << " items/sec   " << i << " total  reads/sec: " << (delta_read / ((std::chrono::duration<double, std::milli>(delta).count() / 1000)))  <<"\n";
+            std::cout << std::setw(12) << int64_t((total / perc) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000))
+                      << " items/sec   " << i << " total  reads/sec: " << std::setw(12) << uint64_t(delta_read / ((std::chrono::duration<double, std::milli>(delta).count() / 1000)))  <<"\n";
          }
 
          uint64_t v[2];
-         uint64_t h =rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4;
+         uint64_t h = rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4;
       //   h          = bswap(h);
-          k = to_key6( std::string_view((char*)&h, sizeof(h)) );
+          auto hk =  std::string_view((char*)&h, sizeof(h));
           /*
           for( auto c : k ) {
              assert( 0 == c >> 6 );
@@ -211,8 +266,11 @@ int main(int argc, char** argv)
          
          if (i < total )
          {
-            bool inserted = s->upsert(std::string_view(k.data(), k.size()),
-                                     std::string_view((char*)&h, sizeof(h)));
+            //base.emplace( std::make_pair(k,std::string((char*)&h, sizeof(h))) );
+            bool inserted = s->upsert(hk, hk);
+            if( not inserted ) {
+               WARN( "failed to insert: ", h );
+            }
             assert(inserted);
 
             //auto got = s.get( std::string_view((char*)&h, sizeof(h)) );

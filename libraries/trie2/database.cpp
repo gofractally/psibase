@@ -40,12 +40,16 @@ namespace trie
       else
          _dbm = reinterpret_cast<database_memory*>(_region->get_address());
 
+      WARN( "hot: ", cfg.hot_pages );
+      WARN( "warm: ", cfg.warm_pages );
+      WARN( "cool: ", cfg.cool_pages );
+      WARN( "cold: ", cfg.cold_pages );
       _ring.reset(new ring_allocator(dir / "ring", ring_allocator::read_write,
                                      {.max_ids    = cfg.max_objects,
                                       .hot_pages  = cfg.hot_pages,
-                                      .warm_pages = cfg.hot_pages * 2,
-                                      .cool_pages = cfg.cold_pages,
-                                      .cold_pages = cfg.cold_pages * 2}));
+                                      .warm_pages = cfg.warm_pages,
+                                      .cool_pages = cfg.cool_pages,
+                                      .cold_pages = cfg.cold_pages}));
 
       _ring->_try_claim_free = [this](){ claim_free(); };
       /*
@@ -65,18 +69,18 @@ namespace trie
    {
       ring_allocator::swap_position sp;
       {
-         std::lock_guard<std::mutex> lock(_active_read_sessions_mutex);
+         std::lock_guard<std::mutex> lock(_active_sessions_mutex);
     //     WARN( "_active_read_sessions: ", _active_read_sessions.size()   );
-         for (auto s : _active_read_sessions)
+         for (auto s : _active_sessions)
          {
      //       DEBUG( "    swap_p[0] = min ", s->_hot_swap_p.load(), "  or  ", sp._swap_pos[0] );
             sp._swap_pos[0] =
                 std::min<uint64_t>(s->_hot_swap_p.load(std::memory_order_relaxed), sp._swap_pos[0]);
-            sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(std::memory_order_relaxed),
+            sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(std::memory_order_acquire),
                                                  sp._swap_pos[1]);
-            sp._swap_pos[2] = std::min<uint64_t>(s->_cool_swap_p.load(std::memory_order_relaxed),
+            sp._swap_pos[2] = std::min<uint64_t>(s->_cool_swap_p.load(std::memory_order_acquire),
                                                  sp._swap_pos[2]);
-            sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(std::memory_order_relaxed),
+            sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(std::memory_order_acquire),
                                                  sp._swap_pos[3]);
          }
          _ring->claim_free(sp);
@@ -84,65 +88,4 @@ namespace trie
    }
    void database::print_stats() { _ring->dump(); }
 }  // namespace trie
-
-#if 0
-
-read thread
-   - all the objects it is reading are constant
-   - the objects may move while being read, but the old data cannot be not updated until
-     the alloc pointer moves past the position of the swap pointer at the start of the read
-     the main thread will not move the alloc pointer past the position of the swap pointer
-     at the start of the read.
-
-main thread (writer)
-   - only thread that can start new write revisions
-   - only thread that can advance last_readable_version
-   - when it needs more alloc space in the hot area
-        it moves the end_free pointer for all levels to the min swap_ptr location of active reads
-             - the active read threads can aggregate this value at the end of each read
-    
-   - a long-running read will block memory from being allocated, therefore the swap_ptr locations
-        for each thread are read at the start of each find/get/etc and at the end of each operation
-        are set to "infinity". 
-
-   - if main needs memory it will spin-lock waiting for read threads to advance their swap_ptr locations
-        to a value equal to or greater than the ring's swap_ptr location        
-
-version gc thread
-   - waits for last_readable_version to change  (using notify_one)
-      then iterates over all read threads to find the min acitve read
-      then releases all root nodes from oldest_read_version to min(last_readable_version, min_active_read) -1
-         - these releases are atomic decrements of the reference counts which are thread safe
-
-swap thread(s)
-   - 1 thread that reads hot's alloc pointer and moves hots swap pointer
-   - 1 thread that reads warms alloc pointer and moves cools swap pointer
-   - 1 thread that reads cools alloc pointer and moves colds swap pointer
-   - waits for alloc_pos to change (using polling with sleep so main doesn't have to notify)
-      then advances swap pointer moving from src->dstuntil free space buffer is restored
-
-
-cold's memory allocation:
-   - needs a way to ensure it doesn't reuse memory which may be read
-   - cannot be a ring because most of this data should never move
-
-   - space divided into 128 GB buckets which comprise a "empty free list"
-   - allocator starts putting data into a bucket until full
-   - swap thread finds bucket with highest % free by object id
-        and moves the objects into the current alloc bucket (defraging in the process)
-        once all objects are moved this bucket is added to a pending free list circular buffer
-        swap thread continues until there are no buckets with more than 20% free space
-
-   - reader threads note the position of the pending free list when they start reading
-   - swap checks teh reader threads locations and once they have all moved past a pending
-     free list position, it adds those blocks back to the "empty free list" at which point
-     they can be used by the allocator.
-   - there are two alloc positions (which comprise a block num and offset)
-         a. one for the cool swap thread to move to cold 
-         b. one for the cold swap thread to defrag to
-             - this prevents interleaving of objects changing their relative locality 
-   - when cool thread or cold thread needs a new empty block it uses an atomic Compare / Exchange
-       to pop the head of the empty free list
-
-#endif
 

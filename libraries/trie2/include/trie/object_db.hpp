@@ -18,6 +18,7 @@ namespace trie
    class object_db
    {
      public:
+      static constexpr uint64_t ref_count_mask = (1ull<<15)-1;
       struct object_id
       {
          uint64_t    id : 40 = 0;  // obj id
@@ -38,46 +39,54 @@ namespace trie
 
       struct object_location
       {
+         enum object_type {
+            leaf  = 0,
+            inner = 1
+         };
+
          // TODO: offset should be multiplied by 8 before use and divided by 8 before stored,
          // this will allow us to maintain a full 48 bit address space
          uint64_t offset : 46;
          uint64_t cache : 2;
+         uint64_t type : 1;
 
          friend bool operator != ( const object_location& a, const object_location& b ) 
          {
             return *reinterpret_cast<const uint64_t*>(&a) != *reinterpret_cast<const uint64_t*>(&b);
          }
       } __attribute__((packed));
-      static_assert(sizeof(object_location) == 6, "unexpected padding");
+  // TODO expand 
+  //    static_assert(sizeof(object_location) == 6, "unexpected padding");
 
       object_db(std::filesystem::path idfile, object_id max_id, bool allow_write);
       object_id alloc(object_location loc = {.offset = 0, .cache = hot_store});
 
-      void            retain(object_id id);
-      object_location release(object_id id);
+      void                                retain(object_id id);
+      std::pair<object_location,uint16_t> release(object_id id);
 
       uint16_t ref(object_id id);
 
       object_location get(object_id id);
       object_location get(object_id id, uint16_t& ref);
-      bool set(object_id id, object_location loc);
-      inline bool set(object_id id, uint64_t offset, uint64_t cache)
+      bool set(object_id id, object_location loc );
+      inline bool set(object_id id, uint64_t offset, uint64_t cache, object_location::object_type t )
       {
-         return set(id, object_location{.offset = offset, .cache = cache});
+         return set(id, object_location{.offset = offset, .cache = cache, .type = t});
       }
+
+      void print_stats();
 
      private:
       inline uint64_t obj_val(object_location loc, uint16_t ref)
       {
-         return uint64_t(loc.offset << 18) | (uint64_t(loc.cache) << 16) | uint64_t(ref);
+         return uint64_t(loc.offset << 18) | (uint64_t(loc.cache) << 16) | (uint64_t(loc.type)<<15) | int64_t(ref);
       }
 
       struct object_db_header
       {
-         object_id first_free;         // free list
+         std::atomic<uint64_t> first_free;         // free list
          object_id first_unallocated;  // high water mark
          object_id max_unallocated;    // end of file
-         int64_t   total_allocated = 0;
 
          std::atomic<uint64_t> objects[1];
       };
@@ -133,7 +142,7 @@ namespace trie
          if (init)
          {
             _header->first_unallocated.id = 0;
-            _header->first_free.id        = 0;
+            _header->first_free.store(0);
          }
       }
    }
@@ -142,9 +151,7 @@ namespace trie
       if (_header->first_unallocated.id >= _header->max_unallocated.id)
          throw std::runtime_error("no more object ids");
 
-      ++_header->total_allocated;
-      assert(_header->total_allocated < _header->max_unallocated.id);
-      if (_header->first_free.id == 0)
+      if (_header->first_free.load() == 0)
       {
          ++_header->first_unallocated.id;
          auto  r   = _header->first_unallocated;
@@ -155,65 +162,63 @@ namespace trie
       }
       else
       {
-         auto& obj              = _header->objects[_header->first_free.id];
-         auto  r                = _header->first_free;
-         _header->first_free.id = obj.load(std::memory_order_relaxed) >> 16;
-         obj.store(obj_val(loc, 1), std::memory_order_relaxed);  // init ref count 1
-         assert(r.id != 0);
-         return r;
+         uint64_t ff = _header->first_free.load(std::memory_order_relaxed);
+         while( not _header->first_free.compare_exchange_strong( ff, _header->objects[ff].load(std::memory_order_relaxed) >> 16, std::memory_order_relaxed ) ){}
+
+         _header->objects[ff].store(obj_val(loc, 1), std::memory_order_relaxed);  // init ref count 1
+         return {.id=ff};
       }
    }
    inline void object_db::retain(object_id id)
    {
       auto& obj = _header->objects[id.id];
       assert( ref(id) > 0 );
-      ++obj;
-   //   obj.store(obj.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
-      //      std::cerr << "    retain id: " << id.id <<"    new count: " << (obj.load() & 0xffff) <<"\n";
+      if( (obj.load( std::memory_order_relaxed ) & ref_count_mask) == ref_count_mask )[[unlikely]] {
+         throw std::runtime_error( "too many references" );
+      }
+      obj.fetch_add(1, std::memory_order_relaxed);
    }
 
    /**
     *  Return null object_location if not released, othewise returns the location
     *  that was freed
     */
-   inline object_db::object_location object_db::release(object_id id)
+   inline std::pair<object_db::object_location,uint16_t> object_db::release(object_id id)
    {
       auto& obj       = _header->objects[id.id];
-      auto  val       = obj.load(std::memory_order_relaxed);
-      auto  new_count = (val & 0xffff) - 1;
+      auto  val       = obj.fetch_sub(1, std::memory_order_relaxed)-1; 
+      auto  new_count = (val & ref_count_mask);
 
-      //   std::cerr << "    id: " << id.id <<"    new count: " << new_count <<"\n";
       if (new_count == 0)
       {
-         if( not obj.compare_exchange_strong(val, int64_t(_header->first_free.id) << 16, std::memory_order_relaxed) ) {
-            WARN( "memory race detected on release()" );
-         }
-         _header->first_free = id;
-         --_header->total_allocated;
-         assert(_header->total_allocated >= 0);
-         return object_location{.offset = val >> 18, .cache = val >> 16};
+         // the invariant is first_free->object with id that points to next free
+         // 1. update object to point to next free
+         // 2. then attempt to update first free 
+
+
+         uint64_t ff;
+         do {
+            ff = _header->first_free.load( std::memory_order_relaxed); 
+            obj.store( ff << 16, std::memory_order_relaxed);
+         } while( not _header->first_free.compare_exchange_strong( ff, id.id ) ); 
       }
-      else
-      {
-         --obj;
-      //   obj.store(val - 1, std::memory_order_relaxed);
-         return object_location{.offset = 0, .cache = val >> 16};
-      }
+      return {object_location{.offset = val >> 18, .cache = val >> 16, .type = (val >> 15)&1 },new_count};
    }
 
    inline uint16_t object_db::ref(object_id id)
    {
-      return _header->objects[id.id].load(std::memory_order_relaxed) & 0xffff;
+      return _header->objects[id.id].load(std::memory_order_relaxed) & ref_count_mask;
    }
 
    inline object_db::object_location object_db::get(object_id id)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
       std::atomic_thread_fence(std::memory_order_acquire);
-      assert((val & 0xffff) or !"expected positive ref count");
+      assert((val & ref_count_mask) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
+      r.type   = (val >> 15) & 1;
       std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
@@ -226,7 +231,8 @@ namespace trie
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
-      ref = val & 0xffff;
+      r.type   = (val >> 15) & 1;
+      ref = val & ref_count_mask;
       std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
@@ -235,10 +241,24 @@ namespace trie
    {
       auto&    obj = _header->objects[id.id];
       auto     old = obj.load(std::memory_order_relaxed);
-      uint16_t ref = old & 0xffff;
+      uint16_t ref = old & ref_count_mask;
       auto r = obj.compare_exchange_strong(old, obj_val(loc, ref), std::memory_order_release);
       std::atomic_thread_fence(std::memory_order_release);
       return r;
+   }
+   inline void object_db::print_stats() {
+      uint64_t zero_ref = 0;
+      uint64_t total = 0;
+      uint64_t non_zero_ref = 0;
+      auto* ptr = _header->objects;
+      auto* end = _header->objects + _header->max_unallocated.id;
+      while( ptr != end ) {
+         zero_ref += 0 == (ptr->load( std::memory_order_relaxed ) & ref_count_mask);
+         ++total;
+         ++ptr;
+      }
+      DEBUG( "first unallocated  ", _header->first_unallocated.id );
+      DEBUG( "total objects: ", total,  " zero ref: ", zero_ref, "  non zero: ", total - zero_ref );
    }
 
 };  // namespace trie
