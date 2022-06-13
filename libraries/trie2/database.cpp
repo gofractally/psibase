@@ -73,7 +73,7 @@ namespace trie
     //     WARN( "_active_read_sessions: ", _active_read_sessions.size()   );
          for (auto s : _active_sessions)
          {
-     //       DEBUG( "    swap_p[0] = min ", s->_hot_swap_p.load(), "  or  ", sp._swap_pos[0] );
+      //      DEBUG( "    swap_p[0] = min ", s->_hot_swap_p.load(), "  or  ", sp._swap_pos[0] );
             sp._swap_pos[0] =
                 std::min<uint64_t>(s->_hot_swap_p.load(std::memory_order_relaxed), sp._swap_pos[0]);
             sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(std::memory_order_acquire),

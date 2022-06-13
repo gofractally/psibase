@@ -95,9 +95,9 @@ int main(int argc, char** argv)
        "big.dir",
        trie::database::config{
         //   .max_objects = (1 * total) / 4, .hot_pages = 1 * 1024ull, .cold_pages = 8*124 * 1024ull},
-          .max_objects = (5 * total) / 4, .hot_pages = 28, 
-                                          .warm_pages = 28,
-                                          .cool_pages = 29,
+          .max_objects = (5 * total) / 4, .hot_pages = 31, 
+                                          .warm_pages = 31,
+                                          .cool_pages = 31,
                                           .cold_pages = 31 },
        //    .max_objects = (5 * total) / 4, .hot_pages =  16*1024ull, .cold_pages = 8*1024 * 1024ull},
        trie::database::read_write);

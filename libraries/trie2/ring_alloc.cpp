@@ -158,9 +158,9 @@ namespace trie
       //DEBUG( "used size: ", used_size, " num_bytes: ", num_bytes, "  round_size: ", round_size );
 
       while ( (ring._head->get_potential_free_space()) < used_size) {
-         WARN( "WAITING ON FREE SPACE" );
+         WARN( "WAITING ON FREE SPACE: level: ", ring.level );
          using namespace std::chrono_literals;
-         std::this_thread::sleep_for(100us);
+         std::this_thread::sleep_for(100000us);
          _try_claim_free();
          if( ring.level == 3 ) {
             dump();
@@ -178,7 +178,9 @@ namespace trie
             _try_claim_free();
             if (ring.get_free_space() < used_size)
             {
-               WARN("what happened here?!!  ef: ", ring._head->end_free_p.load(),
+               _debug.store(true);
+               // there is potential free space, but a reader is blocking us?
+               WARN("what happened here?!!  level: ", ring.level, "  ef: ", ring._head->end_free_p.load(),
                     "  ap: ", ring._head->alloc_p.load(), "  used_size: ", used_size,
                     " max c: ", max_contig,
                     " delta: ", ring._head->end_free_p.load() - ring._head->alloc_p.load(),
@@ -186,10 +188,10 @@ namespace trie
                     " pot fre: ", ring._head->get_potential_free_space(),
                     " free: ", ring._head->get_free_space() );
                dump();
-               throw std::runtime_error( "out of space" );
+         //      throw std::runtime_error( "out of space" );
 
                using namespace std::chrono_literals;
-               std::this_thread::sleep_for(1ms);
+               std::this_thread::sleep_for(2000ms);
             }
             max_contig = ring.max_contigous_alloc();
             if (max_contig < used_size)
@@ -295,7 +297,7 @@ namespace trie
          SCOPE;
          auto fs     = from->_head->get_potential_free_space();
          auto maxs   = from->_head->alloc_area_size;
-         auto target = 1024*1024*8; //maxs / 32;  // target a certain amount free
+         auto target = 1024*1024*4; //maxs / 32;  // target a certain amount free
 
          if (target < fs) {
             if( _debug.load() ) {
