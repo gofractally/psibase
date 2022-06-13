@@ -562,7 +562,6 @@ namespace trie
                                                           string_view val,
                                                           bool&       inserted)
    {
-      SCOPE;
       if (not root)  // empty case
          return make_value(key, val);
 

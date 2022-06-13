@@ -157,10 +157,23 @@ namespace trie
 
       //DEBUG( "used size: ", used_size, " num_bytes: ", num_bytes, "  round_size: ", round_size );
 
+      while ( (ring._head->get_potential_free_space()) < used_size) {
+         WARN( "WAITING ON FREE SPACE" );
+         using namespace std::chrono_literals;
+         std::this_thread::sleep_for(100us);
+         _try_claim_free();
+         if( ring.level == 3 ) {
+            dump();
+            throw std::runtime_error( "database is out of space" );
+         }
+      }
+
       bool trace      = false;
       auto max_contig = ring.max_contigous_alloc();
 
-         while (ring._head->get_potential_free_space() > used_size)
+      if( max_contig < used_size ) {
+    //     WARN( "too little space at end to use: ", max_contig, " needed: ", used_size, "  wait for claim free" );
+         while ( (ring._head->get_potential_free_space()) > used_size)
          {
             _try_claim_free();
             if (ring.get_free_space() < used_size)
@@ -170,7 +183,10 @@ namespace trie
                     " max c: ", max_contig,
                     " delta: ", ring._head->end_free_p.load() - ring._head->alloc_p.load(),
                     " swap p: ", ring._head->swap_p.load(),
-                    " pot fre: ", ring._head->get_potential_free_space());
+                    " pot fre: ", ring._head->get_potential_free_space(),
+                    " free: ", ring._head->get_free_space() );
+               dump();
+               throw std::runtime_error( "out of space" );
 
                using namespace std::chrono_literals;
                std::this_thread::sleep_for(1ms);
@@ -180,6 +196,7 @@ namespace trie
             {
                if (max_contig > 0)
                {
+      //            WARN( "too little space at end to use: ", max_contig, " needed: ", used_size, "  wait for claim free  max:", max_contig );
                   auto* cur = ring.get_alloc_cursor();
                   cur->set_free_area_size(max_contig);
                   ring._head->alloc_p += max_contig;
@@ -188,7 +205,14 @@ namespace trie
             }
             else
                break;
-         }
+         } 
+         // TODO: this can be removed because it should be impossible?
+         /*if( ring._head->get_potential_free_space() < used_size ) {
+             WARN( "level: ", ring.level, " potential free: ", ring._head->get_potential_free_space() );
+             dump();
+             throw std::runtime_error( "out of space" );
+         }*/
+      }
          
          /*
          if (ring.get_free_space() < used_size)
@@ -264,25 +288,24 @@ namespace trie
    // moves data from higher levels to lower levels
    // can be run in any single thread because it doesn't modify the
    // source and it is the only modifies free areas of lower levels
-   void ring_allocator::swap()
+   bool ring_allocator::swap()
    {
       auto do_swap = [this](auto* from, auto* to)
       {
          SCOPE;
          auto fs     = from->_head->get_potential_free_space();
          auto maxs   = from->_head->alloc_area_size;
-         auto target = 1024*1024*64; //maxs / 32;  // target a certain amount free
+         auto target = 1024*1024*8; //maxs / 32;  // target a certain amount free
 
          if (target < fs) {
             if( _debug.load() ) {
                DEBUG( "target: ", target , " < potential_free_space: ", fs, " NOTHING TO SWAP  from: ", from->level );
                using namespace std::chrono_literals;
-               std::this_thread::sleep_for(200ms);
             }
-            return;
+            return false;
          }
 
-         if( _debug.load() ) {
+         if(  _debug.load() ) {
            WARN("               ", "target: ", target, "b  free space: ", fs, 
                                   " from: ", from->level, " to: ", to->level);
            DEBUG( "potential free space: ", from->_head->get_potential_free_space() );
@@ -329,7 +352,7 @@ namespace trie
                p += o->data_capacity() + 8;
             }
          }
-         if( _debug.load() ) {
+         if(_debug.load() ) {
             WARN( "before moved swap by: ", p - from->_head->swap_p.load() );
            DEBUG( "potential free space: ", from->_head->get_potential_free_space() );
            DEBUG( "free space: ", from->_head->get_free_space(), "  from: ", from );
@@ -340,11 +363,14 @@ namespace trie
            DEBUG( "potential free space: ", from->_head->get_potential_free_space() );
            DEBUG( "free space: ", from->_head->get_free_space() );
          }
+         return true;
       };
 
-      do_swap(&hot(), &warm());
-      do_swap(&warm(), &cool());
-      do_swap(&cool(), &cold());
+      bool did_work = false;
+      did_work |= do_swap(&hot(), &warm());
+      did_work |= do_swap(&warm(), &cool());
+      did_work |= do_swap(&cool(), &cold());
+      return did_work;
       //   do_swap(&cold(), &cold());
    }
 

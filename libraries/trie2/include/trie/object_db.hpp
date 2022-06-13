@@ -52,11 +52,11 @@ namespace trie
 
          friend bool operator != ( const object_location& a, const object_location& b ) 
          {
-            return *reinterpret_cast<const uint64_t*>(&a) != *reinterpret_cast<const uint64_t*>(&b);
+            return  a.offset != b.offset || (a.cache != b.cache | a.type != b.type);
          }
       } __attribute__((packed));
   // TODO expand 
-  //    static_assert(sizeof(object_location) == 6, "unexpected padding");
+     static_assert(sizeof(object_location) == 7, "unexpected padding");
 
       object_db(std::filesystem::path idfile, object_id max_id, bool allow_write);
       object_id alloc(object_location loc = {.offset = 0, .cache = hot_store});
@@ -171,12 +171,22 @@ namespace trie
    }
    inline void object_db::retain(object_id id)
    {
+      if( id.id > _header->first_unallocated.id ) [[unlikely]] {
+         DEBUG( "object ID is outside the allocated range" );
+         assert( !"object ID is outside the allocated range" );
+         throw std::runtime_error( "invalid object id, outside allocated range" );
+      }
       auto& obj = _header->objects[id.id];
       assert( ref(id) > 0 );
-      if( (obj.load( std::memory_order_relaxed ) & ref_count_mask) == ref_count_mask )[[unlikely]] {
+      auto cur_ref = obj.load() & ref_count_mask;
+      if( cur_ref == 0 )[[unlikely]] { 
+         DEBUG( "remove this later" );
+         throw std::runtime_error( "cannot retain an object at 0" );
+      }
+      if( cur_ref == ref_count_mask )[[unlikely]] {
          throw std::runtime_error( "too many references" );
       }
-      obj.fetch_add(1, std::memory_order_relaxed);
+      ++obj;
    }
 
    /**
@@ -186,9 +196,14 @@ namespace trie
    inline std::pair<object_db::object_location,uint16_t> object_db::release(object_id id)
    {
       auto& obj       = _header->objects[id.id];
-      auto  val       = obj.fetch_sub(1, std::memory_order_relaxed)-1; 
+      auto  val       = obj.fetch_sub(1)-1; 
       auto  new_count = (val & ref_count_mask);
 
+      if( new_count == ref_count_mask )[[unlikely]] {
+         WARN( "id: ", id.id );
+         assert( !"somethign went wrong with ref, released ref count of 0" );
+         throw std::runtime_error( "something went wrong with ref counts" );
+      }
       if (new_count == 0)
       {
          // the invariant is first_free->object with id that points to next free
@@ -198,8 +213,8 @@ namespace trie
 
          uint64_t ff;
          do {
-            ff = _header->first_free.load( std::memory_order_relaxed); 
-            obj.store( ff << 16, std::memory_order_relaxed);
+            ff = _header->first_free.load(); 
+            obj.store( ff << 16);
          } while( not _header->first_free.compare_exchange_strong( ff, id.id ) ); 
       }
       return {object_location{.offset = val >> 18, .cache = val >> 16, .type = (val >> 15)&1 },new_count};

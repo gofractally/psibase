@@ -48,7 +48,7 @@ namespace trie
       // return a pointer to the obj and its type if released
       std::pair<char*,object_db::object_location::object_type>  release(id);
 
-      void swap();
+      bool swap();
 
       // grows the free area after swap is complete,
       // must synchronize with reader threads, only has work to do
@@ -104,9 +104,11 @@ namespace trie
       {
          while (not _done.load(std::memory_order_relaxed))
          {
-            swap();
+            bool did_work = swap();
             using namespace std::chrono_literals;
-            std::this_thread::sleep_for(1ms);
+            if( not did_work ) {
+               std::this_thread::sleep_for(1ms);
+            }
          }
          WARN( "EXIT SWAP LOOP" );
       }
@@ -181,7 +183,7 @@ namespace trie
          alignas(64) std::atomic<uint64_t> alloc_p;
          alignas(64) std::atomic<uint64_t> swap_p;  // this could be read by multiple threads
          alignas(64) std::atomic<uint64_t> end_free_p;
-         uint32_t              alloc_area_mask;
+         uint64_t              alloc_area_mask;
          uint64_t              alloc_area_size;
 
          object_header* get_alloc_pos() const
@@ -191,11 +193,11 @@ namespace trie
          object_header* get_swap_pos() const
          {
             return reinterpret_cast<object_header*>(
-                (char*)begin.get() + swap_p.load(std::memory_order_relaxed) % alloc_area_size);
+                (char*)begin.get() + (swap_p.load(std::memory_order_relaxed) & alloc_area_mask));
          }
          object_header* get_end_free_pos() const
          {
-            return begin.get() + end_free_p % alloc_area_size;
+            return begin.get() + (end_free_p & alloc_area_mask);
          }
          inline object_header* get_end_pos() const { return end.get(); }
          inline uint64_t       get_free_space() const { return end_free_p.load() - alloc_p.load(); }
@@ -205,8 +207,8 @@ namespace trie
             auto ap =  alloc_p.load();
             auto ep = end_free_p.load();
             auto free_space = ep - ap;
-            auto wraped = (ap + free_space) % alloc_area_size;
-            if( (ap % alloc_area_size) > wraped ) {
+            auto wraped = (ap + free_space) & alloc_area_mask;
+            if( (ap & alloc_area_mask) > wraped ) {
                return free_space - wraped;
             }
             return free_space;

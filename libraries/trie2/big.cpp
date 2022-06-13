@@ -95,10 +95,10 @@ int main(int argc, char** argv)
        "big.dir",
        trie::database::config{
         //   .max_objects = (1 * total) / 4, .hot_pages = 1 * 1024ull, .cold_pages = 8*124 * 1024ull},
-          .max_objects = (5 * total) / 4, .hot_pages = 33, 
-                                          .warm_pages = 34,
-                                          .cool_pages = 35,
-                                          .cold_pages = 35 },
+          .max_objects = (5 * total) / 4, .hot_pages = 28, 
+                                          .warm_pages = 28,
+                                          .cool_pages = 29,
+                                          .cold_pages = 31 },
        //    .max_objects = (5 * total) / 4, .hot_pages =  16*1024ull, .cold_pages = 8*1024 * 1024ull},
        trie::database::read_write);
    db.print_stats();
@@ -199,13 +199,15 @@ int main(int argc, char** argv)
    {
       try
       {
-         if (i % (total / perc) == 1 )
+       //  if( i & (0xff == 0 )
+       //     db.swap();
+         if ( false and i % (total / perc) == 1 )
          {
 
             ++r;
      //       s->release_revision( {revisions[r%16]} );
-        //    revisions[r%16] = s->get_session_revision().id;
-        //    s->retain( {revisions[r%16]} );
+            revisions[r%16] = s->get_session_revision().id;
+            s->retain( {revisions[r%16]} );
             auto v = r.load(std::memory_order_relaxed);
             /*
             if ( v > 1)
@@ -220,7 +222,6 @@ int main(int argc, char** argv)
             }
             */
             if( v == 6 ) {
-               /*
                WARN( "STARTING READ THREADS" );
                new std::thread( [&](){read_loop(0);} );
                new std::thread( [&](){read_loop(1);} );
@@ -228,7 +229,6 @@ int main(int argc, char** argv)
                new std::thread( [&](){read_loop(3);} );
                new std::thread( [&](){read_loop(4);} );
                new std::thread( [&](){read_loop(5);} );
-               */
             }
          }
          // if( r > 10000 ) {
@@ -253,9 +253,13 @@ int main(int argc, char** argv)
          }
 
          uint64_t v[2];
-         uint64_t h = rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4 + rand64()/4;
+         uint64_t h[4];
+         h[0]= rand64();
+         h[1]= rand64();
+         h[2]= rand64();
+         h[3]= rand64();
       //   h          = bswap(h);
-          auto hk =  std::string_view((char*)&h, sizeof(h));
+          auto hk =  std::string_view((char*)h, sizeof(h));
           /*
           for( auto c : k ) {
              assert( 0 == c >> 6 );

@@ -179,6 +179,7 @@ namespace trie
           //  ++ic;
          }
       } else {
+         memset( children(), 0, num_branches()*sizeof(object_id) ); // TODO: redundant
          auto common_branches = in._present_bits & branches;
          auto fb              = std::countr_zero(common_branches);
          while (fb < 64)
