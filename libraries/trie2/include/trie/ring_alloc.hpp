@@ -49,6 +49,7 @@ namespace trie
       std::pair<char*,object_db::object_location::object_type>  release(id);
 
       bool swap();
+      inline void ensure_free_space();
 
       // grows the free area after swap is complete,
       // must synchronize with reader threads, only has work to do
@@ -107,7 +108,7 @@ namespace trie
             bool did_work = swap();
             using namespace std::chrono_literals;
             if( not did_work ) {
-               std::this_thread::sleep_for(1ms);
+               std::this_thread::sleep_for(100us);
             }
          }
          WARN( "EXIT SWAP LOOP" );
@@ -142,7 +143,7 @@ namespace trie
       }
       // assuming obj header holds an obj, returns the next spot that may hold an obj
       object_header* next() const { return (object_header*)(data() + data_capacity()); }
-   } __attribute__((packed)) __attribute__((aligned(1)));
+   };// __attribute__((packed)) __attribute__((aligned(1)));
    static_assert(sizeof(object_header) == 8, "unexpected padding");
 
    // wraps the file and handles resizing
@@ -200,12 +201,12 @@ namespace trie
             return begin.get() + (end_free_p & alloc_area_mask);
          }
          inline object_header* get_end_pos() const { return end.get(); }
-         inline uint64_t       get_free_space() const { return end_free_p.load() - alloc_p.load(); }
-         inline uint64_t       get_potential_free_space() const { return swap_p.load() + alloc_area_size - alloc_p.load(); }
+         inline uint64_t       get_free_space() const { return end_free_p.load(std::memory_order_relaxed) - alloc_p.load(std::memory_order_relaxed); }
+         inline uint64_t       get_potential_free_space() const { return swap_p.load(std::memory_order_acquire) + alloc_area_size - alloc_p.load(std::memory_order_relaxed); }
          uint64_t       max_contigous_alloc() const
          {
-            auto ap =  alloc_p.load();
-            auto ep = end_free_p.load();
+            auto ap = alloc_p.load( std::memory_order_relaxed );
+            auto ep = end_free_p.load( std::memory_order_relaxed );
             auto free_space = ep - ap;
             auto wraped = (ap + free_space) & alloc_area_mask;
             if( (ap & alloc_area_mask) > wraped ) {
@@ -253,11 +254,19 @@ namespace trie
    inline ring_allocator::swap_position ring_allocator::get_swap_pos() const
    {
       swap_position r;
-      r._swap_pos[0] = hot()._head->swap_p;
-      r._swap_pos[1] = warm()._head->swap_p;
-      r._swap_pos[2] = cool()._head->swap_p;
-      r._swap_pos[3] = cold()._head->swap_p;
+      r._swap_pos[0] = hot()._head->swap_p.load( std::memory_order_acquire );
+      r._swap_pos[1] = warm()._head->swap_p.load( std::memory_order_acquire );
+      r._swap_pos[2] = cool()._head->swap_p.load( std::memory_order_acquire );
+      r._swap_pos[3] = cold()._head->swap_p.load( std::memory_order_acquire );
       return r;
+   }
+
+   inline void ring_allocator::ensure_free_space() {
+      if( hot()._head->get_free_space() < 32*1024*1024 ) [[unlikely]] {
+         _try_claim_free();
+         while( hot()._head->get_free_space() < 32*1024*1024 ) 
+            _try_claim_free();
+      }
    }
 
    inline char* ring_allocator::get_cache(id i, std::vector<char>& tmp)

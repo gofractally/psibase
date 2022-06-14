@@ -157,19 +157,23 @@ namespace trie
 
       //DEBUG( "used size: ", used_size, " num_bytes: ", num_bytes, "  round_size: ", round_size );
 
-      while ( (ring._head->get_potential_free_space()) < used_size) {
-         WARN( "WAITING ON FREE SPACE: level: ", ring.level );
-         using namespace std::chrono_literals;
-         std::this_thread::sleep_for(100000us);
-         _try_claim_free();
-         if( ring.level == 3 ) {
-            dump();
-            throw std::runtime_error( "database is out of space" );
+      auto max_contig = ring.max_contigous_alloc();
+
+      if( max_contig < used_size ) {
+         while ( (ring._head->get_potential_free_space()) < used_size) {
+            WARN( "WAITING ON FREE SPACE: level: ", ring.level );
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(10us);
+            _try_claim_free();
+            if( ring.level == 3 ) {
+               dump();
+               throw std::runtime_error( "database is out of space" );
+            }
          }
+         max_contig = ring.max_contigous_alloc();
       }
 
       bool trace      = false;
-      auto max_contig = ring.max_contigous_alloc();
 
       if( max_contig < used_size ) {
     //     WARN( "too little space at end to use: ", max_contig, " needed: ", used_size, "  wait for claim free" );
@@ -191,7 +195,7 @@ namespace trie
          //      throw std::runtime_error( "out of space" );
 
                using namespace std::chrono_literals;
-               std::this_thread::sleep_for(2000ms);
+               std::this_thread::sleep_for(100us);
             }
             max_contig = ring.max_contigous_alloc();
             if (max_contig < used_size)
@@ -297,7 +301,7 @@ namespace trie
          SCOPE;
          auto fs     = from->_head->get_potential_free_space();
          auto maxs   = from->_head->alloc_area_size;
-         auto target = 1024*1024*4; //maxs / 32;  // target a certain amount free
+         auto target = 1024*1024*64; //maxs / 32;  // target a certain amount free
 
          if (target < fs) {
             if( _debug.load() ) {

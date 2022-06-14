@@ -49,6 +49,7 @@ namespace trie
 
       void swap();
       void claim_free() const;
+      inline void ensure_free_space();
 
       class session_base
       {
@@ -75,6 +76,12 @@ namespace trie
       template <typename AccessMode = write_access>
       class session : public session_base
       {
+         using iterator_data = std::vector<std::pair<id,char>>;
+         mutable std::vector<iterator_data> _iterators;
+         mutable uint64_t                   _used_iterators = 0;
+         inline uint64_t&                   used_iterators()const { return _used_iterators; }
+         inline auto&                     iterators()const { return _iterators; }
+
         public:
          struct iterator
          {
@@ -84,14 +91,25 @@ namespace trie
             std::string key() const;
             iterator&   operator++();
             iterator&   operator--();
-            bool        valid() const { return path.size() > 0; }
+            bool        valid() const { return path().size() > 0; }
 
             explicit operator bool() const { return valid(); }
 
+            ~iterator() { 
+               path().clear();
+               _session->used_iterators() ^= 1ull << _iter_num;
+            }
            private:
             friend class session;
-            iterator(const session& s) : _session(&s){};
-            std::vector<std::pair<id, char>> path;
+            iterator(const session& s) : _session(&s){
+               _iter_num = std::countr_one( _session->_used_iterators );
+               _session->used_iterators() ^= 1ull << _iter_num;
+            };
+
+
+            iterator_data& path()const { return _session->iterators()[_iter_num]; };
+
+            uint32_t                       _iter_num;
             const session*                   _session;
          };
 
@@ -333,18 +351,21 @@ namespace trie
       _cool_swap_p.store(sp._swap_pos[2], std::memory_order_relaxed);
       _cold_swap_p.store(sp._swap_pos[3], std::memory_order_relaxed);
    }
+
    template <typename AccessMode>
    inline void database::session<AccessMode>::unlock_swap_p() const
    {
-      _hot_swap_p.store(-1ull, std::memory_order_relaxed);
-      _warm_swap_p.store(-1ull, std::memory_order_relaxed);
-      _cool_swap_p.store(-1ull, std::memory_order_relaxed);
-      _cold_swap_p.store(-1ull, std::memory_order_relaxed);
+      _hot_swap_p.store(-1ull, std::memory_order_release);
+      _warm_swap_p.store(-1ull, std::memory_order_release);
+      _cool_swap_p.store(-1ull, std::memory_order_release);
+      _cold_swap_p.store(-1ull, std::memory_order_release);
    }
+
 
    template <typename AccessMode>
    database::session<AccessMode>::session(database& db) : _db(&db)
    {
+      _iterators.resize(64);
       std::lock_guard<std::mutex> lock(db._active_sessions_mutex);
       db._active_sessions.push_back(this);
    }
@@ -666,6 +687,7 @@ namespace trie
    // return true on insert, false on update
    inline bool database::write_session::upsert(string_view key, string_view val)
    {
+      _db->ensure_free_space();
       swap_guard g(*this);
 
       auto& ar = *_db->_ring;
@@ -686,6 +708,10 @@ namespace trie
    typename database::session<AccessMode>::iterator&
    database::session<AccessMode>::iterator::operator++()
    {
+      if constexpr( std::is_same_v<AccessMode,write_access> )
+         _session->_db->ensure_free_space();
+      swap_guard g(*_session);
+
       _session->next(*this);
       return *this;
    }
@@ -693,19 +719,22 @@ namespace trie
    typename database::session<AccessMode>::iterator&
    database::session<AccessMode>::iterator::operator--()
    {
+      if constexpr( std::is_same_v<AccessMode,write_access> )
+         _session->_db->ensure_free_space();
+      swap_guard g(*_session);
+
       _session->prev(*this);
       return *this;
    }
    template <typename AccessMode>
    void database::session<AccessMode>::prev(iterator& itr) const
    {
-      swap_guard g(*this);
       for (;;)
       {
-         if (not itr.path.size())
+         if (not itr.path().size())
             return;
 
-         auto& c = itr.path.back();
+         auto& c = itr.path().back();
          auto  n = get(c.first);
 
          if (c.second <= 0)
@@ -727,13 +756,13 @@ namespace trie
             if (in.value())
                return;
          }
-         itr.path.pop_back();
+         itr.path().pop_back();
       }
 
       // find last
       for (;;)
       {
-         auto& c = itr.path.back();
+         auto& c = itr.path().back();
          auto  n = get(c.first);
 
          if (n.is_leaf_node())
@@ -745,29 +774,19 @@ namespace trie
 
          if (bi.is_leaf_node())
          {
-            itr.path.emplace_back(b, -1);
+            itr.path().emplace_back(b, -1);
             return;
          }
          auto& bin = bi.as_inner_node();
-         itr.path.emplace_back(b, bin.reverse_lower_bound(63));
+         itr.path().emplace_back(b, bin.reverse_lower_bound(63));
       }
    }
    template <typename AccessMode>
    void database::session<AccessMode>::next(iterator& itr) const
    {
-      swap_guard g(*this);
-      //      WARN( "start key: ", from_key(itr.key()) );
-      //      auto print_path = [&]() {
-      //     for( auto x : itr.path ) {
-      //       std::cerr << "#" << x.first.id << "->" << char(x.second + 62) <<"["<<int(x.second)<<"] ";
-      //   }
-      //  std::cerr<<"\n";
-      // };
-      //     print_path();
-
-      while (itr.path.size())
+      while (itr.path().size())
       {
-         auto& c = itr.path.back();
+         auto& c = itr.path().back();
 
          auto n = get(c.first);
 
@@ -781,37 +800,37 @@ namespace trie
                // find first
                for (;;)
                {
-                  auto n = get(itr.path.back().first);
+                  auto n = get(itr.path().back().first);
                   if (n.is_leaf_node())
                      return;
 
                   auto& in = n.as_inner_node();
 
-                  auto  b   = in.branch(itr.path.back().second);
+                  auto  b   = in.branch(itr.path().back().second);
                   auto  bi  = get(b);
                   auto& bin = bi.as_inner_node();
 
                   if (bin.value())
                   {
-                     itr.path.emplace_back(b, -1);
+                     itr.path().emplace_back(b, -1);
                      return;
                   }
 
-                  itr.path.emplace_back(b, bin.lower_bound(0));
+                  itr.path().emplace_back(b, bin.lower_bound(0));
                }
             }
          }
 
-         itr.path.pop_back();
+         itr.path().pop_back();
       }
    }
 
    template <typename AccessMode>
    std::string_view database::session<AccessMode>::iterator::value() const
    {
-      if (path.size() == 0)
+      if (path().size() == 0)
          return std::string_view();
-      auto n = _session->get(path.back().first);
+      auto n = _session->get(path().back().first);
       if (n.is_leaf_node())
       {
          return n.as_value_node().data();
@@ -824,11 +843,11 @@ namespace trie
    template <typename AccessMode>
    uint32_t database::session<AccessMode>::iterator::key_size() const
    {
-      if (path.size() == 0)
+      if (path().size() == 0)
          return 0;
-      int s = path.size() - 1;
+      int s = path().size() - 1;
 
-      for (auto& e : path)
+      for (auto& e : path())
       {
          auto n = _session->get(e.first);
          s += n->key_size();
@@ -842,7 +861,7 @@ namespace trie
       auto  key_len = std::min<uint32_t>(data_len, key_size());
       char* start   = data;
 
-      for (auto& e : path)
+      for (auto& e : path())
       {
          auto n = _session->get(e.first);
          auto b = n->key_size();
@@ -889,27 +908,34 @@ namespace trie
    template <typename AccessMode>
    typename database::session<AccessMode>::iterator database::session<AccessMode>::first() const
    {
+
+
       id       root = _session_root;
       iterator result(*this);
       if (not root)
          return result;
+
+      if constexpr( std::is_same_v<AccessMode,write_access> )
+         _db->ensure_free_space();
+
+      swap_guard g(*this);
 
       for (;;)
       {
          auto n = get(root);
          if (n.is_leaf_node())
          {
-            result.path.emplace_back(root, -1);
+            result.path().emplace_back(root, -1);
             return result;
          }
          auto& in = n.as_inner_node();
          if (in.value())
          {
-            result.path.emplace_back(root, -1);
+            result.path().emplace_back(root, -1);
             return result;
          }
          auto lb = in.lower_bound(0);
-         result.path.emplace_back(root, lb);
+         result.path().emplace_back(root, lb);
          root = in.branch(lb);
       }
    }
@@ -921,18 +947,23 @@ namespace trie
       if (not root)
          return result;
 
+      if constexpr( std::is_same_v<AccessMode,write_access> )
+         _db->ensure_free_space();
+
+      swap_guard g(*this);
+
       for (;;)
       {
          auto n = get(root);
          if (n.is_leaf_node())
          {
-            result.path.emplace_back(root, -1);
+            result.path().emplace_back(root, -1);
             return result;
          }
 
          auto& in  = n.as_inner_node();
          auto  rlb = in.reverse_lower_bound(63);
-         result.path.emplace_back(root, rlb);
+         result.path().emplace_back(root, rlb);
 
          if (rlb < 0) [[unlikely]]  // should be impossible until keys > 128b are supported
             return result;
@@ -954,12 +985,16 @@ namespace trie
    {
       id       root = _session_root;
       iterator result(*this);
+
       if (not root)
          return result;
 
       prefix = to_key6(prefix);
 
+      if constexpr( std::is_same_v<AccessMode,write_access> )
+         _db->ensure_free_space();
       swap_guard g(*this);
+
       for (;;)
       {
          auto n = get(root);
@@ -971,7 +1006,7 @@ namespace trie
 
             if (pre == prefix)
             {
-               result.path.emplace_back(root, -1);
+               result.path().emplace_back(root, -1);
                return result;
             }
             return iterator(*this);
@@ -988,7 +1023,7 @@ namespace trie
 
                if (n.is_leaf_node())
                {
-                  result.path.emplace_back(root, -1);
+                  result.path().emplace_back(root, -1);
                   return result;
                }
 
@@ -997,11 +1032,11 @@ namespace trie
 
                if (b == -1) [[unlikely]]
                {  /// this should be impossible in well formed tree
-                  result.path.emplace_back(root, -1);
+                  result.path().emplace_back(root, -1);
                   return result;
                }
 
-               result.path.emplace_back(root, b);
+               result.path().emplace_back(root, b);
                root = in.branch(b);
             }
             return result;
@@ -1012,7 +1047,7 @@ namespace trie
          {
             if (cpre == prefix)
             {
-               result.path.emplace_back(root, -1);
+               result.path().emplace_back(root, -1);
                return result;
             }
             return iterator(*this);
@@ -1037,6 +1072,8 @@ namespace trie
 
       key = to_key6(key);
 
+      if constexpr( std::is_same_v<AccessMode,write_access> )
+         _db->ensure_free_space();
       swap_guard g(*this);
       for (;;)
       {
@@ -1045,7 +1082,7 @@ namespace trie
          {
             auto& vn = n.as_value_node();
 
-            result.path.emplace_back(root, -1);
+            result.path().emplace_back(root, -1);
 
             if (vn.key() < key)
                next(result);
@@ -1058,7 +1095,7 @@ namespace trie
 
          if (in_key >= key)
          {
-            result.path.emplace_back(root, -1);
+            result.path().emplace_back(root, -1);
             if (not in.value())
                next(result);
             return result;
@@ -1067,7 +1104,7 @@ namespace trie
          auto cpre = common_prefix(key, in_key);
          if (key <= cpre)
          {
-            result.path.emplace_back(root, -1);
+            result.path().emplace_back(root, -1);
             if (not in.value())
                next(result);
             return result;
@@ -1078,7 +1115,7 @@ namespace trie
          auto b = in.lower_bound(key[cpre.size()]);
          if (b < 64)
          {
-            result.path.emplace_back(root, b);
+            result.path().emplace_back(root, b);
             root = in.branch(b);
             key  = key.substr(cpre.size() + 1);
             continue;
@@ -1097,6 +1134,10 @@ namespace trie
          return iterator(*this);
 
       iterator   result(*this);
+
+      if constexpr( std::is_same_v<AccessMode,write_access> )
+         _db->ensure_free_space();
+
       swap_guard g(*this);
       for (;;)
       {
@@ -1106,7 +1147,7 @@ namespace trie
             auto& vn = n.as_value_node();
             if (vn.key() == key)
             {
-               result.path.emplace_back(root, -1);
+               result.path().emplace_back(root, -1);
                return result;
             }
             break;
@@ -1123,7 +1164,7 @@ namespace trie
             if (not in.value())
                break;
 
-            //result.path.emplace_back(root, -1);
+            //result.path().emplace_back(root, -1);
             root = in.value();
             key  = string_view();
             continue;
@@ -1138,7 +1179,7 @@ namespace trie
          if (not in.has_branch(b))
             break;
 
-         result.path.emplace_back(root, b);
+         result.path().emplace_back(root, b);
          key  = key.substr(cpre.size() + 1);
          root = in.branch(b);
       }
@@ -1156,6 +1197,10 @@ namespace trie
    {
       if (not root)
          return std::nullopt;
+
+      if constexpr( std::is_same_v<AccessMode,write_access> )
+         _db->ensure_free_space();
+
       swap_guard g(*this);
       for (;;)
       {
@@ -1197,6 +1242,7 @@ namespace trie
 
    inline bool database::write_session::remove(string_view key)
    {
+      _db->ensure_free_space();
       swap_guard g(*this);
       bool       removed  = false;
       auto       new_root = remove_child(_session_root, to_key6(key), removed);
@@ -1211,9 +1257,6 @@ namespace trie
                                                              string_view key,
                                                              bool&       removed)
    {
-      //SCOPE;
-      // DEBUG( "key: ", from_key(key),  "  root: " , root.id );
-
       if (not root)
       {
          removed = false;
@@ -1223,7 +1266,6 @@ namespace trie
       auto n = get(root);
       if (n.is_leaf_node())  // current root is value
       {
-         //   WARN( "IS VALUE NODE" );
          auto& vn = n.as_value_node();
          removed  = vn.key() == key;
          return id();
@@ -1537,6 +1579,9 @@ inline key_type from_key6(const key_view sixb)
             break;
       }
       return {key_buf.data(),key_buf.size()};
+   }
+   inline void database::ensure_free_space() {
+      _ring->ensure_free_space(); 
    }
 
 }  // namespace trie

@@ -228,27 +228,27 @@ namespace trie
    inline object_db::object_location object_db::get(object_id id)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-      std::atomic_thread_fence(std::memory_order_acquire);
+    //  std::atomic_thread_fence(std::memory_order_acquire);
       assert((val & ref_count_mask) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
       r.type   = (val >> 15) & 1;
-      std::atomic_thread_fence(std::memory_order_acquire);
+     // std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
 
    inline object_db::object_location object_db::get(object_id id, uint16_t& ref)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-      std::atomic_thread_fence(std::memory_order_acquire);
+     // std::atomic_thread_fence(std::memory_order_acquire);
      // assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
       r.type   = (val >> 15) & 1;
       ref = val & ref_count_mask;
-      std::atomic_thread_fence(std::memory_order_acquire);
+     // std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
 

@@ -6,7 +6,7 @@ if(UNIX AND NOT APPLE)
     set(LINUX_LIBS rt)
 endif()
 
-find_package(Boost 1.75 REQUIRED COMPONENTS )
+find_package(Boost 1.75 REQUIRED COMPONENTS program_options )
 
 set(MDBX_OUTPUT_DIR ${CMAKE_BINARY_DIR}/mdbx)
 set(MDBX_BUILD_TIMESTAMP unknown)
@@ -20,7 +20,7 @@ set_property( TARGET test PROPERTY CXX_STANDARD 20 )
 
 
 add_executable( bigdb ring_alloc.cpp database.cpp  big.cpp  )
-target_link_libraries( bigdb PUBLIC ${LINUX_LIBS} Threads::Threads )
+target_link_libraries( bigdb PUBLIC ${LINUX_LIBS} Threads::Threads Boost::program_options )
 target_compile_options( bigdb PUBLIC -msse4.1 )
 target_include_directories( bigdb PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
 set_property( TARGET bigdb PROPERTY CXX_STANDARD 20 )
