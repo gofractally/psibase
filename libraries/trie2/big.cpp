@@ -37,12 +37,14 @@ int main(int argc, char** argv)
    uint32_t cold_page_c = 35;
    uint64_t num_objects = 250*1000*1000;
    std::string db_dir;
+   bool use_string = false;
 
    uint32_t       num_read_threads = 6;
    po::options_description desc( "Allowed options" );
    desc.add_options()
       ("help,h", "print this message")
       ("reset", "reset the database" )
+      ("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys" )
       ("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"), "the folder that contains the database" )
       ("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6), "number of read threads to launch")
       ("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(34), "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")
@@ -81,6 +83,7 @@ int main(int argc, char** argv)
 
    std::vector<uint64_t> revisions;
    revisions.resize(16);
+   for( auto& e : revisions ) e = 0;
 
    std::map<std::string, std::string> base;
 
@@ -102,7 +105,7 @@ int main(int argc, char** argv)
    for (auto& t : total_lookups)
       t.total_lookups.store(0);
 
-   std::atomic<uint64_t> revs[32];
+   std::atomic<uint64_t> revs[16];
    for (auto& r : revs)
       r.store(0);
 
@@ -120,7 +123,6 @@ int main(int argc, char** argv)
          while (r.load(std::memory_order_relaxed) == v)
          {
             uint64_t h = (uint64_t(gen()) << 32) | gen();
-            ch *= 1000999;
             auto itr = rs->lower_bound(std::string_view((char*)&h, sizeof(h)));
             if (itr.valid())
                ++total_lookups[c].total_lookups;
@@ -172,12 +174,12 @@ int main(int argc, char** argv)
          //     db.swap();
          if (i % (total / perc) == 1)
          {
-            ++r;
-            //       s->release_revision( {revisions[r%16]} );
-            revisions[r % 16] = s->get_session_revision().id;
-            s->retain({revisions[r % 16]});
-            auto v = r.load(std::memory_order_relaxed);
-            if (v == 6)
+            auto new_r = r.load()+1;
+            revisions[new_r % 16] = s->get_session_revision().id;
+            s->retain({revisions[new_r % 16]});
+            s->fork();
+
+            if (++r == 6)
             {
                WARN("STARTING READ THREADS");
                for (int x = 0; x < num_read_threads; ++x)
@@ -212,14 +214,12 @@ int main(int argc, char** argv)
          uint64_t v[2];
          uint64_t h[4];
          std::string str = std::to_string(rand64());
-         /*
          h[0] = rand64();
          h[1] = rand64();
          h[2] = rand64();
          h[3] = rand64();
-         */
          //   h          = bswap(h);
-         //auto hk = std::string_view((char*)h, sizeof(h));
+         auto hk = std::string_view((char*)h, sizeof(h));
          /*
           for( auto c : k ) {
              assert( 0 == c >> 6 );
@@ -231,10 +231,18 @@ int main(int argc, char** argv)
          if (i < total)
          {
             //base.emplace( std::make_pair(k,std::string((char*)&h, sizeof(h))) );
-            bool inserted = s->upsert(str,str);
-            if (not inserted)
-            {
-               WARN("failed to insert: ", h);
+            if( use_string ) {
+               bool inserted = s->upsert(str,str);
+               if (not inserted)
+               {
+                  WARN("failed to insert: ", h);
+               }
+            } else {
+               bool inserted = s->upsert(hk,hk);
+               if (not inserted)
+               {
+                  WARN("failed to insert: ", h);
+               }
             }
             assert(inserted);
 

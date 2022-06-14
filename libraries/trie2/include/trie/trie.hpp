@@ -201,7 +201,7 @@ namespace trie
         public:
          bool upsert(string_view key, string_view val);
          bool remove(string_view key);
-         id   fork(id from_version = id());
+         id   fork(id from_version );
          id   fork();
 
          void set_root_revision(id);
