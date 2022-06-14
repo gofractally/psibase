@@ -29,11 +29,11 @@ namespace trie
      public:
       struct config
       {
-         uint64_t max_objects    = 1000 * 1000ull;
-         uint64_t hot_pages      = 32;
-         uint64_t warm_pages     = 32;
-         uint64_t cool_pages     = 32;
-         uint64_t cold_pages     = 32;
+         uint64_t max_objects = 1000 * 1000ull;
+         uint64_t hot_pages   = 32;
+         uint64_t warm_pages  = 32;
+         uint64_t cool_pages  = 32;
+         uint64_t cold_pages  = 32;
       };
 
       enum access_mode
@@ -47,8 +47,8 @@ namespace trie
       database(std::filesystem::path dir, config, access_mode allow_write);
       ~database();
 
-      void swap();
-      void claim_free() const;
+      void        swap();
+      void        claim_free() const;
       inline void ensure_free_space();
 
       class session_base
@@ -62,8 +62,8 @@ namespace trie
          mutable std::atomic<uint64_t> _cool_swap_p = -1ull;
          mutable std::atomic<uint64_t> _cold_swap_p = -1ull;
 
+         key_view to_key6(key_view v) const;
 
-         key_view to_key6(key_view v)const;
         private:
          mutable key_type key_buf;
       };
@@ -76,11 +76,11 @@ namespace trie
       template <typename AccessMode = write_access>
       class session : public session_base
       {
-         using iterator_data = std::vector<std::pair<id,char>>;
+         using iterator_data = std::vector<std::pair<id, char>>;
          mutable std::vector<iterator_data> _iterators;
          mutable uint64_t                   _used_iterators = 0;
-         inline uint64_t&                   used_iterators()const { return _used_iterators; }
-         inline auto&                     iterators()const { return _iterators; }
+         inline uint64_t&                   used_iterators() const { return _used_iterators; }
+         inline auto&                       iterators() const { return _iterators; }
 
         public:
          struct iterator
@@ -95,22 +95,37 @@ namespace trie
 
             explicit operator bool() const { return valid(); }
 
-            ~iterator() { 
-               path().clear();
-               _session->used_iterators() ^= 1ull << _iter_num;
+            ~iterator()
+            {
+               if( _iter_num != -1 ) {
+                  path().clear();
+                  _session->used_iterators() ^= 1ull << _iter_num;
+               }
             }
+
+            iterator(const iterator& c) : _session(c._session)
+            {
+               _iter_num = std::countr_one(_session->_used_iterators);
+               _session->used_iterators() ^= 1ull << _iter_num;
+               path() = c.path();
+            }
+            iterator(iterator&& c) : _session(c._session),_iter_num(c._iter_num)
+            {
+               c._iter_num = -1;
+            }
+
            private:
             friend class session;
-            iterator(const session& s) : _session(&s){
-               _iter_num = std::countr_one( _session->_used_iterators );
+            iterator(const session& s) : _session(&s)
+            {
+               _iter_num = std::countr_one(_session->_used_iterators);
                _session->used_iterators() ^= 1ull << _iter_num;
             };
 
+            iterator_data& path() const { return _session->iterators()[_iter_num]; };
 
-            iterator_data& path()const { return _session->iterators()[_iter_num]; };
-
-            uint32_t                       _iter_num;
-            const session*                   _session;
+            uint32_t       _iter_num;
+            const session* _session;
          };
 
          /* makes this session read from the root revision */
@@ -138,12 +153,13 @@ namespace trie
          /* the root revision of this session */
          id revision() { return _session_root; }
 
-         iterator                   first() const;
-         iterator                   last() const;
-         iterator                   find(string_view key) const;
-         iterator                   lower_bound(string_view key) const;
-         iterator                   last_with_prefix(string_view prefix) const;
-         std::optional<string_view> get(string_view key) const;
+         iterator first() const;
+         iterator last() const;
+         iterator find(string_view key) const;
+         iterator lower_bound(string_view key) const;
+         iterator last_with_prefix(string_view prefix) const;
+         bool     get(string_view key, std::string& result) const;
+         std::optional<std::string> get(string_view key )const;
 
          void print();
          void validate();
@@ -360,7 +376,6 @@ namespace trie
       _cool_swap_p.store(-1ull, std::memory_order_release);
       _cold_swap_p.store(-1ull, std::memory_order_release);
    }
-
 
    template <typename AccessMode>
    database::session<AccessMode>::session(database& db) : _db(&db)
@@ -708,7 +723,7 @@ namespace trie
    typename database::session<AccessMode>::iterator&
    database::session<AccessMode>::iterator::operator++()
    {
-      if constexpr( std::is_same_v<AccessMode,write_access> )
+      if constexpr (std::is_same_v<AccessMode, write_access>)
          _session->_db->ensure_free_space();
       swap_guard g(*_session);
 
@@ -719,7 +734,7 @@ namespace trie
    typename database::session<AccessMode>::iterator&
    database::session<AccessMode>::iterator::operator--()
    {
-      if constexpr( std::is_same_v<AccessMode,write_access> )
+      if constexpr (std::is_same_v<AccessMode, write_access>)
          _session->_db->ensure_free_space();
       swap_guard g(*_session);
 
@@ -908,14 +923,12 @@ namespace trie
    template <typename AccessMode>
    typename database::session<AccessMode>::iterator database::session<AccessMode>::first() const
    {
-
-
       id       root = _session_root;
       iterator result(*this);
       if (not root)
          return result;
 
-      if constexpr( std::is_same_v<AccessMode,write_access> )
+      if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
 
       swap_guard g(*this);
@@ -947,7 +960,7 @@ namespace trie
       if (not root)
          return result;
 
-      if constexpr( std::is_same_v<AccessMode,write_access> )
+      if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
 
       swap_guard g(*this);
@@ -991,7 +1004,7 @@ namespace trie
 
       prefix = to_key6(prefix);
 
-      if constexpr( std::is_same_v<AccessMode,write_access> )
+      if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
       swap_guard g(*this);
 
@@ -1072,7 +1085,7 @@ namespace trie
 
       key = to_key6(key);
 
-      if constexpr( std::is_same_v<AccessMode,write_access> )
+      if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
       swap_guard g(*this);
       for (;;)
@@ -1133,9 +1146,9 @@ namespace trie
       if (not root)
          return iterator(*this);
 
-      iterator   result(*this);
+      iterator result(*this);
 
-      if constexpr( std::is_same_v<AccessMode,write_access> )
+      if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
 
       swap_guard g(*this);
@@ -1187,10 +1200,34 @@ namespace trie
    }
 
    template <typename AccessMode>
-   std::optional<std::string_view> database::session<AccessMode>::get(string_view key) const
-   {
-      return get(_session_root, to_key6(key) );
+   std::optional<std::string> database::session<AccessMode>::get(string_view key )const {
+      std::string r;
+      if( get( key, r ) ) {
+         return std::optional( std::move(r) );
+      }
+      return std::nullopt;
    }
+
+   template <typename AccessMode>
+   bool database::session<AccessMode>::get(string_view key, std::string& result) const
+   {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _db->ensure_free_space();
+
+      auto k6 = to_key6(key);
+      swap_guard g(*this);
+
+      auto v = get(_session_root, k6);
+      if( v ) {
+         result.resize( v->size() );
+         memcpy( result.data(), v->data(), v->size() );
+         return true;
+      } else {
+         result.resize(0);
+         return false;
+      }
+   }
+
    template <typename AccessMode>
    std::optional<std::string_view> database::session<AccessMode>::get(id          root,
                                                                       string_view key) const
@@ -1198,10 +1235,6 @@ namespace trie
       if (not root)
          return std::nullopt;
 
-      if constexpr( std::is_same_v<AccessMode,write_access> )
-         _db->ensure_free_space();
-
-      swap_guard g(*this);
       for (;;)
       {
          auto n = get(root);
@@ -1222,10 +1255,10 @@ namespace trie
          {
             root = in.value();
 
-            if( not root ) 
+            if (not root)
                return std::nullopt;
 
-            key  = string_view();
+            key = string_view();
             continue;
          }
 
@@ -1509,45 +1542,45 @@ namespace trie
       }
    }
 
-inline key_type from_key6(const key_view sixb)
-{
-   //  for( auto c : sixb ) {print6(c); std::cout <<" ";}
-   //  std::cout <<"\n";
-   std::string out;
-   out.resize((sixb.size() * 6) / 8);
-
-   const char* pos6     = sixb.data();
-   const char* pos6_end = sixb.data() + sixb.size();
-   char*       pos8     = out.data();
-
-   while (pos6 + 4 <= pos6_end)
+   inline key_type from_key6(const key_view sixb)
    {
-      pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
-      pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
-      pos8[2] = (pos6[2] << 6) | pos6[3];         // 2b + 6
-      pos6 += 4;
-      pos8 += 3;
-   }
-   switch (pos6_end - pos6)
-   {
-      case 3:
+      //  for( auto c : sixb ) {print6(c); std::cout <<" ";}
+      //  std::cout <<"\n";
+      std::string out;
+      out.resize((sixb.size() * 6) / 8);
+
+      const char* pos6     = sixb.data();
+      const char* pos6_end = sixb.data() + sixb.size();
+      char*       pos8     = out.data();
+
+      while (pos6 + 4 <= pos6_end)
+      {
          pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
          pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
-         pos8[2] = (pos6[2] << 6);                   // 2b + 6-0
-         break;
-      case 2:
-         pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
-         pos8[1] = (pos6[1] << 4);                   // 4b + 4-0
-         break;
-      case 1:
-         pos8[0] = (pos6[0] << 2);  // 6 + 2-0
-         break;
+         pos8[2] = (pos6[2] << 6) | pos6[3];         // 2b + 6
+         pos6 += 4;
+         pos8 += 3;
+      }
+      switch (pos6_end - pos6)
+      {
+         case 3:
+            pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
+            pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
+            pos8[2] = (pos6[2] << 6);                   // 2b + 6-0
+            break;
+         case 2:
+            pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
+            pos8[1] = (pos6[1] << 4);                   // 4b + 4-0
+            break;
+         case 1:
+            pos8[0] = (pos6[0] << 2);  // 6 + 2-0
+            break;
+      }
+      //   for( auto c : out ) { print8(c); std::cout <<" "; }
+      //   std::cout << "from_key("<<out<<")\n";
+      return out;
    }
-   //   for( auto c : out ) { print8(c); std::cout <<" "; }
-   //   std::cout << "from_key("<<out<<")\n";
-   return out;
-}
-   inline key_view database::session_base::to_key6(key_view v)const
+   inline key_view database::session_base::to_key6(key_view v) const
    {
       auto bits  = v.size() * 8;
       auto byte6 = (bits + 5) / 6;
@@ -1582,10 +1615,8 @@ inline key_type from_key6(const key_view sixb)
          default:
             break;
       }
-      return {key_buf.data(),key_buf.size()};
+      return {key_buf.data(), key_buf.size()};
    }
-   inline void database::ensure_free_space() {
-      _ring->ensure_free_space(); 
-   }
+   inline void database::ensure_free_space() { _ring->ensure_free_space(); }
 
 }  // namespace trie
