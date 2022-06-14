@@ -129,7 +129,7 @@ namespace trie
           new managed_ring(dir / "cold", cfg.cold_pages, cold_cache, false));
 
       _swap_thread = std::make_unique<std::thread>(
-          [=]()
+          [this]()
           {
              thread_name("swap");
              swap_loop();

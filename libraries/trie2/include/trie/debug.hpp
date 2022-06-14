@@ -1,6 +1,7 @@
 #pragma once
 #include <iomanip>
 #include <iostream>
+#include <atomic>
 
 struct scope {
    scope(const scope&) = delete;

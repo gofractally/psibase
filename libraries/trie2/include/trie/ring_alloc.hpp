@@ -3,6 +3,7 @@
 #include <chrono>
 #include <optional>
 #include <thread>
+#include <functional>
 #include <trie/object_db.hpp>
 
 namespace trie

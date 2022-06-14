@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <filesystem>
 
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
