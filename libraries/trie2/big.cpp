@@ -9,6 +9,8 @@
 
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/program_options/parsers.hpp>
 
 #include <trie/trie.hpp>
 
@@ -29,31 +31,50 @@ int64_t rand64()
 int main(int argc, char** argv)
 {
    namespace po = boost::program_options;
+   uint32_t hot_page_c = 34;
+   uint32_t warm_page_c = 33;
+   uint32_t cool_page_c = 35;
+   uint32_t cold_page_c = 35;
+   uint64_t num_objects = 250*1000*1000;
+   std::string db_dir;
 
+   uint32_t       num_read_threads = 6;
    po::options_description desc( "Allowed options" );
    desc.add_options()
-      ("help", "print this message")
-      ("read-threads", "number of read threads to launch")
-      ("hot-size", "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")
-      ("warm-size", "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(hot_size) bytes")
-      ("cool-size", "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(hot_size) bytes")
-      ("cold-size", "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(hot_size) bytes")
+      ("help,h", "print this message")
+      ("reset", "reset the database" )
+      ("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"), "the folder that contains the database" )
+      ("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6), "number of read threads to launch")
+      ("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(34), "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")
+      ("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33), "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")
+      ("warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33), "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(hot_size) bytes")
+      ("cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33), "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(hot_size) bytes")
+      ("cold-size,C",po::value<uint32_t>(&cold_page_c)->default_value(33),  "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(hot_size) bytes")
+      ("max-objects,O",po::value<uint64_t>(&num_objects)->default_value(num_objects),  "the maximum number of unique objects in the database")
       ;
-      
 
+   po::variables_map vm;
+   po::store( po::parse_command_line( argc, argv, desc), vm );
+   po::notify(vm);
 
-   uint64_t       num_read_threads = 10;
+   if( vm.count("help") ) {
+      std::cout << desc <<"\n";
+      return 1;
+   }
+   if( vm.count( "reset" ) ) {
+      std::cout << "resetting database\n";
+      std::filesystem::remove_all( db_dir );
+   }
+
    uint64_t       total            = 2 * 1000 * 1000 * 1000;
    trie::database db(
-       "big.dir",
+       db_dir.c_str(),
        trie::database::config{
-           //   .max_objects = (1 * total) / 4, .hot_pages = 1 * 1024ull, .cold_pages = 8*124 * 1024ull},
-           .max_objects = (5 * total) / 4,
-           .hot_pages   = 34,
-           .warm_pages  = 33,
-           .cool_pages  = 35,
-           .cold_pages  = 35},
-       //    .max_objects = (5 * total) / 4, .hot_pages =  16*1024ull, .cold_pages = 8*1024 * 1024ull},
+           .max_objects = num_objects,
+           .hot_pages   = hot_page_c,
+           .warm_pages  = warm_page_c,
+           .cool_pages  = cool_page_c,
+           .cold_pages  = cold_page_c},
        trie::database::read_write);
    db.print_stats();
    auto s = db.start_write_session();
@@ -190,12 +211,15 @@ int main(int argc, char** argv)
 
          uint64_t v[2];
          uint64_t h[4];
+         std::string str = std::to_string(rand64());
+         /*
          h[0] = rand64();
          h[1] = rand64();
          h[2] = rand64();
          h[3] = rand64();
+         */
          //   h          = bswap(h);
-         auto hk = std::string_view((char*)h, sizeof(h));
+         //auto hk = std::string_view((char*)h, sizeof(h));
          /*
           for( auto c : k ) {
              assert( 0 == c >> 6 );
@@ -207,7 +231,7 @@ int main(int argc, char** argv)
          if (i < total)
          {
             //base.emplace( std::make_pair(k,std::string((char*)&h, sizeof(h))) );
-            bool inserted = s->upsert(hk, hk);
+            bool inserted = s->upsert(str,str);
             if (not inserted)
             {
                WARN("failed to insert: ", h);

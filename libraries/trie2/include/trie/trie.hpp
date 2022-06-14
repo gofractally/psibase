@@ -1221,6 +1221,10 @@ namespace trie
          if (key == in_key)
          {
             root = in.value();
+
+            if( not root ) 
+               return std::nullopt;
+
             key  = string_view();
             continue;
          }
