@@ -13,6 +13,8 @@ using namespace UserContract::Errors;
 using namespace UserContract;
 
 constexpr std::string_view MEMBER_IS_EVICTED = "member is removed from the community";
+constexpr std::string_view EMPTY_CHAIN = "a default chain";
+// TODO: add billing note where applicable and assert on the specific amount of resources (to notice when resource costs change)
 
 namespace
 {
@@ -39,19 +41,18 @@ namespace
 
 SCENARIO("Scheduling meetings")
 {
-   GIVEN("a first-time deployed contract")
+   GIVEN(EMPTY_CHAIN)
    {
-      THEN("There is no meeting scheduled") {
-         AND_THEN("The meeting cadence and day of week + time can be set") {
-            AND_THEN("The meeting cadence cannot be changed (without the Council's say)") { }
-            AND_THEN("The meeting happens at the set time") { }
+      WHEN("There is no meeting scheduled") {
+         AND_THEN("The meeting cadence and day of week + time can be set") { }
+      }
+      WHEN("A meeting is scheduled") {
+         THEN("The meeting happens at the set time") { }
+         THEN("The meeting cadence cannot be changed (by a non-Council member)") { }
+         THEN("The meeting cadence and day of the week can be changed by an Council consensus") {
             // TODO: Tests around Council changing cadence, day/time
          }
       }
-   }
-   GIVEN("an established meeting schedule and cadence")
-   {
-      THEN("The meeting cadence and day of week + time can be updated") { }
    }
 }
 
@@ -96,112 +97,125 @@ SCENARIO("Meeting Attendance and Consensus") {
    constexpr std::string_view CONSENSUS_ACHIEVED = "funds are distributed only to those who were aligned on the consensus report";
    constexpr std::string_view CONSENSUS_NOT_ACHIEVED = "funds are *not* distributed";
 
-   WHEN("There are no consensus reports submitted") {
-      WHEN("There are no participants in a meeting") {
-         THEN(CONSENSUS_NOT_ACHIEVED) { }
-      }
-      WHEN("There are 6 participants in a meeting") {
-        THEN(CONSENSUS_NOT_ACHIEVED) { }
-      }
-   }
-   WHEN("There are 6 participants in a meeting") {
-      WHEN("All reports are in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
-      }
-      WHEN("4 of 6 reports are in agreement, 1 not in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
-      }
-      WHEN("4 of 6 reports are in agreement, and include 2 unranked members") {
-         THEN(CONSENSUS_ACHIEVED) {
-            // algo needs to allow 2 unranked members to have either order and still count as reports in consensus
+   GIVEN("A default chain and a scheduled meeting") {
+      WHEN("When people check in for a meeting") {
+         AND_WHEN("the meeting ends") {
+            AND_WHEN("none of the participants submitted a consensus report") {
+               THEN(CONSENSUS_NOT_ACHIEVED) { }
+            }
+            AND_WHEN("6 participants submit consensus reports") {
+               AND_WHEN("they agree") {
+
+               }
+               AND_WHEN("they disagree") { }
+               // Q: minimum number of consensus submissions?
+            }
          }
       }
-      WHEN("3 of 6 reports are in agreement, 3 not in agreement (and differ)") {
-         THEN(CONSENSUS_NOT_ACHIEVED) { }
+      WHEN("There are 6 participants in a meeting") {
+         WHEN("All reports are in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("4 of 6 reports are in agreement, 1 not in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("4 of 6 reports are in agreement, and include 2 unranked members") {
+            THEN(CONSENSUS_ACHIEVED) {
+               // algo needs to allow 2 unranked members to have either order and still count as reports in consensus
+            }
+         }
+         WHEN("3 of 6 reports are in agreement, 3 not in agreement (and differ)") {
+            THEN(CONSENSUS_NOT_ACHIEVED) { }
+         }
+         THEN("Servicer is paid 1% of all Respect distributed") { }
+         THEN("Distributions to each member are doubled if they're on a team") { }
       }
-      THEN("Servicer is paid 1% of all Respect distributed") { }
-      THEN("Distributions to each member are doubled if they're on a team") { }
-   }
-   WHEN("There are 5 participants in a meeting") {
-      WHEN("All reports are in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
+      WHEN("There are 5 participants in a meeting") {
+         WHEN("All reports are in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("3 of 5 reports are in agreement, 1 not in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("2 of 5 reports are in agreement, 3 not in agreement (and differ)") {
+            THEN(CONSENSUS_NOT_ACHIEVED) { }
+         }
       }
-      WHEN("3 of 5 reports are in agreement, 1 not in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
+      WHEN("There are 4 participants in a meeting") {
+         WHEN("All reports are in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("3 of 4 reports are in agreement, 1 not in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("2 of 4 reports are in agreement, 3 not in agreement (and differ)") {
+            THEN(CONSENSUS_NOT_ACHIEVED) { }
+         }
       }
-      WHEN("2 of 5 reports are in agreement, 3 not in agreement (and differ)") {
-         THEN(CONSENSUS_NOT_ACHIEVED) { }
+      WHEN("There are 3 participants in a meeting") {
+         WHEN("All reports are in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("2 of 3 reports are in agreement, 1 not in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("1 of 3 reports are in agreement, 3 not in agreement (and differ)") {
+            THEN(CONSENSUS_NOT_ACHIEVED) { }
+         }
       }
-   }
-   WHEN("There are 4 participants in a meeting") {
-      WHEN("All reports are in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
+      WHEN("There are 2 participants in a meeting") {
+         WHEN("All reports are in agreement") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("1 of 2 reports are in agreement, 3 not in agreement (and differ)") {
+            THEN(CONSENSUS_NOT_ACHIEVED) { }
+         }
       }
-      WHEN("3 of 4 reports are in agreement, 1 not in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
+      WHEN("There is 1 participant in a meeting") {
+         WHEN("Participant submits a report") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("Participant does not submits a report") {
+            THEN(CONSENSUS_NOT_ACHIEVED) { }
+         }
       }
-      WHEN("2 of 4 reports are in agreement, 3 not in agreement (and differ)") {
-         THEN(CONSENSUS_NOT_ACHIEVED) { }
+      WHEN("A member submits their 5th out-of-consensus report in the last 10 weeks") {
+         THEN(MEMBER_IS_EVICTED) { }
       }
-   }
-   WHEN("There are 3 participants in a meeting") {
-      WHEN("All reports are in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
-      }
-      WHEN("2 of 3 reports are in agreement, 1 not in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
-      }
-      WHEN("1 of 3 reports are in agreement, 3 not in agreement (and differ)") {
-         THEN(CONSENSUS_NOT_ACHIEVED) { }
-      }
-   }
-   WHEN("There are 2 participants in a meeting") {
-      WHEN("All reports are in agreement") {
-         THEN(CONSENSUS_ACHIEVED) { }
-      }
-      WHEN("1 of 2 reports are in agreement, 3 not in agreement (and differ)") {
-         THEN(CONSENSUS_NOT_ACHIEVED) { }
-      }
-   }
-   WHEN("There is 1 participant in a meeting") {
-      WHEN("Participant submits a report") {
-         THEN(CONSENSUS_ACHIEVED) { }
-      }
-      WHEN("Participant does not submits a report") {
-         THEN(CONSENSUS_NOT_ACHIEVED) { }
-      }
-   }
-   WHEN("A member submits their 5th out-of-consensus report in the last 10 weeks") {
-      THEN(MEMBER_IS_EVICTED) { }
-   }
-   WHEN("A member submits their 1st consensus report in line with the majority") {
+      WHEN("A member submits their 1st consensus report in line with the majority") {
       THEN("A new member becomes an active member (out of pending status)") { }
+   }
    }
 }
 
 SCENARIO("Meeting Attendance Accounting") {
-   WHEN("A member joins a meeting after 3 weeks of absence") {
-      THEN("they are immediately be credited 5% of their escrowed balance") { }
-   }
-   WHEN("The day's meetings have ended") {
-      THEN("vote weight has been decreased by max(5%, 1) and increased by today's rank") { }
-      THEN("a team lead's vote weight has been decreased by max(5%, 1) and increased by today's rank + 3") { }
-      WHEN("Community's total rank earned is higher than 6% of total token supply") {
-         THEN("Alice receives her rank in tokens") { }
+   GIVEN("An default chain with a history of >3 meetings") {
+      WHEN("A member joins a meeting after 3 weeks of absence") {
+         THEN("they are immediately be credited 15% of their escrowed balance") {
+            // Q: Can we make this consistent by using a 5%/wk distribution with a final threshold, below which remaining balance is credited?
+            // amortization schedule that works out to 20 periods?
+         }
       }
-      WHEN("Community's total rank earned is less than 6% of total current token supply") {
-         THEN("Alice receives her rank in tokens, scaled to ensure 6% token supply increase") { }
-      }
-      THEN("Bob's team earns an amount matching his earnings for the day") { }
-      // Which reward pools in MVP? Sponsor?
-      // What are we doing about recruitment?
-         // We need to be tracking inviter when we do the invitation process
-      THEN("Alice's weekly averages reflect updated values") { }
-      WHEN("Carol has requested leaving a team, and 20 weeks have passed") {
-         THEN("Carol is no longer on her team and can join a new team") { }
-      }
-      WHEN("20 week rank totals change who's in the top 12") {
-         THEN("The Council shows the current top 12 earning teams (based on total rank of all member on a team)") { }
+      WHEN("The day's meetings have ended") {
+         THEN("vote weight has been decreased by max(5%, 1) and increased by today's rank") { }
+         THEN("a team lead's vote weight has been decreased by max(5%, 1) and increased by today's rank + 3") { }
+         WHEN("Community's total rank earned is higher than 6% of total token supply") {
+            THEN("Alice receives her rank in tokens") { }
+         }
+         WHEN("Community's total rank earned is less than 6% of total current token supply") {
+            THEN("Alice receives her rank in tokens, scaled to ensure 6% token supply increase") { }
+         }
+         THEN("Bob's team earns an amount matching his earnings for the day") { }
+         // Which reward pools in MVP? Sponsor?
+         // What are we doing about recruitment?
+            // We need to be tracking inviter when we do the invitation process
+         THEN("Alice's weekly averages reflect updated values") { }
+         WHEN("Carol has requested leaving a team, and 20 weeks have passed") {
+            THEN("Carol is no longer on her team and can join a new team") { }
+         }
+         WHEN("20 week rank totals change who's in the top 12") {
+            THEN("The Council shows the current top 12 earning teams (based on total rank of all member on a team)") { }
+         }
       }
    }
 }
