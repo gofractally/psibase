@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 
-#include <trie/trie.hpp>
+#include <triedent/database.hpp>
 
 uint64_t bswap(uint64_t x)
 {
@@ -82,11 +82,11 @@ int main(int argc, char** argv)
 
 
    uint64_t       total = 2 * 1000 * 1000 * 1000;
-   trie::database db("bank.dir",
-                     trie::database::config{.max_objects = (5 * total) / 4,
+   triedent::database db("bank.dir",
+                     triedent::database::config{.max_objects = (5 * total) / 4,
                                             .hot_pages   = 128*16 * 1024ull,
                                             .cold_pages  = 8 * 1024 * 1024ull},
-                     trie::database::read_write);
+                     triedent::database::read_write);
    db.print_stats();
 
    srand(0); 

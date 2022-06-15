@@ -2,8 +2,8 @@
 #include <boost/interprocess/managed_mapped_file.hpp>
 #include <boost/interprocess/segment_manager.hpp>
 #include <set>
-#include <trie/debug.hpp>
-#include <trie/object_db.hpp>
+#include <triedent/debug.hpp>
+#include <triedent/object_db.hpp>
 
 /*
    struct data {

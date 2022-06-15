@@ -1,23 +1,30 @@
-#include <trie/debug.hpp>
-#include <trie/ring_alloc.hpp>
+#include <triedent/debug.hpp>
+#include <triedent/ring_alloc.hpp>
 
-namespace trie
+/*
+#  include <TargetConditionals.h>
+#  include <libkern/OSCacheControl.h>
+#  include <mach/vm_statistics.h>
+#  include <pthread.h>
+*/
+
+namespace triedent
 {
    managed_ring::header::header(uint64_t s)
    {
-      if( s > 38 ) {
-         WARN( "size: ", s );
-         throw std::runtime_error( "max rig size level = 38 or 2^40 bytes" );
+      if (s > 38)
+      {
+         WARN("size: ", s);
+         throw std::runtime_error("max rig size level = 38 or 2^40 bytes");
       }
-      auto data_size = 1ull<<s;
-      auto header_size  = (sizeof(*this) + 7) & -8;
-      size              = (1ull<<s) + header_size;
-      begin             = reinterpret_cast<object_header*>((char*)this + header_size);
-      end               = reinterpret_cast<object_header*>((char*)this + size);
+      auto data_size   = 1ull << s;
+      auto header_size = (sizeof(*this) + 7) & -8;
+      size             = (1ull << s) + header_size;
+      begin            = reinterpret_cast<object_header*>((char*)this + header_size);
+      end              = reinterpret_cast<object_header*>((char*)this + size);
 
-      
       alloc_area_size = data_size;
-      alloc_area_mask = data_size -1;
+      alloc_area_mask = data_size - 1;
       alloc_p         = 0;
       swap_p          = 0;
       end_free_p      = alloc_area_size;
@@ -29,10 +36,9 @@ namespace trie
                               bool                             pin)
        : level(lev)
    {
-
-      WARN( "log size: ", logsize );
-      auto data_size = 1ull<<logsize;
-      auto max_size  = data_size + (sizeof( header) + 7) &-8;
+      WARN("log size: ", logsize);
+      auto data_size = 1ull << logsize;
+      auto max_size  = data_size + (sizeof(header) + 7) & -8;
 
       DEBUG("Creating ", filename.generic_string(), " with size ", max_size / 1024 / 1024 / 1024.,
             " GB");
@@ -56,7 +62,9 @@ namespace trie
       }
 
       _file_map.reset(new bip::file_mapping(filename.generic_string().c_str(), bip::read_write));
-      _map_region.reset(new bip::mapped_region(*_file_map, bip::read_write));
+      _map_region.reset(new bip::mapped_region(
+          *_file_map,
+          bip::read_write));  //, 0, 0, 0, bip::default_map_options | VM_FLAGS_SUPERPAGE_SIZE_2MB));
 
       if (init)
          _head = new ((char*)_map_region->get_address()) header(logsize);
@@ -119,14 +127,10 @@ namespace trie
       std::filesystem::create_directories(dir);
       _obj_ids = std::make_unique<object_db>(dir / "objects", id{cfg.max_ids}, mode == read_write);
 
-      _levels[hot_cache].reset(
-          new managed_ring(dir / "hot", cfg.hot_pages, hot_cache, true));
-      _levels[warm_cache].reset(
-          new managed_ring(dir / "warm", cfg.warm_pages, warm_cache, true));
-      _levels[cool_cache].reset(
-          new managed_ring(dir / "cool", cfg.cool_pages, cool_cache, false));
-      _levels[cold_cache].reset(
-          new managed_ring(dir / "cold", cfg.cold_pages, cold_cache, false));
+      _levels[hot_cache].reset(new managed_ring(dir / "hot", cfg.hot_pages, hot_cache, true));
+      _levels[warm_cache].reset(new managed_ring(dir / "warm", cfg.warm_pages, warm_cache, true));
+      _levels[cool_cache].reset(new managed_ring(dir / "cool", cfg.cool_pages, cool_cache, false));
+      _levels[cold_cache].reset(new managed_ring(dir / "cold", cfg.cold_pages, cold_cache, false));
 
       _swap_thread = std::make_unique<std::thread>(
           [this]()
@@ -136,7 +140,8 @@ namespace trie
           });
    }
 
-   std::pair<object_id, char*> ring_allocator::alloc(size_t num_bytes, object_db::object_location::object_type t)
+   std::pair<object_id, char*> ring_allocator::alloc(size_t num_bytes,
+                                                     object_db::object_location::object_type t)
    {
       auto new_id = _obj_ids->alloc();
       auto ptr    = alloc(hot(), new_id, num_bytes, nullptr, t);
@@ -147,52 +152,59 @@ namespace trie
    //   alloc
    //=================================
    template <bool CopyData, bool RequireObjectLoc>
-   char* ring_allocator::alloc(managed_ring& ring, id nid, uint32_t num_bytes, char* data, 
+   char* ring_allocator::alloc(managed_ring&                           ring,
+                               id                                      nid,
+                               uint32_t                                num_bytes,
+                               char*                                   data,
                                object_db::object_location::object_type t)
    {
       uint32_t round_size = (num_bytes + 7) & -8;  // data padding
       uint64_t used_size  = round_size + sizeof(object_header);
-      if( num_bytes > 0xffffff )
-         throw std::runtime_error( "obj too big" );
+      if (num_bytes > 0xffffff)
+         throw std::runtime_error("obj too big");
 
       //DEBUG( "used size: ", used_size, " num_bytes: ", num_bytes, "  round_size: ", round_size );
 
       auto max_contig = ring.max_contigous_alloc();
 
-      if( max_contig < used_size ) {
-         while ( (ring._head->get_potential_free_space()) < used_size) {
-            WARN( "WAITING ON FREE SPACE: level: ", ring.level );
+      if (max_contig < used_size)
+      {
+         while ((ring._head->get_potential_free_space()) < used_size)
+         {
+            WARN("WAITING ON FREE SPACE: level: ", ring.level);
             using namespace std::chrono_literals;
             std::this_thread::sleep_for(10us);
             _try_claim_free();
-            if( ring.level == 3 ) {
+            if (ring.level == 3)
+            {
                dump();
-               throw std::runtime_error( "database is out of space" );
+               throw std::runtime_error("database is out of space");
             }
          }
          max_contig = ring.max_contigous_alloc();
       }
 
-      bool trace      = false;
+      bool trace = false;
 
-      if( max_contig < used_size ) {
-    //     WARN( "too little space at end to use: ", max_contig, " needed: ", used_size, "  wait for claim free" );
-         while ( (ring._head->get_potential_free_space()) > used_size)
+      if (max_contig < used_size)
+      {
+         //     WARN( "too little space at end to use: ", max_contig, " needed: ", used_size, "  wait for claim free" );
+         while ((ring._head->get_potential_free_space()) > used_size)
          {
             _try_claim_free();
             if (ring.get_free_space() < used_size)
             {
                _debug.store(true);
                // there is potential free space, but a reader is blocking us?
-               WARN("what happened here?!!  level: ", ring.level, "  ef: ", ring._head->end_free_p.load(),
-                    "  ap: ", ring._head->alloc_p.load(), "  used_size: ", used_size,
-                    " max c: ", max_contig,
+               WARN("what happened here?!!  level: ", ring.level,
+                    "  ef: ", ring._head->end_free_p.load(), "  ap: ", ring._head->alloc_p.load(),
+                    "  used_size: ", used_size, " max c: ", max_contig,
                     " delta: ", ring._head->end_free_p.load() - ring._head->alloc_p.load(),
                     " swap p: ", ring._head->swap_p.load(),
                     " pot fre: ", ring._head->get_potential_free_space(),
-                    " free: ", ring._head->get_free_space() );
+                    " free: ", ring._head->get_free_space());
                dump();
-         //      throw std::runtime_error( "out of space" );
+               //      throw std::runtime_error( "out of space" );
 
                using namespace std::chrono_literals;
                std::this_thread::sleep_for(100us);
@@ -202,7 +214,7 @@ namespace trie
             {
                if (max_contig > 0)
                {
-      //            WARN( "too little space at end to use: ", max_contig, " needed: ", used_size, "  wait for claim free  max:", max_contig );
+                  //            WARN( "too little space at end to use: ", max_contig, " needed: ", used_size, "  wait for claim free  max:", max_contig );
                   auto* cur = ring.get_alloc_cursor();
                   cur->set_free_area_size(max_contig);
                   ring._head->alloc_p += max_contig;
@@ -211,7 +223,7 @@ namespace trie
             }
             else
                break;
-         } 
+         }
          // TODO: this can be removed because it should be impossible?
          /*if( ring._head->get_potential_free_space() < used_size ) {
              WARN( "level: ", ring.level, " potential free: ", ring._head->get_potential_free_space() );
@@ -219,8 +231,8 @@ namespace trie
              throw std::runtime_error( "out of space" );
          }*/
       }
-         
-         /*
+
+      /*
          if (ring.get_free_space() < used_size)
          {
             _debug.store( true );
@@ -301,21 +313,25 @@ namespace trie
          SCOPE;
          auto fs     = from->_head->get_potential_free_space();
          auto maxs   = from->_head->alloc_area_size;
-         auto target = 1024*1024*64; //maxs / 32;  // target a certain amount free
+         auto target = 1024 * 1024 * 64;  //maxs / 32;  // target a certain amount free
 
-         if (target < fs) {
-            if( _debug.load() ) {
-               DEBUG( "target: ", target , " < potential_free_space: ", fs, " NOTHING TO SWAP  from: ", from->level );
+         if (target < fs)
+         {
+            if (_debug.load())
+            {
+               DEBUG("target: ", target, " < potential_free_space: ", fs,
+                     " NOTHING TO SWAP  from: ", from->level);
                using namespace std::chrono_literals;
             }
             return false;
          }
 
-         if(  _debug.load() ) {
-           WARN("               ", "target: ", target, "b  free space: ", fs, 
-                                  " from: ", from->level, " to: ", to->level);
-           DEBUG( "potential free space: ", from->_head->get_potential_free_space() );
-           DEBUG( "free space: ", from->_head->get_free_space() );
+         if (_debug.load())
+         {
+            WARN("               ", "target: ", target, "b  free space: ", fs,
+                 " from: ", from->level, " to: ", to->level);
+            DEBUG("potential free space: ", from->_head->get_potential_free_space());
+            DEBUG("free space: ", from->_head->get_free_space());
          }
 
          auto bytes = target - fs;
@@ -358,16 +374,18 @@ namespace trie
                p += o->data_capacity() + 8;
             }
          }
-         if(_debug.load() ) {
-            WARN( "before moved swap by: ", p - from->_head->swap_p.load() );
-           DEBUG( "potential free space: ", from->_head->get_potential_free_space() );
-           DEBUG( "free space: ", from->_head->get_free_space(), "  from: ", from );
+         if (_debug.load())
+         {
+            WARN("before moved swap by: ", p - from->_head->swap_p.load());
+            DEBUG("potential free space: ", from->_head->get_potential_free_space());
+            DEBUG("free space: ", from->_head->get_free_space(), "  from: ", from);
          }
          from->_head->swap_p.store(p, std::memory_order_release);
-         if( _debug.load() ) {
-            WARN( "after moved swap" );
-           DEBUG( "potential free space: ", from->_head->get_potential_free_space() );
-           DEBUG( "free space: ", from->_head->get_free_space() );
+         if (_debug.load())
+         {
+            WARN("after moved swap");
+            DEBUG("potential free space: ", from->_head->get_potential_free_space());
+            DEBUG("free space: ", from->_head->get_free_space());
          }
          return true;
       };
@@ -387,23 +405,21 @@ namespace trie
    {
       auto claim = [this](auto& ring, uint64_t mp)
       {
-         
-         if( _debug.load() )
-         WARN("claim free  end_free_p: ", ring._head->end_free_p.load(), " min_swap_p: ", mp,
-              " swap_p: ", ring._head->swap_p.load(),
-              " currently free: ", ring._head->get_free_space(),
-              " alloc_p: ", ring._head->alloc_p.load());
+         if (_debug.load())
+            WARN("claim free  end_free_p: ", ring._head->end_free_p.load(), " min_swap_p: ", mp,
+                 " swap_p: ", ring._head->swap_p.load(),
+                 " currently free: ", ring._head->get_free_space(),
+                 " alloc_p: ", ring._head->alloc_p.load());
          // TODO: load relaxed and store relaxed if swapping is being managed by another thread
          //assert(ring._head->end_free_p <= ring._head->swap_p);
-         ring._head->end_free_p.store(
-             ring._head->alloc_area_size + std::min<uint64_t>(ring._head->swap_p.load(), mp)
-);
+         ring._head->end_free_p.store(ring._head->alloc_area_size +
+                                      std::min<uint64_t>(ring._head->swap_p.load(), mp));
 
-         if( _debug.load() )
-         WARN("claim free  end_free_p: ", ring._head->end_free_p.load(), " min_swap_p: ", mp,
-              " swap_p: ", ring._head->swap_p.load(),
-              " currently free: ", ring._head->get_free_space(),
-              " alloc_p: ", ring._head->alloc_p.load());
+         if (_debug.load())
+            WARN("claim free  end_free_p: ", ring._head->end_free_p.load(), " min_swap_p: ", mp,
+                 " swap_p: ", ring._head->swap_p.load(),
+                 " currently free: ", ring._head->get_free_space(),
+                 " alloc_p: ", ring._head->alloc_p.load());
 
          /*
          WARN("now free: ", ring._head->get_free_space(), "  alloc_p: ", ring._head->alloc_p.load(),
@@ -420,11 +436,12 @@ namespace trie
 
    void ring_allocator::retain(id i) { _obj_ids->retain(i); }
 
-   std::pair<char*,object_db::object_location::object_type> ring_allocator::release(id i)
+   std::pair<char*, object_db::object_location::object_type> ring_allocator::release(id i)
    {
       auto l = _obj_ids->release(i);
       return {(l.second > 0 ? nullptr
-                          : (char*)_levels[l.first.cache]->get_object(l.first.offset)->data()), (object_db::object_location::object_type)l.first.type};
+                            : (char*)_levels[l.first.cache]->get_object(l.first.offset)->data()),
+              (object_db::object_location::object_type)l.first.type};
    }
 
    char*                      ring_allocator::get(id i) { return get_cache<true>(i); }
@@ -439,8 +456,8 @@ namespace trie
       std::cerr << "free  space: " << _head->get_free_space() / 1024. / 1024. << " Mb   "
                 << "free  space bytes: " << _head->get_free_space() << " b  "
                 << " end_free_p: " << _head->end_free_p.load()
-                << " swap_p: " << _head->swap_p.load()
-                << "  alloc_p: " << _head->alloc_p.load() << "  ";
+                << " swap_p: " << _head->swap_p.load() << "  alloc_p: " << _head->alloc_p.load()
+                << "  ";
       std::cerr << "cache hits: " << _head->cache_hits << "   ";
       return;
       /*
@@ -567,8 +584,8 @@ namespace trie
 
    void ring_allocator::dump()
    {
-    //  _obj_ids->print_stats();
-      std::cerr << "============= HOT "<<  &hot() << " ================== \n";
+      //  _obj_ids->print_stats();
+      std::cerr << "============= HOT " << &hot() << " ================== \n";
       hot().dump(*_obj_ids);
       std::cerr << "\n============= WARM ================== \n";
       warm().dump(*_obj_ids);

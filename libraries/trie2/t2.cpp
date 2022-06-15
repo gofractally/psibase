@@ -1,13 +1,13 @@
-#include <trie/object_db.hpp>
-#include <trie/trie.hpp>
+#include <triedent/object_db.hpp>
+#include <triedent/database.hpp>
 #include <unordered_set>
 
 int test_object_db()
 {
    const auto      num = 100 * 1000 * 1000ull;
-   trie::object_db db("db.dat", trie::object_db::object_id{.id = num}, true);
+   triedent::object_db db("db.dat", triedent::object_db::object_id{.id = num}, true);
 
-   std::vector<trie::object_db::object_id> ids;
+   std::vector<triedent::object_db::object_id> ids;
    ids.reserve(num);
    {
       auto start = std::chrono::steady_clock::now();
@@ -74,7 +74,7 @@ int test_object_db()
       auto start = std::chrono::steady_clock::now();
       for (int i = 0; i < num; ++i)
       {
-         db.set(ids[i], trie::object_db::object_location{.offset = 1, .cache = 1});
+         db.set(ids[i], triedent::object_db::object_location{.offset = 1, .cache = 1});
          //    std::cout << i << "  id: " << ids[i].id << " ref: " << db.ref(ids[i]) << "\n";
       }
       auto end   = std::chrono::steady_clock::now();
@@ -104,10 +104,10 @@ void test_object_arena()
    uint64_t           max_objects    = 2 * 6000 * 100ull * 50ull;
    uint64_t           max_hot_cache  = 4 * 16 * 4096 * 200ull * 100ull * 1ull;
    uint64_t           max_cold_cache = max_hot_cache * 3;  //10*4096 * 2000ull*1000ull*1ull;
-   trie::object_arena a("arena.dir", trie::object_arena::read_write, max_objects, max_hot_cache,
+   triedent::object_arena a("arena.dir", triedent::object_arena::read_write, max_objects, max_hot_cache,
                         max_cold_cache);
 
-   std::vector<std::pair<trie::object_arena::id, uint32_t> > aid;
+   std::vector<std::pair<triedent::object_arena::id, uint32_t> > aid;
 
    auto num_alloc = (9 * max_objects) / 10;
 
@@ -391,10 +391,10 @@ void test_trie_remove()
    {
       c = 'B';
    }
-   trie::database db(
+   triedent::database db(
        "dbdir",
-       trie::database::config{.max_objects = 1000ull, .hot_pages = 100ull, .cold_pages = 400ull},
-       trie::database::read_write);
+       triedent::database::config{.max_objects = 1000ull, .hot_pages = 100ull, .cold_pages = 400ull},
+       triedent::database::read_write);
    auto s = db.start_write_revision(0, 0);
    s->upsert(to_key6("hello"), big);
    s->upsert(to_key6("heman"), big);
@@ -447,13 +447,13 @@ void test_trie(int argc, char** argv)
       load_key_values(keys, values, argv[1], from, to);
       std::cerr << "loaded " << keys.size() << " keys\n";
 
-      trie::database db("dbdir",
-                        trie::database::config{.max_objects = std::max<uint64_t>(4 * values.size(),50000),
+      triedent::database db("dbdir",
+                        triedent::database::config{.max_objects = std::max<uint64_t>(4 * values.size(),50000),
                                                .hot_pages   = 32,
                                                .warm_pages   = 32,
                                                .cool_pages  = 32,
                                                .cold_pages  = 32},
-                        trie::database::read_write);
+                        triedent::database::read_write);
 
       auto s  = db.start_write_session();
 

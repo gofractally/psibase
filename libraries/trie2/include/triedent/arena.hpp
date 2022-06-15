@@ -1,6 +1,6 @@
 #pragma once
 #include <boost/interprocess/offset_ptr.hpp>
-#include <trie/page_header.hpp>
+#include <triedent/page_header.hpp>
 
 namespace trie
 {

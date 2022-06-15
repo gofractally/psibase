@@ -6,9 +6,9 @@
 
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
-#include <trie/debug.hpp>
+#include <triedent/debug.hpp>
 
-namespace trie
+namespace triedent
 {
    namespace bip = boost::interprocess;
 

@@ -2,10 +2,10 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
-#include <trie/debug.hpp>
-#include <trie/trie.hpp>
+#include <triedent/debug.hpp>
+#include <triedent/database.hpp>
 
-namespace trie
+namespace triedent
 {
 
    namespace bip = boost::interprocess;
@@ -40,10 +40,6 @@ namespace trie
       else
          _dbm = reinterpret_cast<database_memory*>(_region->get_address());
 
-      WARN( "hot: ", cfg.hot_pages );
-      WARN( "warm: ", cfg.warm_pages );
-      WARN( "cool: ", cfg.cool_pages );
-      WARN( "cold: ", cfg.cold_pages );
       _ring.reset(new ring_allocator(dir / "ring", ring_allocator::read_write,
                                      {.max_ids    = cfg.max_objects,
                                       .hot_pages  = cfg.hot_pages,
@@ -52,12 +48,6 @@ namespace trie
                                       .cold_pages = cfg.cold_pages}));
 
       _ring->_try_claim_free = [this](){ claim_free(); };
-      /*
-      _arena.reset(new object_arena(
-          dir / "arena", allow_write ? object_arena::read_write : object_arena::read_only,
-          cfg.max_objects, 4096 * cfg.hot_pages, 4096 * cfg.cold_pages,
-          cfg.big_hot_pages*4096, cfg.big_cold_pages*4096 ));
-          */
    }
    database::~database() {}
 
@@ -70,10 +60,8 @@ namespace trie
       ring_allocator::swap_position sp;
       {
          std::lock_guard<std::mutex> lock(_active_sessions_mutex);
-    //     WARN( "_active_read_sessions: ", _active_read_sessions.size()   );
          for (auto s : _active_sessions)
          {
-      //      DEBUG( "    swap_p[0] = min ", s->_hot_swap_p.load(), "  or  ", sp._swap_pos[0] );
             sp._swap_pos[0] =
                 std::min<uint64_t>(s->_hot_swap_p.load(std::memory_order_relaxed), sp._swap_pos[0]);
             sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(std::memory_order_acquire),
@@ -83,8 +71,8 @@ namespace trie
             sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(std::memory_order_acquire),
                                                  sp._swap_pos[3]);
          }
-         _ring->claim_free(sp);
       }
+      _ring->claim_free(sp);
    }
    void database::print_stats() { _ring->dump(); }
 }  // namespace trie

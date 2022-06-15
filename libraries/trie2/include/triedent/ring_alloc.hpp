@@ -4,9 +4,9 @@
 #include <optional>
 #include <thread>
 #include <functional>
-#include <trie/object_db.hpp>
+#include <triedent/object_db.hpp>
 
-namespace trie
+namespace triedent
 {
    using object_id = object_db::object_id;
 

@@ -12,7 +12,7 @@
 #include <boost/program_options/variables_map.hpp>
 #include <boost/program_options/parsers.hpp>
 
-#include <trie/trie.hpp>
+#include <triedent/database.hpp>
 
 uint64_t bswap(uint64_t x)
 {
@@ -74,15 +74,15 @@ int main(int argc, char** argv)
    }
 
    uint64_t       total            = 2 * 1000 * 1000 * 1000;
-   trie::database db(
+   triedent::database db(
        db_dir.c_str(),
-       trie::database::config{
+       triedent::database::config{
            .max_objects = num_objects,
            .hot_pages   = hot_page_c,
            .warm_pages  = warm_page_c,
            .cool_pages  = cool_page_c,
            .cold_pages  = cold_page_c},
-       trie::database::read_write);
+       triedent::database::read_write);
    db.print_stats();
    auto s = db.start_write_session();
 

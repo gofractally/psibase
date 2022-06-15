@@ -1,8 +1,8 @@
 #pragma once
-#include <trie/ring_alloc.hpp>
-#include <trie/debug.hpp>
+#include <triedent/ring_alloc.hpp>
+#include <triedent/debug.hpp>
 
-namespace trie
+namespace triedent
 {
    using object_id = ring_allocator::id;
 

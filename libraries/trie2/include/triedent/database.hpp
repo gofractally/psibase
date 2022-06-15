@@ -1,10 +1,10 @@
 #pragma once
 #include <algorithm>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
-#include <trie/node.hpp>
-#include <trie/ring_alloc.hpp>
+#include <triedent/node.hpp>
+#include <triedent/ring_alloc.hpp>
 
-namespace trie
+namespace triedent
 {
 
    inline std::string from_key(std::string_view sv)
