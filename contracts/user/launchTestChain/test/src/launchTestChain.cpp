@@ -55,6 +55,9 @@ SCENARIO("Testing default psibase chain")
    sysIssuer.credit(sysToken, alice, 1'000e8, memo);
    sysIssuer.credit(sysToken, bob, 1'000e8, memo);
 
+   auto create = alice.at<TokenSys>().create(4, 1'000'000e4);
+   alice.at<TokenSys>().mint(create.returnVal(), 100e4, memo);
+
    t.start_block();
 
    /****** At t.get_path(): 

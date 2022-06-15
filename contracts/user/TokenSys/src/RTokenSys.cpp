@@ -1,4 +1,5 @@
 #include <contracts/user/RTokenSys.hpp>
+#include <contracts/user/SymbolSys.hpp>
 #include <contracts/user/TokenSys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/print.hpp>
@@ -52,6 +53,16 @@ void RTokenSys::storeSys(string path, string contentType, vector<char> content)
    storeContent(move(path), move(contentType), move(content), TokenSys::Tables{getReceiver()});
 }
 
+struct AccountBalance
+{
+   psibase::AccountNumber account;
+   TID                    token;
+   psibase::AccountNumber symbol;
+   uint8_t                precision;
+   uint64_t               balance;
+};
+PSIO_REFLECT(AccountBalance, account, token, symbol, precision, balance);
+
 std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& request)
 {
    auto to_json = [](const auto& obj)
@@ -74,18 +85,35 @@ std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& reque
          if (auto result = serveSimpleUI<TokenSys, true>(request))
             return result;
       }
-      if (request.target == "/balances")
+      if (request.target.starts_with("/balances/"))
       {
+         auto user = request.target.substr(string("/balances/").size());
+         check(user.find('/') == string::npos, "invalid user " + user);
+         psibase::AccountNumber acc(string_view{user});
+
          TokenSys::Tables db{TokenSys::contract};
          auto             idx = db.open<TokenTable_t>().getIndex<0>();
          check(idx.begin() != idx.end(), "No tokens");
 
-         auto                       balIdx = db.open<BalanceTable_t>().getIndex<0>();
-         std::vector<BalanceRecord> balances;
-         TID                        tokenId = 1;
+         auto                        balIdx = db.open<BalanceTable_t>().getIndex<0>();
+         std::vector<AccountBalance> balances;
+         TID                         tokenId = 1;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)
          {
-            balances.push_back(at<TokenSys>().getBalance(tokenId, "alice"_a).unpack());
+            auto balance = at<TokenSys>().getBalance(tokenId, acc).unpack();
+            auto token   = at<TokenSys>().getToken(balance.key.tokenId).unpack();
+
+            if (balance.balance != 0)
+            {
+               balances.push_back(AccountBalance{
+                   .account   = balance.key.account,
+                   .token     = balance.key.tokenId,
+                   .symbol    = token.symbolId,
+                   .precision = token.precision.value,
+                   .balance   = balance.balance,
+               });
+            }
+
             ++tokenId;
          }
 
