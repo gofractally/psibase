@@ -47,18 +47,12 @@ int main(int argc, char** argv)
       ("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys" )
       ("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"), "the folder that contains the database" )
       ("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6), "number of read threads to launch")
-      ("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(34), "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")
       ("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33), "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")
       ("warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33), "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes")
       ("cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33), "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes")
       ("cold-size,C",po::value<uint32_t>(&cold_page_c)->default_value(33),  "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes")
       ("max-objects,O",po::value<uint64_t>(&num_objects)->default_value(num_objects),  "the maximum number of unique objects in the database")
       ;
-
-   if( num_read_threads > 64 ) {
-      std::cerr << "maximum number of read threads is 64\n";
-      return 0;
-   }
 
    po::variables_map vm;
    po::store( po::parse_command_line( argc, argv, desc), vm );
@@ -72,6 +66,12 @@ int main(int argc, char** argv)
       std::cout << "resetting database\n";
       std::filesystem::remove_all( db_dir );
    }
+
+   if( num_read_threads > 64 ) {
+      std::cerr << "maximum number of read threads is 64\n";
+      return 0;
+   }
+
 
    uint64_t       total            = 2 * 1000 * 1000 * 1000;
    triedent::database db(

@@ -172,21 +172,23 @@ namespace triedent
    }
    inline void object_db::retain(object_id id)
    {
-      if( id.id > _header->first_unallocated.id ) [[unlikely]] {
-         DEBUG( "object ID is outside the allocated range" );
-         assert( !"object ID is outside the allocated range" );
+      if( id.id > _header->first_unallocated.id ) [[unlikely]] 
          throw std::runtime_error( "invalid object id, outside allocated range" );
-      }
+      
       auto& obj = _header->objects[id.id];
       assert( ref(id) > 0 );
+      assert( ref(id) != ref_count_mask );
+
+      /*
       auto cur_ref = obj.load() & ref_count_mask;
-      if( cur_ref == 0 )[[unlikely]] { 
-         DEBUG( "remove this later" );
+
+      if( cur_ref == 0 )[[unlikely]]  
          throw std::runtime_error( "cannot retain an object at 0" );
-      }
-      if( cur_ref == ref_count_mask )[[unlikely]] {
+      
+      if( cur_ref == ref_count_mask )[[unlikely]] 
          throw std::runtime_error( "too many references" );
-      }
+         */
+
       ++obj;
    }
 
@@ -200,21 +202,21 @@ namespace triedent
       auto  val       = obj.fetch_sub(1)-1; 
       auto  new_count = (val & ref_count_mask);
 
-      if( new_count == ref_count_mask )[[unlikely]] {
-         WARN( "id: ", id.id );
-         assert( !"somethign went wrong with ref, released ref count of 0" );
-         throw std::runtime_error( "something went wrong with ref counts" );
-      }
+
+      assert( new_count != ref_count_mask );
+   //   if( new_count == ref_count_mask )[[unlikely]] {
+   //      WARN( "id: ", id.id );
+   //      assert( !"somethign went wrong with ref, released ref count of 0" );
+   //      throw std::runtime_error( "something went wrong with ref counts" );
+   //   }
       if (new_count == 0)
       {
          // the invariant is first_free->object with id that points to next free
          // 1. update object to point to next free
          // 2. then attempt to update first free 
-
-
          uint64_t ff;
          do {
-            ff = _header->first_free.load(); 
+            ff = _header->first_free.load(std::memory_order_acquire); 
             obj.store( ff << 16);
          } while( not _header->first_free.compare_exchange_strong( ff, id.id ) ); 
       }
@@ -259,7 +261,7 @@ namespace triedent
       auto     old = obj.load(std::memory_order_relaxed);
       uint16_t ref = old & ref_count_mask;
       auto r = obj.compare_exchange_strong(old, obj_val(loc, ref), std::memory_order_release);
-      std::atomic_thread_fence(std::memory_order_release);
+ //     std::atomic_thread_fence(std::memory_order_release);
       return r;
    }
    inline void object_db::print_stats() {

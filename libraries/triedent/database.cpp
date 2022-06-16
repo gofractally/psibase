@@ -55,25 +55,6 @@ namespace triedent
    {
       _ring->swap();
    }
-   void database::claim_free()const
-   {
-      ring_allocator::swap_position sp;
-      {
-         std::lock_guard<std::mutex> lock(_active_sessions_mutex);
-         for (auto s : _active_sessions)
-         {
-            sp._swap_pos[0] =
-                std::min<uint64_t>(s->_hot_swap_p.load(std::memory_order_relaxed), sp._swap_pos[0]);
-            sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(std::memory_order_acquire),
-                                                 sp._swap_pos[1]);
-            sp._swap_pos[2] = std::min<uint64_t>(s->_cool_swap_p.load(std::memory_order_acquire),
-                                                 sp._swap_pos[2]);
-            sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(std::memory_order_acquire),
-                                                 sp._swap_pos[3]);
-         }
-      }
-      _ring->claim_free(sp);
-   }
    void database::print_stats() { _ring->dump(); }
 }  // namespace trie
 

@@ -1,9 +1,9 @@
 #pragma once
 #include <boost/interprocess/offset_ptr.hpp>
 #include <chrono>
+#include <functional>
 #include <optional>
 #include <thread>
-#include <functional>
 #include <triedent/object_db.hpp>
 
 namespace triedent
@@ -43,13 +43,13 @@ namespace triedent
 
       ring_allocator(std::filesystem::path dir, access_mode mode, config cfg);
 
-      std::pair<id, char*> alloc(size_t num_bytes, object_db::object_location::object_type );
+      std::pair<id, char*> alloc(size_t num_bytes, object_db::object_location::object_type);
       void                 retain(id);
 
       // return a pointer to the obj and its type if released
-      std::pair<char*,object_db::object_location::object_type>  release(id);
+      std::pair<char*, object_db::object_location::object_type> release(id);
 
-      bool swap();
+      bool        swap();
       inline void ensure_free_space();
 
       // grows the free area after swap is complete,
@@ -62,8 +62,8 @@ namespace triedent
       template <bool CopyToHot = true>
       char* get_cache(id);  // do not move to hot cache
       template <bool CopyToHot = true>
-      std::pair<char*,object_type> get_cache_with_type(id);  // do not move to hot cache
-      char* get_cache(id i, std::vector<char>& tmp);
+      std::pair<char*, object_type> get_cache_with_type(id);  // do not move to hot cache
+      char*                         get_cache(id i, std::vector<char>& tmp);
 
       uint32_t                   ref(id i) const { return _obj_ids->ref(i); }
       std::pair<uint16_t, char*> get_ref(id i) { return {ref(i), get(i)}; }
@@ -87,8 +87,12 @@ namespace triedent
       }
 
      private:
-      template <bool CopyData = false, bool RequireObjLoc=true>
-      char* alloc(managed_ring& ring, id nid, uint32_t num_bytes, char* data = nullptr, 
+      uint64_t wait_on_free_space(managed_ring& ring, uint64_t used_size);
+      template <bool CopyData = false>
+      char* alloc(managed_ring& ring,
+                  id            nid,
+                  uint32_t      num_bytes,
+                  char*         data                      = nullptr,
                   object_db::object_location::object_type = {});
 
       inline managed_ring&          hot() const { return *_levels[hot_cache]; }
@@ -102,17 +106,18 @@ namespace triedent
       std::atomic<bool>             _done = false;
 
       std::atomic<bool> _debug = false;
-      void swap_loop()
+      void              swap_loop()
       {
          while (not _done.load(std::memory_order_relaxed))
          {
             bool did_work = swap();
             using namespace std::chrono_literals;
-            if( not did_work ) {
+            if (not did_work)
+            {
                std::this_thread::sleep_for(100us);
             }
          }
-         WARN( "EXIT SWAP LOOP" );
+         WARN("EXIT SWAP LOOP");
       }
    };
 
@@ -144,7 +149,7 @@ namespace triedent
       }
       // assuming obj header holds an obj, returns the next spot that may hold an obj
       object_header* next() const { return (object_header*)(data() + data_capacity()); }
-   };// __attribute__((packed)) __attribute__((aligned(1)));
+   };  // __attribute__((packed)) __attribute__((aligned(1)));
    static_assert(sizeof(object_header) == 8, "unexpected padding");
 
    // wraps the file and handles resizing
@@ -166,7 +171,7 @@ namespace triedent
             //assert(alloc_area_size >= swap_p - end_free_p);
          }
 
-         uint64_t                       size;              // file size, max we can move end to
+         uint64_t                       size;  // file size, max we can move end to
          int64_t                        cache_hits = 0;
          bip::offset_ptr<object_header> begin;  // the first obj
          bip::offset_ptr<object_header> end;    // the high water before circle
@@ -185,12 +190,13 @@ namespace triedent
          alignas(64) std::atomic<uint64_t> alloc_p;
          alignas(64) std::atomic<uint64_t> swap_p;  // this could be read by multiple threads
          alignas(64) std::atomic<uint64_t> end_free_p;
-         uint64_t              alloc_area_mask;
-         uint64_t              alloc_area_size;
+         uint64_t alloc_area_mask;
+         uint64_t alloc_area_size;
 
          object_header* get_alloc_pos() const
          {
-            return reinterpret_cast<object_header*>((char*)begin.get() + (alloc_p.load( std::memory_order_relaxed) & alloc_area_mask));
+            return reinterpret_cast<object_header*>(
+                (char*)begin.get() + (alloc_p.load(std::memory_order_relaxed) & alloc_area_mask));
          }
          object_header* get_swap_pos() const
          {
@@ -202,15 +208,24 @@ namespace triedent
             return begin.get() + (end_free_p & alloc_area_mask);
          }
          inline object_header* get_end_pos() const { return end.get(); }
-         inline uint64_t       get_free_space() const { return end_free_p.load(std::memory_order_relaxed) - alloc_p.load(std::memory_order_relaxed); }
-         inline uint64_t       get_potential_free_space() const { return swap_p.load(std::memory_order_acquire) + alloc_area_size - alloc_p.load(std::memory_order_relaxed); }
-         uint64_t       max_contigous_alloc() const
+         inline uint64_t       get_free_space() const
          {
-            auto ap = alloc_p.load( std::memory_order_relaxed );
-            auto ep = end_free_p.load( std::memory_order_relaxed );
+            return end_free_p.load(std::memory_order_relaxed) -
+                   alloc_p.load(std::memory_order_relaxed);
+         }
+         inline uint64_t get_potential_free_space() const
+         {
+            return swap_p.load(std::memory_order_acquire) + alloc_area_size -
+                   alloc_p.load(std::memory_order_relaxed);
+         }
+         uint64_t max_contigous_alloc() const
+         {
+            auto ap         = alloc_p.load(std::memory_order_relaxed);
+            auto ep         = end_free_p.load(std::memory_order_relaxed);
             auto free_space = ep - ap;
-            auto wraped = (ap + free_space) & alloc_area_mask;
-            if( (ap & alloc_area_mask) > wraped ) {
+            auto wraped     = (ap + free_space) & alloc_area_mask;
+            if ((ap & alloc_area_mask) > wraped)
+            {
                return free_space - wraped;
             }
             return free_space;
@@ -234,7 +249,7 @@ namespace triedent
       inline auto&   end_free_cursor() { return _head->end_free; }
       inline char*   end_pos() const { return (char*)_head->end.get(); }
       */
-      inline char*   begin_pos() const { return (char*)_begin; }//_head->begin.get(); }
+      inline char*   begin_pos() const { return (char*)_begin; }  //_head->begin.get(); }
       object_header* get_object(uint64_t offset)
       {
          ++_head->cache_hits;  // TODO: remove from release
@@ -255,17 +270,19 @@ namespace triedent
    inline ring_allocator::swap_position ring_allocator::get_swap_pos() const
    {
       swap_position r;
-      r._swap_pos[0] = hot()._head->swap_p.load( std::memory_order_acquire );
-      r._swap_pos[1] = warm()._head->swap_p.load( std::memory_order_acquire );
-      r._swap_pos[2] = cool()._head->swap_p.load( std::memory_order_acquire );
-      r._swap_pos[3] = cold()._head->swap_p.load( std::memory_order_acquire );
+      r._swap_pos[0] = hot()._head->swap_p.load(std::memory_order_acquire);
+      r._swap_pos[1] = warm()._head->swap_p.load(std::memory_order_acquire);
+      r._swap_pos[2] = cool()._head->swap_p.load(std::memory_order_acquire);
+      r._swap_pos[3] = cold()._head->swap_p.load(std::memory_order_acquire);
       return r;
    }
 
-   inline void ring_allocator::ensure_free_space() {
-      if( hot()._head->get_free_space() < 32*1024*1024 ) [[unlikely]] {
+   inline void ring_allocator::ensure_free_space()
+   {
+      if (hot()._head->get_free_space() < 32 * 1024 * 1024)
+      {
          _try_claim_free();
-         while( hot()._head->get_free_space() < 32*1024*1024 ) 
+         while (hot()._head->get_free_space() < 32 * 1024 * 1024)
             _try_claim_free();
       }
    }
@@ -292,61 +309,236 @@ namespace triedent
    char* ring_allocator::get_cache(id i)
    {
       auto loc = _obj_ids->get(i);
-//      WARN( __FILE__, " loc.offset: ", loc.offset, " loc.cache: ", int(loc.cache) );
-
-      if (loc.cache == hot_cache)
-         return hot().get_object(loc.offset)->data();
-
       auto obj = _levels[loc.cache]->get_object(loc.offset);
 
-      if constexpr (CopyToHot)
-      {
-         if (obj->size > 4096) 
-            return obj->data();
-         return alloc<true,true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type);
-      }
-      else
-      {
+      if constexpr( not CopyToHot )
          return obj->data();
-      }
+
+      if (loc.cache == hot_cache)
+         return obj->data();
+
+      if (obj->size > 4096)
+         return obj->data();
+
+      return alloc<true>(hot(), id{obj->id}, obj->size, obj->data(),
+                               (object_type)loc.type);
    }
    template <bool CopyToHot>
-   std::pair<char*,ring_allocator::object_type> ring_allocator::get_cache_with_type(id i)
+   std::pair<char*, ring_allocator::object_type> ring_allocator::get_cache_with_type(id i)
    {
       auto loc = _obj_ids->get(i);
-//      WARN( __FILE__, " loc.offset: ", loc.offset, " loc.cache: ", int(loc.cache) );
-
-      if (loc.cache == hot_cache)
-         return {hot().get_object(loc.offset)->data(), object_type(loc.type)};
-
       auto obj = _levels[loc.cache]->get_object(loc.offset);
 
-      if constexpr (CopyToHot)
-      {
-         if (obj->size > 4096) 
-            return {obj->data(), (object_type)loc.type};
-         return {alloc<true,true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type), (object_type)loc.type};
-      }
-      else
-      {
+      if constexpr ( not CopyToHot ) 
+         return {obj->data(), object_type(loc.type)};
+
+      if (loc.cache == hot_cache)
+         return {obj->data(), object_type(loc.type)};
+
+      if (obj->size > 4096)
          return {obj->data(), (object_type)loc.type};
-      }
+
+      return {
+          alloc<true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type),
+          (object_type)loc.type};
    }
 
-}  // namespace trie
+   inline uint64_t ring_allocator::wait_on_free_space(managed_ring& ring, uint64_t used_size)
+   {
+      uint64_t max_contig = 0;
+      while ((ring._head->get_potential_free_space()) < used_size)
+      {
+         WARN("WAITING ON FREE SPACE: level: ", ring.level);
+         using namespace std::chrono_literals;
+         std::this_thread::sleep_for(10us);
+         _try_claim_free();
+         if (ring.level == 3)
+         {
+            dump();
+            throw std::runtime_error("database is out of space");
+         }
+      }
+      max_contig = ring.max_contigous_alloc();
 
-/*
+      if (max_contig < used_size)
+      {
+         while ((ring._head->get_potential_free_space()) > used_size)
+         {
+            _try_claim_free();
+            if (ring.get_free_space() < used_size)
+            {
+               // there is potential free space, but a reader is blocking us?
+               WARN("what happened here?!!  level: ", ring.level,
+                    "  ef: ", ring._head->end_free_p.load(), "  ap: ", ring._head->alloc_p.load(),
+                    "  used_size: ", used_size, " max c: ", max_contig,
+                    " delta: ", ring._head->end_free_p.load() - ring._head->alloc_p.load(),
+                    " swap p: ", ring._head->swap_p.load(),
+                    " pot fre: ", ring._head->get_potential_free_space(),
+                    " free: ", ring._head->get_free_space());
+               dump();
 
-   on alloc(size)
-     attempt to write to the current pos, if enough space.
-     while not enough space then look at size of next object
-     find the LRU object of that size and copy it to disk update loc idx
-     copy the next object to the freed location and update loc idx
+               using namespace std::chrono_literals;
+               std::this_thread::sleep_for(100us);
+            }
+            max_contig = ring.max_contigous_alloc();
 
+            if (max_contig >= used_size)
+               break;
 
-   LRU objects get swapped to disk and alloc cost is either:
-         1. free or
-         2. proportional to 2x memcpy of the size being allocated
-         3. 3-4
+            if (max_contig > 0)
+            {
+               auto* cur = ring.get_alloc_cursor();
+               cur->set_free_area_size(max_contig);
+               ring._head->alloc_p += max_contig;
+               max_contig = ring.max_contigous_alloc();
+            }
+         }
+      }
+      return max_contig;
+   }
 
-*/
+   //=================================
+   //   alloc
+   //=================================
+   template <bool CopyData>
+   char* ring_allocator::alloc(managed_ring&                           ring,
+                               id                                      nid,
+                               uint32_t                                num_bytes,
+                               char*                                   data,
+                               object_db::object_location::object_type t)
+   {
+      uint32_t round_size = (num_bytes + 7) & -8;  // data padding
+      uint64_t used_size  = round_size + sizeof(object_header);
+
+      auto max_contig = ring.max_contigous_alloc();
+
+      if (max_contig < used_size) [[unlikely]]
+         max_contig = wait_on_free_space(ring, used_size);
+
+      auto* cur = ring.get_alloc_cursor();
+      ring._head->alloc_p += used_size;
+      cur->set(nid, num_bytes);
+
+      if constexpr (CopyData)
+         memcpy(cur->data(), data, num_bytes);
+
+      /*
+       *  There may be a race between main accessing an object and moving it to hot
+       *  and swap moving the object to a lower level in the cache.       
+       */
+      while (not _obj_ids->set(nid, (char*)cur - ring.begin_pos(), ring.level, t))
+         ;
+
+      return cur->data();
+   }
+
+   // moves data from higher levels to lower levels
+   // can be run in any single thread because it doesn't modify the
+   // source and it is the only modifies free areas of lower levels
+   inline bool ring_allocator::swap()
+   {
+      auto do_swap = [this](auto* from, auto* to)
+      {
+         auto fs     = from->_head->get_potential_free_space();
+         auto maxs   = from->_head->alloc_area_size;
+         auto target = 1024 * 1024 * 64;  //maxs / 32;  // target a certain amount free
+
+         if (target < fs)
+            return false;
+
+         auto bytes = target - fs;
+
+         uint64_t bytes_freed = 0;
+
+         uint64_t sp = from->_head->swap_p.load(std::memory_order_relaxed);
+         uint64_t fp = from->_head->end_free_p.load(std::memory_order_relaxed);
+         uint64_t ap = from->_head->alloc_p.load(std::memory_order_relaxed);
+         if (fp < ap)
+            throw std::runtime_error("end should never be beyond alloc!");
+
+         auto to_obj = [&](auto p)
+         {
+            return reinterpret_cast<object_header*>(((char*)from->_head->begin.get()) +
+                                                    (p & from->_head->alloc_area_mask));
+         };
+
+         auto p   = sp;
+         auto end = std::min<uint64_t>(ap, p + bytes);
+
+         while (p < end)
+         {
+            auto o = to_obj(p);
+            if (o->id == 0)  // unused space
+            {
+               p += o->size;
+               assert(o->size != 0);
+            }
+            else
+            {
+               using obj_type = object_db::object_location::object_type;
+               uint16_t ref;
+               auto     loc = _obj_ids->get(id{o->id}, ref);
+               if (ref != 0 and from->get_object(loc.offset) == o and loc.cache == from->level)
+                  alloc<true>(*to, {o->id}, o->size, o->data(), (obj_type)loc.type);
+               p += o->data_capacity() + 8;
+            }
+         }
+         from->_head->swap_p.store(p, std::memory_order_release);
+         return true;
+      };
+
+      bool did_work = false;
+      did_work |= do_swap(&hot(), &warm());
+      did_work |= do_swap(&warm(), &cool());
+      did_work |= do_swap(&cool(), &cold());
+      return did_work;
+      //   do_swap(&cold(), &cold());
+   }
+
+   // updates the free range after swapping, this allows alloc to start
+   // reusing this space. Must make sure any threads reading are done
+   // before advancing free space.
+   inline void ring_allocator::claim_free(swap_position sp)
+   {
+      auto claim = [this](auto& ring, uint64_t mp)
+      {
+         // TODO: load relaxed and store relaxed if swapping is being managed by another thread
+         //assert(ring._head->end_free_p <= ring._head->swap_p);
+         ring._head->end_free_p.store(ring._head->alloc_area_size +
+                                      std::min<uint64_t>(ring._head->swap_p.load(), mp));
+      };
+      claim(hot(), sp._swap_pos[0]);
+      claim(warm(), sp._swap_pos[1]);
+      claim(cool(), sp._swap_pos[2]);
+      claim(cold(), sp._swap_pos[3]);
+   }
+   inline char*                      ring_allocator::get(id i) { return get_cache<true>(i); }
+   inline std::pair<uint16_t, char*> ring_allocator::get_ref_no_cache(id i)
+   {
+      return {ref(i), get_cache<false>(i)};
+   }
+
+   inline void ring_allocator::retain(id i) { _obj_ids->retain(i); }
+
+   inline std::pair<char*, object_db::object_location::object_type> ring_allocator::release(id i)
+   {
+      auto l = _obj_ids->release(i);
+      return {(l.second > 0 ? nullptr
+                            : (char*)_levels[l.first.cache]->get_object(l.first.offset)->data()),
+              (object_db::object_location::object_type)l.first.type};
+   }
+
+   inline std::pair<object_id, char*> ring_allocator::alloc(
+       size_t                                  num_bytes,
+       object_db::object_location::object_type t)
+   {
+      if (num_bytes > 0xffffff-8) [[unlikely]]
+         throw std::runtime_error("obj too big");
+
+      auto new_id = _obj_ids->alloc();
+      auto ptr    = alloc(hot(), new_id, num_bytes, nullptr, t);
+      return {new_id, ptr};
+   }
+
+}  // namespace triedent
+

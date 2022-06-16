@@ -47,8 +47,8 @@ namespace triedent
       database(std::filesystem::path dir, config, access_mode allow_write);
       ~database();
 
-      void        swap();
-      void        claim_free() const;
+      inline void swap();
+      inline void claim_free() const;
       inline void ensure_free_space();
 
       class session_base
@@ -199,8 +199,8 @@ namespace triedent
       class write_session : public read_session
       {
         public:
-         bool upsert(string_view key, string_view val);
-         bool remove(string_view key);
+         int  upsert(string_view key, string_view val);
+         int  remove(string_view key);
          id   fork(id from_version );
          id   fork();
 
@@ -218,8 +218,8 @@ namespace triedent
                                              id                val,
                                              uint64_t          branches);
 
-         inline id add_child(id root, string_view key, string_view val, bool& inserted);
-         inline id remove_child(id root, string_view key, bool& removed);
+         inline id add_child(id root, string_view key, string_view val, int& old_size);
+         inline id remove_child(id root, string_view key, int& removed_size);
 
          inline id set_value(deref<node> n, string_view key, string_view val);
          inline id set_inner_value(deref<inner_node> n, string_view val);
@@ -596,7 +596,7 @@ namespace triedent
    inline database::id database::write_session::add_child(id          root,
                                                           string_view key,
                                                           string_view val,
-                                                          bool&       inserted)
+                                                          int&       old_size)
    {
       if (not root)  // empty case
          return make_value(key, val);
@@ -605,14 +605,10 @@ namespace triedent
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
-         if ((inserted = (vn.key() != key)))
-         {  // with differnet keys
-
+         if ((vn.key() != key) )   
             return combine_value_nodes(vn.key(), vn.data(), key, val);
-         }
-         else
-         {
-            inserted = false;               // it updated in stead
+         else {
+            old_size = vn.data_size();
             return set_value(n, key, val);  // with the same key
          }
       }
@@ -622,8 +618,12 @@ namespace triedent
       auto  in_key = in.key();
       if (in_key == key)  // whose prefix is same as key, therefore set the value
       {
-         inserted = !in.value();
-         return set_inner_value(n, val);
+         if( not in.value() ) {
+            return set_inner_value(n, val);
+         } else {
+            old_size = get(in.value()).as_value_node().data_size();
+            return set_inner_value( n, val );
+         }
       }
 
       auto cpre = common_prefix(in_key, key);
@@ -636,7 +636,7 @@ namespace triedent
             auto  new_in = make_inner(in, in_key, retain(in.value()), in.branches() | 1ull << b);
             auto& cur_b  = new_in->branch(b);
 
-            auto new_b = add_child(cur_b, key.substr(cpre.size() + 1), val, inserted);
+            auto new_b = add_child(cur_b, key.substr(cpre.size() + 1), val, old_size);
 
             if (new_b != cur_b)
             {
@@ -648,7 +648,7 @@ namespace triedent
          }  // else modify in place
 
          auto& cur_b = in.branch(b);
-         auto  new_b = add_child(cur_b, key.substr(cpre.size() + 1), val, inserted);
+         auto  new_b = add_child(cur_b, key.substr(cpre.size() + 1), val, old_size);
 
          if (new_b != cur_b)
          {
@@ -699,16 +699,16 @@ namespace triedent
       release(_session_root);
       _session_root = id();
    }
-   // return true on insert, false on update
-   inline bool database::write_session::upsert(string_view key, string_view val)
+   // return -1 on insert, the size of the old object on update
+   inline int database::write_session::upsert(string_view key, string_view val)
    {
       _db->ensure_free_space();
       swap_guard g(*this);
 
       auto& ar = *_db->_ring;
 
-      bool inserted = true;
-      auto new_root = add_child(_session_root, to_key6(key), val, inserted);
+      int old_size = -1;
+      auto new_root = add_child(_session_root, to_key6(key), val, old_size);
       assert(new_root.id);
       //  std::cout << "new_root: " << new_root.id << "  old : " << rev._root.id << "\n";
       if (new_root != _session_root)
@@ -716,7 +716,7 @@ namespace triedent
          release(_session_root);
          _session_root = new_root;
       }
-      return inserted;
+      return old_size;
    }
 
    template <typename AccessMode>
@@ -1277,52 +1277,51 @@ namespace triedent
       return std::nullopt;
    }
 
-   inline bool database::write_session::remove(string_view key)
+   inline int database::write_session::remove(string_view key)
    {
       _db->ensure_free_space();
       swap_guard g(*this);
-      bool       removed  = false;
-      auto       new_root = remove_child(_session_root, to_key6(key), removed);
+      int        removed_size  = -1;
+      auto       new_root = remove_child(_session_root, to_key6(key), removed_size);
       if (new_root != _session_root)
       {
          release(_session_root);
          _session_root = new_root;
       }
-      return removed;
+      return removed_size;
    }
    inline database::id database::write_session::remove_child(id          root,
                                                              string_view key,
-                                                             bool&       removed)
+                                                             int&       removed_size)
    {
       if (not root)
-      {
-         removed = false;
          return root;
-      }
 
       auto n = get(root);
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
-         removed  = vn.key() == key;
-         return id();
+         if( vn.key() == key ) {
+            removed_size = vn.data_size();
+            return id();
+         }
+         return root;
       }
 
       auto& in     = n.as_inner_node();
       auto  in_key = in.key();
 
       if (in_key.size() > key.size())
-      {
-         removed = false;
          return root;
-      }
 
       if (in_key == key)
       {
-         //      WARN( "key == in_key" );
-         removed = bool(in.value());
-         if (not removed)
+         auto iv = in.value();
+         if( not iv ) 
             return root;
+
+         if( in.value() ) 
+            removed_size = get(iv).as_value_node().data_size();
 
          if (in.num_branches() == 1)
          {
@@ -1360,29 +1359,22 @@ namespace triedent
 
       auto b = key[in_key.size()];
 
-      //    DEBUG( "prefix: '", from_key(in.key()), "' branch: ", char(b+62) );
       if (not in.has_branch(b))
-      {
-         //        WARN( "not has branch ", char(b+62) );
-         removed = false;
          return root;
-      }
 
       auto& cur_b = in.branch(b);
 
-      auto new_b = remove_child(cur_b, key.substr(in_key.size() + 1), removed);
+      auto new_b = remove_child(cur_b, key.substr(in_key.size() + 1), removed_size);
       if (new_b != cur_b)
       {
          if (new_b and in.version() == _version)
          {
-            // WARN( "replacing existing branch" );
             release(cur_b);
             cur_b = new_b;
             return root;
          }
          if (new_b)  // update branch
          {
-            // WARN( "copy in place, then replace existing branch" );
             auto  new_root = make_inner(in, in.key(), retain(in.value()), in.branches());
             auto& new_br   = new_root->branch(b);
             release(new_br);
@@ -1618,5 +1610,25 @@ namespace triedent
       return {key_buf.data(), key_buf.size()};
    }
    inline void database::ensure_free_space() { _ring->ensure_free_space(); }
+
+   inline void database::claim_free()const
+   {
+      ring_allocator::swap_position sp;
+      {
+         std::lock_guard<std::mutex> lock(_active_sessions_mutex);
+         for (auto s : _active_sessions)
+         {
+            sp._swap_pos[0] =
+                std::min<uint64_t>(s->_hot_swap_p.load(std::memory_order_relaxed), sp._swap_pos[0]);
+            sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(std::memory_order_acquire),
+                                                 sp._swap_pos[1]);
+            sp._swap_pos[2] = std::min<uint64_t>(s->_cool_swap_p.load(std::memory_order_acquire),
+                                                 sp._swap_pos[2]);
+            sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(std::memory_order_acquire),
+                                                 sp._swap_pos[3]);
+         }
+      }
+      _ring->claim_free(sp);
+   }
 
 }  // namespace trie
