@@ -1,8 +1,10 @@
-<h1>psibase</h1>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" />
 
-<h2>Selected Contracts</h2>
-
-<ul id="contracts"></ul>
+<div id="commonRoot"></div>
+<div class="ui container" style="margin-top: 10px" id="root"></div>
 
 <script src="common/rootdomain.js"></script>
-<script src="ui/index.js"></script>
+<script src="ui/commonIndex.js" type="module"></script>
+<script src="ui/index.js" type="module"></script>

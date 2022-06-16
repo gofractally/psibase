@@ -1,3 +1,4 @@
+#include <contracts/system/CommonSys.hpp>
 #include <contracts/user/RTokenSys.hpp>
 #include <contracts/user/SymbolSys.hpp>
 #include <contracts/user/TokenSys.hpp>
@@ -36,10 +37,13 @@ namespace
 
 optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
 {
-   if (auto result = _serveRestEndpoints(request))
+   if (auto result = at<CommonSys>().serveCommon(request).unpack())
       return result;
 
    if (auto result = serveContent(request, TokenSys::Tables{getReceiver()}))
+      return result;
+
+   if (auto result = _serveRestEndpoints(request))
       return result;
 
    // if (auto result = serveGraphQL(request, TokenQuery{}))

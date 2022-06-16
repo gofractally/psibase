@@ -116,6 +116,39 @@ namespace psibase
                             Tables{getReceiver()});
    }
 
+   std::optional<RpcReplyData> CommonSys::serveCommon(RpcRequestData request)
+   {
+      /*
+      <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+      <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" />
+
+      <div id="commonRoot"></div>
+      <div class="ui container" style="margin-top: 10px" id="root"></div>
+
+      <script src="common/rootdomain.js"></script>
+      <script src="ui/commonIndex.js" type="module"></script>
+      <script src="ui/index.js" type="module"></script>
+      */
+
+      if (request.method == "GET")
+      {
+         if (request.target == "/" || request.target == "/ui/commonIndex.js")
+         {
+            auto index =
+                ContractTables<WebContentTable>{contract}.open<WebContentTable>().getIndex<0>();
+            if (auto content = index.get(request.target))
+            {
+               return RpcReplyData{
+                   .contentType = content->contentType,
+                   .body        = content->content,
+               };
+            }
+         }
+      }
+      return std::nullopt;
+   }
+
 }  // namespace psibase
 
 PSIBASE_DISPATCH(psibase::CommonSys)
