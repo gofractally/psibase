@@ -13,7 +13,7 @@ using namespace UserContract::Errors;
 using namespace UserContract;
 
 constexpr std::string_view MEMBER_IS_EVICTED = "member is removed from the community";
-constexpr std::string_view EMPTY_CHAIN = "a default chain";
+constexpr std::string_view AN_EMPTY_CHAIN = "a default chain";
 // TODO: add billing note where applicable and assert on the specific amount of resources (to notice when resource costs change)
 
 namespace
@@ -41,7 +41,7 @@ namespace
 
 SCENARIO("Scheduling meetings")
 {
-   GIVEN(EMPTY_CHAIN)
+   GIVEN(AN_EMPTY_CHAIN)
    {
       WHEN("There is no meeting scheduled") {
          AND_THEN("The meeting cadence and day of week + time can be set") { }
@@ -56,34 +56,52 @@ SCENARIO("Scheduling meetings")
    }
 }
 
-SCENARIO("Pre-meeting user activities") {
-   GIVEN("an hour and 1 minute before the meeting") {
-      THEN("User can't check in to the meeting") { }
-   }
-   GIVEN("An hour before the meeting") {
-      THEN("User can check in to participate in the meetings and submit a bit of entropy") { }
-   }
-   GIVEN("At meeting start time") {
-      THEN("Participants can reveal their entropy") { }
-   }
-   GIVEN("2 minutes after the start of the meeting") {
-      GIVEN("a participant who hasn't checked in and submitted entropy") {
-         THEN("Meetings start on time and includes the user.") { }
+SCENARIO("Pre-meeting member activities") {
+   GIVEN("a default chain with a meeting scheduled") {
+      WHEN("an hour and 1 minute before the meeting") {
+         THEN("member can't check in to the meeting") { }
       }
-      GIVEN("a participant who hasn't checked in and submitted entropy") {
-         THEN("Meetings start on time and does not include the user.") { }
+      WHEN("An hour before the meeting") {
+         THEN("member can check in to participate in the meetings and submit entropy") { }
       }
-   }
-   GIVEN("Each checked-in user is grouped into a random meetings") {
-      // anything to do about verifying random seed for randomizing members into meetings?
-      THEN("Every checked-in user is in a meeting") { }
-      THEN("No non-checked-in user is in a meeting") { }
-      THEN("No user is in more than 1 meeting") { }
+      WHEN("After the meeting start time") {
+         THEN("member can't check in to the meeting") { }
+      }
+      WHEN("member has checked in") {
+         AND_WHEN("the meeting has started") {
+            THEN("member can reveal their entropy") { }
+         }
+         AND_WHEN("1:59 minutes into the meeting") {
+            THEN("member can reveal their entropy") { }
+         }
+         AND_WHEN("2:00 minutes into the meeting") {
+            THEN("member can no longer reveal their entropy") { }
+         }
+      }
+      WHEN("Member has checked in and revealed entropy") {
+         AND_WHEN("meeting has been in progress for > 2:00 minutes") {
+            THEN("Meeting starts on time and includes the member.") { }
+         }
+      }
+      WHEN("meeting has been in progress for > 2:00 minutes") {
+         WHEN("Member has not checked in and revealed entropy") {
+            THEN("Meeting starts on time and does not include the member.") { }
+         }
+         WHEN("Member has checked in but not revealed entropy") {
+            THEN("Meeting starts on time and does not include the member.") { }
+         }
+      }
+      WHEN("Each checked-in member is grouped into a random meetings") {
+         // anything to do about verifying random seed for randomizing members into meetings?
+         THEN("Every checked-in member is in a meeting") { }
+         THEN("No non-checked-in member is in a meeting") { }
+         THEN("No member is in more than 1 meeting") { }
+      }
    }
 }
 
 SCENARIO("In-meeting activities") {
-   GIVEN("A meeting with 5 participants and no activity yet") {
+   GIVEN("A default chain with an active meeting with 5 members and no consensus reports submitted yet") {
       THEN("Alice can submit a consensus report") {
          AND_THEN("Alice cannot submit another consensus report") {}
       }
@@ -97,94 +115,91 @@ SCENARIO("Meeting Attendance and Consensus") {
    constexpr std::string_view CONSENSUS_ACHIEVED = "funds are distributed only to those who were aligned on the consensus report";
    constexpr std::string_view CONSENSUS_NOT_ACHIEVED = "funds are *not* distributed";
 
-   GIVEN("A default chain and a scheduled meeting") {
-      WHEN("When people check in for a meeting") {
-         AND_WHEN("the meeting ends") {
-            AND_WHEN("none of the participants submitted a consensus report") {
-               THEN(CONSENSUS_NOT_ACHIEVED) { }
-            }
-            AND_WHEN("6 participants submit consensus reports") {
-               AND_WHEN("they agree") {
-
-               }
-               AND_WHEN("they disagree") { }
-               // Q: minimum number of consensus submissions?
-            }
-         }
-      }
-      WHEN("There are 6 participants in a meeting") {
-         WHEN("All reports are in agreement") {
+   GIVEN("A default chain") {
+      // Q: minimum number of consensus submissions?
+      AND_GIVEN("6 members in a meeting") {
+         WHEN("All members submit consensus reports that agree") {
             THEN(CONSENSUS_ACHIEVED) { }
          }
-         WHEN("4 of 6 reports are in agreement, 1 not in agreement") {
+         WHEN("4 of 6 members submit consensus reports that agree, and 1 report that does not agree") {
             THEN(CONSENSUS_ACHIEVED) { }
          }
-         WHEN("4 of 6 reports are in agreement, and include 2 unranked members") {
+         WHEN("4 of 6 members submit consensus reports that agree and include 2 unranked members") {
             THEN(CONSENSUS_ACHIEVED) {
                // algo needs to allow 2 unranked members to have either order and still count as reports in consensus
             }
          }
-         WHEN("3 of 6 reports are in agreement, 3 not in agreement (and differ)") {
+         WHEN("3 of 6 members submit consensus reports that agree, and 3 submit consensus reports that does not agree") {
             THEN(CONSENSUS_NOT_ACHIEVED) { }
          }
-         THEN("Servicer is paid 1% of all Respect distributed") { }
-         THEN("Distributions to each member are doubled if they're on a team") { }
-      }
-      WHEN("There are 5 participants in a meeting") {
-         WHEN("All reports are in agreement") {
-            THEN(CONSENSUS_ACHIEVED) { }
-         }
-         WHEN("3 of 5 reports are in agreement, 1 not in agreement") {
-            THEN(CONSENSUS_ACHIEVED) { }
-         }
-         WHEN("2 of 5 reports are in agreement, 3 not in agreement (and differ)") {
+         WHEN("none of the members submit a consensus report") {
             THEN(CONSENSUS_NOT_ACHIEVED) { }
          }
       }
-      WHEN("There are 4 participants in a meeting") {
-         WHEN("All reports are in agreement") {
+      AND_GIVEN("5 members in a meeting") {
+         WHEN("All reports submit consensus reports that agree") {
             THEN(CONSENSUS_ACHIEVED) { }
          }
-         WHEN("3 of 4 reports are in agreement, 1 not in agreement") {
+         WHEN("3 of 5 members submit consensus reports that agree, and 1 report that does not agree") {
             THEN(CONSENSUS_ACHIEVED) { }
          }
-         WHEN("2 of 4 reports are in agreement, 3 not in agreement (and differ)") {
+         WHEN("2 of 5 members submit consensus reports that agree, and 3 reports that do not agree (and differ)") {
             THEN(CONSENSUS_NOT_ACHIEVED) { }
          }
       }
-      WHEN("There are 3 participants in a meeting") {
-         WHEN("All reports are in agreement") {
+      AND_GIVEN("4 members in a meeting") {
+         WHEN("All members submit consensus reports that agree") {
             THEN(CONSENSUS_ACHIEVED) { }
          }
-         WHEN("2 of 3 reports are in agreement, 1 not in agreement") {
+         WHEN("3 of 4 members submit consensus reports that agree, and 1 report that does not agree") {
             THEN(CONSENSUS_ACHIEVED) { }
          }
-         WHEN("1 of 3 reports are in agreement, 3 not in agreement (and differ)") {
+         WHEN("2 of 4 members submit consensus reports that agree, and 3 reports that do not agree (and differ)") {
             THEN(CONSENSUS_NOT_ACHIEVED) { }
          }
       }
-      WHEN("There are 2 participants in a meeting") {
-         WHEN("All reports are in agreement") {
+      AND_GIVEN("3 members in a meeting") {
+         WHEN("All members submit consensus reports that agree") {
             THEN(CONSENSUS_ACHIEVED) { }
          }
-         WHEN("1 of 2 reports are in agreement, 3 not in agreement (and differ)") {
+         WHEN("2 of 3 members submit consensus reports that agree, and 1 report that does not agree") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("1 of 3 members submit consensus reports that agree, and 3 reports that do not agree (and differ)") {
             THEN(CONSENSUS_NOT_ACHIEVED) { }
          }
       }
-      WHEN("There is 1 participant in a meeting") {
-         WHEN("Participant submits a report") {
+      AND_GIVEN("2 members in a meeting") {
+         WHEN("All members submit consensus reports that agree") {
             THEN(CONSENSUS_ACHIEVED) { }
          }
-         WHEN("Participant does not submits a report") {
+         WHEN("1 of 2 members submit a consensus report, and 1 that does not agree") {
             THEN(CONSENSUS_NOT_ACHIEVED) { }
          }
       }
-      WHEN("A member submits their 5th out-of-consensus report in the last 10 weeks") {
-         THEN(MEMBER_IS_EVICTED) { }
+      AND_GIVEN("1 member in a meeting") {
+         WHEN("member submits a report") {
+            THEN(CONSENSUS_ACHIEVED) { }
+         }
+         WHEN("member does not submits a report") {
+            THEN(CONSENSUS_NOT_ACHIEVED) { }
+         }
       }
-      WHEN("A member submits their 1st consensus report in line with the majority") {
-      THEN("A new member becomes an active member (out of pending status)") { }
-   }
+      AND_GIVEN("a member who has submitted out-of-consensus reports for 4 weeks in a row") {
+         WHEN("they submit their 5th out-of-consensus report (in the last 10 weeks)") {
+            THEN(MEMBER_IS_EVICTED) { }
+         }
+      }
+      AND_GIVEN("A new member who has never attended a meeting") {
+         WHEN("they submit their 1st consensus report in line with the consensus") {
+            THEN("they becomes an active member (out of pending status)") { }
+         }
+      }
+      AND_GIVEN("A member who has attended 7 meetings and joined a team") {
+         WHEN("they submit their 8th consensus report") {
+            THEN("they become a full-time member, earning their team the team-matching reward for that week") { }
+         }
+      }
    }
 }
 
@@ -216,15 +231,17 @@ SCENARIO("Meeting Attendance Accounting") {
          WHEN("20 week rank totals change who's in the top 12") {
             THEN("The Council shows the current top 12 earning teams (based on total rank of all member on a team)") { }
          }
+         THEN("Servicer is paid 1% of all Respect distributed") { }
+         THEN("Distributions to each member are doubled if they're on a team") { }
       }
    }
 }
 
-SCENARIO("Funds are distributed to participants in a meeting") {
-   WHEN("There are 6 participants in a meeting, who all submit identical consensus reports") {
+SCENARIO("Funds are distributed to members in a meeting") {
+   WHEN("There are 6 members in a meeting, who all submit identical consensus reports") {
       THEN("Distributions are as follows: 21, 13, 8, 5, 3, 2") { }
    }
-   WHEN("There are 6 participants in a meeting, 5 of whom submit identical consensus reports") {
+   WHEN("There are 6 members in a meeting, 5 of whom submit identical consensus reports") {
       // Alice, Bob, Carol, David, Erik, Freddy
       THEN("Distributions are as follows: 21, 13, 8, 5, 3") { }
       THEN("Erik doesn't receive any respect.") { }
@@ -234,13 +251,13 @@ SCENARIO("Funds are distributed to participants in a meeting") {
 // TODO: more rounds? Higher numbers? We should plan for this either way, knowing that how many rounds should be configurable?
 
 SCENARIO("Attendance stats and their impact") {
-   GIVEN("A community less than 7000 members and a user who has missed 11 consecutive meetings") {
-      WHEN("The user misses their 12th meeting") {
+   GIVEN("A community less than 7000 members and a member who has missed 11 consecutive meetings") {
+      WHEN("The member misses their 12th meeting") {
          THEN(MEMBER_IS_EVICTED) { }
       }
    }
-   GIVEN("A community with 7000 weekly active members and a user who has missed 5 consecutive meetings") {
-      WHEN("The user misses their 6th meeting") {
+   GIVEN("A community with 7000 weekly active members and a member who has missed 5 consecutive meetings") {
+      WHEN("The member misses their 6th meeting") {
          THEN(MEMBER_IS_EVICTED) { }
       }
    }
@@ -267,7 +284,7 @@ SCENARIO("Council's special rights") {
          }
       }
    }
-   GIVEN("an existing user who needs an account recovery") {
+   GIVEN("an existing member who needs an account recovery") {
       THEN("A Council can't recover an account without an active recovery request.") { }
       THEN("Any member can stake respect and request the account recovery") {
          // Q: How much to stake here? Review our Account Recovery process from Eden
