@@ -6,6 +6,16 @@
 
 namespace psibase
 {
+   // TODO: add this to web-services.md. Add note about proxy limiting who can set headers.
+   struct HttpHeader
+   {
+      std::string name;
+      std::string value;
+   };
+   PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
+
+   // TODO: consider adding headers to this
+   // TODO: rename to HttpRequestData; adjust docs
    /// An RPC Request
    ///
    /// Most contracts receive this via their `serveSys` action.
@@ -21,14 +31,16 @@ namespace psibase
    };
    PSIO_REFLECT(RpcRequestData, host, rootHost, method, target, contentType, body)
 
+   // TODO: rename to HttpReplyData; adjust docs
    /// An RPC reply
    ///
    /// Contracts return this from their `serveSys` action.
    struct RpcReplyData
    {
-      std::string       contentType;  ///< "application/json", "text/html", ...
-      std::vector<char> body;         ///< Response body
+      std::string             contentType;  ///< "application/json", "text/html", ...
+      std::vector<char>       body;         ///< Response body
+      std::vector<HttpHeader> headers;      ///< HTTP Headers
    };
-   PSIO_REFLECT(RpcReplyData, contentType, body)
+   PSIO_REFLECT(RpcReplyData, contentType, body, headers)
 
 }  // namespace psibase

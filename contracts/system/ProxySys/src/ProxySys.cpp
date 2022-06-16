@@ -67,7 +67,10 @@ namespace psibase
 
       // TODO: avoid repacking (both directions)
       psibase::Actor<ServerInterface> iface(act.contract, reg->serverContract);
-      setRetval(iface.serveSys(std::move(req)).unpack());
+      auto                            result = iface.serveSys(std::move(req)).unpack();
+      if (result && !result->headers.empty() && contractName != "common-sys")
+         abortMessage("contract " + contract.str() + " attempted to set an http header");
+      setRetval(result);
    }  // serve()
 
 }  // namespace psibase

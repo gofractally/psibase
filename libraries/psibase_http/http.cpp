@@ -145,11 +145,15 @@ namespace psibase::http
          return res;
       };
 
-      const auto ok = [&server, set_cors, req_version, req_keep_alive](std::vector<char> reply,
-                                                                       const char* content_type)
+      const auto ok = [&server, set_cors, req_version, req_keep_alive](
+                          std::vector<char> reply, const char* content_type,
+                          const std::vector<HttpHeader>* headers = nullptr)
       {
          bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         if (headers)
+            for (auto& h : *headers)
+               res.set(h.name, h.value);
          res.set(bhttp::field::content_type, content_type);
          set_cors(res);
          res.keep_alive(req_keep_alive);
@@ -221,7 +225,7 @@ namespace psibase::http
                return send(
                    error(bhttp::status::not_found,
                          "The resource '" + req.target().to_string() + "' was not found.\n"));
-            return send(ok(std::move(result->body), result->contentType.c_str()));
+            return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
          }  // !native
          else if (req.target() == "/native/push_boot" && req.method() == bhttp::verb::post &&
                   server.http_config->push_boot_async)
