@@ -27,6 +27,7 @@ int main(int argc, char** argv)
       desc.add_options()("help,h", "print this message")("reset", "reset the database")(
           "sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys")(
           "status", "print status of the database")
+          ("count", "count the number of keys in database")
           ("export", po::value<std::string>(&export_file), "export the key value db to canonical form")
           ("import", po::value<std::string>(&import_file), "import keys previously exported")
           (
@@ -115,7 +116,10 @@ int main(int argc, char** argv)
          std::cerr << "inserted " << inserted << " keys"<<std::endl;
          std::cerr << "updated " << updated<< " keys"<<std::endl;
       }
-      if (vm.count("export"))
+
+         bool c = vm.count("count");
+         bool e = vm.count("export");
+      if ( e or c )
       {
          std::ofstream ef(export_file.c_str(), std::fstream::trunc);
          database      db(db_dir.c_str(), triedent::database::read_write);
@@ -126,19 +130,24 @@ int main(int argc, char** argv)
          while (i.valid())
          {
             ++count;
-            auto     k  = i.key();
-            auto     v  = i.value();
-            uint8_t  ks = k.size();
-            uint32_t vs = v.size();
-            ef.write((char*)&ks, 1);
-            ef.write(k.data(), ks);
-            ef.write((char*)&vs, 4);
-            ef.write(v.data(), vs);
-            if( count % 1000000 == 0 )
-               std::cerr << "item: " << count <<"        \r";
+            if( e ) {
+               auto     k  = i.key();
+               auto     v  = i.value();
+               uint8_t  ks = k.size();
+               uint32_t vs = v.size();
+               ef.write((char*)&ks, 1);
+               ef.write(k.data(), ks);
+               ef.write((char*)&vs, 4);
+               ef.write(v.data(), vs);
+               if( count % 1000000 == 0 )
+                  std::cerr << "exported " << count <<" items       \r";
+            }
             ++i;
          }
+         if( e )
          std::cerr << "Exported " << count << " keys to " << export_file << std::endl;
+         else
+         std::cerr << count << " keys in database " << std::endl;
       }
    }
    catch (std::exception& e)

@@ -7,15 +7,6 @@
 namespace triedent
 {
 
-   inline std::string from_key(std::string_view sv)
-   {
-      std::string out;
-      out.reserve(sv.size());
-      for (int i = 0; i < sv.size(); ++i)
-         out += sv[i] + 62;
-      return out;
-   }
-
    struct write_access;
    struct read_access;
 
@@ -88,7 +79,6 @@ namespace triedent
          {
             uint32_t    key_size() const;
             uint32_t    read_key(char* data, uint32_t data_len) const;
-            string_view value() const;
             std::string key() const;
             iterator&   operator++();
             iterator&   operator--();
@@ -114,8 +104,17 @@ namespace triedent
             {
                c._iter_num = -1;
             }
+            void value( std::string& v )const;
+
+            std::string value()const {
+               std::string r;
+               value(r);
+               return r;
+            }
 
            private:
+            // ungaurded access
+            string_view _value() const;
             friend class session;
             iterator(const session& s) : _session(&s)
             {
@@ -847,7 +846,20 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   std::string_view database::session<AccessMode>::iterator::value() const
+   void database::session<AccessMode>::iterator::value( std::string& val) const
+   {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _session->_db->ensure_free_space();
+      swap_guard g(*_session);
+
+      auto dat = _value();
+      val.resize(dat.size());
+      memcpy(val.data(), dat.data(), dat.size() );
+   }
+
+
+   template <typename AccessMode>
+   std::string_view database::session<AccessMode>::iterator::_value() const
    {
       if (path().size() == 0)
          return std::string_view();
@@ -879,6 +891,10 @@ namespace triedent
    template <typename AccessMode>
    uint32_t database::session<AccessMode>::iterator::read_key(char* data, uint32_t data_len) const
    {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _session->_db->ensure_free_space();
+      swap_guard g(*_session);
+
       auto  key_len = std::min<uint32_t>(data_len, key_size());
       char* start   = data;
 
@@ -1462,6 +1478,7 @@ namespace triedent
    template <typename AccessMode>
    void database::session<AccessMode>::print(id r, string_view prefix, std::string key)
    {
+      /*
       auto print_key = [](std::string k)
       { std::cerr << std::right << std::setw(30) << from_key(k) << ": "; };
       if (not r)
@@ -1503,6 +1520,7 @@ namespace triedent
             }
          }
       }
+      */
    }
 
    template <typename AccessMode>
@@ -1553,20 +1571,18 @@ namespace triedent
    {
       std::string out;
       out.resize((sixb.size() * 6) / 8);
-      assert( sixb.size()*6 % 8 == 0 and "invalid input, sixb shold be produced by to_key6 which is a multiple of 8bits" );
+      //assert( sixb.size()*6 % 8 == 0 and "invalid input, sixb shold be produced by to_key6 which is a multiple of 8bits" );
 
       const uint8_t* pos6     = (uint8_t*)sixb.data();
       const uint8_t* pos6_end = (uint8_t*)sixb.data() + sixb.size();
       uint8_t*       pos8     = (uint8_t*)out.data();
 
-      auto next = pos6 + 4;
-      while (next <= pos6_end)
+      while ( pos6_end - pos6 >= 4 )
       {
          pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
          pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
          pos8[2] = (pos6[2] << 6) | pos6[3];         // 2b + 6
-         pos6 = next;
-         next += 4;
+         pos6 += 4;
          pos8 += 3;
       }
       switch (pos6_end - pos6)
