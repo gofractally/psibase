@@ -9,63 +9,141 @@ using namespace triedent;
 
 int main(int argc, char** argv)
 {
-   namespace po            = boost::program_options;
-   uint32_t    hot_page_c  = 34;
-   uint32_t    warm_page_c = 33;
-   uint32_t    cool_page_c = 35;
-   uint32_t    cold_page_c = 35;
-   uint64_t    num_objects = 250 * 1000 * 1000;
-   std::string db_dir;
-   bool        use_string = false;
-
-   uint32_t                num_read_threads = 6;
-   po::options_description desc("Allowed options");
-   desc.add_options()("help,h", "print this message")("reset", "reset the database")(
-       "sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys")(
-       "status", "print status of the database")(
-       "create", "creates an empty database with the give parameters")(
-       "data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
-       "the folder that contains the database")(
-       "read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
-       "number of read threads to launch")(
-       "hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33),
-       "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")(
-       "warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33),
-       "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes")(
-       "cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33),
-       "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes")(
-       "cold-size,C", po::value<uint32_t>(&cold_page_c)->default_value(33),
-       "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes")(
-       "max-objects,O", po::value<uint64_t>(&num_objects)->default_value(num_objects),
-       "the maximum number of unique objects in the database");
-
-   po::variables_map vm;
-   po::store(po::parse_command_line(argc, argv, desc), vm);
-   po::notify(vm);
-
-   if (vm.count("help"))
+   try
    {
-      std::cout << desc << "\n";
-      return 1;
+      namespace po            = boost::program_options;
+      uint32_t    hot_page_c  = 34;
+      uint32_t    warm_page_c = 33;
+      uint32_t    cool_page_c = 35;
+      uint32_t    cold_page_c = 35;
+      uint64_t    num_objects = 250 * 1000 * 1000;
+      std::string db_dir;
+      std::string export_file;
+      std::string import_file;
+      bool        use_string = false;
+
+      uint32_t                num_read_threads = 6;
+      po::options_description desc("Allowed options");
+      desc.add_options()("help,h", "print this message")("reset", "reset the database")(
+          "sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys")(
+          "status", "print status of the database")
+          ("export", po::value<std::string>(&export_file), "export the key value db to canonical form")
+          ("import", po::value<std::string>(&import_file), "import keys previously exported")
+          (
+          "create", "creates an empty database with the give parameters")(
+          "data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
+          "the folder that contains the database")(
+          "read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
+          "number of read threads to launch")(
+          "hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33),
+          "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")(
+          "warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33),
+          "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes")(
+          "cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33),
+          "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes")(
+          "cold-size,C", po::value<uint32_t>(&cold_page_c)->default_value(33),
+          "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes")(
+          "max-objects,O", po::value<uint64_t>(&num_objects)->default_value(num_objects),
+          "the maximum number of unique objects in the database");
+
+      po::variables_map vm;
+      po::store(po::parse_command_line(argc, argv, desc), vm);
+      po::notify(vm);
+
+      if (vm.count("help"))
+      {
+         std::cout << desc << "\n";
+         return 1;
+      }
+
+      if (vm.count("reset"))
+      {
+         std::cout << "resetting database\n";
+         std::filesystem::remove_all(db_dir);
+      }
+      if (vm.count("status"))
+      {
+         database db(db_dir.c_str(), triedent::database::read_write);
+         db.print_stats(true);
+      }
+      if (vm.count("create"))
+      {
+         database::create(db_dir, triedent::database::config{.max_objects = num_objects,
+                                                             .hot_pages   = hot_page_c,
+                                                             .warm_pages  = warm_page_c,
+                                                             .cool_pages  = cool_page_c,
+                                                             .cold_pages  = cold_page_c});
+      }
+      if (vm.count("import"))
+      {
+         if( not std::filesystem::exists(import_file) ) {
+            throw std::runtime_error( "import file does not exist: "+ import_file );
+         }
+         database      db(db_dir.c_str(), triedent::database::read_write);
+         auto          s     = db.start_write_session();
+         s->set_session_revision( db.get_root_revision() );
+
+
+         std::ifstream in(import_file.c_str(), std::fstream::binary | std::fstream::in);
+         std::vector<char> value_buffer;
+         value_buffer.resize(0xffffff);
+         std::vector<char> key_buffer;
+         key_buffer.resize(256);
+
+            uint32_t vs;
+            uint8_t ks;
+            uint64_t inserted  = 0;
+            uint64_t updated   = 0;
+         while( not in.eof() ) {
+            in.read( (char*)&ks, 1 );
+            key_buffer.resize(ks);
+            in.read(key_buffer.data(), ks );
+            in.read((char*)&vs, 4 );
+            if( vs > 0xffffff ) {
+               throw std::runtime_error( "invalid value size detected in import file" );
+            }
+            in.read(value_buffer.data(), vs );
+
+            if( in.eof() ) break;
+            auto old_size = s->upsert( std::string_view(key_buffer.data(), ks),
+                       std::string_view(value_buffer.data(), vs ) );
+            if( old_size < 0 ) inserted++;
+            else updated++;
+         }
+         s->set_root_revision(  s->get_session_revision() );
+
+         std::cerr << "inserted " << inserted << " keys"<<std::endl;
+         std::cerr << "updated " << updated<< " keys"<<std::endl;
+      }
+      if (vm.count("export"))
+      {
+         std::ofstream ef(export_file.c_str(), std::fstream::trunc);
+         database      db(db_dir.c_str(), triedent::database::read_write);
+         auto          s     = db.start_write_session();
+         s->set_session_revision( db.get_root_revision() );
+         auto          i     = s->first();
+         int64_t       count = 0;
+         while (i.valid())
+         {
+            ++count;
+            auto     k  = i.key();
+            auto     v  = i.value();
+            uint8_t  ks = k.size();
+            uint32_t vs = v.size();
+            ef.write((char*)&ks, 1);
+            ef.write(k.data(), ks);
+            ef.write((char*)&vs, 4);
+            ef.write(v.data(), vs);
+            if( count % 1000000 == 0 )
+               std::cerr << "item: " << count <<"        \r";
+            ++i;
+         }
+         std::cerr << "Exported " << count << " keys to " << export_file << std::endl;
+      }
    }
-
-   if (vm.count("reset"))
+   catch (std::exception& e)
    {
-      std::cout << "resetting database\n";
-      std::filesystem::remove_all(db_dir);
-   }
-   if (vm.count("status"))
-   {
-      database db(db_dir.c_str(), triedent::database::read_write);
-      db.print_stats(true);
-   }
-   if (vm.count("create"))
-   {
-      database::create(db_dir, triedent::database::config{.max_objects = num_objects,
-                                                          .hot_pages   = hot_page_c,
-                                                          .warm_pages  = warm_page_c,
-                                                          .cool_pages  = cool_page_c,
-                                                          .cold_pages  = cold_page_c});
+      std::cerr << e.what() << std::endl;
    }
 
    return 0;

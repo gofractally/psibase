@@ -77,6 +77,7 @@ int main(int argc, char** argv)
    }
 
 
+
    uint64_t       total            = insert_count ;//2 * 1000 * 1000 * 1000;
    triedent::database db( db_dir.c_str(), triedent::database::read_write);
    db.print_stats();
