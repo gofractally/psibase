@@ -456,6 +456,12 @@ namespace triedent
    {
       auto do_swap = [this](auto* from, auto* to)
       {
+         // TODO: remove fp and the check; a race can cause it to misfire
+         // TODO: please expand the code from get_potential_free_space and 
+         //       remove the redundant atomic reloads to make analysis easier
+         // TODO: `ap` may need to switch to memory_order_acquire to enable
+         //       reading object headers written by the main thread
+
          auto     fs     = from->_head->get_potential_free_space();
          auto     maxs   = from->_head->alloc_area_size;
          uint64_t target = 1024 * 1024 * 40ull;  //maxs / 32;  // target a certain amount free
