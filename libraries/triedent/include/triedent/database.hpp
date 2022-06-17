@@ -1370,6 +1370,10 @@ namespace triedent
 
       auto& cur_b = in.branch(b);
 
+      auto cpre = common_prefix( in_key, key );
+      if( cpre != in_key )
+         return root;
+
       auto new_b = remove_child(cur_b, key.substr(in_key.size() + 1), removed_size);
       if (new_b != cur_b)
       {
@@ -1540,23 +1544,29 @@ namespace triedent
       }
    }
 
+   // 1 byte -> 2 byte6 
+   // 2 byte6 -> 1 byte
+   //
+   // 2*6=12  12/8 = 1
+   // 3 -> 18 bit  which means 2 bytes
    inline key_type from_key6(const key_view sixb)
    {
-      //  for( auto c : sixb ) {print6(c); std::cout <<" ";}
-      //  std::cout <<"\n";
       std::string out;
       out.resize((sixb.size() * 6) / 8);
+      assert( sixb.size()*6 % 8 == 0 and "invalid input, sixb shold be produced by to_key6 which is a multiple of 8bits" );
 
-      const char* pos6     = sixb.data();
-      const char* pos6_end = sixb.data() + sixb.size();
-      char*       pos8     = out.data();
+      const uint8_t* pos6     = (uint8_t*)sixb.data();
+      const uint8_t* pos6_end = (uint8_t*)sixb.data() + sixb.size();
+      uint8_t*       pos8     = (uint8_t*)out.data();
 
-      while (pos6 + 4 <= pos6_end)
+      auto next = pos6 + 4;
+      while (next <= pos6_end)
       {
          pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
          pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
          pos8[2] = (pos6[2] << 6) | pos6[3];         // 2b + 6
-         pos6 += 4;
+         pos6 = next;
+         next += 4;
          pos8 += 3;
       }
       switch (pos6_end - pos6)
@@ -1564,11 +1574,11 @@ namespace triedent
          case 3:
             pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
             pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
-            pos8[2] = (pos6[2] << 6);                   // 2b + 6-0
+        //    pos8[2] = (pos6[2] << 6);                   // 2b + 6-0
             break;
          case 2:
             pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
-            pos8[1] = (pos6[1] << 4);                   // 4b + 4-0
+       //     pos8[1] = (pos6[1] << 4);                   // 4b + 4-0
             break;
          case 1:
             pos8[0] = (pos6[0] << 2);  // 6 + 2-0
@@ -1580,8 +1590,8 @@ namespace triedent
    }
    inline key_view database::session_base::to_key6(key_view v) const
    {
-      auto bits  = v.size() * 8;
-      auto byte6 = (bits + 5) / 6;
+      uint32_t bits  = v.size() * 8;
+      uint32_t byte6 = (bits + 5) / 6;
 
       key_buf.resize(byte6);
 

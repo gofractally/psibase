@@ -17,15 +17,16 @@ using namespace triedent;
 auto createDb()
 {
    std::filesystem::remove_all("testdb");
-   return std::make_unique<database>(  //
-       "testdb",
+   database::create(  "testdb",
        database::config{
            .max_objects = 10000ull,
            .hot_pages   = 30,
            .warm_pages  = 30,
            .cool_pages  = 30,
            .cold_pages  = 30,
-       },
+       } );
+   return std::make_unique<database>(  //
+       "testdb",
        database::read_write);
 }
 
@@ -43,9 +44,3 @@ TEST_CASE("accidental inner removal")
    REQUIRE(session->get({"\x00\x01\x03", 3}) == std::optional{std::string_view{"value 2"}});
 }
 
-TEST_CASE("key conversions")
-{
-   // regression check: accidental sign extension
-   REQUIRE(database::session_base{}.to_key6(from_key6({"\x00\x80", 2})) ==
-           std::string_view{"\x00\x80", 2});
-}
