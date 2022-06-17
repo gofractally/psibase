@@ -28,6 +28,8 @@ int main(int argc, char** argv)
           "sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys")(
           "status", "print status of the database")
           ("count", "count the number of keys in database")
+          ("validate", "count the number of keys in database")
+          ("gc", "free any space caused by dangling ref counts")
           ("export", po::value<std::string>(&export_file), "export the key value db to canonical form")
           ("import", po::value<std::string>(&import_file), "import keys previously exported")
           (
@@ -75,6 +77,23 @@ int main(int argc, char** argv)
                                                              .cool_pages  = cool_page_c,
                                                              .cold_pages  = cold_page_c});
       }
+
+      if( vm.count("validate") ) {
+         database      db(db_dir.c_str(), triedent::database::read_write);
+         auto          s = db.start_write_session();
+         s->set_session_revision( db.get_root_revision() );
+         s->validate();
+         std::cerr << "everything appears to be ok" << std::endl;
+      }
+
+      if( vm.count("gc") ) {
+         database      db(db_dir.c_str(), triedent::database::read_write);
+         auto          s     = db.start_write_session();
+         s->start_collect_garbage();
+         s->recursive_retain( db.get_root_revision() );
+         s->end_collect_garbage();
+      }
+
       if (vm.count("import"))
       {
          if( not std::filesystem::exists(import_file) ) {

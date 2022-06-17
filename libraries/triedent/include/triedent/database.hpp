@@ -75,6 +75,7 @@ namespace triedent
          inline auto&                       iterators() const { return _iterators; }
 
         public:
+
          struct iterator
          {
             uint32_t    key_size() const;
@@ -209,6 +210,20 @@ namespace triedent
 
          friend class database;
          write_session(database& db) : read_session(db) {}
+
+         /**
+          *  These methods are used to recover the database after a crash,
+          *  start_collect_garbage resets all non-zero refcounts to 1,
+          *  then you can call recursve retain for all root nodes that need
+          *  to be kept.
+          */
+         ///@{
+         void start_collect_garbage();
+         void recursive_retain( object_id id );
+         void end_collect_garbage();
+         ///@}
+         
+
 
         private:
          inline deref<value_node> make_value(string_view k, string_view v);
@@ -1523,6 +1538,44 @@ namespace triedent
       */
    }
 
+   /*
+    * visit every node in the tree and retain it. This is used in garbage collection
+    * after a crash.
+    */
+   inline void database::write_session::recursive_retain(id r) {
+      if (not r)
+         return;
+      int cur_ref_count = _db->_ring->ref(r);
+      retain(r);
+
+      if( cur_ref_count > 1 ) // 1 is the default ref when resetting all
+         return; // retaining this node indirectly retains all children
+
+      auto dr = get(r);
+      if( not dr.is_leaf_node() ) {
+         auto& in = dr.as_inner_node();
+
+         recursive_retain(in.value());
+
+         auto* c = in.children();
+         auto* e = c + in.num_branches();
+         while( c != e ) {
+            recursive_retain(*c);
+            ++e;
+         }
+      }
+   }
+
+   inline void database::write_session::start_collect_garbage() {
+
+      _db->_ring->reset_all_ref_counts(1);
+   }
+   inline void database::write_session::end_collect_garbage() {
+
+      _db->_ring->reset_all_ref_counts(-1);
+   }
+
+
    template <typename AccessMode>
    void database::session<AccessMode>::validate(id r)
    {
@@ -1531,47 +1584,30 @@ namespace triedent
 
       auto validate_id = [&](auto i)
       {
-         assert(i.id < 1000000);
-         assert(0 != _db->_ring->get_ref(r).first);
+         if( 0 == _db->_ring->get_ref(r).first ) 
+            throw std::runtime_error( "found reference to object with 0 ref count: " + std::to_string(r.id) );
       };
       validate_id(r);
 
       auto dr = get(r);
-      if (dr.is_leaf_node())
-      {
-         /*
-         auto dat = dr.as_value_node().data();
-         std::cerr << "'" << from_key(dr.as_value_node().key()) << "' => ";
-         std::cerr << (dat.size() > 20 ? string_view("BIG DAT") : dat) << ": " << r.id << "  vr"
-                   << _db->_ring->ref(r) << "\n";
-                   */
-      }
-      else
+      if (not dr.is_leaf_node())
       {
          auto& in = dr.as_inner_node();
+         validate(in.value());
 
-         validate_id(in.value());
-
-         for (char i = 0; i < 64; ++i)
-         {
-            if (in.has_branch(i))
-            {
-               validate(in.branch(i));
-            }
+         auto* c = in.children();
+         auto* e = c + in.num_branches();
+         while( c != e ) {
+            validate(*c);
+            ++c;
          }
       }
    }
 
-   // 1 byte -> 2 byte6 
-   // 2 byte6 -> 1 byte
-   //
-   // 2*6=12  12/8 = 1
-   // 3 -> 18 bit  which means 2 bytes
    inline key_type from_key6(const key_view sixb)
    {
       std::string out;
       out.resize((sixb.size() * 6) / 8);
-      //assert( sixb.size()*6 % 8 == 0 and "invalid input, sixb shold be produced by to_key6 which is a multiple of 8bits" );
 
       const uint8_t* pos6     = (uint8_t*)sixb.data();
       const uint8_t* pos6_end = (uint8_t*)sixb.data() + sixb.size();
@@ -1600,8 +1636,6 @@ namespace triedent
             pos8[0] = (pos6[0] << 2);  // 6 + 2-0
             break;
       }
-      //   for( auto c : out ) { print8(c); std::cout <<" "; }
-      //   std::cout << "from_key("<<out<<")\n";
       return out;
    }
    inline key_view database::session_base::to_key6(key_view v) const
@@ -1615,7 +1649,7 @@ namespace triedent
       const uint8_t* pos8     = (uint8_t*)v.data();
       const uint8_t* pos8_end = (uint8_t*)v.data() + v.size();
 
-      while (pos8 + 3 <= pos8_end)
+      while ( pos8_end - pos8 >= 3)
       {
          pos6[0] = pos8[0] >> 2;
          pos6[1] = (pos8[0] & 0x3) << 4 | pos8[1] >> 4;

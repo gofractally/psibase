@@ -87,6 +87,18 @@ namespace triedent
          _swap_thread->join();
       }
 
+      /**
+       * Sets all non-zero refs to c
+       */
+      void reset_all_ref_counts( uint16_t c ) {
+         _obj_ids->reset_all_ref_counts(c);
+      }
+      void adjust_all_ref_counts( int16_t c ) {
+         _obj_ids->adjust_all_ref_counts(c);
+      }
+
+      void validate(); 
+      void validate(id i) { _obj_ids->validate(i); }
      private:
       uint64_t wait_on_free_space(managed_ring& ring, uint64_t used_size);
       template <bool CopyData = false>
@@ -166,10 +178,9 @@ namespace triedent
 
          void validate()
          {
-            assert(alloc_p <= end_free_p);
-            assert(swap_p <= alloc_p);
-            assert(alloc_area_size >= get_free_space());
-            //assert(alloc_area_size >= swap_p - end_free_p);
+            if( not (alloc_p <= end_free_p) ) throw std::runtime_error( "alloc pointer should be behind end free" );
+            if( not (swap_p <= alloc_p) ) throw std::runtime_error(  "swap pointer should be behind alloc pointer" );
+            if( not (alloc_area_size >= get_free_space() ) ) throw std::runtime_error( "free space is larger than memory area" );
          }
 
          uint64_t                       size;  // file size, max we can move end to
@@ -548,6 +559,13 @@ namespace triedent
       auto ptr    = alloc(hot(), new_id, num_bytes, nullptr, t);
       return {new_id, ptr};
    }
+   inline void ring_allocator::validate(){
+         hot()._head->validate();
+         warm()._head->validate();
+         cool()._head->validate();
+         cold()._head->validate();
+      }
+
 
 }  // namespace triedent
 

@@ -79,6 +79,31 @@ namespace triedent
       }
 
       void print_stats();
+      void validate( object_id i ) {
+         if( i.id > _header->first_unallocated.id )
+            throw std::runtime_error( "invalid object id discovered: " + std::to_string(i.id) );
+      }
+
+      /**
+       * Sets all non-zero refs to c
+       */
+      void reset_all_ref_counts( uint16_t c ) {
+         for( auto& o : _header->objects ) {
+            auto i = o.load(std::memory_order_relaxed);
+            if( i & ref_count_mask ) {
+               i &= ~ref_count_mask;
+               i |= c & ref_count_mask;
+               o.store( i, std::memory_order_relaxed );
+            }
+         }
+      }
+      void adjust_all_ref_counts( int16_t c ) {
+         for( auto& o : _header->objects ) {
+            auto i = o.load(std::memory_order_relaxed);
+            if( i & ref_count_mask ) 
+               o.store( i+c, std::memory_order_relaxed );
+         }
+      }
 
      private:
       inline uint64_t obj_val(object_location loc, uint16_t ref)
