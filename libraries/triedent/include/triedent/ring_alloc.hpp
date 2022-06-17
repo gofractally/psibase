@@ -41,7 +41,8 @@ namespace triedent
 
       swap_position get_swap_pos() const;
 
-      ring_allocator(std::filesystem::path dir, access_mode mode, config cfg);
+      ring_allocator(std::filesystem::path dir, access_mode mode);
+      static void create(std::filesystem::path dir, config cfg);
 
       std::pair<id, char*> alloc(size_t num_bytes, object_db::object_location::object_type);
       void                 retain(id);
@@ -77,7 +78,7 @@ namespace triedent
          cold_cache = 3   // not pinned, copy to hot on access (uncached) AS NEEDED DISK
       };
 
-      void dump();
+      void dump(bool detail = false);
 
       std::function<void()> _try_claim_free;
       ~ring_allocator()
@@ -235,10 +236,10 @@ namespace triedent
          header(uint64_t size);
       };
 
-      managed_ring(std::filesystem::path            filename,
-                   uint64_t                         max_size,
-                   ring_allocator::cache_level_type lev,
-                   bool                             pin = false);
+      managed_ring(std::filesystem::path filename, ring_allocator::cache_level_type level, bool pin = false);
+
+      static void create(std::filesystem::path            filename,
+                         uint8_t                          logsize );
 
       inline auto     get_free_space() const { return _head->get_free_space(); }
       inline auto*    get_alloc_cursor() { return _head->get_alloc_pos(); }
@@ -279,10 +280,10 @@ namespace triedent
 
    inline void ring_allocator::ensure_free_space()
    {
-      if (hot()._head->get_free_space() < 32 * 1024 * 1024)
+      if (hot()._head->get_free_space() < 16 * 1024 * 1024)
       {
          _try_claim_free();
-         while (hot()._head->get_free_space() < 32 * 1024 * 1024)
+         while (hot()._head->get_free_space() < 16 * 1024 * 1024)
             _try_claim_free();
       }
    }
@@ -311,17 +312,16 @@ namespace triedent
       auto loc = _obj_ids->get(i);
       auto obj = _levels[loc.cache]->get_object(loc.offset);
 
-      if constexpr( not CopyToHot )
+      if constexpr (not CopyToHot) 
          return obj->data();
 
-      if (loc.cache == hot_cache)
+      if (loc.cache == hot_cache )
          return obj->data();
 
       if (obj->size > 4096)
          return obj->data();
 
-      return alloc<true>(hot(), id{obj->id}, obj->size, obj->data(),
-                               (object_type)loc.type);
+      return alloc<true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type);
    }
    template <bool CopyToHot>
    std::pair<char*, ring_allocator::object_type> ring_allocator::get_cache_with_type(id i)
@@ -329,18 +329,18 @@ namespace triedent
       auto loc = _obj_ids->get(i);
       auto obj = _levels[loc.cache]->get_object(loc.offset);
 
-      if constexpr ( not CopyToHot ) 
+      if constexpr (not CopyToHot) 
          return {obj->data(), object_type(loc.type)};
 
-      if (loc.cache == hot_cache)
+      if (loc.cache == hot_cache) 
          return {obj->data(), object_type(loc.type)};
 
-      if (obj->size > 4096)
+      if (obj->size > 4096) 
          return {obj->data(), (object_type)loc.type};
+      
 
-      return {
-          alloc<true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type),
-          (object_type)loc.type};
+      return {alloc<true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type),
+              (object_type)loc.type};
    }
 
    inline uint64_t ring_allocator::wait_on_free_space(managed_ring& ring, uint64_t used_size)
@@ -441,7 +441,7 @@ namespace triedent
       {
          auto fs     = from->_head->get_potential_free_space();
          auto maxs   = from->_head->alloc_area_size;
-         auto target = 1024 * 1024 * 64;  //maxs / 32;  // target a certain amount free
+         auto target = 1024 * 1024 * 32;  //maxs / 32;  // target a certain amount free
 
          if (target < fs)
             return false;
@@ -532,7 +532,7 @@ namespace triedent
        size_t                                  num_bytes,
        object_db::object_location::object_type t)
    {
-      if (num_bytes > 0xffffff-8) [[unlikely]]
+      if (num_bytes > 0xffffff - 8) [[unlikely]]
          throw std::runtime_error("obj too big");
 
       auto new_id = _obj_ids->alloc();

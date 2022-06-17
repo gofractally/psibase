@@ -24,7 +24,7 @@ uint64_t bswap(uint64_t x)
 
 int64_t rand64()
 {
-   static std::mt19937 gen(-1);
+   static std::mt19937 gen(rand());
    return uint64_t(gen()) << 32 | gen();
 }
 
@@ -35,9 +35,11 @@ int main(int argc, char** argv)
    uint32_t warm_page_c = 33;
    uint32_t cool_page_c = 35;
    uint32_t cold_page_c = 35;
-   uint64_t num_objects = 250*1000*1000;
+   uint64_t num_objects = 500*1000*1000;
    std::string db_dir;
    bool use_string = false;
+   uint64_t insert_count;
+   uint64_t status_count;
 
    uint32_t       num_read_threads = 6;
    po::options_description desc( "Allowed options" );
@@ -52,6 +54,8 @@ int main(int argc, char** argv)
       ("cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33), "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes")
       ("cold-size,C",po::value<uint32_t>(&cold_page_c)->default_value(33),  "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes")
       ("max-objects,O",po::value<uint64_t>(&num_objects)->default_value(num_objects),  "the maximum number of unique objects in the database")
+      ("insert,i",po::value<uint64_t>(&insert_count)->default_value(100000000ull),  "the number of random key/value pairs to insert")
+      ("stat,s",po::value<uint64_t>(&status_count)->default_value(1000000ull),  "the number of how often to print stats")
       ;
 
    po::variables_map vm;
@@ -73,18 +77,11 @@ int main(int argc, char** argv)
    }
 
 
-   uint64_t       total            = 2 * 1000 * 1000 * 1000;
-   triedent::database db(
-       db_dir.c_str(),
-       triedent::database::config{
-           .max_objects = num_objects,
-           .hot_pages   = hot_page_c,
-           .warm_pages  = warm_page_c,
-           .cool_pages  = cool_page_c,
-           .cold_pages  = cold_page_c},
-       triedent::database::read_write);
+   uint64_t       total            = insert_count ;//2 * 1000 * 1000 * 1000;
+   triedent::database db( db_dir.c_str(), triedent::database::read_write);
    db.print_stats();
    auto s = db.start_write_session();
+   s->set_session_revision( db.get_root_revision() );
 
    std::vector<uint64_t> revisions;
    revisions.resize(16);
@@ -92,8 +89,8 @@ int main(int argc, char** argv)
 
    std::map<std::string, std::string> base;
 
-   srand(0);  //uint64_t(&db));
    auto start = std::chrono::steady_clock::now();
+   srand(s->get_session_revision().id);
 
    std::cout << "starting...\n";
 
@@ -171,13 +168,12 @@ int main(int argc, char** argv)
 
    int64_t     read_start = 0;
    std::string k;
-   for (uint64_t i = 0; i < total; ++i)
+   WARN( "INSERT COUNT: ", insert_count );
+   for (uint64_t i = 0; i < insert_count; ++i)
    {
       try
       {
-         //  if( i & (0xff == 0 )
-         //     db.swap();
-         if (i % (total / perc) == 1)
+         if ( i > 1 and i % status_count == 0)
          {
             auto new_r = r.load()+1;
             revisions[new_r % 16] = s->get_session_revision().id;
@@ -194,11 +190,10 @@ int main(int argc, char** argv)
             }
          }
 
-         if (i % (total / (perc / 20)) == 1)
-         {
+         if (i % (status_count*10) == 0) 
             db.print_stats();
-         }
-         if (i % (total / perc) == 1)
+
+         if (i % status_count == 0)
          {
             auto end        = std::chrono::steady_clock::now();
             auto delta      = end - lstart;
@@ -207,7 +202,7 @@ int main(int argc, char** argv)
             auto delta_read = read_end - read_start;
             read_start      = read_end;
             std::cout << std::setw(12)
-                      << int64_t((total / perc) /
+                      << int64_t(status_count /
                                  (std::chrono::duration<double, std::milli>(delta).count() / 1000))
                       << " items/sec   " << i << " total  reads/sec: " << std::setw(12)
                       << uint64_t(
@@ -237,31 +232,22 @@ int main(int argc, char** argv)
          {
             //base.emplace( std::make_pair(k,std::string((char*)&h, sizeof(h))) );
             if( use_string ) {
-               bool inserted = s->upsert(str,str);
-               if (not inserted)
+               auto inserted = s->upsert(str,str);
+               if (inserted >= 0 )
                {
                   WARN("failed to insert: ", h);
+                  break;
                }
+            assert(inserted<0);
             } else {
-               bool inserted = s->upsert(hk,hk);
-               if (not inserted)
+               auto inserted = s->upsert(hk,hk);
+               if (inserted >= 0 )
                {
                   WARN("failed to insert: ", h);
+                  break;
                }
+            assert(inserted<0);
             }
-            assert(inserted);
-
-            //auto got = s.get( std::string_view((char*)&h, sizeof(h)) );
-            //assert( got );
-            /*
-            if (r > 445)
-            {
-               if( i == 134100-10 ) {
-               //if (i % 10 == 0)
-                  s.validate();
-               }
-            }
-            */
          }
       }
       catch (const std::exception& e)
@@ -276,8 +262,8 @@ int main(int argc, char** argv)
    std::cerr << "insert took:    " << std::chrono::duration<double, std::milli>(delta).count()
              << " ms\n";
 
-   //   s.clear();
-   //   db.print_stats();
+   s->set_root_revision(  s->get_session_revision() );
+   db.print_stats();
 
    return 0;
 }

@@ -44,12 +44,13 @@ namespace triedent
 
       using string_view = std::string_view;
       using id          = object_id;
-      database(std::filesystem::path dir, config, access_mode allow_write);
+      database(std::filesystem::path dir, access_mode allow_write);
       ~database();
 
       inline void swap();
       inline void claim_free() const;
       inline void ensure_free_space();
+      static void create( std::filesystem::path dir, config );
 
       class session_base
       {
@@ -232,7 +233,7 @@ namespace triedent
       std::shared_ptr<write_session> start_write_session();
       std::shared_ptr<read_session>  start_read_session();
 
-      void print_stats();
+      void print_stats( bool detail = false );
 
       id get_root_revision() const;
 
@@ -250,7 +251,9 @@ namespace triedent
       struct database_memory
       {
          std::atomic<uint64_t> _root_revision;
-         database_memory() {}
+         database_memory() {
+            _root_revision.store(0);
+         }
       };
 
       static std::atomic<int>      _read_thread_number;
@@ -318,6 +321,7 @@ namespace triedent
          retain(i);
          release({_db->_dbm->_root_revision.load(std::memory_order_relaxed)});
          _db->_dbm->_root_revision.store(i.id, std::memory_order_relaxed);
+         WARN( "SET ROOT REV: ", i.id );
       }
    }
 
@@ -407,7 +411,8 @@ namespace triedent
    template <typename AccessMode>
    inline deref<node> database::session<AccessMode>::get(id i) const
    {
-      auto r = _db->_ring->get_cache_with_type<std::is_same_v<AccessMode, write_access>>(i);
+      //auto r = _db->_ring->get_cache_with_type<std::is_same_v<AccessMode, write_access>>(i);
+      auto r = _db->_ring->get_cache_with_type<true>(i);
       return {i, r.first, r.second};
    }
 

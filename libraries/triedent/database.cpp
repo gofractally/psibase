@@ -15,46 +15,59 @@ namespace triedent
    std::atomic<int>      database::_read_thread_number = 0;
    thread_local uint32_t database::_thread_num         = 0;
 
-   database::database(std::filesystem::path dir, config cfg, access_mode allow_write)
+   database::database(std::filesystem::path dir, access_mode allow_write)
    {
-      bool init = false;
-      auto rev  = dir / "revisions";
+      auto db = dir / "db";
       if (not std::filesystem::exists(dir))
-      {
-         if (not allow_write)
-            throw std::runtime_error("directory does not exist: '" + dir.generic_string() + "'");
-         std::filesystem::create_directories(dir);
-      }
-      if (not std::filesystem::exists(rev))
-      {
-         init = true;
-         std::ofstream f(rev.generic_string(), std::ofstream::trunc);
-         f.close();
-         std::filesystem::resize_file(rev, sizeof(database_memory));
-      }
-      auto md = allow_write == read_write ? bip::read_write : bip::read_only;
-      _file   = std::make_unique<bip::file_mapping>(rev.generic_string().c_str(), md);
-      _region = std::make_unique<bip::mapped_region>(*_file, md);
-      if (init)
-         _dbm = new (_region->get_address()) database_memory();
-      else
-         _dbm = reinterpret_cast<database_memory*>(_region->get_address());
+         throw std::runtime_error("directory does not exist: '" + dir.generic_string() + "'");
 
-      _ring.reset(new ring_allocator(dir / "ring", ring_allocator::read_write,
+      if (not std::filesystem::exists(db))
+         throw std::runtime_error("file does not exist: '" + db.generic_string() + "'");
+
+      auto md = allow_write == read_write ? bip::read_write : bip::read_only;
+      _file   = std::make_unique<bip::file_mapping>(db.generic_string().c_str(), md);
+      _region = std::make_unique<bip::mapped_region>(*_file, md);
+
+      _dbm = reinterpret_cast<database_memory*>(_region->get_address());
+
+      _ring.reset(new ring_allocator(dir / "data", ring_allocator::read_write ) );
+
+      _ring->_try_claim_free = [this](){ claim_free(); };
+   }
+
+   database::~database() {}
+
+   void database::create( std::filesystem::path dir, config cfg ) {
+      if (std::filesystem::exists(dir))
+         throw std::runtime_error( "directory already exists: " + dir.generic_string() );
+
+      std::filesystem::create_directories(dir);
+
+      auto db = dir / "db";
+      {
+         std::ofstream f(db.generic_string(), std::ofstream::trunc);
+         f.close();
+         std::filesystem::resize_file(db, sizeof(database_memory));
+      }
+
+      bip::file_mapping fm(db.generic_string().c_str(), bip::read_write);
+      bip::mapped_region mr(fm, bip::read_write);
+
+      new (mr.get_address()) database_memory();
+
+      ring_allocator::create( dir / "data",
                                      {.max_ids    = cfg.max_objects,
                                       .hot_pages  = cfg.hot_pages,
                                       .warm_pages = cfg.warm_pages,
                                       .cool_pages = cfg.cool_pages,
-                                      .cold_pages = cfg.cold_pages}));
+                                      .cold_pages = cfg.cold_pages});
 
-      _ring->_try_claim_free = [this](){ claim_free(); };
    }
-   database::~database() {}
 
    void database::swap()
    {
       _ring->swap();
    }
-   void database::print_stats() { _ring->dump(); }
+   void database::print_stats(bool detail) { _ring->dump(detail); }
 }  // namespace trie
 
