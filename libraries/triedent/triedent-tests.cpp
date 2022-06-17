@@ -42,3 +42,10 @@ TEST_CASE("accidental inner removal")
    REQUIRE(session->get({"\x00\x01\x02", 3}) == std::optional{std::string_view{"value 1"}});
    REQUIRE(session->get({"\x00\x01\x03", 3}) == std::optional{std::string_view{"value 2"}});
 }
+
+TEST_CASE("key conversions")
+{
+   // regression check: accidental sign extension
+   REQUIRE(database::session_base{}.to_key6(from_key6({"\x00\x80", 2})) ==
+           std::string_view{"\x00\x80", 2});
+}
