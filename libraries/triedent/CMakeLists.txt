@@ -1,12 +1,33 @@
 cmake_minimum_required(VERSION 3.16)
 project( trie )
 
+include(ExternalProject)
+
 find_package(Threads REQUIRED)
 if(UNIX AND NOT APPLE)
     set(LINUX_LIBS rt)
 endif()
 
 find_package(Boost 1.75 REQUIRED COMPONENTS program_options )
+
+ExternalProject_Add(catch2-ext
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../external/Catch2
+    BINARY_DIR catch2
+    TEST_EXCLUDE_FROM_MAIN 1
+    EXCLUDE_FROM_ALL 1
+    ${CATCH2_INSTALL_COMMAND}
+    CMAKE_ARGS
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        -DCMAKE_TARGET_MESSAGES=${CMAKE_TARGET_MESSAGES}
+        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/catch2
+        -DCATCH_INSTALL_DOCS=FALSE
+        -DCATCH_INSTALL_EXTRAS=FALSE
+        -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+        -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+)
+add_library(catch2 INTERFACE)
+target_include_directories(catch2 INTERFACE ${CMAKE_BINARY_DIR}/catch2/include)
+add_dependencies(catch2 catch2-ext)
 
 set(MDBX_OUTPUT_DIR ${CMAKE_BINARY_DIR}/mdbx)
 set(MDBX_BUILD_TIMESTAMP unknown)
@@ -16,6 +37,12 @@ add_library( triedent database.cpp ring_alloc.cpp )
 target_include_directories( triedent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
 target_compile_options( triedent PUBLIC -msse4.1 )
 set_property( TARGET triedent PROPERTY CXX_STANDARD 20 )
+
+add_executable(triedent-tests database.cpp ring_alloc.cpp catch2 triedent-tests.cpp)
+target_link_libraries(triedent-tests PUBLIC catch2 ${LINUX_LIBS} Threads::Threads)
+target_compile_options(triedent-tests PUBLIC -msse4.1)
+target_include_directories(triedent-tests PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
+set_property(TARGET triedent-tests PROPERTY CXX_STANDARD 20)
 
 
 #add_executable( test database.cpp ring_alloc.cpp t2.cpp  )
