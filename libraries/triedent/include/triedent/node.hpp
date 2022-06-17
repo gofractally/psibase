@@ -167,20 +167,19 @@ namespace triedent
                                  uint64_t          version)
        :_prefix_length(prefix.size()),_version_high_bits(version>>32),  _value(val), _present_bits(branches), _version(version)
    {
-      if( false and in._present_bits == branches ) {
-         memcpy( (char*)children(), (char*)in.children(), num_branches()*sizeof(object_id) );
+      if( in._present_bits == branches ) {
+        // memcpy( (char*)children(), (char*)in.children(), num_branches()*sizeof(object_id) );
          auto c = children();
          auto ic = in.children();
          auto e = c + num_branches();
          while( c != e ) {
-         //   *c = *ic;
+            *c = *ic;
             a.retain(*c); 
             ++c;
-          //  ++ic;
+            ++ic;
          }
       } else {
-         //memset( children(), 0, num_branches()*sizeof(object_id) ); // TODO: redundant
-         auto common_branches = in._present_bits & branches;
+         auto common_branches = in._present_bits & _present_bits;
          auto fb              = std::countr_zero(common_branches);
          while (fb < 64)
          {
@@ -209,6 +208,8 @@ namespace triedent
    inline object_id& inner_node::branch(uint8_t b)
    {
       assert(branch_index(b) >= 0);
+      if( branch_index(b) < 0 ) [[unlikely]]
+         throw std::runtime_error( "branch(b) <= 0, b: "+ std::to_string(int(b)) );
       return reinterpret_cast<object_id*>((char*)this + sizeof(inner_node))[branch_index(b)];
    }
    inline const object_id& inner_node::branch(uint8_t b) const

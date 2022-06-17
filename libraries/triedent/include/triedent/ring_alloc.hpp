@@ -115,7 +115,7 @@ namespace triedent
             using namespace std::chrono_literals;
             if (not did_work)
             {
-               std::this_thread::sleep_for(100us);
+               std::this_thread::sleep_for(10us);
             }
          }
          WARN("EXIT SWAP LOOP");
@@ -236,10 +236,11 @@ namespace triedent
          header(uint64_t size);
       };
 
-      managed_ring(std::filesystem::path filename, ring_allocator::cache_level_type level, bool pin = false);
+      managed_ring(std::filesystem::path            filename,
+                   ring_allocator::cache_level_type level,
+                   bool                             pin = false);
 
-      static void create(std::filesystem::path            filename,
-                         uint8_t                          logsize );
+      static void create(std::filesystem::path filename, uint8_t logsize);
 
       inline auto     get_free_space() const { return _head->get_free_space(); }
       inline auto*    get_alloc_cursor() { return _head->get_alloc_pos(); }
@@ -312,10 +313,10 @@ namespace triedent
       auto loc = _obj_ids->get(i);
       auto obj = _levels[loc.cache]->get_object(loc.offset);
 
-      if constexpr (not CopyToHot) 
+      if constexpr (not CopyToHot)
          return obj->data();
 
-      if (loc.cache == hot_cache )
+      if (loc.cache == hot_cache)
          return obj->data();
 
       if (obj->size > 4096)
@@ -329,15 +330,14 @@ namespace triedent
       auto loc = _obj_ids->get(i);
       auto obj = _levels[loc.cache]->get_object(loc.offset);
 
-      if constexpr (not CopyToHot) 
+      if constexpr (not CopyToHot)
          return {obj->data(), object_type(loc.type)};
 
-      if (loc.cache == hot_cache) 
+      if (loc.cache == hot_cache)
          return {obj->data(), object_type(loc.type)};
 
-      if (obj->size > 4096) 
+      if (obj->size > 4096)
          return {obj->data(), (object_type)loc.type};
-      
 
       return {alloc<true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type),
               (object_type)loc.type};
@@ -345,6 +345,8 @@ namespace triedent
 
    inline uint64_t ring_allocator::wait_on_free_space(managed_ring& ring, uint64_t used_size)
    {
+      WARN("wait on free space");
+
       uint64_t max_contig = 0;
       while ((ring._head->get_potential_free_space()) < used_size)
       {
@@ -416,7 +418,10 @@ namespace triedent
          max_contig = wait_on_free_space(ring, used_size);
 
       auto* cur = ring.get_alloc_cursor();
-      ring._head->alloc_p += used_size;
+
+      auto& alp = ring._head->alloc_p;
+      auto ap         = alp.load(std::memory_order_relaxed);
+      alp.store( ap + used_size, std::memory_order_release );
       cur->set(nid, num_bytes);
 
       if constexpr (CopyData)
@@ -427,7 +432,8 @@ namespace triedent
        *  and swap moving the object to a lower level in the cache.       
        */
       while (not _obj_ids->set(nid, (char*)cur - ring.begin_pos(), ring.level, t))
-         ;
+         WARN("contention detected");
+      ;
 
       return cur->data();
    }
@@ -439,11 +445,14 @@ namespace triedent
    {
       auto do_swap = [this](auto* from, auto* to)
       {
-         auto fs     = from->_head->get_potential_free_space();
-         auto maxs   = from->_head->alloc_area_size;
-         auto target = 1024 * 1024 * 32;  //maxs / 32;  // target a certain amount free
+         auto     fs     = from->_head->get_potential_free_space();
+         auto     maxs   = from->_head->alloc_area_size;
+         uint64_t target = 1024 * 1024 * 40ull;  //maxs / 32;  // target a certain amount free
 
          if (target < fs)
+            return false;
+
+         if (target - fs < 1024 * 256)
             return false;
 
          auto bytes = target - fs;
@@ -456,11 +465,10 @@ namespace triedent
          if (fp < ap)
             throw std::runtime_error("end should never be beyond alloc!");
 
-         auto to_obj = [&](auto p)
-         {
-            return reinterpret_cast<object_header*>(((char*)from->_head->begin.get()) +
-                                                    (p & from->_head->alloc_area_mask));
-         };
+         auto beg    = (char*)from->_head->begin.get();
+         auto msk    = from->_head->alloc_area_mask;
+         auto to_obj = [beg, msk](auto p)
+         { return reinterpret_cast<object_header*>(beg + (p & msk)); };
 
          auto p   = sp;
          auto end = std::min<uint64_t>(ap, p + bytes);
@@ -491,6 +499,8 @@ namespace triedent
       did_work |= do_swap(&hot(), &warm());
       did_work |= do_swap(&warm(), &cool());
       did_work |= do_swap(&cool(), &cold());
+      //if( not did_work ) 
+      //   _try_claim_free();
       return did_work;
       //   do_swap(&cold(), &cold());
    }
@@ -503,9 +513,8 @@ namespace triedent
       auto claim = [this](auto& ring, uint64_t mp)
       {
          // TODO: load relaxed and store relaxed if swapping is being managed by another thread
-         //assert(ring._head->end_free_p <= ring._head->swap_p);
          ring._head->end_free_p.store(ring._head->alloc_area_size +
-                                      std::min<uint64_t>(ring._head->swap_p.load(), mp));
+                                      std::min<uint64_t>(ring._head->swap_p.load(std::memory_order_relaxed), mp));
       };
       claim(hot(), sp._swap_pos[0]);
       claim(warm(), sp._swap_pos[1]);

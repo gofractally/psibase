@@ -180,6 +180,7 @@ namespace triedent
    }
    inline void object_db::retain(object_id id)
    {
+      assert( id.id <= _header->first_unallocated.id );
       if (id.id > _header->first_unallocated.id) [[unlikely]]
          throw std::runtime_error("invalid object id, outside allocated range");
 
@@ -197,7 +198,7 @@ namespace triedent
          throw std::runtime_error( "too many references" );
          */
 
-      ++obj;
+      obj.fetch_add(1, std::memory_order_release );
    }
 
    /**
@@ -240,27 +241,34 @@ namespace triedent
    inline object_db::object_location object_db::get(object_id id)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-      //  std::atomic_thread_fence(std::memory_order_acquire);
+    //    std::atomic_thread_fence(std::memory_order_acquire);
+      
       assert((val & ref_count_mask) or !"expected positive ref count");
+      if( not (val & ref_count_mask) ) [[unlikely]]// TODO: remove in release
+         throw std::runtime_error("expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
       r.type   = (val >> 15) & 1;
-      // std::atomic_thread_fence(std::memory_order_acquire);
+     //  std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
 
    inline object_db::object_location object_db::get(object_id id, uint16_t& ref)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-      // std::atomic_thread_fence(std::memory_order_acquire);
+
+     // if( not (val & ref_count_mask) ) // TODO: remove in release
+     //    throw std::runtime_error("expected positive ref count");
+
+     //  std::atomic_thread_fence(std::memory_order_acquire);
       // assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
       r.type   = (val >> 15) & 1;
       ref      = val & ref_count_mask;
-      // std::atomic_thread_fence(std::memory_order_acquire);
+     //  std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
 
@@ -270,7 +278,7 @@ namespace triedent
       auto     old = obj.load(std::memory_order_relaxed);
       uint16_t ref = old & ref_count_mask;
       auto     r   = obj.compare_exchange_strong(old, obj_val(loc, ref), std::memory_order_release);
-      //     std::atomic_thread_fence(std::memory_order_release);
+  //         std::atomic_thread_fence(std::memory_order_release);
       return r;
    }
    inline void object_db::print_stats()

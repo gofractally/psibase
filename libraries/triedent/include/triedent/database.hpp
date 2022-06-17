@@ -358,7 +358,8 @@ namespace triedent
    inline database::id database::get_root_revision() const
    {
       std::lock_guard<std::mutex> lock(_root_change_mutex);
-      _ring->retain({_dbm->_root_revision});
+      if( _dbm->_root_revision )
+         _ring->retain({_dbm->_root_revision});
       return {_dbm->_root_revision};
    }
 
@@ -411,8 +412,8 @@ namespace triedent
    template <typename AccessMode>
    inline deref<node> database::session<AccessMode>::get(id i) const
    {
-      //auto r = _db->_ring->get_cache_with_type<std::is_same_v<AccessMode, write_access>>(i);
-      auto r = _db->_ring->get_cache_with_type<true>(i);
+      auto r = _db->_ring->get_cache_with_type<std::is_same_v<AccessMode, write_access>>(i);
+      //auto r = _db->_ring->get_cache_with_type<true>(i);
       return {i, r.first, r.second};
    }
 
@@ -1624,12 +1625,12 @@ namespace triedent
          for (auto s : _active_sessions)
          {
             sp._swap_pos[0] =
-                std::min<uint64_t>(s->_hot_swap_p.load(std::memory_order_relaxed), sp._swap_pos[0]);
-            sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(std::memory_order_acquire),
+                std::min<uint64_t>(s->_hot_swap_p.load(), sp._swap_pos[0]);
+            sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(),
                                                  sp._swap_pos[1]);
-            sp._swap_pos[2] = std::min<uint64_t>(s->_cool_swap_p.load(std::memory_order_acquire),
+            sp._swap_pos[2] = std::min<uint64_t>(s->_cool_swap_p.load(),
                                                  sp._swap_pos[2]);
-            sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(std::memory_order_acquire),
+            sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(),
                                                  sp._swap_pos[3]);
          }
       }

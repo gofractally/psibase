@@ -302,9 +302,15 @@ namespace triedent
             return reinterpret_cast<object_header*>(((char*)r._head->begin.get()) +
                                                     (p & r._head->alloc_area_mask));
          };
+         auto last_sp = sp;
          while( sp < ap ) {
             auto o = to_obj(sp);
-            if( o->id == 0 ) {
+            if( o->size == 0 ) {
+               WARN( "SIZE: 0  free area size:", o->free_area_size() );
+               deleted += o->free_area_size();
+               sp += o->free_area_size();
+            }
+            else if( o->id == 0 ) {
               deleted += o->size;
               sp += o->size;
             } else {
@@ -320,6 +326,11 @@ namespace triedent
                   deleted += o->size;
                sp += o->data_capacity() + 8;
             }
+            if( sp == last_sp ) {
+               std::cerr << "obj size: " << o->size <<" id: " << o->id <<"\n";
+               std::cerr << "Infinite Loop Detected, unable to scan memory: " << sp << "  " << ap << "  ap - sp: " << ap-sp<<"\n";
+            }
+            last_sp = sp;
          }
          return std::make_pair(moved,deleted);
       };

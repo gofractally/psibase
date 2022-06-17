@@ -109,54 +109,69 @@ int main(int argc, char** argv)
 
    std::atomic<uint64_t> revs[64];
    for (auto& r : revs)
-      r.store(0);
+      r.store(-1);
 
+   std::atomic<bool> done;
+   done.store(false);
    auto read_loop = [&](int c)
    {
+      try  {
       int  v  = r.load();
       auto rs = db.start_read_session();
 
       std::mt19937 gen(c);
 
       uint64_t ch = 0;
-      while (true)
+      while ( not done.load( std::memory_order_acquire ) )
       {
          rs->set_session_revision({revisions[(v - 4) % 16]});
-         while (r.load(std::memory_order_relaxed) == v)
+         while (r.load(std::memory_order_relaxed) == v  )
          {
             uint64_t h = (uint64_t(gen()) << 32) | gen();
             auto itr = rs->lower_bound(std::string_view((char*)&h, sizeof(h)));
             if (itr.valid())
                ++total_lookups[c].total_lookups;
+            if(  done.load( std::memory_order_relaxed) )
+               break;
          }
+
+               
          v = r.load();
+       //  WARN( "revs[",c,"] = ", v );
          revs[c].store(v);
+      }
+      } catch ( std::exception& e ) {
+         std::cerr << e.what() <<"\n";
+         exit(1);
       }
    };
 
-   new std::thread(
+   std::unique_ptr<std::thread> gc(new std::thread(
        [&]()
        {
           auto rs = db.start_read_session();
 
           uint64_t last_r = 8;
-          while (true)
+          while (not done.load())
           {
-             uint64_t min = -1ull;
+             uint64_t min = r.load()-1;
              for (auto& r : revs)
              {
                 if (r.load() < min)
                    min = r.load();
              }
+        //     WARN( "min: ", min );
              if (min > last_r)
              {
-                //     WARN( "release revision: ", (min-6)%16, "  r: ", min );
-                rs->release_revision({revisions[(min - 7) % 16]});
-                revisions[(min - 7) % 16] = 0;
+    //            WARN( "release revision: ", (min-6)%16, "  r: ", min );
+                rs->release_revision({revisions[(min - 6) % 16]});
+                revisions[(min - 6) % 16] = 0;
                 last_r                    = min;
              }
+             usleep(100);
           }
-       });
+          WARN( "exit GC" );
+       }));
 
    auto get_total_lookups = [&]()
    {
@@ -166,6 +181,8 @@ int main(int argc, char** argv)
       return t;
    };
 
+   std::vector<std::unique_ptr<std::thread>> rthreads;
+
    int64_t     read_start = 0;
    std::string k;
    WARN( "INSERT COUNT: ", insert_count );
@@ -173,19 +190,21 @@ int main(int argc, char** argv)
    {
       try
       {
-         if ( i > 1 and i % status_count == 0)
+         if ( i > 0 and i % (status_count/10) == 0)
          {
-            auto new_r = r.load()+1;
+            auto new_r = r.load();
+     //       WARN( "NEW R: ", new_r, " id:" , s->get_session_revision().id );
             revisions[new_r % 16] = s->get_session_revision().id;
             s->retain({revisions[new_r % 16]});
             s->fork();
+
 
             if (++r == 6)
             {
                WARN("STARTING READ THREADS");
                for (int x = 0; x < num_read_threads; ++x)
                {
-                  new std::thread([&, x]() { read_loop(x); });
+                  rthreads.emplace_back(new std::thread([&, x]() { read_loop(x); }));
                }
             }
          }
@@ -256,6 +275,9 @@ int main(int argc, char** argv)
          return -1;
       }
    }
+   done.store(true);
+   for( auto& r : rthreads ) r->join();
+   gc->join();
 
    auto end   = std::chrono::steady_clock::now();
    auto delta = end - start;
