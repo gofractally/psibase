@@ -507,6 +507,11 @@ namespace triedent
                // TODO: If the object moved to a larger pool, then the pointer arithmetic in
                //       get_object may be UB (offset exceeds underlying array bounds).
                //       Reorder the conditional to put the get_object after the loc.cache check.
+               //
+               // TODO: The main thread could currently be modifying the object in place.
+               //       The memcpy inside alloc races with that. After alloc calls
+               //       _obj_ids->set(), it could point to the old version, the new version,
+               //       or worse.
                if (ref != 0 and from->get_object(loc.offset) == o and loc.cache == from->level)
                   alloc<true>(*to, {o->id}, o->size, o->data(), (obj_type)loc.type);
                p += o->data_capacity() + 8;
