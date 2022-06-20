@@ -330,8 +330,8 @@ namespace triedent
       if (_db->_dbm->_root_revision != i.id)
       {
          retain(i);
-         release({_db->_dbm->_root_revision.load(std::memory_order_relaxed)});
-         _db->_dbm->_root_revision.store(i.id, std::memory_order_relaxed);
+         release({_db->_dbm->_root_revision.load()});
+         _db->_dbm->_root_revision.store(i.id);
          WARN("SET ROOT REV: ", i.id);
       }
    }
@@ -381,19 +381,19 @@ namespace triedent
    inline void database::session<AccessMode>::lock_swap_p() const
    {
       auto sp = _db->_ring->get_swap_pos();
-      _hot_swap_p.store(sp._swap_pos[0], std::memory_order_relaxed);
-      _warm_swap_p.store(sp._swap_pos[1], std::memory_order_relaxed);
-      _cool_swap_p.store(sp._swap_pos[2], std::memory_order_relaxed);
-      _cold_swap_p.store(sp._swap_pos[3], std::memory_order_relaxed);
+      _hot_swap_p.store(sp._swap_pos[0]);
+      _warm_swap_p.store(sp._swap_pos[1]);
+      _cool_swap_p.store(sp._swap_pos[2]);
+      _cold_swap_p.store(sp._swap_pos[3]);
    }
 
    template <typename AccessMode>
    inline void database::session<AccessMode>::unlock_swap_p() const
    {
-      _hot_swap_p.store(-1ull, std::memory_order_release);
-      _warm_swap_p.store(-1ull, std::memory_order_release);
-      _cool_swap_p.store(-1ull, std::memory_order_release);
-      _cold_swap_p.store(-1ull, std::memory_order_release);
+      _hot_swap_p.store(-1ull);
+      _warm_swap_p.store(-1ull);
+      _cool_swap_p.store(-1ull);
+      _cold_swap_p.store(-1ull);
    }
 
    template <typename AccessMode>

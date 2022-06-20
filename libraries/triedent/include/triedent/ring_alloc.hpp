@@ -118,7 +118,7 @@ namespace triedent
       std::atomic<bool> _debug = false;
       void              swap_loop()
       {
-         while (not _done.load(std::memory_order_relaxed))
+         while (not _done.load())
          {
             bool did_work = swap();
             using namespace std::chrono_literals;
@@ -178,33 +178,28 @@ namespace triedent
 
          object_header* get_alloc_pos() const
          {
-            return reinterpret_cast<object_header*>(
-                (char*)begin.get() + (alloc_p.load(std::memory_order_relaxed) & alloc_area_mask));
+            return reinterpret_cast<object_header*>(  //
+                (char*)begin.get() + (alloc_p.load() & alloc_area_mask));
          }
          object_header* get_swap_pos() const
          {
-            return reinterpret_cast<object_header*>(
-                (char*)begin.get() + (swap_p.load(std::memory_order_relaxed) & alloc_area_mask));
+            return reinterpret_cast<object_header*>(  //
+                (char*)begin.get() + (swap_p.load() & alloc_area_mask));
          }
          object_header* get_end_free_pos() const
          {
             return begin.get() + (end_free_p & alloc_area_mask);
          }
          inline object_header* get_end_pos() const { return end.get(); }
-         inline uint64_t       get_free_space() const
+         inline uint64_t       get_free_space() const { return end_free_p.load() - alloc_p.load(); }
+         inline uint64_t       get_potential_free_space() const
          {
-            return end_free_p.load(std::memory_order_relaxed) -
-                   alloc_p.load(std::memory_order_relaxed);
-         }
-         inline uint64_t get_potential_free_space() const
-         {
-            return swap_p.load(std::memory_order_acquire) + alloc_area_size -
-                   alloc_p.load(std::memory_order_relaxed);
+            return swap_p.load() + alloc_area_size - alloc_p.load();
          }
          uint64_t max_contigous_alloc() const
          {
-            auto ap         = alloc_p.load(std::memory_order_relaxed);
-            auto ep         = end_free_p.load(std::memory_order_relaxed);
+            auto ap         = alloc_p.load();
+            auto ep         = end_free_p.load();
             auto free_space = ep - ap;
             auto wraped     = (ap + free_space) & alloc_area_mask;
             if ((ap & alloc_area_mask) > wraped)
@@ -255,10 +250,10 @@ namespace triedent
    inline ring_allocator::swap_position ring_allocator::get_swap_pos() const
    {
       swap_position r;
-      r._swap_pos[0] = hot()._head->swap_p.load(std::memory_order_acquire);
-      r._swap_pos[1] = warm()._head->swap_p.load(std::memory_order_acquire);
-      r._swap_pos[2] = cool()._head->swap_p.load(std::memory_order_acquire);
-      r._swap_pos[3] = cold()._head->swap_p.load(std::memory_order_acquire);
+      r._swap_pos[0] = hot()._head->swap_p.load();
+      r._swap_pos[1] = warm()._head->swap_p.load();
+      r._swap_pos[2] = cool()._head->swap_p.load();
+      r._swap_pos[3] = cold()._head->swap_p.load();
       return r;
    }
 
@@ -403,8 +398,8 @@ namespace triedent
       auto* cur = ring.get_alloc_cursor();
 
       auto& alp = ring._head->alloc_p;
-      auto  ap  = alp.load(std::memory_order_relaxed);
-      alp.store(ap + used_size, std::memory_order_release);
+      auto  ap  = alp.load();
+      alp.store(ap + used_size);
       cur->set(nid, num_bytes);
 
       if constexpr (CopyData)
@@ -448,10 +443,10 @@ namespace triedent
 
          uint64_t bytes_freed = 0;
 
-         uint64_t sp = from->_head->swap_p.load(std::memory_order_relaxed);
+         uint64_t sp = from->_head->swap_p.load();
          /// these two come from main, we read alloc_p first because end free must
          /// always be greater than alloc_p and we don't want to read these in
-         uint64_t ap = from->_head->alloc_p.load(std::memory_order_acquire);
+         uint64_t ap = from->_head->alloc_p.load();
 
          auto beg    = (char*)from->_head->begin.get();
          auto msk    = from->_head->alloc_area_mask;
@@ -487,7 +482,7 @@ namespace triedent
                p += o->data_capacity() + 8;
             }
          }
-         from->_head->swap_p.store(p, std::memory_order_release);
+         from->_head->swap_p.store(p);
          return true;
       };
 
@@ -509,9 +504,8 @@ namespace triedent
       auto claim = [this](auto& ring, uint64_t mp)
       {
          // TODO: load relaxed and store relaxed if swapping is being managed by another thread
-         ring._head->end_free_p.store(
-             ring._head->alloc_area_size +
-             std::min<uint64_t>(ring._head->swap_p.load(std::memory_order_relaxed), mp));
+         ring._head->end_free_p.store(ring._head->alloc_area_size +
+                                      std::min<uint64_t>(ring._head->swap_p.load(), mp));
       };
       claim(hot(), sp._swap_pos[0]);
       claim(warm(), sp._swap_pos[1]);

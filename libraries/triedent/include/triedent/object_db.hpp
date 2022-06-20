@@ -99,12 +99,12 @@ namespace triedent
       {
          for (auto& o : _header->objects)
          {
-            auto i = o.load(std::memory_order_relaxed);
+            auto i = o.load();
             if (i & ref_count_mask)
             {
                i &= ~ref_count_mask;
                i |= c & ref_count_mask;
-               o.store(i, std::memory_order_relaxed);
+               o.store(i);
             }
          }
       }
@@ -112,9 +112,9 @@ namespace triedent
       {
          for (auto& o : _header->objects)
          {
-            auto i = o.load(std::memory_order_relaxed);
+            auto i = o.load();
             if (i & ref_count_mask)
-               o.store(i + c, std::memory_order_relaxed);
+               o.store(i + c);
          }
       }
 
@@ -209,21 +209,19 @@ namespace triedent
          ++_header->first_unallocated.id;
          auto  r   = _header->first_unallocated;
          auto& obj = _header->objects[r.id];
-         obj.store(obj_val(loc, 1), std::memory_order_relaxed);  // init ref count 1
+         obj.store(obj_val(loc, 1));  // init ref count 1
          assert(r.id != 0);
          return r;
       }
       else
       {
-         uint64_t ff = _header->first_free.load(std::memory_order_relaxed);
+         uint64_t ff = _header->first_free.load();
          while (not _header->first_free.compare_exchange_strong(
-             ff, extract_next_ptr(_header->objects[ff].load(std::memory_order_relaxed)),
-             std::memory_order_relaxed))
+             ff, extract_next_ptr(_header->objects[ff].load())))
          {
          }
 
-         _header->objects[ff].store(obj_val(loc, 1),
-                                    std::memory_order_relaxed);  // init ref count 1
+         _header->objects[ff].store(obj_val(loc, 1));  // init ref count 1
          return {.id = ff};
       }
    }
@@ -247,7 +245,7 @@ namespace triedent
          throw std::runtime_error( "too many references" );
          */
 
-      obj.fetch_add(1, std::memory_order_release);
+      obj.fetch_add(1);
    }
 
    /**
@@ -274,7 +272,7 @@ namespace triedent
          uint64_t ff;
          do
          {
-            ff = _header->first_free.load(std::memory_order_acquire);
+            ff = _header->first_free.load();
             obj.store(create_next_ptr(ff));
          } while (not _header->first_free.compare_exchange_strong(ff, id.id));
       }
@@ -286,12 +284,12 @@ namespace triedent
 
    inline uint16_t object_db::ref(object_id id)
    {
-      return _header->objects[id.id].load(std::memory_order_relaxed) & ref_count_mask;
+      return _header->objects[id.id].load() & ref_count_mask;
    }
 
    inline object_location object_db::get(object_id id)
    {
-      auto val = _header->objects[id.id].load(std::memory_order_acquire);
+      auto val = _header->objects[id.id].load();
       //    std::atomic_thread_fence(std::memory_order_acquire);
 
       assert((val & ref_count_mask) or !"expected positive ref count");
@@ -307,7 +305,7 @@ namespace triedent
 
    inline object_location object_db::get(object_id id, uint16_t& ref)
    {
-      auto val = _header->objects[id.id].load(std::memory_order_acquire);
+      auto val = _header->objects[id.id].load();
 
       // if( not (val & ref_count_mask) ) // TODO: remove in release
       //    throw std::runtime_error("expected positive ref count");
@@ -326,9 +324,9 @@ namespace triedent
    inline bool object_db::set(object_id id, object_location loc)
    {
       auto&    obj = _header->objects[id.id];
-      auto     old = obj.load(std::memory_order_relaxed);
+      auto     old = obj.load();
       uint16_t ref = old & ref_count_mask;
-      auto     r   = obj.compare_exchange_strong(old, obj_val(loc, ref), std::memory_order_release);
+      auto     r   = obj.compare_exchange_strong(old, obj_val(loc, ref));
       //         std::atomic_thread_fence(std::memory_order_release);
       return r;
    }
@@ -341,7 +339,7 @@ namespace triedent
       auto*    end          = _header->objects + _header->max_unallocated.id;
       while (ptr != end)
       {
-         zero_ref += 0 == (ptr->load(std::memory_order_relaxed) & ref_count_mask);
+         zero_ref += 0 == (ptr->load() & ref_count_mask);
          ++total;
          ++ptr;
       }
