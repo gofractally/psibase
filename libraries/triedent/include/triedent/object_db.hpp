@@ -65,8 +65,7 @@ namespace triedent
    class object_db
    {
      public:
-      static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
-      using object_id                          = triedent::object_id;
+      using object_id = triedent::object_id;
 
       object_db(std::filesystem::path idfile, bool allow_write);
       static void create(std::filesystem::path idfile, uint64_t max_id);
@@ -120,6 +119,17 @@ namespace triedent
       }
 
      private:
+      static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
+
+      // clang-format off
+      auto extract_offset(uint64_t x)     { return x >> 18; }
+      auto extract_cache(uint64_t x)      { return (x >> 16) & 0x3; }
+      auto extract_type(uint64_t x)       { return (x >> 15) & 1; }
+      auto extract_ref(uint64_t x)        { return x & ((1ull << 15) - 1); }
+      auto extract_next_ptr(uint64_t x)   { return x >> 15; }
+      auto create_next_ptr(uint64_t x)    { return x << 15; }
+      // clang-format on
+
       inline uint64_t obj_val(object_location loc, uint16_t ref)
       {
          return uint64_t(loc.offset << 18) | (uint64_t(loc.cache) << 16) |
@@ -207,7 +217,7 @@ namespace triedent
       {
          uint64_t ff = _header->first_free.load(std::memory_order_relaxed);
          while (not _header->first_free.compare_exchange_strong(
-             ff, _header->objects[ff].load(std::memory_order_relaxed) >> 16,
+             ff, extract_next_ptr(_header->objects[ff].load(std::memory_order_relaxed)),
              std::memory_order_relaxed))
          {
          }
@@ -265,10 +275,12 @@ namespace triedent
          do
          {
             ff = _header->first_free.load(std::memory_order_acquire);
-            obj.store(ff << 16);
+            obj.store(create_next_ptr(ff));
          } while (not _header->first_free.compare_exchange_strong(ff, id.id));
       }
-      return {object_location{.offset = val >> 18, .cache = val >> 16, .type = (val >> 15) & 1},
+      return {object_location{.offset = extract_offset(val),
+                              .cache  = extract_cache(val),
+                              .type   = extract_type(val)},
               new_count};
    }
 
@@ -286,9 +298,9 @@ namespace triedent
       if (not(val & ref_count_mask)) [[unlikely]]  // TODO: remove in release
          throw std::runtime_error("expected positive ref count");
       object_location r;
-      r.cache  = (val >> 16) & 3;
-      r.offset = (val >> 18);
-      r.type   = (val >> 15) & 1;
+      r.cache  = extract_cache(val);
+      r.offset = extract_offset(val);
+      r.type   = extract_type(val);
       //  std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
@@ -303,10 +315,10 @@ namespace triedent
       //  std::atomic_thread_fence(std::memory_order_acquire);
       // assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
-      r.cache  = (val >> 16) & 3;
-      r.offset = (val >> 18);
-      r.type   = (val >> 15) & 1;
-      ref      = val & ref_count_mask;
+      r.cache  = extract_cache(val);
+      r.offset = extract_offset(val);
+      r.type   = extract_type(val);
+      ref      = extract_ref(val);
       //  std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
