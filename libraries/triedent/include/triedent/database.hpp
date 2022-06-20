@@ -286,7 +286,7 @@ namespace triedent
    struct deref
    {
       using id   = object_id;
-      using type = object_db::object_location::object_type;
+      using type = object_location::object_type;
 
       deref() = default;
       //deref(std::pair<id, char*> p) : _id(p.first), ptr(p.second) {}
@@ -304,7 +304,7 @@ namespace triedent
       explicit inline operator bool() const { return bool(_id); }
       inline          operator id() const { return _id; }
 
-      bool         is_leaf_node() const { return _type == object_db::object_location::leaf; }
+      bool         is_leaf_node() const { return _type == object_location::leaf; }
       inline auto& as_value_node() { return *reinterpret_cast<value_node*>(ptr); }
       inline auto& as_inner_node() { return *reinterpret_cast<inner_node*>(ptr); }
 
@@ -444,10 +444,10 @@ namespace triedent
          return;
 
       auto ptr = _ring->release(obj);
-      if (ptr.first and ptr.second == object_db::object_location::inner)
+      if (ptr.first and ptr.second == object_location::inner)
       //  if (ptr.first and not reinterpret_cast<node*>(ptr.first)->is_value_node())
       {
-         //     if( ptr.second != object_db::object_location::inner ) {
+         //     if( ptr.second != object_location::inner ) {
          //        throw std::runtime_error( "unexpected leaf type" );
          //     }
          auto& in = *reinterpret_cast<inner_node*>(ptr.first);
@@ -463,7 +463,7 @@ namespace triedent
          }
       }
       //  else if( ptr.first ) {
-      //     if( ptr.second != object_db::object_location::leaf) {
+      //     if( ptr.second != object_location::leaf) {
       //        throw std::runtime_error( "unexpected inner type" );
       //     }
       //  }

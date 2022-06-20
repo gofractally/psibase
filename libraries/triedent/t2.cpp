@@ -74,7 +74,7 @@ int test_object_db()
       auto start = std::chrono::steady_clock::now();
       for (int i = 0; i < num; ++i)
       {
-         db.set(ids[i], triedent::object_db::object_location{.offset = 1, .cache = 1});
+         db.set(ids[i], triedent::object_location{.offset = 1, .cache = 1});
          //    std::cout << i << "  id: " << ids[i].id << " ref: " << db.ref(ids[i]) << "\n";
       }
       auto end   = std::chrono::steady_clock::now();

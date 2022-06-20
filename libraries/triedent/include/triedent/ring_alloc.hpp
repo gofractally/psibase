@@ -37,18 +37,18 @@ namespace triedent
          swap_position() {}
          uint64_t _swap_pos[4] = {-1ull, -1ull, -1ull, -1ull};
       };
-      using object_type = object_db::object_location::object_type;
+      using object_type = object_location::object_type;
 
       swap_position get_swap_pos() const;
 
       ring_allocator(std::filesystem::path dir, access_mode mode);
       static void create(std::filesystem::path dir, config cfg);
 
-      std::pair<id, char*> alloc(size_t num_bytes, object_db::object_location::object_type);
+      std::pair<id, char*> alloc(size_t num_bytes, object_location::object_type);
       void                 retain(id);
 
       // return a pointer to the obj and its type if released
-      std::pair<char*, object_db::object_location::object_type> release(id);
+      std::pair<char*, object_location::object_type> release(id);
 
       bool        swap();
       inline void ensure_free_space();
@@ -102,8 +102,8 @@ namespace triedent
       char* alloc(managed_ring& ring,
                   id            nid,
                   uint32_t      num_bytes,
-                  char*         data                      = nullptr,
-                  object_db::object_location::object_type = {});
+                  char*         data           = nullptr,
+                  object_location::object_type = {});
 
       inline managed_ring&          hot() const { return *_levels[hot_cache]; }
       inline managed_ring&          warm() const { return *_levels[warm_cache]; }
@@ -386,11 +386,11 @@ namespace triedent
    //   alloc
    //=================================
    template <bool CopyData>
-   char* ring_allocator::alloc(managed_ring&                           ring,
-                               id                                      nid,
-                               uint32_t                                num_bytes,
-                               char*                                   data,
-                               object_db::object_location::object_type t)
+   char* ring_allocator::alloc(managed_ring&                ring,
+                               id                           nid,
+                               uint32_t                     num_bytes,
+                               char*                        data,
+                               object_location::object_type t)
    {
       uint32_t round_size = (num_bytes + 7) & -8;  // data padding
       uint64_t used_size  = round_size + sizeof(object_header);
@@ -471,7 +471,7 @@ namespace triedent
             }
             else
             {
-               using obj_type = object_db::object_location::object_type;
+               using obj_type = object_location::object_type;
                uint16_t ref;
                auto     loc = _obj_ids->get(id{o->id}, ref);
                // TODO: If the object moved to a larger pool, then the pointer arithmetic in
@@ -532,17 +532,17 @@ namespace triedent
       _obj_ids->retain(i);
    }
 
-   inline std::pair<char*, object_db::object_location::object_type> ring_allocator::release(id i)
+   inline std::pair<char*, object_location::object_type> ring_allocator::release(id i)
    {
       auto l = _obj_ids->release(i);
       return {(l.second > 0 ? nullptr
                             : (char*)_levels[l.first.cache]->get_object(l.first.offset)->data()),
-              (object_db::object_location::object_type)l.first.type};
+              (object_location::object_type)l.first.type};
    }
 
-   inline std::pair<object_id, char*> ring_allocator::alloc(
-       size_t                                  num_bytes,
-       object_db::object_location::object_type t)
+   inline std::pair<object_id, char*> ring_allocator::alloc(  //
+       size_t                       num_bytes,
+       object_location::object_type t)
    {
       if (num_bytes > 0xffffff - 8) [[unlikely]]
          throw std::runtime_error("obj too big");

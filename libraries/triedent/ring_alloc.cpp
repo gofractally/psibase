@@ -315,7 +315,7 @@ namespace triedent
             }
             else
             {
-               using obj_type = object_db::object_location::object_type;
+               using obj_type = object_location::object_type;
                uint16_t ref;
                auto     loc = _obj_ids->get(id{o->id}, ref);
                if (ref == 0)

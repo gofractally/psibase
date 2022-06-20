@@ -19,12 +19,11 @@ namespace triedent
       friend bool operator==(object_id a, object_id b) { return a.id == b.id; }
       friend bool operator!=(object_id a, object_id b) { return a.id != b.id; }
    } __attribute__((packed)) __attribute((aligned(1)));
-
    static_assert(sizeof(object_id) == 5, "unexpected padding");
 
    struct object_header
    {
-      // size may not be a multiple of 8, next object is at data() + (size+7)&-8
+      // size might not be a multiple of 8, next object is at data() + (size+7)&-8
       uint64_t size : 24;  // bytes of data, not including header
       uint64_t id : 40;
 
@@ -38,6 +37,27 @@ namespace triedent
    };
    static_assert(sizeof(object_header) == 8, "unexpected padding");
 
+   // Not stored
+   struct object_location
+   {
+      enum object_type
+      {
+         leaf  = 0,
+         inner = 1
+      };
+
+      // TODO: offset should be multiplied by 8 before use and divided by 8 before stored,
+      // this will allow us to maintain a full 48 bit address space
+      uint64_t offset : 46;
+      uint64_t cache : 2;
+      uint64_t type : 1;
+
+      friend bool operator!=(const object_location& a, const object_location& b)
+      {
+         return a.offset != b.offset || (a.cache != b.cache | a.type != b.type);
+      }
+   };
+
    /**
     * Assignes unique ids to objects, tracks their reference counts,
     * and their location. 
@@ -47,28 +67,6 @@ namespace triedent
      public:
       static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
       using object_id                          = triedent::object_id;
-
-      struct object_location
-      {
-         enum object_type
-         {
-            leaf  = 0,
-            inner = 1
-         };
-
-         // TODO: offset should be multiplied by 8 before use and divided by 8 before stored,
-         // this will allow us to maintain a full 48 bit address space
-         uint64_t offset : 46;
-         uint64_t cache : 2;
-         uint64_t type : 1;
-
-         friend bool operator!=(const object_location& a, const object_location& b)
-         {
-            return a.offset != b.offset || (a.cache != b.cache | a.type != b.type);
-         }
-      } __attribute__((packed));
-      // TODO expand
-      static_assert(sizeof(object_location) == 7, "unexpected padding");
 
       object_db(std::filesystem::path idfile, bool allow_write);
       static void create(std::filesystem::path idfile, uint64_t max_id);
@@ -246,7 +244,7 @@ namespace triedent
     *  Return null object_location if not released, othewise returns the location
     *  that was freed
     */
-   inline std::pair<object_db::object_location, uint16_t> object_db::release(object_id id)
+   inline std::pair<object_location, uint16_t> object_db::release(object_id id)
    {
       auto& obj       = _header->objects[id.id];
       auto  val       = obj.fetch_sub(1) - 1;
@@ -279,7 +277,7 @@ namespace triedent
       return _header->objects[id.id].load(std::memory_order_relaxed) & ref_count_mask;
    }
 
-   inline object_db::object_location object_db::get(object_id id)
+   inline object_location object_db::get(object_id id)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
       //    std::atomic_thread_fence(std::memory_order_acquire);
@@ -295,7 +293,7 @@ namespace triedent
       return r;
    }
 
-   inline object_db::object_location object_db::get(object_id id, uint16_t& ref)
+   inline object_location object_db::get(object_id id, uint16_t& ref)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
 

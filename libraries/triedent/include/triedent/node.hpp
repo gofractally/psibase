@@ -44,7 +44,7 @@ namespace triedent
       {
          assert(val.size() < 0xffffff - key.size() - sizeof(value_node));
          uint32_t alloc_size = sizeof(value_node) + key.size() + val.size();
-         auto     r          = a.alloc(alloc_size, object_db::object_location::leaf);
+         auto     r          = a.alloc(alloc_size, object_location::leaf);
          return std::make_pair(r.first, new (r.second) value_node(key, val));
       }
 
@@ -141,7 +141,7 @@ namespace triedent
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
-      auto p = a.alloc(alloc_size, object_db::object_location::inner);
+      auto p = a.alloc(alloc_size, object_location::inner);
       return std::make_pair(p.first,
                             new (p.second) inner_node(a, in, prefix, val, branches, version));
    }
@@ -154,7 +154,7 @@ namespace triedent
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
-      auto p = a.alloc(alloc_size, object_db::object_location::inner);
+      auto p = a.alloc(alloc_size, object_location::inner);
       return std::make_pair(p.first, new (p.second) inner_node(prefix, val, branches, version));
    }
 
