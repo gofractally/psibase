@@ -134,36 +134,7 @@ namespace triedent
       }
    };
 
-   struct object_header
-   {
-      // size may not be a multiple of 8, next object is at data() + (size+7)&-8
-      uint64_t size : 24;  // bytes of data, not including header
-      uint64_t id : 40;
-
-      inline bool     is_free_area() const { return id == 0; }
-      inline uint64_t free_area_size() const { return id; }
-      inline uint64_t data_size() const { return size; }
-      inline uint32_t data_capacity() const { return (size + 7) & -8; }
-      inline char*    data() const { return (char*)(this + 1); }
-      inline void     set_free_area_size(uint64_t s)
-      {
-         size = s, id = 0;
-         assert(s == size);
-      }
-      inline void set(object_id i, uint32_t numb) { size = numb, id = i.id; }
-
-      // assuming size is 0, and therefore this is a "free area", id
-      // holds the size of the free area starting at this. Returns the
-      // first object after the free area.
-      object_header* end_free() const
-      {
-         assert(size == 0);
-         return reinterpret_cast<object_header*>(((char*)this) + id);
-      }
-      // assuming obj header holds an obj, returns the next spot that may hold an obj
-      object_header* next() const { return (object_header*)(data() + data_capacity()); }
-   };  // __attribute__((packed)) __attribute__((aligned(1)));
-   static_assert(sizeof(object_header) == 8, "unexpected padding");
+   using object_header = triedent::object_header;
 
    // wraps the file and handles resizing
    struct managed_ring
@@ -471,10 +442,9 @@ namespace triedent
          uint64_t bytes_freed = 0;
 
          uint64_t sp = from->_head->swap_p.load(std::memory_order_relaxed);
-         uint64_t fp = from->_head->end_free_p.load(std::memory_order_relaxed);
-         uint64_t ap = from->_head->alloc_p.load(std::memory_order_relaxed);
-         if (fp < ap)
-            throw std::runtime_error("end should never be beyond alloc!");
+         /// these two come from main, we read alloc_p first because end free must
+         /// always be greater than alloc_p and we don't want to read these in
+         uint64_t ap = from->_head->alloc_p.load(std::memory_order_acquire);
 
          auto beg    = (char*)from->_head->begin.get();
          auto msk    = from->_head->alloc_area_mask;

@@ -12,6 +12,32 @@ namespace triedent
 {
    namespace bip = boost::interprocess;
 
+   struct object_id
+   {
+      uint64_t    id : 40 = 0;  // obj id
+      explicit    operator bool() const { return id != 0; }
+      friend bool operator==(object_id a, object_id b) { return a.id == b.id; }
+      friend bool operator!=(object_id a, object_id b) { return a.id != b.id; }
+   } __attribute__((packed)) __attribute((aligned(1)));
+
+   static_assert(sizeof(object_id) == 5, "unexpected padding");
+
+   struct object_header
+   {
+      // size may not be a multiple of 8, next object is at data() + (size+7)&-8
+      uint64_t size : 24;  // bytes of data, not including header
+      uint64_t id : 40;
+
+      inline bool     is_free_area() const { return id == 0; }
+      inline uint64_t free_area_size() const { return id; }
+      inline uint64_t data_size() const { return size; }
+      inline uint32_t data_capacity() const { return (size + 7) & -8; }
+      inline char*    data() const { return (char*)(this + 1); }
+      inline void     set_free_area_size(uint64_t s) { size = s, id = 0; }
+      inline void     set(object_id i, uint32_t numb) { size = numb, id = i.id; }
+   };  
+   static_assert(sizeof(object_header) == 8, "unexpected padding");
+
    /**
     * Assignes unique ids to objects, tracks their reference counts,
     * and their location. 
@@ -20,15 +46,7 @@ namespace triedent
    {
      public:
       static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
-      struct object_id
-      {
-         uint64_t    id : 40 = 0;  // obj id
-         explicit    operator bool() const { return id != 0; }
-         friend bool operator==(object_id a, object_id b) { return a.id == b.id; }
-         friend bool operator!=(object_id a, object_id b) { return a.id != b.id; }
-      } __attribute__((packed)) __attribute((aligned(1)));
-
-      static_assert(sizeof(object_id) == 5, "unexpected padding");
+      using object_id = triedent::object_id;
 
       enum object_store_type
       {

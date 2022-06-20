@@ -1584,9 +1584,11 @@ namespace triedent
 
       auto validate_id = [&](auto i)
       {
+         _db->_ring->validate(r);
          if( 0 == _db->_ring->get_ref(r).first ) 
             throw std::runtime_error( "found reference to object with 0 ref count: " + std::to_string(r.id) );
       };
+
       validate_id(r);
 
       auto dr = get(r);
