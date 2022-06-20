@@ -236,6 +236,7 @@ namespace triedent
       inline char*   begin_pos() const { return (char*)_begin; }  //_head->begin.get(); }
       object_header* get_object(uint64_t offset)
       {
+         // TODO: UB since this isn't atomic and there are multiple reader threads
          ++_head->cache_hits;  // TODO: remove from release
          return reinterpret_cast<object_header*>(begin_pos() + offset);
       }
@@ -427,6 +428,12 @@ namespace triedent
    {
       auto do_swap = [this](auto* from, auto* to)
       {
+         // TODO: remove fp and the check; a race can cause it to misfire
+         // TODO: please expand the code from get_potential_free_space and 
+         //       remove the redundant atomic reloads to make analysis easier
+         // TODO: `ap` may need to switch to memory_order_acquire to enable
+         //       reading object headers written by the main thread
+
          auto     fs     = from->_head->get_potential_free_space();
          auto     maxs   = from->_head->alloc_area_size;
          uint64_t target = 1024 * 1024 * 40ull;  //maxs / 32;  // target a certain amount free
@@ -467,6 +474,14 @@ namespace triedent
                using obj_type = object_db::object_location::object_type;
                uint16_t ref;
                auto     loc = _obj_ids->get(id{o->id}, ref);
+               // TODO: If the object moved to a larger pool, then the pointer arithmetic in
+               //       get_object may be UB (offset exceeds underlying array bounds).
+               //       Reorder the conditional to put the get_object after the loc.cache check.
+               //
+               // TODO: The main thread could currently be modifying the object in place.
+               //       The memcpy inside alloc races with that. After alloc calls
+               //       _obj_ids->set(), it could point to the old version, the new version,
+               //       or worse.
                if (ref != 0 and from->get_object(loc.offset) == o and loc.cache == from->level)
                   alloc<true>(*to, {o->id}, o->size, o->data(), (obj_type)loc.type);
                p += o->data_capacity() + 8;
