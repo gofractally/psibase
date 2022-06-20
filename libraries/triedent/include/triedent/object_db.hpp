@@ -28,7 +28,7 @@ namespace triedent
       uint64_t size : 24;  // bytes of data, not including header
       uint64_t id : 40;
 
-      inline bool     is_free_area() const { return id == 0; }
+      inline bool     is_free_area() const { return size == 0; }
       inline uint64_t free_area_size() const { return id; }
       inline uint64_t data_size() const { return size; }
       inline uint32_t data_capacity() const { return (size + 7) & -8; }
@@ -47,14 +47,6 @@ namespace triedent
      public:
       static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
       using object_id                          = triedent::object_id;
-
-      enum object_store_type
-      {
-         cold_store     = 0,  // requires file/io
-         hot_store      = 1,  // pinned
-         big_cold_store = 2,  // requires file/io
-         big_hot_store  = 3   // pinned
-      };
 
       struct object_location
       {
@@ -81,7 +73,7 @@ namespace triedent
       object_db(std::filesystem::path idfile, bool allow_write);
       static void create(std::filesystem::path idfile, uint64_t max_id);
 
-      object_id alloc(object_location loc = {.offset = 0, .cache = hot_store});
+      object_id alloc(object_location loc = {.offset = 0, .cache = 0});
 
       void                                 retain(object_id id);
       std::pair<object_location, uint16_t> release(object_id id);
