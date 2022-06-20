@@ -35,7 +35,7 @@ namespace triedent
       inline char*    data() const { return (char*)(this + 1); }
       inline void     set_free_area_size(uint64_t s) { size = s, id = 0; }
       inline void     set(object_id i, uint32_t numb) { size = numb, id = i.id; }
-   };  
+   };
    static_assert(sizeof(object_header) == 8, "unexpected padding");
 
    /**
@@ -46,7 +46,7 @@ namespace triedent
    {
      public:
       static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
-      using object_id = triedent::object_id;
+      using object_id                          = triedent::object_id;
 
       enum object_store_type
       {
@@ -79,7 +79,7 @@ namespace triedent
       static_assert(sizeof(object_location) == 7, "unexpected padding");
 
       object_db(std::filesystem::path idfile, bool allow_write);
-      static void create( std::filesystem::path idfile, uint64_t max_id );
+      static void create(std::filesystem::path idfile, uint64_t max_id);
 
       object_id alloc(object_location loc = {.offset = 0, .cache = hot_store});
 
@@ -97,29 +97,35 @@ namespace triedent
       }
 
       void print_stats();
-      void validate( object_id i ) {
-         if( i.id > _header->first_unallocated.id )
-            throw std::runtime_error( "invalid object id discovered: " + std::to_string(i.id) );
+      void validate(object_id i)
+      {
+         if (i.id > _header->first_unallocated.id)
+            throw std::runtime_error("invalid object id discovered: " + std::to_string(i.id));
       }
 
       /**
        * Sets all non-zero refs to c
        */
-      void reset_all_ref_counts( uint16_t c ) {
-         for( auto& o : _header->objects ) {
+      void reset_all_ref_counts(uint16_t c)
+      {
+         for (auto& o : _header->objects)
+         {
             auto i = o.load(std::memory_order_relaxed);
-            if( i & ref_count_mask ) {
+            if (i & ref_count_mask)
+            {
                i &= ~ref_count_mask;
                i |= c & ref_count_mask;
-               o.store( i, std::memory_order_relaxed );
+               o.store(i, std::memory_order_relaxed);
             }
          }
       }
-      void adjust_all_ref_counts( int16_t c ) {
-         for( auto& o : _header->objects ) {
+      void adjust_all_ref_counts(int16_t c)
+      {
+         for (auto& o : _header->objects)
+         {
             auto i = o.load(std::memory_order_relaxed);
-            if( i & ref_count_mask ) 
-               o.store( i+c, std::memory_order_relaxed );
+            if (i & ref_count_mask)
+               o.store(i + c, std::memory_order_relaxed);
          }
       }
 
@@ -158,10 +164,10 @@ namespace triedent
       auto idfile_size = sizeof(object_db_header) + max_id * 8;
       std::filesystem::resize_file(idfile, idfile_size);
 
-      bip::file_mapping fm(idfile.generic_string().c_str(), bip::read_write);
+      bip::file_mapping  fm(idfile.generic_string().c_str(), bip::read_write);
       bip::mapped_region mr(fm, bip::read_write, 0, sizeof(object_db_header));
 
-      auto header = reinterpret_cast<object_db_header*>(mr.get_address());
+      auto header                  = reinterpret_cast<object_db_header*>(mr.get_address());
       header->first_unallocated.id = 0;
       header->first_free.store(0);
       header->max_unallocated.id = (idfile_size - sizeof(object_db_header)) / 8;
@@ -170,7 +176,7 @@ namespace triedent
    inline object_db::object_db(std::filesystem::path idfile, bool allow_write)
    {
       if (not std::filesystem::exists(idfile))
-         throw std::runtime_error( "file does not exist: " + idfile.generic_string() );
+         throw std::runtime_error("file does not exist: " + idfile.generic_string());
 
       auto existing_size = std::filesystem::file_size(idfile);
 
@@ -184,13 +190,13 @@ namespace triedent
 
       _region = std::make_unique<bip::mapped_region>(*_file, mode);
 
-      if( mlock(_region->get_address(), existing_size) < 0 )
-         throw std::runtime_error( "unable to lock memory for "+ idfile.generic_string() );
+      if (mlock(_region->get_address(), existing_size) < 0)
+         throw std::runtime_error("unable to lock memory for " + idfile.generic_string());
 
       _header = reinterpret_cast<object_db_header*>(_region->get_address());
 
-      if( _header->max_unallocated.id != (existing_size - sizeof(object_db_header))/8 )
-         throw std::runtime_error( "file corruption detected: " + idfile.generic_string() );
+      if (_header->max_unallocated.id != (existing_size - sizeof(object_db_header)) / 8)
+         throw std::runtime_error("file corruption detected: " + idfile.generic_string());
    }
 
    inline object_db::object_id object_db::alloc(object_location loc)
@@ -223,7 +229,7 @@ namespace triedent
    }
    inline void object_db::retain(object_id id)
    {
-      assert( id.id <= _header->first_unallocated.id );
+      assert(id.id <= _header->first_unallocated.id);
       if (id.id > _header->first_unallocated.id) [[unlikely]]
          throw std::runtime_error("invalid object id, outside allocated range");
 
@@ -241,7 +247,7 @@ namespace triedent
          throw std::runtime_error( "too many references" );
          */
 
-      obj.fetch_add(1, std::memory_order_release );
+      obj.fetch_add(1, std::memory_order_release);
    }
 
    /**
@@ -284,16 +290,16 @@ namespace triedent
    inline object_db::object_location object_db::get(object_id id)
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
-    //    std::atomic_thread_fence(std::memory_order_acquire);
-      
+      //    std::atomic_thread_fence(std::memory_order_acquire);
+
       assert((val & ref_count_mask) or !"expected positive ref count");
-      if( not (val & ref_count_mask) ) [[unlikely]]// TODO: remove in release
+      if (not(val & ref_count_mask)) [[unlikely]]  // TODO: remove in release
          throw std::runtime_error("expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
       r.type   = (val >> 15) & 1;
-     //  std::atomic_thread_fence(std::memory_order_acquire);
+      //  std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
 
@@ -301,17 +307,17 @@ namespace triedent
    {
       auto val = _header->objects[id.id].load(std::memory_order_acquire);
 
-     // if( not (val & ref_count_mask) ) // TODO: remove in release
-     //    throw std::runtime_error("expected positive ref count");
+      // if( not (val & ref_count_mask) ) // TODO: remove in release
+      //    throw std::runtime_error("expected positive ref count");
 
-     //  std::atomic_thread_fence(std::memory_order_acquire);
+      //  std::atomic_thread_fence(std::memory_order_acquire);
       // assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
       r.cache  = (val >> 16) & 3;
       r.offset = (val >> 18);
       r.type   = (val >> 15) & 1;
       ref      = val & ref_count_mask;
-     //  std::atomic_thread_fence(std::memory_order_acquire);
+      //  std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
 
@@ -321,7 +327,7 @@ namespace triedent
       auto     old = obj.load(std::memory_order_relaxed);
       uint16_t ref = old & ref_count_mask;
       auto     r   = obj.compare_exchange_strong(old, obj_val(loc, ref), std::memory_order_release);
-  //         std::atomic_thread_fence(std::memory_order_release);
+      //         std::atomic_thread_fence(std::memory_order_release);
       return r;
    }
    inline void object_db::print_stats()
@@ -337,11 +343,12 @@ namespace triedent
          ++total;
          ++ptr;
       }
-      std::cerr<< std::setw(10) << std::left << "obj ids" << "|";
-      std::cerr<< std::setw(12) << std::left << (" "+std::to_string(total-zero_ref)) << "|";
-      std::cerr<< std::setw(12) << std::left << (" "+std::to_string(zero_ref)) << "|";
-      std::cerr<< std::setw(12) << std::left << (" "+std::to_string(total)) << "|";
-      std::cerr<< std::endl;
+      std::cerr << std::setw(10) << std::left << "obj ids"
+                << "|";
+      std::cerr << std::setw(12) << std::left << (" " + std::to_string(total - zero_ref)) << "|";
+      std::cerr << std::setw(12) << std::left << (" " + std::to_string(zero_ref)) << "|";
+      std::cerr << std::setw(12) << std::left << (" " + std::to_string(total)) << "|";
+      std::cerr << std::endl;
       /*
       DEBUG("first unallocated  ", _header->first_unallocated.id);
       DEBUG("total objects: ", total, " zero ref: ", zero_ref, "  non zero: ", total - zero_ref);

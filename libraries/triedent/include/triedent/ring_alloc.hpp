@@ -90,15 +90,12 @@ namespace triedent
       /**
        * Sets all non-zero refs to c
        */
-      void reset_all_ref_counts( uint16_t c ) {
-         _obj_ids->reset_all_ref_counts(c);
-      }
-      void adjust_all_ref_counts( int16_t c ) {
-         _obj_ids->adjust_all_ref_counts(c);
-      }
+      void reset_all_ref_counts(uint16_t c) { _obj_ids->reset_all_ref_counts(c); }
+      void adjust_all_ref_counts(int16_t c) { _obj_ids->adjust_all_ref_counts(c); }
 
-      void validate(); 
+      void validate();
       void validate(id i) { _obj_ids->validate(i); }
+
      private:
       uint64_t wait_on_free_space(managed_ring& ring, uint64_t used_size);
       template <bool CopyData = false>
@@ -149,9 +146,12 @@ namespace triedent
 
          void validate()
          {
-            if( not (alloc_p <= end_free_p) ) throw std::runtime_error( "alloc pointer should be behind end free" );
-            if( not (swap_p <= alloc_p) ) throw std::runtime_error(  "swap pointer should be behind alloc pointer" );
-            if( not (alloc_area_size >= get_free_space() ) ) throw std::runtime_error( "free space is larger than memory area" );
+            if (not(alloc_p <= end_free_p))
+               throw std::runtime_error("alloc pointer should be behind end free");
+            if (not(swap_p <= alloc_p))
+               throw std::runtime_error("swap pointer should be behind alloc pointer");
+            if (not(alloc_area_size >= get_free_space()))
+               throw std::runtime_error("free space is larger than memory area");
          }
 
          uint64_t                       size;  // file size, max we can move end to
@@ -403,8 +403,8 @@ namespace triedent
       auto* cur = ring.get_alloc_cursor();
 
       auto& alp = ring._head->alloc_p;
-      auto ap         = alp.load(std::memory_order_relaxed);
-      alp.store( ap + used_size, std::memory_order_release );
+      auto  ap  = alp.load(std::memory_order_relaxed);
+      alp.store(ap + used_size, std::memory_order_release);
       cur->set(nid, num_bytes);
 
       if constexpr (CopyData)
@@ -429,7 +429,7 @@ namespace triedent
       auto do_swap = [this](auto* from, auto* to)
       {
          // TODO: remove fp and the check; a race can cause it to misfire
-         // TODO: please expand the code from get_potential_free_space and 
+         // TODO: please expand the code from get_potential_free_space and
          //       remove the redundant atomic reloads to make analysis easier
          // TODO: `ap` may need to switch to memory_order_acquire to enable
          //       reading object headers written by the main thread
@@ -495,7 +495,7 @@ namespace triedent
       did_work |= do_swap(&hot(), &warm());
       did_work |= do_swap(&warm(), &cool());
       did_work |= do_swap(&cool(), &cold());
-      //if( not did_work ) 
+      //if( not did_work )
       //   _try_claim_free();
       return did_work;
       //   do_swap(&cold(), &cold());
@@ -509,21 +509,28 @@ namespace triedent
       auto claim = [this](auto& ring, uint64_t mp)
       {
          // TODO: load relaxed and store relaxed if swapping is being managed by another thread
-         ring._head->end_free_p.store(ring._head->alloc_area_size +
-                                      std::min<uint64_t>(ring._head->swap_p.load(std::memory_order_relaxed), mp));
+         ring._head->end_free_p.store(
+             ring._head->alloc_area_size +
+             std::min<uint64_t>(ring._head->swap_p.load(std::memory_order_relaxed), mp));
       };
       claim(hot(), sp._swap_pos[0]);
       claim(warm(), sp._swap_pos[1]);
       claim(cool(), sp._swap_pos[2]);
       claim(cold(), sp._swap_pos[3]);
    }
-   inline char*                      ring_allocator::get(id i) { return get_cache<true>(i); }
+   inline char* ring_allocator::get(id i)
+   {
+      return get_cache<true>(i);
+   }
    inline std::pair<uint16_t, char*> ring_allocator::get_ref_no_cache(id i)
    {
       return {ref(i), get_cache<false>(i)};
    }
 
-   inline void ring_allocator::retain(id i) { _obj_ids->retain(i); }
+   inline void ring_allocator::retain(id i)
+   {
+      _obj_ids->retain(i);
+   }
 
    inline std::pair<char*, object_db::object_location::object_type> ring_allocator::release(id i)
    {
@@ -544,13 +551,12 @@ namespace triedent
       auto ptr    = alloc(hot(), new_id, num_bytes, nullptr, t);
       return {new_id, ptr};
    }
-   inline void ring_allocator::validate(){
-         hot()._head->validate();
-         warm()._head->validate();
-         cool()._head->validate();
-         cold()._head->validate();
-      }
-
+   inline void ring_allocator::validate()
+   {
+      hot()._head->validate();
+      warm()._head->validate();
+      cool()._head->validate();
+      cold()._head->validate();
+   }
 
 }  // namespace triedent
-

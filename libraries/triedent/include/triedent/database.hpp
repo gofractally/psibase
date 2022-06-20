@@ -41,7 +41,7 @@ namespace triedent
       inline void swap();
       inline void claim_free() const;
       inline void ensure_free_space();
-      static void create( std::filesystem::path dir, config );
+      static void create(std::filesystem::path dir, config);
 
       class session_base
       {
@@ -75,7 +75,6 @@ namespace triedent
          inline auto&                       iterators() const { return _iterators; }
 
         public:
-
          struct iterator
          {
             uint32_t    key_size() const;
@@ -89,7 +88,8 @@ namespace triedent
 
             ~iterator()
             {
-               if( _iter_num != -1 ) {
+               if (_iter_num != -1)
+               {
                   path().clear();
                   _session->used_iterators() ^= 1ull << _iter_num;
                }
@@ -101,13 +101,14 @@ namespace triedent
                _session->used_iterators() ^= 1ull << _iter_num;
                path() = c.path();
             }
-            iterator(iterator&& c) : _session(c._session),_iter_num(c._iter_num)
+            iterator(iterator&& c) : _session(c._session), _iter_num(c._iter_num)
             {
                c._iter_num = -1;
             }
-            void value( std::string& v )const;
+            void value(std::string& v) const;
 
-            std::string value()const {
+            std::string value() const
+            {
                std::string r;
                value(r);
                return r;
@@ -154,13 +155,13 @@ namespace triedent
          /* the root revision of this session */
          id revision() { return _session_root; }
 
-         iterator first() const;
-         iterator last() const;
-         iterator find(string_view key) const;
-         iterator lower_bound(string_view key) const;
-         iterator last_with_prefix(string_view prefix) const;
-         bool     get(string_view key, std::string& result) const;
-         std::optional<std::string> get(string_view key )const;
+         iterator                   first() const;
+         iterator                   last() const;
+         iterator                   find(string_view key) const;
+         iterator                   lower_bound(string_view key) const;
+         iterator                   last_with_prefix(string_view prefix) const;
+         bool                       get(string_view key, std::string& result) const;
+         std::optional<std::string> get(string_view key) const;
 
          void print();
          void validate();
@@ -200,10 +201,10 @@ namespace triedent
       class write_session : public read_session
       {
         public:
-         int  upsert(string_view key, string_view val);
-         int  remove(string_view key);
-         id   fork(id from_version );
-         id   fork();
+         int upsert(string_view key, string_view val);
+         int remove(string_view key);
+         id  fork(id from_version);
+         id  fork();
 
          void set_root_revision(id);
          void clear();
@@ -219,11 +220,9 @@ namespace triedent
           */
          ///@{
          void start_collect_garbage();
-         void recursive_retain( object_id id );
+         void recursive_retain(object_id id);
          void end_collect_garbage();
          ///@}
-         
-
 
         private:
          inline deref<value_node> make_value(string_view k, string_view v);
@@ -247,7 +246,7 @@ namespace triedent
       std::shared_ptr<write_session> start_write_session();
       std::shared_ptr<read_session>  start_read_session();
 
-      void print_stats( bool detail = false );
+      void print_stats(bool detail = false);
 
       id get_root_revision() const;
 
@@ -265,9 +264,7 @@ namespace triedent
       struct database_memory
       {
          std::atomic<uint64_t> _root_revision;
-         database_memory() {
-            _root_revision.store(0);
-         }
+         database_memory() { _root_revision.store(0); }
       };
 
       static std::atomic<int>      _read_thread_number;
@@ -335,7 +332,7 @@ namespace triedent
          retain(i);
          release({_db->_dbm->_root_revision.load(std::memory_order_relaxed)});
          _db->_dbm->_root_revision.store(i.id, std::memory_order_relaxed);
-         WARN( "SET ROOT REV: ", i.id );
+         WARN("SET ROOT REV: ", i.id);
       }
    }
 
@@ -367,12 +364,15 @@ namespace triedent
       return _session_root;
    }
 
-   inline database::id database::write_session::fork() { return fork(_session_root); }
+   inline database::id database::write_session::fork()
+   {
+      return fork(_session_root);
+   }
 
    inline database::id database::get_root_revision() const
    {
       std::lock_guard<std::mutex> lock(_root_change_mutex);
-      if( _dbm->_root_revision )
+      if (_dbm->_root_revision)
          _ring->retain({_dbm->_root_revision});
       return {_dbm->_root_revision};
    }
@@ -616,7 +616,7 @@ namespace triedent
    inline database::id database::write_session::add_child(id          root,
                                                           string_view key,
                                                           string_view val,
-                                                          int&       old_size)
+                                                          int&        old_size)
    {
       if (not root)  // empty case
          return make_value(key, val);
@@ -625,9 +625,10 @@ namespace triedent
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
-         if ((vn.key() != key) )   
+         if ((vn.key() != key))
             return combine_value_nodes(vn.key(), vn.data(), key, val);
-         else {
+         else
+         {
             old_size = vn.data_size();
             return set_value(n, key, val);  // with the same key
          }
@@ -638,11 +639,14 @@ namespace triedent
       auto  in_key = in.key();
       if (in_key == key)  // whose prefix is same as key, therefore set the value
       {
-         if( not in.value() ) {
+         if (not in.value())
+         {
             return set_inner_value(n, val);
-         } else {
+         }
+         else
+         {
             old_size = get(in.value()).as_value_node().data_size();
-            return set_inner_value( n, val );
+            return set_inner_value(n, val);
          }
       }
 
@@ -727,7 +731,7 @@ namespace triedent
 
       auto& ar = *_db->_ring;
 
-      int old_size = -1;
+      int  old_size = -1;
       auto new_root = add_child(_session_root, to_key6(key), val, old_size);
       assert(new_root.id);
       //  std::cout << "new_root: " << new_root.id << "  old : " << rev._root.id << "\n";
@@ -861,7 +865,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   void database::session<AccessMode>::iterator::value( std::string& val) const
+   void database::session<AccessMode>::iterator::value(std::string& val) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _session->_db->ensure_free_space();
@@ -869,9 +873,8 @@ namespace triedent
 
       auto dat = _value();
       val.resize(dat.size());
-      memcpy(val.data(), dat.data(), dat.size() );
+      memcpy(val.data(), dat.data(), dat.size());
    }
-
 
    template <typename AccessMode>
    std::string_view database::session<AccessMode>::iterator::_value() const
@@ -1237,10 +1240,12 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   std::optional<std::string> database::session<AccessMode>::get(string_view key )const {
+   std::optional<std::string> database::session<AccessMode>::get(string_view key) const
+   {
       std::string r;
-      if( get( key, r ) ) {
-         return std::optional( std::move(r) );
+      if (get(key, r))
+      {
+         return std::optional(std::move(r));
       }
       return std::nullopt;
    }
@@ -1251,15 +1256,18 @@ namespace triedent
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
 
-      auto k6 = to_key6(key);
+      auto       k6 = to_key6(key);
       swap_guard g(*this);
 
       auto v = get(_session_root, k6);
-      if( v ) {
-         result.resize( v->size() );
-         memcpy( result.data(), v->data(), v->size() );
+      if (v)
+      {
+         result.resize(v->size());
+         memcpy(result.data(), v->data(), v->size());
          return true;
-      } else {
+      }
+      else
+      {
          result.resize(0);
          return false;
       }
@@ -1318,8 +1326,8 @@ namespace triedent
    {
       _db->ensure_free_space();
       swap_guard g(*this);
-      int        removed_size  = -1;
-      auto       new_root = remove_child(_session_root, to_key6(key), removed_size);
+      int        removed_size = -1;
+      auto       new_root     = remove_child(_session_root, to_key6(key), removed_size);
       if (new_root != _session_root)
       {
          release(_session_root);
@@ -1329,7 +1337,7 @@ namespace triedent
    }
    inline database::id database::write_session::remove_child(id          root,
                                                              string_view key,
-                                                             int&       removed_size)
+                                                             int&        removed_size)
    {
       if (not root)
          return root;
@@ -1338,7 +1346,8 @@ namespace triedent
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
-         if( vn.key() == key ) {
+         if (vn.key() == key)
+         {
             removed_size = vn.data_size();
             return id();
          }
@@ -1354,10 +1363,10 @@ namespace triedent
       if (in_key == key)
       {
          auto iv = in.value();
-         if( not iv ) 
+         if (not iv)
             return root;
 
-         if( in.value() ) 
+         if (in.value())
             removed_size = get(iv).as_value_node().data_size();
 
          if (in.num_branches() == 1)
@@ -1401,8 +1410,8 @@ namespace triedent
 
       auto& cur_b = in.branch(b);
 
-      auto cpre = common_prefix( in_key, key );
-      if( cpre != in_key )
+      auto cpre = common_prefix(in_key, key);
+      if (cpre != in_key)
          return root;
 
       auto new_b = remove_child(cur_b, key.substr(in_key.size() + 1), removed_size);
@@ -1542,39 +1551,41 @@ namespace triedent
     * visit every node in the tree and retain it. This is used in garbage collection
     * after a crash.
     */
-   inline void database::write_session::recursive_retain(id r) {
+   inline void database::write_session::recursive_retain(id r)
+   {
       if (not r)
          return;
       int cur_ref_count = _db->_ring->ref(r);
       retain(r);
 
-      if( cur_ref_count > 1 ) // 1 is the default ref when resetting all
-         return; // retaining this node indirectly retains all children
+      if (cur_ref_count > 1)  // 1 is the default ref when resetting all
+         return;              // retaining this node indirectly retains all children
 
       auto dr = get(r);
-      if( not dr.is_leaf_node() ) {
+      if (not dr.is_leaf_node())
+      {
          auto& in = dr.as_inner_node();
 
          recursive_retain(in.value());
 
          auto* c = in.children();
          auto* e = c + in.num_branches();
-         while( c != e ) {
+         while (c != e)
+         {
             recursive_retain(*c);
             ++e;
          }
       }
    }
 
-   inline void database::write_session::start_collect_garbage() {
-
+   inline void database::write_session::start_collect_garbage()
+   {
       _db->_ring->reset_all_ref_counts(1);
    }
-   inline void database::write_session::end_collect_garbage() {
-
+   inline void database::write_session::end_collect_garbage()
+   {
       _db->_ring->reset_all_ref_counts(-1);
    }
-
 
    template <typename AccessMode>
    void database::session<AccessMode>::validate(id r)
@@ -1585,8 +1596,9 @@ namespace triedent
       auto validate_id = [&](auto i)
       {
          _db->_ring->validate(r);
-         if( 0 == _db->_ring->get_ref(r).first ) 
-            throw std::runtime_error( "found reference to object with 0 ref count: " + std::to_string(r.id) );
+         if (0 == _db->_ring->get_ref(r).first)
+            throw std::runtime_error("found reference to object with 0 ref count: " +
+                                     std::to_string(r.id));
       };
 
       validate_id(r);
@@ -1599,7 +1611,8 @@ namespace triedent
 
          auto* c = in.children();
          auto* e = c + in.num_branches();
-         while( c != e ) {
+         while (c != e)
+         {
             validate(*c);
             ++c;
          }
@@ -1615,7 +1628,7 @@ namespace triedent
       const uint8_t* pos6_end = (uint8_t*)sixb.data() + sixb.size();
       uint8_t*       pos8     = (uint8_t*)out.data();
 
-      while ( pos6_end - pos6 >= 4 )
+      while (pos6_end - pos6 >= 4)
       {
          pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
          pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
@@ -1628,11 +1641,11 @@ namespace triedent
          case 3:
             pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
             pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
-        //    pos8[2] = (pos6[2] << 6);                   // 2b + 6-0
+            //    pos8[2] = (pos6[2] << 6);                   // 2b + 6-0
             break;
          case 2:
             pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
-       //     pos8[1] = (pos6[1] << 4);                   // 4b + 4-0
+            //     pos8[1] = (pos6[1] << 4);                   // 4b + 4-0
             break;
          case 1:
             pos8[0] = (pos6[0] << 2);  // 6 + 2-0
@@ -1651,7 +1664,7 @@ namespace triedent
       const uint8_t* pos8     = (uint8_t*)v.data();
       const uint8_t* pos8_end = (uint8_t*)v.data() + v.size();
 
-      while ( pos8_end - pos8 >= 3)
+      while (pos8_end - pos8 >= 3)
       {
          pos6[0] = pos8[0] >> 2;
          pos6[1] = (pos8[0] & 0x3) << 4 | pos8[1] >> 4;
@@ -1677,26 +1690,25 @@ namespace triedent
       }
       return {key_buf.data(), key_buf.size()};
    }
-   inline void database::ensure_free_space() { _ring->ensure_free_space(); }
+   inline void database::ensure_free_space()
+   {
+      _ring->ensure_free_space();
+   }
 
-   inline void database::claim_free()const
+   inline void database::claim_free() const
    {
       ring_allocator::swap_position sp;
       {
          std::lock_guard<std::mutex> lock(_active_sessions_mutex);
          for (auto s : _active_sessions)
          {
-            sp._swap_pos[0] =
-                std::min<uint64_t>(s->_hot_swap_p.load(), sp._swap_pos[0]);
-            sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(),
-                                                 sp._swap_pos[1]);
-            sp._swap_pos[2] = std::min<uint64_t>(s->_cool_swap_p.load(),
-                                                 sp._swap_pos[2]);
-            sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(),
-                                                 sp._swap_pos[3]);
+            sp._swap_pos[0] = std::min<uint64_t>(s->_hot_swap_p.load(), sp._swap_pos[0]);
+            sp._swap_pos[1] = std::min<uint64_t>(s->_warm_swap_p.load(), sp._swap_pos[1]);
+            sp._swap_pos[2] = std::min<uint64_t>(s->_cool_swap_p.load(), sp._swap_pos[2]);
+            sp._swap_pos[3] = std::min<uint64_t>(s->_cold_swap_p.load(), sp._swap_pos[3]);
          }
       }
       _ring->claim_free(sp);
    }
 
-}  // namespace trie
+}  // namespace triedent

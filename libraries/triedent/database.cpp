@@ -2,8 +2,8 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
-#include <triedent/debug.hpp>
 #include <triedent/database.hpp>
+#include <triedent/debug.hpp>
 
 namespace triedent
 {
@@ -30,16 +30,17 @@ namespace triedent
 
       _dbm = reinterpret_cast<database_memory*>(_region->get_address());
 
-      _ring.reset(new ring_allocator(dir / "data", ring_allocator::read_write ) );
+      _ring.reset(new ring_allocator(dir / "data", ring_allocator::read_write));
 
-      _ring->_try_claim_free = [this](){ claim_free(); };
+      _ring->_try_claim_free = [this]() { claim_free(); };
    }
 
    database::~database() {}
 
-   void database::create( std::filesystem::path dir, config cfg ) {
+   void database::create(std::filesystem::path dir, config cfg)
+   {
       if (std::filesystem::exists(dir))
-         throw std::runtime_error( "directory already exists: " + dir.generic_string() );
+         throw std::runtime_error("directory already exists: " + dir.generic_string());
 
       std::filesystem::create_directories(dir);
 
@@ -50,24 +51,24 @@ namespace triedent
          std::filesystem::resize_file(db, sizeof(database_memory));
       }
 
-      bip::file_mapping fm(db.generic_string().c_str(), bip::read_write);
+      bip::file_mapping  fm(db.generic_string().c_str(), bip::read_write);
       bip::mapped_region mr(fm, bip::read_write);
 
       new (mr.get_address()) database_memory();
 
-      ring_allocator::create( dir / "data",
-                                     {.max_ids    = cfg.max_objects,
-                                      .hot_pages  = cfg.hot_pages,
-                                      .warm_pages = cfg.warm_pages,
-                                      .cool_pages = cfg.cool_pages,
-                                      .cold_pages = cfg.cold_pages});
-
+      ring_allocator::create(dir / "data", {.max_ids    = cfg.max_objects,
+                                            .hot_pages  = cfg.hot_pages,
+                                            .warm_pages = cfg.warm_pages,
+                                            .cool_pages = cfg.cool_pages,
+                                            .cold_pages = cfg.cold_pages});
    }
 
    void database::swap()
    {
       _ring->swap();
    }
-   void database::print_stats(bool detail) { _ring->dump(detail); }
-}  // namespace trie
-
+   void database::print_stats(bool detail)
+   {
+      _ring->dump(detail);
+   }
+}  // namespace triedent

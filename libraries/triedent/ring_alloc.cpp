@@ -38,12 +38,13 @@ namespace triedent
       if (not std::filesystem::exists(filename))
          throw std::runtime_error("file does not exist: " + filename.generic_string());
 
-      auto file_size = std::filesystem::file_size(filename);
+      auto file_size   = std::filesystem::file_size(filename);
       auto header_size = ((sizeof(managed_ring::header) + 7) & -8);
-      auto data_size = file_size - header_size;
+      auto data_size   = file_size - header_size;
 
-      if (std::popcount(data_size) != 1) {
-         std::cerr << "data size: "<< data_size << std::endl;
+      if (std::popcount(data_size) != 1)
+      {
+         std::cerr << "data size: " << data_size << std::endl;
          throw std::runtime_error("file has invalid size: " + filename.generic_string());
       }
 
@@ -66,12 +67,12 @@ namespace triedent
       if (std::filesystem::exists(filename))
          throw std::runtime_error("file already exists: " + filename.generic_string());
 
-      if (logsize < 27 )
+      if (logsize < 27)
          throw std::runtime_error("file size too small: " + filename.generic_string());
 
-      auto data_size = 1ull << logsize;
+      auto data_size   = 1ull << logsize;
       auto header_size = ((sizeof(managed_ring::header) + 7) & -8);
-      auto max_size  = data_size + header_size;
+      auto max_size    = data_size + header_size;
 
       std::filesystem::create_directories(filename.parent_path());
       {
@@ -86,7 +87,6 @@ namespace triedent
 
       new ((char*)mr.get_address()) header(logsize);
    }
-
 
    void managed_ring::header::update_size(uint64_t new_size)
    {
@@ -126,12 +126,11 @@ namespace triedent
 
       object_db::create(dir / "obj_ids", cfg.max_ids);
 
-      managed_ring::create(dir / "hot", cfg.hot_pages );
+      managed_ring::create(dir / "hot", cfg.hot_pages);
       managed_ring::create(dir / "warm", cfg.warm_pages);
       managed_ring::create(dir / "cool", cfg.cool_pages);
       managed_ring::create(dir / "cold", cfg.cold_pages);
    }
-
 
    void managed_ring::dump(object_db& odb)
    {
@@ -265,7 +264,7 @@ namespace triedent
       _head->validate();
    }
 
-   void ring_allocator::dump( bool detail )
+   void ring_allocator::dump(bool detail)
    {
       std::cerr << std::setw(10) << std::left << " Level";
       std::cerr << "|";
@@ -273,15 +272,15 @@ namespace triedent
       std::cerr << "|";
       std::cerr << std::setw(12) << std::left << " Free";
       std::cerr << "|";
-      std::cerr << std::setw(12) << std::left <<" Capacity";
+      std::cerr << std::setw(12) << std::left << " Capacity";
       std::cerr << "|";
-      std::cerr << std::setw(10) << std::left <<" pFree";
+      std::cerr << std::setw(10) << std::left << " pFree";
       std::cerr << "|";
-      std::cerr << std::setw(10) << std::left <<" Moved";
+      std::cerr << std::setw(10) << std::left << " Moved";
       std::cerr << "|";
-      std::cerr << std::setw(10) << std::left <<" Deleted";
+      std::cerr << std::setw(10) << std::left << " Deleted";
       std::cerr << "|";
-      std::cerr << std::setw(10) << std::left <<" Log2(C)";
+      std::cerr << std::setw(10) << std::left << " Log2(C)";
       std::cerr << std::endl;
       std::cerr << "-----------------------------------------------------------";
       std::cerr << "-----------------------------------------------------------" << std::endl;
@@ -289,13 +288,15 @@ namespace triedent
       /* calculate the number of bytes that are not free, but are still unused because
        * they have either been deleted (release) or move to hot.
        */
-      auto calc_void = [&]( auto& r ) {
+      auto calc_void = [&](auto& r)
+      {
          uint64_t sp = r._head->swap_p.load();
          uint64_t ap = r._head->alloc_p.load();
 
-         uint64_t moved = 0;
+         uint64_t moved   = 0;
          uint64_t deleted = 0;
-         if( not detail ) return std::make_pair(moved,deleted);
+         if (not detail)
+            return std::make_pair(moved, deleted);
 
          auto to_obj = [&](auto p)
          {
@@ -303,73 +304,85 @@ namespace triedent
                                                     (p & r._head->alloc_area_mask));
          };
          auto last_sp = sp;
-         while( sp < ap ) {
+         while (sp < ap)
+         {
             auto o = to_obj(sp);
-            if( o->size == 0 ) {
-               WARN( "SIZE: 0  free area size:", o->free_area_size() );
+            if (o->size == 0)
+            {
+               WARN("SIZE: 0  free area size:", o->free_area_size());
                deleted += o->free_area_size();
                sp += o->free_area_size();
             }
-            else if( o->id == 0 ) {
-              deleted += o->size;
-              sp += o->size;
-            } else {
+            else if (o->id == 0)
+            {
+               deleted += o->size;
+               sp += o->size;
+            }
+            else
+            {
                using obj_type = object_db::object_location::object_type;
                uint16_t ref;
                auto     loc = _obj_ids->get(id{o->id}, ref);
-               if( ref == 0 )
+               if (ref == 0)
                   deleted += o->size;
-               else if ( loc.cache != r.level ) {
+               else if (loc.cache != r.level)
+               {
                   moved += o->size;
                }
-               else if ( not(r.get_object(loc.offset) == o) )
+               else if (not(r.get_object(loc.offset) == o))
                   deleted += o->size;
                sp += o->data_capacity() + 8;
             }
-            if( sp == last_sp ) {
-               std::cerr << "obj size: " << o->size <<" id: " << o->id <<"\n";
-               std::cerr << "Infinite Loop Detected, unable to scan memory: " << sp << "  " << ap << "  ap - sp: " << ap-sp<<"\n";
+            if (sp == last_sp)
+            {
+               std::cerr << "obj size: " << o->size << " id: " << o->id << "\n";
+               std::cerr << "Infinite Loop Detected, unable to scan memory: " << sp << "  " << ap
+                         << "  ap - sp: " << ap - sp << "\n";
             }
             last_sp = sp;
          }
-         return std::make_pair(moved,deleted);
+         return std::make_pair(moved, deleted);
       };
 
-      auto data_size = []( auto val ) {
-         if( val < 1024 )
+      auto data_size = [](auto val)
+      {
+         if (val < 1024)
             return " " + std::to_string(val) + " b";
-         if( val < 1024*1024 )
-            return " " + std::to_string(val/1024) + " kb";
-         if( val < 1024*1024*1024 )
-            return " " + std::to_string(val/1024/1024) + " mb";
-         return " " + std::to_string(val/1024/1024/1024) + " gb";
+         if (val < 1024 * 1024)
+            return " " + std::to_string(val / 1024) + " kb";
+         if (val < 1024 * 1024 * 1024)
+            return " " + std::to_string(val / 1024 / 1024) + " mb";
+         return " " + std::to_string(val / 1024 / 1024 / 1024) + " gb";
       };
 
-      auto print_level = [&]( auto level, auto& r ){
-         auto md = calc_void( r );
-         std::cerr << std::setw(10) <<  std::left << level;
+      auto print_level = [&](auto level, auto& r)
+      {
+         auto md = calc_void(r);
+         std::cerr << std::setw(10) << std::left << level;
          std::cerr << "|";
-         std::cerr << std::setw(12) <<  std::left <<  data_size(r._head->alloc_area_size-r._head->get_free_space() );
+         std::cerr << std::setw(12) << std::left
+                   << data_size(r._head->alloc_area_size - r._head->get_free_space());
          std::cerr << "|";
-         std::cerr << std::setw(12) <<  std::left <<  data_size(r._head->get_free_space() );
+         std::cerr << std::setw(12) << std::left << data_size(r._head->get_free_space());
          std::cerr << "|";
-         std::cerr << std::setw(12) << std::left << data_size(r._head->alloc_area_size );
+         std::cerr << std::setw(12) << std::left << data_size(r._head->alloc_area_size);
          std::cerr << "|";
-         std::cerr << std::setw(10) << std::left << data_size(r._head->get_potential_free_space() );
+         std::cerr << std::setw(10) << std::left << data_size(r._head->get_potential_free_space());
          std::cerr << "|";
-         std::cerr << std::setw(10) << std::left << data_size(md.first );
+         std::cerr << std::setw(10) << std::left << data_size(md.first);
          std::cerr << "|";
-         std::cerr << std::setw(10) << std::left << data_size(md.second );
+         std::cerr << std::setw(10) << std::left << data_size(md.second);
          std::cerr << "|";
-         std::cerr << std::setw(10) << std::left << (" "+std::to_string(std::countr_zero(r._head->alloc_area_size)));
+         std::cerr << std::setw(10) << std::left
+                   << (" " + std::to_string(std::countr_zero(r._head->alloc_area_size)));
          std::cerr << std::endl;
       };
-      print_level( "hot", hot() );
-      print_level( "warm", warm() );
-      print_level( "cool", cool() );
-      print_level( "cold", cold() );
+      print_level("hot", hot());
+      print_level("warm", warm());
+      print_level("cool", cool());
+      print_level("cold", cold());
 
-        _obj_ids->print_stats();
+      _obj_ids->print_stats();
 
       std::cerr << "============= HOT " << &hot() << " ================== \n";
       hot().dump(*_obj_ids);
