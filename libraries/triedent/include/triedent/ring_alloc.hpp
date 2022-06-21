@@ -346,7 +346,7 @@ namespace triedent
    inline char* ring_allocator::alloc(managed_ring&        ring,
                                       const location_lock& lock,
                                       uint32_t             num_bytes,
-                                      char*                src)
+                                      char*                data)
    {
       uint32_t round_size = (num_bytes + 7) & -8;  // data padding
       uint64_t used_size  = round_size + sizeof(object_header);
@@ -363,8 +363,8 @@ namespace triedent
       alp.store(ap + used_size);
       cur->set(lock.get_id(), num_bytes);
 
-      if (src)
-         memcpy(cur->data(), src, num_bytes);
+      if (data)
+         memcpy(cur->data(), data, num_bytes);
 
       _obj_ids->move(lock, ring.level, (char*)cur - ring.begin_pos());
       return cur->data();

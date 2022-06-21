@@ -319,7 +319,8 @@ namespace triedent
              ff, extract_next_ptr(_header->objects[ff].load())))
          {
          }
-         _header->objects[ff].store(obj_val({}, 1) | position_lock_mask);  // init ref count 1
+         _header->objects[ff].store(obj_val({.type = type}, 1) |
+                                    position_lock_mask);  // init ref count 1
 
          location_lock lock;
          lock.db = this;
