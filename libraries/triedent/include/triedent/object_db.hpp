@@ -48,13 +48,41 @@ namespace triedent
 
       // TODO: offset should be multiplied by 8 before use and divided by 8 before stored,
       // this will allow us to maintain a full 48 bit address space
-      uint64_t offset : 46;
-      uint64_t cache : 2;
-      uint64_t type : 1;
+      uint64_t offset : 46 = 0;
+      uint64_t cache : 2   = 0;
+      uint64_t type : 1    = 0;
 
       friend bool operator!=(const object_location& a, const object_location& b)
       {
          return a.offset != b.offset || (a.cache != b.cache | a.type != b.type);
+      }
+   };
+
+   class object_db;
+
+   class location_lock
+   {
+      friend object_db;
+
+     private:
+      object_db* db = nullptr;
+      uint64_t   id = 0;
+      void       unlock();
+
+     public:
+      location_lock()                     = default;
+      location_lock(const location_lock&) = delete;
+      location_lock(location_lock&& src) { *this = std::move(src); }
+      ~location_lock() { unlock(); }
+
+      location_lock& operator=(const location_lock&) = delete;
+      location_lock& operator=(location_lock&& src)
+      {
+         unlock();
+         db     = src.db;
+         id     = src.id;
+         src.db = nullptr;
+         return *this;
       }
    };
 
@@ -64,13 +92,76 @@ namespace triedent
     */
    class object_db
    {
+      friend location_lock;
+
      public:
       using object_id = triedent::object_id;
 
       object_db(std::filesystem::path idfile, bool allow_write);
       static void create(std::filesystem::path idfile, uint64_t max_id);
 
-      object_id alloc(object_location loc = {.offset = 0, .cache = 0});
+      // A thread which holds a location_lock may:
+      // * Move the object to another location
+      // * Modify the object if it's not already exposed to reader threads
+      std::optional<location_lock> try_lock(object_id id)
+      {
+         auto& atomic = _header->objects[id.id];
+         auto  obj    = atomic.load();
+         do
+         {
+            if (obj & position_lock_mask)
+               return std::nullopt;
+         } while (!atomic.compare_exchange_weak(obj, obj | position_lock_mask));
+
+         location_lock lock;
+         lock.db = this;
+         lock.id = id.id;
+         return lock;
+      }
+
+      location_lock spin_lock(object_id id)
+      {
+         auto& atomic = _header->objects[id.id];
+         auto  obj    = atomic.load();
+         do
+         {
+            if (obj & position_lock_mask)
+            {
+               obj = atomic.load();
+               continue;
+            }
+         } while (!atomic.compare_exchange_weak(obj, obj | position_lock_mask));
+
+         location_lock lock;
+         lock.db = this;
+         lock.id = id.id;
+         return lock;
+      }
+
+      static void move(location_lock& lock, uint8_t cache, uint64_t offset)
+      {
+         auto& atomic = lock.db->_header->objects[lock.id];
+         auto  obj    = atomic.load();
+         while (!atomic.compare_exchange_weak(
+             obj, obj_val({.offset = offset, .cache = cache, .type = extract_type(obj)},
+                          extract_ref(obj)) |
+                      position_lock_mask))
+         {
+         }
+      }
+
+     private:
+      void unlock(uint64_t id)
+      {
+         auto& atomic = _header->objects[id];
+         auto  obj    = atomic.load();
+         while (!atomic.compare_exchange_weak(obj, obj & ~position_lock_mask))
+         {
+         }
+      }
+
+     public:
+      object_id alloc();
 
       void                                 retain(object_id id);
       std::pair<object_location, uint16_t> release(object_id id);
@@ -119,23 +210,25 @@ namespace triedent
       }
 
      private:
-      static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
+      static constexpr uint64_t position_lock_mask = 1 << 14;
+      static constexpr uint64_t ref_count_mask     = (1ull << 14) - 1;
 
       // clang-format off
-      auto extract_offset(uint64_t x)     { return x >> 18; }
-      auto extract_cache(uint64_t x)      { return (x >> 16) & 0x3; }
-      auto extract_type(uint64_t x)       { return (x >> 15) & 1; }
-      auto extract_ref(uint64_t x)        { return x & ((1ull << 15) - 1); }
-      auto extract_next_ptr(uint64_t x)   { return x >> 15; }
-      auto create_next_ptr(uint64_t x)    { return x << 15; }
+      static uint64_t extract_offset(uint64_t x)     { return x >> 18; }
+      static uint64_t extract_cache(uint64_t x)      { return (x >> 16) & 0x3; }
+      static uint64_t extract_type(uint64_t x)       { return (x >> 15) & 1; }
+      static uint64_t extract_ref(uint64_t x)        { return x & ref_count_mask; }
+      static uint64_t extract_next_ptr(uint64_t x)   { return x >> 15; }
+      static uint64_t create_next_ptr(uint64_t x)    { return x << 15; }
       // clang-format on
 
-      inline uint64_t obj_val(object_location loc, uint16_t ref)
+      static uint64_t obj_val(object_location loc, uint16_t ref)
       {
          return uint64_t(loc.offset << 18) | (uint64_t(loc.cache) << 16) |
                 (uint64_t(loc.type) << 15) | int64_t(ref);
       }
 
+      // TODO: rename first_unallocated
       struct object_db_header
       {
          std::atomic<uint64_t> first_free;         // free list
@@ -197,9 +290,15 @@ namespace triedent
 
       if (_header->max_unallocated.id != (existing_size - sizeof(object_db_header)) / 8)
          throw std::runtime_error("file corruption detected: " + idfile.generic_string());
+
+      // Objects may have been locked for move when process was SIGKILLed. If any objects
+      // were locked because they were being written to, their root will not be reachable
+      // from database_memory::_root_revision, and will be leaked. TODO: make this be true.
+      for (uint64_t i = 0; i <= _header->first_unallocated.id; ++i)
+         _header->objects[i] &= ~position_lock_mask;
    }
 
-   inline object_db::object_id object_db::alloc(object_location loc)
+   inline object_db::object_id object_db::alloc()
    {
       if (_header->first_unallocated.id >= _header->max_unallocated.id)
          throw std::runtime_error("no more object ids");
@@ -209,7 +308,7 @@ namespace triedent
          ++_header->first_unallocated.id;
          auto  r   = _header->first_unallocated;
          auto& obj = _header->objects[r.id];
-         obj.store(obj_val(loc, 1));  // init ref count 1
+         obj.store(obj_val({}, 1));  // init ref count 1
          assert(r.id != 0);
          return r;
       }
@@ -221,7 +320,7 @@ namespace triedent
          {
          }
 
-         _header->objects[ff].store(obj_val(loc, 1));  // init ref count 1
+         _header->objects[ff].store(obj_val({}, 1));  // init ref count 1
          return {.id = ff};
       }
    }
@@ -355,4 +454,9 @@ namespace triedent
       */
    }
 
+   inline void location_lock::unlock()
+   {
+      if (db)
+         db->unlock(id);
+   }
 };  // namespace triedent
