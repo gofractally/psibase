@@ -44,8 +44,11 @@ namespace triedent
       ring_allocator(std::filesystem::path dir, access_mode mode);
       static void create(std::filesystem::path dir, config cfg);
 
-      std::pair<id, char*> alloc(size_t num_bytes, object_location::object_type);
-      void                 retain(id);
+      std::pair<location_lock, char*> alloc(size_t num_bytes, object_location::object_type);
+
+      location_lock spin_lock(object_id id) { return _obj_ids->spin_lock(id); }
+
+      void retain(id);
 
       // return a pointer to the obj and its type if released
       std::pair<char*, object_location::object_type> release(id);
@@ -534,16 +537,16 @@ namespace triedent
               (object_location::object_type)l.first.type};
    }
 
-   inline std::pair<object_id, char*> ring_allocator::alloc(  //
+   inline std::pair<location_lock, char*> ring_allocator::alloc(  //
        size_t                       num_bytes,
        object_location::object_type t)
    {
       if (num_bytes > 0xffffff - 8) [[unlikely]]
          throw std::runtime_error("obj too big");
 
-      auto new_id = _obj_ids->alloc();
-      auto ptr    = alloc(hot(), new_id, num_bytes, nullptr, t);
-      return {new_id, ptr};
+      auto lock = _obj_ids->alloc();
+      auto ptr  = alloc(hot(), lock.get_id(), num_bytes, nullptr, t);
+      return {std::move(lock), ptr};
    }
    inline void ring_allocator::validate()
    {

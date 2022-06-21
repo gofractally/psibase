@@ -84,6 +84,8 @@ namespace triedent
          src.db = nullptr;
          return *this;
       }
+
+      object_id get_id() { return {.id = id}; }
    };
 
    /**
@@ -161,7 +163,7 @@ namespace triedent
       }
 
      public:
-      object_id alloc();
+      location_lock alloc();
 
       void                                 retain(object_id id);
       std::pair<object_location, uint16_t> release(object_id id);
@@ -298,19 +300,22 @@ namespace triedent
          _header->objects[i] &= ~position_lock_mask;
    }
 
-   inline object_db::object_id object_db::alloc()
+   inline location_lock object_db::alloc()
    {
-      if (_header->first_unallocated.id >= _header->max_unallocated.id)
-         throw std::runtime_error("no more object ids");
-
       if (_header->first_free.load() == 0)
       {
+         if (_header->first_unallocated.id >= _header->max_unallocated.id)
+            throw std::runtime_error("no more object ids");
          ++_header->first_unallocated.id;
          auto  r   = _header->first_unallocated;
          auto& obj = _header->objects[r.id];
-         obj.store(obj_val({}, 1));  // init ref count 1
+         obj.store(obj_val({}, 1) | position_lock_mask);  // init ref count 1
          assert(r.id != 0);
-         return r;
+
+         location_lock lock;
+         lock.db = this;
+         lock.id = r.id;
+         return lock;
       }
       else
       {
@@ -319,9 +324,12 @@ namespace triedent
              ff, extract_next_ptr(_header->objects[ff].load())))
          {
          }
+         _header->objects[ff].store(obj_val({}, 1) | position_lock_mask);  // init ref count 1
 
-         _header->objects[ff].store(obj_val({}, 1));  // init ref count 1
-         return {.id = ff};
+         location_lock lock;
+         lock.db = this;
+         lock.id = ff;
+         return lock;
       }
    }
    inline void object_db::retain(object_id id)

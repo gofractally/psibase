@@ -38,14 +38,14 @@ namespace triedent
       inline value_view data() const { return value_view(data_ptr(), data_size()); }
       inline key_view   key() const { return key_view(key_ptr(), key_size()); }
 
-      inline static std::pair<object_id, value_node*> make(ring_allocator& a,
-                                                           key_view        key,
-                                                           value_view      val)
+      inline static std::pair<location_lock, value_node*> make(ring_allocator& a,
+                                                               key_view        key,
+                                                               value_view      val)
       {
          assert(val.size() < 0xffffff - key.size() - sizeof(value_node));
          uint32_t alloc_size = sizeof(value_node) + key.size() + val.size();
          auto     r          = a.alloc(alloc_size, object_location::leaf);
-         return std::make_pair(r.first, new (r.second) value_node(key, val));
+         return std::make_pair(std::move(r.first), new (r.second) value_node(key, val));
       }
 
      private:
@@ -87,18 +87,18 @@ namespace triedent
       inline int8_t  reverse_lower_bound(uint8_t b) const;
       inline uint8_t upper_bound(uint8_t b) const;
 
-      inline static std::pair<object_id, inner_node*> make(ring_allocator&   a,
-                                                           const inner_node& in,
-                                                           key_view          prefix,
-                                                           object_id         val,
-                                                           uint64_t          branches,
-                                                           uint64_t          version);
+      inline static std::pair<location_lock, inner_node*> make(ring_allocator&   a,
+                                                               const inner_node& in,
+                                                               key_view          prefix,
+                                                               object_id         val,
+                                                               uint64_t          branches,
+                                                               uint64_t          version);
 
-      inline static std::pair<object_id, inner_node*> make(ring_allocator& a,
-                                                           key_view        prefix,
-                                                           object_id       val,
-                                                           uint64_t        branches,
-                                                           uint64_t        version);
+      inline static std::pair<location_lock, inner_node*> make(ring_allocator& a,
+                                                               key_view        prefix,
+                                                               object_id       val,
+                                                               uint64_t        branches,
+                                                               uint64_t        version);
 
       inline bool has_branch(uint32_t b) const { return _present_bits & (1ull << b); }
 
@@ -132,30 +132,31 @@ namespace triedent
    } __attribute__((packed));
    static_assert(sizeof(inner_node) == 8 + 4 + 5 + 3, "unexpected padding");
 
-   inline std::pair<object_id, inner_node*> inner_node::make(ring_allocator&   a,
-                                                             const inner_node& in,
-                                                             key_view          prefix,
-                                                             object_id         val,
-                                                             uint64_t          branches,
-                                                             uint64_t          version)
+   inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator&   a,
+                                                                 const inner_node& in,
+                                                                 key_view          prefix,
+                                                                 object_id         val,
+                                                                 uint64_t          branches,
+                                                                 uint64_t          version)
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
       auto p = a.alloc(alloc_size, object_location::inner);
-      return std::make_pair(p.first,
+      return std::make_pair(std::move(p.first),
                             new (p.second) inner_node(a, in, prefix, val, branches, version));
    }
 
-   inline std::pair<object_id, inner_node*> inner_node::make(ring_allocator& a,
-                                                             key_view        prefix,
-                                                             object_id       val,
-                                                             uint64_t        branches,
-                                                             uint64_t        version)
+   inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator& a,
+                                                                 key_view        prefix,
+                                                                 object_id       val,
+                                                                 uint64_t        branches,
+                                                                 uint64_t        version)
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
       auto p = a.alloc(alloc_size, object_location::inner);
-      return std::make_pair(p.first, new (p.second) inner_node(prefix, val, branches, version));
+      return std::make_pair(std::move(p.first),
+                            new (p.second) inner_node(prefix, val, branches, version));
    }
 
    inline inner_node::inner_node(key_view  prefix,

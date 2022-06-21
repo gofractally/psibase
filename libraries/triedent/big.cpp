@@ -63,12 +63,18 @@ int main(int argc, char** argv)
    po::notify(vm);
 
    if( vm.count("help") ) {
-      std::cout << desc <<"\n";
+      std::cerr << desc <<"\n";
       return 1;
    }
    if( vm.count( "reset" ) ) {
-      std::cout << "resetting database\n";
+      std::cerr << "resetting database\n";
       std::filesystem::remove_all( db_dir );
+      triedent::database::create(db_dir, triedent::database::config{
+           .max_objects = num_objects,
+           .hot_pages   = hot_page_c,
+           .warm_pages  = warm_page_c,
+           .cool_pages  = cool_page_c,
+           .cold_pages  = cold_page_c});
    }
 
    if( num_read_threads > 64 ) {
@@ -81,6 +87,7 @@ int main(int argc, char** argv)
    uint64_t       total            = insert_count ;//2 * 1000 * 1000 * 1000;
    triedent::database db( db_dir.c_str(), triedent::database::read_write);
    db.print_stats();
+   std::cerr << "\n";
    auto s = db.start_write_session();
    s->set_session_revision( db.get_root_revision() );
 
@@ -93,7 +100,7 @@ int main(int argc, char** argv)
    auto start = std::chrono::steady_clock::now();
    srand(s->get_session_revision().id);
 
-   std::cout << "starting...\n";
+   std::cerr << "starting...\n";
 
    int  insert_fails = 0;
    auto lstart       = std::chrono::steady_clock::now();
@@ -210,8 +217,10 @@ int main(int argc, char** argv)
             }
          }
 
-         if (i % (status_count*10) == 0) 
+         if (i % (status_count*10) == 0 && false) {
             db.print_stats();
+            std::cerr << "\n";
+         }
 
          if (i % status_count == 0)
          {
@@ -221,7 +230,7 @@ int main(int argc, char** argv)
             auto read_end   = get_total_lookups();
             auto delta_read = read_end - read_start;
             read_start      = read_end;
-            std::cout << std::setw(12)
+            std::cerr << std::setw(12)
                       << int64_t(status_count /
                                  (std::chrono::duration<double, std::milli>(delta).count() / 1000))
                       << " items/sec   " << i << " total  reads/sec: " << std::setw(12)
@@ -287,6 +296,7 @@ int main(int argc, char** argv)
 
    s->set_root_revision(  s->get_session_revision() );
    db.print_stats();
+   std::cerr << "\n";
 
    return 0;
 }

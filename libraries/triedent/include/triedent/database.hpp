@@ -13,6 +13,9 @@ namespace triedent
    template <typename T = node>
    struct deref;
 
+   template <typename T = node>
+   struct mutable_deref;
+
    inline key_type from_key6(const key_view sixb);
 
    class database
@@ -225,12 +228,15 @@ namespace triedent
          ///@}
 
         private:
-         inline deref<value_node> make_value(string_view k, string_view v);
-         inline deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
-         inline deref<inner_node> make_inner(const inner_node& cpy,
-                                             string_view       pre,
-                                             id                val,
-                                             uint64_t          branches);
+         inline mutable_deref<value_node> make_value(string_view k, string_view v);
+         inline mutable_deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
+         inline mutable_deref<inner_node> make_inner(const inner_node& cpy,
+                                                     string_view       pre,
+                                                     id                val,
+                                                     uint64_t          branches);
+
+         template <typename T>
+         inline mutable_deref<T> lock(const deref<T>& obj);
 
          inline id add_child(id root, string_view key, string_view val, int& old_size);
          inline id remove_child(id root, string_view key, int& removed_size);
@@ -289,40 +295,62 @@ namespace triedent
       using type = object_location::object_type;
 
       deref() = default;
-      //deref(std::pair<id, char*> p) : _id(p.first), ptr(p.second) {}
       deref(std::pair<id, value_node*> p) : _id(p.first), ptr((char*)p.second), _type(type::leaf) {}
       deref(std::pair<id, inner_node*> p) : _id(p.first), ptr((char*)p.second), _type(type::inner)
       {
       }
-
       template <typename Other>
       deref(deref<Other> p) : _id(p._id), ptr((char*)p.ptr), _type(p._type)
       {
       }
-
       deref(id i, char* p, type t) : _id(i), ptr(p), _type(t) {}
+
       explicit inline operator bool() const { return bool(_id); }
       inline          operator id() const { return _id; }
 
       bool         is_leaf_node() const { return _type == object_location::leaf; }
-      inline auto& as_value_node() { return *reinterpret_cast<value_node*>(ptr); }
-      inline auto& as_inner_node() { return *reinterpret_cast<inner_node*>(ptr); }
+      inline auto& as_value_node() const { return *reinterpret_cast<const value_node*>(ptr); }
+      inline auto& as_inner_node() const { return *reinterpret_cast<const inner_node*>(ptr); }
 
-      inline T*       operator->() { return reinterpret_cast<T*>(ptr); }
       inline const T* operator->() const { return reinterpret_cast<const T*>(ptr); }
-      inline T&       operator*() { return *reinterpret_cast<T*>(ptr); }
       inline const T& operator*() const { return *reinterpret_cast<const T*>(ptr); }
 
       int64_t as_id() const { return _id.id; }
 
-     private:
+     protected:
       template <typename Other>
       friend class deref;
 
       id    _id;
       char* ptr;
       type  _type;
-   };
+   };  // deref
+
+   template <typename T>
+   struct mutable_deref : deref<T>
+   {
+      mutable_deref() = default;
+      mutable_deref(std::pair<location_lock, value_node*> p)
+          : deref<T>{{p.first.get_id(), p.second}}, lock{std::move(p.first)}
+      {
+      }
+      mutable_deref(std::pair<location_lock, inner_node*> p)
+          : deref<T>{{p.first.get_id(), p.second}}, lock{std::move(p.first)}
+      {
+      }
+      mutable_deref(location_lock lock, const deref<T>& src) : lock{std::move(lock)}, deref<T>{src}
+      {
+      }
+
+      inline auto& as_value_node() const { return *reinterpret_cast<value_node*>(this->ptr); }
+      inline auto& as_inner_node() const { return *reinterpret_cast<inner_node*>(this->ptr); }
+
+      inline T* operator->() const { return reinterpret_cast<T*>(this->ptr); }
+      inline T& operator*() const { return *reinterpret_cast<T*>(this->ptr); }
+
+     private:
+      location_lock lock;
+   };  // mutable_deref
 
    inline void database::write_session::set_root_revision(id i)
    {
@@ -495,23 +523,31 @@ namespace triedent
       return a;
    }
 
-   inline deref<value_node> database::write_session::make_value(string_view key, string_view val)
+   inline mutable_deref<value_node> database::write_session::make_value(string_view key,
+                                                                        string_view val)
    {
-      return deref<value_node>(value_node::make(*_db->_ring, key, val));
+      return value_node::make(*_db->_ring, key, val);
    }
-   inline deref<inner_node> database::write_session::make_inner(string_view pre,
-                                                                id          val,
-                                                                uint64_t    branches)
+
+   inline mutable_deref<inner_node> database::write_session::make_inner(string_view pre,
+                                                                        id          val,
+                                                                        uint64_t    branches)
    {
       return inner_node::make(*_db->_ring, pre, val, branches, _version);
    }
 
-   inline deref<inner_node> database::write_session::make_inner(const inner_node& cpy,
-                                                                string_view       pre,
-                                                                id                val,
-                                                                uint64_t          branches)
+   inline mutable_deref<inner_node> database::write_session::make_inner(const inner_node& cpy,
+                                                                        string_view       pre,
+                                                                        id                val,
+                                                                        uint64_t          branches)
    {
       return inner_node::make(*_db->_ring, cpy, pre, val, branches, _version);
+   }
+
+   template <typename T>
+   inline mutable_deref<T> database::write_session::lock(const deref<T>& obj)
+   {
+      return {_db->_ring->spin_lock(obj), obj};
    }
 
    /**
@@ -571,7 +607,7 @@ namespace triedent
       auto& vn = n.as_value_node();
       if (_db->_ring->ref(n) == 1 and vn.data_size() == val.size())
       {
-         memcpy(vn.data_ptr(), val.data(), val.size());
+         memcpy(lock(n).as_value_node().data_ptr(), val.data(), val.size());
          return n;
       }
 
@@ -582,25 +618,26 @@ namespace triedent
    {
       if (n->version() == _version)
       {
-         if (n->value())
+         auto locked = lock(n);
+         if (locked->value())
          {
-            auto  v  = get(n->value());
+            auto  v  = get(locked->value());
             auto& vn = v.as_value_node();
             if (vn.data_size() == val.size())
             {
-               memcpy(vn.data_ptr(), val.data(), val.size());
+               memcpy(lock(v).as_value_node().data_ptr(), val.data(), val.size());
             }
             else
             {
-               _db->_ring->release(n->value());
-               n->set_value(make_value(string_view(), val));
+               _db->_ring->release(locked->value());
+               locked->set_value(make_value(string_view(), val));
             }
          }
          else
          {
-            n->set_value(make_value(string_view(), val));
+            locked->set_value(make_value(string_view(), val));
          }
-         return n;
+         return locked;
       }
       else
       {
@@ -671,8 +708,9 @@ namespace triedent
             return new_in;
          }  // else modify in place
 
-         auto& cur_b = in.branch(b);
-         auto  new_b = add_child(cur_b, key.substr(cpre.size() + 1), val, old_size);
+         auto  locked = lock(n);
+         auto& cur_b  = locked.as_inner_node().branch(b);
+         auto  new_b  = add_child(cur_b, key.substr(cpre.size() + 1), val, old_size);
 
          if (new_b != cur_b)
          {
@@ -922,8 +960,8 @@ namespace triedent
          auto b = n->key_size();
          if (b > 0)
          {
-            auto  part_len = std::min<uint32_t>(key_len, b);
-            char* key_ptr;
+            auto        part_len = std::min<uint32_t>(key_len, b);
+            const char* key_ptr;
 
             if (n.is_leaf_node())
             {
@@ -1395,6 +1433,8 @@ namespace triedent
 
          if (in.version() == _version)
          {
+            auto  locked = lock(n);
+            auto& in     = locked.as_inner_node();
             release(in.value());
             in.set_value(id());
             return root;
@@ -1419,6 +1459,8 @@ namespace triedent
       {
          if (new_b and in.version() == _version)
          {
+            auto  locked = lock(n);
+            auto& cur_b  = locked.as_inner_node().branch(b);
             release(cur_b);
             cur_b = new_b;
             return root;
