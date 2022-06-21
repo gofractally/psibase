@@ -85,7 +85,7 @@ namespace triedent
          return *this;
       }
 
-      object_id get_id() { return {.id = id}; }
+      object_id get_id() const { return {.id = id}; }
    };
 
    /**
@@ -140,7 +140,7 @@ namespace triedent
          return lock;
       }
 
-      static void move(location_lock& lock, uint8_t cache, uint64_t offset)
+      static void move(const location_lock& lock, uint8_t cache, uint64_t offset)
       {
          auto& atomic = lock.db->_header->objects[lock.id];
          auto  obj    = atomic.load();
@@ -163,7 +163,7 @@ namespace triedent
       }
 
      public:
-      location_lock alloc();
+      location_lock alloc(uint8_t type);
 
       void                                 retain(object_id id);
       std::pair<object_location, uint16_t> release(object_id id);
@@ -172,11 +172,6 @@ namespace triedent
 
       object_location get(object_id id);
       object_location get(object_id id, uint16_t& ref);
-      bool            set(object_id id, object_location loc);
-      inline bool set(object_id id, uint64_t offset, uint64_t cache, object_location::object_type t)
-      {
-         return set(id, object_location{.offset = offset, .cache = cache, .type = t});
-      }
 
       void print_stats();
       void validate(object_id i)
@@ -300,7 +295,7 @@ namespace triedent
          _header->objects[i] &= ~position_lock_mask;
    }
 
-   inline location_lock object_db::alloc()
+   inline location_lock object_db::alloc(uint8_t type)
    {
       if (_header->first_free.load() == 0)
       {
@@ -309,7 +304,7 @@ namespace triedent
          ++_header->first_unallocated.id;
          auto  r   = _header->first_unallocated;
          auto& obj = _header->objects[r.id];
-         obj.store(obj_val({}, 1) | position_lock_mask);  // init ref count 1
+         obj.store(obj_val({.type = type}, 1) | position_lock_mask);  // init ref count 1
          assert(r.id != 0);
 
          location_lock lock;
@@ -428,15 +423,6 @@ namespace triedent
       return r;
    }
 
-   inline bool object_db::set(object_id id, object_location loc)
-   {
-      auto&    obj = _header->objects[id.id];
-      auto     old = obj.load();
-      uint16_t ref = old & ref_count_mask;
-      auto     r   = obj.compare_exchange_strong(old, obj_val(loc, ref));
-      //         std::atomic_thread_fence(std::memory_order_release);
-      return r;
-   }
    inline void object_db::print_stats()
    {
       uint64_t zero_ref     = 0;

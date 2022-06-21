@@ -455,7 +455,6 @@ namespace triedent
    inline deref<node> database::session<AccessMode>::get(id i) const
    {
       auto r = _db->_ring->get_cache_with_type<std::is_same_v<AccessMode, write_access>>(i);
-      //auto r = _db->_ring->get_cache_with_type<true>(i);
       return {i, r.first, r.second};
    }
 
@@ -1638,7 +1637,7 @@ namespace triedent
       auto validate_id = [&](auto i)
       {
          _db->_ring->validate(r);
-         if (0 == _db->_ring->get_ref(r).first)
+         if (0 == _db->_ring->ref(r))
             throw std::runtime_error("found reference to object with 0 ref count: " +
                                      std::to_string(r.id));
       };

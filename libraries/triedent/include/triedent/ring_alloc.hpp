@@ -62,16 +62,10 @@ namespace triedent
       void claim_free(swap_position sp = swap_position());
 
       //  pointer is valid until GC runs
-      char* get(id i);
       template <bool CopyToHot = true>
-      char* get_cache(id);  // do not move to hot cache
-      template <bool CopyToHot = true>
-      std::pair<char*, object_type> get_cache_with_type(id);  // do not move to hot cache
-      char*                         get_cache(id i, std::vector<char>& tmp);
+      std::pair<char*, object_type> get_cache_with_type(id);
 
-      uint32_t                   ref(id i) const { return _obj_ids->ref(i); }
-      std::pair<uint16_t, char*> get_ref(id i) { return {ref(i), get(i)}; }
-      std::pair<uint16_t, char*> get_ref_no_cache(id i);
+      uint32_t ref(id i) const { return _obj_ids->ref(i); }
 
       enum cache_level_type
       {
@@ -101,12 +95,10 @@ namespace triedent
 
      private:
       uint64_t wait_on_free_space(managed_ring& ring, uint64_t used_size);
-      template <bool CopyData = false>
-      char* alloc(managed_ring& ring,
-                  id            nid,
-                  uint32_t      num_bytes,
-                  char*         data           = nullptr,
-                  object_location::object_type = {});
+      char*    alloc(managed_ring&        ring,
+                     const location_lock& lock,
+                     uint32_t             num_bytes,
+                     char*                src = nullptr);
 
       inline managed_ring&          hot() const { return *_levels[hot_cache]; }
       inline managed_ring&          warm() const { return *_levels[warm_cache]; }
@@ -270,41 +262,9 @@ namespace triedent
       }
    }
 
-   inline char* ring_allocator::get_cache(id i, std::vector<char>& tmp)
-   {
-      auto cur_size = tmp.size();
-      auto loc      = _obj_ids->get(i);
-      auto old_loc  = loc;
-      do
-      {
-         auto obj = _levels[loc.cache]->get_object(loc.offset);
-         tmp.resize(cur_size + obj->size + 8);
-         memcpy(tmp.data() + cur_size, obj, obj->size + 8);
-         old_loc = loc;
-         loc     = _obj_ids->get(i);
-      } while (loc != old_loc);
-      return tmp.data() + cur_size + 8;
-   }
-
    //  pointer is valid until claim_free runs, reads can read it then check to see if
    //  the gc moved past char* while reading then read again at new location
-   template <bool CopyToHot>
-   char* ring_allocator::get_cache(id i)
-   {
-      auto loc = _obj_ids->get(i);
-      auto obj = _levels[loc.cache]->get_object(loc.offset);
 
-      if constexpr (not CopyToHot)
-         return obj->data();
-
-      if (loc.cache == hot_cache)
-         return obj->data();
-
-      if (obj->size > 4096)
-         return obj->data();
-
-      return alloc<true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type);
-   }
    template <bool CopyToHot>
    std::pair<char*, ring_allocator::object_type> ring_allocator::get_cache_with_type(id i)
    {
@@ -320,7 +280,7 @@ namespace triedent
       if (obj->size > 4096)
          return {obj->data(), (object_type)loc.type};
 
-      return {alloc<true>(hot(), id{obj->id}, obj->size, obj->data(), (object_type)loc.type),
+      return {alloc(hot(), _obj_ids->spin_lock({.id = obj->id}), obj->size, obj->data()),
               (object_type)loc.type};
    }
 
@@ -383,12 +343,10 @@ namespace triedent
    //=================================
    //   alloc
    //=================================
-   template <bool CopyData>
-   char* ring_allocator::alloc(managed_ring&                ring,
-                               id                           nid,
-                               uint32_t                     num_bytes,
-                               char*                        data,
-                               object_location::object_type t)
+   inline char* ring_allocator::alloc(managed_ring&        ring,
+                                      const location_lock& lock,
+                                      uint32_t             num_bytes,
+                                      char*                src)
    {
       uint32_t round_size = (num_bytes + 7) & -8;  // data padding
       uint64_t used_size  = round_size + sizeof(object_header);
@@ -403,19 +361,12 @@ namespace triedent
       auto& alp = ring._head->alloc_p;
       auto  ap  = alp.load();
       alp.store(ap + used_size);
-      cur->set(nid, num_bytes);
+      cur->set(lock.get_id(), num_bytes);
 
-      if constexpr (CopyData)
-         memcpy(cur->data(), data, num_bytes);
+      if (src)
+         memcpy(cur->data(), src, num_bytes);
 
-      /*
-       *  There may be a race between main accessing an object and moving it to hot
-       *  and swap moving the object to a lower level in the cache.       
-       */
-      while (not _obj_ids->set(nid, (char*)cur - ring.begin_pos(), ring.level, t))
-         WARN("contention detected");
-      ;
-
+      _obj_ids->move(lock, ring.level, (char*)cur - ring.begin_pos());
       return cur->data();
    }
 
@@ -472,21 +423,22 @@ namespace triedent
                using obj_type = object_location::object_type;
                uint16_t ref;
                auto     loc = _obj_ids->get(id{o->id}, ref);
-               // TODO: If the object moved to a larger pool, then the pointer arithmetic in
-               //       get_object may be UB (offset exceeds underlying array bounds).
-               //       Reorder the conditional to put the get_object after the loc.cache check.
-               //
-               // TODO: The main thread could currently be modifying the object in place.
-               //       The memcpy inside alloc races with that. After alloc calls
-               //       _obj_ids->set(), it could point to the old version, the new version,
-               //       or worse.
-               if (ref != 0 and from->get_object(loc.offset) == o and loc.cache == from->level)
-                  alloc<true>(*to, {o->id}, o->size, o->data(), (obj_type)loc.type);
+               if (ref != 0 && loc.cache == from->level && from->get_object(loc.offset) == o)
+               {
+                  if (auto lock = _obj_ids->try_lock({.id = o->id}))
+                     alloc(*to, *lock, o->size, o->data());
+                  else
+                     break;
+               }
                p += o->data_capacity() + 8;
             }
          }
-         from->_head->swap_p.store(p);
-         return true;
+         if (p != sp)
+         {
+            from->_head->swap_p.store(p);
+            return true;
+         }
+         return false;
       };
 
       bool did_work = false;
@@ -515,14 +467,6 @@ namespace triedent
       claim(cool(), sp._swap_pos[2]);
       claim(cold(), sp._swap_pos[3]);
    }
-   inline char* ring_allocator::get(id i)
-   {
-      return get_cache<true>(i);
-   }
-   inline std::pair<uint16_t, char*> ring_allocator::get_ref_no_cache(id i)
-   {
-      return {ref(i), get_cache<false>(i)};
-   }
 
    inline void ring_allocator::retain(id i)
    {
@@ -544,8 +488,8 @@ namespace triedent
       if (num_bytes > 0xffffff - 8) [[unlikely]]
          throw std::runtime_error("obj too big");
 
-      auto lock = _obj_ids->alloc();
-      auto ptr  = alloc(hot(), lock.get_id(), num_bytes, nullptr, t);
+      auto lock = _obj_ids->alloc(t);
+      auto ptr  = alloc(hot(), lock, num_bytes);
       return {std::move(lock), ptr};
    }
    inline void ring_allocator::validate()
