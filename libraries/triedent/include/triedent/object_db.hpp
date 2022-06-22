@@ -40,21 +40,15 @@ namespace triedent
    // Not stored
    struct object_location
    {
-      enum object_type
-      {
-         leaf  = 0,
-         inner = 1
-      };
-
       // TODO: offset should be multiplied by 8 before use and divided by 8 before stored,
       // this will allow us to maintain a full 48 bit address space
-      uint64_t offset : 46 = 0;
-      uint64_t cache : 2   = 0;
-      uint64_t type : 1    = 0;
+      uint64_t offset : 46  = 0;
+      uint64_t cache : 2    = 0;
+      uint64_t is_value : 1 = 0;
 
       friend bool operator!=(const object_location& a, const object_location& b)
       {
-         return a.offset != b.offset || (a.cache != b.cache | a.type != b.type);
+         return a.offset != b.offset || (a.cache != b.cache | a.is_value != b.is_value);
       }
    };
 
@@ -145,7 +139,7 @@ namespace triedent
          auto& atomic = lock.db->_header->objects[lock.id];
          auto  obj    = atomic.load();
          while (!atomic.compare_exchange_weak(
-             obj, obj_val({.offset = offset, .cache = cache, .type = extract_type(obj)},
+             obj, obj_val({.offset = offset, .cache = cache, .is_value = extract_is_value(obj)},
                           extract_ref(obj)) |
                       position_lock_mask))
          {
@@ -156,7 +150,7 @@ namespace triedent
       void unlock(uint64_t id) { _header->objects[id] &= ~position_lock_mask; }
 
      public:
-      location_lock alloc(uint8_t type);
+      location_lock alloc(bool is_value);
 
       void                                 retain(object_id id);
       std::pair<object_location, uint16_t> release(object_id id);
@@ -206,7 +200,7 @@ namespace triedent
       // clang-format off
       static uint64_t extract_offset(uint64_t x)     { return x >> 18; }
       static uint64_t extract_cache(uint64_t x)      { return (x >> 16) & 0x3; }
-      static uint64_t extract_type(uint64_t x)       { return (x >> 15) & 1; }
+      static uint64_t extract_is_value(uint64_t x)   { return (x >> 15) & 1; }
       static uint64_t extract_ref(uint64_t x)        { return x & ref_count_mask; }
       static uint64_t extract_next_ptr(uint64_t x)   { return x >> 15; }
       static uint64_t create_next_ptr(uint64_t x)    { return x << 15; }
@@ -215,7 +209,7 @@ namespace triedent
       static uint64_t obj_val(object_location loc, uint16_t ref)
       {
          return uint64_t(loc.offset << 18) | (uint64_t(loc.cache) << 16) |
-                (uint64_t(loc.type) << 15) | int64_t(ref);
+                (uint64_t(loc.is_value) << 15) | int64_t(ref);
       }
 
       // TODO: rename first_unallocated
@@ -288,7 +282,7 @@ namespace triedent
          _header->objects[i] &= ~position_lock_mask;
    }
 
-   inline location_lock object_db::alloc(uint8_t type)
+   inline location_lock object_db::alloc(bool is_value)
    {
       if (_header->first_free.load() == 0)
       {
@@ -297,7 +291,7 @@ namespace triedent
          ++_header->first_unallocated.id;
          auto  r   = _header->first_unallocated;
          auto& obj = _header->objects[r.id];
-         obj.store(obj_val({.type = type}, 1) | position_lock_mask);  // init ref count 1
+         obj.store(obj_val({.is_value = is_value}, 1) | position_lock_mask);  // init ref count 1
          assert(r.id != 0);
 
          location_lock lock;
@@ -312,7 +306,7 @@ namespace triedent
              ff, extract_next_ptr(_header->objects[ff].load())))
          {
          }
-         _header->objects[ff].store(obj_val({.type = type}, 1) |
+         _header->objects[ff].store(obj_val({.is_value = is_value}, 1) |
                                     position_lock_mask);  // init ref count 1
 
          location_lock lock;
@@ -372,9 +366,9 @@ namespace triedent
             obj.store(create_next_ptr(ff));
          } while (not _header->first_free.compare_exchange_strong(ff, id.id));
       }
-      return {object_location{.offset = extract_offset(val),
-                              .cache  = extract_cache(val),
-                              .type   = extract_type(val)},
+      return {object_location{.offset   = extract_offset(val),
+                              .cache    = extract_cache(val),
+                              .is_value = extract_is_value(val)},
               new_count};
    }
 
@@ -392,9 +386,9 @@ namespace triedent
       if (not(val & ref_count_mask)) [[unlikely]]  // TODO: remove in release
          throw std::runtime_error("expected positive ref count");
       object_location r;
-      r.cache  = extract_cache(val);
-      r.offset = extract_offset(val);
-      r.type   = extract_type(val);
+      r.cache    = extract_cache(val);
+      r.offset   = extract_offset(val);
+      r.is_value = extract_is_value(val);
       //  std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }
@@ -409,10 +403,10 @@ namespace triedent
       //  std::atomic_thread_fence(std::memory_order_acquire);
       // assert((val & 0xffff) or !"expected positive ref count");
       object_location r;
-      r.cache  = extract_cache(val);
-      r.offset = extract_offset(val);
-      r.type   = extract_type(val);
-      ref      = extract_ref(val);
+      r.cache    = extract_cache(val);
+      r.offset   = extract_offset(val);
+      r.is_value = extract_is_value(val);
+      ref        = extract_ref(val);
       //  std::atomic_thread_fence(std::memory_order_acquire);
       return r;
    }

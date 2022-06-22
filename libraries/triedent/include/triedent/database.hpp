@@ -290,24 +290,21 @@ namespace triedent
    template <typename T>
    struct deref
    {
-      using id   = object_id;
-      using type = object_location::object_type;
+      using id = object_id;
 
       deref() = default;
-      deref(std::pair<id, value_node*> p) : _id(p.first), ptr((char*)p.second), _type(type::leaf) {}
-      deref(std::pair<id, inner_node*> p) : _id(p.first), ptr((char*)p.second), _type(type::inner)
-      {
-      }
+      deref(std::pair<id, value_node*> p) : _id(p.first), ptr((char*)p.second), is_value(true) {}
+      deref(std::pair<id, inner_node*> p) : _id(p.first), ptr((char*)p.second), is_value(false) {}
       template <typename Other>
-      deref(deref<Other> p) : _id(p._id), ptr((char*)p.ptr), _type(p._type)
+      deref(deref<Other> p) : _id(p._id), ptr((char*)p.ptr), is_value(p.is_value)
       {
       }
-      deref(id i, char* p, type t) : _id(i), ptr(p), _type(t) {}
+      deref(id i, char* p, bool is_value) : _id(i), ptr(p), is_value(is_value) {}
 
       explicit inline operator bool() const { return bool(_id); }
       inline          operator id() const { return _id; }
 
-      bool         is_leaf_node() const { return _type == object_location::leaf; }
+      bool         is_leaf_node() const { return is_value; }
       inline auto& as_value_node() const { return *reinterpret_cast<const value_node*>(ptr); }
       inline auto& as_inner_node() const { return *reinterpret_cast<const inner_node*>(ptr); }
 
@@ -322,7 +319,7 @@ namespace triedent
 
       id    _id;
       char* ptr;
-      type  _type;
+      bool  is_value;
    };  // deref
 
    template <typename T>
@@ -453,7 +450,7 @@ namespace triedent
    template <typename AccessMode>
    inline deref<node> database::session<AccessMode>::get(id i) const
    {
-      auto r = _db->_ring->get_cache_with_type<std::is_same_v<AccessMode, write_access>>(i);
+      auto r = _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
       return {i, r.first, r.second};
    }
 
@@ -470,8 +467,7 @@ namespace triedent
          return;
 
       auto ptr = _ring->release(obj);
-      if (ptr.first and ptr.second == object_location::inner)
-      //  if (ptr.first and not reinterpret_cast<node*>(ptr.first)->is_value_node())
+      if (ptr.first && !ptr.second)
       {
          //     if( ptr.second != object_location::inner ) {
          //        throw std::runtime_error( "unexpected leaf type" );
