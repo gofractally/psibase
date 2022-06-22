@@ -1,10 +1,10 @@
-#include <triedent/object_db.hpp>
 #include <triedent/database.hpp>
+#include <triedent/object_db.hpp>
 #include <unordered_set>
 
 int test_object_db()
 {
-   const auto      num = 100 * 1000 * 1000ull;
+   const auto          num = 100 * 1000 * 1000ull;
    triedent::object_db db("db.dat", triedent::object_db::object_id{.id = num}, true);
 
    std::vector<triedent::object_db::object_id> ids;
@@ -363,11 +363,11 @@ void load_key_values(std::vector<std::string>&  keys,
          if (to and str > *to)
             continue;
 
-    //     if (from_key6(to_key6(str)) != str)
-    //     {
-     //       throw std::runtime_error("key did not round trip: " + str);
-     //    }
-         vals.push_back(str); //from_key(to_key(str)));
+         //     if (from_key6(to_key6(str)) != str)
+         //     {
+         //       throw std::runtime_error("key did not round trip: " + str);
+         //    }
+         vals.push_back(str);  //from_key(to_key(str)));
          /*
          auto r = unique.insert(vals.back());
          if (not r.second)
@@ -377,7 +377,7 @@ void load_key_values(std::vector<std::string>&  keys,
             continue;
          }
          */
-   //      keys.push_back(to_key(str));
+         //      keys.push_back(to_key(str));
       }
    }
 }
@@ -447,24 +447,25 @@ void test_trie(int argc, char** argv)
       load_key_values(keys, values, argv[1], from, to);
       std::cerr << "loaded " << keys.size() << " keys\n";
 
-      triedent::database db("dbdir",
-                        triedent::database::config{.max_objects = std::max<uint64_t>(4 * values.size(),50000),
-                                               .hot_pages   = 32,
-                                               .warm_pages   = 32,
-                                               .cool_pages  = 32,
-                                               .cold_pages  = 32},
-                        triedent::database::read_write);
+      triedent::database db(
+          "dbdir",
+          triedent::database::config{.max_objects = std::max<uint64_t>(4 * values.size(), 50000),
+                                     .hot_pages   = 32,
+                                     .warm_pages  = 32,
+                                     .cool_pages  = 32,
+                                     .cold_pages  = 32},
+          triedent::database::read_write);
 
-      auto s  = db.start_write_session();
+      auto s = db.start_write_session();
 
       {
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < values.size(); ++i)
          {
-        //    if (i % 10000 == 999)
-        //       db.swap();
+            //    if (i % 10000 == 999)
+            //       db.swap();
 
-        ////    DEBUG( "first upsert ", values[i] );
+            ////    DEBUG( "first upsert ", values[i] );
             //   std::cout << "==================================\n";
             bool in = s->upsert(values[i], values[i]);
             if (not in)
@@ -480,13 +481,13 @@ void test_trie(int argc, char** argv)
          std::cerr << "trie insert upsert:    "
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
       }
-  //    db.print_stats();
+      //    db.print_stats();
       {
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < values.size(); ++i)
          {
-         //   if (i % 10000 == 999)
-         //      db.swap();
+            //   if (i % 10000 == 999)
+            //      db.swap();
 
             //   std::cout << "==================================\n";
             //DEBUG( "second upsert ", values[i] );
@@ -534,9 +535,10 @@ void test_trie(int argc, char** argv)
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
       }
 
-      if(0){
+      if (0)
+      {
          auto rs = db.start_read_session();
-         rs->set_session_revision( s->revision() );
+         rs->set_session_revision(s->revision());
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < values.size(); ++i)
          {
@@ -589,9 +591,10 @@ void test_trie(int argc, char** argv)
          std::cerr << "trie find all:    "
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
       }
-      if( 0){
+      if (0)
+      {
          auto rs = db.start_read_session();
-         rs->set_session_revision( s->revision() );
+         rs->set_session_revision(s->revision());
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < values.size(); ++i)
          {
@@ -646,9 +649,10 @@ void test_trie(int argc, char** argv)
          std::cerr << "trie lower bound all:    "
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms\n";
       }
-      if(0){
+      if (0)
+      {
          auto rs = db.start_read_session();
-         rs->set_session_revision( s->revision() );
+         rs->set_session_revision(s->revision());
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < values.size(); ++i)
          {
@@ -685,7 +689,7 @@ void test_trie(int argc, char** argv)
          auto itr   = s->first();
          while (itr.valid())
          {
-     //       std::cout << "==================     " <<from_key(itr.key())<<" = " << itr.value() <<"  \n";;
+            //       std::cout << "==================     " <<from_key(itr.key())<<" = " << itr.value() <<"  \n";;
             ++itr;
             ++count;
          }
@@ -696,13 +700,14 @@ void test_trie(int argc, char** argv)
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms  " << count
                    << " items \n";
       }
-      if(0){
+      if (0)
+      {
          auto rs = db.start_read_session();
-         rs->set_session_revision( s->revision() );
+         rs->set_session_revision(s->revision());
          auto start = std::chrono::steady_clock::now();
          int  count = 0;
          auto itr   = rs->first();
-     //    std::cout << from_key(itr.key()) << "\n";
+         //    std::cout << from_key(itr.key()) << "\n";
          ;
          while (itr.valid())
          {
@@ -722,7 +727,7 @@ void test_trie(int argc, char** argv)
          auto start = std::chrono::steady_clock::now();
          int  count = 0;
          auto itr   = s->last();
-      //   std::cout << from_key(itr.key()) << "\n";
+         //   std::cout << from_key(itr.key()) << "\n";
          ;
          while (itr.valid())
          {
@@ -737,11 +742,12 @@ void test_trie(int argc, char** argv)
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms  " << count
                    << " items \n";
       }
-      if(0){
+      if (0)
+      {
          auto start = std::chrono::steady_clock::now();
          int  count = 0;
          auto itr   = s->first();
-       //  std::cout << from_key(itr.key()) << "\n";
+         //  std::cout << from_key(itr.key()) << "\n";
          ;
          while (itr.valid())
          {
@@ -756,7 +762,8 @@ void test_trie(int argc, char** argv)
                    << std::chrono::duration<double, std::milli>(delta).count() << " ms  " << count
                    << " items \n";
       }
-      if(1){
+      if (1)
+      {
          auto start = std::chrono::steady_clock::now();
          s->clear();
          auto end   = std::chrono::steady_clock::now();
@@ -766,7 +773,8 @@ void test_trie(int argc, char** argv)
                    << " ms\n";
          s->print();
       }
-      else {
+      else
+      {
          auto start = std::chrono::steady_clock::now();
          for (uint32_t i = 0; i < values.size(); ++i)
          {

@@ -60,41 +60,39 @@ void load_key_values(std::vector<std::string>&  keys,
    }
 }
 
-
 int main(int argc, char** argv)
 {
-      std::vector<std::string>   keys;
-      std::vector<std::string>   values;
-      std::optional<std::string> from, to;
+   std::vector<std::string>   keys;
+   std::vector<std::string>   values;
+   std::optional<std::string> from, to;
 
-      if (argc == 1)
-      {
-         std::cout << "usage: test words.txt [from][to]\n";
-         return 0;
-      }
-      if (argc > 2)
-         from = std::string(argv[2]);
-      if (argc > 3)
-         to = std::string(argv[3]);
+   if (argc == 1)
+   {
+      std::cout << "usage: test words.txt [from][to]\n";
+      return 0;
+   }
+   if (argc > 2)
+      from = std::string(argv[2]);
+   if (argc > 3)
+      to = std::string(argv[3]);
 
-      load_key_values(keys, values, argv[1], from, to);
-      std::cerr<< "loaded " << keys.size() << " keys\n";
+   load_key_values(keys, values, argv[1], from, to);
+   std::cerr << "loaded " << keys.size() << " keys\n";
 
-
-   uint64_t       total = 2 * 1000 * 1000 * 1000;
+   uint64_t           total = 2 * 1000 * 1000 * 1000;
    triedent::database db("bank.dir",
-                     triedent::database::config{.max_objects = (5 * total) / 4,
-                                            .hot_pages   = 128*16 * 1024ull,
-                                            .cold_pages  = 8 * 1024 * 1024ull},
-                     triedent::database::read_write);
+                         triedent::database::config{.max_objects = (5 * total) / 4,
+                                                    .hot_pages   = 128 * 16 * 1024ull,
+                                                    .cold_pages  = 8 * 1024 * 1024ull},
+                         triedent::database::read_write);
    db.print_stats();
 
-   srand(0); 
+   srand(0);
    auto s = db.start_write_session();
 
    std::vector<uint64_t> users;
    users.resize(1000 * 1000 * 20);
-   std::cout <<" creating "<< users.size() <<" user names.\n";
+   std::cout << " creating " << users.size() << " user names.\n";
    for (uint32_t i = 0; i < users.size(); ++i)
    {
       users[i] = rand64() & 0x3f3f3f3f3f3f3f3f;
@@ -102,9 +100,9 @@ int main(int argc, char** argv)
 
    bool inserts = 0;
 
-   std::cout <<" starting " << total << " random transfers\n";
+   std::cout << " starting " << total << " random transfers\n";
    auto lstart = std::chrono::steady_clock::now();
-   auto per = 1000000ull;
+   auto per    = 1000000ull;
    for (uint32_t i = 0; i < total; ++i)
    {
       uint64_t from     = rand64() % users.size();
@@ -117,29 +115,36 @@ int main(int argc, char** argv)
 
       if (from_b)
       {
-         if( from_b->size() != sizeof(uint64_t ) )throw std::runtime_error( "expected different size" );
+         if (from_b->size() != sizeof(uint64_t))
+            throw std::runtime_error("expected different size");
          memcpy(&new_from, from_b->data(), from_b->size());
-      //   std::cout << "found user from: " << from <<" " << users[from] <<"\n";
-      }else {
-       //  std::cout << "create user from: " << from <<"  " << users[from]<<"\n";
+         //   std::cout << "found user from: " << from <<" " << users[from] <<"\n";
+      }
+      else
+      {
+         //  std::cout << "create user from: " << from <<"  " << users[from]<<"\n";
       }
       if (to_b)
       {
-         if( to_b->size() != sizeof(uint64_t ) )throw std::runtime_error( "expected different size" );
+         if (to_b->size() != sizeof(uint64_t))
+            throw std::runtime_error("expected different size");
          memcpy(&new_to, to_b->data(), to_b->size());
-       //  std::cout << "found user to: " << to <<"  " << users[to]<<"\n";
-      } else {
-       //  std::cout << "create user to: " << to <<"  " << users[to]<<"\n";
+         //  std::cout << "found user to: " << to <<"  " << users[to]<<"\n";
+      }
+      else
+      {
+         //  std::cout << "create user to: " << to <<"  " << users[to]<<"\n";
       }
       new_from -= amount;
       new_to += amount;
       inserts += s->upsert(std::string_view((char*)&users[from], sizeof(uint64_t)),
-                          std::string_view((char*)&new_from, sizeof(new_from)));
+                           std::string_view((char*)&new_from, sizeof(new_from)));
       inserts += s->upsert(std::string_view((char*)&users[to], sizeof(uint64_t)),
-                          std::string_view((char*)&new_to, sizeof(new_to)));
+                           std::string_view((char*)&new_to, sizeof(new_to)));
 
-      if( i % 1000 == 999 ) db.swap();
-      if (i % per  == 1)
+      if (i % 1000 == 999)
+         db.swap();
+      if (i % per == 1)
       {
          auto end   = std::chrono::steady_clock::now();
          auto delta = end - lstart;
@@ -150,7 +155,8 @@ int main(int argc, char** argv)
          std::cout << per / (std::chrono::duration<double, std::milli>(delta).count() / 1000)
                    << " transfers/sec   iteration: " << i << " \n";
       }
-      if( i % (5*per) == 1 ) {
+      if (i % (5 * per) == 1)
+      {
          db.print_stats();
       }
    }

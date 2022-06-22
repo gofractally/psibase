@@ -26,13 +26,13 @@ int main(int argc, char** argv)
       po::options_description desc("Allowed options");
       desc.add_options()("help,h", "print this message")("reset", "reset the database")(
           "sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys")(
-          "status", "print status of the database")
-          ("count", "count the number of keys in database")
-          ("validate", "count the number of keys in database")
-          ("gc", "free any space caused by dangling ref counts")
-          ("export", po::value<std::string>(&export_file), "export the key value db to canonical form")
-          ("import", po::value<std::string>(&import_file), "import keys previously exported")
-          (
+          "status", "print status of the database")(
+          "count", "count the number of keys in database")("validate",
+                                                           "count the number of keys in database")(
+          "gc", "free any space caused by dangling ref counts")(
+          "export", po::value<std::string>(&export_file),
+          "export the key value db to canonical form")(
+          "import", po::value<std::string>(&import_file), "import keys previously exported")(
           "create", "creates an empty database with the give parameters")(
           "data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
           "the folder that contains the database")(
@@ -78,78 +78,86 @@ int main(int argc, char** argv)
                                                              .cold_pages  = cold_page_c});
       }
 
-      if( vm.count("validate") ) {
-         database      db(db_dir.c_str(), triedent::database::read_write);
-         auto          s = db.start_write_session();
-         s->set_session_revision( db.get_root_revision() );
+      if (vm.count("validate"))
+      {
+         database db(db_dir.c_str(), triedent::database::read_write);
+         auto     s = db.start_write_session();
+         s->set_session_revision(db.get_root_revision());
          s->validate();
          std::cerr << "everything appears to be ok" << std::endl;
       }
 
-      if( vm.count("gc") ) {
-         database      db(db_dir.c_str(), triedent::database::read_write);
-         auto          s     = db.start_write_session();
+      if (vm.count("gc"))
+      {
+         database db(db_dir.c_str(), triedent::database::read_write);
+         auto     s = db.start_write_session();
          s->start_collect_garbage();
-         s->recursive_retain( db.get_root_revision() );
+         s->recursive_retain(db.get_root_revision());
          s->end_collect_garbage();
       }
 
       if (vm.count("import"))
       {
-         if( not std::filesystem::exists(import_file) ) {
-            throw std::runtime_error( "import file does not exist: "+ import_file );
+         if (not std::filesystem::exists(import_file))
+         {
+            throw std::runtime_error("import file does not exist: " + import_file);
          }
-         database      db(db_dir.c_str(), triedent::database::read_write);
-         auto          s     = db.start_write_session();
-         s->set_session_revision( db.get_root_revision() );
+         database db(db_dir.c_str(), triedent::database::read_write);
+         auto     s = db.start_write_session();
+         s->set_session_revision(db.get_root_revision());
 
-
-         std::ifstream in(import_file.c_str(), std::fstream::binary | std::fstream::in);
+         std::ifstream     in(import_file.c_str(), std::fstream::binary | std::fstream::in);
          std::vector<char> value_buffer;
          value_buffer.resize(0xffffff);
          std::vector<char> key_buffer;
          key_buffer.resize(256);
 
-            uint32_t vs;
-            uint8_t ks;
-            uint64_t inserted  = 0;
-            uint64_t updated   = 0;
-         while( not in.eof() ) {
-            in.read( (char*)&ks, 1 );
+         uint32_t vs;
+         uint8_t  ks;
+         uint64_t inserted = 0;
+         uint64_t updated  = 0;
+         while (not in.eof())
+         {
+            in.read((char*)&ks, 1);
             key_buffer.resize(ks);
-            in.read(key_buffer.data(), ks );
-            in.read((char*)&vs, 4 );
-            if( vs > 0xffffff ) {
-               throw std::runtime_error( "invalid value size detected in import file" );
+            in.read(key_buffer.data(), ks);
+            in.read((char*)&vs, 4);
+            if (vs > 0xffffff)
+            {
+               throw std::runtime_error("invalid value size detected in import file");
             }
-            in.read(value_buffer.data(), vs );
+            in.read(value_buffer.data(), vs);
 
-            if( in.eof() ) break;
-            auto old_size = s->upsert( std::string_view(key_buffer.data(), ks),
-                       std::string_view(value_buffer.data(), vs ) );
-            if( old_size < 0 ) inserted++;
-            else updated++;
+            if (in.eof())
+               break;
+            auto old_size = s->upsert(std::string_view(key_buffer.data(), ks),
+                                      std::string_view(value_buffer.data(), vs));
+            if (old_size < 0)
+               inserted++;
+            else
+               updated++;
          }
-         s->set_root_revision(  s->get_session_revision() );
+         s->set_root_revision(s->get_session_revision());
 
-         std::cerr << "inserted " << inserted << " keys"<<std::endl;
-         std::cerr << "updated " << updated<< " keys"<<std::endl;
+         std::cerr << "inserted " << inserted << " keys" << std::endl;
+         std::cerr << "updated " << updated << " keys" << std::endl;
       }
 
-         bool c = vm.count("count");
-         bool e = vm.count("export");
-      if ( e or c )
+      bool c = vm.count("count");
+      bool e = vm.count("export");
+      if (e or c)
       {
          std::ofstream ef(export_file.c_str(), std::fstream::trunc);
          database      db(db_dir.c_str(), triedent::database::read_write);
-         auto          s     = db.start_write_session();
-         s->set_session_revision( db.get_root_revision() );
-         auto          i     = s->first();
-         int64_t       count = 0;
+         auto          s = db.start_write_session();
+         s->set_session_revision(db.get_root_revision());
+         auto    i     = s->first();
+         int64_t count = 0;
          while (i.valid())
          {
             ++count;
-            if( e ) {
+            if (e)
+            {
                auto     k  = i.key();
                auto     v  = i.value();
                uint8_t  ks = k.size();
@@ -158,15 +166,15 @@ int main(int argc, char** argv)
                ef.write(k.data(), ks);
                ef.write((char*)&vs, 4);
                ef.write(v.data(), vs);
-               if( count % 1000000 == 0 )
-                  std::cerr << "exported " << count <<" items       \r";
+               if (count % 1000000 == 0)
+                  std::cerr << "exported " << count << " items       \r";
             }
             ++i;
          }
-         if( e )
-         std::cerr << "Exported " << count << " keys to " << export_file << std::endl;
+         if (e)
+            std::cerr << "Exported " << count << " keys to " << export_file << std::endl;
          else
-         std::cerr << count << " keys in database " << std::endl;
+            std::cerr << count << " keys in database " << std::endl;
       }
    }
    catch (std::exception& e)

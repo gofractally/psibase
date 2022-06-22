@@ -9,8 +9,8 @@
 
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
-#include <boost/program_options/variables_map.hpp>
 #include <boost/program_options/parsers.hpp>
+#include <boost/program_options/variables_map.hpp>
 
 #include <triedent/database.hpp>
 
@@ -30,70 +30,77 @@ int64_t rand64()
 
 int main(int argc, char** argv)
 {
-   namespace po = boost::program_options;
-   uint32_t hot_page_c = 34;
-   uint32_t warm_page_c = 33;
-   uint32_t cool_page_c = 35;
-   uint32_t cold_page_c = 35;
-   uint64_t num_objects = 500*1000*1000;
+   namespace po            = boost::program_options;
+   uint32_t    hot_page_c  = 34;
+   uint32_t    warm_page_c = 33;
+   uint32_t    cool_page_c = 35;
+   uint32_t    cold_page_c = 35;
+   uint64_t    num_objects = 500 * 1000 * 1000;
    std::string db_dir;
-   bool use_string = false;
-   uint64_t insert_count;
-   uint64_t status_count;
+   bool        use_string = false;
+   uint64_t    insert_count;
+   uint64_t    status_count;
 
-   uint32_t       num_read_threads = 6;
-   po::options_description desc( "Allowed options" );
-   desc.add_options()
-      ("help,h", "print this message")
-      ("reset", "reset the database" )
-      ("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys" )
-      ("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"), "the folder that contains the database" )
-      ("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6), "number of read threads to launch")
-      ("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33), "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")
-      ("warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33), "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes")
-      ("cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33), "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes")
-      ("cold-size,C",po::value<uint32_t>(&cold_page_c)->default_value(33),  "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes")
-      ("max-objects,O",po::value<uint64_t>(&num_objects)->default_value(num_objects),  "the maximum number of unique objects in the database")
-      ("insert,i",po::value<uint64_t>(&insert_count)->default_value(100000000ull),  "the number of random key/value pairs to insert")
-      ("stat,s",po::value<uint64_t>(&status_count)->default_value(1000000ull),  "the number of how often to print stats")
-      ;
+   uint32_t                num_read_threads = 6;
+   po::options_description desc("Allowed options");
+   desc.add_options()("help,h", "print this message")("reset", "reset the database")(
+       "sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys")(
+       "data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
+       "the folder that contains the database")(
+       "read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
+       "number of read threads to launch")(
+       "hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33),
+       "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")(
+       "warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33),
+       "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes")(
+       "cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33),
+       "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes")(
+       "cold-size,C", po::value<uint32_t>(&cold_page_c)->default_value(33),
+       "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes")(
+       "max-objects,O", po::value<uint64_t>(&num_objects)->default_value(num_objects),
+       "the maximum number of unique objects in the database")(
+       "insert,i", po::value<uint64_t>(&insert_count)->default_value(100000000ull),
+       "the number of random key/value pairs to insert")(
+       "stat,s", po::value<uint64_t>(&status_count)->default_value(1000000ull),
+       "the number of how often to print stats");
 
    po::variables_map vm;
-   po::store( po::parse_command_line( argc, argv, desc), vm );
+   po::store(po::parse_command_line(argc, argv, desc), vm);
    po::notify(vm);
 
-   if( vm.count("help") ) {
-      std::cerr << desc <<"\n";
+   if (vm.count("help"))
+   {
+      std::cerr << desc << "\n";
       return 1;
    }
-   if( vm.count( "reset" ) ) {
+   if (vm.count("reset"))
+   {
       std::cerr << "resetting database\n";
-      std::filesystem::remove_all( db_dir );
-      triedent::database::create(db_dir, triedent::database::config{
-           .max_objects = num_objects,
-           .hot_pages   = hot_page_c,
-           .warm_pages  = warm_page_c,
-           .cool_pages  = cool_page_c,
-           .cold_pages  = cold_page_c});
+      std::filesystem::remove_all(db_dir);
+      triedent::database::create(db_dir, triedent::database::config{.max_objects = num_objects,
+                                                                    .hot_pages   = hot_page_c,
+                                                                    .warm_pages  = warm_page_c,
+                                                                    .cool_pages  = cool_page_c,
+                                                                    .cold_pages  = cold_page_c});
    }
 
-   if( num_read_threads > 64 ) {
+   if (num_read_threads > 64)
+   {
       std::cerr << "maximum number of read threads is 64\n";
       return 0;
    }
 
-
-
-   uint64_t       total            = insert_count ;//2 * 1000 * 1000 * 1000;
-   triedent::database db( db_dir.c_str(), triedent::database::read_write);
+   uint64_t           total = insert_count;  //2 * 1000 * 1000 * 1000;
+   triedent::database db(db_dir.c_str(), triedent::database::read_write);
    db.print_stats();
    std::cerr << "\n";
    auto s = db.start_write_session();
-   s->set_session_revision( db.get_root_revision() );
+   s->set_session_revision(db.get_root_revision());
 
    std::vector<uint64_t> revisions;
    revisions.resize(16);
-   for( auto& e : revisions ) e = 0;
+   for (auto& e : revisions)
+      e = 0;
 
    std::map<std::string, std::string> base;
 
@@ -123,33 +130,35 @@ int main(int argc, char** argv)
    done.store(false);
    auto read_loop = [&](int c)
    {
-      try  {
-      int  v  = r.load();
-      auto rs = db.start_read_session();
-
-      std::mt19937 gen(c);
-
-      uint64_t ch = 0;
-      while ( not done.load( std::memory_order_acquire ) )
+      try
       {
-         rs->set_session_revision({revisions[(v - 4) % 16]});
-         while (r.load(std::memory_order_relaxed) == v  )
-         {
-            uint64_t h = (uint64_t(gen()) << 32) | gen();
-            auto itr = rs->lower_bound(std::string_view((char*)&h, sizeof(h)));
-            if (itr.valid())
-               ++total_lookups[c].total_lookups;
-            if(  done.load( std::memory_order_relaxed) )
-               break;
-         }
+         int  v  = r.load();
+         auto rs = db.start_read_session();
 
-               
-         v = r.load();
-       //  WARN( "revs[",c,"] = ", v );
-         revs[c].store(v);
+         std::mt19937 gen(c);
+
+         uint64_t ch = 0;
+         while (not done.load(std::memory_order_acquire))
+         {
+            rs->set_session_revision({revisions[(v - 4) % 16]});
+            while (r.load(std::memory_order_relaxed) == v)
+            {
+               uint64_t h   = (uint64_t(gen()) << 32) | gen();
+               auto     itr = rs->lower_bound(std::string_view((char*)&h, sizeof(h)));
+               if (itr.valid())
+                  ++total_lookups[c].total_lookups;
+               if (done.load(std::memory_order_relaxed))
+                  break;
+            }
+
+            v = r.load();
+            //  WARN( "revs[",c,"] = ", v );
+            revs[c].store(v);
+         }
       }
-      } catch ( std::exception& e ) {
-         std::cerr << e.what() <<"\n";
+      catch (std::exception& e)
+      {
+         std::cerr << e.what() << "\n";
          exit(1);
       }
    };
@@ -162,23 +171,23 @@ int main(int argc, char** argv)
           uint64_t last_r = 8;
           while (not done.load())
           {
-             uint64_t min = r.load()-1;
+             uint64_t min = r.load() - 1;
              for (auto& r : revs)
              {
                 if (r.load() < min)
                    min = r.load();
              }
-        //     WARN( "min: ", min );
+             //     WARN( "min: ", min );
              if (min > last_r)
              {
-    //            WARN( "release revision: ", (min-6)%16, "  r: ", min );
+                //            WARN( "release revision: ", (min-6)%16, "  r: ", min );
                 rs->release_revision({revisions[(min - 6) % 16]});
                 revisions[(min - 6) % 16] = 0;
                 last_r                    = min;
              }
              usleep(100);
           }
-          WARN( "exit GC" );
+          WARN("exit GC");
        }));
 
    auto get_total_lookups = [&]()
@@ -193,19 +202,18 @@ int main(int argc, char** argv)
 
    int64_t     read_start = 0;
    std::string k;
-   WARN( "INSERT COUNT: ", insert_count );
+   WARN("INSERT COUNT: ", insert_count);
    for (uint64_t i = 0; i < insert_count; ++i)
    {
       try
       {
-         if ( i > 0 and i % (status_count/10) == 0)
+         if (i > 0 and i % (status_count / 10) == 0)
          {
             auto new_r = r.load();
-     //       WARN( "NEW R: ", new_r, " id:" , s->get_session_revision().id );
+            //       WARN( "NEW R: ", new_r, " id:" , s->get_session_revision().id );
             revisions[new_r % 16] = s->get_session_revision().id;
             s->retain({revisions[new_r % 16]});
             s->fork();
-
 
             if (++r == 6)
             {
@@ -217,7 +225,8 @@ int main(int argc, char** argv)
             }
          }
 
-         if (i % (status_count*10) == 0 && false) {
+         if (i % (status_count * 10) == 0 && false)
+         {
             db.print_stats();
             std::cerr << "\n";
          }
@@ -240,13 +249,13 @@ int main(int argc, char** argv)
                       << "\n";
          }
 
-         uint64_t v[2];
-         uint64_t h[4];
+         uint64_t    v[2];
+         uint64_t    h[4];
          std::string str = std::to_string(rand64());
-         h[0] = rand64();
-         h[1] = rand64();
-         h[2] = rand64();
-         h[3] = rand64();
+         h[0]            = rand64();
+         h[1]            = rand64();
+         h[2]            = rand64();
+         h[3]            = rand64();
          //   h          = bswap(h);
          auto hk = std::string_view((char*)h, sizeof(h));
          /*
@@ -260,22 +269,25 @@ int main(int argc, char** argv)
          if (i < total)
          {
             //base.emplace( std::make_pair(k,std::string((char*)&h, sizeof(h))) );
-            if( use_string ) {
-               auto inserted = s->upsert(str,str);
-               if (inserted >= 0 )
+            if (use_string)
+            {
+               auto inserted = s->upsert(str, str);
+               if (inserted >= 0)
                {
                   WARN("failed to insert: ", h);
                   break;
                }
-            assert(inserted<0);
-            } else {
-               auto inserted = s->upsert(hk,hk);
-               if (inserted >= 0 )
+               assert(inserted < 0);
+            }
+            else
+            {
+               auto inserted = s->upsert(hk, hk);
+               if (inserted >= 0)
                {
                   WARN("failed to insert: ", h);
                   break;
                }
-            assert(inserted<0);
+               assert(inserted < 0);
             }
          }
       }
@@ -286,7 +298,8 @@ int main(int argc, char** argv)
       }
    }
    done.store(true);
-   for( auto& r : rthreads ) r->join();
+   for (auto& r : rthreads)
+      r->join();
    gc->join();
 
    auto end   = std::chrono::steady_clock::now();
@@ -294,7 +307,7 @@ int main(int argc, char** argv)
    std::cerr << "insert took:    " << std::chrono::duration<double, std::milli>(delta).count()
              << " ms\n";
 
-   s->set_root_revision(  s->get_session_revision() );
+   s->set_root_revision(s->get_session_revision());
    db.print_stats();
    std::cerr << "\n";
 

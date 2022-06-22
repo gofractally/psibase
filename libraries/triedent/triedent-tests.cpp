@@ -1,5 +1,5 @@
-#include <triedent/database.hpp>
 #include <random>
+#include <triedent/database.hpp>
 
 template <typename S, typename T>
 S& operator<<(S& stream, const std::optional<T>& obj)
@@ -18,37 +18,35 @@ using namespace triedent;
 auto createDb()
 {
    std::filesystem::remove_all("testdb");
-   database::create(  "testdb",
-       database::config{
-           .max_objects = 10000ull,
-           .hot_pages   = 30,
-           .warm_pages  = 30,
-           .cool_pages  = 30,
-           .cold_pages  = 30,
-       } );
+   database::create("testdb", database::config{
+                                  .max_objects = 10000ull,
+                                  .hot_pages   = 30,
+                                  .warm_pages  = 30,
+                                  .cool_pages  = 30,
+                                  .cold_pages  = 30,
+                              });
    return std::make_unique<database>(  //
-       "testdb",
-       database::read_write);
+       "testdb", database::read_write);
 }
 
-TEST_CASE("key round trip") 
+TEST_CASE("key round trip")
 {
-   static std::mt19937 gen(0);
+   static std::mt19937  gen(0);
    std::vector<uint8_t> data;
    data.resize(4096);
-   for( auto& b : data ) 
+   for (auto& b : data)
       b = gen();
 
    database::session_base sb;
-   for( uint32_t i = 0; i < 10000; ++i ) {
-      auto offset = gen()%2096;
-      auto size   = gen()%255;
-      auto in_key = std::string_view( (char*)data.data()+offset, size );
-      auto k6 = sb.to_key6( in_key );
-      auto k8 = from_key6( k6 );
-      REQUIRE( k8 == in_key );
+   for (uint32_t i = 0; i < 10000; ++i)
+   {
+      auto offset = gen() % 2096;
+      auto size   = gen() % 255;
+      auto in_key = std::string_view((char*)data.data() + offset, size);
+      auto k6     = sb.to_key6(in_key);
+      auto k8     = from_key6(k6);
+      REQUIRE(k8 == in_key);
    }
-
 }
 
 TEST_CASE("accidental inner removal")
