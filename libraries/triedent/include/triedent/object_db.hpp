@@ -153,14 +153,7 @@ namespace triedent
       }
 
      private:
-      void unlock(uint64_t id)
-      {
-         auto& atomic = _header->objects[id];
-         auto  obj    = atomic.load();
-         while (!atomic.compare_exchange_weak(obj, obj & ~position_lock_mask))
-         {
-         }
-      }
+      void unlock(uint64_t id) { _header->objects[id] &= ~position_lock_mask; }
 
      public:
       location_lock alloc(uint8_t type);

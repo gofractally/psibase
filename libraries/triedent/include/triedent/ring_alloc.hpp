@@ -426,6 +426,7 @@ namespace triedent
                if (ref != 0 && loc.cache == from->level && from->get_object(loc.offset) == o)
                {
                   if (auto lock = _obj_ids->try_lock({.id = o->id}))
+                     // TODO: don't wait on free space
                      alloc(*to, *lock, o->size, o->data());
                   else
                      break;

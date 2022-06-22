@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
 #include <triedent/node.hpp>
-#include <triedent/ring_alloc.hpp>
 
 namespace triedent
 {
