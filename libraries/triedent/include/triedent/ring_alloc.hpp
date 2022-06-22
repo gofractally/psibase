@@ -377,30 +377,20 @@ namespace triedent
    {
       auto do_swap = [this](auto* from, auto* to)
       {
-         // TODO: remove fp and the check; a race can cause it to misfire
-         // TODO: please expand the code from get_potential_free_space and
-         //       remove the redundant atomic reloads to make analysis easier
-         // TODO: `ap` may need to switch to memory_order_acquire to enable
-         //       reading object headers written by the main thread
-
-         auto     fs     = from->_head->get_potential_free_space();
-         auto     maxs   = from->_head->alloc_area_size;
+         uint64_t sp             = from->_head->swap_p.load();
+         uint64_t ap             = from->_head->alloc_p.load();
+         auto     maxs           = from->_head->alloc_area_size;
+         auto     potential_free = sp + maxs - ap;
          uint64_t target = 1024 * 1024 * 40ull;  //maxs / 32;  // target a certain amount free
 
-         if (target < fs)
+         if (target < potential_free)
             return false;
 
-         if (target - fs < 1024 * 256)
+         auto bytes = target - potential_free;
+         if (bytes < 1024 * 256)
             return false;
-
-         auto bytes = target - fs;
 
          uint64_t bytes_freed = 0;
-
-         uint64_t sp = from->_head->swap_p.load();
-         /// these two come from main, we read alloc_p first because end free must
-         /// always be greater than alloc_p and we don't want to read these in
-         uint64_t ap = from->_head->alloc_p.load();
 
          auto beg    = (char*)from->_head->begin.get();
          auto msk    = from->_head->alloc_area_mask;
@@ -446,10 +436,7 @@ namespace triedent
       did_work |= do_swap(&hot(), &warm());
       did_work |= do_swap(&warm(), &cool());
       did_work |= do_swap(&cool(), &cold());
-      //if( not did_work )
-      //   _try_claim_free();
       return did_work;
-      //   do_swap(&cold(), &cold());
    }
 
    // updates the free range after swapping, this allows alloc to start
