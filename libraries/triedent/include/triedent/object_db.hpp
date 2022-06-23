@@ -53,7 +53,88 @@ namespace triedent
    };
 
    class object_db;
+   class location_lock2;
 
+   class shared_id
+   {
+      friend object_db;
+      friend location_lock2;
+
+     private:
+      object_db* db    = nullptr;
+      uint64_t   id    = 0;
+      bool       owner = false;
+
+      void unref();
+
+     public:
+      shared_id() = default;
+      shared_id(shared_id&& src) { *this = std::move(src); }
+      ~shared_id() { unref(); }
+
+      // can't support because of potential overflow
+      shared_id(const shared_id&) = delete;
+
+      // can't support because of potential overflow
+      shared_id& operator=(const shared_id&) = delete;
+
+      shared_id& operator=(shared_id&& src)
+      {
+         if (&src == this)
+            return *this;
+         unref();
+         db        = src.db;
+         id        = src.id;
+         owner     = src.owner;
+         src.db    = nullptr;
+         src.id    = 0;
+         src.owner = false;
+         return *this;
+      }
+
+      std::pair<object_id, bool> release()
+      {
+         auto result = std::pair{object_id{.id = id}, owner};
+         db          = nullptr;
+         id          = 0;
+         owner       = false;
+         return result;
+      }
+   };
+
+   // TODO: Rename to location_lock after phase out
+   class location_lock2
+   {
+      friend object_db;
+
+     private:
+      shared_id shared;
+      void      unlock();
+
+     public:
+      location_lock2()                      = default;
+      location_lock2(const location_lock2&) = delete;
+      location_lock2(location_lock2&& src) { *this = std::move(src); }
+      ~location_lock2() { unlock(); }
+
+      location_lock2& operator=(const location_lock2&) = delete;
+      location_lock2& operator=(location_lock2&& src)
+      {
+         if (&src == this)
+            return *this;
+         unlock();
+         shared = std::move(src.shared);
+         return *this;
+      }
+
+      shared_id into_shared_id()
+      {
+         unlock();
+         return std::move(shared);
+      }
+   };
+
+   // TODO: Phase out this version
    class location_lock
    {
       friend object_db;
@@ -89,12 +170,43 @@ namespace triedent
    class object_db
    {
       friend location_lock;
+      friend location_lock2;
 
      public:
       using object_id = triedent::object_id;
 
       object_db(std::filesystem::path idfile, bool allow_write);
       static void create(std::filesystem::path idfile, uint64_t max_id);
+
+      // Bumps the reference count by 1 if possible. shared_id will
+      // reduce it by 1 at destruction.
+      std::optional<shared_id> bump_count(object_id id)
+      {
+         auto& atomic = _header->objects[id.id];
+         auto  obj    = atomic.load();
+         do
+         {
+            if ((obj & ref_count_mask) == ref_count_mask)
+               return std::nullopt;
+         } while (!atomic.compare_exchange_weak(obj, obj + 1));
+
+         shared_id result;
+         result.db    = this;
+         result.id    = id.id;
+         result.owner = true;
+         return result;
+      }
+
+      // Doesn't bump the reference count. shared_id won't
+      // reduce the count at destruction.
+      std::optional<shared_id> preserve_count(object_id id)
+      {
+         shared_id result;
+         result.db    = this;
+         result.id    = id.id;
+         result.owner = false;
+         return result;
+      }
 
       // A thread which holds a location_lock may:
       // * Move the object to another location
@@ -436,9 +548,21 @@ namespace triedent
       */
    }
 
+   inline void shared_id::unref()
+   {
+      if (owner)
+         db->release({.id = id});
+   }
+
    inline void location_lock::unlock()
    {
       if (db)
          db->unlock(id);
+   }
+
+   inline void location_lock2::unlock()
+   {
+      if (shared.db)
+         shared.db->unlock(shared.id);
    }
 };  // namespace triedent
