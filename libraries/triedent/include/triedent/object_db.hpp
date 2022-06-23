@@ -65,6 +65,10 @@ namespace triedent
       uint64_t   id    = 0;
       bool       owner = false;
 
+      // note: This leaks children. Fixing this here could create a circular dependency
+      //       with ring_alloc. Leaving as is for now since an owned shared_id
+      //       (when it has children) is always wrapped in a maybe_owned or a mutating,
+      //       which prevent leaking children.
       void unref();
 
      public:
@@ -92,14 +96,21 @@ namespace triedent
          return *this;
       }
 
-      std::pair<object_id, bool> release()
-      {
-         auto result = std::pair{object_id{.id = id}, owner};
-         db          = nullptr;
-         id          = 0;
-         owner       = false;
-         return result;
-      }
+      object_db* get_db() const { return db; }
+      object_id  get_id() const { return {.id = id}; }
+
+      // Try taking ownership of id. Bumps reference count if needed.
+      //
+      // If successful, shared_id is cleared. If not successful,
+      // shared_id remains intact.
+      std::optional<object_id> try_take();
+
+      // Try taking exclusive ownership of id. Doesn't modify reference count.
+      //
+      // If shared_id is owned, and the reference count is 1, then clears
+      // shared_id and returns the id. Else leaves shared_id intact and
+      // returns nullopt.
+      std::optional<object_id> try_exclusive_take();
    };
 
    // TODO: Rename to location_lock after phase out
@@ -308,6 +319,12 @@ namespace triedent
      private:
       static constexpr uint64_t position_lock_mask = 1 << 14;
       static constexpr uint64_t ref_count_mask     = (1ull << 14) - 1;
+
+      // 0-13     ref_count
+      // 14       position_lock
+      // 15       is_value       or next_ptr
+      // 16-17    cache          or next_ptr
+      // 18-63    offset         or next_ptr
 
       // clang-format off
       static uint64_t extract_offset(uint64_t x)     { return x >> 18; }
@@ -552,6 +569,43 @@ namespace triedent
    {
       if (owner)
          db->release({.id = id});
+   }
+
+   inline std::optional<object_id> shared_id::try_take()
+   {
+      if (owner)
+      {
+         object_id result = {.id = id};
+         db               = nullptr;
+         id               = 0;
+         owner            = false;
+         return result;
+      }
+      if (!db)
+         return std::nullopt;
+      if (auto other = db->bump_count({.id = id}))
+      {
+         object_id result = {.id = id};
+         db               = nullptr;
+         id               = 0;
+         owner            = false;
+         other->owner     = false;
+         return result;
+      }
+      return std::nullopt;
+   }
+
+   inline std::optional<object_id> shared_id::try_exclusive_take()
+   {
+      if (!owner)
+         return std::nullopt;
+      if (db->ref({.id = id}) != 1)
+         return std::nullopt;
+      object_id result = {.id = id};
+      db               = nullptr;
+      id               = 0;
+      owner            = false;
+      return result;
    }
 
    inline void location_lock::unlock()

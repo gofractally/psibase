@@ -8,8 +8,6 @@
 
 namespace triedent
 {
-   using object_id = object_db::object_id;
-
    struct managed_ring;
 
    class ring_allocator

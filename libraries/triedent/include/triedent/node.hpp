@@ -4,8 +4,6 @@
 
 namespace triedent
 {
-   using object_id = ring_allocator::id;
-
    using key_view   = std::string_view;
    using value_view = std::string_view;
    using key_type   = std::string;

@@ -1,7 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
-#include <triedent/node.hpp>
+#include <triedent/node_traversal.hpp>
 
 namespace triedent
 {
@@ -460,35 +460,9 @@ namespace triedent
       _db->release(obj);
    }
 
-   /* return true if the object was freed */
    inline void database::release(id obj)
    {
-      if (not obj)
-         return;
-
-      auto ptr = _ring->release(obj);
-      if (ptr.first && !ptr.second)
-      {
-         //     if( ptr.second != object_location::inner ) {
-         //        throw std::runtime_error( "unexpected leaf type" );
-         //     }
-         auto& in = *reinterpret_cast<inner_node*>(ptr.first);
-         release(in.value());
-         auto nb  = in.num_branches();
-         auto pos = in.children();
-         auto end = pos + nb;
-         while (pos != end)
-         {
-            assert(*pos);
-            release(*pos);
-            ++pos;
-         }
-      }
-      //  else if( ptr.first ) {
-      //     if( ptr.second != object_location::leaf) {
-      //        throw std::runtime_error( "unexpected inner type" );
-      //     }
-      //  }
+      release_node(*_ring, obj);
    }
 
    template <typename AccessMode>
