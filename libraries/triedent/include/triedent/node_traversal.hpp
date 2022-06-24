@@ -25,6 +25,46 @@ namespace triedent
       }
    }
 
+   object_id bump_refcount_or_copy(ring_allocator& ra, object_id id);
+
+   inline object_id copy_node(ring_allocator& ra, object_id id, char* ptr, bool is_value)
+   {
+      if (is_value)
+      {
+         auto src          = reinterpret_cast<value_node*>(ptr);
+         auto [lock, dest] = value_node::make(ra, src->key(), src->data());
+         return lock.into_unlock_unchecked();
+      }
+      else
+      {
+         // TODO: drop incorrect version value
+         auto src = reinterpret_cast<inner_node*>(ptr);
+         auto [lock, dest] =
+             inner_node::make(ra, src->key(), bump_refcount_or_copy(ra, src->value()),
+                              src->branches(), src->version());
+         auto src_children  = src->children();
+         auto dest_children = dest->children();
+         auto dest_end      = dest_children + dest->num_branches();
+         while (dest_children != dest_end)
+         {
+            *dest_children = bump_refcount_or_copy(ra, *src_children);
+            ++dest_children;
+            ++src_children;
+         }
+         return lock.into_unlock_unchecked();
+      }
+   }
+
+   inline object_id bump_refcount_or_copy(ring_allocator& ra, object_id id)
+   {
+      if (!id)
+         return id;
+      if (auto shared = ra.bump_count(id))
+         return shared->into_unchecked();
+      auto [ptr, is_value] = ra.get_cache<false>(id);
+      return copy_node(ra, id, ptr, is_value);
+   }
+
    struct tracker_base
    {
       ring_allocator* ra;
@@ -142,7 +182,7 @@ namespace triedent
       {
          if (&src == this)
             return *this;
-         if (auto id = shared.try_exclusive_take())
+         if (auto id = shared.try_into_exclusive())
             release_node(*ra, *id);
          tracker_base::operator=(src);
          shared = std::move(src.shared);
@@ -151,7 +191,7 @@ namespace triedent
 
       ~maybe_owned()
       {
-         if (auto id = shared.try_exclusive_take())
+         if (auto id = shared.try_into_exclusive())
             release_node(*ra, *id);
       }
 
@@ -175,6 +215,16 @@ namespace triedent
       // Not implemented; use track_no_track() or track_maybe_unique()
       // to traverse down.
       tracker_base track_child(object_id id) const;
+
+      // Move ownership of id to caller. Bump reference count if needed
+      // (!shared.owner). Copy if the refcount would overflow. Clears
+      // maybe_owned unless a copy was made.
+      object_id into_or_copy()
+      {
+         if (auto x = shared.try_into())
+            return *x;
+         return copy_node(*ra, shared.get_id(), ptr, is_value);
+      }
    };  // maybe_owned
 
    // Use while mutating
@@ -195,7 +245,7 @@ namespace triedent
       {
          if (&src == this)
             return *this;
-         if (auto id = lock.into_shared_id().try_exclusive_take())
+         if (auto id = lock.into_unlock().try_into_exclusive())
             release_node(*ra, *id);
          tracker_base::operator=(src);
          lock = std::move(src.lock);
@@ -204,7 +254,7 @@ namespace triedent
 
       ~mutating()
       {
-         if (auto id = lock.into_shared_id().try_exclusive_take())
+         if (auto id = lock.into_unlock().try_into_exclusive())
             release_node(*ra, *id);
       }
 
@@ -224,14 +274,9 @@ namespace triedent
       {
          if (id == src.shared.get_id())
             return;
-         if (auto x = src.shared.try_take())
-         {
-            auto prev = id;
-            id        = *x;
-            release_node(*ra, prev);
-            return;
-         }
-         // TODO: clone
+         auto prev = id;
+         id        = src.into_or_copy();
+         release_node(*ra, prev);
       }
 
       // Not implemented

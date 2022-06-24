@@ -85,6 +85,7 @@ namespace triedent
       inline int8_t  reverse_lower_bound(uint8_t b) const;
       inline uint8_t upper_bound(uint8_t b) const;
 
+      // TODO: remove; doesn't handle refcount overflow
       inline static std::pair<location_lock, inner_node*> make(ring_allocator&   a,
                                                                const inner_node& in,
                                                                key_view          prefix,
@@ -130,6 +131,7 @@ namespace triedent
    } __attribute__((packed));
    static_assert(sizeof(inner_node) == 8 + 4 + 5 + 3, "unexpected padding");
 
+   // TODO: remove; doesn't handle refcount overflow
    inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator&   a,
                                                                  const inner_node& in,
                                                                  key_view          prefix,
@@ -167,13 +169,13 @@ namespace triedent
          _present_bits(branches),
          _version(version)
    {
-      assert(std::popcount(branches) < 3);
       memset(children(), 0, sizeof(object_id) * num_branches());
       memcpy(key_ptr(), prefix.data(), prefix.size());
    }
    /*
     *  Constructs a copy of in with the branches selected by 'branches'
     */
+   // TODO: remove; doesn't handle refcount overflow
    inline inner_node::inner_node(ring_allocator&   a,
                                  const inner_node& in,
                                  key_view          prefix,
