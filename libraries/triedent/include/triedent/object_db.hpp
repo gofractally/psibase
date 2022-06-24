@@ -106,12 +106,23 @@ namespace triedent
       // overflow), leave shared_id intact.
       std::optional<object_id> try_into();
 
+      // Try moving ownership of id to caller. Doesn't modify
+      // reference count.
+      std::optional<object_id> try_into_if_owned()
+      {
+         if (owner)
+            return into_unchecked();
+         else
+            return std::nullopt;
+      }
+
       // Try moving exclusive ownership of id to caller. Doesn't modify
       // reference count.
       //
       // If shared_id is owned, and the reference count is 1, then clears
       // shared_id and returns the id. Else leaves shared_id intact and
       // returns nullopt.
+      // TODO: remove if not needed
       std::optional<object_id> try_into_exclusive();
 
       // Move ownership (if any) of id to caller (unchecked); this

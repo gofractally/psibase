@@ -182,7 +182,7 @@ namespace triedent
       {
          if (&src == this)
             return *this;
-         if (auto id = shared.try_into_exclusive())
+         if (auto id = shared.try_into_if_owned())
             release_node(*ra, *id);
          tracker_base::operator=(src);
          shared = std::move(src.shared);
@@ -191,7 +191,7 @@ namespace triedent
 
       ~maybe_owned()
       {
-         if (auto id = shared.try_into_exclusive())
+         if (auto id = shared.try_into_if_owned())
             release_node(*ra, *id);
       }
 
@@ -245,7 +245,7 @@ namespace triedent
       {
          if (&src == this)
             return *this;
-         if (auto id = lock.into_unlock().try_into_exclusive())
+         if (auto id = lock.into_unlock().try_into_if_owned())
             release_node(*ra, *id);
          tracker_base::operator=(src);
          lock = std::move(src.lock);
@@ -254,7 +254,7 @@ namespace triedent
 
       ~mutating()
       {
-         if (auto id = lock.into_unlock().try_into_exclusive())
+         if (auto id = lock.into_unlock().try_into_if_owned())
             release_node(*ra, *id);
       }
 
