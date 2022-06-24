@@ -53,11 +53,13 @@ namespace triedent
    };
 
    class object_db;
+   class location_lock;
    class location_lock2;
 
    class shared_id
    {
       friend object_db;
+      friend location_lock;
       friend location_lock2;
 
      private:
@@ -143,6 +145,7 @@ namespace triedent
    class location_lock2
    {
       friend object_db;
+      friend location_lock;
 
      private:
       shared_id shared;
@@ -207,6 +210,18 @@ namespace triedent
          unlock();
          db = nullptr;
          id = 0;
+         return result;
+      }
+
+      // Convert to an owned location_lock2. Caution: only use with lock returned by alloc().
+      location_lock2 into_lock2_alloced_unchecked()
+      {
+         location_lock2 result;
+         result.shared.db    = db;
+         result.shared.id    = id;
+         result.shared.owner = true;
+         db                  = nullptr;
+         id                  = 0;
          return result;
       }
    };  // location_lock
