@@ -1,5 +1,8 @@
 #define CATCH_CONFIG_MAIN
 
+// run a specific test
+// cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON .. && make -j $(nproc) && ./psitest nft_sys-test-debug.wasm -s -r compact
+
 #include "FractallySys.hpp"
 #include <contracts/system/commonErrors.hpp>
 #include <psibase/DefaultTestChain.hpp>
@@ -44,7 +47,7 @@ SCENARIO("Scheduling meetings")
    GIVEN(AN_EMPTY_CHAIN)
    {
       WHEN("There is no meeting scheduled") {
-         AND_THEN("The meeting cadence and day of week + time can be set") { }
+         THEN("The meeting cadence and day of week + time can be set") { }
       }
       WHEN("A meeting is scheduled") {
          THEN("The meeting happens at the set time") { }
@@ -159,29 +162,9 @@ SCENARIO("Meeting Attendance and Consensus") {
          }
       }
       AND_GIVEN("3 members in a meeting") {
+         // Consensus is defined as 3/5 or 4/6 *only*, requiring a minimum of 3 participants in a 5-member room and 4 in a 6-member room to meet the minimum
+         // No one earns *anything* without at least these minima of consensus reports submitted
          WHEN("All members submit consensus reports that agree") {
-            THEN(CONSENSUS_ACHIEVED) { }
-         }
-         WHEN("2 of 3 members submit consensus reports that agree, and 1 report that does not agree") {
-            THEN(CONSENSUS_ACHIEVED) { }
-         }
-         WHEN("1 of 3 members submit consensus reports that agree, and 3 reports that do not agree (and differ)") {
-            THEN(CONSENSUS_NOT_ACHIEVED) { }
-         }
-      }
-      AND_GIVEN("2 members in a meeting") {
-         WHEN("All members submit consensus reports that agree") {
-            THEN(CONSENSUS_ACHIEVED) { }
-         }
-         WHEN("1 of 2 members submit a consensus report, and 1 that does not agree") {
-            THEN(CONSENSUS_NOT_ACHIEVED) { }
-         }
-      }
-      AND_GIVEN("1 member in a meeting") {
-         WHEN("member submits a report") {
-            THEN(CONSENSUS_ACHIEVED) { }
-         }
-         WHEN("member does not submits a report") {
             THEN(CONSENSUS_NOT_ACHIEVED) { }
          }
       }
@@ -200,6 +183,9 @@ SCENARIO("Meeting Attendance and Consensus") {
             THEN("they become a full-time member, earning their team the team-matching reward for that week") { }
          }
       }
+      // TODO: handle Full-time and part-time member thresholds being cross
+      // TODO: handle team being active/inactive based on reent team attendance
+      //    requires 4 FT members to be active
    }
 }
 
@@ -303,7 +289,7 @@ SCENARIO("Petition Life Cycle") {
 }
 
 SCENARIO("Team Administration") {
-   WHEN("At least 4 people agree to be on a team") {
+   GIVEN("4 full-time members not already on a team") {
       // White paper says "Any active member may start a new team and ask others to join. Once a team has 4 members it can select a team leader with 2⁄3 approval".
       // Any reason to allow people to form a team before they have 4 people? It's just extra logic for us if we allow it, impacting
       // . not issuing team rewards until 4 members,
@@ -311,35 +297,85 @@ SCENARIO("Team Administration") {
       // 2 main concerns
       // . code complexity
       // . members forming a lone team or a team of 2 simply to double their rewards, without actually having enough members to get the leverage we want from team collaboration and coordination
-      THEN("They can create a new team") {
-         AND_THEN("They can add a new member with 2/3 agreement + the new member's agreement") { }
-         GIVEN("A member already on a team") {
-            THEN("They can't add that new member with 2/3 agreement + the new member's agreement") { }
-         }
-         AND_THEN("They can elect a team leader with 2/3 agreement") {
-            AND_THEN("They can replace the team leader with 2/3 agreement") { }
-         }
-         GIVEN("A team token balance") {
-            THEN("A member and propose and the team can sign a transaction to transfer from the team's token balance to a member's escrow account") { }
-            THEN("A single vote + 72 hours auto-executes the trx") { }
-            THEN("A 2/3 vote of all members auto-executes the trx") { }
-            THEN("A 2/3 vote of some of the members + 72 hours auto-executes the trx") { }
-            THEN("Less than 2/3 vote of member votes + 72 hours rejects the trx and penalizes the proposer") {
-               // We need to talk about the penalty to the proposer. Given our stance on other issues,
-               // I recommend we let the team set a penalty so that it's a team perogative,
-               // rather than an over-specified detail we impose on them.
-            }
-            THEN("Team member can't propose a trx if they lack sufficient balance to pay the penalty in the case that the trx isn't approved by their team") { }
-            THEN("A non-team member can't propose a trx against the team's token balance") { }
-            THEN("A team member who plans to leave the team can't propose a trx against the team's token balance") {
-               // Q: Agreed?
-               // Q: Does their vote count in team decisions generally? ie. should it count in the 2/3 consensus calculation?
-               // .  many more questions about this. See technical doc for more questions
-            }
+      THEN("They can create a new team") { }
+   }
+   GIVEN("A team with 4 full-time members and no leader") {
+      THEN("They can add a new member with 2/3 agreement + the new member's agreement") { }
+      THEN("They can't add a new member with less than 2/3 agreement + the new member's agreement") { }
+      THEN("They can't add a new member with 2/3 agreement if the new member doesn't agree") { }
+      // TODO: the other permutations of the vote
+      // NOTE: do all can't cases, then end with can case, which sets up next WHEN / GIVEN chunk
+      // TODO: "they" --> Alice? a FT member?
+      THEN("They can't re-add a member already on the team") { }
+      THEN("They can elect a team leader with 2/3 agreement") { } // Q: and the team lead's agreement?
+      THEN("They can't elect a team leader without 2/3 agreement") { } // Q: and the team lead's agreement?
+      THEN("They can't create another team") { }
+      THEN("They can't join another team") { }
+      WHEN("They elect to leave the team") {
+         THEN("They are put in pending status to leave the team") { }
+         
+      }
+   }
+   GIVEN("A team with 4 full-time members and a team lead") {
+      THEN("They can replace the team leader with 2/3 agreement") { } // Q: and the new team lead's agreement?
+
+   }
+   GIVEN("A team with 12 full-time members, one of whom has opted to leave the team and is in pending status") {
+      THEN("The team can't add a new person") { } // TODO: Wrong
+      THEN("The team remains active (and receives its team matching of member rewards") { }
+      WHEN("12 weeks have passed") {
+         THEN("The member who left the team can join a new team") { }
+         THEN("The team (now 3) becomes inactive") { }
+         THEN("The team can add a new full-time member.") {
+            AND_THEN("The team becomes active again") { }
          }
       }
-      THEN("They can't mark a member for removal") {
-         // Q: They can't remove someone if it reduces them to 3, right? Does a team auto-disband at that point?
+   }
+      
+   // TODO: If a team falls below four Full-Time Members, the team is no longer considered active and does not gain any team benefits,
+   //   such as consideration for placement on the Council or matching Respect token distributions.
+   //   If the team falls to zero Full-Time Members, the team is disbanded and all outstanding team escrow is deleted.
+   GIVEN("A team with a token balance") {
+      THEN("A member can propose and the team can sign a transaction to transfer from the team's token balance to a member's escrow account") { }
+      THEN("A member can not propose a transaction to transfer from the team's token balance to a non-member's escrow account") { } // Q: yes?
+      THEN("A single vote + 72 hours auto-executes the trx") { }
+      THEN("A 2/3 vote of all members auto-executes the trx") { }
+      THEN("A 2/3 vote of some of the members + 72 hours auto-executes the trx") { }
+      THEN("Less than 2/3 vote of member votes + 72 hours rejects the trx and penalizes the proposer") {
+         // We need to talk about the penalty to the proposer. Given our stance on other issues,
+         // I recommend we let the team set a penalty so that it's a team perogative,
+         // rather than an over-specified detail we impose on them.
+      }
+      THEN("Team member can't propose a trx if they lack sufficient balance to pay the penalty in the case that the trx isn't approved by their team") { }
+      THEN("A non-team member can't propose a trx against the team's token balance") { }
+         // Q: A member who's in process of leaving the team remains a full team members as long as they're behavior is good.
+         // Q: Does their vote count in team decisions generally? ie. should it count in the 2/3 consensus calculation?
+         //    many more questions about this. See technical doc for more questions
+         //    Yes, they're a Full team member until they're off the team (or not a FT member)
+   }
+   GIVEN("A team of 1 member") {
+      WHEN("The last member leaves the team") {
+         THEN("The team gets auto-disbanded") { } // Q: do they have to wait the same leaving-a-team delay? Or is this immediate?
+      }
+   }
+   WHEN("One member is absent for 5 weeks") {
+      THEN("The team becomes inactive") { }
+      AND_WHEN("The member is present for the next 7 meetings") {
+         THEN("The team is still inactive") { }
+      }
+      AND_WHEN("The member is present for the 8th consecutive meeting") {
+         THEN("The team becomes active again") { }
+      }
+   }
+
+
+   GIVEN("An active team with 12 members") {
+      WHEN("A member opts to leave the team") {
+         THEN("The team can't add a new person.") { }
+         AND_WHEN("12 weeks pass") {
+            THEN("The member who left can join another team") { }
+            THEN("The team can add a new person.") { }
+         }
       }
    }
    WHEN("3 people agree to form a new team") {
@@ -353,3 +389,5 @@ SCENARIO("Team Administration") {
       THEN("They can mark a member for removal") { }
    }
 }
+
+// TODO: non-member actions

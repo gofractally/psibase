@@ -1,13 +1,12 @@
 #pragma once
 
-#include <array>
 #include <compare>
 #include <limits>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
 
 // #include "nft_sys.hpp"
-// #include "symbol_tables.hpp"
+#include "../../token_sys/include/types.hpp"
 #include "types.hpp"
 
 namespace UserContract
@@ -40,62 +39,66 @@ namespace UserContract
    // };
    // PSIO_REFLECT(InflationRecord, settings, stats);
 
-   // struct TokenRecord
-   // {
-   //    TID                id;
-   //    NID                ownerNft;
-   //    InflationRecord    inflation;
-   //    psibase::Bitset<8> config;
-   //    Precision          precision;
-   //    Quantity           currentSupply;
-   //    Quantity           maxSupply;
-   //    SID                symbolId;
+   struct ProposalRecord
+   {
+      ProposalID id;
+   };
 
-   //    using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"}, psibase::NamedBit_t{"untradeable"}>;
+   struct TeamRecord
+   {
+      TeamID id;
+      psibase::AccountNumber account;
+      std::vector<psibase::AccountNumber> members;
+      psibase::AccountNumber lead;
+      bool    isActive;
+      // psibase::Bitset<8> config;
+      // Precision          precision;
+      // Quantity           currentSupply;
+      // Quantity           maxSupply;
+      // SID                symbolId;
 
-   //    static bool isValidKey(TID tokenId)
-   //    {
-   //       /*
-   //        * The final of the 32 bits is reserved such that there are only 31 bits used for token ID.
-   //        * This is simply an attempt to future proof the token record, so we have a spare bit to
-   //        *   separately namespace tokens should the need arise.
-   //        */
+      // using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"}, psibase::NamedBit_t{"untradeable"}>;
 
-   //       return tokenId > 0 && tokenId <= std::numeric_limits<uint32_t>::max() / 2;
-   //    }
+      // static bool isValidKey(TID tokenId)
+      // {
+      //    /*
+      //     * The final of the 32 bits is reserved such that there are only 31 bits used for token ID.
+      //     * This is simply an attempt to future proof the token record, so we have a spare bit to
+      //     *   separately namespace tokens should the need arise.
+      //     */
 
-   //    auto operator<=>(const TokenRecord&) const = default;
-   // };
-   // PSIO_REFLECT(TokenRecord,
-   //              id,
-   //              ownerNft,
-   //              inflation,
-   //              config,
-   //              precision,
-   //              currentSupply,
-   //              maxSupply,
-   //              symbolId);
-   // using TokenTable_t = psibase::Table<TokenRecord, &TokenRecord::id>;
+      //    return tokenId > 0 && tokenId <= std::numeric_limits<uint32_t>::max() / 2;
+      // }
+
+      auto operator<=>(const TeamRecord&) const = default;
+   };
+   PSIO_REFLECT(TeamRecord,
+               id,
+               account,
+               members,
+               lead,
+               isActive);
+   using TeamTable_t = psibase::Table<TeamRecord, &TeamRecord::id>;
    // // Todo - add symbolId as secondary index when possible
 
-   // struct BalanceKey_t
-   // {
-   //    psibase::AccountNumber account;
-   //    TID                    tokenId;
+   struct BalanceKey_t
+   {
+      psibase::AccountNumber account;
+      TID                    tokenId;
 
-   //    auto operator<=>(const BalanceKey_t&) const = default;
-   // };
-   // PSIO_REFLECT(BalanceKey_t, tokenId, account);
+      auto operator<=>(const BalanceKey_t&) const = default;
+   };
+   PSIO_REFLECT(BalanceKey_t, tokenId, account);
 
-   // struct BalanceRecord
-   // {
-   //    BalanceKey_t key;
-   //    uint64_t     balance;
+   struct BalanceRecord
+   {
+      BalanceKey_t key;
+      uint64_t     balance;
 
-   //    auto operator<=>(const BalanceRecord&) const = default;
-   // };
-   // PSIO_REFLECT(BalanceRecord, key, balance);
-   // using BalanceTable_t = psibase::Table<BalanceRecord, &BalanceRecord::key>;
+      auto operator<=>(const BalanceRecord&) const = default;
+   };
+   PSIO_REFLECT(BalanceRecord, key, balance);
+   using BalanceTable_t = psibase::Table<BalanceRecord, &BalanceRecord::key>;
 
    // struct SharedBalanceKey_t
    // {

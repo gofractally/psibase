@@ -8,7 +8,8 @@
 
 namespace UserContract
 {
-   // using TID = uint32_t;
+   using TeamID = uint32_t;
+   using ProposalID = uint32_t;
 
    // struct Precision
    // {
