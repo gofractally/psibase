@@ -98,6 +98,7 @@ namespace triedent
 
       object_db* get_db() const { return db; }
       object_id  get_id() const { return {.id = id}; }
+      bool       get_owner() const { return owner; }
 
       // Try moving ownership of id to caller. Bump reference count
       // if needed (!owner).

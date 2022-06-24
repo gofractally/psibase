@@ -450,8 +450,9 @@ namespace triedent
    template <typename AccessMode>
    inline deref<node> database::session<AccessMode>::get(id i) const
    {
-      auto r = _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
-      return {i, r.first, r.second};
+      auto [ptr, is_value, ref] =
+          _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
+      return {i, ptr, is_value};
    }
 
    template <typename AccessMode>

@@ -62,7 +62,7 @@ namespace triedent
 
       //  pointer is valid until GC runs
       template <bool CopyToHot = true>
-      std::pair<char*, bool> get_cache(id);
+      std::tuple<char*, bool, uint16_t> get_cache(id);
 
       uint32_t ref(id i) const { return _obj_ids->ref(i); }
 
@@ -265,22 +265,23 @@ namespace triedent
    //  the gc moved past char* while reading then read again at new location
 
    template <bool CopyToHot>
-   std::pair<char*, bool> ring_allocator::get_cache(id i)
+   std::tuple<char*, bool, uint16_t> ring_allocator::get_cache(id i)
    {
-      auto loc = _obj_ids->get(i);
-      auto obj = _levels[loc.cache]->get_object(loc.offset);
+      uint16_t ref;
+      auto     loc = _obj_ids->get(i, ref);
+      auto     obj = _levels[loc.cache]->get_object(loc.offset);
 
       if constexpr (not CopyToHot)
-         return {obj->data(), (bool)loc.is_value};
+         return {obj->data(), (bool)loc.is_value, ref};
 
       if (loc.cache == hot_cache)
-         return {obj->data(), (bool)loc.is_value};
+         return {obj->data(), (bool)loc.is_value, ref};
 
       if (obj->size > 4096)
-         return {obj->data(), (bool)loc.is_value};
+         return {obj->data(), (bool)loc.is_value, ref};
 
       return {alloc(hot(), _obj_ids->spin_lock({.id = obj->id}), obj->size, obj->data()),
-              (bool)loc.is_value};
+              (bool)loc.is_value, ref};
    }
 
    inline uint64_t ring_allocator::wait_on_free_space(managed_ring& ring, uint64_t used_size)

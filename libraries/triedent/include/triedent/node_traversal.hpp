@@ -61,7 +61,7 @@ namespace triedent
          return id;
       if (auto shared = ra.bump_count(id))
          return shared->into_unchecked();
-      auto [ptr, is_value] = ra.get_cache<false>(id);
+      auto [ptr, is_value, ref] = ra.get_cache<false>(id);
       return copy_node(ra, id, ptr, is_value);
    }
 
@@ -121,7 +121,7 @@ namespace triedent
 
       no_track track_child(object_id id) const
       {
-         auto [ptr, is_value] = ra->get_cache<CopyToHot>(id);
+         auto [ptr, is_value, ref] = ra->get_cache<CopyToHot>(id);
          return {ra, ptr, is_value, id};
       }
    };  // no_track
@@ -158,8 +158,8 @@ namespace triedent
 
       maybe_unique track_child(object_id id) const
       {
-         auto [ptr, is_value] = ra->get_cache<true>(id);
-         return {ra, ptr, is_value, id, unique && ra->ref(id) == 1};
+         auto [ptr, is_value, ref] = ra->get_cache<true>(id);
+         return {ra, ptr, is_value, id, unique && ref == 1};
       }
    };  // maybe_unique
 
@@ -172,7 +172,7 @@ namespace triedent
       maybe_owned(ring_allocator* ra       = nullptr,
                   char*           ptr      = nullptr,
                   bool            is_value = false,
-                  shared_id       shared   = {})
+                  shared_id&&     shared   = {})
           : tracker_base(ra, ptr, is_value), shared(std::move(shared))
       {
       }
@@ -195,7 +195,10 @@ namespace triedent
             release_node(*ra, *id);
       }
 
-      bool is_unique() const { return shared.get_db()->ref(shared.get_id()) == 1; }
+      bool is_unique() const
+      {
+         return shared.get_owner() && shared.get_db()->ref(shared.get_id()) == 1;
+      }
 
       // Not implemented; mutation requires `mutating`
       template <typename T>
