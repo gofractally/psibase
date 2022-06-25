@@ -6,66 +6,6 @@ namespace triedent
    struct maybe_unique;
    struct maybe_owned;
 
-   inline void release_node(ring_allocator& ra, object_id obj)
-   {
-      if (!obj)
-         return;
-      if (auto [ptr, is_value] = ra.release(obj); ptr && !is_value)
-      {
-         auto& in = *reinterpret_cast<inner_node*>(ptr);
-         release_node(ra, in.value());
-         auto nb  = in.num_branches();
-         auto pos = in.children();
-         auto end = pos + nb;
-         while (pos != end)
-         {
-            assert(*pos);
-            release_node(ra, *pos);
-            ++pos;
-         }
-      }
-   }
-
-   object_id bump_refcount_or_copy(ring_allocator& ra, object_id id);
-
-   inline object_id copy_node(ring_allocator& ra, object_id id, char* ptr, bool is_value)
-   {
-      if (is_value)
-      {
-         auto src          = reinterpret_cast<value_node*>(ptr);
-         auto [lock, dest] = value_node::make(ra, src->key(), src->data());
-         return lock.into_unlock_unchecked();
-      }
-      else
-      {
-         // TODO: drop incorrect version value
-         auto src = reinterpret_cast<inner_node*>(ptr);
-         auto [lock, dest] =
-             inner_node::make(ra, src->key(), bump_refcount_or_copy(ra, src->value()),
-                              src->branches(), src->version());
-         auto src_children  = src->children();
-         auto dest_children = dest->children();
-         auto dest_end      = dest_children + dest->num_branches();
-         while (dest_children != dest_end)
-         {
-            *dest_children = bump_refcount_or_copy(ra, *src_children);
-            ++dest_children;
-            ++src_children;
-         }
-         return lock.into_unlock_unchecked();
-      }
-   }
-
-   inline object_id bump_refcount_or_copy(ring_allocator& ra, object_id id)
-   {
-      if (!id)
-         return id;
-      if (auto shared = ra.bump_count(id))
-         return shared->into_unchecked();
-      auto [ptr, is_value, ref] = ra.get_cache<false>(id);
-      return copy_node(ra, id, ptr, is_value);
-   }
-
    struct tracker_base
    {
       ring_allocator* ra;

@@ -9,6 +9,8 @@ namespace triedent
    using key_type   = std::string;
    using value_type = key_type;
 
+   object_id bump_refcount_or_copy(ring_allocator& ra, object_id id);
+
    class node
    {
      public:
@@ -85,7 +87,6 @@ namespace triedent
       inline int8_t  reverse_lower_bound(uint8_t b) const;
       inline uint8_t upper_bound(uint8_t b) const;
 
-      // TODO: remove; doesn't handle refcount overflow
       inline static std::pair<location_lock, inner_node*> make(ring_allocator&   a,
                                                                const inner_node& in,
                                                                key_view          prefix,
@@ -131,7 +132,6 @@ namespace triedent
    } __attribute__((packed));
    static_assert(sizeof(inner_node) == 8 + 4 + 5 + 3, "unexpected padding");
 
-   // TODO: remove; doesn't handle refcount overflow
    inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator&   a,
                                                                  const inner_node& in,
                                                                  key_view          prefix,
@@ -175,7 +175,6 @@ namespace triedent
    /*
     *  Constructs a copy of in with the branches selected by 'branches'
     */
-   // TODO: remove; doesn't handle refcount overflow
    inline inner_node::inner_node(ring_allocator&   a,
                                  const inner_node& in,
                                  key_view          prefix,
@@ -196,8 +195,7 @@ namespace triedent
          auto e  = c + num_branches();
          while (c != e)
          {
-            *c = *ic;
-            a.retain(*c);
+            *c = bump_refcount_or_copy(a, *ic);
             ++c;
             ++ic;
          }
@@ -208,10 +206,7 @@ namespace triedent
          auto fb              = std::countr_zero(common_branches);
          while (fb < 64)
          {
-            auto b = in.branch(fb);
-            a.retain(b);
-            branch(fb) = b;
-
+            branch(fb) = bump_refcount_or_copy(a, in.branch(fb));
             common_branches ^= 1ull << fb;
             fb = std::countr_zero(common_branches);
          }
@@ -272,4 +267,52 @@ namespace triedent
       return b >= 63 ? 64 : std::countr_zero(_present_bits & mask);
    }
 
+   inline void release_node(ring_allocator& ra, object_id obj)
+   {
+      if (!obj)
+         return;
+      if (auto [ptr, is_value] = ra.release(obj); ptr && !is_value)
+      {
+         auto& in = *reinterpret_cast<inner_node*>(ptr);
+         release_node(ra, in.value());
+         auto nb  = in.num_branches();
+         auto pos = in.children();
+         auto end = pos + nb;
+         while (pos != end)
+         {
+            assert(*pos);
+            release_node(ra, *pos);
+            ++pos;
+         }
+      }
+   }
+
+   inline object_id copy_node(ring_allocator& ra, object_id id, char* ptr, bool is_value)
+   {
+      if (is_value)
+      {
+         auto src          = reinterpret_cast<value_node*>(ptr);
+         auto [lock, dest] = value_node::make(ra, src->key(), src->data());
+         return lock.into_unlock_unchecked();
+      }
+      else
+      {
+         // TODO: drop incorrect version value
+         auto src = reinterpret_cast<inner_node*>(ptr);
+         auto [lock, dest] =
+             inner_node::make(ra, *src, src->key(), bump_refcount_or_copy(ra, src->value()),
+                              src->branches(), src->version());
+         return lock.into_unlock_unchecked();
+      }
+   }
+
+   inline object_id bump_refcount_or_copy(ring_allocator& ra, object_id id)
+   {
+      if (!id)
+         return id;
+      if (auto shared = ra.bump_count(id))
+         return shared->into_unchecked();
+      auto [ptr, is_value, ref] = ra.get_cache<false>(id);
+      return copy_node(ra, id, ptr, is_value);
+   }
 }  // namespace triedent
