@@ -25,11 +25,6 @@ namespace triedent
          return reinterpret_cast<const T*>(ptr);
       }
 
-      // Not implemented; this must be `mutating`, id must be non-const,
-      // and Tr must be `maybe_owned`.
-      template <typename Tr>
-      void set_child(const object_id& id, Tr&& src);
-
      protected:
       void clear()
       {
@@ -55,21 +50,11 @@ namespace triedent
       no_track(const no_track&)            = default;
       no_track& operator=(const no_track&) = default;
 
-      // Not implemented; mutation requires `mutating`
-      template <typename T>
-      T* mut() const;
-
       template <bool CH>
       no_track<CH> track_no_track() const
       {
          return {ra, ptr, is_value, id};
       }
-
-      // Not implemented; can't start tracking unique from here
-      maybe_unique track_maybe_unique() const;
-
-      // Not implemented; can't start tracking owned from here
-      maybe_owned into_maybe_owned() &&;
 
       no_track track_child(object_id id) const
       {
@@ -95,10 +80,6 @@ namespace triedent
       }
       maybe_unique(const maybe_unique&)            = default;
       maybe_unique& operator=(const maybe_unique&) = default;
-
-      // Not implemented; mutation requires `mutating`
-      template <typename T>
-      T* mut() const;
 
       template <bool CopyToHot>
       no_track<CopyToHot> track_no_track() const
@@ -155,10 +136,6 @@ namespace triedent
          return shared.get_owner() && shared.get_db()->ref(shared.get_id()) == 1;
       }
 
-      // Not implemented; mutation requires `mutating`
-      template <typename T>
-      T* mut() const;
-
       template <bool CopyToHot>
       no_track<CopyToHot> track_no_track() const
       {
@@ -171,10 +148,6 @@ namespace triedent
       }
 
       maybe_owned into_maybe_owned() && { return std::move(*this); }
-
-      // Not implemented; use track_no_track() or track_maybe_unique()
-      // to traverse down.
-      tracker_base track_child(object_id id) const;
 
       // Move ownership of id to caller. Bump reference count if needed
       // (!shared.owner). Copy if the refcount would overflow. Clears
@@ -234,12 +207,6 @@ namespace triedent
          return reinterpret_cast<T*>(ptr);
       }
 
-      template <typename T>
-      T* mut()
-      {
-         return reinterpret_cast<T*>(ptr);
-      }
-
       void set_child(object_id& id, maybe_owned&& src)
       {
          if (id == src.shared.get_id())
@@ -249,22 +216,12 @@ namespace triedent
          release_node(*ra, prev);
       }
 
-      // Not implemented
-      template <bool CopyToHot>
-      no_track<CopyToHot> track_no_track() const;
-
-      // Not implemented; can't start tracking unique from here
-      maybe_unique track_maybe_unique() const;
-
       maybe_owned into_maybe_owned() &&
       {
          maybe_owned result = {ra, ptr, is_value, lock.into_unlock()};
          clear();
          return result;
       }
-
-      // Not implemented; use track_no_track() to traverse down.
-      tracker_base track_child(object_id id) const;
    };  // mutating
 
    template <typename Tracker>
@@ -299,7 +256,7 @@ namespace triedent
       // Tree mutation functions in database.hpp return node_ref<maybe_owned>
       node_ref<maybe_owned> into() &&;
 
-      auto track_child(object_id id) const -> node_ref<decltype(tracker.track_child(id))>;
+      auto track_child(object_id id) const;
    };
 
    template <typename Tracker>
@@ -307,16 +264,11 @@ namespace triedent
    {
      private:
       auto ptr() const { return this->tracker.template as<value_node>(); }
-      auto mut() const { return this->tracker.template mut<value_node>(); }
 
      public:
       using base = ref_base<Tracker, value_ref>;
 
-      value_ref(Tracker&& tracker) : base(std::move(tracker)) {}
-      value_ref(const value_ref&)            = default;
-      value_ref(value_ref&&)                 = default;
-      value_ref& operator=(const value_ref&) = default;
-      value_ref& operator=(value_ref&&)      = default;
+      using base::base;
 
       uint32_t key_size() const { return ptr()->key_size(); }
       key_view key() const { return ptr()->key(); }
@@ -330,16 +282,11 @@ namespace triedent
    {
      private:
       auto ptr() const { return this->tracker.template as<inner_node>(); }
-      auto mut() const { return this->tracker.template mut<inner_node>(); }
 
      public:
       using base = ref_base<Tracker, inner_ref>;
 
-      inner_ref(Tracker&& tracker) : base(std::move(tracker)) {}
-      inner_ref(const inner_ref&)            = default;
-      inner_ref(inner_ref&&)                 = default;
-      inner_ref& operator=(const inner_ref&) = default;
-      inner_ref& operator=(inner_ref&&)      = default;
+      using base::base;
 
       uint32_t key_size() const { return ptr()->key_size(); }
       key_view key() const { return ptr()->key(); }
@@ -357,12 +304,7 @@ namespace triedent
      public:
       using base = ref_base<Tracker, node_ref>;
 
-      node_ref() = default;
-      node_ref(Tracker&& tracker) : base(std::move(tracker)) {}
-      node_ref(const node_ref&)            = default;
-      node_ref(node_ref&&)                 = default;
-      node_ref& operator=(const node_ref&) = default;
-      node_ref& operator=(node_ref&&)      = default;
+      using base::base;
 
       value_ref<Tracker> into_value_node() && { return {std::move(this->tracker)}; }
       inner_ref<Tracker> into_inner_node() && { return {std::move(this->tracker)}; }
@@ -370,9 +312,8 @@ namespace triedent
 
    template <typename Tracker, template <typename Tr> typename Derived>
    auto ref_base<Tracker, Derived>::track_child(object_id id) const
-       -> node_ref<decltype(tracker.track_child(id))>
    {
-      return {tracker.track_child(id)};
+      return node_ref<decltype(tracker.track_child(id))>{tracker.track_child(id)};
    }
 
    template <typename Tracker, template <typename Tr> typename Derived>
