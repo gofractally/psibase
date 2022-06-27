@@ -5,6 +5,7 @@ namespace triedent
 {
    struct maybe_unique;
    struct maybe_owned;
+   struct mutating;
 
    struct tracker_base
    {
@@ -51,7 +52,7 @@ namespace triedent
       no_track& operator=(const no_track&) = default;
 
       template <bool CH>
-      no_track<CH> track_no_track() const
+      no_track<CH> as_no_track() const
       {
          return {ra, ptr, is_value, id};
       }
@@ -82,14 +83,18 @@ namespace triedent
       maybe_unique& operator=(const maybe_unique&) = default;
 
       template <bool CopyToHot>
-      no_track<CopyToHot> track_no_track() const
+      no_track<CopyToHot> as_no_track() const
       {
          return {ra, ptr, is_value, id};
       }
 
-      maybe_unique track_maybe_unique() const { return *this; }
+      maybe_unique as_maybe_unique() const { return *this; }
 
-      maybe_owned into_maybe_owned();
+      maybe_owned as_maybe_owned() const;
+      maybe_owned into_maybe_owned() const;
+
+      // If unique, then edit in place
+      std::optional<mutating> edit() const;
 
       maybe_unique track_child(object_id id) const
       {
@@ -137,23 +142,23 @@ namespace triedent
       }
 
       template <bool CopyToHot>
-      no_track<CopyToHot> track_no_track() const
+      no_track<CopyToHot> as_no_track() const
       {
          return {ra, ptr, is_value, shared.get_id()};
       }
 
-      maybe_unique track_maybe_unique() const
+      maybe_unique as_maybe_unique() const
       {
          return {ra, ptr, is_value, shared.get_id(), is_unique()};
       }
-
-      maybe_owned into_maybe_owned() && { return std::move(*this); }
 
       // Move ownership of id to caller. Bump reference count if needed
       // (!shared.owner). Copy if the refcount would overflow. Clears
       // maybe_owned unless a copy was made.
       object_id into_or_copy()
       {
+         if (!shared.get_id())
+            return {};
          if (auto x = shared.try_into())
          {
             clear();
@@ -163,10 +168,15 @@ namespace triedent
       }
    };  // maybe_owned
 
-   inline maybe_owned maybe_unique::into_maybe_owned()
+   inline maybe_owned maybe_unique::as_maybe_owned() const
    {
       // Result isn't owned since maybe_unique borrows from elsewhere
       return {ra, ptr, is_value, ra->preserve_count(id)};
+   }
+
+   inline maybe_owned maybe_unique::into_maybe_owned() const
+   {
+      return as_maybe_owned();
    }
 
    // Use while mutating
@@ -202,7 +212,7 @@ namespace triedent
       }
 
       template <typename T>
-      T* as()
+      T* as() const
       {
          return reinterpret_cast<T*>(ptr);
       }
@@ -224,6 +234,11 @@ namespace triedent
       }
    };  // mutating
 
+   inline std::optional<mutating> maybe_unique::edit() const
+   {
+      return mutating{ra, ptr, is_value, ra->spin_lock(id).into_lock2_editing_unchecked()};
+   }
+
    template <typename Tracker>
    class node_ref;
 
@@ -235,6 +250,7 @@ namespace triedent
 
      public:
       ref_base() = default;
+      ref_base(const Tracker& tracker) : tracker(tracker) {}
       ref_base(Tracker&& tracker) : tracker(std::move(tracker)) {}
       ref_base(const ref_base&)            = default;
       ref_base(ref_base&&)                 = default;
@@ -246,65 +262,115 @@ namespace triedent
       bool is_value() const { return tracker.is_value; }
 
       template <bool CopyToHot>
-      Derived<no_track<CopyToHot>> track_no_track() const
+      Derived<no_track<CopyToHot>> as_no_track() const
       {
-         return {tracker.template track_no_track<CopyToHot>()};
+         return {tracker.template as_no_track<CopyToHot>()};
       }
 
-      Derived<maybe_unique> track_maybe_unique() const { return {tracker.track_maybe_unique()}; }
+      Derived<maybe_unique> as_maybe_unique() const { return {tracker.as_maybe_unique()}; }
+      Derived<maybe_owned>  as_maybe_owned() const { return {tracker.as_maybe_owned()}; }
 
-      // Tree mutation functions in database.hpp return node_ref<maybe_owned>
-      node_ref<maybe_owned> into() &&;
+      // If unique, then edit in place
+      std::optional<Derived<mutating>> edit() const { return {tracker.edit()}; }
+
+      // This unlocks and consumes mutating, but leaves maybe_unique intact.
+      // Named `ret` since it's used at the return point of tree manipulation functions
+      // in database.hpp.
+      node_ref<maybe_owned> ret();
 
       auto track_child(object_id id) const;
    };
 
    template <typename Tracker>
+   class inner_ref;
+
+   template <typename Tracker = no_track<false>>
    class value_ref : public ref_base<Tracker, value_ref>
    {
+      template <typename Tr>
+      friend class inner_ref;
+
      private:
       auto ptr() const { return this->tracker.template as<value_node>(); }
 
      public:
       using base = ref_base<Tracker, value_ref>;
-
       using base::base;
+
+      static value_ref<mutating> make(ring_allocator& ra, key_view key, value_view val)
+      {
+         auto [lock, ptr] = value_node::make(ra, key, val);
+         return {mutating{&ra, (char*)ptr, true, lock.into_lock2_alloced_unchecked()}};
+      }
 
       uint32_t key_size() const { return ptr()->key_size(); }
       key_view key() const { return ptr()->key(); }
 
       uint32_t   data_size() const { return ptr()->data_size(); }
       value_view data() const { return ptr()->data(); }
-   };
+   };  // value_ref
 
-   template <typename Tracker>
+   template <typename Tracker = no_track<false>>
    class inner_ref : public ref_base<Tracker, inner_ref>
    {
+      template <typename Tr>
+      friend class inner_ref;
+
      private:
       auto ptr() const { return this->tracker.template as<inner_node>(); }
 
      public:
       using base = ref_base<Tracker, inner_ref>;
-
       using base::base;
+
+      template <typename T1>
+      static inner_ref<mutating> make(ring_allocator&          ra,
+                                      const inner_ref<T1>&     src,
+                                      key_view                 key,
+                                      value_ref<maybe_owned>&& value,
+                                      uint64_t                 branches)
+      {
+         // TODO: remove incorrect version
+         auto [lock, ptr] = inner_node::make(  //
+             ra, *src.ptr(), key, value.tracker.into_or_copy(), branches, src.ptr()->version());
+         return {mutating{&ra, (char*)ptr, false, lock.into_lock2_alloced_unchecked()}};
+      }
+
+      template <typename T1>
+      static inner_ref<mutating> make(ring_allocator&                ra,
+                                      const inner_ref<T1>&           src,
+                                      key_view                       key,
+                                      const value_ref<maybe_unique>& value,
+                                      uint64_t                       branches)
+      {
+         return make(ra, src, key, value.as_maybe_owned(), branches);
+      }
 
       uint32_t key_size() const { return ptr()->key_size(); }
       key_view key() const { return ptr()->key(); }
 
       auto value() const { return this->track_child(ptr()->value()).into_value_node(); }
 
+      void set_value(value_ref<maybe_owned>&& src)
+      {
+         this->tracker.set_child(ptr()->value(), std::move(src.tracker));
+      }
+
       inline uint32_t num_branches() const { return ptr()->num_branches(); }
       inline uint64_t branches() const { return ptr()->branches(); }
       auto            child(uint32_t i) const { return this->track_child(ptr()->children()[i]); }
-   };
+   };  // inner_ref
 
-   template <typename Tracker>
+   template <typename Tracker = no_track<false>>
    class node_ref : public ref_base<Tracker, node_ref>
    {
      public:
       using base = ref_base<Tracker, node_ref>;
 
       using base::base;
+
+      value_ref<Tracker> as_value_node() const { return {this->tracker}; }
+      inner_ref<Tracker> as_inner_node() const { return {this->tracker}; }
 
       value_ref<Tracker> into_value_node() && { return {std::move(this->tracker)}; }
       inner_ref<Tracker> into_inner_node() && { return {std::move(this->tracker)}; }
@@ -317,14 +383,8 @@ namespace triedent
    }
 
    template <typename Tracker, template <typename Tr> typename Derived>
-   node_ref<maybe_owned> ref_base<Tracker, Derived>::into() &&
+   node_ref<maybe_owned> ref_base<Tracker, Derived>::ret()
    {
       return {std::move(tracker).into_maybe_owned()};
-   }
-
-   inline value_ref<mutating> make_mutating_value(ring_allocator& ra, key_view key, value_view val)
-   {
-      auto [lock, ptr] = value_node::make(ra, key, val);
-      return {mutating{&ra, (char*)ptr, true, lock.into_lock2_alloced_unchecked()}};
    }
 }  // namespace triedent

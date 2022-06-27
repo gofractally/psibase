@@ -71,6 +71,7 @@ namespace triedent
       inline object_id&       branch(uint8_t b);
       inline const object_id& branch(uint8_t b) const;
       inline object_id        value() const { return _value; }
+      inline object_id&       value() { return _value; }
       inline void             set_value(object_id i) { _value = i; }
 
       inline uint32_t num_children() const { return num_branches() + (_value.id != 0); }

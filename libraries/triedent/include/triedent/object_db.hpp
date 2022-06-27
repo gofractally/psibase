@@ -224,6 +224,18 @@ namespace triedent
          id                  = 0;
          return result;
       }
+
+      // Convert to an unowned location_lock2. Caution: only use with lock returned by spin_*().
+      location_lock2 into_lock2_editing_unchecked()
+      {
+         location_lock2 result;
+         result.shared.db    = db;
+         result.shared.id    = id;
+         result.shared.owner = false;
+         db                  = nullptr;
+         id                  = 0;
+         return result;
+      }
    };  // location_lock
 
    /**
