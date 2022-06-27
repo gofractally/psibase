@@ -58,6 +58,8 @@ namespace triedent
       no_track(const no_track&)            = default;
       no_track& operator=(const no_track&) = default;
 
+      object_id get_id() { return id; }
+
       template <bool CH>
       no_track<CH> as_no_track() const
       {
@@ -89,6 +91,8 @@ namespace triedent
       maybe_unique(const maybe_unique&)            = default;
       maybe_unique& operator=(const maybe_unique&) = default;
 
+      object_id get_id() { return id; }
+
       template <bool CopyToHot>
       no_track<CopyToHot> as_no_track() const
       {
@@ -99,6 +103,8 @@ namespace triedent
 
       maybe_owned as_maybe_owned() const;
       maybe_owned into_maybe_owned() const;
+
+      object_id into_or_copy() const;
 
       // If unique, then edit in place
       std::optional<mutating> edit() const;
@@ -143,6 +149,8 @@ namespace triedent
             release_node(*ra, *id);
       }
 
+      object_id get_id() { return shared.get_id(); }
+
       bool is_unique() const
       {
          return shared.get_owner() && shared.get_db()->ref(shared.get_id()) == 1;
@@ -162,7 +170,7 @@ namespace triedent
       // Move ownership of id to caller. Bump reference count if needed
       // (!shared.owner). Copy if the refcount would overflow. Clears
       // maybe_owned unless a copy was made.
-      object_id into_or_copy()
+      object_id into_or_copy() &&
       {
          if (!shared.get_id())
             return {};
@@ -184,6 +192,11 @@ namespace triedent
    inline maybe_owned maybe_unique::into_maybe_owned() const
    {
       return as_maybe_owned();
+   }
+
+   inline object_id maybe_unique::into_or_copy() const
+   {
+      return as_maybe_owned().into_or_copy();
    }
 
    // Use while mutating
@@ -218,18 +231,21 @@ namespace triedent
             release_node(*ra, *id);
       }
 
+      object_id get_id() { return lock.get_id(); }
+
       template <typename T>
       T* as() const
       {
          return reinterpret_cast<T*>(ptr);
       }
 
-      void set_child(object_id& id, maybe_owned&& src)
+      template <typename Tr>
+      void set_child(object_id& id, Tr&& src) const
       {
-         if (id == src.shared.get_id())
+         if (id == src.get_id())
             return;
          auto prev = id;
-         id        = src.into_or_copy();
+         id        = std::move(src).into_or_copy();
          release_node(*ra, prev);
       }
 
@@ -238,6 +254,11 @@ namespace triedent
          maybe_owned result = {ra, ptr, is_value, lock.into_unlock()};
          clear();
          return result;
+      }
+
+      inline object_id into_or_copy() &&
+      {
+         return std::move(*this).into_maybe_owned().into_or_copy();
       }
    };  // mutating
 
@@ -265,6 +286,12 @@ namespace triedent
       ref_base& operator=(ref_base&&)      = default;
 
       operator bool() const { return tracker.ptr; }
+
+      friend bool operator==(const ref_base& a, const ref_base& b)
+      {
+         return a.tracker.get_id() == b.tracker.get_id();
+      }
+      friend bool operator!=(const ref_base& a, const ref_base& b) { return !(a == b); }
 
       bool is_value() const { return tracker.is_value; }
 
@@ -344,6 +371,7 @@ namespace triedent
 
       uint32_t   data_size() const { return ptr()->data_size(); }
       value_view data() const { return ptr()->data(); }
+      auto       data_ptr() const { return ptr()->data_ptr(); }
    };  // value_ref
 
    template <typename Tracker>
@@ -377,27 +405,18 @@ namespace triedent
       using base = ref_base<Tracker, inner_ref>;
       using base::base;
 
-      template <typename T1>
-      static inner_ref<mutating> make(ring_allocator&          ra,
-                                      const inner_ref<T1>&     src,
-                                      key_view                 key,
-                                      value_ref<maybe_owned>&& value,
-                                      uint64_t                 branches)
+      template <typename Tr1, typename Tr2>
+      static inner_ref<mutating> make(ring_allocator&       ra,
+                                      const inner_ref<Tr1>& src,
+                                      key_view              key,
+                                      value_ref<Tr2>&&      value,
+                                      uint64_t              branches)
       {
          // TODO: remove incorrect version
          auto [lock, ptr] = inner_node::make(  //
-             ra, *src.ptr(), key, value.tracker.into_or_copy(), branches, src.ptr()->version());
+             ra, *src.ptr(), key, std::move(value.tracker).into_or_copy(), branches,
+             src.ptr()->version());
          return {mutating{&ra, (char*)ptr, false, lock.into_lock2_alloced_unchecked()}};
-      }
-
-      template <typename T1>
-      static inner_ref<mutating> make(ring_allocator&                ra,
-                                      const inner_ref<T1>&           src,
-                                      key_view                       key,
-                                      const value_ref<maybe_unique>& value,
-                                      uint64_t                       branches)
-      {
-         return make(ra, src, key, value.as_maybe_owned(), branches);
       }
 
       uint32_t key_size() const { return ptr()->key_size(); }
@@ -405,14 +424,22 @@ namespace triedent
 
       auto value() const { return this->track_child(ptr()->value()).into_value_node(); }
 
-      void set_value(value_ref<maybe_owned>&& src)
+      template <typename Tr>
+      void set_value(value_ref<Tr>&& src)
       {
          this->tracker.set_child(ptr()->value(), std::move(src.tracker));
       }
 
-      inline uint32_t num_branches() const { return ptr()->num_branches(); }
-      inline uint64_t branches() const { return ptr()->branches(); }
-      auto            child(uint32_t i) const { return this->track_child(ptr()->children()[i]); }
+      uint32_t num_branches() const { return ptr()->num_branches(); }
+      bool     has_branch(uint32_t b) const { return ptr()->has_branch(b); }
+      uint64_t branches() const { return ptr()->branches(); }
+      auto     child(uint32_t i) const { return this->track_child(ptr()->children()[i]); }
+
+      auto branch(uint8_t b) const { return this->track_child(ptr()->branch(b)); }
+      void set_branch(uint8_t b, node_ref<maybe_owned>&& src) const
+      {
+         this->tracker.set_child(ptr()->branch(b), std::move(src.tracker));
+      }
    };  // inner_ref
 
    template <typename Tracker>

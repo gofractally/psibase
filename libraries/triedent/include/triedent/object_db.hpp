@@ -167,6 +167,8 @@ namespace triedent
          return *this;
       }
 
+      object_id get_id() const { return shared.get_id(); }
+
       // Unlock and convert to shared_id
       shared_id into_unlock()
       {
@@ -277,7 +279,8 @@ namespace triedent
       shared_id preserve_count(object_id id)
       {
          shared_id result;
-         result.db    = this;
+         if (id)
+            result.db = this;
          result.id    = id.id;
          result.owner = false;
          return result;
