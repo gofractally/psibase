@@ -7,6 +7,13 @@ namespace triedent
    struct maybe_owned;
    struct mutating;
 
+   template <typename Tracker>
+   class node_ref;
+   template <typename Tracker>
+   class value_ref;
+   template <typename Tracker>
+   class inner_ref;
+
    struct tracker_base
    {
       ring_allocator* ra;
@@ -281,12 +288,41 @@ namespace triedent
       auto track_child(object_id id) const;
    };
 
-   template <typename Tracker>
-   class inner_ref;
+   template <typename Tracker = no_track<false>>
+   class node_ref : public ref_base<Tracker, node_ref>
+   {
+      template <typename Tr>
+      friend class inner_ref;
+
+     public:
+      using base = ref_base<Tracker, node_ref>;
+
+      using base::base;
+
+      value_ref<Tracker> as_value_node() const;
+      inner_ref<Tracker> as_inner_node() const;
+      value_ref<Tracker> into_value_node() &&;
+      inner_ref<Tracker> into_inner_node() &&;
+   };
+
+   template <typename Tracker, template <typename Tr> typename Derived>
+   auto ref_base<Tracker, Derived>::track_child(object_id id) const
+   {
+      return node_ref<decltype(tracker.track_child(id))>{tracker.track_child(id)};
+   }
+
+   template <typename Tracker, template <typename Tr> typename Derived>
+   node_ref<maybe_owned> ref_base<Tracker, Derived>::ret()
+   {
+      return {std::move(tracker).into_maybe_owned()};
+   }
 
    template <typename Tracker = no_track<false>>
    class value_ref : public ref_base<Tracker, value_ref>
    {
+      template <typename Tr>
+      friend class node_ref;
+
       template <typename Tr>
       friend class inner_ref;
 
@@ -310,9 +346,27 @@ namespace triedent
       value_view data() const { return ptr()->data(); }
    };  // value_ref
 
+   template <typename Tracker>
+   value_ref<Tracker> node_ref<Tracker>::as_value_node() const
+   {
+      return {this->tracker};
+   }
+
+   template <typename Tracker>
+   value_ref<Tracker> node_ref<Tracker>::into_value_node() &&
+   {
+      return {std::move(this->tracker)};
+   }
+
    template <typename Tracker = no_track<false>>
    class inner_ref : public ref_base<Tracker, inner_ref>
    {
+      template <typename Tr>
+      friend class node_ref;
+
+      template <typename Tr>
+      friend class value_ref;
+
       template <typename Tr>
       friend class inner_ref;
 
@@ -361,30 +415,15 @@ namespace triedent
       auto            child(uint32_t i) const { return this->track_child(ptr()->children()[i]); }
    };  // inner_ref
 
-   template <typename Tracker = no_track<false>>
-   class node_ref : public ref_base<Tracker, node_ref>
+   template <typename Tracker>
+   inner_ref<Tracker> node_ref<Tracker>::as_inner_node() const
    {
-     public:
-      using base = ref_base<Tracker, node_ref>;
-
-      using base::base;
-
-      value_ref<Tracker> as_value_node() const { return {this->tracker}; }
-      inner_ref<Tracker> as_inner_node() const { return {this->tracker}; }
-
-      value_ref<Tracker> into_value_node() && { return {std::move(this->tracker)}; }
-      inner_ref<Tracker> into_inner_node() && { return {std::move(this->tracker)}; }
-   };
-
-   template <typename Tracker, template <typename Tr> typename Derived>
-   auto ref_base<Tracker, Derived>::track_child(object_id id) const
-   {
-      return node_ref<decltype(tracker.track_child(id))>{tracker.track_child(id)};
+      return {this->tracker};
    }
 
-   template <typename Tracker, template <typename Tr> typename Derived>
-   node_ref<maybe_owned> ref_base<Tracker, Derived>::ret()
+   template <typename Tracker>
+   inner_ref<Tracker> node_ref<Tracker>::into_inner_node() &&
    {
-      return {std::move(tracker).into_maybe_owned()};
+      return {std::move(this->tracker)};
    }
 }  // namespace triedent
