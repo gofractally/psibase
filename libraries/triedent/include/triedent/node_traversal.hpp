@@ -24,6 +24,8 @@ namespace triedent
    // maybe_unique
    //    -> maybe_owned    To return from tree mutation functions
    //    -> mutating       To edit in place
+   // mutating
+   //    -> maybe_owned    To return from tree mutation functions
 
    struct tracker_base
    {
