@@ -14,6 +14,17 @@ namespace triedent
    template <typename Tracker>
    class inner_ref;
 
+   // Transitions
+   // ===========
+   // no_track<CopyToHot>
+   //    no outward transitions
+   // maybe_owned
+   //    -> no_track       To pass to tree query functions
+   //    -> maybe_unique   To pass to tree mutation functions
+   // maybe_unique
+   //    -> maybe_owned    To return from tree mutation functions
+   //    -> mutating       To edit in place
+
    struct tracker_base
    {
       ring_allocator* ra;
@@ -93,12 +104,6 @@ namespace triedent
 
       object_id get_id() { return id; }
 
-      template <bool CopyToHot>
-      no_track<CopyToHot> as_no_track() const
-      {
-         return {ra, ptr, is_value, id};
-      }
-
       maybe_unique as_maybe_unique() const { return *this; }
 
       maybe_owned as_maybe_owned() const;
@@ -153,6 +158,7 @@ namespace triedent
 
       bool is_unique() const
       {
+         // TODO: cache the ref count inside shared
          return shared.get_owner() && shared.get_db()->ref(shared.get_id()) == 1;
       }
 
