@@ -140,7 +140,7 @@ namespace triedent
 
       maybe_owned& operator=(maybe_owned&& src)
       {
-         if (&src == this)
+         if (src.shared.get_id() == shared.get_id())
             return *this;
          if (auto id = shared.try_into_if_owned())
             release_node(*ra, *id);
@@ -268,11 +268,21 @@ namespace triedent
       {
          return std::move(*this).into_maybe_owned().into_or_copy();
       }
+
+      // Editing a parent doesn't imply editing a child; it may be shared
+      maybe_unique track_child(object_id id) const
+      {
+         auto [ptr, is_value, ref] = ra->get_cache<true>(id);
+         return {ra, ptr, is_value, id, ref == 1};
+      }
    };  // mutating
 
    inline std::optional<mutating> maybe_unique::edit() const
    {
-      return mutating{ra, ptr, is_value, ra->spin_lock(id).into_lock2_editing_unchecked()};
+      if (unique)
+         return mutating{ra, ptr, is_value, ra->spin_lock(id).into_lock2_editing_unchecked()};
+      else
+         return std::nullopt;
    }
 
    template <typename Tracker>
@@ -388,6 +398,11 @@ namespace triedent
       auto       data_ptr() const { return ptr()->data_ptr(); }
    };  // value_ref
 
+   inline value_ref<maybe_owned> no_value()
+   {
+      return {};
+   }
+
    template <typename Tracker>
    value_ref<Tracker> node_ref<Tracker>::as_value_node() const
    {
@@ -418,6 +433,18 @@ namespace triedent
      public:
       using base = ref_base<Tracker, inner_ref>;
       using base::base;
+
+      template <typename Tr>
+      static inner_ref<mutating> make(ring_allocator& ra,
+                                      key_view        key,
+                                      value_ref<Tr>&& value,
+                                      uint64_t        branches)
+      {
+         // TODO: remove incorrect version
+         auto [lock, ptr] = inner_node::make(  //
+             ra, key, std::move(value.tracker).into_or_copy(), branches, 0);
+         return {mutating{&ra, (char*)ptr, false, lock.into_lock2_alloced_unchecked()}};
+      }
 
       template <typename Tr1, typename Tr2>
       static inner_ref<mutating> make(ring_allocator&       ra,
@@ -450,7 +477,9 @@ namespace triedent
       auto     child(uint32_t i) const { return this->track_child(ptr()->children()[i]); }
 
       auto branch(uint8_t b) const { return this->track_child(ptr()->branch(b)); }
-      void set_branch(uint8_t b, node_ref<maybe_owned>&& src) const
+
+      template <typename T>
+      void set_branch(uint8_t b, T&& src) const
       {
          this->tracker.set_child(ptr()->branch(b), std::move(src.tracker));
       }
