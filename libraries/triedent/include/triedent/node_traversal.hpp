@@ -81,6 +81,8 @@ namespace triedent
 
       no_track track_child(object_id id) const
       {
+         if (!id)
+            return {};
          auto [ptr, is_value, ref] = ra->get_cache<CopyToHot>(id);
          return {ra, ptr, is_value, id};
       }
@@ -113,11 +115,15 @@ namespace triedent
 
       object_id into_or_copy() const;
 
+      bool editable() const { return unique; }
+
       // If unique, then edit in place
       std::optional<mutating> edit() const;
 
       maybe_unique track_child(object_id id) const
       {
+         if (!id)
+            return {};
          auto [ptr, is_value, ref] = ra->get_cache<true>(id);
          return {ra, ptr, is_value, id, unique && ref == 1};
       }
@@ -272,6 +278,8 @@ namespace triedent
       // Editing a parent doesn't imply editing a child; it may be shared
       maybe_unique track_child(object_id id) const
       {
+         if (!id)
+            return {};
          auto [ptr, is_value, ref] = ra->get_cache<true>(id);
          return {ra, ptr, is_value, id, ref == 1};
       }
@@ -321,6 +329,8 @@ namespace triedent
 
       Derived<maybe_unique> as_maybe_unique() const { return {tracker.as_maybe_unique()}; }
       Derived<maybe_owned>  as_maybe_owned() const { return {tracker.as_maybe_owned()}; }
+
+      bool editable() const { return tracker.editable(); }
 
       // If unique, then edit in place
       std::optional<Derived<mutating>> edit() const

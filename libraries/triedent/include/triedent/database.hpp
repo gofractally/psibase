@@ -187,6 +187,8 @@ namespace triedent
          friend class database;
          database* _db;
 
+         auto& ring() { return *_db->_ring; }
+
          void lock_swap_p() const;
          void unlock_swap_p() const;
 
@@ -246,6 +248,23 @@ namespace triedent
                                        string_view v1,
                                        string_view k2,
                                        string_view v2);
+
+         inline node_ref<maybe_owned> set_value2(value_ref<maybe_unique> n,
+                                                 string_view             key,
+                                                 string_view             val);
+         inline node_ref<maybe_owned> set_inner_value2(inner_ref<maybe_unique> n, string_view val);
+         inline node_ref<maybe_owned> combine_value_nodes2(string_view k1,
+                                                           string_view v1,
+                                                           string_view k2,
+                                                           string_view v2);
+
+         inline node_ref<maybe_owned> add_child2(node_ref<maybe_unique> root,
+                                                 string_view            key,
+                                                 string_view            val,
+                                                 int&                   old_size);
+         inline node_ref<maybe_owned> remove_child2(node_ref<maybe_unique> root,
+                                                    string_view            key,
+                                                    int&                   removed_size);
       };
 
       std::shared_ptr<write_session> start_write_session();
@@ -723,6 +742,155 @@ namespace triedent
          }
       }
    }
+
+   inline node_ref<maybe_owned> database::write_session::set_value2(value_ref<maybe_unique> n,
+                                                                    string_view             key,
+                                                                    string_view             val)
+   {
+      if (n && n.data_size() == val.size())
+      {
+         if (auto edit = n.edit())
+         {
+            memcpy(edit->data_ptr(), val.data(), val.size());
+            return edit->ret();
+         }
+      }
+      return value_ref<>::make(ring(), key, val).ret();
+   }
+
+   inline node_ref<maybe_owned> database::write_session::set_inner_value2(inner_ref<maybe_unique> n,
+                                                                          string_view val)
+   {
+      if (auto vn = n.value())
+         if (vn.data_size() == val.size())
+            if (auto edit = vn.edit())
+            {
+               memcpy(edit->data_ptr(), val.data(), val.size());
+               return edit->ret();
+            }
+      auto new_val = value_ref<>::make(ring(), {}, val);
+      if (auto edit = n.edit())
+      {
+         edit->set_value(std::move(new_val));
+         return edit->ret();
+      }
+      else
+      {
+         return inner_ref<>::make(ring(), n, n.key(), std::move(new_val), n.branches()).ret();
+      }
+   }
+
+   node_ref<maybe_owned> database::write_session::combine_value_nodes2(string_view k1,
+                                                                       string_view v1,
+                                                                       string_view k2,
+                                                                       string_view v2)
+   {
+      if (k1.size() > k2.size())
+         return combine_value_nodes2(k2, v2, k1, v1);
+
+      auto cpre = common_prefix(k1, k2);
+      if (cpre == k1)
+      {
+         auto inner_value = value_ref<>::make(ring(), {}, v1);
+         auto k2sfx       = k2.substr(cpre.size());
+         auto b2          = k2sfx.front();
+
+         auto in = inner_ref<>::make(ring(), cpre, std::move(inner_value), 1ull << b2);
+         in.set_branch(b2, value_ref<>::make(ring(), k2sfx.substr(1), v2));
+         return in.ret();
+      }
+      else
+      {
+         auto b1sfx = k1.substr(cpre.size());
+         auto b2sfx = k2.substr(cpre.size());
+         auto b1    = b1sfx.front();
+         auto b2    = b2sfx.front();
+         auto b1v   = value_ref<>::make(ring(), b1sfx.substr(1), v1);
+         auto b2v   = value_ref<>::make(ring(), b2sfx.substr(1), v2);
+
+         auto in = inner_ref<>::make(ring(), cpre, no_value(), inner_node::branches(b1, b2));
+         in.set_branch(b1, std::move(b1v));
+         in.set_branch(b2, std::move(b2v));
+         return in.ret();
+      }
+   }  // combine_value_nodes2
+
+   inline node_ref<maybe_owned> database::write_session::add_child2(node_ref<maybe_unique> root,
+                                                                    string_view            key,
+                                                                    string_view            val,
+                                                                    int&                   old_size)
+   {
+      if (!root)  // empty case
+         return value_ref<>::make(ring(), key, val).ret();
+
+      if (root.is_value())
+      {
+         auto vn = root.as_value_node();
+         if (vn.key() == key)
+         {
+            old_size = vn.data_size();
+            return set_value2(vn, key, val);
+         }
+         else
+            return combine_value_nodes2(vn.key(), vn.data(), key, val);
+      }
+
+      // current root is an inner node
+      auto in     = root.as_inner_node();
+      auto in_key = in.key();
+      if (in_key == key)  // whose prefix is same as key, therefore set the value
+      {
+         if (auto v = in.value())
+            old_size = v.data_size();
+         return set_inner_value2(in, val);
+      }
+
+      auto cpre = common_prefix(in_key, key);
+      if (cpre == in_key)  // value is on child branch
+      {
+         auto b = key[cpre.size()];
+         if (in.editable() && in.has_branch(b))
+         {
+            auto cur_b = in.branch(b);
+            auto new_b = add_child2(cur_b, key.substr(cpre.size() + 1), val, old_size);
+            auto edit  = in.edit();  // will succeed
+            edit->set_branch(b, std::move(new_b));
+            return edit->ret();
+         }
+
+         auto new_in = inner_ref<>::make(ring(), in, in_key, in.value(), in.branches() | 1ull << b);
+         auto cur_b  = new_in.branch(b);
+         auto new_b  = add_child2(cur_b, key.substr(cpre.size() + 1), val, old_size);
+         new_in.set_branch(b, std::move(new_b));
+         return new_in.ret();
+      }
+      else  // the current node needs to split and become a child of new parent
+      {
+         if (cpre == key)  // value needs to be on a new inner node
+         {
+            auto b1    = in_key[cpre.size()];
+            auto b1key = in_key.substr(cpre.size() + 1);
+            auto b1val = inner_ref<>::make(ring(), in, b1key, in.value(), in.branches());
+            auto b0val = value_ref<>::make(ring(), string_view(), val);
+
+            auto nin = inner_ref<>::make(ring(), cpre, std::move(b0val), inner_node::branches(b1));
+            nin.set_branch(b1, std::move(b1val));
+            return nin.ret();
+         }
+         else  // there are two branches
+         {
+            auto b1    = key[cpre.size()];
+            auto b2    = in_key[cpre.size()];
+            auto b1key = key.substr(cpre.size() + 1);
+            auto b2key = in_key.substr(cpre.size() + 1);
+            auto nin   = inner_ref<>::make(ring(), cpre, no_value(), inner_node::branches(b1, b2));
+
+            nin.set_branch(b1, value_ref<>::make(ring(), b1key, val));
+            nin.set_branch(b2, inner_ref<>::make(ring(), in, b2key, in.value(), in.branches()));
+            return nin.ret();
+         }
+      }
+   }  // add_child2
 
    inline void database::write_session::clear()
    {
