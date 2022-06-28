@@ -313,7 +313,13 @@ namespace triedent
       Derived<maybe_owned>  as_maybe_owned() const { return {tracker.as_maybe_owned()}; }
 
       // If unique, then edit in place
-      std::optional<Derived<mutating>> edit() const { return {tracker.edit()}; }
+      std::optional<Derived<mutating>> edit() const
+      {
+         if (auto tr = tracker.edit())
+            return Derived<mutating>{std::move(*tr)};
+         else
+            return std::nullopt;
+      }
 
       // This unlocks and consumes mutating, but leaves maybe_unique intact.
       // Named `ret` since it's used at the return point of tree manipulation functions
