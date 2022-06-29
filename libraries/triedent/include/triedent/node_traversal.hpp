@@ -36,6 +36,7 @@ namespace triedent
       tracker_base(ring_allocator* ra = nullptr, char* ptr = nullptr, bool is_value = false)
           : ra(ra), ptr(ptr), is_value(is_value)
       {
+         assert(!ptr && !is_value || ra && ptr);
       }
       tracker_base(const tracker_base&)            = default;
       tracker_base& operator=(const tracker_base&) = default;
@@ -43,6 +44,7 @@ namespace triedent
       template <typename T>
       const T* as() const
       {
+         assert(ptr);
          return reinterpret_cast<const T*>(ptr);
       }
 
@@ -67,11 +69,12 @@ namespace triedent
                object_id       id       = {.id = 0})
           : tracker_base(ra, ptr, is_value), id(id)
       {
+         assert(!id.id || ra);
       }
       no_track(const no_track&)            = default;
       no_track& operator=(const no_track&) = default;
 
-      object_id get_id() { return id; }
+      object_id get_id() const { return id; }
 
       template <bool CH>
       no_track<CH> as_no_track() const
@@ -81,6 +84,7 @@ namespace triedent
 
       no_track track_child(object_id id) const
       {
+         assert(ra);
          if (!id)
             return {};
          auto [ptr, is_value, ref] = ra->get_cache<CopyToHot>(id);
@@ -102,11 +106,12 @@ namespace triedent
                    bool            unique   = false)
           : tracker_base(ra, ptr, is_value), id(id), unique(unique)
       {
+         assert(!id.id && !unique || ra && id.id);
       }
       maybe_unique(const maybe_unique&)            = default;
       maybe_unique& operator=(const maybe_unique&) = default;
 
-      object_id get_id() { return id; }
+      object_id get_id() const { return id; }
 
       maybe_unique as_maybe_unique() const { return *this; }
 
@@ -122,6 +127,7 @@ namespace triedent
 
       maybe_unique track_child(object_id id) const
       {
+         assert(ra);
          if (!id)
             return {};
          auto [ptr, is_value, ref] = ra->get_cache<true>(id);
@@ -131,16 +137,20 @@ namespace triedent
 
    // Use this to hold a root. Also use it when returning nodes
    // to insert back into parents.
-   struct maybe_owned : tracker_base
+   //
+   // maybe_owned is the only tracker which may outlive swap_guard.
+   // This prevents it from holding a pointer, thus it doesn't inherit
+   // from tracker_base.
+   struct maybe_owned
    {
-      shared_id shared;
+      ring_allocator* ra;
+      bool            is_value;
+      shared_id       shared;
 
-      maybe_owned(ring_allocator* ra       = nullptr,
-                  char*           ptr      = nullptr,
-                  bool            is_value = false,
-                  shared_id&&     shared   = {})
-          : tracker_base(ra, ptr, is_value), shared(std::move(shared))
+      maybe_owned(ring_allocator* ra = nullptr, bool is_value = false, shared_id&& shared = {})
+          : ra(ra), is_value(is_value), shared(std::move(shared))
       {
+         assert(!this->shared.get_id() && !is_value || this->shared.get_id() && ra);
       }
       maybe_owned(maybe_owned&& src) { *this = std::move(src); }
 
@@ -149,36 +159,46 @@ namespace triedent
          if (src.shared.get_id() == shared.get_id())
             return *this;
          if (auto id = shared.try_into_if_owned())
+         {
+            assert(ra);
             release_node(*ra, *id);
-         tracker_base::operator=(src);
-         shared = std::move(src.shared);
-         src.clear();
+         }
+         ra           = src.ra;
+         is_value     = src.is_value;
+         shared       = std::move(src.shared);
+         src.is_value = false;
+         assert(!shared.get_id() && !is_value || shared.get_id() && ra);
          return *this;
       }
 
       ~maybe_owned()
       {
          if (auto id = shared.try_into_if_owned())
+         {
+            assert(ra);
             release_node(*ra, *id);
+         }
       }
 
-      object_id get_id() { return shared.get_id(); }
-
-      bool is_unique() const
-      {
-         // TODO: cache the ref count inside shared
-         return shared.get_owner() && shared.get_db()->ref(shared.get_id()) == 1;
-      }
+      object_id get_id() const { return shared.get_id(); }
 
       template <bool CopyToHot>
       no_track<CopyToHot> as_no_track() const
       {
+         if (!shared.get_id())
+            return {};
+         assert(ra);
+         auto [ptr, is_value, ref] = ra->get_cache<CopyToHot>(shared.get_id());
          return {ra, ptr, is_value, shared.get_id()};
       }
 
       maybe_unique as_maybe_unique() const
       {
-         return {ra, ptr, is_value, shared.get_id(), is_unique()};
+         if (!shared.get_id())
+            return {};
+         assert(ra);
+         auto [ptr, is_value, ref] = ra->get_cache<true>(shared.get_id());
+         return {ra, ptr, is_value, shared.get_id(), shared.get_owner() && ref == 1};
       }
 
       // Move ownership of id to caller. Bump reference count if needed
@@ -190,17 +210,22 @@ namespace triedent
             return {};
          if (auto x = shared.try_into())
          {
-            clear();
+            is_value = false;
             return *x;
          }
+         assert(ra);
+         auto [ptr, is_value, ref] = ra->get_cache<false>(shared.get_id());
          return copy_node(*ra, shared.get_id(), ptr, is_value);
       }
    };  // maybe_owned
 
    inline maybe_owned maybe_unique::as_maybe_owned() const
    {
+      if (!id)
+         return {};
+      assert(ra);
       // Result isn't owned since maybe_unique borrows from elsewhere
-      return {ra, ptr, is_value, ra->preserve_count(id)};
+      return {ra, is_value, ra->preserve_count(id)};
    }
 
    inline maybe_owned maybe_unique::into_maybe_owned() const
@@ -224,6 +249,7 @@ namespace triedent
                location_lock2  lock     = {})
           : tracker_base(ra, ptr, is_value), lock(std::move(lock))
       {
+         assert(!ra && !this->lock.get_id() || ra && this->lock.get_id());
       }
       mutating(mutating&& src) { *this = std::move(src); }
 
@@ -232,30 +258,39 @@ namespace triedent
          if (&src == this)
             return *this;
          if (auto id = lock.into_unlock().try_into_if_owned())
+         {
+            assert(ra);
             release_node(*ra, *id);
+         }
          tracker_base::operator=(src);
          lock = std::move(src.lock);
          src.clear();
+         assert(!ra && !ptr && !is_value && !lock.get_id() || ra && ptr && lock.get_id());
          return *this;
       }
 
       ~mutating()
       {
          if (auto id = lock.into_unlock().try_into_if_owned())
+         {
+            assert(ra);
             release_node(*ra, *id);
+         }
       }
 
-      object_id get_id() { return lock.get_id(); }
+      object_id get_id() const { return lock.get_id(); }
 
       template <typename T>
       T* as() const
       {
+         assert(ptr);
          return reinterpret_cast<T*>(ptr);
       }
 
       template <typename Tr>
       void set_child(object_id& id, Tr&& src) const
       {
+         assert(ra);
          if (id == src.get_id())
             return;
          auto prev = id;
@@ -265,7 +300,7 @@ namespace triedent
 
       maybe_owned into_maybe_owned() &&
       {
-         maybe_owned result = {ra, ptr, is_value, lock.into_unlock()};
+         maybe_owned result = {ra, is_value, lock.into_unlock()};
          clear();
          return result;
       }
@@ -278,6 +313,7 @@ namespace triedent
       // Editing a parent doesn't imply editing a child; it may be shared
       maybe_unique track_child(object_id id) const
       {
+         assert(ra);
          if (!id)
             return {};
          auto [ptr, is_value, ref] = ra->get_cache<true>(id);
@@ -311,7 +347,9 @@ namespace triedent
       ref_base& operator=(const ref_base&) = default;
       ref_base& operator=(ref_base&&)      = default;
 
-      operator bool() const { return tracker.ptr; }
+      operator bool() const { return tracker.get_id().id != 0; }
+
+      auto get_id() const { return tracker.get_id(); }
 
       friend bool operator==(const ref_base& a, const ref_base& b)
       {
@@ -397,6 +435,7 @@ namespace triedent
       static value_ref<mutating> make(ring_allocator& ra, key_view key, value_view val)
       {
          auto [lock, ptr] = value_node::make(ra, key, val);
+         assert(lock.get_id() && ptr);
          return {mutating{&ra, (char*)ptr, true, lock.into_lock2_alloced_unchecked()}};
       }
 
