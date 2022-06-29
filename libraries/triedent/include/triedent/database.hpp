@@ -1666,6 +1666,139 @@ namespace triedent
       return root;
    }
 
+   inline node_ref<maybe_owned> database::write_session::remove_child2(node_ref<maybe_unique> root,
+                                                                       string_view            key,
+                                                                       int& removed_size)
+   {
+      if (!root)
+         return {};
+
+      if (root.is_value())
+      {
+         auto vn = root.as_value_node();
+         if (vn.key() == key)
+         {
+            removed_size = vn.data_size();
+            return {};
+         }
+         return vn.ret();
+      }
+
+      auto in     = root.as_inner_node();
+      auto in_key = in.key();
+
+      if (in_key.size() > key.size())
+         return root.ret();
+
+      if (in_key == key)
+      {
+         auto iv = in.value();
+         if (!iv)
+            return root.ret();
+         removed_size = iv.data_size();
+
+         if (in.num_branches() == 1)
+         {
+            char        b  = std::countr_zero(in.branches());
+            auto        bn = in.child(0);
+            std::string new_key;
+            new_key += in_key;
+            new_key += b;
+
+            if (bn.is_value())
+            {
+               auto vn = bn.as_value_node();
+               new_key += vn.key();
+               return value_ref<>::make(ring(), new_key, vn.data()).ret();
+            }
+            else
+            {
+               auto bin = bn.as_inner_node();
+               new_key += bin.key();
+               return inner_ref<>::make(ring(), bin, new_key, bin.value(), bin.branches()).ret();
+            }
+         }
+
+         if (auto edit = in.edit())
+         {
+            edit->set_value(no_value());
+            return edit->ret();
+         }
+         else
+            return inner_ref<>::make(ring(), in, in_key, no_value(), in.branches()).ret();
+      }
+
+      auto cpre = common_prefix(in_key, key);
+      if (cpre != in_key)
+         return root.ret();
+
+      auto b = key[in_key.size()];
+      if (!in.has_branch(b))
+         return root.ret();
+
+      auto cur_b = in.branch(b);
+      auto new_b = remove_child2(cur_b, key.substr(in_key.size() + 1), removed_size);
+      if (new_b == cur_b)
+         return root.ret();
+
+      if (new_b)  // update branch
+      {
+         if (auto edit = in.edit())
+         {
+            edit->set_branch(b, std::move(new_b));
+            return edit->ret();
+         }
+
+         auto new_root = inner_ref<>::make(ring(), in, in_key, in.value(), in.branches());
+         new_root.set_branch(b, std::move(new_b));
+         return new_root.ret();
+      }
+
+      // remove branch
+      auto new_branches = in.branches() & ~inner_node::branches(b);
+      if (std::popcount(new_branches) + bool(in.value()) > 1)
+      {  // multiple branches remain, nothing to merge up, just realloc without branch
+         //   WARN( "clone without branch" );
+         return inner_ref<>::make(ring(), in, in_key, in.value(), new_branches).ret();
+      }
+
+      if (!new_branches)
+      {
+         // since we can only remove one item at a time, and this node exists
+         // then it means it either had 2 branches before or 1 branch and a value
+         // in this case, not branches means it must have a value
+         assert(in.value() && "expected value because we removed a branch");
+
+         auto cv = in.value();
+         return value_ref<>::make(ring(), in_key, cv.data()).ret();
+      }
+
+      // there must be only 1 branch left
+      //     WARN( "merge inner.key() + b + value.key() and return new value node" );
+      auto lb    = std::countr_zero(in.branches() ^ inner_node::branches(b));
+      auto cur_v = in.branch(lb);
+
+      // the one branch is either a value or an inner node
+      if (cur_v.is_value())
+      {
+         auto        cv = cur_v.as_value_node();
+         std::string new_key;
+         new_key += in_key;
+         new_key += char(lb);
+         new_key += cv.key();
+         return value_ref<>::make(ring(), new_key, cv.data()).ret();
+      }
+      else
+      {
+         auto        ci = cur_v.as_inner_node();
+         std::string new_key;
+         new_key += in_key;
+         new_key += char(lb);
+         new_key += ci.key();
+         return inner_ref<>::make(ring(), ci, new_key, ci.value(), ci.branches()).ret();
+      }
+   }  // remove_child2
+
    template <typename AccessMode>
    void database::session<AccessMode>::print()
    {
