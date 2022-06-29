@@ -323,10 +323,13 @@ namespace triedent
 
    inline std::optional<mutating> maybe_unique::edit() const
    {
-      if (unique)
-         return mutating{ra, ptr, is_value, ra->spin_lock(id).into_lock2_editing_unchecked()};
-      else
+      if (!unique)
          return std::nullopt;
+      assert(ra);
+      auto lock = ra->spin_lock(id).into_lock2_editing_unchecked();
+      // The pointer may change before lock is acquired; refetch it
+      auto [ptr, is_value, ref] = ra->get_cache<false>(id);
+      return mutating{ra, ptr, is_value, std::move(lock)};
    }
 
    template <typename Tracker>
