@@ -5,6 +5,7 @@
 
 namespace triedent
 {
+   class database;
 
    struct write_access;
    struct read_access;
@@ -17,8 +18,232 @@ namespace triedent
 
    inline key_type from_key6(const key_view sixb);
 
+   class session_base
+   {
+     public:
+      using string_view = std::string_view;
+      using id          = object_id;
+
+      id _session_root;
+      /* auto inc id used to detect when we can modify in place*/
+      uint64_t                      _version     = 0;
+      mutable std::atomic<uint64_t> _hot_swap_p  = -1ull;
+      mutable std::atomic<uint64_t> _warm_swap_p = -1ull;
+      mutable std::atomic<uint64_t> _cool_swap_p = -1ull;
+      mutable std::atomic<uint64_t> _cold_swap_p = -1ull;
+
+      key_view to_key6(key_view v) const;
+
+     private:
+      mutable key_type key_buf;
+   };
+
+   /**
+       *  Write access mode may modify in place and updates
+       *  the object locations in cache, a read_access mode will
+       *  not move objects in cache.
+       */
+   template <typename AccessMode = write_access>
+   class session : public session_base
+   {
+      using iterator_data = std::vector<std::pair<id, char>>;
+      mutable std::vector<iterator_data> _iterators;
+      mutable uint64_t                   _used_iterators = 0;
+      inline uint64_t&                   used_iterators() const { return _used_iterators; }
+      inline auto&                       iterators() const { return _iterators; }
+
+     public:
+      struct iterator
+      {
+         uint32_t    key_size() const;
+         uint32_t    read_key(char* data, uint32_t data_len) const;
+         std::string key() const;
+         iterator&   operator++();
+         iterator&   operator--();
+         bool        valid() const { return path().size() > 0; }
+
+         explicit operator bool() const { return valid(); }
+
+         ~iterator()
+         {
+            if (_iter_num != -1)
+            {
+               path().clear();
+               _session->used_iterators() ^= 1ull << _iter_num;
+            }
+         }
+
+         iterator(const iterator& c) : _session(c._session)
+         {
+            _iter_num = std::countr_one(_session->_used_iterators);
+            _session->used_iterators() ^= 1ull << _iter_num;
+            path() = c.path();
+         }
+         iterator(iterator&& c) : _session(c._session), _iter_num(c._iter_num) { c._iter_num = -1; }
+         void value(std::string& v) const;
+
+         std::string value() const
+         {
+            std::string r;
+            value(r);
+            return r;
+         }
+
+        private:
+         // ungaurded access
+         string_view _value() const;
+         friend class session;
+         iterator(const session& s) : _session(&s)
+         {
+            _iter_num = std::countr_one(_session->_used_iterators);
+            _session->used_iterators() ^= 1ull << _iter_num;
+         };
+
+         iterator_data& path() const { return _session->iterators()[_iter_num]; };
+
+         uint32_t       _iter_num;
+         const session* _session;
+      };
+
+      /* makes this session read from the root revision */
+      void get_root_revision();
+
+      /* changes the root of the tree this session is reading */
+      void set_session_revision(id r)
+      {
+         if (r != _session_root)
+         {
+            retain(r);
+            release(_session_root);
+            _session_root = r;
+         }
+      }
+
+      /* returns the root of the tree this session is reading */
+      id get_session_revision() { return _session_root; }
+
+      inline id retain(id);
+
+      /* decrements the revision ref count and frees if necessary */
+      void release_revision(id i);
+
+      /* the root revision of this session */
+      id revision() { return _session_root; }
+
+      iterator                   first() const;
+      iterator                   last() const;
+      iterator                   find(string_view key) const;
+      iterator                   lower_bound(string_view key) const;
+      iterator                   last_with_prefix(string_view prefix) const;
+      bool                       get(string_view key, std::string& result) const;
+      std::optional<std::string> get(string_view key) const;
+
+      void print();
+      void validate();
+      ~session();
+
+      session(database& db);
+
+     protected:
+      session(const session&) = delete;
+
+      void                       validate(id);
+      void                       next(iterator& itr) const;
+      void                       prev(iterator& itr) const;
+      iterator                   find(id n, string_view key) const;
+      void                       print(id n, string_view prefix = "", std::string k = "");
+      inline deref<node>         get(ring_allocator::id i) const;
+      std::optional<string_view> get(id root, string_view key) const;
+
+      inline void release(id);
+
+      friend class database;
+      database* _db;
+
+      auto& ring();
+
+      void lock_swap_p() const;
+      void unlock_swap_p() const;
+
+      struct swap_guard
+      {
+         swap_guard(const session& s) : _s(s) { _s.lock_swap_p(); }
+         swap_guard(const session* s) : _s(*s) { _s.lock_swap_p(); }
+         ~swap_guard() { _s.unlock_swap_p(); }
+         const session& _s;
+      };
+   };
+   using read_session = session<read_access>;
+
+   class write_session : public read_session
+   {
+     public:
+      int upsert(string_view key, string_view val);
+      int remove(string_view key);
+      id  fork(id from_version);
+      id  fork();
+
+      void set_root_revision(id);
+      void clear();
+
+      friend class database;
+      write_session(database& db) : read_session(db) {}
+
+      /**
+          *  These methods are used to recover the database after a crash,
+          *  start_collect_garbage resets all non-zero refcounts to 1,
+          *  then you can call recursve retain for all root nodes that need
+          *  to be kept.
+          */
+      ///@{
+      void start_collect_garbage();
+      void recursive_retain(object_id id);
+      void end_collect_garbage();
+      ///@}
+
+     private:
+      inline mutable_deref<value_node> make_value(string_view k, string_view v);
+      inline mutable_deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
+      inline mutable_deref<inner_node> make_inner(const inner_node& cpy,
+                                                  string_view       pre,
+                                                  id                val,
+                                                  uint64_t          branches);
+
+      template <typename T>
+      inline mutable_deref<T> lock(const deref<T>& obj);
+
+      inline id add_child(id root, string_view key, string_view val, int& old_size);
+      inline id remove_child(id root, string_view key, int& removed_size);
+
+      inline id set_value(deref<node> n, string_view key, string_view val);
+      inline id set_inner_value(deref<inner_node> n, string_view val);
+      inline id combine_value_nodes(string_view k1, string_view v1, string_view k2, string_view v2);
+
+      inline node_ref<maybe_owned> set_value2(value_ref<maybe_unique> n,
+                                              string_view             key,
+                                              string_view             val);
+      inline node_ref<maybe_owned> set_inner_value2(inner_ref<maybe_unique> n, string_view val);
+      inline node_ref<maybe_owned> combine_value_nodes2(string_view k1,
+                                                        string_view v1,
+                                                        string_view k2,
+                                                        string_view v2);
+
+      inline node_ref<maybe_owned> add_child2(node_ref<maybe_unique> root,
+                                              string_view            key,
+                                              string_view            val,
+                                              int&                   old_size);
+      inline node_ref<maybe_owned> remove_child2(node_ref<maybe_unique> root,
+                                                 string_view            key,
+                                                 int&                   removed_size);
+   };
+
    class database
    {
+      template <typename AccessMode>
+      friend class session;
+
+      friend write_session;
+
      public:
       struct config
       {
@@ -44,228 +269,6 @@ namespace triedent
       inline void claim_free() const;
       inline void ensure_free_space();
       static void create(std::filesystem::path dir, config);
-
-      class session_base
-      {
-        public:
-         id _session_root;
-         /* auto inc id used to detect when we can modify in place*/
-         uint64_t                      _version     = 0;
-         mutable std::atomic<uint64_t> _hot_swap_p  = -1ull;
-         mutable std::atomic<uint64_t> _warm_swap_p = -1ull;
-         mutable std::atomic<uint64_t> _cool_swap_p = -1ull;
-         mutable std::atomic<uint64_t> _cold_swap_p = -1ull;
-
-         key_view to_key6(key_view v) const;
-
-        private:
-         mutable key_type key_buf;
-      };
-
-      /**
-       *  Write access mode may modify in place and updates
-       *  the object locations in cache, a read_access mode will
-       *  not move objects in cache.
-       */
-      template <typename AccessMode = write_access>
-      class session : public session_base
-      {
-         using iterator_data = std::vector<std::pair<id, char>>;
-         mutable std::vector<iterator_data> _iterators;
-         mutable uint64_t                   _used_iterators = 0;
-         inline uint64_t&                   used_iterators() const { return _used_iterators; }
-         inline auto&                       iterators() const { return _iterators; }
-
-        public:
-         struct iterator
-         {
-            uint32_t    key_size() const;
-            uint32_t    read_key(char* data, uint32_t data_len) const;
-            std::string key() const;
-            iterator&   operator++();
-            iterator&   operator--();
-            bool        valid() const { return path().size() > 0; }
-
-            explicit operator bool() const { return valid(); }
-
-            ~iterator()
-            {
-               if (_iter_num != -1)
-               {
-                  path().clear();
-                  _session->used_iterators() ^= 1ull << _iter_num;
-               }
-            }
-
-            iterator(const iterator& c) : _session(c._session)
-            {
-               _iter_num = std::countr_one(_session->_used_iterators);
-               _session->used_iterators() ^= 1ull << _iter_num;
-               path() = c.path();
-            }
-            iterator(iterator&& c) : _session(c._session), _iter_num(c._iter_num)
-            {
-               c._iter_num = -1;
-            }
-            void value(std::string& v) const;
-
-            std::string value() const
-            {
-               std::string r;
-               value(r);
-               return r;
-            }
-
-           private:
-            // ungaurded access
-            string_view _value() const;
-            friend class session;
-            iterator(const session& s) : _session(&s)
-            {
-               _iter_num = std::countr_one(_session->_used_iterators);
-               _session->used_iterators() ^= 1ull << _iter_num;
-            };
-
-            iterator_data& path() const { return _session->iterators()[_iter_num]; };
-
-            uint32_t       _iter_num;
-            const session* _session;
-         };
-
-         /* makes this session read from the root revision */
-         void get_root_revision();
-
-         /* changes the root of the tree this session is reading */
-         void set_session_revision(id r)
-         {
-            if (r != _session_root)
-            {
-               retain(r);
-               release(_session_root);
-               _session_root = r;
-            }
-         }
-
-         /* returns the root of the tree this session is reading */
-         id get_session_revision() { return _session_root; }
-
-         inline id retain(id);
-
-         /* decrements the revision ref count and frees if necessary */
-         void release_revision(id i) { _db->release(i); }
-
-         /* the root revision of this session */
-         id revision() { return _session_root; }
-
-         iterator                   first() const;
-         iterator                   last() const;
-         iterator                   find(string_view key) const;
-         iterator                   lower_bound(string_view key) const;
-         iterator                   last_with_prefix(string_view prefix) const;
-         bool                       get(string_view key, std::string& result) const;
-         std::optional<std::string> get(string_view key) const;
-
-         void print();
-         void validate();
-         ~session();
-
-         session(database& db);
-
-        protected:
-         session(const session&) = delete;
-
-         void                       validate(id);
-         void                       next(iterator& itr) const;
-         void                       prev(iterator& itr) const;
-         iterator                   find(id n, string_view key) const;
-         void                       print(id n, string_view prefix = "", std::string k = "");
-         inline deref<node>         get(ring_allocator::id i) const;
-         std::optional<string_view> get(id root, string_view key) const;
-
-         inline void release(id);
-
-         friend class database;
-         database* _db;
-
-         auto& ring() { return *_db->_ring; }
-
-         void lock_swap_p() const;
-         void unlock_swap_p() const;
-
-         struct swap_guard
-         {
-            swap_guard(const session& s) : _s(s) { _s.lock_swap_p(); }
-            swap_guard(const session* s) : _s(*s) { _s.lock_swap_p(); }
-            ~swap_guard() { _s.unlock_swap_p(); }
-            const session& _s;
-         };
-      };
-      using read_session = session<read_access>;
-
-      class write_session : public read_session
-      {
-        public:
-         int upsert(string_view key, string_view val);
-         int remove(string_view key);
-         id  fork(id from_version);
-         id  fork();
-
-         void set_root_revision(id);
-         void clear();
-
-         friend class database;
-         write_session(database& db) : read_session(db) {}
-
-         /**
-          *  These methods are used to recover the database after a crash,
-          *  start_collect_garbage resets all non-zero refcounts to 1,
-          *  then you can call recursve retain for all root nodes that need
-          *  to be kept.
-          */
-         ///@{
-         void start_collect_garbage();
-         void recursive_retain(object_id id);
-         void end_collect_garbage();
-         ///@}
-
-        private:
-         inline mutable_deref<value_node> make_value(string_view k, string_view v);
-         inline mutable_deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
-         inline mutable_deref<inner_node> make_inner(const inner_node& cpy,
-                                                     string_view       pre,
-                                                     id                val,
-                                                     uint64_t          branches);
-
-         template <typename T>
-         inline mutable_deref<T> lock(const deref<T>& obj);
-
-         inline id add_child(id root, string_view key, string_view val, int& old_size);
-         inline id remove_child(id root, string_view key, int& removed_size);
-
-         inline id set_value(deref<node> n, string_view key, string_view val);
-         inline id set_inner_value(deref<inner_node> n, string_view val);
-         inline id combine_value_nodes(string_view k1,
-                                       string_view v1,
-                                       string_view k2,
-                                       string_view v2);
-
-         inline node_ref<maybe_owned> set_value2(value_ref<maybe_unique> n,
-                                                 string_view             key,
-                                                 string_view             val);
-         inline node_ref<maybe_owned> set_inner_value2(inner_ref<maybe_unique> n, string_view val);
-         inline node_ref<maybe_owned> combine_value_nodes2(string_view k1,
-                                                           string_view v1,
-                                                           string_view k2,
-                                                           string_view v2);
-
-         inline node_ref<maybe_owned> add_child2(node_ref<maybe_unique> root,
-                                                 string_view            key,
-                                                 string_view            val,
-                                                 int&                   old_size);
-         inline node_ref<maybe_owned> remove_child2(node_ref<maybe_unique> root,
-                                                    string_view            key,
-                                                    int&                   removed_size);
-      };
 
       std::shared_ptr<write_session> start_write_session();
       std::shared_ptr<read_session>  start_read_session();
@@ -367,7 +370,7 @@ namespace triedent
       location_lock lock;
    };  // mutable_deref
 
-   inline void database::write_session::set_root_revision(id i)
+   inline void write_session::set_root_revision(id i)
    {
       std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
       if (_db->_dbm->_root_revision != i.id)
@@ -379,7 +382,7 @@ namespace triedent
       }
    }
 
-   inline database::id database::write_session::fork(id from_version)
+   inline database::id write_session::fork(id from_version)
    {
       swap_guard g(this);
 
@@ -407,7 +410,7 @@ namespace triedent
       return _session_root;
    }
 
-   inline database::id database::write_session::fork()
+   inline database::id write_session::fork()
    {
       return fork(_session_root);
    }
@@ -421,7 +424,13 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   inline void database::session<AccessMode>::lock_swap_p() const
+   inline auto& session<AccessMode>::ring()
+   {
+      return *_db->_ring;
+   }
+
+   template <typename AccessMode>
+   inline void session<AccessMode>::lock_swap_p() const
    {
       auto sp = _db->_ring->get_swap_pos();
       _hot_swap_p.store(sp._swap_pos[0]);
@@ -431,7 +440,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   inline void database::session<AccessMode>::unlock_swap_p() const
+   inline void session<AccessMode>::unlock_swap_p() const
    {
       _hot_swap_p.store(-1ull);
       _warm_swap_p.store(-1ull);
@@ -440,14 +449,14 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   database::session<AccessMode>::session(database& db) : _db(&db)
+   session<AccessMode>::session(database& db) : _db(&db)
    {
       _iterators.resize(64);
       std::lock_guard<std::mutex> lock(db._active_sessions_mutex);
       db._active_sessions.push_back(this);
    }
    template <typename AccessMode>
-   database::session<AccessMode>::~session()
+   session<AccessMode>::~session()
    {
       std::lock_guard<std::mutex> lock(_db->_active_sessions_mutex);
 
@@ -456,18 +465,18 @@ namespace triedent
       _db->_active_sessions.erase(itr);
    }
 
-   inline std::shared_ptr<database::read_session> database::start_read_session()
+   inline std::shared_ptr<read_session> database::start_read_session()
    {
       return std::make_shared<read_session>(std::ref(*this));
    }
 
-   inline std::shared_ptr<database::write_session> database::start_write_session()
+   inline std::shared_ptr<write_session> database::start_write_session()
    {
       return std::make_shared<write_session>(std::ref(*this));
    }
 
    template <typename AccessMode>
-   inline deref<node> database::session<AccessMode>::get(id i) const
+   inline deref<node> session<AccessMode>::get(id i) const
    {
       auto [ptr, is_value, ref] =
           _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
@@ -475,7 +484,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   inline void database::session<AccessMode>::release(id obj)
+   inline void session<AccessMode>::release(id obj)
    {
       _db->release(obj);
    }
@@ -486,7 +495,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   inline database::id database::session<AccessMode>::retain(id obj)
+   inline database::id session<AccessMode>::retain(id obj)
    {
       if (not obj)
          return obj;
@@ -494,6 +503,12 @@ namespace triedent
       _db->_ring->retain(obj);
 
       return obj;
+   }
+
+   template <typename AccessMode>
+   inline void session<AccessMode>::release_revision(id i)
+   {
+      _db->release(i);
    }
 
    inline std::string_view common_prefix(std::string_view a, std::string_view b)
@@ -511,29 +526,28 @@ namespace triedent
       return a;
    }
 
-   inline mutable_deref<value_node> database::write_session::make_value(string_view key,
-                                                                        string_view val)
+   inline mutable_deref<value_node> write_session::make_value(string_view key, string_view val)
    {
       return value_node::make(*_db->_ring, key, val);
    }
 
-   inline mutable_deref<inner_node> database::write_session::make_inner(string_view pre,
-                                                                        id          val,
-                                                                        uint64_t    branches)
+   inline mutable_deref<inner_node> write_session::make_inner(string_view pre,
+                                                              id          val,
+                                                              uint64_t    branches)
    {
       return inner_node::make(*_db->_ring, pre, val, branches, _version);
    }
 
-   inline mutable_deref<inner_node> database::write_session::make_inner(const inner_node& cpy,
-                                                                        string_view       pre,
-                                                                        id                val,
-                                                                        uint64_t          branches)
+   inline mutable_deref<inner_node> write_session::make_inner(const inner_node& cpy,
+                                                              string_view       pre,
+                                                              id                val,
+                                                              uint64_t          branches)
    {
       return inner_node::make(*_db->_ring, cpy, pre, val, branches, _version);
    }
 
    template <typename T>
-   inline mutable_deref<T> database::write_session::lock(const deref<T>& obj)
+   inline mutable_deref<T> write_session::lock(const deref<T>& obj)
    {
       return {_db->_ring->spin_lock(obj), obj};
    }
@@ -541,10 +555,10 @@ namespace triedent
    /**
     *  Given an existing value node and a new key/value to insert 
     */
-   database::id database::write_session::combine_value_nodes(string_view k1,
-                                                             string_view v1,
-                                                             string_view k2,
-                                                             string_view v2)
+   database::id write_session::combine_value_nodes(string_view k1,
+                                                   string_view v1,
+                                                   string_view k2,
+                                                   string_view v2)
    {
       if (k1.size() > k2.size())
          return combine_value_nodes(k2, v2, k1, v1);
@@ -585,7 +599,7 @@ namespace triedent
       }
    }
 
-   database::id database::write_session::set_value(deref<node> n, string_view key, string_view val)
+   database::id write_session::set_value(deref<node> n, string_view key, string_view val)
    {
       if (not n)
          return make_value(key, val);
@@ -602,7 +616,7 @@ namespace triedent
       return make_value(key, val);
    }
 
-   database::id database::write_session::set_inner_value(deref<inner_node> n, string_view val)
+   database::id write_session::set_inner_value(deref<inner_node> n, string_view val)
    {
       if (n->version() == _version)
       {
@@ -638,10 +652,10 @@ namespace triedent
     *  Given an existing tree node (root) add a new key/value under it and return the id
     *  of the new node if a new node had to be allocated. 
     */
-   inline database::id database::write_session::add_child(id          root,
-                                                          string_view key,
-                                                          string_view val,
-                                                          int&        old_size)
+   inline database::id write_session::add_child(id          root,
+                                                string_view key,
+                                                string_view val,
+                                                int&        old_size)
    {
       if (not root)  // empty case
          return make_value(key, val);
@@ -743,9 +757,9 @@ namespace triedent
       }
    }
 
-   inline node_ref<maybe_owned> database::write_session::set_value2(value_ref<maybe_unique> n,
-                                                                    string_view             key,
-                                                                    string_view             val)
+   inline node_ref<maybe_owned> write_session::set_value2(value_ref<maybe_unique> n,
+                                                          string_view             key,
+                                                          string_view             val)
    {
       if (n && n.data_size() == val.size())
       {
@@ -758,8 +772,8 @@ namespace triedent
       return value_ref<>::make(ring(), key, val).ret();
    }
 
-   inline node_ref<maybe_owned> database::write_session::set_inner_value2(inner_ref<maybe_unique> n,
-                                                                          string_view val)
+   inline node_ref<maybe_owned> write_session::set_inner_value2(inner_ref<maybe_unique> n,
+                                                                string_view             val)
    {
       if (auto vn = n.value())
          if (vn.data_size() == val.size())
@@ -780,10 +794,10 @@ namespace triedent
       }
    }
 
-   node_ref<maybe_owned> database::write_session::combine_value_nodes2(string_view k1,
-                                                                       string_view v1,
-                                                                       string_view k2,
-                                                                       string_view v2)
+   node_ref<maybe_owned> write_session::combine_value_nodes2(string_view k1,
+                                                             string_view v1,
+                                                             string_view k2,
+                                                             string_view v2)
    {
       if (k1.size() > k2.size())
          return combine_value_nodes2(k2, v2, k1, v1);
@@ -815,10 +829,10 @@ namespace triedent
       }
    }  // combine_value_nodes2
 
-   inline node_ref<maybe_owned> database::write_session::add_child2(node_ref<maybe_unique> root,
-                                                                    string_view            key,
-                                                                    string_view            val,
-                                                                    int&                   old_size)
+   inline node_ref<maybe_owned> write_session::add_child2(node_ref<maybe_unique> root,
+                                                          string_view            key,
+                                                          string_view            val,
+                                                          int&                   old_size)
    {
       if (!root)  // empty case
          return value_ref<>::make(ring(), key, val).ret();
@@ -892,14 +906,14 @@ namespace triedent
       }
    }  // add_child2
 
-   inline void database::write_session::clear()
+   inline void write_session::clear()
    {
       swap_guard g(*this);
       release(_session_root);
       _session_root = id();
    }
    // return -1 on insert, the size of the old object on update
-   inline int database::write_session::upsert(string_view key, string_view val)
+   inline int write_session::upsert(string_view key, string_view val)
    {
       _db->ensure_free_space();
       swap_guard g(*this);
@@ -919,8 +933,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   typename database::session<AccessMode>::iterator&
-   database::session<AccessMode>::iterator::operator++()
+   typename session<AccessMode>::iterator& session<AccessMode>::iterator::operator++()
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _session->_db->ensure_free_space();
@@ -930,8 +943,7 @@ namespace triedent
       return *this;
    }
    template <typename AccessMode>
-   typename database::session<AccessMode>::iterator&
-   database::session<AccessMode>::iterator::operator--()
+   typename session<AccessMode>::iterator& session<AccessMode>::iterator::operator--()
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _session->_db->ensure_free_space();
@@ -941,7 +953,7 @@ namespace triedent
       return *this;
    }
    template <typename AccessMode>
-   void database::session<AccessMode>::prev(iterator& itr) const
+   void session<AccessMode>::prev(iterator& itr) const
    {
       for (;;)
       {
@@ -996,7 +1008,7 @@ namespace triedent
       }
    }
    template <typename AccessMode>
-   void database::session<AccessMode>::next(iterator& itr) const
+   void session<AccessMode>::next(iterator& itr) const
    {
       while (itr.path().size())
       {
@@ -1040,7 +1052,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   void database::session<AccessMode>::iterator::value(std::string& val) const
+   void session<AccessMode>::iterator::value(std::string& val) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _session->_db->ensure_free_space();
@@ -1052,7 +1064,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   std::string_view database::session<AccessMode>::iterator::_value() const
+   std::string_view session<AccessMode>::iterator::_value() const
    {
       if (path().size() == 0)
          return std::string_view();
@@ -1067,7 +1079,7 @@ namespace triedent
       }
    }
    template <typename AccessMode>
-   uint32_t database::session<AccessMode>::iterator::key_size() const
+   uint32_t session<AccessMode>::iterator::key_size() const
    {
       if (path().size() == 0)
          return 0;
@@ -1082,7 +1094,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   uint32_t database::session<AccessMode>::iterator::read_key(char* data, uint32_t data_len) const
+   uint32_t session<AccessMode>::iterator::read_key(char* data, uint32_t data_len) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _session->_db->ensure_free_space();
@@ -1127,7 +1139,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   std::string database::session<AccessMode>::iterator::key() const
+   std::string session<AccessMode>::iterator::key() const
    {
       std::string result;
       result.resize(key_size());
@@ -1136,7 +1148,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   typename database::session<AccessMode>::iterator database::session<AccessMode>::first() const
+   typename session<AccessMode>::iterator session<AccessMode>::first() const
    {
       id       root = _session_root;
       iterator result(*this);
@@ -1168,7 +1180,7 @@ namespace triedent
       }
    }
    template <typename AccessMode>
-   typename database::session<AccessMode>::iterator database::session<AccessMode>::last() const
+   typename session<AccessMode>::iterator session<AccessMode>::last() const
    {
       id       root = _session_root;
       iterator result(*this);
@@ -1202,13 +1214,12 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   typename database::session<AccessMode>::iterator database::session<AccessMode>::find(
-       string_view key) const
+   typename session<AccessMode>::iterator session<AccessMode>::find(string_view key) const
    {
       return find(_session_root, to_key6(key));
    }
    template <typename AccessMode>
-   typename database::session<AccessMode>::iterator database::session<AccessMode>::last_with_prefix(
+   typename session<AccessMode>::iterator session<AccessMode>::last_with_prefix(
        string_view prefix) const
    {
       id       root = _session_root;
@@ -1290,8 +1301,7 @@ namespace triedent
       return iterator(*this);
    }
    template <typename AccessMode>
-   typename database::session<AccessMode>::iterator database::session<AccessMode>::lower_bound(
-       string_view key) const
+   typename session<AccessMode>::iterator session<AccessMode>::lower_bound(string_view key) const
    {
       id       root = _session_root;
       iterator result(*this);
@@ -1354,9 +1364,8 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   inline typename database::session<AccessMode>::iterator database::session<AccessMode>::find(
-       id          root,
-       string_view key) const
+   inline typename session<AccessMode>::iterator session<AccessMode>::find(id          root,
+                                                                           string_view key) const
    {
       if (not root)
          return iterator(*this);
@@ -1415,7 +1424,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   std::optional<std::string> database::session<AccessMode>::get(string_view key) const
+   std::optional<std::string> session<AccessMode>::get(string_view key) const
    {
       std::string r;
       if (get(key, r))
@@ -1426,7 +1435,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   bool database::session<AccessMode>::get(string_view key, std::string& result) const
+   bool session<AccessMode>::get(string_view key, std::string& result) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
@@ -1449,8 +1458,7 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   std::optional<std::string_view> database::session<AccessMode>::get(id          root,
-                                                                      string_view key) const
+   std::optional<std::string_view> session<AccessMode>::get(id root, string_view key) const
    {
       if (not root)
          return std::nullopt;
@@ -1497,7 +1505,7 @@ namespace triedent
       return std::nullopt;
    }
 
-   inline int database::write_session::remove(string_view key)
+   inline int write_session::remove(string_view key)
    {
       _db->ensure_free_space();
       swap_guard g(*this);
@@ -1510,9 +1518,7 @@ namespace triedent
       }
       return removed_size;
    }
-   inline database::id database::write_session::remove_child(id          root,
-                                                             string_view key,
-                                                             int&        removed_size)
+   inline database::id write_session::remove_child(id root, string_view key, int& removed_size)
    {
       if (not root)
          return root;
@@ -1666,9 +1672,9 @@ namespace triedent
       return root;
    }
 
-   inline node_ref<maybe_owned> database::write_session::remove_child2(node_ref<maybe_unique> root,
-                                                                       string_view            key,
-                                                                       int& removed_size)
+   inline node_ref<maybe_owned> write_session::remove_child2(node_ref<maybe_unique> root,
+                                                             string_view            key,
+                                                             int&                   removed_size)
    {
       if (!root)
          return {};
@@ -1800,19 +1806,19 @@ namespace triedent
    }  // remove_child2
 
    template <typename AccessMode>
-   void database::session<AccessMode>::print()
+   void session<AccessMode>::print()
    {
       print(_session_root, string_view(), "");
    }
 
    template <typename AccessMode>
-   void database::session<AccessMode>::validate()
+   void session<AccessMode>::validate()
    {
       validate(_session_root);
    }
 
    template <typename AccessMode>
-   void database::session<AccessMode>::print(id r, string_view prefix, std::string key)
+   void session<AccessMode>::print(id r, string_view prefix, std::string key)
    {
       /*
       auto print_key = [](std::string k)
@@ -1863,7 +1869,7 @@ namespace triedent
     * visit every node in the tree and retain it. This is used in garbage collection
     * after a crash.
     */
-   inline void database::write_session::recursive_retain(id r)
+   inline void write_session::recursive_retain(id r)
    {
       if (not r)
          return;
@@ -1890,17 +1896,17 @@ namespace triedent
       }
    }
 
-   inline void database::write_session::start_collect_garbage()
+   inline void write_session::start_collect_garbage()
    {
       _db->_ring->reset_all_ref_counts(1);
    }
-   inline void database::write_session::end_collect_garbage()
+   inline void write_session::end_collect_garbage()
    {
       _db->_ring->reset_all_ref_counts(-1);
    }
 
    template <typename AccessMode>
-   void database::session<AccessMode>::validate(id r)
+   void session<AccessMode>::validate(id r)
    {
       if (not r)
          return;
@@ -1965,7 +1971,7 @@ namespace triedent
       }
       return out;
    }
-   inline key_view database::session_base::to_key6(key_view v) const
+   inline key_view session_base::to_key6(key_view v) const
    {
       uint32_t bits  = v.size() * 8;
       uint32_t byte6 = (bits + 5) / 6;

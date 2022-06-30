@@ -37,7 +37,7 @@ TEST_CASE("key round trip")
    for (auto& b : data)
       b = gen();
 
-   database::session_base sb;
+   session_base sb;
    for (uint32_t i = 0; i < 10000; ++i)
    {
       auto offset = gen() % 2096;
