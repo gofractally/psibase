@@ -5,7 +5,12 @@
 
 namespace triedent
 {
+   template <typename AccessMode>
+   class session;
+
    class database;
+   class shared_root;
+   class write_session;
 
    struct write_access;
    struct read_access;
@@ -18,12 +23,67 @@ namespace triedent
 
    inline key_type from_key6(const key_view sixb);
 
+   class root
+   {
+      template <typename AccessMode>
+      friend class session;
+
+      friend shared_root;
+      friend write_session;
+
+     private:
+      node_ref<maybe_owned> node;
+
+      root(node_ref<maybe_owned>&& node) : node(std::move(node)) { assert(this->node.get_owner()); }
+
+     public:
+      root()            = default;
+      root(const root&) = delete;
+      root(root&&)      = default;
+
+      root& operator=(const root&) = delete;
+      root& operator=(root&&)      = default;
+   };
+
+   class shared_root
+   {
+      template <typename AccessMode>
+      friend class session;
+
+      friend write_session;
+
+     private:
+      std::shared_ptr<root> root_ptr;
+
+      template <bool CopyToHot>
+      node_ref<no_track<CopyToHot>> as_no_track() const
+      {
+         if (root_ptr)
+            return root_ptr->node.as_no_track<CopyToHot>();
+         else
+            return {};
+      }
+
+     public:
+      shared_root()                   = default;
+      shared_root(const shared_root&) = default;
+      shared_root(shared_root&&)      = default;
+
+      shared_root(root&& r) : root_ptr(std::make_shared<root>(std::move(r))) {}
+
+      shared_root& operator=(const shared_root&) = default;
+      shared_root& operator=(shared_root&&)      = default;
+   };
+
    class session_base
    {
+      friend database;
+
      public:
       using string_view = std::string_view;
       using id          = object_id;
 
+     protected:
       id _session_root;
       /* auto inc id used to detect when we can modify in place*/
       uint64_t                      _version     = 0;
@@ -32,6 +92,7 @@ namespace triedent
       mutable std::atomic<uint64_t> _cool_swap_p = -1ull;
       mutable std::atomic<uint64_t> _cold_swap_p = -1ull;
 
+     public:
       key_view to_key6(key_view v) const;
 
      private:
@@ -178,8 +239,15 @@ namespace triedent
    class write_session : public read_session
    {
      public:
+      // Bump the ref count of r. Copy the node if the ref
+      // count would overflow.
+      root clone(const root& r);
+      root clone(const shared_root& r);
+
       int upsert(string_view key, string_view val);
+      int upsert(root& r, string_view key, string_view val);
       int remove(string_view key);
+      int remove(root& r, string_view key, string_view val);
       id  fork(id from_version);
       id  fork();
 
@@ -369,6 +437,21 @@ namespace triedent
      private:
       location_lock lock;
    };  // mutable_deref
+
+   inline root write_session::clone(const root& r)
+   {
+      _db->ensure_free_space();
+      swap_guard g(*this);
+      return {r.node.bump_count_or_copy()};
+   }
+
+   inline root write_session::clone(const shared_root& r)
+   {
+      if (r.root_ptr)
+         return clone(*r.root_ptr);
+      else
+         return {};
+   }
 
    inline void write_session::set_root_revision(id i)
    {
@@ -912,6 +995,7 @@ namespace triedent
       release(_session_root);
       _session_root = id();
    }
+
    // return -1 on insert, the size of the old object on update
    inline int write_session::upsert(string_view key, string_view val)
    {
@@ -929,6 +1013,15 @@ namespace triedent
          release(_session_root);
          _session_root = new_root;
       }
+      return old_size;
+   }
+
+   inline int write_session::upsert(root& r, string_view key, string_view val)
+   {
+      _db->ensure_free_space();
+      swap_guard g(*this);
+      int        old_size = -1;
+      r.node              = add_child2(r.node.as_maybe_unique(), to_key6(key), val, old_size);
       return old_size;
    }
 
@@ -1518,6 +1611,16 @@ namespace triedent
       }
       return removed_size;
    }
+
+   inline int write_session::remove(root& r, string_view key, string_view val)
+   {
+      _db->ensure_free_space();
+      swap_guard g(*this);
+      int        removed_size = -1;
+      r.node                  = remove_child2(r.node.as_maybe_unique(), to_key6(key), removed_size);
+      return removed_size;
+   }
+
    inline database::id write_session::remove_child(id root, string_view key, int& removed_size)
    {
       if (not root)

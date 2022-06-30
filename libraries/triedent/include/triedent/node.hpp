@@ -288,13 +288,13 @@ namespace triedent
       }
    }
 
-   inline object_id copy_node(ring_allocator& ra, object_id id, char* ptr, bool is_value)
+   inline location_lock copy_node(ring_allocator& ra, object_id id, char* ptr, bool is_value)
    {
       if (is_value)
       {
          auto src          = reinterpret_cast<value_node*>(ptr);
          auto [lock, dest] = value_node::make(ra, src->key(), src->data());
-         return lock.into_unlock_unchecked();
+         return std::move(lock);
       }
       else
       {
@@ -303,7 +303,7 @@ namespace triedent
          auto [lock, dest] =
              inner_node::make(ra, *src, src->key(), bump_refcount_or_copy(ra, src->value()),
                               src->branches(), src->version());
-         return lock.into_unlock_unchecked();
+         return std::move(lock);
       }
    }
 
@@ -314,6 +314,6 @@ namespace triedent
       if (auto shared = ra.bump_count(id))
          return shared->into_unchecked();
       auto [ptr, is_value, ref] = ra.get_cache<false>(id);
-      return copy_node(ra, id, ptr, is_value);
+      return copy_node(ra, id, ptr, is_value).into_unlock_unchecked();
    }
 }  // namespace triedent

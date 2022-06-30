@@ -181,6 +181,7 @@ namespace triedent
       }
 
       object_id get_id() const { return shared.get_id(); }
+      bool      get_owner() const { return shared.get_owner(); }
 
       template <bool CopyToHot>
       no_track<CopyToHot> as_no_track() const
@@ -215,7 +216,21 @@ namespace triedent
          }
          assert(ra);
          auto [ptr, is_value, ref] = ra->get_cache<false>(shared.get_id());
-         return copy_node(*ra, shared.get_id(), ptr, is_value);
+         return copy_node(*ra, shared.get_id(), ptr, is_value).into_unlock_unchecked();
+      }
+
+      // Bump reference count and return maybe_owned. Copy if the refcount
+      // would overflow.
+      maybe_owned bump_count_or_copy() const
+      {
+         if (!shared.get_id())
+            return {};
+         assert(ra);
+         if (auto s = ra->bump_count(shared.get_id()))
+            return {ra, is_value, std::move(*s)};
+         auto [ptr, is_value, ref] = ra->get_cache<false>(shared.get_id());
+         auto lock                 = copy_node(*ra, shared.get_id(), ptr, is_value);
+         return {ra, is_value, lock.into_lock2_alloced_unchecked().into_unlock()};
       }
    };  // maybe_owned
 
@@ -353,6 +368,7 @@ namespace triedent
       operator bool() const { return tracker.get_id().id != 0; }
 
       auto get_id() const { return tracker.get_id(); }
+      bool get_owner() const { return tracker.get_owner(); }
 
       friend bool operator==(const ref_base& a, const ref_base& b)
       {
@@ -386,6 +402,8 @@ namespace triedent
       // Named `ret` since it's used at the return point of tree manipulation functions
       // in database.hpp.
       node_ref<maybe_owned> ret();
+
+      Derived<maybe_owned> bump_count_or_copy() const { return {tracker.bump_count_or_copy()}; }
 
       auto track_child(object_id id) const;
    };
