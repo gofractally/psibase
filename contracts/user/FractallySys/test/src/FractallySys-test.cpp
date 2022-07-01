@@ -8,6 +8,7 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
+#include "helpers.hpp"
 
 using namespace psibase;
 using namespace psibase::benchmarking;
@@ -36,15 +37,6 @@ namespace
 
    const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
        {FractallySys::contract, "FractallySys.wasm"}};
-
-   // DefaultTestChain twfam(neededContracts);
-   void addFractal(DefaultTestChain &t) {
-      auto founder = t.as(t.add_account("founder"_a));
-      auto f     = founder.at<FractallySys>();
-      // Initialize user contracts
-      f.init();
-      f.createFractal("FirstFractal");
-   };
 }  // namespace
 
 SCENARIO("Creating a fractal")
@@ -72,9 +64,9 @@ SCENARIO("Creating a fractal")
 SCENARIO("Inviting to a fractal") {
    GIVEN("A chain with a fractal") {
       DefaultTestChain t(neededContracts);
-      addFractal(t);
-      auto founder = t.as(t.get_account("founder"_a));
+      auto founder = t.as(t.add_account("founder"_a));
       auto f     = founder.at<FractallySys>();
+      FractallyChainHelper::addFractal(t, f);
 
       THEN("The founder can invite new member") {
          auto bob = t.as(t.add_account("bob"_a));
@@ -89,9 +81,6 @@ SCENARIO("Inviting to a fractal") {
          }
       }
    }
-   GIVEN("A chain with a fractal with a member") {
-      THEN("The member can invite a new members") {}
-   }
 }
 
 SCENARIO("Scheduling meetings")
@@ -99,18 +88,20 @@ SCENARIO("Scheduling meetings")
    GIVEN(A_DEFAULT_CHAIN_W_A_FRACTAL)
    {
       DefaultTestChain t(neededContracts);
-
-      auto a = t.as(t.add_account("alice"_a)).at<FractallySys>();
-      a.init();
-      a.createFractal("FirstFractal");
+      auto f = t.as(t.add_account("founder"_a)).at<FractallySys>();
+      FractallyChainHelper::addFractal(t, f);
 
       WHEN("There is no meeting scheduled") {
          THEN("The meeting cadence and day of week + time can be set by the Founder") {
-            a.proposeSchedule(5, 7); // 5 = Saturday; cadence = 7d
-            a.confSchedule();
+            auto propose = f.proposeSchedule(5, 7); // 5 = Saturday; cadence = 7d
+            CHECK(propose.succeeded());
+            auto confirm = f.confSchedule();
+            CHECK(confirm.succeeded());
          }
       }
       WHEN("A meeting is scheduled") {
+         auto propose = f.proposeSchedule(5, 7); // 5 = Saturday; cadence = 7d
+         auto confirm = f.confSchedule();
          THEN("The meeting happens at the set time") { }
          THEN("The meeting cadence cannot be changed (by a non-Council member)") { }
          THEN("The meeting cadence cannot be changed (by a non-Founder member)") {
