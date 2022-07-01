@@ -26,6 +26,13 @@ namespace psibase
 
       if (request.method == "GET")
       {
+         if (request.target.starts_with("/applet/"))
+         {
+            // All requests to load a specific applet will return the root index from common-sys.
+            // Then common-sys will read the URL bar, detect that an applet is being loaded,
+            // and request the applet to load inside an iframe.
+            request.target = "/";
+         }
          if (request.target == "/common/thiscontract")
          {
             std::string contractName;
@@ -118,22 +125,23 @@ namespace psibase
 
    std::optional<RpcReplyData> CommonSys::serveCommon(RpcRequestData request)
    {
-      /*
-      <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-      <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" />
-
-      <div id="commonRoot"></div>
-      <div class="ui container" style="margin-top: 10px" id="root"></div>
-
-      <script src="common/rootdomain.js"></script>
-      <script src="ui/commonIndex.js" type="module"></script>
-      <script src="ui/index.js" type="module"></script>
-      */
-
       if (request.method == "GET")
       {
-         if (request.target == "/" || request.target == "/ui/commonIndex.js")
+         std::vector<std::pair<std::string, std::string>> commonResMap{
+             {"/", "/ui/common.index.html"}};
+
+         bool serveFromCommon = std::any_of(commonResMap.begin(), commonResMap.end(),
+                                            [&](const auto& res)
+                                            {
+                                               if (res.first == request.target)
+                                               {
+                                                  request.target = res.second;
+                                                  return true;
+                                               }
+                                               return false;
+                                            });
+
+         if (serveFromCommon)
          {
             auto index =
                 ContractTables<WebContentTable>{contract}.open<WebContentTable>().getIndex<0>();

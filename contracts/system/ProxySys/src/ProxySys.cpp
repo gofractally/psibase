@@ -9,6 +9,57 @@ static constexpr bool enable_print = false;
 
 namespace psibase
 {
+   namespace
+   {
+      bool isSubdomain(const psibase::RpcRequestData& req)
+      {
+         return req.host.size() > req.rootHost.size() + 1  //
+                && req.host.ends_with(req.rootHost)        //
+                && req.host[req.host.size() - req.rootHost.size() - 1] == '.';
+      }
+
+      struct Injector
+      {
+         using TestFunc = std::function<bool(const psibase::RpcRequestData&)>;
+         TestFunc    func;
+         std::string injection;
+         bool        shouldInject = 0;
+      };
+
+      // Todo - replace cdn with on-chain resources
+      Injector iframeResizer{
+          .func = [](const psibase::RpcRequestData& req) { return (req.target == "/"); },
+          .injection =
+              "<script src=\"https://unpkg.com/iframe-resizer@4.3.1/js/"
+              "iframeResizer.contentWindow.js\" crossorigin></script>",
+      };
+
+      Injector subdomainLogin{
+          .func = [](const psibase::RpcRequestData& req) { return isSubdomain(req); },
+          .injection =
+              "<link rel=\"stylesheet\" "
+              "href=\"https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css\" "
+              "/>"
+              "<script src=\"common/loginBar.js\" type=\"module\"></script>",
+      };
+
+      std::vector<Injector> injectors{iframeResizer, subdomainLogin};
+
+      void injectHtml(std::optional<psibase::RpcReplyData>& reply, const std::string& html)
+      {
+         if (reply.has_value() && reply->contentType == "text/html")
+         {
+            reply->body.insert(reply->body.end(), html.begin(), html.end());
+         }
+      }
+
+      void debugAlert(std::optional<psibase::RpcReplyData>& reply, const std::string& message)
+      {
+         injectHtml(reply, "<script>alert(\"" + message + "\");</script>");
+      }
+
+   }  // namespace
+
    // TODO: switch to Table wrapper
    using table_num = uint16_t;
 
@@ -52,13 +103,17 @@ namespace psibase
          contractName = "common-sys";
 
       // subdomain
-      else if (req.host.size() > req.rootHost.size() + 1 && req.host.ends_with(req.rootHost) &&
-               req.host[req.host.size() - req.rootHost.size() - 1] == '.')
+      else if (isSubdomain(req))
          contractName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
 
       // root domain
       else
          contractName = "common-sys";
+
+      for (auto& i : injectors)
+      {
+         i.shouldInject = i.func(req);
+      }
 
       auto contract = AccountNumber(contractName);
       auto reg      = kvGet<RegisteredContractRow>(registeredContractKey(act.contract, contract));
@@ -67,7 +122,17 @@ namespace psibase
 
       // TODO: avoid repacking (both directions)
       psibase::Actor<ServerInterface> iface(act.contract, reg->serverContract);
-      setRetval(iface.serveSys(std::move(req)).unpack());
+      auto                            reply = iface.serveSys(std::move(req)).unpack();
+
+      for (auto& i : injectors)
+      {
+         if (i.shouldInject)
+         {
+            injectHtml(reply, i.injection);
+         }
+      }
+
+      setRetval(reply);
    }  // serve()
 
 }  // namespace psibase

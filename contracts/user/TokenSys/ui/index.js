@@ -1,6 +1,7 @@
 //import { siblingUrl } from "/common/rootdomain.mjs";
 import { getJson } from "/common/rpc.mjs";
 import htm from "https://unpkg.com/htm@3.1.0?module";
+await import("https://unpkg.com/iframe-resizer@4.3.1/js/iframeResizer.js");
 
 const html = htm.bind(React.createElement);
 class Search extends React.Component {
@@ -160,7 +161,7 @@ class ToolsTabs extends React.Component {
           ${this.state.tabs.map((t, index) => {
             return html`
               <div
-                key=${index}
+                key=${t.title}
                 onClick=${this.onTabClicked(index)}
                 class="item ${t.class}"
               >
@@ -169,9 +170,12 @@ class ToolsTabs extends React.Component {
             `;
           })}
         </div>
-        ${this.state.tabs.map((t, index) => {
+        ${this.state.tabs.map((t) => {
           return html`
-            <div key=${index} class="ui bottom attached tab segment ${t.class}">
+            <div
+              key=${t.title}
+              class="ui bottom attached tab segment ${t.class}"
+            >
               ${t.panel}
             </div>
           `;
@@ -193,7 +197,7 @@ class App extends React.Component {
 
   render() {
     return html`
-      <div>
+      <div class="ui container">
         <${Search} title="Select a user" onSubmit=${this.onSearchSubmit} />
         <${BalanceTable}
           title=${"Token balances: " + this.state.user}

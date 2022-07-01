@@ -232,6 +232,9 @@ void DefaultTestChain::registerSysRpc()
    std::vector<psibase::Action> b{
        // CommonSys
        rpcCommon.storeSys("/", html, read_whole_file(comDir + "/ui/index.html")),
+       rpcCommon.storeSys("/ui/common.index.html", html,
+                          read_whole_file(comDir + "/ui/common.index.html")),
+
        rpcCommon.storeSys("/common/rpc.mjs", js, read_whole_file(comDir + "/common/rpc.mjs")),
        rpcCommon.storeSys("/common/useGraphQLQuery.mjs", js,
                           read_whole_file(comDir + "/common/useGraphQLQuery.mjs")),
@@ -239,8 +242,9 @@ void DefaultTestChain::registerSysRpc()
                           read_whole_file(comDir + "/common/SimpleUI.mjs")),
        rpcCommon.storeSys("/common/keyConversions.mjs", js,
                           read_whole_file(comDir + "/common/keyConversions.mjs")),
+       rpcCommon.storeSys("/common/loginBar.js", js,
+                          read_whole_file(comDir + "/common/loginBar.js")),
        rpcCommon.storeSys("/ui/index.js", js, read_whole_file(comDir + "/ui/index.js")),
-       rpcCommon.storeSys("/ui/commonIndex.js", js, read_whole_file(comDir + "/ui/commonIndex.js")),
 
        // AccountSys
        rpcAccount.storeSys("/", html, read_whole_file(accDir + "/ui/index.html")),
