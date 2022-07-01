@@ -112,7 +112,12 @@ namespace psibase
       }
 
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
+      {
+         result->headers = {
+             {"Content-Security-Policy", "frame-ancestors 'none';"},
+         };
          return result;
+      }
       return std::nullopt;
    }  // CommonSys::serveSys
 

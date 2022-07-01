@@ -1,5 +1,4 @@
 use libpsibase::*;
-use psi_macros::contract;
 
 #[contract(example)]
 mod example_contract {

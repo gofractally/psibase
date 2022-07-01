@@ -1,53 +1,169 @@
+use crate::{account, Fracpack};
 use custom_error::custom_error;
 use ripemd::{Digest, Ripemd160};
 use std::{fmt, str::FromStr};
 
-custom_error! { pub Error
-    InvalidKeyOrSig = "Invalid key or signature",
-    ExpectedPublicKey = "Expected public key",
-    ExpectedPrivateKey = "Expected private key",
+custom_error! {
+    #[allow(clippy::enum_variant_names)] pub Error
+
+    InvalidKey          = "Invalid key",
+    ExpectedPublicKey   = "Expected public key",
+    ExpectedPrivateKey  = "Expected private key",
+}
+
+#[cfg(not(target_family = "wasm"))]
+custom_error! { pub K1Error
+    OnlyK1              = "Only K1 keys are fully supported",
+    Msg{s:String}       = "{s}",
 }
 
 pub type EccPublicKey = [u8; 33];
 
-#[derive(Debug, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 pub enum PublicKeyEnum {
     K1(EccPublicKey),
     R1(EccPublicKey),
 }
 
-#[derive(Debug, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 #[fracpack(definition_will_not_change)]
 pub struct PublicKey {
     pub data: PublicKeyEnum,
 }
 
+impl FromStr for PublicKey {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() > 7 && &s[..7] == "PUB_K1_" {
+            Ok(PublicKey {
+                data: PublicKeyEnum::K1(
+                    string_to_key_bytes(&s[7..], "K1").ok_or(Error::InvalidKey)?,
+                ),
+            })
+        } else if s.len() > 7 && &s[..7] == "PUB_R1_" {
+            Ok(PublicKey {
+                data: PublicKeyEnum::R1(
+                    string_to_key_bytes(&s[7..], "R1").ok_or(Error::InvalidKey)?,
+                ),
+            })
+        } else {
+            Err(Error::ExpectedPublicKey)
+        }
+    }
+}
+
+impl fmt::Display for PublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.data {
+            PublicKeyEnum::K1(data) => write!(f, "PUB_K1_{}", key_to_string(data, "K1")),
+            PublicKeyEnum::R1(data) => write!(f, "PUB_R1_{}", key_to_string(data, "R1")),
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl From<&secp256k1::PublicKey> for PublicKey {
+    fn from(key: &secp256k1::PublicKey) -> Self {
+        Self {
+            data: PublicKeyEnum::K1(key.serialize()),
+        }
+    }
+}
+
 pub type EccPrivateKey = [u8; 32];
 
-#[derive(Debug, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 pub enum PrivateKeyEnum {
     K1(EccPrivateKey),
     R1(EccPrivateKey),
 }
 
-#[derive(Debug, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 #[fracpack(definition_will_not_change)]
 pub struct PrivateKey {
     pub data: PrivateKeyEnum,
 }
 
+impl PrivateKey {
+    #[cfg(not(target_family = "wasm"))]
+    pub fn into_k1(&self) -> Result<secp256k1::SecretKey, K1Error> {
+        match &self.data {
+            PrivateKeyEnum::K1(data) => secp256k1::SecretKey::from_slice(data)
+                .map_err(|e| K1Error::Msg { s: e.to_string() }),
+            PrivateKeyEnum::R1(_) => Err(K1Error::OnlyK1),
+        }
+    }
+}
+
+impl FromStr for PrivateKey {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() > 7 && &s[..7] == "PVT_K1_" {
+            Ok(PrivateKey {
+                data: PrivateKeyEnum::K1(
+                    string_to_key_bytes(&s[7..], "K1").ok_or(Error::InvalidKey)?,
+                ),
+            })
+        } else if s.len() > 7 && &s[..7] == "PVT_R1_" {
+            Ok(PrivateKey {
+                data: PrivateKeyEnum::R1(
+                    string_to_key_bytes(&s[7..], "R1").ok_or(Error::InvalidKey)?,
+                ),
+            })
+        } else {
+            Err(Error::ExpectedPrivateKey)
+        }
+    }
+}
+
+impl fmt::Display for PrivateKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.data {
+            PrivateKeyEnum::K1(data) => write!(f, "PVT_K1_{}", key_to_string(data, "K1")),
+            PrivateKeyEnum::R1(data) => write!(f, "PVT_R1_{}", key_to_string(data, "R1")),
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl From<&secp256k1::SecretKey> for PrivateKey {
+    fn from(key: &secp256k1::SecretKey) -> Self {
+        Self {
+            data: PrivateKeyEnum::K1(key.secret_bytes()),
+        }
+    }
+}
+
 pub type EccSignature = [u8; 64];
 
-#[derive(Debug, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 pub enum SignatureEnum {
     K1(EccSignature),
     R1(EccSignature),
 }
 
-#[derive(Debug, psi_macros::Fracpack)]
+#[derive(Debug, Clone, Fracpack)]
 #[fracpack(definition_will_not_change)]
 pub struct Signature {
     pub data: SignatureEnum,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl From<&secp256k1::ecdsa::Signature> for Signature {
+    fn from(signature: &secp256k1::ecdsa::Signature) -> Self {
+        Self {
+            data: SignatureEnum::K1(signature.serialize_compact()),
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl From<secp256k1::ecdsa::Signature> for Signature {
+    fn from(signature: secp256k1::ecdsa::Signature) -> Self {
+        Self {
+            data: SignatureEnum::K1(signature.serialize_compact()),
+        }
+    }
 }
 
 const BASE58_CHARS: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -71,12 +187,12 @@ const BASE58_MAP: [u8; 256] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 ];
 
-fn base58_to_binary(s: &str) -> Result<Vec<u8>, Error> {
+fn base58_to_binary(s: &str) -> Option<Vec<u8>> {
     let mut result = Vec::new();
     for src_digit in s.bytes() {
         let mut carry = BASE58_MAP[src_digit as usize] as u16;
         if carry & 0x80 != 0 {
-            return Err(Error::InvalidKeyOrSig);
+            return None;
         }
         for result_byte in &mut result {
             let x = *result_byte as u16 * 58 + carry;
@@ -95,7 +211,7 @@ fn base58_to_binary(s: &str) -> Result<Vec<u8>, Error> {
         }
     }
     result.reverse();
-    Ok(result)
+    Some(result)
 }
 
 fn binary_to_base58(bin: &[u8]) -> String {
@@ -129,18 +245,18 @@ fn digest_suffix_ripemd160(data: &[u8], suffix: &[u8]) -> [u8; 20] {
     hasher.finalize().into()
 }
 
-fn string_to_key_bytes<const SIZE: usize>(s: &str, suffix: &str) -> Result<[u8; SIZE], Error> {
+fn string_to_key_bytes<const SIZE: usize>(s: &str, suffix: &str) -> Option<[u8; SIZE]> {
     let v = base58_to_binary(s)?;
     if v.len() != SIZE + 4 {
-        return Err(Error::InvalidKeyOrSig);
+        return None;
     }
     let ripe_digest = digest_suffix_ripemd160(&v[..v.len() - 4], suffix.as_bytes());
     if ripe_digest[0..4] != v[v.len() - 4..] {
-        return Err(Error::InvalidKeyOrSig);
+        return None;
     }
     let mut result = [0; SIZE];
     result.copy_from_slice(&v[..v.len() - 4]);
-    Ok(result)
+    Some(result)
 }
 
 fn key_to_string(bytes: &[u8], suffix: &str) -> String {
@@ -152,54 +268,38 @@ fn key_to_string(bytes: &[u8], suffix: &str) -> String {
     binary_to_base58(&whole)
 }
 
-impl FromStr for PublicKey {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if &s[..7] == "PUB_K1_" {
-            Ok(PublicKey {
-                data: PublicKeyEnum::K1(string_to_key_bytes(&s[7..], "K1")?),
-            })
-        } else if &s[..7] == "PUB_R1_" {
-            Ok(PublicKey {
-                data: PublicKeyEnum::R1(string_to_key_bytes(&s[7..], "R1")?),
-            })
-        } else {
-            Err(Error::ExpectedPublicKey)
-        }
-    }
-}
-
-impl fmt::Display for PublicKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.data {
-            PublicKeyEnum::K1(data) => write!(f, "PUB_K1_{}", key_to_string(data, "K1")),
-            PublicKeyEnum::R1(data) => write!(f, "PUB_R1_{}", key_to_string(data, "R1")),
-        }
-    }
-}
-
-impl FromStr for PrivateKey {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if &s[..7] == "PVT_K1_" {
-            Ok(PrivateKey {
-                data: PrivateKeyEnum::K1(string_to_key_bytes(&s[7..], "K1")?),
-            })
-        } else if &s[..7] == "PVT_R1_" {
-            Ok(PrivateKey {
-                data: PrivateKeyEnum::R1(string_to_key_bytes(&s[7..], "R1")?),
-            })
-        } else {
-            Err(Error::ExpectedPrivateKey)
-        }
-    }
-}
-
-impl fmt::Display for PrivateKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.data {
-            PrivateKeyEnum::K1(data) => write!(f, "PVT_K1_{}", key_to_string(data, "K1")),
-            PrivateKeyEnum::R1(data) => write!(f, "PVT_R1_{}", key_to_string(data, "R1")),
-        }
-    }
+#[cfg(not(target_family = "wasm"))]
+pub fn sign_transaction(
+    mut trx: crate::Transaction,
+    keys: &[PrivateKey],
+) -> Result<crate::SignedTransaction, K1Error> {
+    use crate::libpsibase;
+    let keys = keys
+        .iter()
+        .map(|k| k.into_k1())
+        .collect::<Result<Vec<_>, _>>()?;
+    trx.claims = keys
+        .iter()
+        .map(|k| crate::Claim {
+            contract: account!("verifyec-sys"),
+            raw_data: fracpack::Packable::packed_bytes(&PublicKey::from(
+                &secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, k),
+            )),
+        })
+        .collect();
+    let transaction = fracpack::Packable::packed_bytes(&trx);
+    let digest =
+        secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(&transaction);
+    let proofs = keys
+        .iter()
+        .map(|k| {
+            fracpack::Packable::packed_bytes(&Signature::from(
+                secp256k1::SECP256K1.sign_ecdsa(&digest, k),
+            ))
+        })
+        .collect();
+    Ok(crate::SignedTransaction {
+        transaction,
+        proofs,
+    })
 }

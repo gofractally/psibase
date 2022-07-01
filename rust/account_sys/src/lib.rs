@@ -1,7 +1,7 @@
 use libpsibase::*;
 use serde_json::json;
 
-#[psi_macros::contract(example_iface)]
+#[contract(example_iface)]
 mod example_impl {
     use crate::*;
 
