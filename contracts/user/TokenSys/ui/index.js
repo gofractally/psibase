@@ -198,6 +198,7 @@ class App extends React.Component {
   render() {
     return html`
       <div class="ui container">
+        <h1>Wallet</h1>
         <${Search} title="Select a user" onSubmit=${this.onSearchSubmit} />
         <${BalanceTable}
           title=${"Token balances: " + this.state.user}

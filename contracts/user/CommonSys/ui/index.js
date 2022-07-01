@@ -7,7 +7,7 @@ await import(
 
 const html = htm.bind(React.createElement);
 
-const { useState, useEffect } = React;
+const { useEffect } = React;
 const { BrowserRouter, Route } = ReactRouterDOM;
 
 const appletPrefix = "/applet/";
@@ -37,15 +37,15 @@ let contracts = [
   },
 ];
 
-const AppStates = {
-  Browse: 0,
-  InApp: 1,
-};
-
-const contract = await getJson("/common/thiscontract");
-
 function activeIf(cName) {
-  return cName === contract ? "active" : "";
+  if (cName === "common-sys")
+  {
+    return window.location.pathname === "/" ? "active" : "";
+  }
+  else
+  {
+    return window.location.pathname.indexOf(cName) != -1 ? "active" : "";
+  }
 }
 
 function Nav() {
