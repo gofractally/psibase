@@ -251,7 +251,6 @@ void DefaultTestChain::registerSysRpc()
        rpcAccount.storeSys("/ui/index.js", js, read_whole_file(accDir + "/ui/index.js")),
 
        // ExploreSys
-       rpcExplore.storeSys("/", html, read_whole_file(expDir + "/ui/index.html")),
        rpcExplore.storeSys("/ui/index.js", js, read_whole_file(expDir + "/ui/index.js"))};
 
    trace = pushTransaction(make_transaction(std::move(b)));

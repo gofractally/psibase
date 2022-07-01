@@ -26,7 +26,7 @@ const App = () => {
     const pagedResult = useGraphQLPagedQuery('/graphql', query, 10, (result) => result.data?.blocks.pageInfo);
     const tdStyle = { border: "1px solid" };
     return html`
-        <div>
+        <div class="ui container">
             <a href=${siblingUrl()}>psibase</a>
             <h1>explore-sys</h1>
         
