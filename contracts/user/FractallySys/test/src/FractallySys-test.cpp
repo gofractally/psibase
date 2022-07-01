@@ -16,7 +16,8 @@ using namespace UserContract::Errors;
 using namespace UserContract;
 
 constexpr std::string_view MEMBER_IS_EVICTED = "member is removed from the community";
-constexpr std::string_view AN_EMPTY_CHAIN = "a default chain";
+constexpr std::string_view A_DEFAULT_CHAIN = "a default chain";
+constexpr std::string_view A_DEFAULT_CHAIN_W_A_FRACTAL = "a default chain with a fractal";
 // TODO: add billing note where applicable and assert on the specific amount of resources (to notice when resource costs change)
 
 namespace
@@ -36,24 +37,93 @@ namespace
    const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
        {FractallySys::contract, "FractallySys.wasm"}};
 
-   constexpr auto manualDebit  = "manualDebit"_m;
-   constexpr auto unrecallable = "unrecallable"_m;
-   constexpr auto untradeable  = "untradeable"_m;
-
+   // DefaultTestChain twfam(neededContracts);
+   void addFractal(DefaultTestChain &t) {
+      auto founder = t.as(t.add_account("founder"_a));
+      auto f     = founder.at<FractallySys>();
+      // Initialize user contracts
+      f.init();
+      f.createFractal("FirstFractal");
+   };
 }  // namespace
+
+SCENARIO("Creating a fractal")
+{
+   GIVEN(A_DEFAULT_CHAIN)
+   {
+      DefaultTestChain t(neededContracts);
+
+      auto alice = t.as(t.add_account("alice"_a));
+      auto a     = alice.at<FractallySys>();
+      
+      // Initialize user contracts
+      alice.at<FractallySys>().init();
+
+      THEN("A user can create a fractal") {
+         auto create = a.createFractal("FirstFractal");
+         CHECK(create.succeeded());
+
+         AND_THEN("The fractal exists") { }
+         AND_THEN("alice is the fractal's founder") { }
+      }
+   }
+}
+
+SCENARIO("Inviting to a fractal") {
+   GIVEN("A chain with a fractal") {
+      DefaultTestChain t(neededContracts);
+      addFractal(t);
+      auto founder = t.as(t.get_account("founder"_a));
+      auto f     = founder.at<FractallySys>();
+
+      THEN("The founder can invite new member") {
+         auto bob = t.as(t.add_account("bob"_a));
+         auto invite = f.inviteMember(bob);
+         CHECK(invite.succeeded());
+
+         AND_THEN("That member can invite a new member") {
+            auto b = bob.at<FractallySys>();
+            auto carol = t.as(t.add_account("carol"_a));
+            auto invite = b.inviteMember(carol);
+            CHECK(invite.succeeded());
+         }
+      }
+   }
+   GIVEN("A chain with a fractal with a member") {
+      THEN("The member can invite a new members") {}
+   }
+}
 
 SCENARIO("Scheduling meetings")
 {
-   GIVEN(AN_EMPTY_CHAIN)
+   GIVEN(A_DEFAULT_CHAIN_W_A_FRACTAL)
    {
+      DefaultTestChain t(neededContracts);
+
+      auto a = t.as(t.add_account("alice"_a)).at<FractallySys>();
+      a.init();
+      a.createFractal("FirstFractal");
+
       WHEN("There is no meeting scheduled") {
-         THEN("The meeting cadence and day of week + time can be set") { }
+         THEN("The meeting cadence and day of week + time can be set by the Founder") {
+            a.proposeSchedule(5, 7); // 5 = Saturday; cadence = 7d
+            a.confSchedule();
+         }
       }
       WHEN("A meeting is scheduled") {
          THEN("The meeting happens at the set time") { }
          THEN("The meeting cadence cannot be changed (by a non-Council member)") { }
-         THEN("The meeting cadence and day of the week can be changed by an Council consensus") {
-            // TODO: Tests around Council changing cadence, day/time
+         THEN("The meeting cadence cannot be changed (by a non-Founder member)") {
+            auto b = t.as(t.add_account("bob"_a)).at<FractallySys>();
+            auto propose = b.proposeSchedule(6, 7); // 6 = Sunday; cadence = 7d
+            CHECK(propose.failed(insufficientPerm));
+         }
+      }
+   }
+   GIVEN("A chain with a Fractal and a Council")
+   {
+      WHEN("There is a meeting scheduled and cadence set") {
+         THEN("The meeting cadence and day of week + time can be set by the Council") {
          }
       }
    }
@@ -192,7 +262,7 @@ SCENARIO("Meeting Attendance and Consensus") {
 SCENARIO("Meeting Attendance Accounting") {
    GIVEN("An default chain with a history of >3 meetings") {
       WHEN("A member joins a meeting after 3 weeks of absence") {
-         THEN("they are immediately be credited 15% of their escrowed balance") {
+         THEN("they are immediately credited 15% of their escrowed balance") {
             // Q: Can we make this consistent by using a 5%/wk distribution with a final threshold, below which remaining balance is credited?
             // amortization schedule that works out to 20 periods?
          }

@@ -11,74 +11,45 @@
 
 namespace UserContract
 {
-   // struct InfSettingsRecord
-   // {
-   //    uint64_t daily_limit_pct;
-   //    uint64_t daily_limit_qty;
-   //    uint64_t yearly_limit_pct;
-
-   //    auto operator<=>(const InfSettingsRecord&) const = default;
-   // };
-   // PSIO_REFLECT(InfSettingsRecord, daily_limit_pct, daily_limit_qty, yearly_limit_pct);
-
-   // struct InfStatsRecord
-   // {
-   //    int64_t avg_daily;
-   //    int64_t avg_yearly;
-
-   //    auto operator<=>(const InfStatsRecord&) const = default;
-   // };
-   // PSIO_REFLECT(InfStatsRecord, avg_daily, avg_yearly);
-
-   // struct InflationRecord
-   // {
-   //    InfSettingsRecord settings;
-   //    InfStatsRecord    stats;
-
-   //    auto operator<=>(const InflationRecord&) const = default;
-   // };
-   // PSIO_REFLECT(InflationRecord, settings, stats);
-
-   struct ProposalRecord
-   {
-      ProposalID id;
+   enum MemberStatus {
+      FullTime = 0,
+      PartTime = 1,
+      Nonparticipating = 2
    };
-
+   struct MemberRecord
+   {
+      psibase::AccountNumber account;
+      std::time_t joinDate;
+      MemberStatus status;
+      float consensusRollingAvg; // 12-week rolling avg of coming to consensus
+      uint16_t rankRollingTotal; // 12-week rolling total, calculated end of meetings
+   };
    struct TeamRecord
    {
-      TeamID id;
       psibase::AccountNumber account;
-      std::vector<psibase::AccountNumber> members;
+      // TODO: set const for max_team_size
+      std::array<psibase::AccountNumber, 12> members;
       psibase::AccountNumber lead;
-      bool    isActive;
-      // psibase::Bitset<8> config;
-      // Precision          precision;
-      // Quantity           currentSupply;
-      // Quantity           maxSupply;
-      // SID                symbolId;
+      uint16_t rankRollingTotal; // 12-week rolling total
+      uint16_t earningsRollingTotal; // 12-week rolling total
+      uint8_t weeksOnCouncil; // incremented or wiped EOD
 
-      // using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"}, psibase::NamedBit_t{"untradeable"}>;
-
-      // static bool isValidKey(TID tokenId)
-      // {
-      //    /*
-      //     * The final of the 32 bits is reserved such that there are only 31 bits used for token ID.
-      //     * This is simply an attempt to future proof the token record, so we have a spare bit to
-      //     *   separately namespace tokens should the need arise.
-      //     */
-
-      //    return tokenId > 0 && tokenId <= std::numeric_limits<uint32_t>::max() / 2;
-      // }
+      bool isActive()
+      {
+         /* Team active/inactive flag */
+        // TODO: isActive can be computation based on max 12 queries for members being full-time
+         return true;
+      }
 
       auto operator<=>(const TeamRecord&) const = default;
    };
    PSIO_REFLECT(TeamRecord,
-               id,
-               account,
                members,
                lead,
-               isActive);
-   using TeamTable_t = psibase::Table<TeamRecord, &TeamRecord::id>;
+               rankRollingTotal,
+               earningsRollingTotal,
+               weeksOnCouncil);
+   using TeamTable_t = psibase::Table<TeamRecord, &TeamRecord::account>;
    // // Todo - add symbolId as secondary index when possible
 
    struct BalanceKey_t
@@ -100,37 +71,12 @@ namespace UserContract
    PSIO_REFLECT(BalanceRecord, key, balance);
    using BalanceTable_t = psibase::Table<BalanceRecord, &BalanceRecord::key>;
 
-   // struct SharedBalanceKey_t
-   // {
-   //    psibase::AccountNumber creditor;
-   //    psibase::AccountNumber debitor;
-   //    TID                    tokenId;
-
-   //    auto operator<=>(const SharedBalanceKey_t&) const = default;
-   // };
-   // PSIO_REFLECT(SharedBalanceKey_t, tokenId, creditor, debitor);
-
-   // struct SharedBalanceRecord
-   // {
-   //    SharedBalanceKey_t key;
-   //    uint64_t           balance;
-
-   //    auto operator<=>(const SharedBalanceRecord&) const = default;
-   // };
-   // PSIO_REFLECT(SharedBalanceRecord, key, balance);
-   // using SharedBalanceTable_t = psibase::Table<SharedBalanceRecord, &SharedBalanceRecord::key>;
-   // // Todo - How can I add a secondary index for debitor? I imagine people will want to search for shared balances by debitor.
-
-   // struct TokenHolderRecord
-   // {
-   //    psibase::AccountNumber account;
-   //    psibase::Bitset<8>     config;
-
-   //    using Configurations = psibase::NamedBits<psibase::NamedBit_t{"manualDebit"}>;
-
-   //    auto operator<=>(const TokenHolderRecord&) const = default;
-   // };
-   // PSIO_REFLECT(TokenHolderRecord, account, config);
-   // using TokenHolderTable_t = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
+   /*
+    * Petitions
+    * How do we list Petitions? index msigs by auth?
+    */
+   
+   // TODO: Events
+   // - index member rank so we can pull rank history and calculate averages
 
 }  // namespace UserContract

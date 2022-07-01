@@ -5,9 +5,7 @@
 
 #include <psibase/Contract.hpp>
 #include <psibase/String.hpp>
-#include <psibase/check.hpp>
 #include <string>
-// #include "symbol_tables.hpp"
 #include "FractallyErrors.hpp"
 #include "FractallyTables.hpp"
 #include "types.hpp"
@@ -23,8 +21,7 @@ namespace UserContract
    //                                           SharedBalanceTable_t,
    //                                           TokenHolderTable_t,
    //                                           InitTable_t>;
-      static constexpr auto contract    = psibase::AccountNumber("FractallySys");
-      using WhatType = uint32_t;
+      static constexpr auto contract    = psibase::AccountNumber("fractally-sys");
    //    static constexpr auto sysToken    = TID{1};
    //    static constexpr auto sysTokenSym = SID{"PSI"};
 
@@ -35,18 +32,23 @@ namespace UserContract
    /* utility functions */
       void triggerEvents(uint32_t max) {};
 
+   /* Fractal creation and building */
+      void createFractal(psio::const_view<psibase::String> name) {};
+      void inviteMember(psibase::AccountNumber account) {};
+
    /* Meetings */
       void proposeSchedule(WhatType dayOfWeek, WhatType frequency) {};
       void confSchedule() {};
 
+      // Q: are we still doing this? Or using subjective random number from BP?
       void checkin(psibase::Checksum256 entropy) {};
+      void revealEntropy(psio::const_view<psibase::String> entropyRevealMsg) {};
 
-      void revealEntropy(psio::const_view<psibase::String> entropyRevealKey) {};
-      void submitConsensus(std::vector<psibase::AccountNumber> ranks) {};
+      void submitConsensus(const std::vector<psibase::AccountNumber> &ranks) {};
       void proposeRemove(psibase::AccountNumber member) {};
 
    /* Teams */
-      void create(std::vector<psibase::AccountNumber> members,
+      void create(const std::vector<psibase::AccountNumber> &members,
                   psio::const_view<psibase::String> name) {};
       void proposeMember(psibase::AccountNumber teamName,
                   psibase::AccountNumber member) {};
@@ -61,7 +63,7 @@ namespace UserContract
 
    /* Social */
       void createPetition(psio::const_view<psibase::String> title,
-                  psio::const_view<psibase::String> contents,
+                  const std::string& contents,
                   WhatType txid) {}; // Q: What's the process? broadcast a trx that requires the appropriate msig/auth and include the trxid here?
 
    //   private:
@@ -107,6 +109,8 @@ namespace UserContract
    PSIO_REFLECT(FractallySys,
       method(init),
       method(triggerEvents, max),
+      method(createFractal, name),
+      method(inviteMember, account),
       method(proposeSchedule, dayOfWeek, frequency),
       method(confSchedule),
       method(checkin, entropy),
