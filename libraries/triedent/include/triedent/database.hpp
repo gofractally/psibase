@@ -690,11 +690,14 @@ namespace triedent
       assert(n.is_leaf_node());
 
       auto& vn = n.as_value_node();
+      // TODO: condition is insufficient since parent may be an older version
+      /*
       if (_db->_ring->ref(n) == 1 and vn.data_size() == val.size())
       {
          memcpy(lock(n).as_value_node().data_ptr(), val.data(), val.size());
          return n;
       }
+      */
 
       return make_value(key, val);
    }
@@ -708,7 +711,7 @@ namespace triedent
          {
             auto  v  = get(locked->value());
             auto& vn = v.as_value_node();
-            if (vn.data_size() == val.size())
+            if (vn.data_size() == val.size() && _db->_ring->ref(locked->value()) == 1)
             {
                memcpy(lock(v).as_value_node().data_ptr(), val.data(), val.size());
             }
@@ -793,12 +796,13 @@ namespace triedent
             return new_in;
          }  // else modify in place
 
-         auto  locked = lock(n);
-         auto& cur_b  = locked.as_inner_node().branch(b);
-         auto  new_b  = add_child(cur_b, key.substr(cpre.size() + 1), val, old_size);
+         auto cur_b = in.branch(b);
+         auto new_b = add_child(cur_b, key.substr(cpre.size() + 1), val, old_size);
 
          if (new_b != cur_b)
          {
+            auto  locked = lock(n);
+            auto& cur_b  = locked.as_inner_node().branch(b);
             release(cur_b);
             cur_b = new_b;
          }
@@ -806,7 +810,7 @@ namespace triedent
       }
       else  // the current node needs to split and become a child of new parent
       {
-         if (cpre == key)  // value is one new inner node
+         if (cpre == key)  // value needs to be on a new inner node
          {
             //std::cerr << __func__ << ":" << __LINE__ << "\n";
             auto b1    = in_key[cpre.size()];
@@ -816,8 +820,6 @@ namespace triedent
 
             auto nin        = make_inner(cpre, b0val, inner_node::branches(b1));
             nin->branch(b1) = b1val;
-
-            nin->set_value(b0val);
             return nin;
          }
          else  // there are two branches
