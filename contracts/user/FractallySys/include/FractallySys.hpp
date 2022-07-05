@@ -48,7 +48,7 @@ namespace UserContract
       void proposeRemove(psibase::AccountNumber member) {};
 
    /* Teams */
-      void create(const std::vector<psibase::AccountNumber> &members,
+      void createTeam(const std::vector<psibase::AccountNumber> &members,
                   psio::const_view<psibase::String> name) {};
       void proposeMember(psibase::AccountNumber teamName,
                   psibase::AccountNumber member) {};
@@ -117,7 +117,7 @@ namespace UserContract
       method(revealEntropy, entropyRevealKey),
       method(submitConsensus, ranks),
       method(proposeRemove, member),
-      method(create, members, name),
+      method(createTeam, members, name),
       method(proposeMember, teamName, member),
       method(confirmMember, team, member),
       method(proposeLead, member),

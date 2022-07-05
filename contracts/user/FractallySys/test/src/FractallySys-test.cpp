@@ -66,7 +66,7 @@ SCENARIO("Inviting to a fractal") {
       DefaultTestChain t(neededContracts);
       auto founder = t.as(t.add_account("founder"_a));
       auto f     = founder.at<FractallySys>();
-      FractallyChainHelper::addFractal(t, f);
+      FractallyChainHelper::chainWithFractal(t, f);
 
       THEN("The founder can invite new member") {
          auto bob = t.as(t.add_account("bob"_a));
@@ -89,7 +89,7 @@ SCENARIO("Scheduling meetings")
    {
       DefaultTestChain t(neededContracts);
       auto f = t.as(t.add_account("founder"_a)).at<FractallySys>();
-      FractallyChainHelper::addFractal(t, f);
+      FractallyChainHelper::chainWithFractal(t, f);
 
       WHEN("There is no meeting scheduled") {
          THEN("The meeting cadence and day of week + time can be set by the Founder") {
@@ -113,6 +113,15 @@ SCENARIO("Scheduling meetings")
    }
    GIVEN("A chain with a Fractal and a Council")
    {
+      DefaultTestChain t(neededContracts);
+      auto councilMember1 = t.add_account("council1"_a);
+      auto councilMember2 = t.add_account("council2"_a);
+      auto councilMember3 = t.add_account("council3"_a);
+      auto c1 = t.as(councilMember1).at<FractallySys>();
+      auto c2 = t.as(councilMember2).at<FractallySys>();
+      auto c3 = t.as(councilMember3).at<FractallySys>();
+      std::array<psibase::AccountNumber, 3> councilMembers = {councilMember1, councilMember2, councilMember3};
+      FractallyChainHelper::chainWithACouncil(t, councilMembers);
       WHEN("There is a meeting scheduled and cadence set") {
          THEN("The meeting cadence and day of week + time can be set by the Council") {
          }
