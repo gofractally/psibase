@@ -23,17 +23,16 @@ namespace
        {TokenSys::contract, "TokenSys.wasm"},
        {NftSys::contract, "NftSys.wasm"},
        {SymbolSys::contract, "SymbolSys.wasm"},
-       {RpcTokenSys::contract, "RTokenSys.wasm"}};
+       {RTokenSys::contract, "RTokenSys.wasm"}};
 }  // namespace
 
 SCENARIO("Testing default psibase chain")
 {
    DefaultTestChain t(neededContracts);
 
-   auto        rpcTokenSys = t.as(RpcTokenSys::contract).at<RpcTokenSys>();
+   auto        tokenSysRpc = t.as(RTokenSys::contract).at<RTokenSys>();
    std::string rpcUiDir    = "../contracts/user/TokenSys/ui/";
-   rpcTokenSys.storeSys("/", "text/html", read_whole_file(rpcUiDir + "index.html"));
-   rpcTokenSys.storeSys("/ui/index.js", "text/javascript", read_whole_file(rpcUiDir + "index.js"));
+   tokenSysRpc.storeSys("/ui/index.js", "text/javascript", read_whole_file(rpcUiDir + "index.js"));
 
    auto alice = t.as(t.add_account("alice"_a));
    auto bob   = t.as(t.add_account("bob"_a));
@@ -54,6 +53,9 @@ SCENARIO("Testing default psibase chain")
    sysIssuer.mint(sysToken, userBalance, memo);
    sysIssuer.credit(sysToken, alice, 1'000e8, memo);
    sysIssuer.credit(sysToken, bob, 1'000e8, memo);
+
+   auto create = alice.at<TokenSys>().create(4, 1'000'000e4);
+   alice.at<TokenSys>().mint(create.returnVal(), 100e4, memo);
 
    t.start_block();
 

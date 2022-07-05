@@ -7,7 +7,7 @@
 namespace psibase
 {
    constexpr const char simpleUIMainPage[] =
-       R"(<html><div id="root"></div><script src="/common/SimpleUI.mjs" type="module"></script></html>)";
+       R"(<html><div id="root" class="ui container"></div><script src="/common/SimpleUI.mjs" type="module"></script></html>)";
 
    /// Serve a developer UI
    ///

@@ -46,67 +46,67 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
             .rawData  = psio::convert_to_frac(GenesisActionData{
                  .contracts =  // g.a.d--^ is config file for gen
                 {
-                    {
+                     {
                          .contract     = system_contract::TransactionSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = system_contract::TransactionSys::contractFlags,
                          .code         = read_whole_file("TransactionSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = system_contract::AccountSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = system_contract::AccountSys::contractFlags,
                          .code         = read_whole_file("AccountSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = ProxySys::contract,
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("ProxySys.wasm"),
                     },
-                    {
+                     {
                          .contract     = system_contract::AuthFakeSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("AuthFakeSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = system_contract::AuthEcSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("AuthEcSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = system_contract::VerifyEcSys::contract,
                          .authContract = system_contract::AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("VerifyEcSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = CommonSys::contract,
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("CommonSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = RAccountSys::contract,
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("RAccountSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = ExploreSys::contract,
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("ExploreSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = RAuthEcSys::contract,
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("RAuthEcSys.wasm"),
                     },
-                    {
+                     {
                          .contract     = RProxySys::contract,
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
@@ -221,10 +221,10 @@ void DefaultTestChain::registerSysRpc()
    transactor<ExploreSys>  rpcExplore(ExploreSys::contract, ExploreSys::contract);
 
    // Store UI files
-   std::string                  cdir   = "../contracts";
-   std::string                  comDir = cdir + "/user/CommonSys";
-   std::string                  accDir = cdir + "/system/AccountSys";
-   std::string                  expDir = cdir + "/user/ExploreSys";
+   std::string cdir   = "../contracts";
+   std::string comDir = cdir + "/user/CommonSys";
+   std::string accDir = cdir + "/system/AccountSys";
+   std::string expDir = cdir + "/user/ExploreSys";
 
    const std::string html = "text/html";
    const std::string js   = "text/javascript";
@@ -232,6 +232,9 @@ void DefaultTestChain::registerSysRpc()
    std::vector<psibase::Action> b{
        // CommonSys
        rpcCommon.storeSys("/", html, read_whole_file(comDir + "/ui/index.html")),
+       rpcCommon.storeSys("/ui/common.index.html", html,
+                          read_whole_file(comDir + "/ui/common.index.html")),
+
        rpcCommon.storeSys("/common/rpc.mjs", js, read_whole_file(comDir + "/common/rpc.mjs")),
        rpcCommon.storeSys("/common/useGraphQLQuery.mjs", js,
                           read_whole_file(comDir + "/common/useGraphQLQuery.mjs")),
@@ -239,6 +242,8 @@ void DefaultTestChain::registerSysRpc()
                           read_whole_file(comDir + "/common/SimpleUI.mjs")),
        rpcCommon.storeSys("/common/keyConversions.mjs", js,
                           read_whole_file(comDir + "/common/keyConversions.mjs")),
+       rpcCommon.storeSys("/common/loginBar.js", js,
+                          read_whole_file(comDir + "/common/loginBar.js")),
        rpcCommon.storeSys("/ui/index.js", js, read_whole_file(comDir + "/ui/index.js")),
 
        // AccountSys
@@ -246,7 +251,6 @@ void DefaultTestChain::registerSysRpc()
        rpcAccount.storeSys("/ui/index.js", js, read_whole_file(accDir + "/ui/index.js")),
 
        // ExploreSys
-       rpcExplore.storeSys("/", html, read_whole_file(expDir + "/ui/index.html")),
        rpcExplore.storeSys("/ui/index.js", js, read_whole_file(expDir + "/ui/index.js"))};
 
    trace = pushTransaction(make_transaction(std::move(b)));

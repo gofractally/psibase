@@ -500,7 +500,7 @@ namespace psio
    // TODO: schema support for these types as inputs
    template <typename T, typename E>
    auto gql_parse_arg(T& arg, gql_stream& input_stream, const E& error)
-       -> std::enable_if_t<reflect<T>::is_struct, bool>
+       -> std::enable_if_t<reflect<T>::is_struct && !use_json_string_for_gql((T*)nullptr), bool>
    {
       if (input_stream.current_puncuator != '{')
          return error("expected {");

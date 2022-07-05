@@ -26,6 +26,13 @@ namespace psibase
 
       if (request.method == "GET")
       {
+         if (request.target.starts_with("/applet/"))
+         {
+            // All requests to load a specific applet will return the root index from common-sys.
+            // Then common-sys will read the URL bar, detect that an applet is being loaded,
+            // and request the applet to load inside an iframe.
+            request.target = "/";
+         }
          if (request.target == "/common/thiscontract")
          {
             std::string contractName;
@@ -119,6 +126,40 @@ namespace psibase
       psibase::check(getSender() == getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
                             Tables{getReceiver()});
+   }
+
+   std::optional<RpcReplyData> CommonSys::serveCommon(RpcRequestData request)
+   {
+      if (request.method == "GET")
+      {
+         std::vector<std::pair<std::string, std::string>> commonResMap{
+             {"/", "/ui/common.index.html"}};
+
+         bool serveFromCommon = std::any_of(commonResMap.begin(), commonResMap.end(),
+                                            [&](const auto& res)
+                                            {
+                                               if (res.first == request.target)
+                                               {
+                                                  request.target = res.second;
+                                                  return true;
+                                               }
+                                               return false;
+                                            });
+
+         if (serveFromCommon)
+         {
+            auto index =
+                ContractTables<WebContentTable>{contract}.open<WebContentTable>().getIndex<0>();
+            if (auto content = index.get(request.target))
+            {
+               return RpcReplyData{
+                   .contentType = content->contentType,
+                   .body        = content->content,
+               };
+            }
+         }
+      }
+      return std::nullopt;
    }
 
 }  // namespace psibase

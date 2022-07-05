@@ -1,5 +1,6 @@
 #include "contracts/user/ExploreSys.hpp"
 
+#include <contracts/system/CommonSys.hpp>
 #include <contracts/system/ProxySys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
@@ -22,6 +23,8 @@ namespace system_contract
 {
    std::optional<psibase::RpcReplyData> ExploreSys::serveSys(psibase::RpcRequestData request)
    {
+      if (auto result = at<psibase::CommonSys>().serveCommon(request).unpack())
+         return result;
       if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))

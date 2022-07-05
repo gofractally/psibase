@@ -238,12 +238,6 @@ fn common_startup_trx() -> SignedTransaction {
         reg_server(account!("explore-sys"), account!("explore-sys")),
         store_sys(
             account!("explore-sys"),
-            "/",
-            "text/html",
-            include_bytes!("../boot-image/ExploreSys/ui/index.html"),
-        ),
-        store_sys(
-            account!("explore-sys"),
             "/ui/index.js",
             "text/javascript",
             include_bytes!("../boot-image/ExploreSys/ui/index.js"),

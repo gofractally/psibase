@@ -112,7 +112,7 @@ function useMsg() {
 function App() {
     const [trx, setTrx] = React.useState('');
     const { msg, addMsg, clearMsg } = useMsg();
-    return html`<div>
+    return html`<div class="ui container">
         <h1>account_sys</h1>
         <h2>Accounts</h2>
         ${AccountList(addMsg, clearMsg)}
