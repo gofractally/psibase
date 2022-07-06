@@ -92,14 +92,12 @@ namespace triedent
                                                                const inner_node& in,
                                                                key_view          prefix,
                                                                object_id         val,
-                                                               uint64_t          branches,
-                                                               uint64_t          version);
+                                                               uint64_t          branches);
 
       inline static std::pair<location_lock, inner_node*> make(ring_allocator& a,
                                                                key_view        prefix,
                                                                object_id       val,
-                                                               uint64_t        branches,
-                                                               uint64_t        version);
+                                                               uint64_t        branches);
 
       inline bool has_branch(uint32_t b) const { return _present_bits & (1ull << b); }
 
@@ -114,61 +112,52 @@ namespace triedent
          return reinterpret_cast<const char*>(children() + num_branches());
       }
 
-      uint64_t version() const { return uint64_t(_version_high_bits) << 32 | _version; }
-
      private:
       inner_node(ring_allocator&   a,
                  const inner_node& in,
                  key_view          prefix,
                  object_id         val,
-                 uint64_t          branches,
-                 uint64_t          version);
-      inner_node(key_view prefix, object_id val, uint64_t branches, uint64_t version);
+                 uint64_t          branches);
+      inner_node(key_view prefix, object_id val, uint64_t branches);
 
-      uint8_t   _prefix_length     = 0;  // mirrors value nodes to signal type and prefix length
-      uint16_t  _version_high_bits = 0;  // this will be unaligned
-      object_id _value;                  // this is 5 bytes
-      uint64_t  _present_bits = 0;       // keep this 8 byte aligned for popcount instructions
-      uint32_t  _version      = 0;       // lower bits of version
+      uint8_t   _prefix_length = 0;  // mirrors value nodes to signal type and prefix length
+      uint8_t   _reserved_a    = 0;  // future use
+      uint8_t   _reserved_b    = 0;  // future use
+      object_id _value;              // this is 5 bytes
+      uint64_t  _present_bits = 0;   // keep this 8 byte aligned for popcount instructions
    } __attribute__((packed));
-   static_assert(sizeof(inner_node) == 8 + 4 + 5 + 3, "unexpected padding");
+   static_assert(sizeof(inner_node) == 3 + 5 + 8, "unexpected padding");
 
    inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator&   a,
                                                                  const inner_node& in,
                                                                  key_view          prefix,
                                                                  object_id         val,
-                                                                 uint64_t          branches,
-                                                                 uint64_t          version)
+                                                                 uint64_t          branches)
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
       auto p = a.alloc(alloc_size, false);
       return std::make_pair(std::move(p.first),
-                            new (p.second) inner_node(a, in, prefix, val, branches, version));
+                            new (p.second) inner_node(a, in, prefix, val, branches));
    }
 
    inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator& a,
                                                                  key_view        prefix,
                                                                  object_id       val,
-                                                                 uint64_t        branches,
-                                                                 uint64_t        version)
+                                                                 uint64_t        branches)
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
       auto p = a.alloc(alloc_size, false);
-      return std::make_pair(std::move(p.first),
-                            new (p.second) inner_node(prefix, val, branches, version));
+      return std::make_pair(std::move(p.first), new (p.second) inner_node(prefix, val, branches));
    }
 
-   inline inner_node::inner_node(key_view  prefix,
-                                 object_id val,
-                                 uint64_t  branches,
-                                 uint64_t  version)
+   inline inner_node::inner_node(key_view prefix, object_id val, uint64_t branches)
        : _prefix_length(prefix.size()),
-         _version_high_bits(version >> 32),
+         _reserved_a(0),
+         _reserved_b(0),
          _value(val),
-         _present_bits(branches),
-         _version(version)
+         _present_bits(branches)
    {
       memset(children(), 0, sizeof(object_id) * num_branches());
       memcpy(key_ptr(), prefix.data(), prefix.size());
@@ -180,13 +169,12 @@ namespace triedent
                                  const inner_node& in,
                                  key_view          prefix,
                                  object_id         val,
-                                 uint64_t          branches,
-                                 uint64_t          version)
+                                 uint64_t          branches)
        : _prefix_length(prefix.size()),
-         _version_high_bits(version >> 32),
+         _reserved_a(0),
+         _reserved_b(0),
          _value(val),
-         _present_bits(branches),
-         _version(version)
+         _present_bits(branches)
    {
       if (in._present_bits == branches)
       {
@@ -298,11 +286,9 @@ namespace triedent
       }
       else
       {
-         // TODO: drop incorrect version value
-         auto src = reinterpret_cast<inner_node*>(ptr);
-         auto [lock, dest] =
-             inner_node::make(ra, *src, src->key(), bump_refcount_or_copy(ra, src->value()),
-                              src->branches(), src->version());
+         auto src          = reinterpret_cast<inner_node*>(ptr);
+         auto [lock, dest] = inner_node::make(
+             ra, *src, src->key(), bump_refcount_or_copy(ra, src->value()), src->branches());
          return std::move(lock);
       }
    }

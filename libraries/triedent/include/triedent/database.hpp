@@ -86,7 +86,6 @@ namespace triedent
      protected:
       id _session_root;
       /* auto inc id used to detect when we can modify in place*/
-      uint64_t                      _version     = 0;
       mutable std::atomic<uint64_t> _hot_swap_p  = -1ull;
       mutable std::atomic<uint64_t> _warm_swap_p = -1ull;
       mutable std::atomic<uint64_t> _cool_swap_p = -1ull;
@@ -214,6 +213,7 @@ namespace triedent
       iterator                   find(id n, string_view key) const;
       void                       print(id n, string_view prefix = "", std::string k = "");
       inline deref<node>         get(ring_allocator::id i) const;
+      inline deref<node>         get(ring_allocator::id i, bool& unique) const;
       std::optional<string_view> get(id root, string_view key) const;
 
       inline void release(id);
@@ -280,11 +280,11 @@ namespace triedent
       template <typename T>
       inline mutable_deref<T> lock(const deref<T>& obj);
 
-      inline id add_child(id root, string_view key, string_view val, int& old_size);
-      inline id remove_child(id root, string_view key, int& removed_size);
+      inline id add_child(id root, bool unique, string_view key, string_view val, int& old_size);
+      inline id remove_child(id root, bool unique, string_view key, int& removed_size);
 
-      inline id set_value(deref<node> n, string_view key, string_view val);
-      inline id set_inner_value(deref<inner_node> n, string_view val);
+      inline id set_value(deref<node> n, bool unique, string_view key, string_view val);
+      inline id set_inner_value(deref<inner_node> n, bool unique, string_view val);
       inline id combine_value_nodes(string_view k1, string_view v1, string_view k2, string_view v2);
 
       inline node_ref<maybe_owned> set_value2(value_ref<maybe_unique> n,
@@ -470,7 +470,6 @@ namespace triedent
       swap_guard g(this);
 
       id new_root = from_version;
-      _version    = 0;
 
       if (from_version)
       {
@@ -483,7 +482,6 @@ namespace triedent
          else
          {
             auto& in = n.as_inner_node();
-            _version = in.version() + 1;
             new_root = make_inner(in, in.key(), in.value(), in.branches());
          }
       }
@@ -567,6 +565,15 @@ namespace triedent
    }
 
    template <typename AccessMode>
+   inline deref<node> session<AccessMode>::get(id i, bool& unique) const
+   {
+      auto [ptr, is_value, ref] =
+          _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
+      unique &= ref == 1;
+      return {i, ptr, is_value};
+   }
+
+   template <typename AccessMode>
    inline void session<AccessMode>::release(id obj)
    {
       _db->release(obj);
@@ -618,7 +625,7 @@ namespace triedent
                                                               id          val,
                                                               uint64_t    branches)
    {
-      return inner_node::make(*_db->_ring, pre, val, branches, _version);
+      return inner_node::make(*_db->_ring, pre, val, branches);
    }
 
    inline mutable_deref<inner_node> write_session::make_inner(const inner_node& cpy,
@@ -626,7 +633,7 @@ namespace triedent
                                                               id                val,
                                                               uint64_t          branches)
    {
-      return inner_node::make(*_db->_ring, cpy, pre, val, branches, _version);
+      return inner_node::make(*_db->_ring, cpy, pre, val, branches);
    }
 
    template <typename T>
@@ -682,7 +689,10 @@ namespace triedent
       }
    }
 
-   database::id write_session::set_value(deref<node> n, string_view key, string_view val)
+   database::id write_session::set_value(deref<node> n,
+                                         bool        unique,
+                                         string_view key,
+                                         string_view val)
    {
       if (not n)
          return make_value(key, val);
@@ -690,21 +700,18 @@ namespace triedent
       assert(n.is_leaf_node());
 
       auto& vn = n.as_value_node();
-      // TODO: condition is insufficient since parent may be an older version
-      /*
-      if (_db->_ring->ref(n) == 1 and vn.data_size() == val.size())
+      if (unique and vn.data_size() == val.size())
       {
          memcpy(lock(n).as_value_node().data_ptr(), val.data(), val.size());
          return n;
       }
-      */
 
       return make_value(key, val);
    }
 
-   database::id write_session::set_inner_value(deref<inner_node> n, string_view val)
+   database::id write_session::set_inner_value(deref<inner_node> n, bool unique, string_view val)
    {
-      if (n->version() == _version)
+      if (unique)
       {
          auto locked = lock(n);
          if (locked->value())
@@ -739,6 +746,7 @@ namespace triedent
     *  of the new node if a new node had to be allocated. 
     */
    inline database::id write_session::add_child(id          root,
+                                                bool        unique,
                                                 string_view key,
                                                 string_view val,
                                                 int&        old_size)
@@ -746,7 +754,7 @@ namespace triedent
       if (not root)  // empty case
          return make_value(key, val);
 
-      auto n = get(root);
+      auto n = get(root, unique);
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
@@ -755,7 +763,7 @@ namespace triedent
          else
          {
             old_size = vn.data_size();
-            return set_value(n, key, val);  // with the same key
+            return set_value(n, unique, key, val);  // with the same key
          }
       }
 
@@ -766,12 +774,12 @@ namespace triedent
       {
          if (not in.value())
          {
-            return set_inner_value(n, val);
+            return set_inner_value(n, unique, val);
          }
          else
          {
             old_size = get(in.value()).as_value_node().data_size();
-            return set_inner_value(n, val);
+            return set_inner_value(n, unique, val);
          }
       }
 
@@ -780,12 +788,12 @@ namespace triedent
       {
          auto b = key[cpre.size()];
 
-         if (in.version() != _version or not in.has_branch(b))  // copy on write
+         if (!unique or not in.has_branch(b))  // copy on write
          {
             auto  new_in = make_inner(in, in_key, retain(in.value()), in.branches() | 1ull << b);
             auto& cur_b  = new_in->branch(b);
 
-            auto new_b = add_child(cur_b, key.substr(cpre.size() + 1), val, old_size);
+            auto new_b = add_child(cur_b, false, key.substr(cpre.size() + 1), val, old_size);
 
             if (new_b != cur_b)
             {
@@ -797,7 +805,7 @@ namespace triedent
          }  // else modify in place
 
          auto cur_b = in.branch(b);
-         auto new_b = add_child(cur_b, key.substr(cpre.size() + 1), val, old_size);
+         auto new_b = add_child(cur_b, unique, key.substr(cpre.size() + 1), val, old_size);
 
          if (new_b != cur_b)
          {
@@ -1007,7 +1015,7 @@ namespace triedent
       auto& ar = *_db->_ring;
 
       int  old_size = -1;
-      auto new_root = add_child(_session_root, to_key6(key), val, old_size);
+      auto new_root = add_child(_session_root, true, to_key6(key), val, old_size);
       assert(new_root.id);
       //  std::cout << "new_root: " << new_root.id << "  old : " << rev._root.id << "\n";
       if (new_root != _session_root)
@@ -1605,7 +1613,7 @@ namespace triedent
       _db->ensure_free_space();
       swap_guard g(*this);
       int        removed_size = -1;
-      auto       new_root     = remove_child(_session_root, to_key6(key), removed_size);
+      auto       new_root     = remove_child(_session_root, true, to_key6(key), removed_size);
       if (new_root != _session_root)
       {
          release(_session_root);
@@ -1623,12 +1631,15 @@ namespace triedent
       return removed_size;
    }
 
-   inline database::id write_session::remove_child(id root, string_view key, int& removed_size)
+   inline database::id write_session::remove_child(id          root,
+                                                   bool        unique,
+                                                   string_view key,
+                                                   int&        removed_size)
    {
       if (not root)
          return root;
 
-      auto n = get(root);
+      auto n = get(root, unique);
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
@@ -1677,7 +1688,7 @@ namespace triedent
             }
          }
 
-         if (in.version() == _version)
+         if (unique)
          {
             auto  locked = lock(n);
             auto& in     = locked.as_inner_node();
@@ -1699,10 +1710,10 @@ namespace triedent
 
       auto& cur_b = in.branch(b);
 
-      auto new_b = remove_child(cur_b, key.substr(in_key.size() + 1), removed_size);
+      auto new_b = remove_child(cur_b, unique, key.substr(in_key.size() + 1), removed_size);
       if (new_b != cur_b)
       {
-         if (new_b and in.version() == _version)
+         if (new_b and unique)
          {
             auto  locked = lock(n);
             auto& cur_b  = locked.as_inner_node().branch(b);

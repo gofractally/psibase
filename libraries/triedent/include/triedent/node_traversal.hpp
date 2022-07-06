@@ -510,9 +510,8 @@ namespace triedent
                                       value_ref<Tr>&& value,
                                       uint64_t        branches)
       {
-         // TODO: remove incorrect version
          auto [lock, ptr] = inner_node::make(  //
-             ra, key, std::move(value.tracker).into_or_copy(), branches, 0);
+             ra, key, std::move(value.tracker).into_or_copy(), branches);
          return {mutating{&ra, (char*)ptr, false, lock.into_lock2_alloced_unchecked()}};
       }
 
@@ -523,10 +522,8 @@ namespace triedent
                                       value_ref<Tr2>&&      value,
                                       uint64_t              branches)
       {
-         // TODO: remove incorrect version
          auto [lock, ptr] = inner_node::make(  //
-             ra, *src.ptr(), key, std::move(value.tracker).into_or_copy(), branches,
-             src.ptr()->version());
+             ra, *src.ptr(), key, std::move(value.tracker).into_or_copy(), branches);
          return {mutating{&ra, (char*)ptr, false, lock.into_lock2_alloced_unchecked()}};
       }
 
