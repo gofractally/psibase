@@ -1651,9 +1651,7 @@ namespace triedent
          auto iv = in.value();
          if (not iv)
             return root;
-
-         if (in.value())
-            removed_size = get(iv).as_value_node().data_size();
+         removed_size = get(iv).as_value_node().data_size();
 
          if (in.num_branches() == 1)
          {
@@ -1691,16 +1689,15 @@ namespace triedent
             return make_inner(in, key, id(), in.branches());
       }
 
-      auto b = key[in_key.size()];
+      auto cpre = common_prefix(in_key, key);
+      if (cpre != in_key)
+         return root;
 
+      auto b = key[in_key.size()];
       if (not in.has_branch(b))
          return root;
 
       auto& cur_b = in.branch(b);
-
-      auto cpre = common_prefix(in_key, key);
-      if (cpre != in_key)
-         return root;
 
       auto new_b = remove_child(cur_b, key.substr(in_key.size() + 1), removed_size);
       if (new_b != cur_b)
@@ -1719,7 +1716,7 @@ namespace triedent
             auto& new_br   = new_root->branch(b);
             release(new_br);
             new_br = new_b;
-            return new_br;
+            return new_root;
          }
          else  // remove branch
          {
@@ -1739,11 +1736,7 @@ namespace triedent
 
                auto  cur_v = get(in.value());
                auto& cv    = cur_v.as_value_node();
-
-               std::string new_key;
-               new_key += in.key();
-               new_key += cv.key();
-               return make_value(new_key, cv.data());
+               return make_value(in_key, cv.data());
             }
             else
             {  // there must be only 1 branch left
