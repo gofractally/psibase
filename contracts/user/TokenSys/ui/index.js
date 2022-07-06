@@ -4,6 +4,8 @@ import htm from "https://unpkg.com/htm@3.1.0?module";
 await import("https://unpkg.com/iframe-resizer@4.3.1/js/iframeResizer.js");
 
 const html = htm.bind(React.createElement);
+
+const { useEffect, useState } = React;
 class Search extends React.Component {
   state = { term: "" };
 
@@ -185,29 +187,57 @@ class ToolsTabs extends React.Component {
   }
 }
 
-class App extends React.Component {
-  state = { balances: [], user: "" };
 
-  onSearchSubmit = async (term) => {
-    let b = await getJson("/balances/" + term);
-    console.log(b);
-    this.setState({ balances: b });
-    this.setState({ user: term });
+
+function App() {
+  const [balances, setBalances] = useState([]);
+  const [user, setUser] = useState("");
+
+  let handleMessage = (msg) => {
+    setBalances(msg);
   };
 
-  render() {
-    return html`
-      <div class="ui container">
-        <h1>Wallet</h1>
-        <${Search} title="Select a user" onSubmit=${this.onSearchSubmit} />
-        <${BalanceTable}
-          title=${"Token balances: " + this.state.user}
-          records=${this.state.balances}
-        />
-        <${ToolsTabs} />
-      </div>
-    `;
-  }
+  let query = (path, arg) => {
+      return () => {
+        if (path && arg)
+        {
+          if ('parentIFrame' in window) {
+            console.log("Parent iframe found, sending message.");
+            parentIFrame.sendMessage(path + arg, "*");
+          }
+          else
+          {
+            console.error("Failed to post message to parent window.");
+          }
+        }
+    };
+  };
+
+  useEffect(()=>{
+    window.iFrameResizer = {
+      onMessage: (message)=>{
+        handleMessage(message);
+      }
+    };
+  }, []);
+
+  useEffect(query("balances/", user), [user]);
+
+  let onSearchSubmit = async (term) => {
+    setUser(term);
+  };
+
+  return html`
+    <div class="ui container">
+      <h1>Wallet</h1>
+      <${Search} title="Select a user" onSubmit=${onSearchSubmit} />
+      <${BalanceTable}
+        title=${"Token balances: " + user}
+        records=${balances}
+      />
+      <${ToolsTabs} />
+    </div>
+  `;
 }
 
 const container = document.getElementById("root");
