@@ -1,9 +1,11 @@
 //import { siblingUrl } from "/common/rootdomain.mjs";
-import { getJson } from "/common/rpc.mjs";
+import { configRoutes, route, query } from "/common/rpc.mjs";
 import htm from "https://unpkg.com/htm@3.1.0?module";
 await import("https://unpkg.com/iframe-resizer@4.3.1/js/iframeResizer.js");
 
 const html = htm.bind(React.createElement);
+
+const { useEffect, useState } = React;
 class Search extends React.Component {
   state = { term: "" };
 
@@ -185,29 +187,33 @@ class ToolsTabs extends React.Component {
   }
 }
 
-class App extends React.Component {
-  state = { balances: [], user: "" };
+function App() {
+  const [balances, setBalances] = useState([]);
+  const [user, setUser] = useState("");
 
-  onSearchSubmit = async (term) => {
-    let b = await getJson("/balances/" + term);
-    console.log(b);
-    this.setState({ balances: b });
-    this.setState({ user: term });
+  let updateBalances = async (bal) => {
+    setBalances(bal);
+  };
+  
+  let onSearchSubmit = async (term) => {
+    setUser(term);
   };
 
-  render() {
-    return html`
-      <div class="ui container">
-        <h1>Wallet</h1>
-        <${Search} title="Select a user" onSubmit=${this.onSearchSubmit} />
-        <${BalanceTable}
-          title=${"Token balances: " + this.state.user}
-          records=${this.state.balances}
-        />
-        <${ToolsTabs} />
-      </div>
-    `;
-  }
+  useEffect(configRoutes([route("balances/", updateBalances)]), []);
+
+  useEffect(query("balances/", user), [user]);
+
+  return html`
+    <div class="ui container">
+      <h1>Wallet</h1>
+      <${Search} title="Select a user" onSubmit=${onSearchSubmit} />
+      <${BalanceTable}
+        title=${"Token balances: " + user}
+        records=${balances}
+      />
+      <${ToolsTabs} />
+    </div>
+  `;
 }
 
 const container = document.getElementById("root");

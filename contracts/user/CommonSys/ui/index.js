@@ -7,7 +7,7 @@ await import(
 
 const html = htm.bind(React.createElement);
 
-const { useEffect } = React;
+const { useEffect, useState } = React;
 const { BrowserRouter, Route } = ReactRouterDOM;
 
 const appletPrefix = "/applet/";
@@ -78,51 +78,95 @@ function Nav() {
 }
 
 function Applet() {
-  const path = window.location.pathname;
-  var applet = path.substring(appletPrefix.length);
-  var subPath = "";
-  const startOfSubpath = applet.indexOf("/");
-  if (startOfSubpath != -1) {
-    subPath = applet.substring(startOfSubpath);
-    applet = applet.substring(0, startOfSubpath);
-  }
+  
+  const [applet, setApplet] = useState("");
+  const [appletSrc, setAppletSrc] = useState("");
 
   useEffect(() => {
-    window.document.title = applet;
+    const pathname = window.location.pathname;
+    var appletStr = pathname.substring(appletPrefix.length);
+    var subPath = "";
+    const startOfSubpath = appletStr.indexOf("/");
+    if (startOfSubpath != -1) {
+      subPath = appletStr.substring(startOfSubpath);
+      appletStr = appletStr.substring(0, startOfSubpath);
+    }
+
+    setApplet(appletStr);
+    setAppletSrc(siblingUrl(null, appletStr, subPath));
   }, []);
 
+  useEffect(()=>{
+    if (applet)
+    {
+      window.document.title = applet;
+    }
+  }, [applet]);
+
   useEffect(() => {
-    // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
-    iFrameResize(
+
+    const doMessage = async (request) => {
+      let {queryPath, queryArg} = request.message;
+      var res = {};
+      res = await getJson(appletSrc + queryPath + queryArg);
+
+      var iframe = document.getElementById("applet");
+      if (iframe != null)
       {
-        // log: true,
-        // checkOrigin: false,
-        heightCalculationMethod: "lowestElement",
-        onMessage: ({ iframe, message }) => {
-          console.log("MESSAGE: ");
-          console.log(iframe);
-          console.log(message);
-        },
-        minHeight:
-          document.documentElement.scrollHeight -
-          document.getElementById("applet").getBoundingClientRect().top,
-      },
-      "#applet"
-    );
-  }, []);
+        let response = {queryPath: queryPath, payload: res};
+        iframe.iFrameResizer.sendMessage(response, appletSrc);
+      }
+      else
+      {
+        console.error("Child iframe not found.");
+      }
+    };
 
-  return html`
+    if (appletSrc)
+    {
+      iFrameResize(
+        {
+          // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
+          //log: true,
+          checkOrigin: false,
+          heightCalculationMethod: "lowestElement",
+          onMessage: doMessage,
+          minHeight:
+            document.documentElement.scrollHeight -
+            document.getElementById("applet").getBoundingClientRect().top,
+        },
+        "#applet"
+      )[0].iFrameResizer;
+    }
+  }, [appletSrc]);
+
+  if (appletSrc)
+  {
+    return html`
     <iframe
       id="applet"
       style=${{
         margin: 0,
-        padding: 0,
+        padding: 0
       }}
-      src="${siblingUrl(null, applet, subPath)}"
+      src="${appletSrc}"
       title="TODO Applet Description"
       frameborder="0"
     ></iframe>
   `;
+  }
+  else
+  {
+    return html`
+    <div class="ui segment">
+      <div class="ui active inverted dimmer">
+        <div class="ui text loader">Loading</div>
+      </div>
+      <p></p>
+    </div>
+    `;
+  }
+  
 }
 
 function Dashboard() {
