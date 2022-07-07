@@ -32,6 +32,7 @@ namespace triedent
       friend write_session;
 
      private:
+      // TODO: BUG: release reads memory without a swap_guard
       node_ref<maybe_owned> node;
 
       root(node_ref<maybe_owned>&& node) : node(std::move(node)) { assert(this->node.get_owner()); }
@@ -73,6 +74,15 @@ namespace triedent
 
       shared_root& operator=(const shared_root&) = default;
       shared_root& operator=(shared_root&&)      = default;
+
+      // TODO: remove
+      object_id get_id() const
+      {
+         if (root_ptr)
+            return root_ptr->node.get_id();
+         else
+            return {};
+      }
    };
 
    class session_base
@@ -187,6 +197,9 @@ namespace triedent
       /* decrements the revision ref count and frees if necessary */
       void release_revision(id i);
 
+      void destroy(root&& root);         // temporary bug workaround
+      void destroy(shared_root&& root);  // temporary bug workaround
+
       /* the root revision of this session */
       id revision() { return _session_root; }
 
@@ -197,6 +210,8 @@ namespace triedent
       iterator                   last_with_prefix(string_view prefix) const;
       bool                       get(string_view key, std::string& result) const;
       std::optional<std::string> get(string_view key) const;
+      bool                       get(const root& root, string_view key, std::string& result) const;
+      std::optional<std::string> get(const root& root, string_view key) const;
 
       void print();
       void validate();
@@ -465,6 +480,7 @@ namespace triedent
       }
    }
 
+   // TODO: remove
    inline database::id write_session::fork(id from_version)
    {
       swap_guard g(this);
@@ -598,7 +614,24 @@ namespace triedent
    template <typename AccessMode>
    inline void session<AccessMode>::release_revision(id i)
    {
+      swap_guard g(*this);
       _db->release(i);
+   }
+
+   template <typename AccessMode>
+   inline void session<AccessMode>::destroy(root&& r)
+   {
+      // destroy inside the swap_guard
+      swap_guard g(*this);
+      root       temp = std::move(r);
+   }
+
+   template <typename AccessMode>
+   inline void session<AccessMode>::destroy(shared_root&& r)
+   {
+      // destroy (if needed) inside the swap_guard
+      swap_guard  g(*this);
+      shared_root temp = std::move(r);
    }
 
    inline std::string_view common_prefix(std::string_view a, std::string_view b)
@@ -1547,6 +1580,38 @@ namespace triedent
       swap_guard g(*this);
 
       auto v = get(_session_root, k6);
+      if (v)
+      {
+         result.resize(v->size());
+         memcpy(result.data(), v->data(), v->size());
+         return true;
+      }
+      else
+      {
+         result.resize(0);
+         return false;
+      }
+   }
+
+   template <typename AccessMode>
+   std::optional<std::string> session<AccessMode>::get(const root& root, string_view key) const
+   {
+      std::string r;
+      if (get(root, key, r))
+         return std::optional(std::move(r));
+      return std::nullopt;
+   }
+
+   template <typename AccessMode>
+   bool session<AccessMode>::get(const root& root, string_view key, std::string& result) const
+   {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _db->ensure_free_space();
+
+      auto       k6 = to_key6(key);
+      swap_guard g(*this);
+
+      auto v = get(root.node.get_id(), k6);
       if (v)
       {
          result.resize(v->size());

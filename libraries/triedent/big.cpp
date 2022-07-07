@@ -40,29 +40,35 @@ int main(int argc, char** argv)
    bool        use_string = false;
    uint64_t    insert_count;
    uint64_t    status_count;
+   bool        check_content = false;
+   bool        use_nt        = false;
 
    uint32_t                num_read_threads = 6;
    po::options_description desc("Allowed options");
-   desc.add_options()("help,h", "print this message")("reset", "reset the database")(
-       "sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys")(
-       "data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
-       "the folder that contains the database")(
-       "read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
-       "number of read threads to launch")(
-       "hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33),
-       "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")(
-       "warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33),
-       "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes")(
-       "cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33),
-       "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes")(
-       "cold-size,C", po::value<uint32_t>(&cold_page_c)->default_value(33),
-       "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes")(
-       "max-objects,O", po::value<uint64_t>(&num_objects)->default_value(num_objects),
-       "the maximum number of unique objects in the database")(
-       "insert,i", po::value<uint64_t>(&insert_count)->default_value(100000000ull),
-       "the number of random key/value pairs to insert")(
-       "stat,s", po::value<uint64_t>(&status_count)->default_value(1000000ull),
+   auto                    opt = desc.add_options();
+   opt("help,h", "print this message");
+   opt("reset", "reset the database");
+   opt("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys");
+   opt("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
+       "the folder that contains the database");
+   opt("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
+       "number of read threads to launch");
+   opt("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33),
+       "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes");
+   opt("warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33),
+       "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes");
+   opt("cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33),
+       "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes");
+   opt("cold-size,C", po::value<uint32_t>(&cold_page_c)->default_value(33),
+       "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes");
+   opt("max-objects,O", po::value<uint64_t>(&num_objects)->default_value(num_objects),
+       "the maximum number of unique objects in the database");
+   opt("insert,i", po::value<uint64_t>(&insert_count)->default_value(100000000ull),
+       "the number of random key/value pairs to insert");
+   opt("stat,s", po::value<uint64_t>(&status_count)->default_value(1000000ull),
        "the number of how often to print stats");
+   opt("check-content", po::bool_switch(&check_content), "check content against std::map (slow)");
+   opt("node-traversal,n", po::bool_switch(&use_nt), "use node_traversal");
 
    po::variables_map vm;
    po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -94,14 +100,18 @@ int main(int argc, char** argv)
    triedent::database db(db_dir.c_str(), triedent::database::read_write);
    db.print_stats();
    std::cerr << "\n";
-   auto s = db.start_write_session();
-   s->set_session_revision(db.get_root_revision());
+   auto           s = db.start_write_session();
+   triedent::root nt_root;
+   if (use_nt)
+   {
+      // TODO: load nt_root
+   }
+   else
+      s->set_session_revision(db.get_root_revision());
 
-   std::vector<uint64_t> revisions;
-   revisions.resize(16);
-   for (auto& e : revisions)
-      e = 0;
-
+   std::mutex                         revisions_mutex;
+   std::vector<uint64_t>              revisions(16);
+   std::vector<triedent::shared_root> nt_revisions(16);
    std::map<std::string, std::string> base;
 
    auto start = std::chrono::steady_clock::now();
@@ -140,7 +150,19 @@ int main(int argc, char** argv)
          uint64_t ch = 0;
          while (not done.load(std::memory_order_acquire))
          {
-            rs->set_session_revision({revisions[(v - 4) % 16]});
+            {
+               triedent::object_id r;
+               {
+                  std::lock_guard lock{revisions_mutex};
+                  if (use_nt)
+                     r = {nt_revisions[(v - 4) % 16].get_id()};
+                  else
+                     r = {revisions[(v - 4) % 16]};
+                  rs->retain(r);  // TODO: this can malfunction
+               }
+               rs->set_session_revision(r);
+               rs->release_revision(r);
+            }
             while (r.load(std::memory_order_relaxed) == v)
             {
                uint64_t h   = (uint64_t(gen()) << 32) | gen();
@@ -181,9 +203,26 @@ int main(int argc, char** argv)
              if (min > last_r)
              {
                 //            WARN( "release revision: ", (min-6)%16, "  r: ", min );
-                rs->release_revision({revisions[(min - 6) % 16]});
-                revisions[(min - 6) % 16] = 0;
-                last_r                    = min;
+                if (use_nt)
+                {
+                   triedent::shared_root r;
+                   {
+                      std::lock_guard lock{revisions_mutex};
+                      r = std::move(nt_revisions[(min - 6) % 16]);
+                   }
+                   rs->destroy(std::move(r));
+                }
+                else
+                {
+                   triedent::object_id r;
+                   {
+                      std::lock_guard lock{revisions_mutex};
+                      r                         = {.id = revisions[(min - 6) % 16]};
+                      revisions[(min - 6) % 16] = 0;
+                   }
+                   rs->release_revision(r);
+                }
+                last_r = min;
              }
              usleep(100);
           }
@@ -203,6 +242,7 @@ int main(int argc, char** argv)
    int64_t     read_start = 0;
    std::string k;
    WARN("INSERT COUNT: ", insert_count);
+   std::map<std::string, std::string> comparison_map;
    for (uint64_t i = 0; i < insert_count; ++i)
    {
       try
@@ -211,9 +251,29 @@ int main(int argc, char** argv)
          {
             auto new_r = r.load();
             //       WARN( "NEW R: ", new_r, " id:" , s->get_session_revision().id );
-            revisions[new_r % 16] = s->get_session_revision().id;
-            s->retain({revisions[new_r % 16]});
-            s->fork();
+            if (use_nt)
+            {
+               auto                  r = s->clone(nt_root);
+               triedent::shared_root old_r;
+               {
+                  std::lock_guard lock{revisions_mutex};
+                  old_r                    = std::move(nt_revisions[new_r % 16]);
+                  nt_revisions[new_r % 16] = std::move(r);
+               }
+               s->destroy(std::move(old_r));
+            }
+            else
+            {
+               auto r = s->get_session_revision();
+               s->retain(r);  // TODO: this can malfunction
+               triedent::object_id old_r;
+               {
+                  std::lock_guard lock{revisions_mutex};
+                  old_r                 = {.id = revisions[new_r % 16]};
+                  revisions[new_r % 16] = r.id;
+               }
+               s->release_revision(old_r);
+            }
 
             if (++r == 6)
             {
@@ -271,7 +331,13 @@ int main(int argc, char** argv)
             //base.emplace( std::make_pair(k,std::string((char*)&h, sizeof(h))) );
             if (use_string)
             {
-               auto inserted = s->upsert(str, str);
+               if (check_content)
+                  comparison_map[str] = str;
+               int inserted;
+               if (use_nt)
+                  inserted = s->upsert(nt_root, str, str);
+               else
+                  inserted = s->upsert(str, str);
                if (inserted >= 0)
                {
                   WARN("failed to insert: ", h);
@@ -281,7 +347,13 @@ int main(int argc, char** argv)
             }
             else
             {
-               auto inserted = s->upsert(hk, hk);
+               if (check_content)
+                  comparison_map[(std::string)hk] = (std::string)hk;
+               int inserted;
+               if (use_nt)
+                  inserted = s->upsert(nt_root, hk, hk);
+               else
+                  inserted = s->upsert(hk, hk);
                if (inserted >= 0)
                {
                   WARN("failed to insert: ", h);
@@ -304,12 +376,35 @@ int main(int argc, char** argv)
 
    auto end   = std::chrono::steady_clock::now();
    auto delta = end - start;
-   std::cerr << "insert took:    " << std::chrono::duration<double, std::milli>(delta).count()
+   std::cerr << "\ninsert took:    " << std::chrono::duration<double, std::milli>(delta).count()
              << " ms\n";
 
-   s->set_root_revision(s->get_session_revision());
+   if (use_nt)
+   {
+      // TODO
+   }
+   else
+      s->set_root_revision(s->get_session_revision());
    db.print_stats();
    std::cerr << "\n";
+
+   if (check_content)
+   {
+      std::cerr << "Checking content...\n";
+      int missing    = 0;
+      int mismatched = 0;
+      for (auto& [k, v] : comparison_map)
+      {
+         std::string read_value;
+         if (use_nt && !s->get(nt_root, k, read_value))
+            ++missing;
+         else if (!use_nt && !s->get(k, read_value))
+            ++missing;
+         else if (read_value != v)
+            ++mismatched;
+      }
+      std::cerr << "missing: " << missing << " mismatched: " << mismatched << "\n";
+   }
 
    return 0;
 }
