@@ -16,11 +16,8 @@ namespace UserContract
    class FractallySys : public psibase::Contract<FractallySys>
    {
      public:
-   //    using tables                      = psibase::ContractTables<TokenTable_t,
-   //                                           BalanceTable_t,
-   //                                           SharedBalanceTable_t,
-   //                                           TokenHolderTable_t,
-   //                                           InitTable_t>;
+      using tables                      = psibase::ContractTables<TeamTable_t,
+                                             BalanceTable_t>;
       static constexpr auto contract    = psibase::AccountNumber("fractally-sys");
    //    static constexpr auto sysToken    = TID{1};
    //    static constexpr auto sysTokenSym = SID{"PSI"};
@@ -33,12 +30,12 @@ namespace UserContract
       void triggerEvents(uint32_t max) {};
 
    /* Fractal creation and building */
-      void createFractal(psio::const_view<psibase::String> name) {};
-      void inviteMember(psibase::AccountNumber account) {};
+      void createFractal(psio::const_view<psibase::String> name);
+      void inviteMember(psibase::AccountNumber account);
 
    /* Meetings */
-      void proposeSchedule(WhatType dayOfWeek, WhatType frequency) {};
-      void confSchedule() {};
+      void proposeSchedule(WhatType dayOfWeek, WhatType frequency);
+      void confSchedule();
 
       // Q: are we still doing this? Or using subjective random number from BP?
       void checkin(psibase::Checksum256 entropy) {};
@@ -49,7 +46,7 @@ namespace UserContract
 
    /* Teams */
       void createTeam(const std::vector<psibase::AccountNumber> &members,
-                  psio::const_view<psibase::String> name) {};
+                  psibase::AccountNumber name);
       void proposeMember(psibase::AccountNumber teamName,
                   psibase::AccountNumber member) {};
       void confirmMember(psibase::AccountNumber team,
@@ -66,8 +63,8 @@ namespace UserContract
                   const std::string& contents,
                   WhatType txid) {}; // Q: What's the process? broadcast a trx that requires the appropriate msig/auth and include the trxid here?
 
-   //   private:
-   //    tables db{contract};
+     private:
+      tables db{contract};
 
    //    void _checkAccountValid(psibase::AccountNumber account);
    //    bool _isSenderIssuer(TID tokenId);
