@@ -181,3 +181,63 @@ export function hexToUint8Array(hex) {
     }
     return result;
 };
+
+export function configRoutes(routes)
+{
+    /* routes
+    [
+        {
+            queryPath: "/balances",
+            payload: {}
+        },
+        {
+            queryPath: "/whatever",
+            payload: {}
+        },
+    ]
+    */
+
+  return ()=>{
+    window.iFrameResizer = {
+      onMessage: (msg)=>{
+        routes.forEach((route)=>{
+          if (msg.queryPath === route.queryPath)
+          {
+            if (msg.payload !== {})
+            {
+              route.callback(msg.payload);
+            }
+            else
+            {
+              console.error("Query " + msg.queryPath + " returned empty response.");
+            }
+          }
+        });
+      }
+    };
+  }
+}
+
+export function route(queryPath, callback)
+{
+  return {queryPath, callback};
+}
+
+export function query(path, arg) 
+{
+  // Currently assumes you're making a request to "this" contract
+  let queryObj = {queryPath: path, queryArg: arg};
+
+  return () => {
+    if (path)
+    {
+      if ('parentIFrame' in window) {
+        parentIFrame.sendMessage(queryObj, "*");
+      }
+    }
+    else
+    {
+      console.error("Empty query path.");
+    }
+  };
+};

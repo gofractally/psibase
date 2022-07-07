@@ -1,5 +1,5 @@
 //import { siblingUrl } from "/common/rootdomain.mjs";
-import { getJson } from "/common/rpc.mjs";
+import { configRoutes, route, query } from "/common/rpc.mjs";
 import htm from "https://unpkg.com/htm@3.1.0?module";
 await import("https://unpkg.com/iframe-resizer@4.3.1/js/iframeResizer.js");
 
@@ -187,45 +187,21 @@ class ToolsTabs extends React.Component {
   }
 }
 
-
-
 function App() {
   const [balances, setBalances] = useState([]);
   const [user, setUser] = useState("");
 
-  let handleMessage = (msg) => {
-    setBalances(msg);
+  let updateBalances = async (bal) => {
+    setBalances(bal);
   };
-
-  let query = (path, arg) => {
-      return () => {
-        if (path && arg)
-        {
-          if ('parentIFrame' in window) {
-            console.log("Parent iframe found, sending message.");
-            parentIFrame.sendMessage(path + arg, "*");
-          }
-          else
-          {
-            console.error("Failed to post message to parent window.");
-          }
-        }
-    };
-  };
-
-  useEffect(()=>{
-    window.iFrameResizer = {
-      onMessage: (message)=>{
-        handleMessage(message);
-      }
-    };
-  }, []);
-
-  useEffect(query("balances/", user), [user]);
-
+  
   let onSearchSubmit = async (term) => {
     setUser(term);
   };
+
+  useEffect(configRoutes([route("balances/", updateBalances)]), []);
+
+  useEffect(query("balances/", user), [user]);
 
   return html`
     <div class="ui container">

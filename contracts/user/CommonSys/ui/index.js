@@ -105,12 +105,20 @@ function Applet() {
 
   useEffect(() => {
 
-    const doMessage = async (obj) => {
-      let b = await getJson(appletSrc + obj.message);
+    const doMessage = async (request) => {
+      let {queryPath, queryArg} = request.message;
+      var res = {};
+      res = await getJson(appletSrc + queryPath + queryArg);
+
       var iframe = document.getElementById("applet");
-      if (iframe != null) 
+      if (iframe != null)
       {
-        iframe.iFrameResizer.sendMessage(b, appletSrc);
+        let response = {queryPath: queryPath, payload: res};
+        iframe.iFrameResizer.sendMessage(response, appletSrc);
+      }
+      else
+      {
+        console.error("Child iframe not found.");
       }
     };
 
@@ -134,9 +142,6 @@ function Applet() {
 
   if (appletSrc)
   {
-    console.log("Detected applet: " + applet);
-    console.log("Detected appletSrc: " + appletSrc);
-
     return html`
     <iframe
       id="applet"
