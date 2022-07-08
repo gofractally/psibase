@@ -177,7 +177,7 @@ void pushTransaction(BlockContext&             bc,
    }
 }  // pushTransaction
 
-void run(const char* db_path, bool produce, const char* host, uint32_t leeway_us)
+void run(const char* db_path, bool produce, const char* host, bool host_perf, uint32_t leeway_us)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -198,6 +198,7 @@ void run(const char* db_path, bool produce, const char* host, uint32_t leeway_us
           .address          = "0.0.0.0",
           .port             = 8080,
           .host             = host,
+          .host_perf        = host_perf,
       });
 
       // TODO: speculative execution on non-producers
@@ -276,6 +277,9 @@ OPTIONS:
       -o, --host <name>
             Host http server
 
+      -O, --host-perf
+            Show various metrics
+
       -l, --leeway <amount>
             Transaction leeway, in us. Defaults to 30000.
 
@@ -290,6 +294,7 @@ int main(int argc, char* argv[])
    bool        error      = false;
    bool        produce    = false;
    const char* host       = nullptr;
+   bool        host_perf  = false;
    uint32_t    leeway_us  = 30000;  // TODO: find a good default
    int         next_arg   = 1;
    while (next_arg < argc && argv[next_arg][0] == '-')
@@ -301,6 +306,8 @@ int main(int argc, char* argv[])
       else if ((!strcmp(argv[next_arg], "-o") || !strcmp(argv[next_arg], "--host")) &&
                next_arg + 1 < argc)
          host = argv[++next_arg];
+      else if (!strcmp(argv[next_arg], "-O") || !strcmp(argv[next_arg], "--host-perf"))
+         host_perf = true;
       else if ((!strcmp(argv[next_arg], "-l") || !strcmp(argv[next_arg], "--leeway")) &&
                next_arg + 1 < argc)
          leeway_us = std::stoi(argv[++next_arg]);
@@ -322,7 +329,7 @@ int main(int argc, char* argv[])
    }
    try
    {
-      run(argv[next_arg], produce, host, leeway_us);
+      run(argv[next_arg], produce, host, host_perf, leeway_us);
       return 0;
    }
    catch (std::exception& e)

@@ -219,6 +219,25 @@ namespace psibase
          currentActContext = prev;
       }
 
+      template <typename F>
+      auto timeDb(F f)
+      {
+         auto start  = std::chrono::steady_clock::now();
+         auto result = f();
+         currentActContext->transactionContext.databaseTime +=
+             std::chrono::steady_clock::now() - start;
+         return result;
+      }
+
+      template <typename F>
+      void timeDbVoid(F f)
+      {
+         auto start = std::chrono::steady_clock::now();
+         f();
+         currentActContext->transactionContext.databaseTime +=
+             std::chrono::steady_clock::now() - start;
+      }
+
       DbId getDbRead(uint32_t db)
       {
          if (db == uint32_t(DbId::contract))
@@ -464,119 +483,152 @@ namespace psibase
       // TODO: restrict value size
       void kvPut(uint32_t db, span<const char> key, span<const char> value)
       {
-         if (db == uint32_t(DbId::nativeConstrained))
-            verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
-         clearResult();
-         auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
-         if (!(contractAccount.flags & AccountRow::isSubjective))
-         {
-            auto& delta =
-                transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
-            delta.records += 1;
-            delta.keyBytes += key.size();
-            delta.valueBytes += value.size();
-            if (readable)
-            {
-               if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
-               {
-                  delta.records -= 1;
-                  delta.keyBytes -= key.size();
-                  delta.valueBytes -= existing->remaining();
-               }
-            }
-         }
-         database.kvPutRaw(m, {key.data(), key.size()}, {value.data(), value.size()});
+         timeDbVoid(
+             [&]
+             {
+                if (db == uint32_t(DbId::nativeConstrained))
+                   verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
+                clearResult();
+                auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
+                if (!(contractAccount.flags & AccountRow::isSubjective))
+                {
+                   auto& delta =
+                       transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
+                   delta.records += 1;
+                   delta.keyBytes += key.size();
+                   delta.valueBytes += value.size();
+                   if (readable)
+                   {
+                      if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
+                      {
+                         delta.records -= 1;
+                         delta.keyBytes -= key.size();
+                         delta.valueBytes -= existing->remaining();
+                      }
+                   }
+                }
+                database.kvPutRaw(m, {key.data(), key.size()}, {value.data(), value.size()});
+             });
       }
 
       // TODO: restrict value size
       uint64_t kvPutSequential(uint32_t db, span<const char> value)
       {
-         clearResult();
-         auto m = getDbWriteSequential(db);
+         return timeDb(
+             [&]
+             {
+                clearResult();
+                auto m = getDbWriteSequential(db);
 
-         if (!(contractAccount.flags & AccountRow::isSubjective))
-         {
-            auto& delta =
-                transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
-            delta.records += 1;
-            delta.keyBytes += sizeof(uint64_t);
-            delta.valueBytes += value.size();
-         }
+                if (!(contractAccount.flags & AccountRow::isSubjective))
+                {
+                   auto& delta =
+                       transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
+                   delta.records += 1;
+                   delta.keyBytes += sizeof(uint64_t);
+                   delta.valueBytes += value.size();
+                }
 
-         psio::input_stream v{value.data(), value.size()};
-         check(v.remaining() >= sizeof(AccountNumber::value),
-               "value prefix must match contract during write");
-         auto contract = psio::from_bin<AccountNumber>(v);
-         check(contract == contractAccount.num, "value prefix must match contract during write");
+                psio::input_stream v{value.data(), value.size()};
+                check(v.remaining() >= sizeof(AccountNumber::value),
+                      "value prefix must match contract during write");
+                auto contract = psio::from_bin<AccountNumber>(v);
+                check(contract == contractAccount.num,
+                      "value prefix must match contract during write");
 
-         auto&    dbStatus = transactionContext.blockContext.databaseStatus;
-         uint64_t indexNumber;
-         if (db == uint32_t(DbId::historyEvent))
-            indexNumber = dbStatus.nextHistoryEventNumber++;
-         else if (db == uint32_t(DbId::uiEvent))
-            indexNumber = dbStatus.nextUIEventNumber++;
-         else
-            check(false, "kvPutSequential: unsupported db");
-         database.kvPut(DatabaseStatusRow::db, dbStatus.key(), dbStatus);
+                auto&    dbStatus = transactionContext.blockContext.databaseStatus;
+                uint64_t indexNumber;
+                if (db == uint32_t(DbId::historyEvent))
+                   indexNumber = dbStatus.nextHistoryEventNumber++;
+                else if (db == uint32_t(DbId::uiEvent))
+                   indexNumber = dbStatus.nextUIEventNumber++;
+                else
+                   check(false, "kvPutSequential: unsupported db");
+                database.kvPut(DatabaseStatusRow::db, dbStatus.key(), dbStatus);
 
-         database.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
-         return indexNumber;
+                database.kvPutRaw(m, psio::convert_to_key(indexNumber),
+                                  {value.data(), value.size()});
+                return indexNumber;
+             });
       }  // kvPutSequential()
 
       void kvRemove(uint32_t db, span<const char> key)
       {
-         clearResult();
-         auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
-         if (readable && !(contractAccount.flags & AccountRow::isSubjective))
-         {
-            if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
-            {
-               auto& delta =
-                   transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
-               delta.records -= 1;
-               delta.keyBytes -= key.size();
-               delta.valueBytes -= existing->remaining();
-            }
-         }
-         database.kvRemoveRaw(m, {key.data(), key.size()});
+         timeDbVoid(
+             [&]
+             {
+                clearResult();
+                auto [m, readable] = getDbWrite(db, {key.data(), key.size()});
+                if (readable && !(contractAccount.flags & AccountRow::isSubjective))
+                {
+                   if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
+                   {
+                      auto& delta = transactionContext
+                                        .kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
+                      delta.records -= 1;
+                      delta.keyBytes -= key.size();
+                      delta.valueBytes -= existing->remaining();
+                   }
+                }
+                database.kvRemoveRaw(m, {key.data(), key.size()});
+             });
       }
 
       uint32_t kvGet(uint32_t db, span<const char> key)
       {
-         return setResult(database.kvGetRaw(getDbRead(db), {key.data(), key.size()}));
+         return timeDb(
+             [&] {
+                return setResult(database.kvGetRaw(getDbRead(db), {key.data(), key.size()}));
+             });
       }
 
       uint32_t kvGetSequential(uint32_t db, uint64_t indexNumber)
       {
-         auto m = getDbReadSequential(db);
-         return setResult(database.kvGetRaw(m, psio::convert_to_key(indexNumber)));
+         return timeDb(
+             [&]
+             {
+                auto m = getDbReadSequential(db);
+                return setResult(database.kvGetRaw(m, psio::convert_to_key(indexNumber)));
+             });
       }
 
       uint32_t kvGreaterEqual(uint32_t db, span<const char> key, uint32_t matchKeySize)
       {
-         check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-         if (keyHasContractPrefix(db))
-            check(matchKeySize >= sizeof(AccountNumber::value),
-                  "matchKeySize is smaller than 8 bytes");
-         return setResult(
-             database.kvGreaterEqualRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
+         return timeDb(
+             [&]
+             {
+                check(matchKeySize <= key.size(), "matchKeySize is larger than key");
+                if (keyHasContractPrefix(db))
+                   check(matchKeySize >= sizeof(AccountNumber::value),
+                         "matchKeySize is smaller than 8 bytes");
+                return setResult(database.kvGreaterEqualRaw(getDbRead(db), {key.data(), key.size()},
+                                                            matchKeySize));
+             });
       }
 
       uint32_t kvLessThan(uint32_t db, span<const char> key, uint32_t matchKeySize)
       {
-         check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-         if (keyHasContractPrefix(db))
-            check(matchKeySize >= sizeof(AccountNumber::value),
-                  "matchKeySize is smaller than 8 bytes");
-         return setResult(
-             database.kvLessThanRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
+         return timeDb(
+             [&]
+             {
+                check(matchKeySize <= key.size(), "matchKeySize is larger than key");
+                if (keyHasContractPrefix(db))
+                   check(matchKeySize >= sizeof(AccountNumber::value),
+                         "matchKeySize is smaller than 8 bytes");
+                return setResult(
+                    database.kvLessThanRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
+             });
       }
 
       uint32_t kvMax(uint32_t db, span<const char> key)
       {
-         if (keyHasContractPrefix(db))
-            check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
-         return setResult(database.kvMaxRaw(getDbRead(db), {key.data(), key.size()}));
+         return timeDb(
+             [&]
+             {
+                if (keyHasContractPrefix(db))
+                   check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
+                return setResult(database.kvMaxRaw(getDbRead(db), {key.data(), key.size()}));
+             });
       }
 
       uint32_t kvGetTransactionUsage()
