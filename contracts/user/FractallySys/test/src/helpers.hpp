@@ -10,7 +10,7 @@ class FractallyChainHelper {
 public: 
    static void chainWithFractal(DefaultTestChain &t, psibase::test_chain::ContractUser<UserContract::FractallySys> f) {
       f.init();
-      f.createFractal("FirstFractal");
+      f.createFractal("firstfractal"_a, std::string("FirstFractal"), std::string("Our mission is important"), std::string("en"), std::string("Americas"));
    };
    static void chainWith1Team(DefaultTestChain &t,
                               psibase::AccountNumber founder) {

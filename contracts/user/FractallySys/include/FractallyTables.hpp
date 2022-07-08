@@ -33,6 +33,7 @@ namespace UserContract
       uint16_t rankRollingTotal; // 12-week rolling total
       uint16_t earningsRollingTotal; // 12-week rolling total
       uint8_t weeksOnCouncil; // incremented or wiped EOD
+      psibase::TimePointSec creationDate;
 
       bool isActive()
       {
@@ -40,15 +41,14 @@ namespace UserContract
         // TODO: isActive can be computation based on max 12 queries for members being full-time
          return true;
       }
-
-      auto operator<=>(const TeamRecord&) const = default;
    };
    PSIO_REFLECT(TeamRecord,
                members,
                lead,
                rankRollingTotal,
                earningsRollingTotal,
-               weeksOnCouncil);
+               weeksOnCouncil,
+               creationDate);
    using TeamTable_t = psibase::Table<TeamRecord, &TeamRecord::account>;
    // // Todo - add symbolId as secondary index when possible
 
@@ -56,8 +56,6 @@ namespace UserContract
    {
       psibase::AccountNumber account;
       TID                    tokenId;
-
-      auto operator<=>(const BalanceKey_t&) const = default;
    };
    PSIO_REFLECT(BalanceKey_t, tokenId, account);
 
@@ -65,12 +63,31 @@ namespace UserContract
    {
       BalanceKey_t key;
       uint64_t     balance;
-
-      auto operator<=>(const BalanceRecord&) const = default;
    };
    PSIO_REFLECT(BalanceRecord, key, balance);
    using BalanceTable_t = psibase::Table<BalanceRecord, &BalanceRecord::key>;
 
+   struct FractalRecord
+   {
+      psibase::AccountNumber account;
+      std::string name;
+      std::string mission;
+      // language: leaving this a string so it can be specified however a community wants
+      //   (rather than imposing the ISO standard on them)
+      std::string language;
+      // timezone: also left general so a region of the world or a group of island
+      //   or similar speaking people can label themselves as they wish
+      std::string timezone;
+      psibase::TimePointSec creationDate;
+   };
+   PSIO_REFLECT(FractalRecord,
+               account,
+               name,
+               mission,
+               language,
+               timezone,
+               creationDate);
+   using FractalsTable_t = psibase::Table<FractalRecord, &FractalRecord::account>;
    /*
     * Petitions
     * How do we list Petitions? index msigs by auth?

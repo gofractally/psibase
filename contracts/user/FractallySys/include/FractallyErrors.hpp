@@ -7,6 +7,9 @@ namespace UserContract
    namespace Errors
    {
       constexpr std::string_view insufficientPerm    = "Insufficient permission";
+      constexpr std::string_view teamAlreadyExists    = "Team already exists";
+      constexpr std::string_view fractalAlreadyExists = "Fractal already exists";
+
       // constexpr std::string_view tokenDNE            = "Token DNE";
       // constexpr std::string_view tokenUnrecallable   = "Token unrecallable";
       // constexpr std::string_view maxSupplyExceeded   = "Max token supply exceeded";

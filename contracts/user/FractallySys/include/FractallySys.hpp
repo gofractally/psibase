@@ -16,7 +16,8 @@ namespace UserContract
    class FractallySys : public psibase::Contract<FractallySys>
    {
      public:
-      using tables                      = psibase::ContractTables<TeamTable_t,
+      using tables                      = psibase::ContractTables<FractalsTable_t,
+                                             TeamTable_t,
                                              BalanceTable_t>;
       static constexpr auto contract    = psibase::AccountNumber("fractally-sys");
    //    static constexpr auto sysToken    = TID{1};
@@ -30,7 +31,11 @@ namespace UserContract
       void triggerEvents(uint32_t max) {};
 
    /* Fractal creation and building */
-      void createFractal(psio::const_view<psibase::String> name);
+      void createFractal(psibase::AccountNumber acct,
+                                 std::string name,
+                                 std::string mission,
+                                 std::string language,
+                                 std::string timezone);
       void inviteMember(psibase::AccountNumber account);
 
    /* Meetings */
@@ -106,7 +111,7 @@ namespace UserContract
    PSIO_REFLECT(FractallySys,
       method(init),
       method(triggerEvents, max),
-      method(createFractal, name),
+      method(createFractal, acct, name, mission, language, timezone),
       method(inviteMember, account),
       method(proposeSchedule, dayOfWeek, frequency),
       method(confSchedule),

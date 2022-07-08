@@ -15,6 +15,7 @@ using namespace psibase::benchmarking;
 using UserContract::FractallySys;
 using namespace UserContract::Errors;
 using namespace UserContract;
+using namespace std::literals;
 
 constexpr std::string_view MEMBER_IS_EVICTED = "member is removed from the community";
 constexpr std::string_view A_DEFAULT_CHAIN = "a default chain";
@@ -52,7 +53,7 @@ SCENARIO("Creating a fractal")
       alice.at<FractallySys>().init();
 
       THEN("A user can create a fractal") {
-         auto create = a.createFractal("FirstFractal");
+         auto create = a.createFractal("firstfractal"_a, "FirstFractal"s, "Our mission is important"s, "en"s, "Americas"s);
          CHECK(create.succeeded());
 
          AND_THEN("The fractal exists") { }
