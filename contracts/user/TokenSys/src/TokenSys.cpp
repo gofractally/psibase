@@ -446,7 +446,7 @@ bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit_t flag)
 void TokenSys::_checkAccountValid(psibase::AccountNumber account)
 {
    check(at<AccountSys>().exists(account), invalidAccount);
-   check(account != AccountNumber{0}, invalidAccount);
+   check(account != AccountSys::nullAccount, invalidAccount);
 }
 
 bool TokenSys::_isSenderIssuer(TID tokenId)
