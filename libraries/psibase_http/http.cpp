@@ -232,7 +232,7 @@ namespace psibase::http
                       std::chrono::duration_cast<std::chrono::microseconds>(duration).count());
                };
                std::string report;
-               report += "handling " + data.method + " " + data.target + "\n";
+               report += "handling " + data.host + " " + data.method + " " + data.target + "\n";
                report += "   pack request:   " + t(startExecTime - startTime) + " us\n";
                report +=
                    "   load contracts: " + t(endExecTime - startExecTime - tc.getBillableTime()) +
