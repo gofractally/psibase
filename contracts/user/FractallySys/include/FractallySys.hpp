@@ -20,8 +20,6 @@ namespace UserContract
                                              TeamTable_t,
                                              BalanceTable_t>;
       static constexpr auto contract    = psibase::AccountNumber("fractally-sys");
-   //    static constexpr auto sysToken    = TID{1};
-   //    static constexpr auto sysTokenSym = SID{"PSI"};
 
       FractallySys(psio::shared_view_ptr<psibase::Action> action);
 
@@ -71,39 +69,6 @@ namespace UserContract
      private:
       tables db{contract};
 
-   //    void _checkAccountValid(psibase::AccountNumber account);
-   //    bool _isSenderIssuer(TID tokenId);
-
-   //   public:
-   //    struct Events
-   //    {
-   //       using Account    = psibase::AccountNumber;
-   //       using StringView = psio::const_view<psibase::String>;
-
-   //       // clang-format off
-   //       struct Ui  // History <-- Todo - Change back to History
-   //       {
-   //          void initialized() {}
-   //          void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
-   //          void minted(TID tokenId, Account minter, Quantity amount, StringView memo) {}
-   //          void burned(TID tokenId, Account burner, Quantity amount) {}
-   //          void userConfSet(Account account, psibase::NamedBit_t flag, bool enable) {}
-   //          void tokenConfSet(TID tokenId, Account setter, psibase::NamedBit_t flag, bool enable) {}
-   //          void symbolMapped(TID tokenId, Account account, SID symbolId) {}
-   //          //};
-
-   //          //struct Ui
-   //          //{
-   //          void credited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-   //          void uncredited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-   //          //};
-
-   //          //struct Merkle
-   //          //{
-   //          void transferred(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-   //          void recalled(TID tokenId, Account from, Quantity amount, StringView memo) {}
-   //       };
-   //    };
       // clang-format on
    };
 
@@ -127,23 +92,6 @@ namespace UserContract
       method(proposeTransfer, member, amount, memo),
       method(createPetition, title, contents, txid) // Q: What's the process? broadcast a trx that requires the appropriate msig/auth and include the trxid here?
     );
-   // PSIBASE_REFLECT_UI_EVENTS(FractallySys, // Change to history
-   //    method(initialized),
-   //    method(created, tokenId, creator, precision, maxSupply),
-   //    method(minted, tokenId, minter, amount, memo),
-   //    method(burned, tokenId, burner, amount),
-   //    method(userConfSet, account, flag, enable),
-   //    method(tokenConfSet, tokenId, setter, flag, enable),
-   //    method(symbolMapped, tokenId, account, symbolId),
-   // //);
-   // //PSIBASE_REFLECT_UI_EVENTS(FractallySys, 
-   //    method(credited, tokenId, sender, receiver, amount, memo),
-   //    method(uncredited, tokenId, sender, receiver, amount, memo),
-   // //);
-   // //PSIBASE_REFLECT_MERKLE_EVENTS(FractallySys, 
-   //    method(transferred, tokenId, sender, receiver, amount, memo),
-   //    method(recalled, tokenId, from, amount, memo)
-   // );
    // clang-format on
 
 }  // namespace UserContract

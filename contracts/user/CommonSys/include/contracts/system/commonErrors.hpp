@@ -10,7 +10,6 @@ namespace UserContract
       constexpr std::string_view uninitialized       = "Contract not initialized";
       constexpr std::string_view alreadyInit         = "Contract already initialized";
       constexpr std::string_view invalidAccount      = "Invalid account";
-      constexpr std::string_view accountAlreadyExists = "Invalid account";
-
+      constexpr std::string_view accountAlreadyExists = "Account already exists";
    }  // namespace Errors
 }  // namespace UserContract
