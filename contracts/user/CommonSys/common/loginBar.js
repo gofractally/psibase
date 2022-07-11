@@ -1,7 +1,7 @@
 import { siblingUrl } from "/common/rootdomain.mjs";
 import htm from "https://unpkg.com/htm@3.1.0?module";
 
-if (React === undefined) {
+if (typeof variable === 'undefined') {
   await import("https://unpkg.com/react@18/umd/react.production.min.js");
   await import(
     "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
