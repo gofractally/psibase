@@ -34,6 +34,7 @@ namespace psibase
       ~TransactionContext();
 
       void execTransaction();
+      void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execServe(const Action& act, ActionTrace& atrace);
 

@@ -114,19 +114,17 @@ namespace psibase
 
    static void execProcessTransaction(TransactionContext& self)
    {
-      /// TODO: move this to a common header
-      static constexpr AccountNumber trxsys = AccountNumber("transact-sys");
-      Action                         action{
-                                  .sender   = AccountNumber(),
-                                  .contract = trxsys,
-                                  .rawData  = {self.signedTransaction.transaction.data(),
-                                               self.signedTransaction.transaction.data() +
-                                                   self.signedTransaction.transaction.size()},
+      Action action{
+          .sender   = AccountNumber(),
+          .contract = transactionContractNum,
+          .rawData  = {self.signedTransaction.transaction.data(),
+                       self.signedTransaction.transaction.data() +
+                           self.signedTransaction.transaction.size()},
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
       ActionContext ac = {self, action, self.transactionTrace.actionTraces.back()};
-      auto&         ec = self.getExecutionContext(trxsys);
+      auto&         ec = self.getExecutionContext(transactionContractNum);
       ec.execProcessTransaction(ac);
    }
 
@@ -164,6 +162,20 @@ namespace psibase
          auto&         ec = self.getExecutionContext(action.contract);
          ec.execVerify(ac);
       }
+   }
+
+   void TransactionContext::execNonTrxAction(uint64_t      callerFlags,
+                                             const Action& action,
+                                             ActionTrace&  atrace)
+   {
+      auto& db     = blockContext.db;
+      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
+      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+
+      atrace.action    = action;
+      ActionContext ac = {*this, action, atrace};
+      auto&         ec = getExecutionContext(action.contract);
+      ec.execCalled(callerFlags, ac);
    }
 
    void TransactionContext::execCalledAction(uint64_t      callerFlags,

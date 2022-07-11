@@ -18,6 +18,11 @@ static const auto& getStatus()
 
 namespace system_contract
 {
+   void TransactionSys::startBlock()
+   {
+      // TODO: expire transaction IDs
+   }
+
    psibase::BlockNum TransactionSys::headBlockNum() const
    {
       auto& stat = getStatus();

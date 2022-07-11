@@ -241,6 +241,7 @@ void run(const char* db_path, bool produce, const char* host, bool host_perf, ui
 
          BlockContext bc{*system, true, true};
          bc.start();
+         bc.callStartBlock();
 
          bool abort_boot = false;
          for (auto& entry : entries)

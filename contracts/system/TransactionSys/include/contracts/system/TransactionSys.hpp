@@ -18,6 +18,8 @@ namespace system_contract
       static constexpr uint64_t contractFlags =
           psibase::AccountRow::allowSudo | psibase::AccountRow::allowWriteNative;
 
+      void startBlock();
+
       psibase::BlockNum     headBlockNum() const;
       psibase::TimePointSec headBlockTime() const;
 
@@ -29,6 +31,7 @@ namespace system_contract
    };
 
    PSIO_REFLECT(TransactionSys,
+                method(startBlock),
                 method(setCode, contact, vmType, vmVersion, code),
                 method(headBlockNum),
                 method(headBlockTime))

@@ -135,7 +135,7 @@ struct test_chain
       sys = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
-   test_chain(const test_chain&) = delete;
+   test_chain(const test_chain&)            = delete;
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
@@ -166,6 +166,7 @@ struct test_chain
                                         skipAdditional};
 
       blockContext->start(skippedTime);
+      blockContext->callStartBlock();
    }
 
    void start_if_needed()

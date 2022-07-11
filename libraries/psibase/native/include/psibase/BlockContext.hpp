@@ -33,6 +33,7 @@ namespace psibase
 
       StatusRow start(std::optional<TimePointSec> time = {});
       void      start(Block&& src);
+      void      callStartBlock();
       void      commit();
 
       void pushTransaction(const SignedTransaction&                 trx,

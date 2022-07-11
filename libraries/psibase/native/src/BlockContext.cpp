@@ -1,4 +1,5 @@
 #include <psibase/TransactionContext.hpp>
+#include <psibase/contractEntry.hpp>
 
 namespace psibase
 {
@@ -83,6 +84,37 @@ namespace psibase
       active = true;
    }
 
+   void BlockContext::callStartBlock()
+   {
+      if (current.header.blockNum == 2)
+         return;
+
+      checkActive();
+      active = false;
+
+      Action action{
+          .sender   = {},
+          .contract = transactionContractNum,
+          .method   = MethodNumber("startBlock"),
+          .rawData  = {},
+      };
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, false};
+      auto&              atrace = trace.actionTraces.emplace_back();
+
+      // Failure here aborts the block since transaction-sys relies on startBlock
+      // functioning correctly. Fixing this type of failure requires forking
+      // the chain, just like fixing bugs which block transactions within
+      // transaction-sys's process_transaction may require forking the chain.
+      //
+      // TODO: log failure
+      tc.execNonTrxAction(0, action, atrace);
+
+      tc.session.commit();
+      active = true;
+   }
+
    void BlockContext::commit()
    {
       checkActive();
@@ -123,6 +155,7 @@ namespace psibase
       }
    }
 
+   // TODO: call callStartBlock() here? caller's responsibility?
    void BlockContext::execAllInBlock()
    {
       for (auto& trx : current.transactions)
