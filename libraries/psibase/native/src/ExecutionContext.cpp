@@ -455,6 +455,7 @@ namespace psibase
             check(false, "call depth exceeded (temporary rule)");
 
          // TODO: don't unpack rawData
+         // TODO: verify no extra data
          check(psio::fracvalidate<Action>(data.data(), data.end()).valid_and_known(),
                "call: invalid data format");
          auto act = psio::convert_from_frac<Action>({data.data(), data.size()});

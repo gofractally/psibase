@@ -10,17 +10,30 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-static const auto& getStatus()
-{
-   static const auto status = kvGet<StatusRow>(StatusRow::db, statusKey());
-   return status;
-}
-
 namespace system_contract
 {
+   struct IncludedTrx
+   {
+      Checksum256  id;
+      TimePointSec expiration;
+
+      auto by_expiration() const { return std::make_tuple(expiration, id); }
+   };
+   PSIO_REFLECT(IncludedTrx, id, expiration)
+   using IncludedTrxTable = Table<IncludedTrx, &IncludedTrx::id, &IncludedTrx::by_expiration>;
+
+   using Tables = ContractTables<IncludedTrxTable>;
+
+   static const auto& getStatus()
+   {
+      static const auto status = kvGet<StatusRow>(StatusRow::db, statusKey());
+      return status;
+   }
+
    void TransactionSys::startBlock()
    {
       // TODO: expire transaction IDs
+      // TODO: record (and expire) information for tapos
    }
 
    psibase::BlockNum TransactionSys::headBlockNum() const
@@ -103,15 +116,20 @@ namespace system_contract
       // TODO: limit execution time
       auto top_act = getCurrentAction();
       // TODO: avoid copying inner rawData during unpack
-      // TODO: verify fracpack (no unknown)
+      // TODO: verify fracpack (no unknown, no extra data)
       auto trx = psio::convert_from_frac<Transaction>(top_act.rawData);
+      auto id  = sha256(top_act.rawData.data(), top_act.rawData.size());
 
       check(trx.actions.size() > 0, "transaction has no actions");
 
-      if (const auto& stat = getStatus())
-      {
-         check(stat->head->header.time <= trx.tapos.expiration, "transaction has expired");
-      }
+      const auto& stat = getStatus();
+      check(stat.has_value(), "missing status record");
+      check(stat->head->header.time <= trx.tapos.expiration, "transaction has expired");
+
+      auto table = Tables(TransactionSys::contract).open<IncludedTrxTable>();
+      auto idx   = table.getIndex<0>();
+      check(!idx.get(id), "duplicate transaction");
+      table.put({id, trx.tapos.expiration});
 
       for (auto& act : trx.actions)
       {
