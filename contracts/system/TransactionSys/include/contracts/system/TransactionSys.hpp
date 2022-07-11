@@ -20,6 +20,8 @@ namespace system_contract
 
       void startBlock();
 
+      // TODO: currentBlockNum(), currentBlockTime(): fetch from new status fields
+      //       also update contracts which use `head + 1`
       psibase::BlockNum     headBlockNum() const;
       psibase::TimePointSec headBlockTime() const;
 
