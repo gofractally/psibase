@@ -108,7 +108,6 @@ namespace system_contract
       if (enable_print)
          print("process_transaction\n");
 
-      // TODO: expiration
       // TODO: check refBlockNum, refBlockPrefix
       // TODO: check max_net_usage_words, max_cpu_usage_ms
       // TODO: resource billing
@@ -124,7 +123,7 @@ namespace system_contract
 
       const auto& stat = getStatus();
       check(stat.has_value(), "missing status record");
-      check(stat->head->header.time <= trx.tapos.expiration, "transaction has expired");
+      check(stat->current.time <= trx.tapos.expiration, "transaction has expired");
 
       auto table = Tables(TransactionSys::contract).open<IncludedTrxTable>();
       auto idx   = table.getIndex<0>();
