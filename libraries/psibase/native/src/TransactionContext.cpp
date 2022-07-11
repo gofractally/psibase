@@ -8,6 +8,7 @@
 
 namespace psibase
 {
+   // TODO: spawn timeout thread once per block instead of once per trx
    struct TransactionContextImpl
    {
       std::mutex                                mutex             = {};

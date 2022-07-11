@@ -21,13 +21,14 @@ namespace psibase
    struct StatusRow
    {
       Checksum256              chainId;
+      BlockHeader              current;
       std::optional<BlockInfo> head;
       uint32_t                 numExecutionMemories = 32;
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(StatusRow, chainId, head, numExecutionMemories)
+   PSIO_REFLECT(StatusRow, chainId, current, head, numExecutionMemories)
 
    // TODO: Rename account to contract?
    inline auto accountKey(AccountNumber num)

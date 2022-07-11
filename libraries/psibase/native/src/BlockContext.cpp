@@ -23,16 +23,13 @@ namespace psibase
    }
 
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold
-   void BlockContext::start(std::optional<TimePointSec> time)
+   StatusRow BlockContext::start(std::optional<TimePointSec> time)
    {
       check(!started, "block has already been started");
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       if (!status)
-      {
          status.emplace();
-         if (!isReadOnly)
-            db.kvPut(StatusRow::db, status->key(), *status);
-      }
+
       auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
       if (!dbStatus)
       {
@@ -64,20 +61,26 @@ namespace psibase
          if (time)
             current.header.time = *time;
       }
+      status->current = current.header;
+      if (!isReadOnly)
+         db.kvPut(StatusRow::db, status->key(), *status);
       started = true;
       active  = true;
+      return *status;
    }
 
    // TODO: (or elsewhere) check block signature
    void BlockContext::start(Block&& src)
    {
-      start(src.header.time);
-      active = false;
+      auto status = start(src.header.time);
+      active      = false;
       check(src.header.previous == current.header.previous,
             "block previous does not match expected");
       check(src.header.blockNum == current.header.blockNum, "block num does not match expected");
-      current = std::move(src);
-      active  = true;
+      current        = std::move(src);
+      status.current = current.header;
+      db.kvPut(StatusRow::db, status.key(), status);
+      active = true;
    }
 
    void BlockContext::commit()
