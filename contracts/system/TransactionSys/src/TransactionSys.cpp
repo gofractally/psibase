@@ -12,18 +12,6 @@ static constexpr bool enable_print = false;
 
 namespace system_contract
 {
-   struct IncludedTrx
-   {
-      Checksum256  id;
-      TimePointSec expiration;
-
-      auto by_expiration() const { return std::make_tuple(expiration, id); }
-   };
-   PSIO_REFLECT(IncludedTrx, id, expiration)
-   using IncludedTrxTable = Table<IncludedTrx, &IncludedTrx::id, &IncludedTrx::by_expiration>;
-
-   using Tables = ContractTables<IncludedTrxTable>;
-
    static const auto& getStatus()
    {
       static const auto status = kvGet<StatusRow>(StatusRow::db, statusKey());
@@ -31,10 +19,41 @@ namespace system_contract
       return *status;
    }
 
+   // CAUTION: startBlock() is critical to chain operations. If it fails, the chain stops.
+   //          If the chain stops, it can only be fixed by forking out the misbehaving
+   //          transact-sys.wasm and replacing it with a working one. That procedure
+   //          isn't implemented yet, and will likely be painful once it is (if ever).
+   //          If you're tempted to do anything application-specific in startBlock,
+   //          or are considering adding new features to startBlock, then consider
+   //          the risk of it halting the chain if a bug or exploit appears.
    void TransactionSys::startBlock()
    {
+      check(getSender().value == 0, "Only native code may call startBlock");
+      auto& stat = getStatus();
+
+      // Add blocks to BlockSummaryTable; process_transaction uses it to
+      // verify TAPoS on transactions.
+      if (stat.head && !((stat.head->header.blockNum - 2) & 0xfff))
+      {
+         auto table = Tables(TransactionSys::contract).open<BlockSummaryTable>();
+         auto idx   = table.getIndex<0>();
+         auto row   = idx.get(std::tuple<>{});
+         if (!row)
+            row.emplace();
+         uint8_t i = (stat.head->header.blockNum - 2) >> 12;
+         memcpy(
+             &row->blockSuffixes[i],
+             stat.head->blockId.data() + stat.head->blockId.size() - sizeof(row->blockSuffixes[i]),
+             sizeof(row->blockSuffixes[i]));
+         table.put(*row);
+
+         if constexpr (enable_print)
+            print("blockNum: ", stat.head->header.blockNum, " index: ", i,
+                  " id: ", psio::convert_to_json(stat.head->blockId),
+                  " suffix: ", row->blockSuffixes[i], "\n");
+      }
+
       // TODO: expire transaction IDs
-      // TODO: record (and expire) information for tapos
    }
 
    psibase::BlockNum TransactionSys::headBlockNum() const
@@ -104,6 +123,11 @@ namespace system_contract
    }  // setCode
 
    // Native code calls this on the transaction-sys account
+   //
+   // All transactions pass through this function, so it's critical
+   // for chain operations. A bug here can stop any new transactions
+   // from entering the chain, including transactions which try to
+   // fix the problem.
    extern "C" [[clang::export_name("process_transaction")]] void process_transaction()
    {
       if constexpr (enable_print)
@@ -125,7 +149,7 @@ namespace system_contract
       const auto& stat = getStatus();
       check(stat.current.time <= trx.tapos.expiration, "transaction has expired");
 
-      auto table = Tables(TransactionSys::contract).open<IncludedTrxTable>();
+      auto table = TransactionSys::Tables(TransactionSys::contract).open<IncludedTrxTable>();
       auto idx   = table.getIndex<0>();
       check(!idx.get(id), "duplicate transaction");
       table.put({id, trx.tapos.expiration});

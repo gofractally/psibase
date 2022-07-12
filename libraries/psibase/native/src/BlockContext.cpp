@@ -110,6 +110,7 @@ namespace psibase
       //
       // TODO: log failure
       tc.execNonTrxAction(0, action, atrace);
+      // printf("%s\n", prettyTrace(atrace).c_str());
 
       tc.session.commit();
       active = true;
@@ -194,7 +195,7 @@ namespace psibase
          {
             // TODO: limit billed time in block
             // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
-            check(!(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast),
+            check(!(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast_flag),
                   "cannot commit a do_not_broadcast transaction");
             t.session.commit();
             active = true;

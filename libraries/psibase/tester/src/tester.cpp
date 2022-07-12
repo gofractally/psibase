@@ -309,8 +309,8 @@ void psibase::test_chain::fill_tapos(Transaction& t, uint32_t expire_sec)
 {
    auto& info                 = get_head_block_info();
    t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
-   t.tapos.refBlockNum        = info.header.blockNum;
-   memcpy(&t.tapos.refBlockPrefix, (char*)info.blockId.data() + 8, sizeof(t.tapos.refBlockPrefix));
+   // t.tapos.refBlockNum        = info.header.blockNum;
+   // memcpy(&t.tapos.refBlockPrefix, (char*)info.blockId.data() + 8, sizeof(t.tapos.refBlockPrefix));
 }
 
 psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)
