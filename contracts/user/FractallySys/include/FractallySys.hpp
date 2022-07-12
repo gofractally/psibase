@@ -1,7 +1,9 @@
 #pragma once
 
 // build:
+// setup build folder: cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RUST=yes ..
 // cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON .. && make -j $(nproc)
+// with CCACHE: cmake -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_BUILD_TYPE=Release -DCMAKE_TARGET_MESSAGES=no -DBUILD_DEBUG_WASM=ON .. && make -j $(nproc)
 
 #include <psibase/Contract.hpp>
 #include <psibase/String.hpp>
@@ -23,6 +25,8 @@ namespace UserContract
 
       FractallySys(psio::shared_view_ptr<psibase::Action> action);
 
+      typedef uint32_t teamTransferID;
+
       void init();
 
    /* utility functions */
@@ -34,6 +38,10 @@ namespace UserContract
                                  std::string mission,
                                  std::string language,
                                  std::string timezone);
+      void setFracName(std::string name) {};
+      void setFracMisn(std::string mission) {};
+      void setFracLang(std::string lang) {};
+      void setFracTZ(std::string timezone) {};
       void inviteMember(psibase::AccountNumber account);
 
    /* Meetings */
@@ -45,6 +53,8 @@ namespace UserContract
       void revealEntropy(psio::const_view<psibase::String> entropyRevealMsg) {};
 
       void submitConsensus(const std::vector<psibase::AccountNumber> &ranks) {};
+      // Q: Do we want helper action like this that turn into msigs?
+      //   Or will members create msigs directly from standard templates
       void proposeRemove(psibase::AccountNumber member) {};
 
    /* Teams */
@@ -55,11 +65,12 @@ namespace UserContract
       void confirmMember(psibase::AccountNumber team,
                   psibase::AccountNumber member) {};
       void proposeLead(psibase::AccountNumber member) {};
-      void initLeave(psibase::AccountNumber member,
+      void initLeave(psibase::AccountNumber member, // Q: Allow this to be called for any member on the team
                   psibase::AccountNumber team) {};
-      void proposeTransfer(psibase::AccountNumber member,
+      teamTransferID proposeTransfer(psibase::AccountNumber member,
                   Quantity                          amount,
                   psio::const_view<psibase::String> memo) {};
+      void confTransfer(teamTransferID teamTransferID) {};
 
    /* Social */
       void createPetition(psio::const_view<psibase::String> title,
@@ -77,6 +88,10 @@ namespace UserContract
       method(init),
       method(triggerEvents, max),
       method(createFractal, acct, name, mission, language, timezone),
+      method(setFracName, name),
+      method(setFracMisn, mission),
+      method(setFracLang, lang),
+      method(setFracTZ, timezone),
       method(inviteMember, account),
       method(proposeSchedule, dayOfWeek, frequency),
       method(confSchedule),
@@ -90,6 +105,7 @@ namespace UserContract
       method(proposeLead, member),
       method(initLeave, member, team),
       method(proposeTransfer, member, amount, memo),
+      method(confTransfer, teamTransferID),
       method(createPetition, title, contents, txid) // Q: What's the process? broadcast a trx that requires the appropriate msig/auth and include the trxid here?
     );
    // clang-format on

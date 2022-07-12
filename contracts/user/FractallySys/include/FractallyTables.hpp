@@ -6,7 +6,7 @@
 #include <psibase/Table.hpp>
 
 // #include "nft_sys.hpp"
-#include "../../token_sys/include/types.hpp"
+#include "../../TokenSys/include/contracts/user/tokenTypes.hpp"
 #include "types.hpp"
 
 namespace UserContract
