@@ -19,6 +19,9 @@ namespace psibase
       std::vector<char> result_key;
       std::vector<char> result_value;
 
+      // TODO: rename kvPutSequential, kvGetSequential
+      // TODO: clean up which functions do/don't clear result_*
+
       uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset);
       uint32_t getKey(eosio::vm::span<char> dest);
       void     writeConsole(eosio::vm::span<const char> str);
