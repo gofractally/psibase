@@ -27,7 +27,8 @@ namespace system_contract
    static const auto& getStatus()
    {
       static const auto status = kvGet<StatusRow>(StatusRow::db, statusKey());
-      return status;
+      check(status.has_value(), "missing status record");
+      return *status;
    }
 
    void TransactionSys::startBlock()
@@ -39,15 +40,15 @@ namespace system_contract
    psibase::BlockNum TransactionSys::headBlockNum() const
    {
       auto& stat = getStatus();
-      if (stat && stat->head)
-         return stat->head->header.blockNum;
+      if (stat.head)
+         return stat.head->header.blockNum;
       return 1;  // next block (currently being produced) is 2 (genesis)
    }
    psibase::TimePointSec TransactionSys::headBlockTime() const
    {
       auto& stat = getStatus();
-      if (stat && stat->head)
-         return stat->head->header.time;
+      if (stat.head)
+         return stat.head->header.time;
       return {};
    }
 
@@ -105,7 +106,7 @@ namespace system_contract
    // Native code calls this on the transaction-sys account
    extern "C" [[clang::export_name("process_transaction")]] void process_transaction()
    {
-      if (enable_print)
+      if constexpr (enable_print)
          print("process_transaction\n");
 
       // TODO: check refBlockNum, refBlockPrefix
@@ -122,8 +123,7 @@ namespace system_contract
       check(trx.actions.size() > 0, "transaction has no actions");
 
       const auto& stat = getStatus();
-      check(stat.has_value(), "missing status record");
-      check(stat->current.time <= trx.tapos.expiration, "transaction has expired");
+      check(stat.current.time <= trx.tapos.expiration, "transaction has expired");
 
       auto table = Tables(TransactionSys::contract).open<IncludedTrxTable>();
       auto idx   = table.getIndex<0>();
@@ -136,12 +136,12 @@ namespace system_contract
          if (!account)
             abortMessage("unknown sender \"" + act.sender.str() + "\"");
 
-         if (enable_print)
+         if constexpr (enable_print)
             print("call checkAuthSys on ", account->authContract.str(), " for account ",
                   act.sender.str());
          Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
          auth.checkAuthSys(act, trx.claims);
-         if (enable_print)
+         if constexpr (enable_print)
             print("call action\n");
          call(act);  // TODO: avoid copy (serializing)
       }
