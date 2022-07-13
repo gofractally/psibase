@@ -3,7 +3,6 @@
 #include <psibase/dispatch.hpp>
 
 #include <psibase/crypto.hpp>
-#include <psibase/nativeTables.hpp>
 #include <psibase/print.hpp>
 
 using namespace psibase;
@@ -17,13 +16,6 @@ static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
 
 namespace system_contract
 {
-   static const auto& getStatus()
-   {
-      static const auto status = kvGet<StatusRow>(StatusRow::db, statusKey());
-      check(status.has_value(), "missing status record");
-      return *status;
-   }
-
    // CAUTION: startBlock() is critical to chain operations. If it fails, the chain stops.
    //          If the chain stops, it can only be fixed by forking out the misbehaving
    //          transact-sys.wasm and replacing it with a working one. That procedure
@@ -34,35 +26,12 @@ namespace system_contract
    void TransactionSys::startBlock()
    {
       check(getSender().value == 0, "Only native code may call startBlock");
-      auto& stat = getStatus();
 
-      // Add blocks to BlockSummaryTable; process_transaction uses it to
+      Tables tables(TransactionSys::contract);
+
+      // Add head block to BlockSummaryTable; process_transaction uses it to
       // verify TAPoS on transactions.
-      if (stat.head)
-      {
-         auto table = Tables(TransactionSys::contract).open<BlockSummaryTable>();
-         auto idx   = table.getIndex<0>();
-         auto row   = idx.get(std::tuple<>{});
-         if (!row)
-            row.emplace();
-
-         auto record = [&](uint8_t i)
-         {
-            auto& suffix = row->blockSuffixes[i];
-            memcpy(&suffix, stat.head->blockId.data() + stat.head->blockId.size() - sizeof(suffix),
-                   sizeof(suffix));
-         };
-
-         record(stat.head->header.blockNum & 0x7f);
-         if (!(stat.head->header.blockNum & 0x1fff))
-            record((stat.head->header.blockNum >> 13) | 0x80);
-
-         table.put(*row);
-
-         if constexpr (enable_print)
-            print("blockNum: ", stat.head->header.blockNum,
-                  " id: ", psio::convert_to_json(stat.head->blockId), "\n");
-      }
+      tables.open<BlockSummaryTable>().put(getBlockSummary());
 
       // TODO: expire transaction IDs
    }

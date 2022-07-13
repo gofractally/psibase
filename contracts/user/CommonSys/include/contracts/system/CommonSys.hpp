@@ -3,15 +3,14 @@
 #include <psibase/Contract.hpp>
 #include <psibase/contractEntry.hpp>
 
-namespace psibase
+namespace system_contract
 {
-   ///
    struct CommonSys : psibase::Contract<CommonSys>
    {
       static constexpr auto contract = psibase::AccountNumber("common-sys");
 
-      auto serveSys(RpcRequestData request) -> std::optional<RpcReplyData>;
-      auto serveCommon(RpcRequestData request) -> std::optional<RpcReplyData>;
+      auto serveSys(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
+      auto serveCommon(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
 
@@ -22,4 +21,4 @@ namespace psibase
       method(storeSys, path, contentType, content)
    )
    // clang-format on
-}  // namespace psibase
+}  // namespace system_contract

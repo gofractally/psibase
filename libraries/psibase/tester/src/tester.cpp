@@ -310,15 +310,9 @@ void psibase::test_chain::fill_tapos(Transaction& t, uint32_t expire_sec)
 {
    auto& info                 = get_head_block_info();
    t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
-
-   auto tables = system_contract::TransactionSys::Tables(system_contract::TransactionSys::contract);
-   auto summaryTable = tables.open<system_contract::BlockSummaryTable>();
-   auto summaryIdx   = summaryTable.getIndex<0>();
-   if (auto summary = summaryIdx.get(std::tuple<>{}))
-   {
-      t.tapos.refBlockIndex  = info.header.blockNum & 0x7f;
-      t.tapos.refBlockSuffix = summary->blockSuffixes[t.tapos.refBlockIndex];
-   }
+   auto [index, suffix]       = system_contract::headTapos();
+   t.tapos.refBlockIndex      = index;
+   t.tapos.refBlockSuffix     = suffix;
 }
 
 psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)
