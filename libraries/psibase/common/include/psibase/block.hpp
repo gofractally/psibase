@@ -55,21 +55,24 @@ namespace psibase
    PSIO_REFLECT(Claim, contract, rawData)
 
    // Rules for TAPOS:
-   // * Reference block's number must be (2 + multiple of 4096)
-   // * refBlockIndex = ((blockNum - 2) >> 12) & 0xff
-   // * refBlockSuffix = last 4 bytes of the block ID, bit-casted to uint32_t
+   // * Reference block's number must be either:
+   //    * One of the most-recent 128 blocks. For this case, refBlockIndex = blockNum & 0x7f
+   //    * A multiple of 8192. For this case, refBlockIndex = (blockNum >> 13) | 0x80
+   // * refBlockSuffix = last 4 bytes of the block ID, bit-casted to uint32_t.
    //
-   // TransactionSys maintains block suffixes for the most-recent 256 blocks which
-   // have block numbers which are (2 + multiple of 4096). If the blocks are
-   // all 1 second apart, then this allows up to 12 days to sign and execute a
-   // transaction. If the blocks have variable length, then the amount of available
-   // time will vary with network activity. If we assume a max sustained block
-   // rate of 4 per sec, then this still allows 3 days.
+   // TransactionSys maintains block suffixes for:
+   // * The most-recent 128 blocks. This allows transactions to depend on other recent transactions.
+   // * The most-recent 128 blocks which have block numbers which are a multiple of 8192. This gives
+   //   users which sign transactions offline plenty of time to do so.
+   //
+   // If the blocks are all 1 second apart, then the second case allows up to 12 days to sign and execute
+   // a transaction. If the blocks have variable length, then the amount of available time will vary with
+   // network activity. If we assume a max sustained block rate of 4 per sec, then this still allows 3 days.
    //
    // A transaction will be rejected if:
    // * It is expired.
    // * It arrives earlier than (expired - maxTrxLifetime). maxTrxLifetime
-   //   is defined in TransactionSys.cpp and can be changed in the future.
+   //   is defined in TransactionSys.cpp and may be changed in the future.
    // * It references a block that isn't on the current fork, or a block which
    //   is too old. For best results, use the most-recent irreversible block which
    //   meets the criteria.

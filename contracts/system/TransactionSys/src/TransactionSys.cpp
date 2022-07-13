@@ -38,25 +38,30 @@ namespace system_contract
 
       // Add blocks to BlockSummaryTable; process_transaction uses it to
       // verify TAPoS on transactions.
-      if (stat.head && !((stat.head->header.blockNum - 2) & 0xfff))
+      if (stat.head)
       {
-         // TODO: split in 2: fine resolution and course resolution
          auto table = Tables(TransactionSys::contract).open<BlockSummaryTable>();
          auto idx   = table.getIndex<0>();
          auto row   = idx.get(std::tuple<>{});
          if (!row)
             row.emplace();
-         uint8_t i = (stat.head->header.blockNum - 2) >> 12;
-         memcpy(
-             &row->blockSuffixes[i],
-             stat.head->blockId.data() + stat.head->blockId.size() - sizeof(row->blockSuffixes[i]),
-             sizeof(row->blockSuffixes[i]));
+
+         auto record = [&](uint8_t i)
+         {
+            auto& suffix = row->blockSuffixes[i];
+            memcpy(&suffix, stat.head->blockId.data() + stat.head->blockId.size() - sizeof(suffix),
+                   sizeof(suffix));
+         };
+
+         record(stat.head->header.blockNum & 0x7f);
+         if (!(stat.head->header.blockNum & 0x1fff))
+            record((stat.head->header.blockNum >> 13) | 0x80);
+
          table.put(*row);
 
          if constexpr (enable_print)
-            print("blockNum: ", stat.head->header.blockNum, " index: ", i,
-                  " id: ", psio::convert_to_json(stat.head->blockId),
-                  " suffix: ", row->blockSuffixes[i], "\n");
+            print("blockNum: ", stat.head->header.blockNum,
+                  " id: ", psio::convert_to_json(stat.head->blockId), "\n");
       }
 
       // TODO: expire transaction IDs
@@ -173,11 +178,13 @@ namespace system_contract
 #ifdef ENABLE_TAPOS
       if (auto summary = summaryIdx.get(std::tuple<>{}))
       {
-         // print("refBlockIndex: ", trx.tapos.refBlockIndex,
-         //       " refBlockSuffix: ", trx.tapos.refBlockSuffix,
-         //       " maxIndex: ", (stat.head->header.blockNum - 2) >> 12, "\n");
-         check(trx.tapos.refBlockIndex <= (stat.head->header.blockNum - 2) >> 12,
-               "transaction references non-existing block");
+         if (trx.tapos.refBlockIndex & 0x80)
+            check(((trx.tapos.refBlockIndex - 2) & 0x7f) <= (stat.head->header.blockNum >> 13) - 2,
+                  "transaction references non-existing block");
+         else
+            check(((trx.tapos.refBlockIndex - 2) & 0x7f) <= stat.head->header.blockNum - 2,
+                  "transaction references non-existing block");
+
          // print("expected suffix: ", summary->blockSuffixes[trx.tapos.refBlockIndex], "\n");
          check(trx.tapos.refBlockSuffix == summary->blockSuffixes[trx.tapos.refBlockIndex],
                "transaction references non-existing block");

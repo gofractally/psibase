@@ -316,7 +316,7 @@ void psibase::test_chain::fill_tapos(Transaction& t, uint32_t expire_sec)
    auto summaryIdx   = summaryTable.getIndex<0>();
    if (auto summary = summaryIdx.get(std::tuple<>{}))
    {
-      t.tapos.refBlockIndex  = (info.header.blockNum - 2) >> 12;
+      t.tapos.refBlockIndex  = info.header.blockNum & 0x7f;
       t.tapos.refBlockSuffix = summary->blockSuffixes[t.tapos.refBlockIndex];
    }
 }
