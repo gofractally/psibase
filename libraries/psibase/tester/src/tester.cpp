@@ -1,6 +1,7 @@
 #include <psibase/tester.hpp>
 
 #include <secp256k1.h>
+#include <contracts/system/TransactionSys.hpp>
 #include <contracts/system/VerifyEcSys.hpp>
 
 namespace
@@ -309,8 +310,15 @@ void psibase::test_chain::fill_tapos(Transaction& t, uint32_t expire_sec)
 {
    auto& info                 = get_head_block_info();
    t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
-   // t.tapos.refBlockNum        = info.header.blockNum;
-   // memcpy(&t.tapos.refBlockPrefix, (char*)info.blockId.data() + 8, sizeof(t.tapos.refBlockPrefix));
+
+   auto tables = system_contract::TransactionSys::Tables(system_contract::TransactionSys::contract);
+   auto summaryTable = tables.open<system_contract::BlockSummaryTable>();
+   auto summaryIdx   = summaryTable.getIndex<0>();
+   if (auto summary = summaryIdx.get(std::tuple<>{}))
+   {
+      t.tapos.refBlockIndex  = (info.header.blockNum - 2) >> 12;
+      t.tapos.refBlockSuffix = summary->blockSuffixes[t.tapos.refBlockIndex];
+   }
 }
 
 psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)

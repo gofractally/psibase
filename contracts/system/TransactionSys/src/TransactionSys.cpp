@@ -8,7 +8,12 @@
 
 using namespace psibase;
 
+// #define ENABLE_TAPOS
+
 static constexpr bool enable_print = false;
+
+// TODO: remove this limit after billing accounts for the storage
+static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
 
 namespace system_contract
 {
@@ -35,6 +40,7 @@ namespace system_contract
       // verify TAPoS on transactions.
       if (stat.head && !((stat.head->header.blockNum - 2) & 0xfff))
       {
+         // TODO: split in 2: fine resolution and course resolution
          auto table = Tables(TransactionSys::contract).open<BlockSummaryTable>();
          auto idx   = table.getIndex<0>();
          auto row   = idx.get(std::tuple<>{});
@@ -133,7 +139,6 @@ namespace system_contract
       if constexpr (enable_print)
          print("process_transaction\n");
 
-      // TODO: check refBlockNum, refBlockPrefix
       // TODO: check max_net_usage_words, max_cpu_usage_ms
       // TODO: resource billing
       // TODO: subjective mitigation hooks
@@ -147,12 +152,44 @@ namespace system_contract
       check(trx.actions.size() > 0, "transaction has no actions");
 
       const auto& stat = getStatus();
-      check(stat.current.time <= trx.tapos.expiration, "transaction has expired");
+      // print("time: ", psio::convert_to_json(stat.current.time),
+      //       " expiration: ", psio::convert_to_json(trx.tapos.expiration), "\n");
 
-      auto table = TransactionSys::Tables(TransactionSys::contract).open<IncludedTrxTable>();
-      auto idx   = table.getIndex<0>();
-      check(!idx.get(id), "duplicate transaction");
-      table.put({id, trx.tapos.expiration});
+      check(stat.current.time <= trx.tapos.expiration, "transaction has expired");
+#ifdef ENABLE_TAPOS
+      check(trx.tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
+            "transaction was submitted too early");
+#endif
+
+      auto tables        = TransactionSys::Tables(TransactionSys::contract);
+      auto includedTable = tables.open<IncludedTrxTable>();
+      auto includedIdx   = includedTable.getIndex<0>();
+      auto summaryTable  = tables.open<BlockSummaryTable>();
+      auto summaryIdx    = summaryTable.getIndex<0>();
+
+      check(!includedIdx.get(id), "duplicate transaction");
+      includedTable.put({id, trx.tapos.expiration});
+
+#ifdef ENABLE_TAPOS
+      if (auto summary = summaryIdx.get(std::tuple<>{}))
+      {
+         // print("refBlockIndex: ", trx.tapos.refBlockIndex,
+         //       " refBlockSuffix: ", trx.tapos.refBlockSuffix,
+         //       " maxIndex: ", (stat.head->header.blockNum - 2) >> 12, "\n");
+         check(trx.tapos.refBlockIndex <= (stat.head->header.blockNum - 2) >> 12,
+               "transaction references non-existing block");
+         // print("expected suffix: ", summary->blockSuffixes[trx.tapos.refBlockIndex], "\n");
+         check(trx.tapos.refBlockSuffix == summary->blockSuffixes[trx.tapos.refBlockIndex],
+               "transaction references non-existing block");
+      }
+      else
+      {
+         // print("refBlockIndex: ", trx.tapos.refBlockIndex,
+         //       " refBlockSuffix: ", trx.tapos.refBlockSuffix, "; should be 0\n");
+         check(!trx.tapos.refBlockIndex && !trx.tapos.refBlockSuffix,
+               "transaction references non-existing block");
+      }
+#endif
 
       for (auto& act : trx.actions)
       {
@@ -162,7 +199,7 @@ namespace system_contract
 
          if constexpr (enable_print)
             print("call checkAuthSys on ", account->authContract.str(), " for account ",
-                  act.sender.str());
+                  act.sender.str(), "\n");
          Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
          auth.checkAuthSys(act, trx.claims);
          if constexpr (enable_print)
