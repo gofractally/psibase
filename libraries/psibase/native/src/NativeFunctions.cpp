@@ -39,21 +39,19 @@ namespace psibase
             //       However, there's a possibility this may make it easier on an active attacker.
             //       Make this capability a node configuration toggle? Allow node config to whitelist
             //       contracts for this?
-            if ((self.contractAccount.flags & AccountRow::isSubjective) ||
-                self.transactionContext.blockContext.isReadOnly)
+            if ((self.contractAccount.flags & AccountRow::isSubjective) || self.isReadOnly)
                return (DbId)db;
          }
-         if (db == uint32_t(DbId::writeOnly) && self.transactionContext.blockContext.isReadOnly)
+         if (db == uint32_t(DbId::writeOnly) && self.isReadOnly)
             return (DbId)db;
-         if (db == uint32_t(DbId::blockLog) && self.transactionContext.blockContext.isReadOnly)
+         if (db == uint32_t(DbId::blockLog) && self.isReadOnly)
             return (DbId)db;
          throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
 
       DbId getDbReadSequential(NativeFunctions& self, uint32_t db)
       {
-         if (self.transactionContext.blockContext.isReadOnly ||
-             (self.contractAccount.flags & AccountRow::isSubjective))
+         if (self.isReadOnly || (self.contractAccount.flags & AccountRow::isSubjective))
          {
             if (db == uint32_t(DbId::historyEvent))
                return (DbId)db;
@@ -77,7 +75,7 @@ namespace psibase
 
       Writable getDbWrite(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
-         check(!self.transactionContext.blockContext.isReadOnly, "writes disabled during query");
+         check(!self.isReadOnly, "writes disabled during query");
 
          if (keyHasContractPrefix(db))
          {
@@ -109,7 +107,7 @@ namespace psibase
 
       DbId getDbWriteSequential(NativeFunctions& self, uint32_t db)
       {
-         check(!self.transactionContext.blockContext.isReadOnly, "writes disabled during query");
+         check(!self.isReadOnly, "writes disabled during query");
 
          // Prevent poison block; subjective contracts skip execution during replay
          check(!(self.contractAccount.flags & AccountRow::isSubjective),

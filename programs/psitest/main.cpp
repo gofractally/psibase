@@ -211,6 +211,7 @@ struct test_chain
          nativeFunctions = std::make_unique<psibase::NativeFunctions>(
              psibase::NativeFunctions{blockContext->db,
                                       *nativeFunctionsTransactionContext,
+                                      true,
                                       {},
                                       &*nativeFunctionsActionContext});
       }

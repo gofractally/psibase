@@ -13,7 +13,8 @@ namespace psibase
    {
       Database&           database;
       TransactionContext& transactionContext;
-      AccountRow          contractAccount;
+      bool                isReadOnly        = false;
+      AccountRow          contractAccount   = {};
       ActionContext*      currentActContext = nullptr;  // Changes during recursion
 
       std::vector<char> result_key;
