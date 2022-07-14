@@ -66,9 +66,9 @@ pub struct Claim {
 #[fracpack(definition_will_not_change)]
 pub struct Tapos {
     pub expiration: TimePointSec,
+    pub ref_block_suffix: u32,
     pub flags: u16,
-    pub ref_block_prefix: u32,
-    pub ref_block_num: u16,
+    pub ref_block_index: u8,
 }
 
 #[derive(Fracpack, Serialize, Deserialize)]

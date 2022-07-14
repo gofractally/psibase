@@ -188,9 +188,9 @@ pub fn wrap_basic_trx(actions: Vec<Action>) -> Transaction {
     Transaction {
         tapos: Tapos {
             expiration,
+            ref_block_suffix: 0,
             flags: 0,
-            ref_block_prefix: 0,
-            ref_block_num: 0,
+            ref_block_index: 0,
         },
         actions,
         claims: vec![],
