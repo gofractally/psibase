@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, packAction, signAndPushTransaction } from './rpc.mjs';
+import { getJson, getTaposForHeadBlock, packAction, signAndPushTransaction } from './rpc.mjs';
 
 await import('https://unpkg.com/react@18/umd/react.production.min.js');
 await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
@@ -51,6 +51,7 @@ function ActionButtons({ setTrx }) {
         const onClick = e => {
             setTrx(JSON.stringify({
                 tapos: {
+                    ...await getTaposForHeadBlock(),
                     expiration: new Date(Date.now() + 10 * 60 * 1000),
                 },
                 actions: [{
