@@ -18,6 +18,8 @@ async function pushTransaction(transaction, keys, addMsg, clearMsg) {
             addMsg('rawData: ' + action.rawData);
             return action;
         }));
+        addMsg('getting tapos');
+        transaction.tapos = { ...await getTaposForHeadBlock(), ...transaction.tapos };
         const trace = await signAndPushTransaction('', transaction, keys);
         addMsg('\nPushed\n');
         addMsg(JSON.stringify(trace, null, 4));
@@ -51,7 +53,6 @@ function ActionButtons({ setTrx }) {
         const onClick = e => {
             setTrx(JSON.stringify({
                 tapos: {
-                    ...await getTaposForHeadBlock(),
                     expiration: new Date(Date.now() + 10 * 60 * 1000),
                 },
                 actions: [{

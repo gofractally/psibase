@@ -4,8 +4,8 @@ use clap::{Parser, Subcommand};
 use custom_error::custom_error;
 use fracpack::Packable;
 use libpsibase::{
-    account, method, push_transaction, sign_transaction, AccountNumber, Action, ExactAccountNumber,
-    Fracpack, PrivateKey, PublicKey, Tapos, TimePointSec, Transaction,
+    account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
+    ExactAccountNumber, Fracpack, PrivateKey, PublicKey, Tapos, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -180,7 +180,7 @@ fn store_sys(contract: AccountNumber, path: &str, content_type: &str, content: &
     }
 }
 
-pub fn wrap_basic_trx(actions: Vec<Action>) -> Transaction {
+pub fn without_tapos(actions: Vec<Action>) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec {
         seconds: now_plus_10secs.timestamp() as u32,
@@ -195,6 +195,28 @@ pub fn wrap_basic_trx(actions: Vec<Action>) -> Transaction {
         actions,
         claims: vec![],
     }
+}
+
+pub async fn with_tapos(
+    base_url: &Url,
+    client: reqwest::Client,
+    actions: Vec<Action>,
+) -> Result<Transaction, anyhow::Error> {
+    let tapos = get_tapos_for_head(base_url, client).await?;
+    let now_plus_10secs = Utc::now() + Duration::seconds(10);
+    let expiration = TimePointSec {
+        seconds: now_plus_10secs.timestamp() as u32,
+    };
+    Ok(Transaction {
+        tapos: Tapos {
+            expiration,
+            ref_block_suffix: tapos.ref_block_suffix,
+            flags: 0,
+            ref_block_index: tapos.ref_block_index,
+        },
+        actions,
+        claims: vec![],
+    })
 }
 
 async fn deploy(
@@ -235,7 +257,7 @@ async fn deploy(
         actions.push(reg_server(account, account));
     }
 
-    let trx = wrap_basic_trx(actions);
+    let trx = with_tapos(&args.api, client.clone(), actions).await?;
     push_transaction(
         &args.api,
         client,
@@ -260,7 +282,7 @@ async fn upload(
         content_type,
         &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
     )];
-    let trx = wrap_basic_trx(actions);
+    let trx = with_tapos(&args.api, client.clone(), actions).await?;
 
     push_transaction(
         &args.api,

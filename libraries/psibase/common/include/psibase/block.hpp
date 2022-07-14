@@ -79,6 +79,7 @@ namespace psibase
    struct Tapos
    {
       static constexpr uint16_t do_not_broadcast_flag = 1u << 0;
+      static constexpr uint16_t valid_flags           = 0x0001;
 
       TimePointSec expiration;
       uint32_t     refBlockSuffix = 0;

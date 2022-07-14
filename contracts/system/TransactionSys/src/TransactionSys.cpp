@@ -7,8 +7,6 @@
 
 using namespace psibase;
 
-// #define ENABLE_TAPOS
-
 static constexpr bool enable_print = false;
 
 // TODO: remove this limit after billing accounts for the storage
@@ -129,11 +127,10 @@ namespace system_contract
       // print("time: ", psio::convert_to_json(stat.current.time),
       //       " expiration: ", psio::convert_to_json(trx.tapos.expiration), "\n");
 
+      check(!(trx.tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
       check(stat.current.time <= trx.tapos.expiration, "transaction has expired");
-#ifdef ENABLE_TAPOS
       check(trx.tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
             "transaction was submitted too early");
-#endif
 
       auto tables        = TransactionSys::Tables(TransactionSys::contract);
       auto includedTable = tables.open<IncludedTrxTable>();
@@ -144,7 +141,6 @@ namespace system_contract
       check(!includedIdx.get(id), "duplicate transaction");
       includedTable.put({id, trx.tapos.expiration});
 
-#ifdef ENABLE_TAPOS
       if (auto summary = summaryIdx.get(std::tuple<>{}))
       {
          if (trx.tapos.refBlockIndex & 0x80)
@@ -165,7 +161,6 @@ namespace system_contract
          check(!trx.tapos.refBlockIndex && !trx.tapos.refBlockSuffix,
                "transaction references non-existing block");
       }
-#endif
 
       for (auto& act : trx.actions)
       {
