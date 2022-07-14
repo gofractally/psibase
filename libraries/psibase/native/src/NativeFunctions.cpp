@@ -277,8 +277,10 @@ namespace psibase
                 verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
              clearResult(*this);
              auto [m, readable] = getDbWrite(*this, db, {key.data(), key.size()});
+             // TODO: BUG: CRITICAL: user subjective contracts need to bill
              if (!(contractAccount.flags & AccountRow::isSubjective))
              {
+                // TODO: BUG: CRITICAL: charge some db types, but don't refund
                 auto& delta =
                     transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
                 delta.records += 1;
@@ -308,8 +310,10 @@ namespace psibase
              clearResult(*this);
              auto m = getDbWriteSequential(*this, db);
 
+             // TODO: BUG: CRITICAL: user subjective contracts need to bill
              if (!(contractAccount.flags & AccountRow::isSubjective))
              {
+                // TODO: BUG: CRITICAL: charge some db types, but don't refund
                 auto& delta =
                     transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
                 delta.records += 1;
@@ -347,10 +351,12 @@ namespace psibase
           {
              clearResult(*this);
              auto [m, readable] = getDbWrite(*this, db, {key.data(), key.size()});
+             // TODO: BUG: CRITICAL: user subjective contracts need to bill
              if (readable && !(contractAccount.flags & AccountRow::isSubjective))
              {
                 if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
                 {
+                   // TODO: BUG: CRITICAL: charge some db types, but don't refund
                    auto& delta =
                        transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
                    delta.records -= 1;
