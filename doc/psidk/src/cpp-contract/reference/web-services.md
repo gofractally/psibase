@@ -51,7 +51,7 @@
 
 `psinode` passes most HTTP requests to the [psibase::ProxySys] contract, which then routes requests to the appropriate contract's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The contracts run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
-[psibase::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
+[system_contract::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
 `psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Contracts don't serve these.
 
