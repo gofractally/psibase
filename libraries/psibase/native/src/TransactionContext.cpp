@@ -128,7 +128,15 @@ namespace psibase
       ec.execProcessTransaction(ac);
    }
 
-   // TODO: disable access to db
+   // TODO: disable access to db?
+   // TODO: verifiers may need access to previous block state?
+   // TODO: potential replacement concept: wasms can spawn threads which
+   //       * can only read previous block's state
+   //       * can't return values
+   //       * can't write
+   //       * can be skipped on replay
+   //       * transaction-sys uses this for proof verification
+   //       * make these independent call flags?
    // TODO: parallel execution
    // TODO: separate execution memories with smaller number of max active wasms
    // TODO: separate ExecutionContext pool for executing each proof

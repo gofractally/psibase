@@ -23,7 +23,7 @@ namespace psibase
       Checksum256              chainId;
       BlockHeader              current;
       std::optional<BlockInfo> head;
-      uint32_t                 numExecutionMemories = 32;
+      uint32_t                 numExecutionMemories = 32;  // TODO: move to a configuration table
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
