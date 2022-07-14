@@ -771,19 +771,10 @@ void backtrace()
       callbacks::single->backtrace();
 }
 
-#define DB_REGISTER_SECONDARY(IDX)                                                         \
-   rhf_t::add<&callbacks::db_##IDX##_find_secondary>("env", "db_" #IDX "_find_secondary"); \
-   rhf_t::add<&callbacks::db_##IDX##_find_primary>("env", "db_" #IDX "_find_primary");     \
-   rhf_t::add<&callbacks::db_##IDX##_lowerbound>("env", "db_" #IDX "_lowerbound");         \
-   rhf_t::add<&callbacks::db_##IDX##_upperbound>("env", "db_" #IDX "_upperbound");         \
-   rhf_t::add<&callbacks::db_##IDX##_end>("env", "db_" #IDX "_end");                       \
-   rhf_t::add<&callbacks::db_##IDX##_next>("env", "db_" #IDX "_next");                     \
-   rhf_t::add<&callbacks::db_##IDX##_previous>("env", "db_" #IDX "_previous");
-
 void register_callbacks()
 {
    rhf_t::add<&callbacks::tester_abort>("env", "tester_abort");
-   rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");
+   rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");  // TODO: rename
    rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
    rhf_t::add<&callbacks::prints_l>("env", "prints_l");  // TODO: replace with writeConsole
    rhf_t::add<&callbacks::tester_get_arg_counts>("env", "tester_get_arg_counts");
