@@ -230,9 +230,18 @@ void run(const char* db_path, bool produce, const char* host, bool host_perf, ui
    // TODO: replay
    while (true)
    {
-      std::this_thread::sleep_for(std::chrono::milliseconds{1000});
+      std::this_thread::sleep_for(std::chrono::milliseconds{100});
       if (produce)
       {
+         TimePointSec t{(uint32_t)time(nullptr)};
+         {
+            Database db{system->sharedDatabase};
+            auto     session = db.startRead();
+            auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+            if (status && status->head && status->head->header.time >= t)
+               continue;
+         }
+
          std::vector<transaction_queue::entry> entries;
          {
             std::scoped_lock lock{queue->mutex};
@@ -240,7 +249,7 @@ void run(const char* db_path, bool produce, const char* host, bool host_perf, ui
          }
 
          BlockContext bc{*system, true, true};
-         bc.start();
+         bc.start(t);
          bc.callStartBlock();
 
          bool abort_boot = false;
