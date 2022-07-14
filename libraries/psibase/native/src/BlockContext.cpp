@@ -124,9 +124,19 @@ namespace psibase
 
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       check(status.has_value(), "missing status record");
-      status->head = current;
+      status->head = current;  // Also calculates blockId
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
+
+      // These values will be replaced at the start of the next block.
+      // Changing the these here gives contracts running in RPC mode
+      // the illusion that they're running during the production of a new
+      // block. This helps to give them a consistent view between production
+      // and RPC modes.
+      status->current.previous     = status->head->blockId;
+      status->current.blockNum     = status->head->header.blockNum + 1;
+      status->current.time.seconds = status->head->header.time.seconds + 1;
+
       db.kvPut(StatusRow::db, status->key(), *status);
 
       // TODO: store block IDs somewhere?
