@@ -43,6 +43,7 @@ namespace UserContract
       void setFracLang(std::string lang) {};
       void setFracTZ(std::string timezone) {};
       void inviteMember(psibase::AccountNumber account);
+      void enableCouncil() {};
 
    /* Meetings */
       void proposeSchedule(WhatType dayOfWeek, WhatType frequency);
@@ -77,9 +78,40 @@ namespace UserContract
                   const std::string& contents,
                   WhatType txid) {}; // Q: What's the process? broadcast a trx that requires the appropriate msig/auth and include the trxid here?
 
+   // Read-only interface:
+      WhatType getFractal(psibase::AccountNumber name) {};
+
      private:
       tables db{contract};
 
+     public:
+      struct Events
+      {
+         // clang-format off
+         struct Ui  // History <-- Todo - Change back to History
+         {
+            // Member
+            void checkinStart() {}
+            void entropySubm() {}
+            void entrRvelStart() {}
+            void meetingStart() {}
+            void consensusSubm() {}
+            void meetingEnd() {}
+            void submissionsEnd() {}
+            
+            // Team
+            void setTemLead() {}
+            void addMember() {}
+            void memberLeft() {}
+            void TeamateRemoved() {}
+            void teamXfer() {}
+
+            // Council
+            void scheduleUpdated() {}
+            void memberEvicted(psibase::AccountNumber member) {}
+            void petApproved(WhatType petitionID) {}
+         };
+      };
       // clang-format on
    };
 
@@ -92,6 +124,7 @@ namespace UserContract
       method(setFracMisn, mission),
       method(setFracLang, lang),
       method(setFracTZ, timezone),
+      method(enableCouncil),
       method(inviteMember, account),
       method(proposeSchedule, dayOfWeek, frequency),
       method(confSchedule),
@@ -106,8 +139,29 @@ namespace UserContract
       method(initLeave, member, team),
       method(proposeTransfer, member, amount, memo),
       method(confTransfer, teamTransferID),
-      method(createPetition, title, contents, txid) // Q: What's the process? broadcast a trx that requires the appropriate msig/auth and include the trxid here?
+      method(createPetition, title, contents, txid), // Q: What's the process? broadcast a trx that requires the appropriate msig/auth and include the trxid here?
+      method(getFractal, name)
     );
+   PSIBASE_REFLECT_UI_EVENTS(FractallySys, // Change to history
+      // Member
+      method(checkinStart),
+      method(entropySubm),
+      method(entrRvelStart),
+      method(meetingStart),
+      method(consensusSubm),
+      method(meetingEnd),
+      method(submissionsEnd),
+      //Team
+      method(setTemLead),
+      method(addMember),
+      method(memberLeft),
+      method(TeamateRemoved),
+      method(teamXfer),
+      // Council
+      method(scheduleUpdated),
+      method(memberEvicted),
+      method(petApproved, petitionID)
+   );
    // clang-format on
 
 }  // namespace UserContract

@@ -20,7 +20,7 @@ bob->>FractallySys: rejectPetition(petitionID)
 carol->>FractallySys: approvePetition(petitionID)
 dave->>FractallySys: approvePetition(petitionID)
 note right of FractallySys: All 3 teams or 2/3 of Council
-FractallySys-->>FractallySys: emit(petApproved)
+FractallySys-->>FractallySys: emit(petitionApproved)
 note right of FractallySys: Trx executed
-FractallySys-->>FractallySys: emit(memberEvicted: ivan)
+FractallySys-->>FractallySys: emit(memberRemoved: ivan)
 ```

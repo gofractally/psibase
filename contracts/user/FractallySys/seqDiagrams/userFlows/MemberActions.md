@@ -5,28 +5,27 @@ Actor anyone
 Actor alice
 
 anyone-->>FractallySys: triggerEvents()
-FractallySys-->>FractallySys: emit(checkinStart)
+FractallySys-->>FractallySys: emit(checkinStarted)
 alice->>FractallySys: checkin(entropy)
 note right of alice: bob, carol, dave, henry, ivan, jen, kaley, mandy, nancy, opie, pete also check in
-FractallySys-->>FractallySys: emit(entropySubm)
+FractallySys-->>FractallySys: emit(entropySubmitted)
 
 anyone-->>FractallySys: triggerEvents()
-FractallySys-->>FractallySys: emit(entrRvelStarted)
+FractallySys-->>FractallySys: emit(entropyRevealStarted)
 note right of FractallySys: 2 mintes to reveal entropy
 alice->>FractallySys: revealEntropy(entropyRevealMsg)
 note right of alice: bob, carol, dave, henry, ivan, jen, kaley, mandy, nancy, opie, pete also reveal
 
 anyone-->>FractallySys: triggerEvents()
-FractallySys-->>FractallySys: emit(meetingStart)
+FractallySys-->>FractallySys: emit(meetingStarted)
 note right of FractallySys: Discussion and ranking ensue
 alice->>FractallySys: submitConsensus(ranks)
 note right of alice: bob, carol, dave, henry, ivan, jen, kaley, mandy, nancy, opie, pete also submit reports
-FractallySys->>FractallySys: emit(consensusSubm)
 anyone-->>FractallySys: triggerEvents()
-FractallySys-->>FractallySys: emit(meetingEnd)
+FractallySys-->>FractallySys: emit(meetingEnded)
 note right of alice: People have an hour post-meeting to submit consensus reports
 anyone-->>FractallySys: triggerEvents()
-FractallySys-->>FractallySys: emit(submissionsEnd)
+FractallySys-->>FractallySys: emit(submissionsEnded)
 ```
 
 ## Member Self-Admin Actions

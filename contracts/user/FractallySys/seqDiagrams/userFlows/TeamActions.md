@@ -7,10 +7,10 @@ Actor bob
 Actor carol
 Actor dave
 
-alice->>TokenSys: credit(token, receiver: FractallySys, qty, memo)
+alice->>TokenSys: credit(from: founder, to: FractallySys, Amount, token)
 alice->>FractallySys: createTeam(members: [alice, bob, carol, dave], name: "ATeam")
 activate FractallySys
-FractallySys->>TokenSys: debit(token, sender: FractallySys, qty, memo)
+FractallySys->>TokenSys: debit(members: [alice, bob, carol, dave], name: "ATeam")
 deactivate FractallySys
 
 alice->>FractallySys: proposeLead(member: alice)
@@ -50,7 +50,7 @@ Actor carol
 carol->>FractallySys: initLeave(member: "carol", teamName: "ATeam")
 activate FractallySys
 note right of FractallySys: 20 weeks pass
-FractallySys-->>FractallySys: emit(memberLeft: carol)
+FractallySys-->>FractallySys: emit(Team::memberLeft: carol)
 deactivate FractallySys
 ```
 
@@ -63,7 +63,7 @@ ed->>FractallySys: initLeave(member: "bob", teamName: "ATeam")
 activate FractallySys
 note right of FractallySys: 20 weeks pass
 note right of FractallySys: Q: Member is locked out of team actions because he was kicked?
-FractallySys-->>FractallySys: emit(TeamateRemoved: bob)
+FractallySys-->>FractallySys: emit(Team::memberEvicted: bob)
 deactivate FractallySys
 ```
 
@@ -74,7 +74,7 @@ Actor alice
 
 alice->>FractallySys: proposeTransfer(to: "bob", teamName: "ATeam", amount, memo)
 note right of FractallySys: Q: token is assumed, given a team in a ƒractal will always have balance in that ƒractal's token?
-FractallySys-->>FractallySys: emit(transfer: to: bob, amount, memo)
+FractallySys-->>FractallySys: emit(Team::transfer: to: bob, amount, memo)
 note right of FractallySys: Q: xfer happens immediately because team lead proposed it?
 ```
 
@@ -91,29 +91,7 @@ activate FractallySys
 carol->>FractallySys: confTransfer(teamXferID)
 dave->>FractallySys: confTransfer(teamXferID)
 ed->>FractallySys: confTransfer(teamXferID)
-FractallySys-->>FractallySys: emit(teamXfer: to: bob, amount, memo)
+FractallySys-->>FractallySys: emit(teamTransfer: to: bob, amount, memo)
+note right of FractallySys: xfer required 2/3 of team to confirm because it was proposed by a team member
 deactivate FractallySys
-note right of FractallySys: xfer required 2/3 of team to confirm because it was proposed by a team member
-```
-
-## EXPERIMENTAL Team Management: Team Member Proposes Team Respect Transfer
-```mermaid
-sequenceDiagram
-Actor bob
-Actor carol
-Actor dave
-Actor ed
-
-FractallySys->>TokenSys: credit(token, receiver: "ATeam", qty, memo)
-note right of FractallySys: FractallySys credits weekly rewards to Team account as part of weekly accounting
-bob->>ATeam: proposeTransfer(to: "bob", teamName: "ATeam", amount, memo)
-activate ATeam
-carol->>ATeam: confTransfer(teamXferID)
-dave->>ATeam: confTransfer(teamXferID)
-ed->>ATeam: confTransfer(teamXferID)
-note right of FractallySys: xfer required 2/3 of team to confirm because it was proposed by a team member
-ATeam->>TokenSys: debit(token, sender: FractallySys, qty, memo)
-ATeam->>bob: credit(token, receiver: bob, qty, memo)
-ATeam-->>ATeam: emit(teamXfer: to: bob, amount, memo)
-deactivate ATeam
 ```
