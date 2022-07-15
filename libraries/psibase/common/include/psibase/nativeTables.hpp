@@ -38,11 +38,12 @@ namespace psibase
    }
    struct AccountRow
    {
-      static constexpr uint64_t allowSudo        = uint64_t(1) << 0;
-      static constexpr uint64_t allowWriteNative = uint64_t(1) << 1;
-      static constexpr uint64_t isSubjective     = uint64_t(1) << 2;
-      static constexpr uint64_t canNotTimeOut    = uint64_t(1) << 3;
-      static constexpr uint64_t canSetTimeLimit  = uint64_t(1) << 4;
+      static constexpr uint64_t allowSudo            = uint64_t(1) << 0;
+      static constexpr uint64_t allowWriteNative     = uint64_t(1) << 1;
+      static constexpr uint64_t isSubjective         = uint64_t(1) << 2;
+      static constexpr uint64_t allowWriteSubjective = uint64_t(1) << 3;
+      static constexpr uint64_t canNotTimeOut        = uint64_t(1) << 4;
+      static constexpr uint64_t canSetTimeLimit      = uint64_t(1) << 5;
 
       AccountNumber num;           // TODO: rename
       AccountNumber authContract;  // TODO: move out of native

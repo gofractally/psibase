@@ -86,16 +86,22 @@ namespace psibase
                   "key prefix must match contract during write");
          };
 
-         // TODO: user-written subjective contracts writing to subjective storage
-         //       isn't really viable. Make it a separate permission bit.
-         //       * It creates billing issues
-         //       * It's not useful outside of subjective attack mitigation
-         //         because of the unusual semantics:
-         //          * Aborting or undoing a transaction doesn't roll back subjective storage
-         //          * Forking doesn't roll back subjective storage
-         //          * Subjective execution doesn't happen when nodes get the produced block
-         if (db == uint32_t(DbId::subjective) &&
-             (self.contractAccount.flags & AccountRow::isSubjective))
+         // User-written subjective contracts writing to subjective storage isn't really
+         // viable, so it requires an additional permission bit. The oddities:
+         //
+         // * It has billing issues since database billing is objective
+         // * Aborting or undoing a transaction doesn't roll back subjective storage;
+         //   writes from speculative execution survive
+         // * Forking doesn't roll back subjective storage
+         // * Subjective execution doesn't happen when nodes get the produced block
+         //
+         // The unusual semantics exist to enable trusted subjective contracts to do
+         // subjective attack mitigation.
+         //
+         // TODO: reenable after subjective database support is working as intended
+         if (false && db == uint32_t(DbId::subjective) &&
+             (self.contractAccount.flags & AccountRow::isSubjective) &&
+             (self.contractAccount.flags & AccountRow::allowWriteSubjective))
             // Not chargeable since subjective contracts are skipped during replay
             return {(DbId)db, false, false};
 
