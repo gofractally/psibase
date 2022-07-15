@@ -86,6 +86,14 @@ namespace psibase
                   "key prefix must match contract during write");
          };
 
+         // TODO: user-written subjective contracts writing to subjective storage
+         //       isn't really viable. Make it a separate permission bit.
+         //       * It creates billing issues
+         //       * It's not useful outside of subjective attack mitigation
+         //         because of the unusual semantics:
+         //          * Aborting or undoing a transaction doesn't roll back subjective storage
+         //          * Forking doesn't roll back subjective storage
+         //          * Subjective execution doesn't happen when nodes get the produced block
          if (db == uint32_t(DbId::subjective) &&
              (self.contractAccount.flags & AccountRow::isSubjective))
             // Not chargeable since subjective contracts are skipped during replay
@@ -430,8 +438,6 @@ namespace psibase
           });
    }
 
-   // TODO: consider switching this to subjective-only to allow user-written subjective
-   //       contracts to be billed for their storage
    uint32_t NativeFunctions::kvGetTransactionUsage()
    {
       auto seq  = transactionContext.kvResourceDeltas.extract_sequence();
