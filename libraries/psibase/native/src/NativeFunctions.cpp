@@ -70,7 +70,8 @@ namespace psibase
       struct Writable
       {
          DbId db;
-         bool readable;
+         bool chargeable;
+         bool refundable;
       };
 
       Writable getDbWrite(NativeFunctions& self, uint32_t db, psio::input_stream key)
@@ -87,24 +88,30 @@ namespace psibase
 
          if (db == uint32_t(DbId::subjective) &&
              (self.contractAccount.flags & AccountRow::isSubjective))
-            return {(DbId)db, true};
+            // Not chargeable since subjective contracts are skipped during replay
+            return {(DbId)db, false, false};
 
          // Prevent poison block; subjective contracts skip execution during replay
          check(!(self.contractAccount.flags & AccountRow::isSubjective),
                "subjective contracts may only write to DbId::subjective");
 
-         if (db == uint32_t(DbId::contract) || db == uint32_t(DbId::writeOnly))
-            return {(DbId)db, false};
+         if (db == uint32_t(DbId::contract))
+            return {(DbId)db, true, true};
+         if (db == uint32_t(DbId::writeOnly))
+            return {(DbId)db, true, false};
          if (db == uint32_t(DbId::nativeConstrained) &&
              (self.contractAccount.flags & AccountRow::allowWriteNative))
-            return {(DbId)db, true};
+            return {(DbId)db, true, true};
          if (db == uint32_t(DbId::nativeUnconstrained) &&
              (self.contractAccount.flags & AccountRow::allowWriteNative))
-            return {(DbId)db, true};
+            return {(DbId)db, true, true};
          throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
       }
 
+      // Caution: All sequential databases are currently non-refundable. If this
+      //          changes, then this function needs to return Writable and the
+      //          functions which call it need to adjust their logic.
       DbId getDbWriteSequential(NativeFunctions& self, uint32_t db)
       {
          check(!self.isReadOnly, "writes disabled during query");
@@ -276,19 +283,17 @@ namespace psibase
              if (db == uint32_t(DbId::nativeConstrained))
                 verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
              clearResult(*this);
-             auto [m, readable] = getDbWrite(*this, db, {key.data(), key.size()});
-             // TODO: BUG: CRITICAL: user subjective contracts need to bill
-             if (!(contractAccount.flags & AccountRow::isSubjective))
+             auto w = getDbWrite(*this, db, {key.data(), key.size()});
+             if (w.chargeable)
              {
-                // TODO: BUG: CRITICAL: charge some db types, but don't refund
                 auto& delta =
                     transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
                 delta.records += 1;
                 delta.keyBytes += key.size();
                 delta.valueBytes += value.size();
-                if (readable)
+                if (w.refundable)
                 {
-                   if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
+                   if (auto existing = database.kvGetRaw(w.db, {key.data(), key.size()}))
                    {
                       delta.records -= 1;
                       delta.keyBytes -= key.size();
@@ -296,7 +301,7 @@ namespace psibase
                    }
                 }
              }
-             database.kvPutRaw(m, {key.data(), key.size()}, {value.data(), value.size()});
+             database.kvPutRaw(w.db, {key.data(), key.size()}, {value.data(), value.size()});
           });
    }
 
@@ -309,17 +314,6 @@ namespace psibase
           {
              clearResult(*this);
              auto m = getDbWriteSequential(*this, db);
-
-             // TODO: BUG: CRITICAL: user subjective contracts need to bill
-             if (!(contractAccount.flags & AccountRow::isSubjective))
-             {
-                // TODO: BUG: CRITICAL: charge some db types, but don't refund
-                auto& delta =
-                    transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
-                delta.records += 1;
-                delta.keyBytes += sizeof(uint64_t);
-                delta.valueBytes += value.size();
-             }
 
              psio::input_stream v{value.data(), value.size()};
              check(v.remaining() >= sizeof(AccountNumber::value),
@@ -350,13 +344,11 @@ namespace psibase
           [&]
           {
              clearResult(*this);
-             auto [m, readable] = getDbWrite(*this, db, {key.data(), key.size()});
-             // TODO: BUG: CRITICAL: user subjective contracts need to bill
-             if (readable && !(contractAccount.flags & AccountRow::isSubjective))
+             auto w = getDbWrite(*this, db, {key.data(), key.size()});
+             if (w.refundable)
              {
-                if (auto existing = database.kvGetRaw(m, {key.data(), key.size()}))
+                if (auto existing = database.kvGetRaw(w.db, {key.data(), key.size()}))
                 {
-                   // TODO: BUG: CRITICAL: charge some db types, but don't refund
                    auto& delta =
                        transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
                    delta.records -= 1;
@@ -364,7 +356,7 @@ namespace psibase
                    delta.valueBytes -= existing->remaining();
                 }
              }
-             database.kvRemoveRaw(m, {key.data(), key.size()});
+             database.kvRemoveRaw(w.db, {key.data(), key.size()});
           });
    }
 
@@ -438,6 +430,8 @@ namespace psibase
           });
    }
 
+   // TODO: consider switching this to subjective-only to allow user-written subjective
+   //       contracts to be billed for their storage
    uint32_t NativeFunctions::kvGetTransactionUsage()
    {
       auto seq  = transactionContext.kvResourceDeltas.extract_sequence();
