@@ -1,5 +1,5 @@
 import { siblingUrl } from "/common/rootdomain.mjs";
-import { getJson } from "/common/rpc.mjs";
+import { signAndPushTransaction, CommonResources, ErrorCodes, MessageTypes } from "/common/rpc.mjs";
 import htm from "https://unpkg.com/htm@3.1.0?module";
 await import(
   "https://unpkg.com/react-router-dom@5.3.3/umd/react-router-dom.min.js"
@@ -105,21 +105,89 @@ function Applet() {
 
   useEffect(() => {
 
-    const doMessage = async (request) => {
-      let {queryPath, queryArg} = request.message;
-      var res = {};
-      res = await getJson(appletSrc + queryPath + queryArg);
+    const getRes = (resourceID) => {
+      if (resourceID === CommonResources.loggedInUser)
+      {
+        // Todo - get sender from key management extension
+        return "alice";
+      }
+      else
+      {
+        console.error("Resource with invalid id (" + resourceID + ") requested");
+        return ErrorCodes.invalidResource;
+      }
+    };
 
+    const injectSender = (actions) => {
+      actions.forEach(action => {
+        if (typeof action.sender === 'undefined')
+        {
+          action.sender = getRes(CommonResources.loggedInUser);
+        }
+      });
+
+      return actions;
+    };
+
+    const constructTransaction = (actions) => {
+      let tenMinutes = 10 * 60 * 1000;
+      var transaction = JSON.parse(JSON.stringify({
+          tapos: {
+              expiration: new Date(Date.now() + tenMinutes),
+          },
+          actions,
+      }, null, 4));
+
+      return transaction;
+    };
+
+    const handleMessage = async (request) => {      
       var iframe = document.getElementById("applet");
       if (iframe != null)
       {
-        let response = {queryPath: queryPath, payload: res};
-        iframe.iFrameResizer.sendMessage(response, appletSrc);
+        let {type, id} = request.message;
+        if (type === undefined || typeof type !== "number")
+        {
+          console.error("Received malformed from message from applet (no type property)");
+          return;
+        }
+        if (id === undefined || typeof id !== "number")
+        {
+          console.error("Received malformed from message from applet (malformed id)");
+          return;
+        }
+
+        var payload = "";
+        if (type === MessageTypes.getResource)
+        {
+          let {resource} = request.message;
+          payload = getRes(resource);
+        }
+        else
+        {
+          var {actions} = request.message;
+          if (actions === undefined || !Array.isArray(actions)) 
+          {
+            console.error("Received malformed from message from applet (action array missing or malformed)");
+            return;
+          }
+
+          try 
+          {
+            payload = await signAndPushTransaction('', constructTransaction(injectSender(actions)));
+          }
+          catch (e)
+          {
+            payload = ErrorCodes.serverError;
+          }
+        }
+        iframe.iFrameResizer.sendMessage({type, id, payload}, appletSrc);
       }
       else
       {
         console.error("Child iframe not found.");
       }
+
     };
 
     if (appletSrc)
@@ -130,7 +198,7 @@ function Applet() {
           //log: true,
           checkOrigin: false,
           heightCalculationMethod: "lowestElement",
-          onMessage: doMessage,
+          onMessage: handleMessage,
           minHeight:
             document.documentElement.scrollHeight -
             document.getElementById("applet").getBoundingClientRect().top,

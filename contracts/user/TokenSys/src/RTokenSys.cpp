@@ -40,6 +40,9 @@ optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
    if (auto result = at<CommonSys>().serveCommon(request).unpack())
       return result;
 
+   if (auto result = servePackAction<TokenSys>(request))
+         return result;
+
    if (auto result = serveContent(request, TokenSys::Tables{getReceiver()}))
       return result;
 
