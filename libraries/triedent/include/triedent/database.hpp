@@ -307,18 +307,24 @@ namespace triedent
       using id = object_id;
 
       deref() = default;
-      deref(std::pair<id, value_node*> p) : _id(p.first), ptr((char*)p.second), is_value(true) {}
-      deref(std::pair<id, inner_node*> p) : _id(p.first), ptr((char*)p.second), is_value(false) {}
-      template <typename Other>
-      deref(deref<Other> p) : _id(p._id), ptr((char*)p.ptr), is_value(p.is_value)
+      deref(std::pair<id, value_node*> p, node_type type)
+          : _id(p.first), ptr((char*)p.second), type(type)
       {
       }
-      deref(id i, char* p, bool is_value) : _id(i), ptr(p), is_value(is_value) {}
+      deref(std::pair<id, inner_node*> p)
+          : _id(p.first), ptr((char*)p.second), type(node_type::inner)
+      {
+      }
+      template <typename Other>
+      deref(deref<Other> p) : _id(p._id), ptr((char*)p.ptr), type(p.type)
+      {
+      }
+      deref(id i, char* p, node_type type) : _id(i), ptr(p), type(type) {}
 
       explicit inline operator bool() const { return bool(_id); }
       inline          operator id() const { return _id; }
 
-      bool         is_leaf_node() const { return is_value; }
+      bool         is_leaf_node() const { return type != node_type::inner; }
       inline auto& as_value_node() const { return *reinterpret_cast<const value_node*>(ptr); }
       inline auto& as_inner_node() const { return *reinterpret_cast<const inner_node*>(ptr); }
 
@@ -331,17 +337,17 @@ namespace triedent
       template <typename Other>
       friend class deref;
 
-      id    _id;
-      char* ptr;
-      bool  is_value;
+      id        _id;
+      char*     ptr;
+      node_type type;
    };  // deref
 
    template <typename T>
    struct mutable_deref : deref<T>
    {
       mutable_deref() = default;
-      mutable_deref(std::pair<location_lock, value_node*> p)
-          : deref<T>{{p.first.get_id(), p.second}}, lock{std::move(p.first)}
+      mutable_deref(std::pair<location_lock, value_node*> p, node_type type)
+          : deref<T>{{p.first.get_id(), p.second}, type}, lock{std::move(p.first)}
       {
       }
       mutable_deref(std::pair<location_lock, inner_node*> p)
@@ -469,18 +475,16 @@ namespace triedent
    template <typename AccessMode>
    inline deref<node> session<AccessMode>::get(id i) const
    {
-      auto [ptr, is_value, ref] =
-          _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
-      return {i, ptr, is_value};
+      auto [ptr, type, ref] = _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
+      return {i, ptr, type};
    }
 
    template <typename AccessMode>
    inline deref<node> session<AccessMode>::get(id i, bool& unique) const
    {
-      auto [ptr, is_value, ref] =
-          _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
+      auto [ptr, type, ref] = _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
       unique &= ref == 1;
-      return {i, ptr, is_value};
+      return {i, ptr, type};
    }
 
    template <typename AccessMode>
@@ -529,7 +533,8 @@ namespace triedent
 
    inline mutable_deref<value_node> write_session::make_value(string_view key, string_view val)
    {
-      return value_node::make(*_db->_ring, key, val);
+      // TODO
+      return {value_node::make(*_db->_ring, key, val, node_type::bytes, false), node_type::bytes};
    }
 
    inline mutable_deref<inner_node> write_session::make_inner(string_view pre,

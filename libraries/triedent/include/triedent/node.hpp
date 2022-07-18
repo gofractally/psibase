@@ -35,30 +35,45 @@ namespace triedent
          return ((const char*)this) + sizeof(value_node) + key_size();
       }
 
+      inline object_id*       roots() { return reinterpret_cast<object_id*>(data_ptr()); }
+      inline const object_id* roots() const
+      {
+         return reinterpret_cast<const object_id*>(data_ptr());
+      }
+      auto num_roots() const { return data_size() / sizeof(object_id); }
+
       inline value_view data() const { return value_view(data_ptr(), data_size()); }
       inline key_view   key() const { return key_view(key_ptr(), key_size()); }
 
       inline static std::pair<location_lock, value_node*> make(ring_allocator& a,
                                                                key_view        key,
-                                                               value_view      val)
+                                                               value_view      val,
+                                                               node_type       type,
+                                                               bool            bump_root_refs)
       {
          assert(val.size() < 0xffffff - key.size() - sizeof(value_node));
          uint32_t alloc_size = sizeof(value_node) + key.size() + val.size();
-         auto     r          = a.alloc(alloc_size, true);
-         return std::make_pair(std::move(r.first), new (r.second) value_node(key, val));
+         auto     r          = a.alloc(alloc_size, type);
+         return std::make_pair(std::move(r.first),
+                               new (r.second) value_node(a, key, val, bump_root_refs));
       }
 
      private:
-      value_node(key_view key, value_view val)
+      value_node(ring_allocator& ra, key_view key, value_view val, bool bump_root_refs)
       {
-         _key_size = key.size();  // | 0x80;
-         /*
-         sizes = (val.size() << 8) + (key.size() & 0x7f);
-         key_size |= 0x80;
-         */
-
+         _key_size = key.size();
          memcpy(key_ptr(), key.data(), key_size());
-         memcpy(data_ptr(), val.data(), val.size());
+         if (bump_root_refs)
+         {
+            assert(val.size() % sizeof(object_id) == 0);
+            auto n    = val.size() / sizeof(object_id);
+            auto src  = reinterpret_cast<const object_id*>(val.data());
+            auto dest = roots();
+            while (n--)
+               *dest++ = bump_refcount_or_copy(ra, *src++);
+         }
+         else
+            memcpy(data_ptr(), val.data(), val.size());
       }
       //  uint32_t sizes;
       uint8_t _key_size;
@@ -136,7 +151,7 @@ namespace triedent
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
-      auto p = a.alloc(alloc_size, false);
+      auto p = a.alloc(alloc_size, node_type::inner);
       return std::make_pair(std::move(p.first),
                             new (p.second) inner_node(a, in, prefix, val, branches));
    }
@@ -148,7 +163,7 @@ namespace triedent
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
-      auto p = a.alloc(alloc_size, false);
+      auto p = a.alloc(alloc_size, node_type::inner);
       return std::make_pair(std::move(p.first), new (p.second) inner_node(prefix, val, branches));
    }
 
@@ -260,7 +275,8 @@ namespace triedent
    {
       if (!obj)
          return;
-      if (auto [ptr, is_value] = ra.release(obj); ptr && !is_value)
+      auto [ptr, type] = ra.release(obj);
+      if (ptr && type == node_type::inner)
       {
          auto& in = *reinterpret_cast<inner_node*>(ptr);
          release_node(ra, in.value());
@@ -274,14 +290,23 @@ namespace triedent
             ++pos;
          }
       }
+      if (ptr && type == node_type::roots)
+      {
+         auto& vn    = *reinterpret_cast<value_node*>(ptr);
+         auto  n     = vn.num_roots();
+         auto  roots = vn.roots();
+         while (n--)
+            release_node(ra, *roots++);
+      }
    }
 
-   inline location_lock copy_node(ring_allocator& ra, object_id id, char* ptr, bool is_value)
+   inline location_lock copy_node(ring_allocator& ra, object_id id, char* ptr, node_type type)
    {
-      if (is_value)
+      if (type != node_type::inner)
       {
-         auto src          = reinterpret_cast<value_node*>(ptr);
-         auto [lock, dest] = value_node::make(ra, src->key(), src->data());
+         auto src = reinterpret_cast<value_node*>(ptr);
+         auto [lock, dest] =
+             value_node::make(ra, src->key(), src->data(), type, type == node_type::roots);
          return std::move(lock);
       }
       else
@@ -299,7 +324,7 @@ namespace triedent
          return id;
       if (ra.bump_count(id))
          return id;
-      auto [ptr, is_value, ref] = ra.get_cache<false>(id);
-      return copy_node(ra, id, ptr, is_value).into_unlock_unchecked();
+      auto [ptr, type, ref] = ra.get_cache<false>(id);
+      return copy_node(ra, id, ptr, type).into_unlock_unchecked();
    }
 }  // namespace triedent

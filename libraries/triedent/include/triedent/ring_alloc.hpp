@@ -41,15 +41,15 @@ namespace triedent
       ring_allocator(std::filesystem::path dir, access_mode mode);
       static void create(std::filesystem::path dir, config cfg);
 
-      std::pair<location_lock, char*> alloc(size_t num_bytes, bool is_value);
+      std::pair<location_lock, char*> alloc(size_t num_bytes, node_type type);
 
       location_lock spin_lock(object_id id) { return _obj_ids->spin_lock(id); }
       bool          bump_count(object_id id) { return _obj_ids->bump_count(id); }
 
       void retain(id);
 
-      // return a pointer to the obj and is_value if released
-      std::pair<char*, bool> release(id);
+      // return (pointer to obj, type) if released
+      std::pair<char*, node_type> release(id);
 
       bool        swap();
       inline void ensure_free_space();
@@ -61,7 +61,7 @@ namespace triedent
 
       //  pointer is valid until GC runs
       template <bool CopyToHot = true>
-      std::tuple<char*, bool, uint16_t> get_cache(id);
+      std::tuple<char*, node_type, uint16_t> get_cache(id);
 
       uint32_t ref(id i) const { return _obj_ids->ref(i); }
 
@@ -264,23 +264,24 @@ namespace triedent
    //  the gc moved past char* while reading then read again at new location
 
    template <bool CopyToHot>
-   std::tuple<char*, bool, uint16_t> ring_allocator::get_cache(id i)
+   std::tuple<char*, node_type, uint16_t> ring_allocator::get_cache(id i)
    {
       uint16_t ref;
       auto     loc = _obj_ids->get(i, ref);
       auto     obj = _levels[loc.cache]->get_object(loc.offset);
 
       if constexpr (not CopyToHot)
-         return {obj->data(), (bool)loc.is_value, ref};
+         return {obj->data(), {loc.type}, ref};
 
       if (loc.cache == hot_cache)
-         return {obj->data(), (bool)loc.is_value, ref};
+         return {obj->data(), {loc.type}, ref};
 
       if (obj->size > 4096)
-         return {obj->data(), (bool)loc.is_value, ref};
+         return {obj->data(), {loc.type}, ref};
 
       return {alloc(hot(), _obj_ids->spin_lock({.id = obj->id}), obj->size, obj->data()),
-              (bool)loc.is_value, ref};
+              {loc.type},
+              ref};
    }
 
    inline uint64_t ring_allocator::wait_on_free_space(managed_ring& ring, uint64_t used_size)
@@ -459,22 +460,22 @@ namespace triedent
       _obj_ids->retain(i);
    }
 
-   inline std::pair<char*, bool> ring_allocator::release(id i)
+   inline std::pair<char*, node_type> ring_allocator::release(id i)
    {
       auto l = _obj_ids->release(i);
       return {(l.second > 0 ? nullptr
                             : (char*)_levels[l.first.cache]->get_object(l.first.offset)->data()),
-              (bool)l.first.is_value};
+              {l.first.type}};
    }
 
    inline std::pair<location_lock, char*> ring_allocator::alloc(  //
-       size_t num_bytes,
-       bool   is_value)
+       size_t    num_bytes,
+       node_type type)
    {
       if (num_bytes > 0xffffff - 8) [[unlikely]]
          throw std::runtime_error("obj too big");
 
-      auto lock = _obj_ids->alloc(is_value);
+      auto lock = _obj_ids->alloc(type);
       auto ptr  = alloc(hot(), lock, num_bytes);
       return {std::move(lock), ptr};
    }
