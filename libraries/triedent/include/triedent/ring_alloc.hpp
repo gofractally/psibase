@@ -43,9 +43,8 @@ namespace triedent
 
       std::pair<location_lock, char*> alloc(size_t num_bytes, bool is_value);
 
-      location_lock            spin_lock(object_id id) { return _obj_ids->spin_lock(id); }
-      std::optional<shared_id> bump_count(object_id id) { return _obj_ids->bump_count(id); }
-      shared_id                preserve_count(object_id id) { return _obj_ids->preserve_count(id); }
+      location_lock spin_lock(object_id id) { return _obj_ids->spin_lock(id); }
+      bool          bump_count(object_id id) { return _obj_ids->bump_count(id); }
 
       void retain(id);
 

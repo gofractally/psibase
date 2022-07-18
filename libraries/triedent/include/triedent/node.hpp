@@ -297,8 +297,8 @@ namespace triedent
    {
       if (!id)
          return id;
-      if (auto shared = ra.bump_count(id))
-         return shared->into_unchecked();
+      if (ra.bump_count(id))
+         return id;
       auto [ptr, is_value, ref] = ra.get_cache<false>(id);
       return copy_node(ra, id, ptr, is_value).into_unlock_unchecked();
    }

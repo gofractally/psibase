@@ -1,7 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
-#include <triedent/node_traversal.hpp>
+#include <triedent/node.hpp>
 
 namespace triedent
 {
@@ -22,68 +22,6 @@ namespace triedent
    struct mutable_deref;
 
    inline key_type from_key6(const key_view sixb);
-
-   class root
-   {
-      template <typename AccessMode>
-      friend class session;
-
-      friend shared_root;
-      friend write_session;
-
-     private:
-      // TODO: BUG: release reads memory without a swap_guard
-      node_ref<maybe_owned> node;
-
-      root(node_ref<maybe_owned>&& node) : node(std::move(node)) { assert(this->node.get_owner()); }
-
-     public:
-      root()            = default;
-      root(const root&) = delete;
-      root(root&&)      = default;
-
-      root& operator=(const root&) = delete;
-      root& operator=(root&&)      = default;
-   };
-
-   class shared_root
-   {
-      template <typename AccessMode>
-      friend class session;
-
-      friend write_session;
-
-     private:
-      std::shared_ptr<root> root_ptr;
-
-      template <bool CopyToHot>
-      node_ref<no_track<CopyToHot>> as_no_track() const
-      {
-         if (root_ptr)
-            return root_ptr->node.as_no_track<CopyToHot>();
-         else
-            return {};
-      }
-
-     public:
-      shared_root()                   = default;
-      shared_root(const shared_root&) = default;
-      shared_root(shared_root&&)      = default;
-
-      shared_root(root&& r) : root_ptr(std::make_shared<root>(std::move(r))) {}
-
-      shared_root& operator=(const shared_root&) = default;
-      shared_root& operator=(shared_root&&)      = default;
-
-      // TODO: remove
-      object_id get_id() const
-      {
-         if (root_ptr)
-            return root_ptr->node.get_id();
-         else
-            return {};
-      }
-   };
 
    class session_base
    {
@@ -197,9 +135,6 @@ namespace triedent
       /* decrements the revision ref count and frees if necessary */
       void release_revision(id i);
 
-      void destroy(root&& root);         // temporary bug workaround
-      void destroy(shared_root&& root);  // temporary bug workaround
-
       /* the root revision of this session */
       id revision() { return _session_root; }
 
@@ -210,8 +145,6 @@ namespace triedent
       iterator                   last_with_prefix(string_view prefix) const;
       bool                       get(string_view key, std::string& result) const;
       std::optional<std::string> get(string_view key) const;
-      bool                       get(const root& root, string_view key, std::string& result) const;
-      std::optional<std::string> get(const root& root, string_view key) const;
 
       void print();
       void validate();
@@ -254,15 +187,8 @@ namespace triedent
    class write_session : public read_session
    {
      public:
-      // Bump the ref count of r. Copy the node if the ref
-      // count would overflow.
-      root clone(const root& r);
-      root clone(const shared_root& r);
-
       int upsert(string_view key, string_view val);
-      int upsert(root& r, string_view key, string_view val);
       int remove(string_view key);
-      int remove(root& r, string_view key, string_view val);
       id  fork(id from_version);
       id  fork();
 
@@ -301,23 +227,6 @@ namespace triedent
       inline id set_value(deref<node> n, bool unique, string_view key, string_view val);
       inline id set_inner_value(deref<inner_node> n, bool unique, string_view val);
       inline id combine_value_nodes(string_view k1, string_view v1, string_view k2, string_view v2);
-
-      inline node_ref<maybe_owned> set_value2(value_ref<maybe_unique> n,
-                                              string_view             key,
-                                              string_view             val);
-      inline node_ref<maybe_owned> set_inner_value2(inner_ref<maybe_unique> n, string_view val);
-      inline node_ref<maybe_owned> combine_value_nodes2(string_view k1,
-                                                        string_view v1,
-                                                        string_view k2,
-                                                        string_view v2);
-
-      inline node_ref<maybe_owned> add_child2(node_ref<maybe_unique> root,
-                                              string_view            key,
-                                              string_view            val,
-                                              int&                   old_size);
-      inline node_ref<maybe_owned> remove_child2(node_ref<maybe_unique> root,
-                                                 string_view            key,
-                                                 int&                   removed_size);
    };
 
    class database
@@ -452,21 +361,6 @@ namespace triedent
      private:
       location_lock lock;
    };  // mutable_deref
-
-   inline root write_session::clone(const root& r)
-   {
-      _db->ensure_free_space();
-      swap_guard g(*this);
-      return {r.node.bump_count_or_copy()};
-   }
-
-   inline root write_session::clone(const shared_root& r)
-   {
-      if (r.root_ptr)
-         return clone(*r.root_ptr);
-      else
-         return {};
-   }
 
    inline void write_session::set_root_revision(id i)
    {
@@ -616,22 +510,6 @@ namespace triedent
    {
       swap_guard g(*this);
       _db->release(i);
-   }
-
-   template <typename AccessMode>
-   inline void session<AccessMode>::destroy(root&& r)
-   {
-      // destroy inside the swap_guard
-      swap_guard g(*this);
-      root       temp = std::move(r);
-   }
-
-   template <typename AccessMode>
-   inline void session<AccessMode>::destroy(shared_root&& r)
-   {
-      // destroy (if needed) inside the swap_guard
-      swap_guard  g(*this);
-      shared_root temp = std::move(r);
    }
 
    inline std::string_view common_prefix(std::string_view a, std::string_view b)
@@ -883,155 +761,6 @@ namespace triedent
       }
    }
 
-   inline node_ref<maybe_owned> write_session::set_value2(value_ref<maybe_unique> n,
-                                                          string_view             key,
-                                                          string_view             val)
-   {
-      if (n && n.data_size() == val.size())
-      {
-         if (auto edit = n.edit())
-         {
-            memcpy(edit->data_ptr(), val.data(), val.size());
-            return edit->ret();
-         }
-      }
-      return value_ref<>::make(ring(), key, val).ret();
-   }
-
-   inline node_ref<maybe_owned> write_session::set_inner_value2(inner_ref<maybe_unique> n,
-                                                                string_view             val)
-   {
-      if (auto vn = n.value())
-         if (vn.data_size() == val.size())
-            if (auto edit = vn.edit())
-            {
-               memcpy(edit->data_ptr(), val.data(), val.size());
-               return edit->ret();
-            }
-      auto new_val = value_ref<>::make(ring(), {}, val);
-      if (auto edit = n.edit())
-      {
-         edit->set_value(std::move(new_val));
-         return edit->ret();
-      }
-      else
-      {
-         return inner_ref<>::make(ring(), n, n.key(), std::move(new_val), n.branches()).ret();
-      }
-   }
-
-   node_ref<maybe_owned> write_session::combine_value_nodes2(string_view k1,
-                                                             string_view v1,
-                                                             string_view k2,
-                                                             string_view v2)
-   {
-      if (k1.size() > k2.size())
-         return combine_value_nodes2(k2, v2, k1, v1);
-
-      auto cpre = common_prefix(k1, k2);
-      if (cpre == k1)
-      {
-         auto inner_value = value_ref<>::make(ring(), {}, v1);
-         auto k2sfx       = k2.substr(cpre.size());
-         auto b2          = k2sfx.front();
-
-         auto in = inner_ref<>::make(ring(), cpre, std::move(inner_value), 1ull << b2);
-         in.set_branch(b2, value_ref<>::make(ring(), k2sfx.substr(1), v2));
-         return in.ret();
-      }
-      else
-      {
-         auto b1sfx = k1.substr(cpre.size());
-         auto b2sfx = k2.substr(cpre.size());
-         auto b1    = b1sfx.front();
-         auto b2    = b2sfx.front();
-         auto b1v   = value_ref<>::make(ring(), b1sfx.substr(1), v1);
-         auto b2v   = value_ref<>::make(ring(), b2sfx.substr(1), v2);
-
-         auto in = inner_ref<>::make(ring(), cpre, no_value(), inner_node::branches(b1, b2));
-         in.set_branch(b1, std::move(b1v));
-         in.set_branch(b2, std::move(b2v));
-         return in.ret();
-      }
-   }  // combine_value_nodes2
-
-   inline node_ref<maybe_owned> write_session::add_child2(node_ref<maybe_unique> root,
-                                                          string_view            key,
-                                                          string_view            val,
-                                                          int&                   old_size)
-   {
-      if (!root)  // empty case
-         return value_ref<>::make(ring(), key, val).ret();
-
-      if (root.is_value())
-      {
-         auto vn = root.as_value_node();
-         if (vn.key() == key)
-         {
-            old_size = vn.data_size();
-            return set_value2(vn, key, val);
-         }
-         else
-            return combine_value_nodes2(vn.key(), vn.data(), key, val);
-      }
-
-      // current root is an inner node
-      auto in     = root.as_inner_node();
-      auto in_key = in.key();
-      if (in_key == key)  // whose prefix is same as key, therefore set the value
-      {
-         if (auto v = in.value())
-            old_size = v.data_size();
-         return set_inner_value2(in, val);
-      }
-
-      auto cpre = common_prefix(in_key, key);
-      if (cpre == in_key)  // value is on child branch
-      {
-         auto b = key[cpre.size()];
-         if (in.editable() && in.has_branch(b))
-         {
-            auto cur_b = in.branch(b);
-            auto new_b = add_child2(cur_b, key.substr(cpre.size() + 1), val, old_size);
-            auto edit  = in.edit();  // will succeed
-            edit->set_branch(b, std::move(new_b));
-            return edit->ret();
-         }
-
-         auto new_in = inner_ref<>::make(ring(), in, in_key, in.value(), in.branches() | 1ull << b);
-         auto cur_b  = new_in.branch(b);
-         auto new_b  = add_child2(cur_b, key.substr(cpre.size() + 1), val, old_size);
-         new_in.set_branch(b, std::move(new_b));
-         return new_in.ret();
-      }
-      else  // the current node needs to split and become a child of new parent
-      {
-         if (cpre == key)  // value needs to be on a new inner node
-         {
-            auto b1    = in_key[cpre.size()];
-            auto b1key = in_key.substr(cpre.size() + 1);
-            auto b1val = inner_ref<>::make(ring(), in, b1key, in.value(), in.branches());
-            auto b0val = value_ref<>::make(ring(), string_view(), val);
-
-            auto nin = inner_ref<>::make(ring(), cpre, std::move(b0val), inner_node::branches(b1));
-            nin.set_branch(b1, std::move(b1val));
-            return nin.ret();
-         }
-         else  // there are two branches
-         {
-            auto b1    = key[cpre.size()];
-            auto b2    = in_key[cpre.size()];
-            auto b1key = key.substr(cpre.size() + 1);
-            auto b2key = in_key.substr(cpre.size() + 1);
-            auto nin   = inner_ref<>::make(ring(), cpre, no_value(), inner_node::branches(b1, b2));
-
-            nin.set_branch(b1, value_ref<>::make(ring(), b1key, val));
-            nin.set_branch(b2, inner_ref<>::make(ring(), in, b2key, in.value(), in.branches()));
-            return nin.ret();
-         }
-      }
-   }  // add_child2
-
    inline void write_session::clear()
    {
       swap_guard g(*this);
@@ -1056,15 +785,6 @@ namespace triedent
          release(_session_root);
          _session_root = new_root;
       }
-      return old_size;
-   }
-
-   inline int write_session::upsert(root& r, string_view key, string_view val)
-   {
-      _db->ensure_free_space();
-      swap_guard g(*this);
-      int        old_size = -1;
-      r.node              = add_child2(r.node.as_maybe_unique(), to_key6(key), val, old_size);
       return old_size;
    }
 
@@ -1594,38 +1314,6 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   std::optional<std::string> session<AccessMode>::get(const root& root, string_view key) const
-   {
-      std::string r;
-      if (get(root, key, r))
-         return std::optional(std::move(r));
-      return std::nullopt;
-   }
-
-   template <typename AccessMode>
-   bool session<AccessMode>::get(const root& root, string_view key, std::string& result) const
-   {
-      if constexpr (std::is_same_v<AccessMode, write_access>)
-         _db->ensure_free_space();
-
-      auto       k6 = to_key6(key);
-      swap_guard g(*this);
-
-      auto v = get(root.node.get_id(), k6);
-      if (v)
-      {
-         result.resize(v->size());
-         memcpy(result.data(), v->data(), v->size());
-         return true;
-      }
-      else
-      {
-         result.resize(0);
-         return false;
-      }
-   }
-
-   template <typename AccessMode>
    std::optional<std::string_view> session<AccessMode>::get(id root, string_view key) const
    {
       if (not root)
@@ -1684,15 +1372,6 @@ namespace triedent
          release(_session_root);
          _session_root = new_root;
       }
-      return removed_size;
-   }
-
-   inline int write_session::remove(root& r, string_view key, string_view val)
-   {
-      _db->ensure_free_space();
-      swap_guard g(*this);
-      int        removed_size = -1;
-      r.node                  = remove_child2(r.node.as_maybe_unique(), to_key6(key), removed_size);
       return removed_size;
    }
 
@@ -1845,139 +1524,6 @@ namespace triedent
       }
       return root;
    }
-
-   inline node_ref<maybe_owned> write_session::remove_child2(node_ref<maybe_unique> root,
-                                                             string_view            key,
-                                                             int&                   removed_size)
-   {
-      if (!root)
-         return {};
-
-      if (root.is_value())
-      {
-         auto vn = root.as_value_node();
-         if (vn.key() == key)
-         {
-            removed_size = vn.data_size();
-            return {};
-         }
-         return vn.ret();
-      }
-
-      auto in     = root.as_inner_node();
-      auto in_key = in.key();
-
-      if (in_key.size() > key.size())
-         return root.ret();
-
-      if (in_key == key)
-      {
-         auto iv = in.value();
-         if (!iv)
-            return root.ret();
-         removed_size = iv.data_size();
-
-         if (in.num_branches() == 1)
-         {
-            char        b  = std::countr_zero(in.branches());
-            auto        bn = in.child(0);
-            std::string new_key;
-            new_key += in_key;
-            new_key += b;
-
-            if (bn.is_value())
-            {
-               auto vn = bn.as_value_node();
-               new_key += vn.key();
-               return value_ref<>::make(ring(), new_key, vn.data()).ret();
-            }
-            else
-            {
-               auto bin = bn.as_inner_node();
-               new_key += bin.key();
-               return inner_ref<>::make(ring(), bin, new_key, bin.value(), bin.branches()).ret();
-            }
-         }
-
-         if (auto edit = in.edit())
-         {
-            edit->set_value(no_value());
-            return edit->ret();
-         }
-         else
-            return inner_ref<>::make(ring(), in, in_key, no_value(), in.branches()).ret();
-      }
-
-      auto cpre = common_prefix(in_key, key);
-      if (cpre != in_key)
-         return root.ret();
-
-      auto b = key[in_key.size()];
-      if (!in.has_branch(b))
-         return root.ret();
-
-      auto cur_b = in.branch(b);
-      auto new_b = remove_child2(cur_b, key.substr(in_key.size() + 1), removed_size);
-      if (new_b == cur_b)
-         return root.ret();
-
-      if (new_b)  // update branch
-      {
-         if (auto edit = in.edit())
-         {
-            edit->set_branch(b, std::move(new_b));
-            return edit->ret();
-         }
-
-         auto new_root = inner_ref<>::make(ring(), in, in_key, in.value(), in.branches());
-         new_root.set_branch(b, std::move(new_b));
-         return new_root.ret();
-      }
-
-      // remove branch
-      auto new_branches = in.branches() & ~inner_node::branches(b);
-      if (std::popcount(new_branches) + bool(in.value()) > 1)
-      {  // multiple branches remain, nothing to merge up, just realloc without branch
-         //   WARN( "clone without branch" );
-         return inner_ref<>::make(ring(), in, in_key, in.value(), new_branches).ret();
-      }
-
-      if (!new_branches)
-      {
-         // since we can only remove one item at a time, and this node exists
-         // then it means it either had 2 branches before or 1 branch and a value
-         // in this case, not branches means it must have a value
-         assert(in.value() && "expected value because we removed a branch");
-
-         auto cv = in.value();
-         return value_ref<>::make(ring(), in_key, cv.data()).ret();
-      }
-
-      // there must be only 1 branch left
-      //     WARN( "merge inner.key() + b + value.key() and return new value node" );
-      auto lb    = std::countr_zero(in.branches() ^ inner_node::branches(b));
-      auto cur_v = in.branch(lb);
-
-      // the one branch is either a value or an inner node
-      if (cur_v.is_value())
-      {
-         auto        cv = cur_v.as_value_node();
-         std::string new_key;
-         new_key += in_key;
-         new_key += char(lb);
-         new_key += cv.key();
-         return value_ref<>::make(ring(), new_key, cv.data()).ret();
-      }
-      else
-      {
-         auto        ci = cur_v.as_inner_node();
-         std::string new_key;
-         new_key += in_key;
-         new_key += char(lb);
-         new_key += ci.key();
-         return inner_ref<>::make(ring(), ci, new_key, ci.value(), ci.branches()).ret();
-      }
-   }  // remove_child2
 
    template <typename AccessMode>
    void session<AccessMode>::print()

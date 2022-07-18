@@ -53,131 +53,7 @@ namespace triedent
    };
 
    class object_db;
-   class location_lock;
-   class location_lock2;
 
-   class shared_id
-   {
-      friend object_db;
-      friend location_lock;
-      friend location_lock2;
-
-     private:
-      object_db* db    = nullptr;
-      uint64_t   id    = 0;
-      bool       owner = false;  // Does this shared_id own a reference count?
-
-      // note: This leaks children. Fixing this here could create a circular dependency
-      //       with ring_alloc. Leaving as is for now since an owned shared_id
-      //       (when it has children) is always wrapped in a maybe_owned or a mutating,
-      //       which prevent leaking children.
-      void unref();
-
-     public:
-      shared_id() = default;
-      shared_id(shared_id&& src) { *this = std::move(src); }
-      ~shared_id() { unref(); }
-
-      // can't support because of potential overflow
-      shared_id(const shared_id&) = delete;
-
-      // can't support because of potential overflow
-      shared_id& operator=(const shared_id&) = delete;
-
-      shared_id& operator=(shared_id&& src)
-      {
-         if (&src == this)
-            return *this;
-         unref();
-         db        = src.db;
-         id        = src.id;
-         owner     = src.owner;
-         src.db    = nullptr;
-         src.id    = 0;
-         src.owner = false;
-         return *this;
-      }
-
-      object_db* get_db() const { return db; }
-      object_id  get_id() const { return {.id = id}; }
-      bool       get_owner() const { return owner; }
-
-      // Try moving ownership of id to caller. Bump reference count
-      // if needed (!owner).
-      //
-      // If successful, clear shared_id. If not successful (ref count would
-      // overflow), leave shared_id intact.
-      std::optional<object_id> try_into();
-
-      // Try moving ownership of id to caller. Doesn't modify
-      // reference count.
-      std::optional<object_id> try_into_if_owned()
-      {
-         if (owner)
-            return into_unchecked();
-         else
-            return std::nullopt;
-      }
-
-      // Try moving exclusive ownership of id to caller. Doesn't modify
-      // reference count.
-      //
-      // If shared_id is owned, and the reference count is 1, then clears
-      // shared_id and returns the id. Else leaves shared_id intact and
-      // returns nullopt.
-      // TODO: remove if not needed
-      std::optional<object_id> try_into_exclusive();
-
-      // Move ownership (if any) of id to caller (unchecked); this
-      // clears shared_id. The caller is responsible for knowing if owner
-      // was set.
-      object_id into_unchecked()
-      {
-         object_id result = {.id = id};
-         db               = nullptr;
-         id               = 0;
-         owner            = false;
-         return result;
-      }
-   };  // shared_id
-
-   // TODO: Rename to location_lock after phasing out 1
-   class location_lock2
-   {
-      friend object_db;
-      friend location_lock;
-
-     private:
-      shared_id shared;
-      void      unlock();
-
-     public:
-      location_lock2()                      = default;
-      location_lock2(const location_lock2&) = delete;
-      location_lock2(location_lock2&& src) { *this = std::move(src); }
-      ~location_lock2() { unlock(); }
-
-      location_lock2& operator=(const location_lock2&) = delete;
-      location_lock2& operator=(location_lock2&& src)
-      {
-         if (&src == this)
-            return *this;
-         unlock();
-         shared = std::move(src.shared);
-         return *this;
-      }
-
-      object_id get_id() const { return shared.get_id(); }
-
-      // Unlock and convert to shared_id
-      shared_id into_unlock()
-      {
-         unlock();
-         return std::move(shared);
-      }
-   };  // location_lock2
-
-   // TODO: Phase out this version
    class location_lock
    {
       friend object_db;
@@ -214,30 +90,6 @@ namespace triedent
          id = 0;
          return result;
       }
-
-      // Convert to an owned location_lock2. Caution: only use with lock returned by alloc().
-      location_lock2 into_lock2_alloced_unchecked()
-      {
-         location_lock2 result;
-         result.shared.db    = db;
-         result.shared.id    = id;
-         result.shared.owner = true;
-         db                  = nullptr;
-         id                  = 0;
-         return result;
-      }
-
-      // Convert to an unowned location_lock2. Caution: only use with lock returned by spin_*().
-      location_lock2 into_lock2_editing_unchecked()
-      {
-         location_lock2 result;
-         result.shared.db    = db;
-         result.shared.id    = id;
-         result.shared.owner = false;
-         db                  = nullptr;
-         id                  = 0;
-         return result;
-      }
    };  // location_lock
 
    /**
@@ -247,7 +99,6 @@ namespace triedent
    class object_db
    {
       friend location_lock;
-      friend location_lock2;
 
      public:
       using object_id = triedent::object_id;
@@ -255,35 +106,17 @@ namespace triedent
       object_db(std::filesystem::path idfile, bool allow_write);
       static void create(std::filesystem::path idfile, uint64_t max_id);
 
-      // Bumps the reference count by 1 if possible. shared_id will
-      // reduce it by 1 at destruction.
-      std::optional<shared_id> bump_count(object_id id)
+      // Bumps the reference count by 1 if possible
+      bool bump_count(object_id id)
       {
          auto& atomic = _header->objects[id.id];
          auto  obj    = atomic.load();
          do
          {
             if ((obj & ref_count_mask) == ref_count_mask)
-               return std::nullopt;
+               return false;
          } while (!atomic.compare_exchange_weak(obj, obj + 1));
-
-         shared_id result;
-         result.db    = this;
-         result.id    = id.id;
-         result.owner = true;
-         return result;
-      }
-
-      // Doesn't bump the reference count. shared_id won't
-      // reduce the count at destruction.
-      shared_id preserve_count(object_id id)
-      {
-         shared_id result;
-         if (id)
-            result.db = this;
-         result.id    = id.id;
-         result.owner = false;
-         return result;
+         return true;
       }
 
       // A thread which holds a location_lock may:
@@ -632,58 +465,9 @@ namespace triedent
       */
    }
 
-   inline void shared_id::unref()
-   {
-      if (owner)
-         db->release({.id = id});
-   }
-
-   inline std::optional<object_id> shared_id::try_into()
-   {
-      if (owner)
-      {
-         object_id result = {.id = id};
-         db               = nullptr;
-         id               = 0;
-         owner            = false;
-         return result;
-      }
-      if (!db)
-         return std::nullopt;
-      if (auto other = db->bump_count({.id = id}))
-      {
-         object_id result = {.id = id};
-         db               = nullptr;
-         id               = 0;
-         owner            = false;
-         other->owner     = false;
-         return result;
-      }
-      return std::nullopt;
-   }
-
-   inline std::optional<object_id> shared_id::try_into_exclusive()
-   {
-      if (!owner)
-         return std::nullopt;
-      if (db->ref({.id = id}) != 1)
-         return std::nullopt;
-      object_id result = {.id = id};
-      db               = nullptr;
-      id               = 0;
-      owner            = false;
-      return result;
-   }
-
    inline void location_lock::unlock()
    {
       if (db)
          db->unlock(id);
-   }
-
-   inline void location_lock2::unlock()
-   {
-      if (shared.db)
-         shared.db->unlock(shared.id);
    }
 };  // namespace triedent

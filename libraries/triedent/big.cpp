@@ -68,7 +68,7 @@ int main(int argc, char** argv)
    opt("stat,s", po::value<uint64_t>(&status_count)->default_value(1000000ull),
        "the number of how often to print stats");
    opt("check-content", po::bool_switch(&check_content), "check content against std::map (slow)");
-   opt("node-traversal,n", po::bool_switch(&use_nt), "use node_traversal");
+   // opt("node-traversal,n", po::bool_switch(&use_nt), "use node_traversal");
 
    po::variables_map vm;
    po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -100,18 +100,20 @@ int main(int argc, char** argv)
    triedent::database db(db_dir.c_str(), triedent::database::read_write);
    db.print_stats();
    std::cerr << "\n";
-   auto           s = db.start_write_session();
+   auto s = db.start_write_session();
+   /*
    triedent::root nt_root;
    if (use_nt)
    {
       // TODO: load nt_root
    }
    else
-      s->set_session_revision(db.get_root_revision());
+   */
+   s->set_session_revision(db.get_root_revision());
 
-   std::mutex                         revisions_mutex;
-   std::vector<uint64_t>              revisions(16);
-   std::vector<triedent::shared_root> nt_revisions(16);
+   std::mutex            revisions_mutex;
+   std::vector<uint64_t> revisions(16);
+   // std::vector<triedent::shared_root> nt_revisions(16);
    std::map<std::string, std::string> base;
 
    auto start = std::chrono::steady_clock::now();
@@ -154,10 +156,12 @@ int main(int argc, char** argv)
                triedent::object_id r;
                {
                   std::lock_guard lock{revisions_mutex};
+                  /*
                   if (use_nt)
                      r = {nt_revisions[(v - 4) % 16].get_id()};
                   else
-                     r = {revisions[(v - 4) % 16]};
+                  */
+                  r = {revisions[(v - 4) % 16]};
                   rs->retain(r);  // TODO: this can malfunction
                }
                rs->set_session_revision(r);
@@ -203,6 +207,7 @@ int main(int argc, char** argv)
              if (min > last_r)
              {
                 //            WARN( "release revision: ", (min-6)%16, "  r: ", min );
+                /*
                 if (use_nt)
                 {
                    triedent::shared_root r;
@@ -213,6 +218,7 @@ int main(int argc, char** argv)
                    rs->destroy(std::move(r));
                 }
                 else
+                */
                 {
                    triedent::object_id r;
                    {
@@ -251,6 +257,7 @@ int main(int argc, char** argv)
          {
             auto new_r = r.load();
             //       WARN( "NEW R: ", new_r, " id:" , s->get_session_revision().id );
+            /*
             if (use_nt)
             {
                auto                  r = s->clone(nt_root);
@@ -263,6 +270,7 @@ int main(int argc, char** argv)
                s->destroy(std::move(old_r));
             }
             else
+            */
             {
                auto r = s->get_session_revision();
                s->retain(r);  // TODO: this can malfunction
@@ -334,10 +342,12 @@ int main(int argc, char** argv)
                if (check_content)
                   comparison_map[str] = str;
                int inserted;
+               /*
                if (use_nt)
                   inserted = s->upsert(nt_root, str, str);
                else
-                  inserted = s->upsert(str, str);
+               */
+               inserted = s->upsert(str, str);
                if (inserted >= 0)
                {
                   WARN("failed to insert: ", h);
@@ -350,10 +360,12 @@ int main(int argc, char** argv)
                if (check_content)
                   comparison_map[(std::string)hk] = (std::string)hk;
                int inserted;
+               /*
                if (use_nt)
                   inserted = s->upsert(nt_root, hk, hk);
                else
-                  inserted = s->upsert(hk, hk);
+               */
+               inserted = s->upsert(hk, hk);
                if (inserted >= 0)
                {
                   WARN("failed to insert: ", h);
@@ -378,13 +390,14 @@ int main(int argc, char** argv)
    auto delta = end - start;
    std::cerr << "\ninsert took:    " << std::chrono::duration<double, std::milli>(delta).count()
              << " ms\n";
-
+   /*
    if (use_nt)
    {
       // TODO
    }
    else
-      s->set_root_revision(s->get_session_revision());
+   */
+   s->set_root_revision(s->get_session_revision());
    db.print_stats();
    std::cerr << "\n";
 
@@ -396,9 +409,12 @@ int main(int argc, char** argv)
       for (auto& [k, v] : comparison_map)
       {
          std::string read_value;
+         /*
          if (use_nt && !s->get(nt_root, k, read_value))
             ++missing;
-         else if (!use_nt && !s->get(k, read_value))
+         else 
+         */
+         if (!use_nt && !s->get(k, read_value))
             ++missing;
          else if (read_value != v)
             ++mismatched;
