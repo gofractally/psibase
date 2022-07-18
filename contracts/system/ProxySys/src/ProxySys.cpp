@@ -18,46 +18,6 @@ namespace psibase
                 && req.host[req.host.size() - req.rootHost.size() - 1] == '.';
       }
 
-      struct Injector
-      {
-         using TestFunc = std::function<bool(const psibase::RpcRequestData&)>;
-         TestFunc    func;
-         std::string injection;
-         bool        shouldInject = 0;
-      };
-
-      // Todo - replace cdn with on-chain resources
-      Injector iframeResizer{
-          .func = [](const psibase::RpcRequestData& req) { return (req.target == "/"); },
-          .injection =
-              "<script src=\"https://unpkg.com/iframe-resizer@4.3.1/js/"
-              "iframeResizer.contentWindow.js\" crossorigin></script>",
-      };
-
-      Injector subdomainLogin{
-          .func = [](const psibase::RpcRequestData& req) { return isSubdomain(req); },
-          .injection =
-              "<link rel=\"stylesheet\" "
-              "href=\"https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css\" "
-              "/>"
-              "<script src=\"common/loginBar.js\" type=\"module\"></script>",
-      };
-
-      std::vector<Injector> injectors{iframeResizer, subdomainLogin};
-
-      void injectHtml(std::optional<psibase::RpcReplyData>& reply, const std::string& html)
-      {
-         if (reply.has_value() && reply->contentType == "text/html")
-         {
-            reply->body.insert(reply->body.end(), html.begin(), html.end());
-         }
-      }
-
-      void debugAlert(std::optional<psibase::RpcReplyData>& reply, const std::string& message)
-      {
-         injectHtml(reply, "<script>alert(\"" + message + "\");</script>");
-      }
-
    }  // namespace
 
    // TODO: switch to Table wrapper
@@ -110,11 +70,6 @@ namespace psibase
       else
          contractName = "common-sys";
 
-      for (auto& i : injectors)
-      {
-         i.shouldInject = i.func(req);
-      }
-
       auto contract = AccountNumber(contractName);
       auto reg      = kvGet<RegisteredContractRow>(registeredContractKey(act.contract, contract));
       if (!reg)
@@ -126,14 +81,6 @@ namespace psibase
       auto result = iface.serveSys(std::move(req)).unpack();
       if (result && !result->headers.empty() && contractName != "common-sys")
          abortMessage("contract " + contract.str() + " attempted to set an http header");
-
-      for (auto& i : injectors)
-      {
-         if (i.shouldInject)
-         {
-            injectHtml(result, i.injection);
-         }
-      }
 
       setRetval(result);
    }  // serve()
