@@ -1,6 +1,8 @@
 #pragma once
+
 #include <algorithm>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
+#include <memory>
 #include <triedent/node.hpp>
 
 namespace triedent
@@ -38,6 +40,16 @@ namespace triedent
       mutable std::atomic<uint64_t> _warm_swap_p = -1ull;
       mutable std::atomic<uint64_t> _cool_swap_p = -1ull;
       mutable std::atomic<uint64_t> _cold_swap_p = -1ull;
+
+      void lock_swap_p(database& db) const;
+      void unlock_swap_p() const;
+
+      struct swap_guard
+      {
+         swap_guard(database& db, const session_base& s) : _s(s) { _s.lock_swap_p(db); }
+         ~swap_guard() { _s.unlock_swap_p(); }
+         const session_base& _s;
+      };
 
      public:
       key_view to_key6(key_view v) const;
@@ -148,9 +160,9 @@ namespace triedent
 
       void print();
       void validate();
-      ~session();
 
-      session(database& db);
+      session(std::shared_ptr<database> db);
+      ~session();
 
      protected:
       session(const session&) = delete;
@@ -167,19 +179,14 @@ namespace triedent
       inline void release(id);
 
       friend class database;
-      database* _db;
+      std::shared_ptr<database> _db;
 
       auto& ring();
 
-      void lock_swap_p() const;
-      void unlock_swap_p() const;
-
-      struct swap_guard
+      struct swap_guard : session_base::swap_guard
       {
-         swap_guard(const session& s) : _s(s) { _s.lock_swap_p(); }
-         swap_guard(const session* s) : _s(*s) { _s.lock_swap_p(); }
-         ~swap_guard() { _s.unlock_swap_p(); }
-         const session& _s;
+         swap_guard(const session& s) : session_base::swap_guard(*s._db, s) {}
+         swap_guard(const session* s) : session_base::swap_guard(*s->_db, *s) {}
       };
    };
    using read_session = session<read_access>;
@@ -187,6 +194,8 @@ namespace triedent
    class write_session : public read_session
    {
      public:
+      write_session(std::shared_ptr<database> db) : read_session(db) {}
+
       int upsert(string_view key, string_view val);
       int remove(string_view key);
       id  fork(id from_version);
@@ -194,9 +203,6 @@ namespace triedent
 
       void set_root_revision(id);
       void clear();
-
-      friend class database;
-      write_session(database& db) : read_session(db) {}
 
       /**
           *  These methods are used to recover the database after a crash,
@@ -229,12 +235,13 @@ namespace triedent
       inline id combine_value_nodes(string_view k1, string_view v1, string_view k2, string_view v2);
    };
 
-   class database
+   class database : public std::enable_shared_from_this<database>
    {
       template <typename AccessMode>
       friend class session;
 
       friend write_session;
+      friend session_base;
 
      public:
       struct config
@@ -254,6 +261,7 @@ namespace triedent
 
       using string_view = std::string_view;
       using id          = object_id;
+
       database(std::filesystem::path dir, access_mode allow_write);
       ~database();
 
@@ -299,6 +307,7 @@ namespace triedent
       mutable std::mutex         _root_change_mutex;
       mutable std::mutex         _active_sessions_mutex;
       std::vector<session_base*> _active_sessions;
+      bool                       _have_write_session;
    };
 
    template <typename T>
@@ -426,18 +435,16 @@ namespace triedent
       return *_db->_ring;
    }
 
-   template <typename AccessMode>
-   inline void session<AccessMode>::lock_swap_p() const
+   inline void session_base::lock_swap_p(database& db) const
    {
-      auto sp = _db->_ring->get_swap_pos();
+      auto sp = db._ring->get_swap_pos();
       _hot_swap_p.store(sp._swap_pos[0]);
       _warm_swap_p.store(sp._swap_pos[1]);
       _cool_swap_p.store(sp._swap_pos[2]);
       _cold_swap_p.store(sp._swap_pos[3]);
    }
 
-   template <typename AccessMode>
-   inline void session<AccessMode>::unlock_swap_p() const
+   inline void session_base::unlock_swap_p() const
    {
       _hot_swap_p.store(-1ull);
       _warm_swap_p.store(-1ull);
@@ -446,11 +453,19 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   session<AccessMode>::session(database& db) : _db(&db)
+   session<AccessMode>::session(std::shared_ptr<database> db) : _db(std::move(db))
    {
       _iterators.resize(64);
-      std::lock_guard<std::mutex> lock(db._active_sessions_mutex);
-      db._active_sessions.push_back(this);
+
+      std::lock_guard<std::mutex> lock(_db->_active_sessions_mutex);
+
+      if (std::is_same_v<AccessMode, write_access> && _db->_have_write_session)
+         throw std::runtime_error("Only 1 write session may be active");
+
+      _db->_active_sessions.push_back(this);
+
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _db->_have_write_session = true;
    }
    template <typename AccessMode>
    session<AccessMode>::~session()
@@ -458,18 +473,20 @@ namespace triedent
       std::lock_guard<std::mutex> lock(_db->_active_sessions_mutex);
 
       auto itr = std::find(_db->_active_sessions.begin(), _db->_active_sessions.end(), this);
-
       _db->_active_sessions.erase(itr);
+
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _db->_have_write_session = false;
    }
 
    inline std::shared_ptr<read_session> database::start_read_session()
    {
-      return std::make_shared<read_session>(std::ref(*this));
+      return std::make_shared<read_session>(shared_from_this());
    }
 
    inline std::shared_ptr<write_session> database::start_write_session()
    {
-      return std::make_shared<write_session>(std::ref(*this));
+      return std::make_shared<write_session>(shared_from_this());
    }
 
    template <typename AccessMode>

@@ -66,8 +66,8 @@ int main(int argc, char** argv)
       }
       if (vm.count("status"))
       {
-         database db(db_dir.c_str(), triedent::database::read_write);
-         db.print_stats(true);
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         db->print_stats(true);
       }
       if (vm.count("create"))
       {
@@ -80,19 +80,19 @@ int main(int argc, char** argv)
 
       if (vm.count("validate"))
       {
-         database db(db_dir.c_str(), triedent::database::read_write);
-         auto     s = db.start_write_session();
-         s->set_session_revision(db.get_root_revision());
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto s  = db->start_write_session();
+         s->set_session_revision(db->get_root_revision());
          s->validate();
          std::cerr << "everything appears to be ok" << std::endl;
       }
 
       if (vm.count("gc"))
       {
-         database db(db_dir.c_str(), triedent::database::read_write);
-         auto     s = db.start_write_session();
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto s  = db->start_write_session();
          s->start_collect_garbage();
-         s->recursive_retain(db.get_root_revision());
+         s->recursive_retain(db->get_root_revision());
          s->end_collect_garbage();
       }
 
@@ -102,9 +102,9 @@ int main(int argc, char** argv)
          {
             throw std::runtime_error("import file does not exist: " + import_file);
          }
-         database db(db_dir.c_str(), triedent::database::read_write);
-         auto     s = db.start_write_session();
-         s->set_session_revision(db.get_root_revision());
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto s  = db->start_write_session();
+         s->set_session_revision(db->get_root_revision());
 
          std::ifstream     in(import_file.c_str(), std::fstream::binary | std::fstream::in);
          std::vector<char> value_buffer;
@@ -148,9 +148,9 @@ int main(int argc, char** argv)
       if (e or c)
       {
          std::ofstream ef(export_file.c_str(), std::fstream::trunc);
-         database      db(db_dir.c_str(), triedent::database::read_write);
-         auto          s = db.start_write_session();
-         s->set_session_revision(db.get_root_revision());
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto s  = db->start_write_session();
+         s->set_session_revision(db->get_root_revision());
          auto    i     = s->first();
          int64_t count = 0;
          while (i.valid())

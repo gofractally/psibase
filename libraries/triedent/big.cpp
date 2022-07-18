@@ -96,8 +96,9 @@ int main(int argc, char** argv)
       return 0;
    }
 
-   uint64_t           total = insert_count;  //2 * 1000 * 1000 * 1000;
-   triedent::database db(db_dir.c_str(), triedent::database::read_write);
+   uint64_t total = insert_count;  //2 * 1000 * 1000 * 1000;
+   auto  _db = std::make_shared<triedent::database>(db_dir.c_str(), triedent::database::read_write);
+   auto& db  = *_db;
    db.print_stats();
    std::cerr << "\n";
    auto s = db.start_write_session();

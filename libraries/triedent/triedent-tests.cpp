@@ -25,7 +25,7 @@ auto createDb()
                                   .cool_pages  = 30,
                                   .cold_pages  = 30,
                               });
-   return std::make_unique<database>(  //
+   return std::make_shared<database>(  //
        "testdb", database::read_write);
 }
 
