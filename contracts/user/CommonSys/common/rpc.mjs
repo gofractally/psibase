@@ -339,7 +339,7 @@ export async function initializeApplet()
         },
       };
 
-    await import("https://unpkg.com/iframe-resizer@4.3.1/js/iframeResizer.js");
+    await import("https://unpkg.com/iframe-resizer@4.3.1/js/iframeResizer.contentWindow.js");
 }
 
 /**
