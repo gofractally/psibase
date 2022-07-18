@@ -189,6 +189,20 @@ export function hexToUint8Array(hex) {
     return result;
 };
 
+let redirectIfAccessedDirectly = () => {
+    try {
+        if (window.self === window.top)
+        {
+            // We are the top window. Redirect needed.
+            const applet = window.location.hostname.substring(0, window.location.hostname.indexOf("."));
+            window.location.replace(siblingUrl(null, "", "/applet/" + applet));
+        }
+    } catch (e) {
+        // The browser blocked access to window.top due to the same origin policy, 
+        //   therefore we are in an iframe, all is well.
+    }
+};
+
 export const ErrorCodes = {
     invalidResource: 404,
     serverError: 500,
@@ -206,123 +220,155 @@ export const ErrorMessages = [
 ]
 
 export const MessageTypes = {
-    transaction: 0,
-    getResource: 1,
+    getResource: 0,
+    transaction: 1,
 };
+
+let verifyFields = (obj, fieldNames) => {
+    var missingField = false;
+
+    fieldNames.forEach((fieldName)=>{
+        if (!obj.hasOwnProperty(fieldName))
+        {
+            console.error("Message from core missing \"" + fieldName + "\" field");
+            missingField = true;
+        }
+    });
+
+    return !missingField;
+};
+
+let handleErrorCode = (code) => {
+    if (code === undefined) return false;
+
+    let recognizedError = ErrorMessages.some((err)=>{
+        if (err.code === code)
+        {
+            console.error(err.message);
+            return true;
+        }
+        return false;
+    });
+    if (!recognizedError)
+        console.error("Message from core contains unrecognized error code: " + error);
+
+    return true;
+};
+
+let messageRouting = [
+    {
+        type: MessageTypes.getResource,
+        validate: (payload)=>{
+            if (!verifyFields(payload, ["id", "resource"])) 
+                return false;
+
+            return true;
+        },
+        route: (payload) => {
+            let {id, resource} = payload;
+            var idx = -1;
+            let handled = singleUseHandlers.some((handler, index)=>{
+                if (handler.id === id)
+                {
+                    idx = index;
+                    handler.callback(resource);
+                    return true;
+                }
+                return false;
+            });
+
+            if (handled)
+            {   // Remove the handler from singleUseHandlers.
+                singleUseHandlers.splice(idx, 1);
+                return true;
+            }
+            return false;
+        },
+    },
+    {
+        type: MessageTypes.transaction,
+        validate: (payload)=>{
+            if (!verifyFields(payload, ["type", "trace"])) 
+                return false;
+
+            return true;
+        },
+        route: (payload) => {
+            let {type, trace} = payload;
+            
+            var handled = false;
+            handlers.filter((h)=>{return h.type == type;}).forEach((h)=>{
+                handled = true;
+                h.callback(trace);
+            });
+            return handled;
+        },
+    },
+];
 
 // Handlers that are constructed when an applet starts and persist
 var handlers = [];
 
 // Handlers that are destroyed after routing a message
-var tempHandlers = [];
+var singleUseHandlers = [];
 
-export function callBeforeImportIframeResizer()
+export async function initializeApplet()
 {
+    redirectIfAccessedDirectly();
+
     window.iFrameResizer = {
         onMessage: (msg)=>{
-            if (msg.type === undefined || typeof msg.type !== "number")
+            let {type, payload} = msg;
+            if (type === undefined || typeof type !== "number" || payload === undefined)
             {
                 console.error("Malformed message received from core");
                 return;
             }
-            if (msg.id === undefined || typeof msg.id !== "number")
-            {
-                console.error("Message received with malformed ID field");
-                return;
-            }
-            if (msg.payload === undefined || msg.payload === {})
-            {
-                console.error("Message with id " + msg.id + " returned with an empty payload.");
-                return;
-            }
-            if (typeof msg.payload === "number")
-            {
-                let error = ErrorMessages.some((error)=>{
-                    if (error.code === msg.payload)
-                    {
-                        console.error(error.message);
-                        return true;
-                    }
-                    return false;
-                });
-                if (error) return;
-            }
 
-            if (msg.type === MessageTypes.getResource)
-            {
-                var idx = -1;
-                let handled = tempHandlers.some((handler, index)=>{
-                    if (handler.id === msg.id)
-                    {
-                        idx = index;
-                        handler.callback(msg.payload);
-                        return true;
-                    }
-                    return false;
-                });
+            if (!messageRouting[type].validate(payload))
+                return;
 
-                if (handled && idx !== -1)
-                {
-                    tempHandlers.splice(idx, 1);
-                }
-                if (!handled)
-                {
-                    console.error("Child has no handler for message with ID: " + msg.id);
-                }
-            }
-            else
+            if (handleErrorCode(payload.error))
+                return;
+
+            if (!messageRouting[type].route(payload))
             {
-                var handled = false;
-                handlers.forEach((h, index)=>{
-                    let relevantHandler = h(msg);
-                    handled ||= relevantHandler;
-                });
-    
-                if (!handled) 
-                {
-                    console.error("Child has no handler for transaction ID: " + msg.id);
-                }
+                console.error("Child has no handler for message: " + msg);
+                return;
             }
         },
       };
-}
 
-function createRouteHandler(routes)
-{
-    return (msg)=>{
-        var handled = false;
-        routes.forEach((route, index)=>{
-            if (msg.id === route.id)
-            {
-                route.callback(msg.payload);
-                handled = true;
-            }
-            handled ||= false;
-        });
-        return handled;
-   }
+    await import("https://unpkg.com/iframe-resizer@4.3.1/js/iframeResizer.js");
 }
 
 /**
- * Description: Construct a route object for use in addRoutes
+ * Description: Append a route handler to map a transaction types to a callback function.
+ * Multiple routes can be configured for the same transaction type.
  * 
- * @param {Number} id - An arbitrary number mapped to this type of transaction
+ * @param {String} id - An arbitrary but unique name mapped to this specific route.
+ * @param {Number} type - An arbitrary number mapped to this type of transaction.
  * @param {Function} callback - A callback function that should be called when a return message is received with the corresponding ID.
  */
-export function route(id, callback)
+export function addRoute(id, type, callback)
 {
-  return {id, callback};
-}
+    // Find and remove the old route mapped to this id
+    var idx = -1;
+    handlers.some((h, index)=>{
+        if (h.id == id) 
+        {
+            idx = index;
+            return true;
+        }
+        return false;
+    });
+    if (idx !== -1)
+    {
+        handlers.splice(idx, 1);
+    }
 
-/**
- * Description: Append more route handlers to map transaction types to callback functions.
- * Multiple routes can be configured for the same route ID
- * 
- * @param {Array} routes - An array of routes generated with the route() function
- */
-export function addRoutes(routes)
-{
-    handlers.push(createRouteHandler(routes));
+    // Add the new route
+    handlers.push({id, type, callback});
 }
 
 /**
@@ -353,10 +399,17 @@ export async function push(transactionType, actions)
 {
     if ('parentIFrame' in window) {
         parentIFrame.sendMessage({
-            type: MessageTypes.transaction, 
-            id: transactionType, 
-            actions
+            type: MessageTypes.transaction,
+            payload: {
+                type: transactionType,
+                actions
+            },
         }, "*");
+    }
+    else
+    {
+        // This can sometimes happen if the window hasn't fully loaded
+        console.log("No parent iframe");
     }
 }
 
@@ -364,17 +417,27 @@ export const CommonResources = {
     loggedInUser: 0,
 };
 
-export async function getResource(resource, callback)
+/**
+ * Description: Gets a client-side resource.
+ * 
+ * @param {Number} resource - The ID of the requested resource
+ * @param {Array} callback - The function to call with the requested resource
+ */
+export async function getLocalResource(resource, callback)
 {
     if ('parentIFrame' in window) {
-
-        let id = tempHandlers.length;
-        tempHandlers.push({id, callback});
+        let id = singleUseHandlers.length;
+        singleUseHandlers.push({id, callback});
 
         parentIFrame.sendMessage({
             type: MessageTypes.getResource,
-            id,
-            resource,
+            payload: { id, resource },
         }, "*");
     }
+    else
+    {
+        // This can sometimes happen if the window hasn't fully loaded
+        console.log("No parent iframe");
+    }
 }
+

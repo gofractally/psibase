@@ -1,17 +1,15 @@
 import htm from "https://unpkg.com/htm@3.1.0?module";
 import { siblingUrl } from "/common/rootdomain.mjs";
-import { callBeforeImportIframeResizer, 
-  getJson, action, route, 
-  addRoutes, push, getResource, CommonResources } from "/common/rpc.mjs";
-
-callBeforeImportIframeResizer();
-await import("https://unpkg.com/iframe-resizer@4.3.1/js/iframeResizer.js");
+import { initializeApplet, 
+  getJson, action, addRoute, push, 
+  getLocalResource, CommonResources } from "/common/rpc.mjs";
 
 const html = htm.bind(React.createElement);
+const { useEffect, useState, useCallback, useRef } = React;
 
-const contract = await getJson('/common/thiscontract');
+await initializeApplet();
 
-const { useEffect, useState, useCallback } = React;
+export const thisApplet = await getJson('/common/thiscontract');
 
 const transactionTypes = {
   credit: 0,
@@ -27,7 +25,6 @@ function Headers(headers) {
 
 function Rows(balances) {
   return balances.map((b, index) => {
-    //if (b.symbol) console.log("Symbol = " + b.symbol + " and token = " + b.token);
     return html`
       <tr key=${index}>
         <td>${b.symbol ? b.symbol.toUpperCase() : b.token}</td>
@@ -39,65 +36,39 @@ function Rows(balances) {
 
 function BalanceTable({loggedInUser}) {
 
-  const [refresh, setRefresh] = useState(true);
   const [balances, setBalances] = useState([]);
   const [user, setUser] = useState("");
-
-  const mRefresh = useCallback(()=>{
-    setRefresh(!refresh);
-  }, [refresh])
-
-  useEffect(()=>{
-    if (user !== loggedInUser)
-    {
-      setUser(loggedInUser);
-      mRefresh();
-    }
-  }, [loggedInUser]);
-
-  useEffect(()=>{
-    const getBalances = async () => {
-      console.log("ok " + user);
-      if (user)
-      {
-        let res = await getJson(siblingUrl(null, contract, "balances/" + user));
-        console.log("New balances:");
-        console.log(res);
-        setBalances(res);
-      }
-    }
-
-    console.log("Getting balances, bro");
-    getBalances().catch(console.error);
-
-  }, [refresh, user])
+  const [searchTerm, setSearchTerm] = useState("");
 
   const onSearchSubmit = (e) => {
     e.preventDefault();
-    mRefresh();
+    setUser(searchTerm);
   };
 
-  const refreshBalances = useCallback((payload) => {
-    console.log("Refreshing balances!");
-    //mRefresh(); <-- This seems to call mRefresh, but then setUser doesn't work.
-    const getBalances = async () => {
-      console.log("ok " + user); // Similarly, user here is always empty...
-      if (user)
-      {
-        let res = await getJson(siblingUrl(null, contract, "balances/" + user));
-        console.log("New balances:");
-        console.log(res);
-        setBalances(res);
-      }
-    }
+  useEffect(()=>{
+    setSearchTerm(loggedInUser);
+    setUser(loggedInUser);
+  }, [loggedInUser]);
 
-    console.log("Getting balances, bro");
-    getBalances().catch(console.error);
-  }, [mRefresh]);
+  const getBalances = useCallback(async () => {
+    if (user)
+    {
+      let res = await getJson(siblingUrl(null, thisApplet, "balances/" + user));
+      setBalances(res);
+    }
+  }, [user]);
 
   useEffect(()=>{
-    addRoutes([route(transactionTypes.credit, refreshBalances)]);
-  }, []);
+    getBalances().catch(console.error);
+  }, [getBalances])
+
+  const refreshBalances = useCallback((trace) => {
+    getBalances().catch(console.error);
+  }, [user]);
+
+  useEffect(()=>{
+    addRoute("refreshbalances", transactionTypes.credit, refreshBalances);
+  }, [refreshBalances]);
 
   return html`
     <div class="ui segment">
@@ -108,9 +79,9 @@ function BalanceTable({loggedInUser}) {
             <input
               type="text"
               placeholder="Search accounts..."
-              value=${user}
+              value=${searchTerm}
               onChange=${(e) => {
-                setUser(e.target.value);
+                setSearchTerm(e.target.value);
               }}
             />
             <i class="users icon"></i>
@@ -197,22 +168,21 @@ function SendPanel() {
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState("");
 
-  const credited = async (payload)=>{
-    console.log(payload);
+  const credited = useCallback( async (payload) =>{
     setStatus("Transfer successful!");
     setTimeout(()=>{setStatus("");}, 5000);
-  };
+  }, []);
 
   useEffect(()=>{
-    addRoutes([route(transactionTypes.credit, credited)])
-  }, []);
+    addRoute("credited", transactionTypes.credit, credited);
+  }, [credited]);
 
   const onSendSubmit = (e) => {
     e.preventDefault();
     const credit = async () => {
 
       push(transactionTypes.credit, [await action(
-        contract, "credit", 
+        thisApplet, "credit", 
         {
           tokenId: 1, 
           receiver: receiver, 
@@ -297,7 +267,14 @@ function App() {
   const [user, setUser] = useState("");
 
   useEffect(()=>{
-    getResource(CommonResources.loggedInUser, setUser);
+    // Todo - Timeout is used because sometimes the window.parentIFrame isn't loaded yet when 
+    //  this runs. Should use a better fix for the race condition than a delay.
+    setTimeout(()=>{ 
+      getLocalResource(CommonResources.loggedInUser, (u)=>{
+        console.log("got user " + user);
+        setUser(u);
+      });
+    }, 50);
   }, []);
 
   return html`

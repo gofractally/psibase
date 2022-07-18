@@ -77,6 +77,82 @@ function Nav() {
   `;
 }
 
+const injectSender = (actions) => {
+  actions.forEach(action => {
+    if (typeof action.sender === 'undefined')
+    {
+      action.sender = messageRouting[MessageTypes.getResource].getResponse({id: 0, resource: CommonResources.loggedInUser}).resource;
+    }
+  });
+
+  return actions;
+};
+
+const constructTransaction = (actions) => {
+  let tenMinutes = 10 * 60 * 1000;
+  var transaction = JSON.parse(JSON.stringify({
+      tapos: {
+          expiration: new Date(Date.now() + tenMinutes),
+      },
+      actions,
+  }, null, 4));
+
+  return transaction;
+};
+
+let messageRouting = [
+  {
+    type: MessageTypes.getResource,
+    validate: (payload) => {
+      if (payload.id === undefined || typeof payload.id !== "number")
+      {
+        console.error("Received malformed resource request from applet (malformed id)");
+        return false;
+      }
+      return true;
+    },
+    getResponse: (payload) => {
+      let { id, resource } = payload;
+      if (resource === CommonResources.loggedInUser)
+      {
+        // Todo - get sender from key management extension
+        return {id, resource: "alice"};
+      }
+      else
+      {
+        console.error("Resource with invalid id (" + resource + ") requested");
+        return {id, resource: "", error: ErrorCodes.invalidResource};
+      }
+    },
+  },
+  {
+    type: MessageTypes.transaction,
+    validate: (payload) => {
+      if (payload.actions === undefined || !Array.isArray(payload.actions))
+      {
+        console.error("Error in transaction message from applet (action array missing or malformed)");
+        return false;
+      }
+      return true;
+    },
+    getResponse: async (payload) => {
+      let {type, actions} = payload;
+
+      try 
+      {
+        let trace = await signAndPushTransaction('', constructTransaction(injectSender(actions)));
+        return {type, trace};
+      }
+      catch (e)
+      {
+        return {type, trace: "", error: ErrorCodes.serverError};
+      }
+    }
+  },
+];
+
+
+
 function Applet() {
   
   const [applet, setApplet] = useState("");
@@ -104,90 +180,25 @@ function Applet() {
   }, [applet]);
 
   useEffect(() => {
-
-    const getRes = (resourceID) => {
-      if (resourceID === CommonResources.loggedInUser)
-      {
-        // Todo - get sender from key management extension
-        return "alice";
-      }
-      else
-      {
-        console.error("Resource with invalid id (" + resourceID + ") requested");
-        return ErrorCodes.invalidResource;
-      }
-    };
-
-    const injectSender = (actions) => {
-      actions.forEach(action => {
-        if (typeof action.sender === 'undefined')
-        {
-          action.sender = getRes(CommonResources.loggedInUser);
-        }
-      });
-
-      return actions;
-    };
-
-    const constructTransaction = (actions) => {
-      let tenMinutes = 10 * 60 * 1000;
-      var transaction = JSON.parse(JSON.stringify({
-          tapos: {
-              expiration: new Date(Date.now() + tenMinutes),
-          },
-          actions,
-      }, null, 4));
-
-      return transaction;
-    };
-
-    const handleMessage = async (request) => {      
+    const handleMessage = async (request) => {
       var iframe = document.getElementById("applet");
-      if (iframe != null)
-      {
-        let {type, id} = request.message;
-        if (type === undefined || typeof type !== "number")
-        {
-          console.error("Received malformed from message from applet (no type property)");
-          return;
-        }
-        if (id === undefined || typeof id !== "number")
-        {
-          console.error("Received malformed from message from applet (malformed id)");
-          return;
-        }
-
-        var payload = "";
-        if (type === MessageTypes.getResource)
-        {
-          let {resource} = request.message;
-          payload = getRes(resource);
-        }
-        else
-        {
-          var {actions} = request.message;
-          if (actions === undefined || !Array.isArray(actions)) 
-          {
-            console.error("Received malformed from message from applet (action array missing or malformed)");
-            return;
-          }
-
-          try 
-          {
-            payload = await signAndPushTransaction('', constructTransaction(injectSender(actions)));
-          }
-          catch (e)
-          {
-            payload = ErrorCodes.serverError;
-          }
-        }
-        iframe.iFrameResizer.sendMessage({type, id, payload}, appletSrc);
-      }
-      else
+      if (iframe == null)
       {
         console.error("Child iframe not found.");
+        return;
       }
+      let {type, payload} = request.message;
+      if (type === undefined || typeof type !== "number" || payload === undefined)
+      {
+        console.error("Received malformed resource request from applet");
+        return;
+      }
+      if (!messageRouting[type].validate(payload)) 
+        return;
 
+      // Get and send response
+      var responsePayload = await messageRouting[type].getResponse(payload);
+      iframe.iFrameResizer.sendMessage({type, payload: responsePayload}, appletSrc);
     };
 
     if (appletSrc)
@@ -218,7 +229,7 @@ function Applet() {
         padding: 0
       }}
       src="${appletSrc}"
-      title="TODO Applet Description"
+      title="${applet}"
       frameborder="0"
     ></iframe>
   `;
