@@ -25,6 +25,100 @@ namespace triedent
 
    inline key_type from_key6(const key_view sixb);
 
+   // Write thread usage notes:
+   // * To create a new tree, default-initialize a shared_ptr<root>
+   // * To get the upper-most root, use write_session::get_root_revision
+   // * To set the upper-most root, use write_session::set_root_revision
+   // * Trees may store roots within their leaves. This makes it possible
+   //   to have an outer tree which holds multiple revisions of inner trees
+   //   within it. This can nest to any depth, assuming there's enough stack
+   //   space to traverse it.
+   // * Several write_session methods take a non-const shared_ptr<root>&; they
+   //   modify this shared_ptr.
+   // * triedent uses a persistent data structure model; the changes that
+   //   mutation functions make aren't reachable after shutdown unless you use
+   //   set_root_revision. They are reachable by other threads without using
+   //   set_root_revision if you pass an up-to-date copy of the shared_ptr<root>
+   //   to the other threads.
+   //
+   // Read thread usage notes:
+   // * The write thread should pass a copy of a shared_ptr<root> to the read threads.
+   //   This may be the upper-most root, or the root(s) of any other tree(s).
+   // * Read threads may use their shared_ptr<root> in combination with a
+   //   read_session to query and iterate.
+   // * Some queries return shared_ptr<root>; use this with any read_session to
+   //   query and iterate this additional tree.
+   // * Read threads never bump database refcounts; they only bump or release
+   //   shared_ptr::use_count, which in turn may reduce database refcounts.
+   //
+   // Thread safety notes:
+   // * If you share a read_session or write_session between threads, then you must
+   //   synchronize access to it. Since a database only allows at most a single
+   //   write_session at a time, only 1 thread at a time may write.
+   // * Recommendation: only have a single write thread and give each read thread
+   //   its own read_session.
+   // * If you share any std::shared_ptr between threads, then you must synchronize
+   //   access to it. e.g. don't pass a non-const reference to std::shared_ptr to
+   //   any write_session methods if that shared_ptr is currently being used by any
+   //   read threads. Instead, copy the shared_ptr between threads. Nothing new
+   //   here; this is a rule from the C++ standard library.
+   // * database::start_write_session and database::start_read_session have internal
+   //   synchronization; you don't need to synchronize access to these functions.
+   class root
+   {
+      template <typename AccessMode>
+      friend class session;
+
+      friend shared_root;
+      friend write_session;
+
+     private:
+      // If db == nullptr, then the other fields don't matter. There are 3
+      // ways to represent an empty tree:
+      //    shared_ptr<root>  == nullptr ||     // Default-initialized shared_ptr
+      //    root::db          == nullptr ||     // Moved-from or default-initialized root
+      //    root::id          == {}             // Result of removing from an almost-empty tree
+      //
+      // If ancestor == nullptr, then id (if not 0) has a refcount on it which will be
+      // decremented within ~root(). If this fails to happen (SIGKILL), then the refcount
+      // will leak; mermaid can clean this up. If id is referenced within a leaf, or there
+      // are any other root instances pointing at it, then its refcount will be greater
+      // than 1, preventing its node from being dropped or edited in place. If
+      // shared_ptr<root>::use_count is greater than 1, then it also won't be dropped or
+      // edited in place. This limits edit-in-place to nodes which aren't reachable by
+      // other threads.
+      //
+      // If ancestor != nullptr, then id doesn't have a refcount on it. ancestor
+      // keeps ancestor's id alive. ancestor's id keeps this id alive. If ancestor is
+      // held anywhere else, then either its shared_ptr::use_count or its storage
+      // refcount will be greater than 1, preventing it from being dropped or edited
+      // in place, which in turn keeps this id and the node it references safe.
+
+      std::shared_ptr<database> db;
+      std::shared_ptr<root>     ancestor;
+      object_id                 id;
+
+      root(std::shared_ptr<database> db, std::shared_ptr<root> ancestor, object_id id)
+          : db(std::move(db)), ancestor(std::move(ancestor)), id(id)
+      {
+      }
+
+     public:
+      root()            = default;
+      root(const root&) = delete;
+      root(root&&)      = default;
+      ~root()
+      {
+         if (db && id && !ancestor)
+         {
+            // TODO
+         }
+      }
+
+      root& operator=(const root&) = delete;
+      root& operator=(root&&)      = default;
+   };  // root
+
    class session_base
    {
       friend database;
@@ -34,7 +128,7 @@ namespace triedent
       using id          = object_id;
 
      protected:
-      id _session_root;
+      id _session_root;  // TODO: remove
       /* auto inc id used to detect when we can modify in place*/
       mutable std::atomic<uint64_t> _hot_swap_p  = -1ull;
       mutable std::atomic<uint64_t> _warm_swap_p = -1ull;
@@ -126,6 +220,7 @@ namespace triedent
       };
 
       /* makes this session read from the root revision */
+      // TODO: move to write_session. return shared_ptr<root>.
       void get_root_revision();
 
       /* changes the root of the tree this session is reading */
@@ -142,12 +237,15 @@ namespace triedent
       /* returns the root of the tree this session is reading */
       id get_session_revision() { return _session_root; }
 
+      // TODO: protected
       inline id retain(id);
 
       /* decrements the revision ref count and frees if necessary */
+      // TODO: protected
       void release_revision(id i);
 
       /* the root revision of this session */
+      // TODO: protected
       id revision() { return _session_root; }
 
       iterator                   first() const;
@@ -167,6 +265,7 @@ namespace triedent
      protected:
       session(const session&) = delete;
 
+      inline object_id           get_id(const std::shared_ptr<root>& r) const;
       void                       validate(id);
       void                       next(iterator& itr) const;
       void                       prev(iterator& itr) const;
@@ -196,11 +295,18 @@ namespace triedent
      public:
       write_session(std::shared_ptr<database> db) : read_session(db) {}
 
-      int upsert(string_view key, string_view val);
-      int remove(string_view key);
-      id  fork(id from_version);
-      id  fork();
+      int upsert(string_view key, string_view val);  // TODO: remove
+      int upsert(std::shared_ptr<root>& r, string_view key, string_view val);
+      int remove(string_view key);  // TODO: remove
+      int remove(std::shared_ptr<root>& r, string_view key);
 
+      // TODO: remove
+      id fork(id from_version);
+
+      // TODO: remove
+      id fork();
+
+      // TODO: shared_ptr<root>
       void set_root_revision(id);
       void clear();
 
@@ -217,6 +323,9 @@ namespace triedent
       ///@}
 
      private:
+      inline bool get_unique(std::shared_ptr<root>& r);
+      inline void update_root(std::shared_ptr<root>& r, object_id id);
+
       inline mutable_deref<value_node> make_value(string_view k, string_view v);
       inline mutable_deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
       inline mutable_deref<inner_node> make_inner(const inner_node& cpy,
@@ -548,6 +657,35 @@ namespace triedent
       return a;
    }
 
+   inline bool write_session::get_unique(std::shared_ptr<root>& r)
+   {
+      // This doesn't check the refcount in object_db; that's checked elsewhere.
+      return r && r->db && !r->ancestor && r.use_count() == 1;
+   }
+
+   inline void write_session::update_root(std::shared_ptr<root>& r, object_id id)
+   {
+      if (r && r->db && r->id == id)
+      {
+         // Either there was no change, or it was edited in place (but only if
+         // unique). For either case, the refcount wasn't bumped and it doesn't
+         // need to be bumped.
+         return;
+      }
+      else if (get_unique(r))
+      {
+         // Even though it is unique, it wasn't edited in place (r->id != id).
+         // The new id (if not 0) has a refcount of 1, so doesn't need to be
+         // bumped.
+         release(r->id);
+         r->id = id;
+      }
+      else
+      {
+         r = std::make_shared<root>(root{_db, nullptr, id});
+      }
+   }
+
    inline mutable_deref<value_node> write_session::make_value(string_view key, string_view val)
    {
       // TODO
@@ -576,7 +714,7 @@ namespace triedent
    }
 
    /**
-    *  Given an existing value node and a new key/value to insert 
+    *  Given an existing value node and a new key/value to insert
     */
    database::id write_session::combine_value_nodes(string_view k1,
                                                    string_view v1,
@@ -676,7 +814,7 @@ namespace triedent
 
    /**
     *  Given an existing tree node (root) add a new key/value under it and return the id
-    *  of the new node if a new node had to be allocated. 
+    *  of the new node if a new node had to be allocated.
     */
    inline database::id write_session::add_child(id          root,
                                                 bool        unique,
@@ -807,6 +945,19 @@ namespace triedent
          release(_session_root);
          _session_root = new_root;
       }
+      return old_size;
+   }
+
+   inline int write_session::upsert(std::shared_ptr<root>& r, string_view key, string_view val)
+   {
+      _db->ensure_free_space();
+      swap_guard g(*this);
+      auto&      ar = *_db->_ring;
+
+      int  old_size = -1;
+      auto new_root = add_child(get_id(r), get_unique(r), to_key6(key), val, old_size);
+      assert(new_root.id);
+      update_root(r, new_root);
       return old_size;
    }
 
@@ -1397,6 +1548,16 @@ namespace triedent
       return removed_size;
    }
 
+   inline int write_session::remove(std::shared_ptr<root>& r, string_view key)
+   {
+      _db->ensure_free_space();
+      swap_guard g(*this);
+      int        removed_size = -1;
+      auto       new_root     = remove_child(get_id(r), get_unique(r), to_key6(key), removed_size);
+      update_root(r, new_root);
+      return removed_size;
+   }
+
    inline database::id write_session::remove_child(id          root,
                                                    bool        unique,
                                                    string_view key,
@@ -1651,6 +1812,16 @@ namespace triedent
       //       Since there might be cases where SIGKILL also cause
       //       this, we probably need to rebuild the free list
       //       from scratch.
+   }
+
+   template <typename AccessMode>
+   inline object_id session<AccessMode>::get_id(const std::shared_ptr<root>& r) const
+   {
+      if (!r || !r->db)
+         return {};
+      if (r->db != _db)
+         throw std::runtime_error("root is from a different database");
+      return r->id;
    }
 
    template <typename AccessMode>
