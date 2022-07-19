@@ -64,6 +64,10 @@ namespace triedent
    //   here; this is a rule from the C++ standard library.
    // * database::start_write_session and database::start_read_session have internal
    //   synchronization; you don't need to synchronize access to these functions.
+   // * If `p` is a `shared_ptr<root>`, then it's usually best to never use `*p`
+   //   or `p->` outside of the code within this file. Especially never use
+   //   `*p = ...` or `std::move(*p)` outside of this file. If you do, you'll have
+   //   additional synchronization rules to deal with which aren't explained here.
    class root
    {
       template <typename AccessMode>
