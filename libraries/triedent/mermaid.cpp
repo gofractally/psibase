@@ -98,6 +98,7 @@ int main(int argc, char** argv)
 
       if (vm.count("import"))
       {
+         // TODO: roots within trees
          if (not std::filesystem::exists(import_file))
          {
             throw std::runtime_error("import file does not exist: " + import_file);
@@ -147,6 +148,7 @@ int main(int argc, char** argv)
       bool e = vm.count("export");
       if (e or c)
       {
+         // TODO: roots within trees
          std::ofstream ef(export_file.c_str(), std::fstream::trunc);
          auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
          auto s  = db->start_write_session();

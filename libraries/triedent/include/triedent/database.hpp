@@ -1616,7 +1616,7 @@ namespace triedent
       if (not r)
          return;
       int cur_ref_count = _db->_ring->ref(r);
-      retain(r);
+      retain(r);  // TODO: overflow
 
       if (cur_ref_count > 1)  // 1 is the default ref when resetting all
          return;              // retaining this node indirectly retains all children
@@ -1636,6 +1636,8 @@ namespace triedent
             ++e;
          }
       }
+
+      // TODO: leaves which point to roots
    }
 
    inline void write_session::start_collect_garbage()
@@ -1644,7 +1646,11 @@ namespace triedent
    }
    inline void write_session::end_collect_garbage()
    {
-      _db->_ring->reset_all_ref_counts(-1);
+      _db->_ring->adjust_all_ref_counts(-1);
+      // TODO: Counts fell to 0 without being added to free list.
+      //       Since there might be cases where SIGKILL also cause
+      //       this, we probably need to rebuild the free list
+      //       from scratch.
    }
 
    template <typename AccessMode>
