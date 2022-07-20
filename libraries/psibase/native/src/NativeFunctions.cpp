@@ -252,6 +252,24 @@ namespace psibase
       return setResult(*this, psio::convert_to_frac(currentActContext->action));
    }
 
+   // TODO: flags arg. potential flags:
+   //   * Prevent writes. Caution: don't accidentally allow prohibited reads.
+   //   * Not needed: prevent recursion; the dispatcher can do that
+   //   * Run in parallel
+   //      * generalization of execVerifyProofs
+   //      * needs access to proofs
+   //      * no return value
+   //      * require prevent writes flag
+   //      * allow nodes to optionally skip during block log replay. Normal replay
+   //        includes since success is part of consensus; especially if this replaces
+   //        execVerifyProofs
+   //      * read snapshot: 1 block behind? Immediately before trx?
+   //      * kvGetTransactionUsage needs to know number of parallel executions and
+   //        execution time.
+   //        CAUTION: kvGetTransactionUsage is currently objective.
+   //          * Create a subjective one?
+   //          * Make it wait until all parallel executions complete?
+   //          * Caution with waiting: vulnerability when combined with canNotTimeOut
    uint32_t NativeFunctions::call(eosio::vm::span<const char> data)
    {
       // TODO: replace temporary rule
