@@ -27,8 +27,8 @@ namespace triedent
 
    // Write thread usage notes:
    // * To create a new tree, default-initialize a shared_ptr<root>
-   // * To get the upper-most root, use write_session::get_root_revision
-   // * To set the upper-most root, use write_session::set_root_revision
+   // * To get the upper-most root, use write_session::get_top_root
+   // * To set the upper-most root, use write_session::set_top_root
    // * Trees may store roots within their leaves. This makes it possible
    //   to have an outer tree which holds multiple revisions of inner trees
    //   within it. This can nest to any depth, assuming there's enough stack
@@ -37,8 +37,8 @@ namespace triedent
    //   modify this shared_ptr.
    // * triedent uses a persistent data structure model; the changes that
    //   mutation functions make aren't reachable after shutdown unless you use
-   //   set_root_revision. They are reachable by other threads without using
-   //   set_root_revision if you pass an up-to-date copy of the shared_ptr<root>
+   //   set_top_root. They are reachable by other threads without using
+   //   set_top_root if you pass an up-to-date copy of the shared_ptr<root>
    //   to the other threads.
    //
    // Read thread usage notes:
@@ -223,10 +223,6 @@ namespace triedent
          const session* _session;
       };
 
-      /* makes this session read from the root revision */
-      // TODO: move to write_session. return shared_ptr<root>.
-      void get_root_revision();
-
       /* changes the root of the tree this session is reading */
       void set_session_revision(id r)
       {
@@ -244,21 +240,23 @@ namespace triedent
       // TODO: protected
       inline id retain(id);
 
-      /* decrements the revision ref count and frees if necessary */
-      // TODO: protected
-      void release_revision(id i);
-
       /* the root revision of this session */
-      // TODO: protected
+      // TODO: remove
       id revision() { return _session_root; }
 
-      iterator                   first() const;
-      iterator                   last() const;
-      iterator                   find(string_view key) const;
-      iterator                   lower_bound(string_view key) const;
-      iterator                   last_with_prefix(string_view prefix) const;
-      bool                       get(string_view key, std::string& result) const;
-      std::optional<std::string> get(string_view key) const;
+      // This is more efficient than simply dropping r since it
+      // doesn't usually lock a mutex. However, like dropping r,
+      // it still recurses, so there may be an advantage to
+      // calling this from a dedicated cleanup thread.
+      void release(std::shared_ptr<root>& r);
+
+      iterator first() const;
+      iterator last() const;
+      iterator find(string_view key) const;
+      iterator lower_bound(string_view key) const;
+      iterator last_with_prefix(string_view prefix) const;
+      bool     get(const std::shared_ptr<root>& r, string_view key, std::string& result) const;
+      std::optional<std::string> get(const std::shared_ptr<root>& r, string_view key) const;
 
       void print();
       void validate();
@@ -299,19 +297,12 @@ namespace triedent
      public:
       write_session(std::shared_ptr<database> db) : read_session(db) {}
 
-      int upsert(string_view key, string_view val);  // TODO: remove
+      std::shared_ptr<root> get_top_root();
+      void                  set_top_root(const std::shared_ptr<root>& r);
+
       int upsert(std::shared_ptr<root>& r, string_view key, string_view val);
-      int remove(string_view key);  // TODO: remove
       int remove(std::shared_ptr<root>& r, string_view key);
 
-      // TODO: remove
-      id fork(id from_version);
-
-      // TODO: remove
-      id fork();
-
-      // TODO: shared_ptr<root>
-      void set_root_revision(id);
       void clear();
 
       /**
@@ -388,8 +379,6 @@ namespace triedent
 
       void print_stats(bool detail = false);
 
-      id get_root_revision() const;
-
      private:
       inline void release(id);
 
@@ -403,8 +392,15 @@ namespace triedent
 
       struct database_memory
       {
-         std::atomic<uint64_t> _root_revision;
-         database_memory() { _root_revision.store(0); }
+         // top_root is protected by _root_change_mutex to prevent race conditions
+         // which involve loading or storing top_root, bumping refcounts, decrementing
+         // refcounts, cloning, and cleaning up node children when the refcount hits 0.
+         // Since it's protected by a mutex, it normally wouldn't need to be atomic.
+         // However, making it atomic hopefully aids SIGKILL behavior, which is impacted
+         // by instruction reordering and multi-instruction non-atomic writes.
+         std::atomic<uint64_t> top_root;
+
+         database_memory() { top_root.store(0); }
       };
 
       static std::atomic<int>      _read_thread_number;
@@ -490,58 +486,6 @@ namespace triedent
       location_lock lock;
    };  // mutable_deref
 
-   inline void write_session::set_root_revision(id i)
-   {
-      std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
-      if (_db->_dbm->_root_revision != i.id)
-      {
-         retain(i);
-         release({_db->_dbm->_root_revision.load()});
-         _db->_dbm->_root_revision.store(i.id);
-         WARN("SET ROOT REV: ", i.id);
-      }
-   }
-
-   // TODO: remove
-   inline database::id write_session::fork(id from_version)
-   {
-      swap_guard g(this);
-
-      id new_root = from_version;
-
-      if (from_version)
-      {
-         auto n = get(from_version);
-         if (n.is_leaf_node())
-         {
-            auto& vn = n.as_value_node();
-            new_root = make_value(vn.key(), vn.data());
-         }
-         else
-         {
-            auto& in = n.as_inner_node();
-            new_root = make_inner(in, in.key(), in.value(), in.branches());
-         }
-      }
-
-      release(_session_root);
-      _session_root = new_root;
-      return _session_root;
-   }
-
-   inline database::id write_session::fork()
-   {
-      return fork(_session_root);
-   }
-
-   inline database::id database::get_root_revision() const
-   {
-      std::lock_guard<std::mutex> lock(_root_change_mutex);
-      if (_dbm->_root_revision)
-         _ring->retain({_dbm->_root_revision});
-      return {_dbm->_root_revision};
-   }
-
    template <typename AccessMode>
    inline auto& session<AccessMode>::ring()
    {
@@ -618,6 +562,19 @@ namespace triedent
    }
 
    template <typename AccessMode>
+   inline void session<AccessMode>::release(std::shared_ptr<root>& r)
+   {
+      if (r.use_count() == 1 && r->db && !r->ancestor && r->id)
+      {
+         auto id = r->id;
+         r->id   = {};
+         swap_guard g(*this);
+         release(id);
+      }
+      r = {};
+   }
+
+   template <typename AccessMode>
    inline void session<AccessMode>::release(id obj)
    {
       _db->release(obj);
@@ -639,13 +596,6 @@ namespace triedent
       return obj;
    }
 
-   template <typename AccessMode>
-   inline void session<AccessMode>::release_revision(id i)
-   {
-      swap_guard g(*this);
-      _db->release(i);
-   }
-
    inline std::string_view common_prefix(std::string_view a, std::string_view b)
    {
       if (a.size() > b.size())
@@ -659,6 +609,34 @@ namespace triedent
          ++itr;
       }
       return a;
+   }
+
+   inline std::shared_ptr<root> write_session::get_top_root()
+   {
+      _db->ensure_free_space();
+      std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
+      auto                        id = _db->_dbm->top_root.load();
+      if (!id)
+         return {};
+
+      swap_guard g(*this);
+      id = bump_refcount_or_copy(ring(), {id}).id;
+      return std::make_shared<root>(root{_db, nullptr, {id}});
+   }
+
+   inline void write_session::set_top_root(const std::shared_ptr<root>& r)
+   {
+      _db->ensure_free_space();
+      std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
+      auto                        current = _db->_dbm->top_root.load();
+      auto                        id      = get_id(r);
+      if (current == id.id)
+         return;
+
+      swap_guard g(*this);
+      id = bump_refcount_or_copy(ring(), id);
+      _db->_dbm->top_root.store(id.id);
+      release({current});
    }
 
    inline bool write_session::get_unique(std::shared_ptr<root>& r)
@@ -930,26 +908,6 @@ namespace triedent
       swap_guard g(*this);
       release(_session_root);
       _session_root = id();
-   }
-
-   // return -1 on insert, the size of the old object on update
-   inline int write_session::upsert(string_view key, string_view val)
-   {
-      _db->ensure_free_space();
-      swap_guard g(*this);
-
-      auto& ar = *_db->_ring;
-
-      int  old_size = -1;
-      auto new_root = add_child(_session_root, true, to_key6(key), val, old_size);
-      assert(new_root.id);
-      //  std::cout << "new_root: " << new_root.id << "  old : " << rev._root.id << "\n";
-      if (new_root != _session_root)
-      {
-         release(_session_root);
-         _session_root = new_root;
-      }
-      return old_size;
    }
 
    inline int write_session::upsert(std::shared_ptr<root>& r, string_view key, string_view val)
@@ -1457,18 +1415,19 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   std::optional<std::string> session<AccessMode>::get(string_view key) const
+   std::optional<std::string> session<AccessMode>::get(const std::shared_ptr<root>& r,
+                                                       string_view                  key) const
    {
-      std::string r;
-      if (get(key, r))
-      {
-         return std::optional(std::move(r));
-      }
+      std::string result;
+      if (get(r, key, result))
+         return std::optional(std::move(result));
       return std::nullopt;
    }
 
    template <typename AccessMode>
-   bool session<AccessMode>::get(string_view key, std::string& result) const
+   bool session<AccessMode>::get(const std::shared_ptr<root>& r,
+                                 string_view                  key,
+                                 std::string&                 result) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
@@ -1476,7 +1435,7 @@ namespace triedent
       auto       k6 = to_key6(key);
       swap_guard g(*this);
 
-      auto v = get(_session_root, k6);
+      auto v = get(get_id(r), k6);
       if (v)
       {
          result.resize(v->size());
@@ -1536,20 +1495,6 @@ namespace triedent
          root = in.branch(b);
       }
       return std::nullopt;
-   }
-
-   inline int write_session::remove(string_view key)
-   {
-      _db->ensure_free_space();
-      swap_guard g(*this);
-      int        removed_size = -1;
-      auto       new_root     = remove_child(_session_root, true, to_key6(key), removed_size);
-      if (new_root != _session_root)
-      {
-         release(_session_root);
-         _session_root = new_root;
-      }
-      return removed_size;
    }
 
    inline int write_session::remove(std::shared_ptr<root>& r, string_view key)

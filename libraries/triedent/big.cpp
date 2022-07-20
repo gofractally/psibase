@@ -41,7 +41,6 @@ int main(int argc, char** argv)
    uint64_t    insert_count;
    uint64_t    status_count;
    bool        check_content = false;
-   bool        use_nt        = false;
 
    uint32_t                num_read_threads = 6;
    po::options_description desc("Allowed options");
@@ -68,7 +67,6 @@ int main(int argc, char** argv)
    opt("stat,s", po::value<uint64_t>(&status_count)->default_value(1000000ull),
        "the number of how often to print stats");
    opt("check-content", po::bool_switch(&check_content), "check content against std::map (slow)");
-   // opt("node-traversal,n", po::bool_switch(&use_nt), "use node_traversal");
 
    po::variables_map vm;
    po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -101,24 +99,15 @@ int main(int argc, char** argv)
    auto& db  = *_db;
    db.print_stats();
    std::cerr << "\n";
-   auto s = db.start_write_session();
-   /*
-   triedent::root nt_root;
-   if (use_nt)
-   {
-      // TODO: load nt_root
-   }
-   else
-   */
-   s->set_session_revision(db.get_root_revision());
+   auto s    = db.start_write_session();
+   auto root = s->get_top_root();
 
-   std::mutex            revisions_mutex;
-   std::vector<uint64_t> revisions(16);
-   // std::vector<triedent::shared_root> nt_revisions(16);
-   std::map<std::string, std::string> base;
+   using root_t = std::shared_ptr<triedent::root>;
+   std::mutex          revisions_mutex;
+   std::vector<root_t> revisions(16);
 
    auto start = std::chrono::steady_clock::now();
-   srand(s->get_session_revision().id);
+   srand(time(nullptr));
 
    std::cerr << "starting...\n";
 
@@ -145,8 +134,9 @@ int main(int argc, char** argv)
    {
       try
       {
-         int  v  = r.load();
-         auto rs = db.start_read_session();
+         int    v  = r.load();
+         auto   rs = db.start_read_session();
+         root_t rr;
 
          std::mt19937 gen(c);
 
@@ -154,19 +144,8 @@ int main(int argc, char** argv)
          while (not done.load(std::memory_order_acquire))
          {
             {
-               triedent::object_id r;
-               {
-                  std::lock_guard lock{revisions_mutex};
-                  /*
-                  if (use_nt)
-                     r = {nt_revisions[(v - 4) % 16].get_id()};
-                  else
-                  */
-                  r = {revisions[(v - 4) % 16]};
-                  rs->retain(r);  // TODO: this can malfunction
-               }
-               rs->set_session_revision(r);
-               rs->release_revision(r);
+               std::lock_guard lock{revisions_mutex};
+               rr = {revisions[(v - 4) % 16]};
             }
             while (r.load(std::memory_order_relaxed) == v)
             {
@@ -208,27 +187,12 @@ int main(int argc, char** argv)
              if (min > last_r)
              {
                 //            WARN( "release revision: ", (min-6)%16, "  r: ", min );
-                /*
-                if (use_nt)
+                root_t r;
                 {
-                   triedent::shared_root r;
-                   {
-                      std::lock_guard lock{revisions_mutex};
-                      r = std::move(nt_revisions[(min - 6) % 16]);
-                   }
-                   rs->destroy(std::move(r));
+                   std::lock_guard lock{revisions_mutex};
+                   r = std::move(revisions[(min - 6) % 16]);
                 }
-                else
-                */
-                {
-                   triedent::object_id r;
-                   {
-                      std::lock_guard lock{revisions_mutex};
-                      r                         = {.id = revisions[(min - 6) % 16]};
-                      revisions[(min - 6) % 16] = 0;
-                   }
-                   rs->release_revision(r);
-                }
+                rs->release(r);
                 last_r = min;
              }
              usleep(100);
@@ -256,33 +220,14 @@ int main(int argc, char** argv)
       {
          if (i > 0 and i % (status_count / 10) == 0)
          {
-            auto new_r = r.load();
-            //       WARN( "NEW R: ", new_r, " id:" , s->get_session_revision().id );
-            /*
-            if (use_nt)
+            auto   new_r = r.load();
+            root_t old_root;
             {
-               auto                  r = s->clone(nt_root);
-               triedent::shared_root old_r;
-               {
-                  std::lock_guard lock{revisions_mutex};
-                  old_r                    = std::move(nt_revisions[new_r % 16]);
-                  nt_revisions[new_r % 16] = std::move(r);
-               }
-               s->destroy(std::move(old_r));
+               std::lock_guard lock{revisions_mutex};
+               old_root              = std::move(revisions[new_r % 16]);
+               revisions[new_r % 16] = root;
             }
-            else
-            */
-            {
-               auto r = s->get_session_revision();
-               s->retain(r);  // TODO: this can malfunction
-               triedent::object_id old_r;
-               {
-                  std::lock_guard lock{revisions_mutex};
-                  old_r                 = {.id = revisions[new_r % 16]};
-                  revisions[new_r % 16] = r.id;
-               }
-               s->release_revision(old_r);
-            }
+            s->release(old_root);
 
             if (++r == 6)
             {
@@ -343,12 +288,7 @@ int main(int argc, char** argv)
                if (check_content)
                   comparison_map[str] = str;
                int inserted;
-               /*
-               if (use_nt)
-                  inserted = s->upsert(nt_root, str, str);
-               else
-               */
-               inserted = s->upsert(str, str);
+               inserted = s->upsert(root, str, str);
                if (inserted >= 0)
                {
                   WARN("failed to insert: ", h);
@@ -361,12 +301,7 @@ int main(int argc, char** argv)
                if (check_content)
                   comparison_map[(std::string)hk] = (std::string)hk;
                int inserted;
-               /*
-               if (use_nt)
-                  inserted = s->upsert(nt_root, hk, hk);
-               else
-               */
-               inserted = s->upsert(hk, hk);
+               inserted = s->upsert(root, hk, hk);
                if (inserted >= 0)
                {
                   WARN("failed to insert: ", h);
@@ -391,14 +326,7 @@ int main(int argc, char** argv)
    auto delta = end - start;
    std::cerr << "\ninsert took:    " << std::chrono::duration<double, std::milli>(delta).count()
              << " ms\n";
-   /*
-   if (use_nt)
-   {
-      // TODO
-   }
-   else
-   */
-   s->set_root_revision(s->get_session_revision());
+   s->set_top_root(root);
    db.print_stats();
    std::cerr << "\n";
 
@@ -410,12 +338,7 @@ int main(int argc, char** argv)
       for (auto& [k, v] : comparison_map)
       {
          std::string read_value;
-         /*
-         if (use_nt && !s->get(nt_root, k, read_value))
-            ++missing;
-         else 
-         */
-         if (!use_nt && !s->get(k, read_value))
+         if (!s->get(root, k, read_value))
             ++missing;
          else if (read_value != v)
             ++mismatched;
