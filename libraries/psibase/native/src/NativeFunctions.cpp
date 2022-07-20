@@ -262,7 +262,7 @@ namespace psibase
    //      * require prevent writes flag
    //      * allow nodes to optionally skip during block log replay. Normal replay
    //        includes since success is part of consensus; especially if this replaces
-   //        execVerifyProofs
+   //        execVerifyProofs. Production absolutely must not skip.
    //      * read snapshot: 1 block behind? Immediately before trx?
    //      * kvGetTransactionUsage needs to know number of parallel executions and
    //        execution time.
@@ -270,6 +270,15 @@ namespace psibase
    //          * Create a subjective one?
    //          * Make it wait until all parallel executions complete?
    //          * Caution with waiting: vulnerability when combined with canNotTimeOut
+   //      * Flag to indicate that a parallel run failure is an authorization failure.
+   //        Only privileged contracts can set this since it impacts billing.
+   //        Iffy. There's got to be another way. Some of the billing policies seem to
+   //        be leaking into native.
+   //      * Need to prioritize proofs over other background tasks. Rely on the above flag?
+   //      * Don't allow RPC to invoke parallel. High cost, no reward for queries since it
+   //        can only indicate failure.
+   //      * Consensus config: number of wasm memories for a parallel execution
+   //      * Node config: number of parallel executions happening at the same time
    uint32_t NativeFunctions::call(eosio::vm::span<const char> data)
    {
       // TODO: replace temporary rule

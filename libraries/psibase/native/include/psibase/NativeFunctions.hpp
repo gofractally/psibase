@@ -24,6 +24,15 @@ namespace psibase
       // TODO: clean up which functions do/don't clear result_*
       // TODO: delete range. Need some way for system contracts to enable/disable it
       //       since it's only compatible with some resource models
+      // TODO: some way for transaction-sys to indicate auth failures.
+      //       Maybe not an intrinsic? Is there a way to tie this into the
+      //       subjective mechanics?
+      // TODO: related to ^. Some way to bill failed transactions after the first
+      //       authorizer has been verified. But... custom proof and auth contracts
+      //       could abuse that. Maybe a time limit for the proofs and the first auth
+      //       contract? Can't limit just a single proof since first auth could depend
+      //       on several proofs.
+      // TODO: related to ^. See TODOs on NativeFunctions::call
 
       uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset);
       uint32_t getKey(eosio::vm::span<char> dest);
