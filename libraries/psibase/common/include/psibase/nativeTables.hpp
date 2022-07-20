@@ -38,6 +38,7 @@ namespace psibase
    }
    struct AccountRow
    {
+      // Constants for flags
       static constexpr uint64_t allowSudo            = uint64_t(1) << 0;
       static constexpr uint64_t allowWriteNative     = uint64_t(1) << 1;
       static constexpr uint64_t isSubjective         = uint64_t(1) << 2;
@@ -47,7 +48,7 @@ namespace psibase
 
       AccountNumber num;           // TODO: rename
       AccountNumber authContract;  // TODO: move out of native
-      uint64_t      flags = 0;     // allowSudo | allowWriteNative | isSubjective
+      uint64_t      flags = 0;     // Constants above
 
       // TODO?  1 account with contract per 1000+ without - faster perf on dispatch because don't need to lookup new account
       Checksum256 codeHash  = {};

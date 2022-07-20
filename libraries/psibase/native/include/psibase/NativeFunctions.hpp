@@ -22,6 +22,8 @@ namespace psibase
 
       // TODO: rename kvPutSequential, kvGetSequential
       // TODO: clean up which functions do/don't clear result_*
+      // TODO: delete range. Need some way for system contracts to enable/disable it
+      //       since it's only compatible with some resource models
 
       uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset);
       uint32_t getKey(eosio::vm::span<char> dest);
