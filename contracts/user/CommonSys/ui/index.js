@@ -1,9 +1,7 @@
 import { siblingUrl } from "/common/rootdomain.mjs";
 import { signAndPushTransaction, CommonResources, ErrorCodes, MessageTypes } from "/common/rpc.mjs";
-import htm from "https://unpkg.com/htm@3.1.0?module";
-await import(
-  "https://unpkg.com/react-router-dom@5.3.3/umd/react-router-dom.min.js"
-);
+import htm from "/common/htm.module.js";
+await import("/common/react-router-dom.min.js");
 
 const html = htm.bind(React.createElement);
 

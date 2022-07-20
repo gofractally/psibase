@@ -1,4 +1,4 @@
-import htm from "https://unpkg.com/htm@3.1.0?module";
+import htm from "/common/htm.module.js";
 import { siblingUrl } from "/common/rootdomain.mjs";
 import { initializeApplet, 
   getJson, action, addRoute, push, 
@@ -270,10 +270,7 @@ function App() {
     // Todo - Timeout is used because sometimes the window.parentIFrame isn't loaded yet when 
     //  this runs. Should use a better fix for the race condition than a delay.
     setTimeout(()=>{ 
-      getLocalResource(CommonResources.loggedInUser, (u)=>{
-        console.log("got user " + user);
-        setUser(u);
-      });
+      getLocalResource(CommonResources.loggedInUser, setUser);
     }, 50);
   }, []);
 

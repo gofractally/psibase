@@ -221,10 +221,11 @@ void DefaultTestChain::registerSysRpc()
    transactor<ExploreSys>  rpcExplore(ExploreSys::contract, ExploreSys::contract);
 
    // Store UI files
-   std::string cdir   = "../contracts";
-   std::string comDir = cdir + "/user/CommonSys";
-   std::string accDir = cdir + "/system/AccountSys";
-   std::string expDir = cdir + "/user/ExploreSys";
+   std::string cdir     = "../contracts";
+   std::string comDir   = cdir + "/user/CommonSys";
+   std::string accDir   = cdir + "/system/AccountSys";
+   std::string expDir   = cdir + "/user/ExploreSys";
+   std::string thirdPty = comDir + "/common/thirdParty/src";
 
    const std::string html = "text/html";
    const std::string js   = "text/javascript";
@@ -242,9 +243,25 @@ void DefaultTestChain::registerSysRpc()
                           read_whole_file(comDir + "/common/SimpleUI.mjs")),
        rpcCommon.storeSys("/common/keyConversions.mjs", js,
                           read_whole_file(comDir + "/common/keyConversions.mjs")),
-       rpcCommon.storeSys("/common/loginBar.js", js,
-                          read_whole_file(comDir + "/common/loginBar.js")),
        rpcCommon.storeSys("/ui/index.js", js, read_whole_file(comDir + "/ui/index.js")),
+
+       // CommonSys - 3rd party
+       rpcCommon.storeSys("/common/iframeResizer.js", js,
+                          read_whole_file(thirdPty + "/iframeResizer.js")),
+       rpcCommon.storeSys("/common/iframeResizer.contentWindow.js", js,
+                          read_whole_file(thirdPty + "/iframeResizer.contentWindow.js")),
+       rpcCommon.storeSys("/common/react.production.min.js", js,
+                          read_whole_file(thirdPty + "/react.production.min.js")),
+       rpcCommon.storeSys("/common/react-dom.production.min.js", js,
+                          read_whole_file(thirdPty + "/react-dom.production.min.js")),
+       rpcCommon.storeSys("/common/react-router-dom.min.js", js,
+                          read_whole_file(thirdPty + "/react-router-dom.min.js")),
+       rpcCommon.storeSys("/common/htm.module.js", js,
+                          read_whole_file(thirdPty + "/htm.module.js")),
+       rpcCommon.storeSys("/common/react.development.js", js,
+                          read_whole_file(thirdPty + "/react.development.js")),
+       rpcCommon.storeSys("/common/react-dom.development.js", js,
+                          read_whole_file(thirdPty + "/react-dom.development.js")),
 
        // AccountSys
        rpcAccount.storeSys("/", html, read_whole_file(accDir + "/ui/index.html")),

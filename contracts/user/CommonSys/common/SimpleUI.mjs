@@ -1,8 +1,8 @@
-import htm from 'https://unpkg.com/htm@3.1.0?module';
+import htm from '/common/htm.module.js';
 import { getJson, packAction, signAndPushTransaction } from './rpc.mjs';
 
-await import('https://unpkg.com/react@18/umd/react.production.min.js');
-await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
+await import('/common/react.production.min.js');
+await import('/common/react-dom.production.min.js');
 const html = htm.bind(React.createElement);
 
 const contract = await getJson('/common/thiscontract');
