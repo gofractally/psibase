@@ -177,7 +177,7 @@ void pushTransaction(BlockContext&             bc,
    }
 }  // pushTransaction
 
-void run(const char* db_path, bool produce, const char* host, uint32_t leeway_us)
+void run(const char* db_path, bool produce, const char* host, bool host_perf, uint32_t leeway_us)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -198,6 +198,7 @@ void run(const char* db_path, bool produce, const char* host, uint32_t leeway_us
           .address          = "0.0.0.0",
           .port             = 8080,
           .host             = host,
+          .host_perf        = host_perf,
       });
 
       // TODO: speculative execution on non-producers
@@ -229,9 +230,18 @@ void run(const char* db_path, bool produce, const char* host, uint32_t leeway_us
    // TODO: replay
    while (true)
    {
-      std::this_thread::sleep_for(std::chrono::milliseconds{1000});
+      std::this_thread::sleep_for(std::chrono::milliseconds{100});
       if (produce)
       {
+         TimePointSec t{(uint32_t)time(nullptr)};
+         {
+            Database db{system->sharedDatabase};
+            auto     session = db.startRead();
+            auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+            if (status && status->head && status->head->header.time >= t)
+               continue;
+         }
+
          std::vector<transaction_queue::entry> entries;
          {
             std::scoped_lock lock{queue->mutex};
@@ -239,7 +249,8 @@ void run(const char* db_path, bool produce, const char* host, uint32_t leeway_us
          }
 
          BlockContext bc{*system, true, true};
-         bc.start();
+         bc.start(t);
+         bc.callStartBlock();
 
          bool abort_boot = false;
          for (auto& entry : entries)
@@ -276,6 +287,9 @@ OPTIONS:
       -o, --host <name>
             Host http server
 
+      -O, --host-perf
+            Show various metrics
+
       -l, --leeway <amount>
             Transaction leeway, in us. Defaults to 30000.
 
@@ -290,6 +304,7 @@ int main(int argc, char* argv[])
    bool        error      = false;
    bool        produce    = false;
    const char* host       = nullptr;
+   bool        host_perf  = false;
    uint32_t    leeway_us  = 30000;  // TODO: find a good default
    int         next_arg   = 1;
    while (next_arg < argc && argv[next_arg][0] == '-')
@@ -301,6 +316,8 @@ int main(int argc, char* argv[])
       else if ((!strcmp(argv[next_arg], "-o") || !strcmp(argv[next_arg], "--host")) &&
                next_arg + 1 < argc)
          host = argv[++next_arg];
+      else if (!strcmp(argv[next_arg], "-O") || !strcmp(argv[next_arg], "--host-perf"))
+         host_perf = true;
       else if ((!strcmp(argv[next_arg], "-l") || !strcmp(argv[next_arg], "--leeway")) &&
                next_arg + 1 < argc)
          leeway_us = std::stoi(argv[++next_arg]);
@@ -322,7 +339,7 @@ int main(int argc, char* argv[])
    }
    try
    {
-      run(argv[next_arg], produce, host, leeway_us);
+      run(argv[next_arg], produce, host, host_perf, leeway_us);
       return 0;
    }
    catch (std::exception& e)

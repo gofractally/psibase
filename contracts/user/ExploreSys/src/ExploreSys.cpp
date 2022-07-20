@@ -23,7 +23,7 @@ namespace system_contract
 {
    std::optional<psibase::RpcReplyData> ExploreSys::serveSys(psibase::RpcRequestData request)
    {
-      if (auto result = at<psibase::CommonSys>().serveCommon(request).unpack())
+      if (auto result = at<CommonSys>().serveCommon(request).unpack())
          return result;
       if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;

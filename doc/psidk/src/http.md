@@ -43,17 +43,18 @@ TODO: npm package which supports bundling
 <!-- prettier-ignore -->
 ```js
 // Use these if your script is NOT hosted by psinode:
-import { signAndPushTransaction }
+import { getTaposForHeadBlock, signAndPushTransaction }
     from 'http://psibase.127.0.0.1.sslip.io:8080/common/rpc.mjs';
 const baseUrl = 'http://psibase.127.0.0.1.sslip.io:8080';
 
 // Use these if your script is hosted by psinode:
-//    import {signAndPushTransaction} from '/common/rpc.mjs';
+//    import {getTaposForHeadBlock, signAndPushTransaction} from '/common/rpc.mjs';
 //    const baseUrl = '';
 
 try {
     const transaction = {
         tapos: {
+            ...await getTaposForHeadBlock(baseUrl),
             // expire after 10 seconds
             expiration: new Date(Date.now() + 10000),
         },
@@ -316,9 +317,11 @@ or be empty or null; see [rootdomain and siblingUrl (js)](#rootdomain-and-siblin
 ```
 {
     tapos: {
-        expiration: "..." // When transaction expires (UTC)
-                          // Example value: "2022-05-31T21:32:23Z"
-                          // Use `new Date(...)` to generate the correct format.
+        refBlockIndex: ...,   // Identifies block
+        refBlockSuffix: ...,  // Identifies block
+        expiration: "..."     // When transaction expires (UTC)
+                              // Example value: "2022-05-31T21:32:23Z"
+                              // Use `new Date(...)` to generate the correct format.
     },
     actions: [],        // See below
 }

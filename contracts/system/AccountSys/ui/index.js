@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, postJsonGetArrayBuffer, uint8ArrayToHex, packAndPushSignedTransaction } from '/common/rpc.mjs';
+import { getJson, getTaposForHeadBlock, packAndPushSignedTransaction } from '/common/rpc.mjs';
 
 await import('https://unpkg.com/react@18/umd/react.production.min.js');
 await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
@@ -57,6 +57,7 @@ async function newAccount(name, pubkey, addMsg, clearMsg) {
         const trace = await packAndPushSignedTransaction('', {
             transaction: {
                 tapos: {
+                    ...await getTaposForHeadBlock(),
                     expiration: new Date(Date.now() + 10_000),
                 },
                 actions,

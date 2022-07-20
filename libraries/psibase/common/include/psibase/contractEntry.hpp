@@ -5,7 +5,8 @@
 
 namespace psibase
 {
-   static constexpr auto proxyContractNum = AccountNumber("proxy-sys");
+   static constexpr auto transactionContractNum = AccountNumber("transact-sys");
+   static constexpr auto proxyContractNum       = AccountNumber("proxy-sys");
 
    struct VerifyData
    {

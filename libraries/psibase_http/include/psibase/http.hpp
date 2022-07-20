@@ -28,6 +28,7 @@ namespace psibase::http
       std::string               host                   = {};
       push_boot_t               push_boot_async        = {};
       push_transaction_t        push_transaction_async = {};
+      bool                      host_perf              = false;
    };
 
    struct server

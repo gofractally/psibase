@@ -26,8 +26,10 @@ namespace psibase
       /// Data that is not part of consensus
       ///
       /// Only accessible to subjective contracts during transactions,
-      /// but readable by all contracts during RPC. Individual nodes may
-      /// modify this database or wipe it entirely at will.
+      /// but readable by all contracts during RPC. Doesn't undo
+      /// from aborting transactions, aborting blocks, or forking
+      /// blocks. Individual nodes may modify this database or wipe
+      //  it entirely at will.
       subjective,
 
       /// Tables used by native code

@@ -6,6 +6,9 @@
 
 namespace system_contract
 {
+   // TODO: account deletion, with an index to prevent reusing IDs
+   // TODO: a mode which restricts which account may use newAccount.
+   //       also let the UI know.
    class AccountSys : public psibase::Contract<AccountSys>
    {
      public:

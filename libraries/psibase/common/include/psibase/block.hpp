@@ -54,16 +54,39 @@ namespace psibase
    };
    PSIO_REFLECT(Claim, contract, rawData)
 
+   // Rules for TAPOS:
+   // * Reference block's number must be either:
+   //    * One of the most-recent 128 blocks. For this case, refBlockIndex = blockNum & 0x7f
+   //    * A multiple of 8192. For this case, refBlockIndex = (blockNum >> 13) | 0x80
+   // * refBlockSuffix = last 4 bytes of the block ID, bit-casted to uint32_t.
+   //
+   // TransactionSys maintains block suffixes for:
+   // * The most-recent 128 blocks. This allows transactions to depend on other recent transactions.
+   // * The most-recent 128 blocks which have block numbers which are a multiple of 8192. This gives
+   //   users which sign transactions offline plenty of time to do so.
+   //
+   // If the blocks are all 1 second apart, then the second case allows up to 12 days to sign and execute
+   // a transaction. If the blocks have variable length, then the amount of available time will vary with
+   // network activity. If we assume a max sustained block rate of 4 per sec, then this still allows 3 days.
+   //
+   // A transaction will be rejected if:
+   // * It is expired.
+   // * It arrives earlier than (expired - maxTrxLifetime). maxTrxLifetime
+   //   is defined in TransactionSys.cpp and may be changed in the future.
+   // * It references a block that isn't on the current fork, or a block which
+   //   is too old. For best results, use the most-recent irreversible block which
+   //   meets the criteria.
    struct Tapos
    {
-      static constexpr uint16_t do_not_broadcast = 1u << 0;
+      static constexpr uint16_t do_not_broadcast_flag = 1u << 0;
+      static constexpr uint16_t valid_flags           = 0x0001;
 
       TimePointSec expiration;
+      uint32_t     refBlockSuffix = 0;
       uint16_t     flags          = 0;
-      uint32_t     refBlockPrefix = 0;
-      uint16_t     refBlockNum    = 0;
+      uint8_t      refBlockIndex  = 0;
    };
-   PSIO_REFLECT(Tapos, definitionWillNotChange(), expiration, flags, refBlockPrefix, refBlockNum)
+   PSIO_REFLECT(Tapos, definitionWillNotChange(), expiration, refBlockSuffix, flags, refBlockIndex)
 
    // TODO: separate native-defined fields from contract-defined fields
    struct Transaction

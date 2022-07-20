@@ -1,4 +1,5 @@
 #include <psibase/TransactionContext.hpp>
+#include <psibase/contractEntry.hpp>
 
 namespace psibase
 {
@@ -23,16 +24,13 @@ namespace psibase
    }
 
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold
-   void BlockContext::start(std::optional<TimePointSec> time)
+   StatusRow BlockContext::start(std::optional<TimePointSec> time)
    {
       check(!started, "block has already been started");
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       if (!status)
-      {
          status.emplace();
-         if (!isReadOnly)
-            db.kvPut(StatusRow::db, status->key(), *status);
-      }
+
       auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
       if (!dbStatus)
       {
@@ -64,20 +62,58 @@ namespace psibase
          if (time)
             current.header.time = *time;
       }
+      status->current = current.header;
+      if (!isReadOnly)
+         db.kvPut(StatusRow::db, status->key(), *status);
       started = true;
       active  = true;
+      return *status;
    }
 
    // TODO: (or elsewhere) check block signature
    void BlockContext::start(Block&& src)
    {
-      start(src.header.time);
-      active = false;
+      auto status = start(src.header.time);
+      active      = false;
       check(src.header.previous == current.header.previous,
             "block previous does not match expected");
       check(src.header.blockNum == current.header.blockNum, "block num does not match expected");
-      current = std::move(src);
-      active  = true;
+      current        = std::move(src);
+      status.current = current.header;
+      db.kvPut(StatusRow::db, status.key(), status);
+      active = true;
+   }
+
+   void BlockContext::callStartBlock()
+   {
+      if (current.header.blockNum == 2)
+         return;
+
+      checkActive();
+      active = false;
+
+      Action action{
+          .sender   = {},
+          .contract = transactionContractNum,
+          .method   = MethodNumber("startBlock"),
+          .rawData  = {},
+      };
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, false};
+      auto&              atrace = trace.actionTraces.emplace_back();
+
+      // Failure here aborts the block since transaction-sys relies on startBlock
+      // functioning correctly. Fixing this type of failure requires forking
+      // the chain, just like fixing bugs which block transactions within
+      // transaction-sys's process_transaction may require forking the chain.
+      //
+      // TODO: log failure
+      tc.execNonTrxAction(0, action, atrace);
+      // printf("%s\n", prettyTrace(atrace).c_str());
+
+      tc.session.commit();
+      active = true;
    }
 
    void BlockContext::commit()
@@ -88,9 +124,19 @@ namespace psibase
 
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       check(status.has_value(), "missing status record");
-      status->head = current;
+      status->head = current;  // Also calculates blockId
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
+
+      // These values will be replaced at the start of the next block.
+      // Changing the these here gives contracts running in RPC mode
+      // the illusion that they're running during the production of a new
+      // block. This helps to give them a consistent view between production
+      // and RPC modes.
+      status->current.previous     = status->head->blockId;
+      status->current.blockNum     = status->head->header.blockNum + 1;
+      status->current.time.seconds = status->head->header.time.seconds + 1;
+
       db.kvPut(StatusRow::db, status->key(), *status);
 
       // TODO: store block IDs somewhere?
@@ -120,6 +166,7 @@ namespace psibase
       }
    }
 
+   // TODO: call callStartBlock() here? caller's responsibility?
    void BlockContext::execAllInBlock()
    {
       for (auto& trx : current.transactions)
@@ -158,7 +205,7 @@ namespace psibase
          {
             // TODO: limit billed time in block
             // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
-            check(!(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast),
+            check(!(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast_flag),
                   "cannot commit a do_not_broadcast transaction");
             t.session.commit();
             active = true;

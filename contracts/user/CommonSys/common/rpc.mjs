@@ -93,6 +93,10 @@ export async function postArrayBufferGetJson(url, arrayBuffer) {
     return await (await postArrayBuffer(url, arrayBuffer)).json();
 }
 
+export async function getTaposForHeadBlock(baseUrl = '') {
+    return await getJson(baseUrl.replace(/\/+$/, '') + '/common/tapos/head');
+}
+
 export async function packAction(baseUrl, action) {
     let { sender, contract, method, data, rawData } = action;
     if (!rawData) {

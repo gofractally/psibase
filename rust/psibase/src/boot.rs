@@ -1,4 +1,4 @@
-use crate::{reg_server, store_sys, wrap_basic_trx, Args, Error};
+use crate::{reg_server, store_sys, without_tapos, Args, Error};
 use anyhow::Context;
 use fracpack::Packable;
 use libpsibase::{
@@ -165,7 +165,7 @@ fn boot_trx() -> SignedTransaction {
     }];
 
     SignedTransaction {
-        transaction: wrap_basic_trx(actions).packed_bytes(),
+        transaction: without_tapos(actions).packed_bytes(),
         proofs: vec![],
     }
 }
@@ -245,7 +245,7 @@ fn common_startup_trx() -> SignedTransaction {
     ];
 
     SignedTransaction {
-        transaction: wrap_basic_trx(actions).packed_bytes(),
+        transaction: without_tapos(actions).packed_bytes(),
         proofs: vec![],
     }
 }

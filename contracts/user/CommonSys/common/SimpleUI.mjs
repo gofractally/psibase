@@ -1,5 +1,6 @@
 import htm from '/common/htm.module.js';
 import { getJson, packAction, signAndPushTransaction } from './rpc.mjs';
+import { getJson, getTaposForHeadBlock, packAction, signAndPushTransaction } from './rpc.mjs';
 
 await import('/common/react.production.min.js');
 await import('/common/react-dom.production.min.js');
@@ -18,6 +19,8 @@ async function pushTransaction(transaction, keys, addMsg, clearMsg) {
             addMsg('rawData: ' + action.rawData);
             return action;
         }));
+        addMsg('getting tapos');
+        transaction.tapos = { ...await getTaposForHeadBlock(), ...transaction.tapos };
         const trace = await signAndPushTransaction('', transaction, keys);
         addMsg('\nPushed\n');
         addMsg(JSON.stringify(trace, null, 4));

@@ -159,6 +159,7 @@ function(add suffix)
             native/src/BlockContext.cpp
             native/src/db.cpp
             native/src/ExecutionContext.cpp
+            native/src/NativeFunctions.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
         )

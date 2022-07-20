@@ -25,6 +25,7 @@ namespace psibase
       KvResourceMap                               kvResourceDeltas;
       int                                         callDepth = 0;
       const std::chrono::steady_clock::time_point startTime;
+      std::chrono::steady_clock::duration         databaseTime;
 
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,
@@ -33,6 +34,7 @@ namespace psibase
       ~TransactionContext();
 
       void execTransaction();
+      void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execServe(const Action& act, ActionTrace& atrace);
 

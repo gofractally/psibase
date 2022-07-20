@@ -1,6 +1,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <debug_eos_vm/debug_eos_vm.hpp>
-#include <psibase/BlockContext.hpp>
+#include <psibase/ActionContext.hpp>
+#include <psibase/NativeFunctions.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 
@@ -120,12 +121,16 @@ struct test_chain_ref
 
 struct test_chain
 {
-   ::state&                                state;
-   std::set<test_chain_ref*>               refs;
-   boost::filesystem::path                 dir;
-   psibase::SharedDatabase                 db;
-   std::unique_ptr<psibase::SystemContext> sys;
-   std::unique_ptr<psibase::BlockContext>  blockContext;
+   ::state&                                     state;
+   std::set<test_chain_ref*>                    refs;
+   boost::filesystem::path                      dir;
+   psibase::SharedDatabase                      db;
+   std::unique_ptr<psibase::SystemContext>      sys;
+   std::unique_ptr<psibase::BlockContext>       blockContext;
+   std::unique_ptr<psibase::TransactionTrace>   nativeFunctionsTrace;
+   std::unique_ptr<psibase::TransactionContext> nativeFunctionsTransactionContext;
+   std::unique_ptr<psibase::ActionContext>      nativeFunctionsActionContext;
+   std::unique_ptr<psibase::NativeFunctions>    nativeFunctions;
 
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
@@ -135,13 +140,16 @@ struct test_chain
       sys = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
-   test_chain(const test_chain&) = delete;
+   test_chain(const test_chain&)            = delete;
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
    {
       for (auto* ref : refs)
          ref->chain = nullptr;
+      nativeFunctions.reset();
+      nativeFunctionsActionContext.reset();
+      nativeFunctionsTransactionContext.reset();
       blockContext.reset();
       sys.reset();
       db = {};
@@ -166,6 +174,7 @@ struct test_chain
                                         skipAdditional};
 
       blockContext->start(skippedTime);
+      blockContext->callStartBlock();
    }
 
    void start_if_needed()
@@ -178,9 +187,35 @@ struct test_chain
    {
       if (blockContext)
       {
+         nativeFunctions.reset();
+         nativeFunctionsActionContext.reset();
+         nativeFunctionsTransactionContext.reset();
          blockContext->commit();
          blockContext.reset();
       }
+   }
+
+   psibase::NativeFunctions& native()
+   {
+      static const psibase::SignedTransaction dummyTransaction;
+      static const psibase::Action            dummyAction;
+      if (!nativeFunctions)
+      {
+         nativeFunctionsTrace = std::make_unique<psibase::TransactionTrace>();
+         nativeFunctionsTrace->actionTraces.resize(1);
+         nativeFunctionsTransactionContext = std::make_unique<psibase::TransactionContext>(
+             *blockContext, dummyTransaction, *nativeFunctionsTrace, false);
+         nativeFunctionsActionContext = std::make_unique<psibase::ActionContext>(
+             *nativeFunctionsTransactionContext, dummyAction,
+             nativeFunctionsTrace->actionTraces[0]);
+         nativeFunctions = std::make_unique<psibase::NativeFunctions>(
+             psibase::NativeFunctions{blockContext->db,
+                                      *nativeFunctionsTransactionContext,
+                                      true,
+                                      {},
+                                      &*nativeFunctionsActionContext});
+      }
+      return *nativeFunctions;
    }
 };  // test_chain
 
@@ -679,6 +714,53 @@ struct callbacks
       assert_chain(chain_index);
       state.selected_chain_index = chain_index;
    }
+
+   psibase::NativeFunctions& native()
+   {
+      if (!state.selected_chain_index)
+         throw std::runtime_error("no chain is selected");
+      return assert_chain(*state.selected_chain_index).native();
+   }
+
+   uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset)
+   {
+      return native().getResult(dest, offset);
+   }
+
+   uint32_t getKey(eosio::vm::span<char> dest)
+   {  //
+      return native().getKey(dest);
+   }
+
+   uint32_t kvGet(uint32_t db, eosio::vm::span<const char> key)
+   {  //
+      return native().kvGet(db, key);
+   }
+
+   uint32_t kvGetSequential(uint32_t db, uint64_t indexNumber)
+   {
+      return native().kvGetSequential(db, indexNumber);
+   }
+
+   uint32_t kvGreaterEqual(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
+   {
+      return native().kvGreaterEqual(db, key, matchKeySize);
+   }
+
+   uint32_t kvLessThan(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
+   {
+      return native().kvLessThan(db, key, matchKeySize);
+   }
+
+   uint32_t kvMax(uint32_t db, eosio::vm::span<const char> key)
+   {  //
+      return native().kvMax(db, key);
+   }
+
+   uint32_t kvGetTransactionUsage()
+   {  //
+      return native().kvGetTransactionUsage();
+   }
 };  // callbacks
 
 callbacks* callbacks::single = nullptr;  // TODO: remove
@@ -689,21 +771,12 @@ void backtrace()
       callbacks::single->backtrace();
 }
 
-#define DB_REGISTER_SECONDARY(IDX)                                                         \
-   rhf_t::add<&callbacks::db_##IDX##_find_secondary>("env", "db_" #IDX "_find_secondary"); \
-   rhf_t::add<&callbacks::db_##IDX##_find_primary>("env", "db_" #IDX "_find_primary");     \
-   rhf_t::add<&callbacks::db_##IDX##_lowerbound>("env", "db_" #IDX "_lowerbound");         \
-   rhf_t::add<&callbacks::db_##IDX##_upperbound>("env", "db_" #IDX "_upperbound");         \
-   rhf_t::add<&callbacks::db_##IDX##_end>("env", "db_" #IDX "_end");                       \
-   rhf_t::add<&callbacks::db_##IDX##_next>("env", "db_" #IDX "_next");                     \
-   rhf_t::add<&callbacks::db_##IDX##_previous>("env", "db_" #IDX "_previous");
-
 void register_callbacks()
 {
    rhf_t::add<&callbacks::tester_abort>("env", "tester_abort");
-   rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");
+   rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");  // TODO: rename
    rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
-   rhf_t::add<&callbacks::prints_l>("env", "prints_l");
+   rhf_t::add<&callbacks::prints_l>("env", "prints_l");  // TODO: replace with writeConsole
    rhf_t::add<&callbacks::tester_get_arg_counts>("env", "tester_get_arg_counts");
    rhf_t::add<&callbacks::tester_get_args>("env", "tester_get_args");
    rhf_t::add<&callbacks::tester_clock_time_get>("env", "tester_clock_time_get");
@@ -723,6 +796,14 @@ void register_callbacks()
    rhf_t::add<&callbacks::tester_get_head_block_info>("env", "tester_get_head_block_info");
    rhf_t::add<&callbacks::tester_push_transaction>("env", "tester_push_transaction");
    rhf_t::add<&callbacks::tester_select_chain_for_db>("env", "tester_select_chain_for_db");
+   rhf_t::add<&callbacks::getResult>("env", "getResult");
+   rhf_t::add<&callbacks::getKey>("env", "getKey");
+   rhf_t::add<&callbacks::kvGet>("env", "kvGet");
+   rhf_t::add<&callbacks::kvGetSequential>("env", "kvGetSequential");
+   rhf_t::add<&callbacks::kvGreaterEqual>("env", "kvGreaterEqual");
+   rhf_t::add<&callbacks::kvLessThan>("env", "kvLessThan");
+   rhf_t::add<&callbacks::kvMax>("env", "kvMax");
+   rhf_t::add<&callbacks::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
 }
 
 void fill_substitutions(::state& state, const std::map<std::string, std::string>& substitutions)

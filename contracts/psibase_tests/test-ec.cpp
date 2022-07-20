@@ -67,6 +67,7 @@ TEST_CASE("ec")
        psio::convert_to_frac(sign(priv_key1, sha256(packed_ec_trx.data(), packed_ec_trx.size())))};
    expect(t.pushTransaction(ec_signed));
 
+   t.start_block();
    expect(t.pushTransaction(t.make_transaction({{
                                 .sender   = sue,
                                 .contract = test_contract,

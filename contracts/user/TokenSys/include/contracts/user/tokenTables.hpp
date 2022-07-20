@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <compare>
 #include <contracts/user/tokenTypes.hpp>
 #include <limits>

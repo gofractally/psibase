@@ -1,6 +1,7 @@
 #include "contracts/system/CommonSys.hpp"
 
 #include <contracts/system/ProxySys.hpp>
+#include <contracts/system/TransactionSys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serveContent.hpp>
@@ -11,7 +12,7 @@ static constexpr bool enable_print = false;
 using namespace psibase;
 using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
-namespace psibase
+namespace system_contract
 {
    static constexpr std::pair<const char*, const char*> commonResMap[]{
        {"/", "/ui/common.index.html"}};
@@ -86,6 +87,16 @@ namespace psibase
                 .body        = {js.begin(), js.end()},
             };
          }
+         if (request.target == "/common/tapos/head")
+         {
+            auto [index, suffix] = headTapos();
+            auto json            = "{\"refBlockIndex\":" + std::to_string(index) +
+                        ",\"refBlockSuffix\":" + std::to_string(suffix) + "}";
+            return RpcReplyData{
+                .contentType = "application/json",
+                .body        = {json.begin(), json.end()},
+            };
+         }
       }
 
       if (request.method == "POST")
@@ -154,6 +165,6 @@ namespace psibase
       return std::nullopt;
    }
 
-}  // namespace psibase
+}  // namespace system_contract
 
-PSIBASE_DISPATCH(psibase::CommonSys)
+PSIBASE_DISPATCH(system_contract::CommonSys)

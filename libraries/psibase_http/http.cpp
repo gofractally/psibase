@@ -186,6 +186,7 @@ namespace psibase::http
 
          else if (!req.target().starts_with("/native"))
          {
+            auto           startTime = steady_clock::now();
             RpcRequestData data;
             if (req.method() == bhttp::verb::get)
                data.method = "GET";
@@ -217,10 +218,31 @@ namespace psibase::http
             TransactionTrace   trace;
             TransactionContext tc{bc, trx, trace, false};
             ActionTrace        atrace;
+            auto               startExecTime = steady_clock::now();
             tc.execServe(action, atrace);
+            auto endExecTime = steady_clock::now();
             // TODO: option to print this
             // printf("%s\n", prettyTrace(atrace).c_str());
-            auto result = psio::convert_from_frac<std::optional<RpcReplyData>>(atrace.rawRetval);
+            auto result  = psio::convert_from_frac<std::optional<RpcReplyData>>(atrace.rawRetval);
+            auto endTime = steady_clock::now();
+            if (server.http_config->host_perf)
+            {
+               auto t = [](const auto& duration) {
+                  return std::to_string(
+                      std::chrono::duration_cast<std::chrono::microseconds>(duration).count());
+               };
+               std::string report;
+               report += "handling " + data.host + " " + data.method + " " + data.target + "\n";
+               report += "   pack request:   " + t(startExecTime - startTime) + " us\n";
+               report +=
+                   "   load contracts: " + t(endExecTime - startExecTime - tc.getBillableTime()) +
+                   " us\n";
+               report += "   database:       " + t(tc.databaseTime) + " us\n";
+               report +=
+                   "   exec wasm:      " + t(tc.getBillableTime() - tc.databaseTime) + " us\n";
+               report += "   total:          " + t(endTime - startTime) + " us\n";
+               std::cout << report;
+            }
             if (!result)
                return send(
                    error(bhttp::status::not_found,

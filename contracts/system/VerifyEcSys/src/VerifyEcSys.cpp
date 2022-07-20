@@ -27,10 +27,12 @@ extern "C" [[clang::export_name("verify")]] void verify()
    auto act  = getCurrentAction();
    auto data = psio::convert_from_frac<VerifyData>(act.rawData);
 
+   // TODO: check no extra data
    check(psio::fracvalidate<PublicKey>(data.claim.rawData).valid_and_known(),
          "Claim has invalid format");
    auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.rawData);
 
+   // TODO: check no extra data
    check(psio::fracvalidate<Signature>(data.proof).valid_and_known(), "Proof has invalid format");
    auto sig = psio::convert_from_frac<Signature>(data.proof);
 
