@@ -1,5 +1,4 @@
 import htm from '/common/htm.module.js';
-import { getJson, packAction, signAndPushTransaction } from './rpc.mjs';
 import { getJson, getTaposForHeadBlock, packAction, signAndPushTransaction } from './rpc.mjs';
 
 await import('/common/react.production.min.js');
