@@ -46,7 +46,7 @@ namespace triedent
       location_lock spin_lock(object_id id) { return _obj_ids->spin_lock(id); }
       bool          bump_count(object_id id) { return _obj_ids->bump_count(id); }
 
-      void retain(id);
+      void dangerous_retain(id);
 
       // return (pointer to obj, type) if released
       std::pair<char*, node_type> release(id);
@@ -455,9 +455,9 @@ namespace triedent
       claim(cold(), sp._swap_pos[3]);
    }
 
-   inline void ring_allocator::retain(id i)
+   inline void ring_allocator::dangerous_retain(id i)
    {
-      _obj_ids->retain(i);
+      _obj_ids->dangerous_retain(i);
    }
 
    inline std::pair<char*, node_type> ring_allocator::release(id i)

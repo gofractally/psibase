@@ -27,6 +27,7 @@ namespace triedent
       friend bool operator!=(object_id a, object_id b) { return a.id != b.id; }
    } __attribute__((packed)) __attribute((aligned(1)));
    static_assert(sizeof(object_id) == 5, "unexpected padding");
+   static_assert(alignof(object_id) == 1, "unexpected alignment");
 
    struct object_header
    {
@@ -182,7 +183,9 @@ namespace triedent
      public:
       location_lock alloc(node_type type);
 
-      void                                 retain(object_id id);
+      // TODO: remove
+      void dangerous_retain(object_id id);
+
       std::pair<object_location, uint16_t> release(object_id id);
 
       uint16_t ref(object_id id);
@@ -351,7 +354,7 @@ namespace triedent
          return lock;
       }
    }
-   inline void object_db::retain(object_id id)
+   inline void object_db::dangerous_retain(object_id id)
    {
       assert(id.id <= _header->first_unallocated.id);
       if (id.id > _header->first_unallocated.id) [[unlikely]]

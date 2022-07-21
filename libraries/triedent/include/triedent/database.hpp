@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
 #include <memory>
+#include <span>
 #include <triedent/node.hpp>
 
 namespace triedent
@@ -31,10 +32,9 @@ namespace triedent
    // * To set the upper-most root, use write_session::set_top_root
    // * Trees may store roots within their leaves. This makes it possible
    //   to have an outer tree which holds multiple revisions of inner trees
-   //   within it. This can nest to any depth, assuming there's enough stack
-   //   space to traverse it.
-   // * Several write_session methods take a non-const shared_ptr<root>&; they
-   //   modify this shared_ptr.
+   //   within it. This can nest to any depth.
+   // * Several methods take a non-const shared_ptr<root>&; they modify
+   //   this shared_ptr.
    // * triedent uses a persistent data structure model; the changes that
    //   mutation functions make aren't reachable after shutdown unless you use
    //   set_top_root. They are reachable by other threads without using
@@ -236,9 +236,6 @@ namespace triedent
          const session* _session;
       };
 
-      // TODO: protected
-      inline id retain(id);
-
       // This is more efficient than simply dropping r since it
       // doesn't usually lock a mutex. However, like dropping r,
       // it still recurses, so there may be an advantage to
@@ -272,6 +269,7 @@ namespace triedent
       inline deref<node>         get(ring_allocator::id i, bool& unique) const;
       std::optional<string_view> get(id root, string_view key) const;
 
+      inline id   retain(id);
       inline void release(id);
 
       friend class database;
@@ -583,12 +581,7 @@ namespace triedent
    template <typename AccessMode>
    inline database::id session<AccessMode>::retain(id obj)
    {
-      if (not obj)
-         return obj;
-
-      _db->_ring->retain(obj);
-
-      return obj;
+      return bump_refcount_or_copy(*_db->_ring, obj);
    }
 
    inline std::string_view common_prefix(std::string_view a, std::string_view b)
@@ -615,7 +608,7 @@ namespace triedent
          return {};
 
       swap_guard g(*this);
-      id = bump_refcount_or_copy(ring(), {id}).id;
+      id = retain({id}).id;
       return std::make_shared<root>(root{_db, nullptr, {id}});
    }
 
@@ -629,7 +622,7 @@ namespace triedent
          return;
 
       swap_guard g(*this);
-      id = bump_refcount_or_copy(ring(), id);
+      id = retain(id);
       _db->_dbm->top_root.store(id.id);
       release({current});
    }
@@ -1730,7 +1723,11 @@ namespace triedent
       if (not r)
          return;
       int cur_ref_count = _db->_ring->ref(r);
-      retain(r);  // TODO: overflow
+
+      // TODO: rework recursive_retain to fix up overflow; will require
+      //       cloning nodes and tracking the clones. Or just detect
+      //       and give up.
+      _db->_ring->dangerous_retain(r);
 
       if (cur_ref_count > 1)  // 1 is the default ref when resetting all
          return;              // retaining this node indirectly retains all children
