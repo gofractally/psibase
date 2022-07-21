@@ -59,15 +59,16 @@ namespace triedent
    //   its own read_session.
    // * If you share any std::shared_ptr between threads, then you must synchronize
    //   access to it. e.g. don't pass a non-const reference to std::shared_ptr to
-   //   any write_session methods if that shared_ptr is currently being used by any
-   //   read threads. Instead, copy the shared_ptr between threads. Nothing new
+   //   any functions in this library if that shared_ptr is currently being used by
+   //   any other threads. Instead, copy the shared_ptr between threads. Nothing new
    //   here; this is a rule from the C++ standard library.
    // * database::start_write_session and database::start_read_session have internal
    //   synchronization; you don't need to synchronize access to these functions.
    // * If `p` is a `shared_ptr<root>`, then it's usually best to never use `*p`
    //   or `p->` outside of the code within this file. Especially never use
    //   `*p = ...` or `std::move(*p)` outside of this file. If you do, you'll have
-   //   additional synchronization rules to deal with which aren't explained here.
+   //   additional synchronization and iterator rules to deal with which aren't
+   //   explained here.
    class root
    {
       template <typename AccessMode>
@@ -132,7 +133,6 @@ namespace triedent
       using id          = object_id;
 
      protected:
-      id _session_root;  // TODO: remove
       /* auto inc id used to detect when we can modify in place*/
       mutable std::atomic<uint64_t> _hot_swap_p  = -1ull;
       mutable std::atomic<uint64_t> _warm_swap_p = -1ull;
@@ -171,6 +171,14 @@ namespace triedent
       inline auto&                       iterators() const { return _iterators; }
 
      public:
+      // Caution: as long as an iterator is in use:
+      // * The session which created it must be alive
+      // * The root which created it must be alive and unchanged.
+      //   To meet this requirement, don't drop or modify the root
+      //   shared_ptr, or pass it by non-const ref to any functions
+      //   in this library. You may modify copies of the shared_ptr.
+      // * Don't compare iterators created by different sessions or
+      //   different roots.
       struct iterator
       {
          uint32_t    key_size() const;
@@ -193,11 +201,15 @@ namespace triedent
 
          iterator(const iterator& c) : _session(c._session)
          {
+            // TODO: detect none available; currently causes UB
             _iter_num = std::countr_one(_session->_used_iterators);
             _session->used_iterators() ^= 1ull << _iter_num;
             path() = c.path();
          }
          iterator(iterator&& c) : _session(c._session), _iter_num(c._iter_num) { c._iter_num = -1; }
+
+         // TODO: ==, !=
+
          void value(std::string& v) const;
 
          std::string value() const
@@ -213,6 +225,7 @@ namespace triedent
          friend class session;
          iterator(const session& s) : _session(&s)
          {
+            // TODO: detect none available; currently causes UB
             _iter_num = std::countr_one(_session->_used_iterators);
             _session->used_iterators() ^= 1ull << _iter_num;
          };
@@ -223,26 +236,8 @@ namespace triedent
          const session* _session;
       };
 
-      /* changes the root of the tree this session is reading */
-      void set_session_revision(id r)
-      {
-         if (r != _session_root)
-         {
-            retain(r);
-            release(_session_root);
-            _session_root = r;
-         }
-      }
-
-      /* returns the root of the tree this session is reading */
-      id get_session_revision() { return _session_root; }
-
       // TODO: protected
       inline id retain(id);
-
-      /* the root revision of this session */
-      // TODO: remove
-      id revision() { return _session_root; }
 
       // This is more efficient than simply dropping r since it
       // doesn't usually lock a mutex. However, like dropping r,
@@ -250,16 +245,16 @@ namespace triedent
       // calling this from a dedicated cleanup thread.
       void release(std::shared_ptr<root>& r);
 
-      iterator first() const;
-      iterator last() const;
-      iterator find(string_view key) const;
-      iterator lower_bound(string_view key) const;
-      iterator last_with_prefix(string_view prefix) const;
+      iterator first(const std::shared_ptr<root>& r) const;
+      iterator last(const std::shared_ptr<root>& r) const;
+      iterator find(const std::shared_ptr<root>& r, string_view key) const;
+      iterator lower_bound(const std::shared_ptr<root>& r, string_view key) const;
+      iterator last_with_prefix(const std::shared_ptr<root>& r, string_view prefix) const;
       bool     get(const std::shared_ptr<root>& r, string_view key, std::string& result) const;
       std::optional<std::string> get(const std::shared_ptr<root>& r, string_view key) const;
 
-      void print();
-      void validate();
+      void print(const std::shared_ptr<root>& r);
+      void validate(const std::shared_ptr<root>& r);
 
       session(std::shared_ptr<database> db);
       ~session();
@@ -303,8 +298,6 @@ namespace triedent
       int upsert(std::shared_ptr<root>& r, string_view key, string_view val);
       int remove(std::shared_ptr<root>& r, string_view key);
 
-      void clear();
-
       /**
           *  These methods are used to recover the database after a crash,
           *  start_collect_garbage resets all non-zero refcounts to 1,
@@ -313,13 +306,15 @@ namespace triedent
           */
       ///@{
       void start_collect_garbage();
-      void recursive_retain(object_id id);
+      void recursive_retain();
       void end_collect_garbage();
       ///@}
 
      private:
       inline bool get_unique(std::shared_ptr<root>& r);
       inline void update_root(std::shared_ptr<root>& r, object_id id);
+
+      void recursive_retain(object_id id);
 
       inline mutable_deref<value_node> make_value(string_view k, string_view v);
       inline mutable_deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
@@ -903,13 +898,6 @@ namespace triedent
       }
    }
 
-   inline void write_session::clear()
-   {
-      swap_guard g(*this);
-      release(_session_root);
-      _session_root = id();
-   }
-
    inline int write_session::upsert(std::shared_ptr<root>& r, string_view key, string_view val)
    {
       _db->ensure_free_space();
@@ -1139,9 +1127,10 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   typename session<AccessMode>::iterator session<AccessMode>::first() const
+   typename session<AccessMode>::iterator session<AccessMode>::first(
+       const std::shared_ptr<root>& r) const
    {
-      id       root = _session_root;
+      id       root = get_id(r);
       iterator result(*this);
       if (not root)
          return result;
@@ -1171,9 +1160,10 @@ namespace triedent
       }
    }
    template <typename AccessMode>
-   typename session<AccessMode>::iterator session<AccessMode>::last() const
+   typename session<AccessMode>::iterator session<AccessMode>::last(
+       const std::shared_ptr<root>& r) const
    {
-      id       root = _session_root;
+      id       root = get_id(r);
       iterator result(*this);
       if (not root)
          return result;
@@ -1205,15 +1195,17 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   typename session<AccessMode>::iterator session<AccessMode>::find(string_view key) const
+   typename session<AccessMode>::iterator session<AccessMode>::find(const std::shared_ptr<root>& r,
+                                                                    string_view key) const
    {
-      return find(_session_root, to_key6(key));
+      return find(r, to_key6(key));
    }
    template <typename AccessMode>
    typename session<AccessMode>::iterator session<AccessMode>::last_with_prefix(
-       string_view prefix) const
+       const std::shared_ptr<root>& r,
+       string_view                  prefix) const
    {
-      id       root = _session_root;
+      id       root = get_id(r);
       iterator result(*this);
 
       if (not root)
@@ -1292,9 +1284,11 @@ namespace triedent
       return iterator(*this);
    }
    template <typename AccessMode>
-   typename session<AccessMode>::iterator session<AccessMode>::lower_bound(string_view key) const
+   typename session<AccessMode>::iterator session<AccessMode>::lower_bound(
+       const std::shared_ptr<root>& r,
+       string_view                  key) const
    {
-      id       root = _session_root;
+      id       root = get_id(r);
       iterator result(*this);
       if (not root)
          return result;
@@ -1658,15 +1652,15 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   void session<AccessMode>::print()
+   void session<AccessMode>::print(const std::shared_ptr<root>& r)
    {
-      print(_session_root, string_view(), "");
+      print(get_id(r), string_view(), "");
    }
 
    template <typename AccessMode>
-   void session<AccessMode>::validate()
+   void session<AccessMode>::validate(const std::shared_ptr<root>& r)
    {
-      validate(_session_root);
+      validate(get_id(r));
    }
 
    template <typename AccessMode>
@@ -1721,6 +1715,16 @@ namespace triedent
     * visit every node in the tree and retain it. This is used in garbage collection
     * after a crash.
     */
+   inline void write_session::recursive_retain()
+   {
+      object_id id;
+      {
+         std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
+         id = {_db->_dbm->top_root.load()};
+      }
+      recursive_retain(id);
+   }
+
    inline void write_session::recursive_retain(id r)
    {
       if (not r)

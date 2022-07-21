@@ -150,7 +150,7 @@ int main(int argc, char** argv)
             while (r.load(std::memory_order_relaxed) == v)
             {
                uint64_t h   = (uint64_t(gen()) << 32) | gen();
-               auto     itr = rs->lower_bound(std::string_view((char*)&h, sizeof(h)));
+               auto     itr = rs->lower_bound(rr, std::string_view((char*)&h, sizeof(h)));
                if (itr.valid())
                   ++total_lookups[c].total_lookups;
                if (done.load(std::memory_order_relaxed))

@@ -54,11 +54,12 @@ TEST_CASE("accidental inner removal")
    // regression check: a missing compare caused a non-matching key to be removed
    auto db      = createDb();
    auto session = db->start_write_session();
-   session->upsert({"\x00\x01\x02", 3}, {"value 1"});
-   session->upsert({"\x00\x01\x03", 3}, {"value 2"});
-   REQUIRE(session->get({"\x00\x01\x02", 3}) == std::optional{std::string_view{"value 1"}});
-   REQUIRE(session->get({"\x00\x01\x03", 3}) == std::optional{std::string_view{"value 2"}});
-   session->remove({"\x00\x00\x02", 3});
-   REQUIRE(session->get({"\x00\x01\x02", 3}) == std::optional{std::string_view{"value 1"}});
-   REQUIRE(session->get({"\x00\x01\x03", 3}) == std::optional{std::string_view{"value 2"}});
+   auto root    = session->get_top_root();
+   session->upsert(root, {"\x00\x01\x02", 3}, {"value 1"});
+   session->upsert(root, {"\x00\x01\x03", 3}, {"value 2"});
+   REQUIRE(session->get(root, {"\x00\x01\x02", 3}) == std::optional{std::string_view{"value 1"}});
+   REQUIRE(session->get(root, {"\x00\x01\x03", 3}) == std::optional{std::string_view{"value 2"}});
+   session->remove(root, {"\x00\x00\x02", 3});
+   REQUIRE(session->get(root, {"\x00\x01\x02", 3}) == std::optional{std::string_view{"value 1"}});
+   REQUIRE(session->get(root, {"\x00\x01\x03", 3}) == std::optional{std::string_view{"value 2"}});
 }

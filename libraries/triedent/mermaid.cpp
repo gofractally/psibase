@@ -80,10 +80,10 @@ int main(int argc, char** argv)
 
       if (vm.count("validate"))
       {
-         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
-         auto s  = db->start_write_session();
-         s->set_session_revision(db->get_root_revision());
-         s->validate();
+         auto db   = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto s    = db->start_write_session();
+         auto root = s->get_top_root();
+         s->validate(root);
          std::cerr << "everything appears to be ok" << std::endl;
       }
 
@@ -92,7 +92,7 @@ int main(int argc, char** argv)
          auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
          auto s  = db->start_write_session();
          s->start_collect_garbage();
-         s->recursive_retain(db->get_root_revision());
+         s->recursive_retain();
          s->end_collect_garbage();
       }
 
@@ -103,9 +103,9 @@ int main(int argc, char** argv)
          {
             throw std::runtime_error("import file does not exist: " + import_file);
          }
-         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
-         auto s  = db->start_write_session();
-         s->set_session_revision(db->get_root_revision());
+         auto db   = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto s    = db->start_write_session();
+         auto root = s->get_top_root();
 
          std::ifstream     in(import_file.c_str(), std::fstream::binary | std::fstream::in);
          std::vector<char> value_buffer;
@@ -131,14 +131,14 @@ int main(int argc, char** argv)
 
             if (in.eof())
                break;
-            auto old_size = s->upsert(std::string_view(key_buffer.data(), ks),
+            auto old_size = s->upsert(root, std::string_view(key_buffer.data(), ks),
                                       std::string_view(value_buffer.data(), vs));
             if (old_size < 0)
                inserted++;
             else
                updated++;
          }
-         s->set_root_revision(s->get_session_revision());
+         s->set_top_root(root);
 
          std::cerr << "inserted " << inserted << " keys" << std::endl;
          std::cerr << "updated " << updated << " keys" << std::endl;
@@ -150,10 +150,10 @@ int main(int argc, char** argv)
       {
          // TODO: roots within trees
          std::ofstream ef(export_file.c_str(), std::fstream::trunc);
-         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
-         auto s  = db->start_write_session();
-         s->set_session_revision(db->get_root_revision());
-         auto    i     = s->first();
+         auto    db    = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto    s     = db->start_write_session();
+         auto    root  = s->get_top_root();
+         auto    i     = s->first(root);
          int64_t count = 0;
          while (i.valid())
          {
