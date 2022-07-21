@@ -159,6 +159,13 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
     return { transaction: uint8ArrayToHex(transaction), proofs };
 }
 
+/**
+ * Description: Signs and pushes a transaction object to the baseUrl endpoint
+ * 
+ * @param {String} baseUrl - The URL endpoint to which to push the signed transaction
+ * @param {Object} transaction - A JSON object that follows the transaction schema to define a collection of actions to execute
+ * @param {Array} privateKeys - An array of strings that represent private keys used to sign this transaction
+ */
 export async function signAndPushTransaction(baseUrl, transaction, privateKeys) {
     return await packAndPushSignedTransaction(baseUrl, await signTransaction(baseUrl, transaction, privateKeys));
 }
@@ -186,62 +193,255 @@ export function hexToUint8Array(hex) {
     return result;
 };
 
-export function configRoutes(routes)
-{
-    /* routes
-    [
+let redirectIfAccessedDirectly = () => {
+    try {
+        if (window.self === window.top)
         {
-            queryPath: "/balances",
-            payload: {}
-        },
-        {
-            queryPath: "/whatever",
-            payload: {}
-        },
-    ]
-    */
+            // We are the top window. Redirect needed.
+            const applet = window.location.hostname.substring(0, window.location.hostname.indexOf("."));
+            window.location.replace(siblingUrl(null, "", "/applet/" + applet));
+        }
+    } catch (e) {
+        // The browser blocked access to window.top due to the same origin policy, 
+        //   therefore we are in an iframe, all is well.
+    }
+};
 
-  return ()=>{
-    window.iFrameResizer = {
-      onMessage: (msg)=>{
-        routes.forEach((route)=>{
-          if (msg.queryPath === route.queryPath)
-          {
-            if (msg.payload !== {})
-            {
-              route.callback(msg.payload);
-            }
-            else
-            {
-              console.error("Query " + msg.queryPath + " returned empty response.");
-            }
-          }
-        });
-      }
-    };
-  }
-}
+export const ErrorCodes = {
+    invalidResource: 404,
+    serverError: 500,
+};
 
-export function route(queryPath, callback)
-{
-  return {queryPath, callback};
-}
-
-export function query(path, arg) 
-{
-  // Currently assumes you're making a request to "this" contract
-  let queryObj = {queryPath: path, queryArg: arg};
-
-  return () => {
-    if (path)
+export const ErrorMessages = [
     {
-      if ('parentIFrame' in window) {
-        parentIFrame.sendMessage(queryObj, "*");
-      }
+        code: ErrorCodes.invalidResource,
+        message: "Error 404: Resource not found",
+    },
+    {
+        code: ErrorCodes.serverError,
+        message: "Error 500: Server error, possibly incorrect transaction data",
+    },
+]
+
+export const MessageTypes = {
+    getResource: 0,
+    transaction: 1,
+};
+
+let verifyFields = (obj, fieldNames) => {
+    var missingField = false;
+
+    fieldNames.forEach((fieldName)=>{
+        if (!obj.hasOwnProperty(fieldName))
+        {
+            console.error("Message from core missing \"" + fieldName + "\" field");
+            missingField = true;
+        }
+    });
+
+    return !missingField;
+};
+
+let handleErrorCode = (code) => {
+    if (code === undefined) return false;
+
+    let recognizedError = ErrorMessages.some((err)=>{
+        if (err.code === code)
+        {
+            console.error(err.message);
+            return true;
+        }
+        return false;
+    });
+    if (!recognizedError)
+        console.error("Message from core contains unrecognized error code: " + error);
+
+    return true;
+};
+
+let messageRouting = [
+    {
+        type: MessageTypes.getResource,
+        validate: (payload)=>{
+            if (!verifyFields(payload, ["id", "resource"])) 
+                return false;
+
+            return true;
+        },
+        route: (payload) => {
+            let {id, resource} = payload;
+            var idx = -1;
+            let handled = singleUseHandlers.some((handler, index)=>{
+                if (handler.id === id)
+                {
+                    idx = index;
+                    handler.callback(resource);
+                    return true;
+                }
+                return false;
+            });
+
+            if (handled)
+            {   // Remove the handler from singleUseHandlers.
+                singleUseHandlers.splice(idx, 1);
+                return true;
+            }
+            return false;
+        },
+    },
+    {
+        type: MessageTypes.transaction,
+        validate: (payload)=>{
+            if (!verifyFields(payload, ["type", "trace"])) 
+                return false;
+
+            return true;
+        },
+        route: (payload) => {
+            let {type, trace} = payload;
+            
+            var handled = false;
+            handlers.filter((h)=>{return h.type == type;}).forEach((h)=>{
+                handled = true;
+                h.callback(trace);
+            });
+            return handled;
+        },
+    },
+];
+
+// Handlers that are constructed when an applet starts and persist
+var handlers = [];
+
+// Handlers that are destroyed after routing a message
+var singleUseHandlers = [];
+
+export async function initializeApplet()
+{
+    redirectIfAccessedDirectly();
+
+    window.iFrameResizer = {
+        onMessage: (msg)=>{
+            let {type, payload} = msg;
+            if (type === undefined || typeof type !== "number" || payload === undefined)
+            {
+                console.error("Malformed message received from core");
+                return;
+            }
+
+            if (!messageRouting[type].validate(payload))
+                return;
+
+            if (handleErrorCode(payload.error))
+                return;
+
+            if (!messageRouting[type].route(payload))
+            {
+                console.error("Child has no handler for message: " + msg);
+                return;
+            }
+        },
+      };
+
+    await import("/common/iframeResizer.contentWindow.js");
+}
+
+/**
+ * Description: Append a route handler to map a transaction types to a callback function.
+ * Multiple routes can be configured for the same transaction type.
+ * 
+ * @param {String} id - An arbitrary but unique name mapped to this specific route.
+ * @param {Number} type - An arbitrary number mapped to this type of transaction.
+ * @param {Function} callback - A callback function that should be called when a return message is received with the corresponding ID.
+ */
+export function addRoute(id, type, callback)
+{
+    // Find and remove the old route mapped to this id
+    var idx = -1;
+    handlers.some((h, index)=>{
+        if (h.id == id) 
+        {
+            idx = index;
+            return true;
+        }
+        return false;
+    });
+    if (idx !== -1)
+    {
+        handlers.splice(idx, 1);
+    }
+
+    // Add the new route
+    handlers.push({id, type, callback});
+}
+
+/**
+ * Description: Constructs an action that can be pushed to chain with push().
+ * 
+ * Example usage: action("token-sys", "credit", {tokenId: 1, receiver: "alice", amount: 100, memo: "Test"});
+ * @param {String} contract - The name of the contract
+ * @param {String} actionName - The name of the action to be called
+ * @param {Object} params - The name and value of each of the action parameters
+ * @param {String} sender [0] - The name of the sender. Will default to the logged in user, unless explicitly specified.
+ */
+export async function action(contract, actionName, params, sender = 0)
+{
+    if (sender !== 0)
+        return {sender, contract, method: actionName, data: params};
+    else
+        return {contract, method: actionName, data: params};
+}
+
+/**
+ * Description: Pushes a collection of actions to the chain.
+ * 
+ * Example usage: push("swap-transaction", Array(myCreditAction, myDebitAction));
+ * @param {Number} transactionType - An arbitrary name for this type of transaction that has a corresponding route configuration
+ * @param {Array} actions - An array of Objects constructed via the action() function
+ */
+export async function push(transactionType, actions)
+{
+    if ('parentIFrame' in window) {
+        parentIFrame.sendMessage({
+            type: MessageTypes.transaction,
+            payload: {
+                type: transactionType,
+                actions
+            },
+        }, "*");
     }
     else
     {
-      console.error("Empty query path.");
+        // This can sometimes happen if the window hasn't fully loaded
+        console.log("No parent iframe");
     }
-  };
+}
+
+export const CommonResources = {
+    loggedInUser: 0,
 };
+
+/**
+ * Description: Gets a client-side resource.
+ * 
+ * @param {Number} resource - The ID of the requested resource
+ * @param {Array} callback - The function to call with the requested resource
+ */
+export async function getLocalResource(resource, callback)
+{
+    if ('parentIFrame' in window) {
+        let id = singleUseHandlers.length;
+        singleUseHandlers.push({id, callback});
+
+        parentIFrame.sendMessage({
+            type: MessageTypes.getResource,
+            payload: { id, resource },
+        }, "*");
+    }
+    else
+    {
+        // This can sometimes happen if the window hasn't fully loaded
+        console.log("No parent iframe");
+    }
+}
+

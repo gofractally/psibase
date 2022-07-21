@@ -14,6 +14,9 @@ using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
 namespace system_contract
 {
+   static constexpr std::pair<const char*, const char*> commonResMap[]{
+       {"/", "/ui/common.index.html"}};
+
    std::optional<RpcReplyData> CommonSys::serveSys(RpcRequestData request)
    {
       auto to_json = [](const auto& obj)
@@ -143,30 +146,19 @@ namespace system_contract
    {
       if (request.method == "GET")
       {
-         std::vector<std::pair<std::string, std::string>> commonResMap{
-             {"/", "/ui/common.index.html"}};
-
-         bool serveFromCommon = std::any_of(commonResMap.begin(), commonResMap.end(),
-                                            [&](const auto& res)
-                                            {
-                                               if (res.first == request.target)
-                                               {
-                                                  request.target = res.second;
-                                                  return true;
-                                               }
-                                               return false;
-                                            });
-
-         if (serveFromCommon)
+         for (auto [target, replacement] : commonResMap)
          {
-            auto index =
-                ContractTables<WebContentTable>{contract}.open<WebContentTable>().getIndex<0>();
-            if (auto content = index.get(request.target))
+            if (target == request.target)
             {
-               return RpcReplyData{
-                   .contentType = content->contentType,
-                   .body        = content->content,
-               };
+               auto index =
+                   ContractTables<WebContentTable>{contract}.open<WebContentTable>().getIndex<0>();
+               if (auto content = index.get(std::string(replacement)))
+               {
+                  return RpcReplyData{
+                      .contentType = content->contentType,
+                      .body        = content->content,
+                  };
+               }
             }
          }
       }

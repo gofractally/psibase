@@ -1,9 +1,7 @@
 import { siblingUrl } from "/common/rootdomain.mjs";
-import { getJson } from "/common/rpc.mjs";
-import htm from "https://unpkg.com/htm@3.1.0?module";
-await import(
-  "https://unpkg.com/react-router-dom@5.3.3/umd/react-router-dom.min.js"
-);
+import { signAndPushTransaction, CommonResources, ErrorCodes, MessageTypes } from "/common/rpc.mjs";
+import htm from "/common/htm.module.js";
+await import("/common/react-router-dom.min.js");
 
 const html = htm.bind(React.createElement);
 
@@ -77,6 +75,82 @@ function Nav() {
   `;
 }
 
+const injectSender = (actions) => {
+  actions.forEach(action => {
+    if (typeof action.sender === 'undefined')
+    {
+      action.sender = messageRouting[MessageTypes.getResource].getResponse({id: 0, resource: CommonResources.loggedInUser}).resource;
+    }
+  });
+
+  return actions;
+};
+
+const constructTransaction = (actions) => {
+  let tenMinutes = 10 * 60 * 1000;
+  var transaction = JSON.parse(JSON.stringify({
+      tapos: {
+          expiration: new Date(Date.now() + tenMinutes),
+      },
+      actions,
+  }, null, 4));
+
+  return transaction;
+};
+
+let messageRouting = [
+  {
+    type: MessageTypes.getResource,
+    validate: (payload) => {
+      if (payload.id === undefined || typeof payload.id !== "number")
+      {
+        console.error("Received malformed resource request from applet (malformed id)");
+        return false;
+      }
+      return true;
+    },
+    getResponse: (payload) => {
+      let { id, resource } = payload;
+      if (resource === CommonResources.loggedInUser)
+      {
+        // Todo - get sender from key management extension
+        return {id, resource: "alice"};
+      }
+      else
+      {
+        console.error("Resource with invalid id (" + resource + ") requested");
+        return {id, resource: "", error: ErrorCodes.invalidResource};
+      }
+    },
+  },
+  {
+    type: MessageTypes.transaction,
+    validate: (payload) => {
+      if (payload.actions === undefined || !Array.isArray(payload.actions))
+      {
+        console.error("Error in transaction message from applet (action array missing or malformed)");
+        return false;
+      }
+      return true;
+    },
+    getResponse: async (payload) => {
+      let {type, actions} = payload;
+
+      try 
+      {
+        let trace = await signAndPushTransaction('', constructTransaction(injectSender(actions)));
+        return {type, trace};
+      }
+      catch (e)
+      {
+        return {type, trace: "", error: ErrorCodes.serverError};
+      }
+    }
+  },
+];
+
+
+
 function Applet() {
   
   const [applet, setApplet] = useState("");
@@ -104,22 +178,25 @@ function Applet() {
   }, [applet]);
 
   useEffect(() => {
-
-    const doMessage = async (request) => {
-      let {queryPath, queryArg} = request.message;
-      var res = {};
-      res = await getJson(appletSrc + queryPath + queryArg);
-
+    const handleMessage = async (request) => {
       var iframe = document.getElementById("applet");
-      if (iframe != null)
-      {
-        let response = {queryPath: queryPath, payload: res};
-        iframe.iFrameResizer.sendMessage(response, appletSrc);
-      }
-      else
+      if (iframe == null)
       {
         console.error("Child iframe not found.");
+        return;
       }
+      let {type, payload} = request.message;
+      if (type === undefined || typeof type !== "number" || payload === undefined)
+      {
+        console.error("Received malformed resource request from applet");
+        return;
+      }
+      if (!messageRouting[type].validate(payload)) 
+        return;
+
+      // Get and send response
+      var responsePayload = await messageRouting[type].getResponse(payload);
+      iframe.iFrameResizer.sendMessage({type, payload: responsePayload}, appletSrc);
     };
 
     if (appletSrc)
@@ -130,7 +207,7 @@ function Applet() {
           //log: true,
           checkOrigin: false,
           heightCalculationMethod: "lowestElement",
-          onMessage: doMessage,
+          onMessage: handleMessage,
           minHeight:
             document.documentElement.scrollHeight -
             document.getElementById("applet").getBoundingClientRect().top,
@@ -150,7 +227,7 @@ function Applet() {
         padding: 0
       }}
       src="${appletSrc}"
-      title="TODO Applet Description"
+      title="${applet}"
       frameborder="0"
     ></iframe>
   `;
