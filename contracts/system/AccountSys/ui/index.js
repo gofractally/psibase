@@ -1,22 +1,38 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, getTaposForHeadBlock, packAndPushSignedTransaction } from '/common/rpc.mjs';
+import { getJson, initializeApplet, addRoute, push, action } from '/common/rpc.mjs';
 
-await import('https://unpkg.com/react@18/umd/react.production.min.js');
-await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
 const html = htm.bind(React.createElement);
+
+await initializeApplet();
+const thisApplet = await getJson('/common/thiscontract');
+
+let transactionTypes = {
+    newacc: 0,
+};
 
 function useAccounts(addMsg, clearMsg) {
     const [accounts, setAccounts] = React.useState([]);
-    React.useEffect(() => {
+
+    const refreshAccounts = React.useCallback((trace) => {
         (async () => {
+            addMsg(JSON.stringify(trace, null, 4));
             try {
                 setAccounts(await getJson('/accounts'));
-            } catch (e) {
+            }
+            catch (e) {
                 clearMsg();
                 addMsg(e);
             }
         })();
     }, []);
+
+    React.useEffect(refreshAccounts, []);
+
+    React.useEffect(()=>{
+        addRoute("accCreated", transactionTypes.newacc, refreshAccounts);
+    }, [refreshAccounts]);
+    
+
     return accounts;
 }
 
@@ -36,34 +52,26 @@ async function newAccount(name, pubkey, addMsg, clearMsg) {
     try {
         clearMsg();
         addMsg("Pushing transaction...");
-        let actions = [{
-            sender: 'account-sys',
-            contract: 'account-sys',
-            method: 'newAccount',
-            data: { name, authContract: 'auth-fake-sys', requireNew: true },
-        }];
+
+        var actions = [await action(
+            thisApplet, 
+            "newAccount", 
+            { 
+                name, 
+                authContract: 'auth-fake-sys', 
+                requireNew: true 
+            },
+            thisApplet,
+          )];
+
         if (pubkey)
-            actions = actions.concat([{
-                sender: name,
-                contract: 'auth-ec-sys',
-                method: 'setKey',
-                data: { key: pubkey },
-            }, {
-                sender: name,
-                contract: 'account-sys',
-                method: 'setAuthCntr',
-                data: { authContract: 'auth-ec-sys' },
-            }]);
-        const trace = await packAndPushSignedTransaction('', {
-            transaction: {
-                tapos: {
-                    ...await getTaposForHeadBlock(),
-                    expiration: new Date(Date.now() + 10_000),
-                },
-                actions,
-            }
-        });
-        addMsg(JSON.stringify(trace, null, 4));
+            actions = actions.concat([
+                await action('auth-ec-sys', 'setKey', {key: pubkey}, name),
+                await action('auth-ec-sys', 'setAuthCntr', {authContract: ''}, name), 
+            ]);
+
+        push(transactionTypes.newacc, actions);
+
     } catch (e) {
         console.error(e);
         addMsg('');
