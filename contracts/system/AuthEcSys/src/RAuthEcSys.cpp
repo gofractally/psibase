@@ -13,11 +13,17 @@ namespace system_contract
 {
    std::optional<RpcReplyData> RAuthEcSys::serveSys(RpcRequestData request)
    {
-      if (auto result = psibase::serveSimpleUI<AuthEcSys, true>(request))
-         return result;
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
          return result;
+
+      if (auto result = servePackAction<AuthEcSys>(request))
+         return result;
+
+      if (auto result = psibase::serveSimpleUI<AuthEcSys, true>(request))
+         return result;
+
       return std::nullopt;
+
    }  // serveSys
 
    void RAuthEcSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
