@@ -294,6 +294,17 @@ namespace triedent
       void                  set_top_root(const std::shared_ptr<root>& r);
 
       int upsert(std::shared_ptr<root>& r, string_view key, string_view val);
+
+      // Caution: r (the reference) must not reference any of the shared_ptrs
+      //          within roots. It may be a copy of a shared_ptr within roots.
+      //          The latter case won't create a loop; instead it will create a
+      //          newer tree which references an older tree in one of its leaves.
+      //          The newer tree will still have structural sharing with the older
+      //          tree.
+      int upsert(std::shared_ptr<root>&                 r,
+                 string_view                            key,
+                 std::span<const std::shared_ptr<root>> roots);
+
       int remove(std::shared_ptr<root>& r, string_view key);
 
       /**
@@ -314,7 +325,7 @@ namespace triedent
 
       void recursive_retain(object_id id);
 
-      inline mutable_deref<value_node> make_value(string_view k, string_view v);
+      inline mutable_deref<value_node> make_value(node_type type, string_view k, string_view v);
       inline mutable_deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
       inline mutable_deref<inner_node> make_inner(const inner_node& cpy,
                                                   string_view       pre,
@@ -324,12 +335,27 @@ namespace triedent
       template <typename T>
       inline mutable_deref<T> lock(const deref<T>& obj);
 
-      inline id add_child(id root, bool unique, string_view key, string_view val, int& old_size);
+      inline id add_child(id          root,
+                          bool        unique,
+                          node_type   type,
+                          string_view key,
+                          string_view val,
+                          int&        old_size);
       inline id remove_child(id root, bool unique, string_view key, int& removed_size);
 
-      inline id set_value(deref<node> n, bool unique, string_view key, string_view val);
-      inline id set_inner_value(deref<inner_node> n, bool unique, string_view val);
-      inline id combine_value_nodes(string_view k1, string_view v1, string_view k2, string_view v2);
+      inline void modify_value(mutable_deref<value_node> mut, string_view val);
+      inline id   set_value(deref<node> n,
+                            bool        unique,
+                            node_type   type,
+                            string_view key,
+                            string_view val);
+      inline id set_inner_value(deref<inner_node> n, bool unique, node_type type, string_view val);
+      inline id combine_value_nodes(node_type   t1,
+                                    string_view k1,
+                                    string_view v1,
+                                    node_type   t2,
+                                    string_view k2,
+                                    string_view v2);
    };
 
    class database : public std::enable_shared_from_this<database>
@@ -418,24 +444,25 @@ namespace triedent
       using id = object_id;
 
       deref() = default;
-      deref(std::pair<id, value_node*> p, node_type type)
-          : _id(p.first), ptr((char*)p.second), type(type)
+      deref(std::pair<id, value_node*> p, node_type t)
+          : _id(p.first), ptr((char*)p.second), _type(t)
       {
       }
       deref(std::pair<id, inner_node*> p)
-          : _id(p.first), ptr((char*)p.second), type(node_type::inner)
+          : _id(p.first), ptr((char*)p.second), _type(node_type::inner)
       {
       }
       template <typename Other>
-      deref(deref<Other> p) : _id(p._id), ptr((char*)p.ptr), type(p.type)
+      deref(deref<Other> p) : _id(p._id), ptr((char*)p.ptr), _type(p._type)
       {
       }
-      deref(id i, char* p, node_type type) : _id(i), ptr(p), type(type) {}
+      deref(id i, char* p, node_type t) : _id(i), ptr(p), _type(t) {}
 
       explicit inline operator bool() const { return bool(_id); }
       inline          operator id() const { return _id; }
 
-      bool         is_leaf_node() const { return type != node_type::inner; }
+      auto         type() const { return _type; }
+      bool         is_leaf_node() const { return _type != node_type::inner; }
       inline auto& as_value_node() const { return *reinterpret_cast<const value_node*>(ptr); }
       inline auto& as_inner_node() const { return *reinterpret_cast<const inner_node*>(ptr); }
 
@@ -450,7 +477,7 @@ namespace triedent
 
       id        _id;
       char*     ptr;
-      node_type type;
+      node_type _type;
    };  // deref
 
    template <typename T>
@@ -656,10 +683,11 @@ namespace triedent
       }
    }
 
-   inline mutable_deref<value_node> write_session::make_value(string_view key, string_view val)
+   inline mutable_deref<value_node> write_session::make_value(node_type   type,
+                                                              string_view key,
+                                                              string_view val)
    {
-      // TODO
-      return {value_node::make(*_db->_ring, key, val, node_type::bytes, false), node_type::bytes};
+      return {value_node::make(*_db->_ring, key, val, type, false), type};
    }
 
    inline mutable_deref<inner_node> write_session::make_inner(string_view pre,
@@ -686,13 +714,15 @@ namespace triedent
    /**
     *  Given an existing value node and a new key/value to insert
     */
-   database::id write_session::combine_value_nodes(string_view k1,
+   database::id write_session::combine_value_nodes(node_type   t1,
+                                                   string_view k1,
                                                    string_view v1,
+                                                   node_type   t2,
                                                    string_view k2,
                                                    string_view v2)
    {
       if (k1.size() > k2.size())
-         return combine_value_nodes(k2, v2, k1, v1);
+         return combine_value_nodes(t2, k2, v2, t1, k1, v1);
 
       //std::cerr << __func__ << ":" << __LINE__ << "\n";
       auto cpre = common_prefix(k1, k2);
@@ -700,14 +730,14 @@ namespace triedent
       if (cpre == k1)
       {
          //  std::cerr << __func__ << ":" << __LINE__ << "\n";
-         auto inner_value = make_value(string_view(), v1);
+         auto inner_value = make_value(t1, string_view(), v1);
          auto k2sfx       = k2.substr(cpre.size());
          auto b2          = k2sfx.front();
 
          auto in = make_inner(cpre, id(), 1ull << b2);
          in->set_value(inner_value);
 
-         in->branch(b2) = make_value(k2sfx.substr(1), v2);
+         in->branch(b2) = make_value(t2, k2sfx.substr(1), v2);
 
          return in;
       }
@@ -718,8 +748,8 @@ namespace triedent
          auto b2sfx = k2.substr(cpre.size());
          auto b1    = b1sfx.front();
          auto b2    = b2sfx.front();
-         auto b1v   = make_value(b1sfx.substr(1), v1);
-         auto b2v   = make_value(b2sfx.substr(1), v2);
+         auto b1v   = make_value(t1, b1sfx.substr(1), v1);
+         auto b2v   = make_value(t2, b2sfx.substr(1), v2);
 
          //auto in        = make_inner(cpre, (1ull << b2) | (1ul << b1), _version);
          auto in        = make_inner(cpre, id(), inner_node::branches(b1, b2));
@@ -730,27 +760,49 @@ namespace triedent
       }
    }
 
+   void write_session::modify_value(mutable_deref<value_node> mut, string_view val)
+   {
+      if (mut.type() == node_type::roots)
+      {
+         auto* src  = reinterpret_cast<const object_id*>(val.data());
+         auto* dest = mut->roots();
+         auto  n    = mut->num_roots();
+         while (n--)
+         {
+            auto prev = *dest;
+            *dest++   = *src++;
+            release(prev);
+         }
+      }
+      else
+         memcpy(mut->data_ptr(), val.data(), val.size());
+   }
+
    database::id write_session::set_value(deref<node> n,
                                          bool        unique,
+                                         node_type   type,
                                          string_view key,
                                          string_view val)
    {
-      if (not n)
-         return make_value(key, val);
+      if (!n || !unique || type != n.type())
+         return make_value(type, key, val);
 
       assert(n.is_leaf_node());
 
       auto& vn = n.as_value_node();
-      if (unique and vn.data_size() == val.size())
+      if (vn.data_size() == val.size())
       {
-         memcpy(lock(n).as_value_node().data_ptr(), val.data(), val.size());
+         modify_value(lock(deref<value_node>(n)), val);
          return n;
       }
 
-      return make_value(key, val);
+      return make_value(type, key, val);
    }
 
-   database::id write_session::set_inner_value(deref<inner_node> n, bool unique, string_view val)
+   database::id write_session::set_inner_value(deref<inner_node> n,
+                                               bool              unique,
+                                               node_type         type,
+                                               string_view       val)
    {
       if (unique)
       {
@@ -759,25 +811,26 @@ namespace triedent
          {
             auto  v  = get(locked->value());
             auto& vn = v.as_value_node();
-            if (vn.data_size() == val.size() && _db->_ring->ref(locked->value()) == 1)
+            if (v.type() == type && vn.data_size() == val.size() &&
+                _db->_ring->ref(locked->value()) == 1)
             {
-               memcpy(lock(v).as_value_node().data_ptr(), val.data(), val.size());
+               modify_value(lock(deref<value_node>(v)), val);
             }
             else
             {
                _db->_ring->release(locked->value());
-               locked->set_value(make_value(string_view(), val));
+               locked->set_value(make_value(type, string_view(), val));
             }
          }
          else
          {
-            locked->set_value(make_value(string_view(), val));
+            locked->set_value(make_value(type, string_view(), val));
          }
          return locked;
       }
       else
       {
-         auto new_val = make_value(string_view(), val);
+         auto new_val = make_value(type, string_view(), val);
          return make_inner(*n, n->key(), new_val, n->branches());
       }
    }
@@ -788,23 +841,24 @@ namespace triedent
     */
    inline database::id write_session::add_child(id          root,
                                                 bool        unique,
+                                                node_type   type,
                                                 string_view key,
                                                 string_view val,
                                                 int&        old_size)
    {
       if (not root)  // empty case
-         return make_value(key, val);
+         return make_value(type, key, val);
 
       auto n = get(root, unique);
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
-         if ((vn.key() != key))
-            return combine_value_nodes(vn.key(), vn.data(), key, val);
+         if (vn.key() != key)
+            return combine_value_nodes(n.type(), vn.key(), vn.data(), type, key, val);
          else
          {
             old_size = vn.data_size();
-            return set_value(n, unique, key, val);  // with the same key
+            return set_value(n, unique, type, key, val);
          }
       }
 
@@ -813,15 +867,9 @@ namespace triedent
       auto  in_key = in.key();
       if (in_key == key)  // whose prefix is same as key, therefore set the value
       {
-         if (not in.value())
-         {
-            return set_inner_value(n, unique, val);
-         }
-         else
-         {
+         if (in.value())
             old_size = get(in.value()).as_value_node().data_size();
-            return set_inner_value(n, unique, val);
-         }
+         return set_inner_value(n, unique, type, val);
       }
 
       auto cpre = common_prefix(in_key, key);
@@ -834,7 +882,7 @@ namespace triedent
             auto  new_in = make_inner(in, in_key, retain(in.value()), in.branches() | 1ull << b);
             auto& cur_b  = new_in->branch(b);
 
-            auto new_b = add_child(cur_b, false, key.substr(cpre.size() + 1), val, old_size);
+            auto new_b = add_child(cur_b, false, type, key.substr(cpre.size() + 1), val, old_size);
 
             if (new_b != cur_b)
             {
@@ -846,7 +894,7 @@ namespace triedent
          }  // else modify in place
 
          auto cur_b = in.branch(b);
-         auto new_b = add_child(cur_b, unique, key.substr(cpre.size() + 1), val, old_size);
+         auto new_b = add_child(cur_b, unique, type, key.substr(cpre.size() + 1), val, old_size);
 
          if (new_b != cur_b)
          {
@@ -865,7 +913,7 @@ namespace triedent
             auto b1    = in_key[cpre.size()];
             auto b1key = in_key.substr(cpre.size() + 1);
             auto b1val = make_inner(in, b1key, retain(in.value()), in.branches());
-            auto b0val = make_value(string_view(), val);
+            auto b0val = make_value(type, string_view(), val);
 
             auto nin        = make_inner(cpre, b0val, inner_node::branches(b1));
             nin->branch(b1) = b1val;
@@ -881,7 +929,7 @@ namespace triedent
             auto nin   = make_inner(cpre, id(), inner_node::branches(b1, b2));
 
             assert(not nin->branch(b1));
-            nin->branch(b1) = make_value(b1key, val);
+            nin->branch(b1) = make_value(type, b1key, val);
             auto sub        = make_inner(in, b2key, retain(in.value()), in.branches());
             assert(not nin->branch(b2));
             nin->branch(b2) = sub;
@@ -889,7 +937,7 @@ namespace triedent
             return nin;
          }
       }
-   }
+   }  // write_session::add_child
 
    inline int write_session::upsert(std::shared_ptr<root>& r, string_view key, string_view val)
    {
@@ -898,7 +946,30 @@ namespace triedent
       auto&      ar = *_db->_ring;
 
       int  old_size = -1;
-      auto new_root = add_child(get_id(r), get_unique(r), to_key6(key), val, old_size);
+      auto new_root =
+          add_child(get_id(r), get_unique(r), node_type::bytes, to_key6(key), val, old_size);
+      assert(new_root.id);
+      update_root(r, new_root);
+      return old_size;
+   }
+
+   inline int write_session::upsert(std::shared_ptr<root>&                 r,
+                                    string_view                            key,
+                                    std::span<const std::shared_ptr<root>> roots)
+   {
+      _db->ensure_free_space();
+      swap_guard g(*this);
+      auto&      ar = *_db->_ring;
+
+      std::vector<object_id> ids;
+      ids.reserve(roots.size());
+      for (auto& r : roots)
+         ids.push_back(retain(get_id(r)));
+
+      int  old_size = -1;
+      auto new_root = add_child(
+          get_id(r), get_unique(r), node_type::roots, to_key6(key),
+          {reinterpret_cast<const char*>(ids.data()), ids.size() * sizeof(object_id)}, old_size);
       assert(new_root.id);
       update_root(r, new_root);
       return old_size;
@@ -1540,7 +1611,7 @@ namespace triedent
                auto& vn = bn.as_value_node();
                new_key += vn.key();
                //           DEBUG( "clone value" );
-               return make_value(new_key, vn.data());
+               return make_value(bn.type(), new_key, vn.data());
             }
             else
             {
@@ -1610,7 +1681,7 @@ namespace triedent
 
                auto  cur_v = get(in.value());
                auto& cv    = cur_v.as_value_node();
-               return make_value(in_key, cv.data());
+               return make_value(cur_v.type(), in_key, cv.data());
             }
             else
             {  // there must be only 1 branch left
@@ -1627,7 +1698,7 @@ namespace triedent
                   new_key += in.key();
                   new_key += char(lb);
                   new_key += cv.key();
-                  return make_value(new_key, cv.data());
+                  return make_value(cur_v.type(), new_key, cv.data());
                }
                else
                {
