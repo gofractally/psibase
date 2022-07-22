@@ -1,5 +1,5 @@
 import { siblingUrl } from "/common/rootdomain.mjs";
-import { signAndPushTransaction, CommonResources, ErrorCodes, MessageTypes } from "/common/rpc.mjs";
+import { signAndPushTransaction, getTaposForHeadBlock, CommonResources, ErrorCodes, MessageTypes } from "/common/rpc.mjs";
 import htm from "/common/htm.module.js";
 await import("/common/react-router-dom.min.js");
 
@@ -14,9 +14,15 @@ const appletPrefix = "/applet/";
 
 let contracts = [
   {
-    title: "Account Management",
-    description: "Used to create and/or update your account.",
+    title: "Account Creation",
+    description: "Create a new account. Only available on testnet.",
     contract: "account-sys",
+    color: "teal"
+  },
+  {
+    title: "Account Management",
+    description: "Used to manage your existing accounts.",
+    contract: "auth-ec-sys",
     color: "red",
   },
   {
@@ -86,10 +92,11 @@ const injectSender = (actions) => {
   return actions;
 };
 
-const constructTransaction = (actions) => {
+const constructTransaction = async (actions) => {
   let tenMinutes = 10 * 60 * 1000;
   var transaction = JSON.parse(JSON.stringify({
       tapos: {
+          ...await getTaposForHeadBlock(),
           expiration: new Date(Date.now() + tenMinutes),
       },
       actions,
@@ -138,7 +145,8 @@ let messageRouting = [
 
       try 
       {
-        let trace = await signAndPushTransaction('', constructTransaction(injectSender(actions)));
+        let trans = await constructTransaction(injectSender(actions));
+        let trace = await signAndPushTransaction('', trans);
         return {type, trace};
       }
       catch (e)
