@@ -24,29 +24,31 @@ int main(int argc, char** argv)
 
       uint32_t                num_read_threads = 6;
       po::options_description desc("Allowed options");
-      desc.add_options()("help,h", "print this message")("reset", "reset the database")(
-          "sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys")(
-          "status", "print status of the database")(
-          "count", "count the number of keys in database")("validate",
-                                                           "count the number of keys in database")(
-          "gc", "free any space caused by dangling ref counts")(
-          "export", po::value<std::string>(&export_file),
-          "export the key value db to canonical form")(
-          "import", po::value<std::string>(&import_file), "import keys previously exported")(
-          "create", "creates an empty database with the give parameters")(
-          "data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
-          "the folder that contains the database")(
-          "read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
-          "number of read threads to launch")(
-          "hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33),
-          "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes")(
-          "warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33),
-          "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes")(
-          "cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33),
-          "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes")(
-          "cold-size,C", po::value<uint32_t>(&cold_page_c)->default_value(33),
-          "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes")(
-          "max-objects,O", po::value<uint64_t>(&num_objects)->default_value(num_objects),
+      auto                    opt = desc.add_options();
+      opt("help,h", "print this message");
+      opt("reset", "reset the database");
+      opt("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys");
+      opt("status", "print status of the database");
+      // opt("count", "count the number of keys in database");
+      opt("validate", "count the number of keys in database");
+      opt("gc", "free any space caused by dangling ref counts");
+      // opt("export", po::value<std::string>(&export_file),
+      //     "export the key value db to canonical form");
+      // opt("import", po::value<std::string>(&import_file), "import keys previously exported");
+      opt("create", "creates an empty database with the give parameters");
+      opt("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
+          "the folder that contains the database");
+      opt("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
+          "number of read threads to launch");
+      opt("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33),
+          "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes");
+      opt("warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33),
+          "the power of 2 for the amount of RAM for the warm ring, RAM = 2^(warm_size) bytes");
+      opt("cool-size,c", po::value<uint32_t>(&cool_page_c)->default_value(33),
+          "the power of 2 for the amount of RAM for the cool ring, RAM = 2^(cool_size) bytes");
+      opt("cold-size,C", po::value<uint32_t>(&cold_page_c)->default_value(33),
+          "the power of 2 for the amount of RAM for the cold ring, RAM = 2^(cold_size) bytes");
+      opt("max-objects,O", po::value<uint64_t>(&num_objects)->default_value(num_objects),
           "the maximum number of unique objects in the database");
 
       po::variables_map vm;
@@ -96,6 +98,7 @@ int main(int argc, char** argv)
          s->end_collect_garbage();
       }
 
+#if 0
       if (vm.count("import"))
       {
          // TODO: roots within trees
@@ -178,6 +181,7 @@ int main(int argc, char** argv)
          else
             std::cerr << count << " keys in database " << std::endl;
       }
+#endif
    }
    catch (std::exception& e)
    {

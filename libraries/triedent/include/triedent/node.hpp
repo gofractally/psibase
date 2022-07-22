@@ -257,6 +257,8 @@ namespace triedent
       const uint64_t mask = (-1ull << (b & 63));
       return b >= 64 ? 64 : std::countr_zero(_present_bits & mask);
    }
+
+   // last branch <= b
    inline int8_t inner_node::reverse_lower_bound(uint8_t b) const
    {
       const uint64_t mask = b == 63 ? -1ull : ~(-1ull << ((b + 1) & 63));

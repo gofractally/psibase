@@ -179,6 +179,10 @@ namespace triedent
       //   in this library. You may modify copies of the shared_ptr.
       // * Don't compare iterators created by different sessions or
       //   different roots.
+      //
+      // TODO: iterator implementation isn't complete; multiple functions
+      //       need to be fixed
+#if 0
       struct iterator
       {
          uint32_t    key_size() const;
@@ -237,6 +241,7 @@ namespace triedent
          uint32_t       _iter_num;
          const session* _session;
       };
+#endif
 
       // This is more efficient than simply dropping r since it
       // doesn't usually lock a mutex. However, like dropping r,
@@ -244,12 +249,13 @@ namespace triedent
       // calling this from a dedicated cleanup thread.
       void release(std::shared_ptr<root>& r);
 
-      iterator first(const std::shared_ptr<root>& r) const;
-      iterator last(const std::shared_ptr<root>& r) const;
-      iterator find(const std::shared_ptr<root>& r, string_view key) const;
-      iterator lower_bound(const std::shared_ptr<root>& r, string_view key) const;
-      iterator last_with_prefix(const std::shared_ptr<root>& r, string_view prefix) const;
-      bool     get(const std::shared_ptr<root>& r, string_view key, std::string& result) const;
+      // iterator first(const std::shared_ptr<root>& r) const;
+      // iterator last(const std::shared_ptr<root>& r) const;
+      // iterator find(const std::shared_ptr<root>& r, string_view key) const;
+      // iterator lower_bound(const std::shared_ptr<root>& r, string_view key) const;
+      // iterator last_with_prefix(const std::shared_ptr<root>& r, string_view prefix) const;
+
+      bool get(const std::shared_ptr<root>& r, string_view key, std::string& result) const;
       std::optional<std::string> get(const std::shared_ptr<root>& r, string_view key) const;
 
       void print(const std::shared_ptr<root>& r);
@@ -261,11 +267,11 @@ namespace triedent
      protected:
       session(const session&) = delete;
 
-      inline object_id           get_id(const std::shared_ptr<root>& r) const;
-      void                       validate(id);
-      void                       next(iterator& itr) const;
-      void                       prev(iterator& itr) const;
-      iterator                   find(id n, string_view key) const;
+      inline object_id get_id(const std::shared_ptr<root>& r) const;
+      void             validate(id);
+      // void                       next(iterator& itr) const;
+      // void                       prev(iterator& itr) const;
+      // iterator                   find(id n, string_view key) const;
       void                       print(id n, string_view prefix = "", std::string k = "");
       inline deref<node>         get(ring_allocator::id i) const;
       inline deref<node>         get(ring_allocator::id i, bool& unique) const;
@@ -976,6 +982,7 @@ namespace triedent
       return old_size;
    }
 
+#if 0
    template <typename AccessMode>
    typename session<AccessMode>::iterator& session<AccessMode>::iterator::operator++()
    {
@@ -1493,6 +1500,7 @@ namespace triedent
       }
       return iterator(*this);
    }
+#endif
 
    template <typename AccessMode>
    std::optional<std::string> session<AccessMode>::get(const std::shared_ptr<root>& r,
