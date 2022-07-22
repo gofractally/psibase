@@ -338,10 +338,10 @@ int main(int argc, char** argv)
       int mismatched = 0;
       for (auto& [k, v] : comparison_map)
       {
-         std::string read_value;
+         std::vector<char> read_value;
          if (!s->get(root, k, read_value))
             ++missing;
-         else if (read_value != v)
+         else if (std::string_view{read_value.data(), read_value.size()} != v)
             ++mismatched;
       }
       std::cerr << "missing: " << missing << " mismatched: " << mismatched << "\n";

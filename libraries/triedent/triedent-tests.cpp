@@ -15,6 +15,14 @@ S& operator<<(S& stream, const std::optional<T>& obj)
 
 using namespace triedent;
 
+std::optional<std::string_view> osv(const std::optional<std::vector<char>>& v)
+{
+   if (v)
+      return {{v->data(), v->size()}};
+   else
+      return std::nullopt;
+}
+
 auto createDb()
 {
    std::filesystem::remove_all("testdb");
@@ -57,9 +65,13 @@ TEST_CASE("accidental inner removal")
    auto root    = session->get_top_root();
    session->upsert(root, {"\x00\x01\x02", 3}, {"value 1"});
    session->upsert(root, {"\x00\x01\x03", 3}, {"value 2"});
-   REQUIRE(session->get(root, {"\x00\x01\x02", 3}) == std::optional{std::string_view{"value 1"}});
-   REQUIRE(session->get(root, {"\x00\x01\x03", 3}) == std::optional{std::string_view{"value 2"}});
+   REQUIRE(osv(session->get(root, {"\x00\x01\x02", 3})) ==
+           std::optional{std::string_view{"value 1"}});
+   REQUIRE(osv(session->get(root, {"\x00\x01\x03", 3})) ==
+           std::optional{std::string_view{"value 2"}});
    session->remove(root, {"\x00\x00\x02", 3});
-   REQUIRE(session->get(root, {"\x00\x01\x02", 3}) == std::optional{std::string_view{"value 1"}});
-   REQUIRE(session->get(root, {"\x00\x01\x03", 3}) == std::optional{std::string_view{"value 2"}});
+   REQUIRE(osv(session->get(root, {"\x00\x01\x02", 3})) ==
+           std::optional{std::string_view{"value 1"}});
+   REQUIRE(osv(session->get(root, {"\x00\x01\x03", 3})) ==
+           std::optional{std::string_view{"value 2"}});
 }

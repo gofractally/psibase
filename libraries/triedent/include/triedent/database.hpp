@@ -255,8 +255,8 @@ namespace triedent
       // iterator lower_bound(const std::shared_ptr<root>& r, string_view key) const;
       // iterator last_with_prefix(const std::shared_ptr<root>& r, string_view prefix) const;
 
-      bool get(const std::shared_ptr<root>& r, string_view key, std::string& result) const;
-      std::optional<std::string> get(const std::shared_ptr<root>& r, string_view key) const;
+      bool get(const std::shared_ptr<root>& r, string_view key, std::vector<char>& result) const;
+      std::optional<std::vector<char>> get(const std::shared_ptr<root>& r, string_view key) const;
 
       void print(const std::shared_ptr<root>& r);
       void validate(const std::shared_ptr<root>& r);
@@ -1503,10 +1503,10 @@ namespace triedent
 #endif
 
    template <typename AccessMode>
-   std::optional<std::string> session<AccessMode>::get(const std::shared_ptr<root>& r,
-                                                       string_view                  key) const
+   std::optional<std::vector<char>> session<AccessMode>::get(const std::shared_ptr<root>& r,
+                                                             string_view                  key) const
    {
-      std::string result;
+      std::vector<char> result;
       if (get(r, key, result))
          return std::optional(std::move(result));
       return std::nullopt;
@@ -1515,7 +1515,7 @@ namespace triedent
    template <typename AccessMode>
    bool session<AccessMode>::get(const std::shared_ptr<root>& r,
                                  string_view                  key,
-                                 std::string&                 result) const
+                                 std::vector<char>&           result) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
