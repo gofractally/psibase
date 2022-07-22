@@ -63,10 +63,6 @@ namespace triedent
                                             .cold_pages = cfg.cold_pages});
    }
 
-   void database::swap()
-   {
-      _ring->swap();
-   }
    void database::print_stats(bool detail)
    {
       _ring->dump(detail);

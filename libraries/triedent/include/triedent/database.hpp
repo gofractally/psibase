@@ -388,9 +388,6 @@ namespace triedent
       database(std::filesystem::path dir, access_mode allow_write);
       ~database();
 
-      inline void swap();
-      inline void claim_free() const;
-      inline void ensure_free_space();
       static void create(std::filesystem::path dir, config);
 
       std::shared_ptr<write_session> start_write_session();
@@ -400,6 +397,8 @@ namespace triedent
 
      private:
       inline void release(id);
+      inline void claim_free() const;
+      inline void ensure_free_space();
 
       struct revision
       {
