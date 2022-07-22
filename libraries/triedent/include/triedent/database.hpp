@@ -220,9 +220,11 @@ namespace triedent
          }
 
         private:
-         // ungaurded access
-         string_view _value() const;
          friend class session;
+
+         string_view unguarded_value() const;
+         uint32_t    unguarded_key_size() const;
+         uint32_t    unguarded_read_key(char* data, uint32_t data_len) const;
          iterator(const session& s) : _session(&s)
          {
             // TODO: detect none available; currently causes UB
@@ -1100,13 +1102,13 @@ namespace triedent
          _session->_db->ensure_free_space();
       swap_guard g(*_session);
 
-      auto dat = _value();
+      auto dat = unguarded_value();
       val.resize(dat.size());
       memcpy(val.data(), dat.data(), dat.size());
    }
 
    template <typename AccessMode>
-   std::string_view session<AccessMode>::iterator::_value() const
+   std::string_view session<AccessMode>::iterator::unguarded_value() const
    {
       if (path().size() == 0)
          return std::string_view();
@@ -1120,8 +1122,19 @@ namespace triedent
          return _session->get(n.as_inner_node().value()).as_value_node().data();
       }
    }
+
    template <typename AccessMode>
    uint32_t session<AccessMode>::iterator::key_size() const
+   {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _session->_db->ensure_free_space();
+      swap_guard g(*_session);
+
+      return unguarded_key_size();
+   }
+
+   template <typename AccessMode>
+   uint32_t session<AccessMode>::iterator::unguarded_key_size() const
    {
       if (path().size() == 0)
          return 0;
@@ -1142,6 +1155,12 @@ namespace triedent
          _session->_db->ensure_free_space();
       swap_guard g(*_session);
 
+      return unguarded_read_key(data, data_len);
+   }
+
+   template <typename AccessMode>
+   uint32_t session<AccessMode>::iterator::unguarded_read_key(char* data, uint32_t data_len) const
+   {
       auto  key_len = std::min<uint32_t>(data_len, key_size());
       char* start   = data;
 
@@ -1183,9 +1202,13 @@ namespace triedent
    template <typename AccessMode>
    std::string session<AccessMode>::iterator::key() const
    {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _session->_db->ensure_free_space();
+      swap_guard g(*_session);
+
       std::string result;
-      result.resize(key_size());
-      read_key(result.data(), result.size());
+      result.resize(unguarded_key_size());
+      unguarded_read_key(result.data(), result.size());
       return from_key6(result);
    }
 
