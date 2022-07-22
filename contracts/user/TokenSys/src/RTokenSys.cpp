@@ -41,7 +41,7 @@ optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
       return result;
 
    if (auto result = servePackAction<TokenSys>(request))
-         return result;
+      return result;
 
    if (auto result = serveContent(request, TokenSys::Tables{getReceiver()}))
       return result;

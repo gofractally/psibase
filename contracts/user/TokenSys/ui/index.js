@@ -5,7 +5,8 @@ import { initializeApplet,
   getLocalResource, CommonResources } from "/common/rpc.mjs";
 
 const html = htm.bind(React.createElement);
-const { useEffect, useState, useCallback, useRef } = React;
+const { useEffect, useState, useCallback } = React;
+const { Segment, Header, Form, Table, Input, Button, Message, Tab, Container } = semanticUIReact;
 
 await initializeApplet();
 
@@ -15,21 +16,13 @@ const transactionTypes = {
   credit: 0,
 };
 
-function Headers(headers) {
-  return html`<tr>
-    ${headers.map((x, index) => {
-      return html`<th key=${index}>${x}</th>`;
-    })}
-  </tr>`;
-}
-
 function Rows(balances) {
-  return balances.map((b, index) => {
+  return balances.map(b => {
     return html`
-      <tr key=${index}>
-        <td>${b.symbol ? b.symbol.toUpperCase() : b.token}</td>
-        <td>${b.balance / Math.pow(10, b.precision)}</td>
-      </tr>
+      <${Table.Row}>
+        <${Table.Cell}>${b.symbol ? b.symbol.toUpperCase() : b.token}</${Table.Cell}>
+        <${Table.Cell}>${b.balance / Math.pow(10, b.precision)}</${Table.Cell}>
+      </${Table.Row}>
     `;
   });
 }
@@ -58,119 +51,82 @@ function BalanceTable({loggedInUser}) {
     }
   }, [user]);
 
-  useEffect(()=>{
-    getBalances().catch(console.error);
-  }, [getBalances])
-
   const refreshBalances = useCallback((trace) => {
     getBalances().catch(console.error);
-  }, [user]);
+  }, [getBalances]);
+
+  useEffect(()=>{
+    refreshBalances();
+  }, [refreshBalances])
 
   useEffect(()=>{
     addRoute("refreshbalances", transactionTypes.credit, refreshBalances);
   }, [refreshBalances]);
 
   return html`
-    <div class="ui segment">
-      <h2>Token balances</h2>
-      <form onSubmit=${onSearchSubmit} class="ui form">
-        <div class="field">
-          <div class="ui left icon input">
-            <input
-              type="text"
-              placeholder="Search accounts..."
-              value=${searchTerm}
-              onChange=${(e) => {
-                setSearchTerm(e.target.value);
-              }}
-            />
-            <i class="users icon"></i>
-          </div>
-        </div>
-      </form>
-      <table class="ui celled table">
-        <thead>
-          ${Headers(["token", "balance"])}
-        </thead>
-        <tbody>
+
+    <${Segment}>
+      <${Header} as='h2'>Token balances</${Header}>
+      <${Form} fluid onSubmit=${onSearchSubmit}>
+        <${Form.Group} widths=${1}>
+          <${Form.Input}
+            icon='user'
+            iconPosition='left'
+            placeholder='Search accounts...'
+            name='name'
+            value=${searchTerm}
+            onChange=${(e) => {
+              setSearchTerm(e.target.value);
+            }}
+          />
+        </${Form.Group}>
+      </${Form}>
+
+      <${Table} celled striped>
+        <${Table.Header}>
+          <${Table.Row}>
+            <${Table.HeaderCell}>token</${Table.HeaderCell}>
+            <${Table.HeaderCell}>balance</${Table.HeaderCell}>
+          </${Table.Row}>
+        </${Table.Header}>
+
+        <${Table.Body}>
           ${Rows(balances)}
-        </tbody>
-      </table>
-    </div>
+        </${Table.Body}>
+      </${Table}>
+    </${Segment}>
   `;
 }
 
-class EmptyPanel extends React.Component {
-  render() {
-    return html`
-      <div class="ui segment">
-        <p>Not yet implemented</p>
-      </div>
-    `;
-  }
+function EmptyPanel() {
+  return html`
+    <${Segment}>
+      Not yet implemented
+    </${Segment}>
+  `;
 }
 
-function makeLabel(lab, placeholder, val, disabled, onChanged)
+function GetMessage(props) 
 {
-  let getValue = () => {
-    return val == null? "" : val;
-  };
-
-  if (disabled)
+  if (props.show === true)
   {
     return html`
-    <div class="ui fluid labeled input" style="${{marginTop: "5px"}}">
-      <div class="ui label">
-        ${lab}
-      </div>
-      <input 
-        type="text"
-        placeholder="${placeholder}"
-        value="${getValue()}"
-        disabled
-        onChange=${(e) => {
-          onChanged(e.target.value);
-        }}
-      />
-    </div>
-    <br />
+      <${Message} positive header='Transfer successful' content='Your transfer to Bob was successful.' />
     `;
   }
-  else
-  {
-    return html`
-    <div class="ui fluid labeled input" style="${{marginTop: "5px"}}">
-      <div class="ui label">
-        ${lab}
-      </div>
-
-      <input 
-        type="text"
-        placeholder="${placeholder}"
-        value="${getValue()}"
-        onChange=${(e) => {
-          onChanged(e.target.value);
-        }}
-      />
-    </div>
-    <br />
-    `;
-  }
+  else return html``;
 }
 
-function SubmitButton(props) {
-  return html`<button class="ui primary button" onClick=${props.callback}>Send</button>`;
-}
 
 function SendPanel() {
   const [receiver, setReceiver] = useState("bob");
   const [token, setToken] = useState("PSI");
   const [amount, setAmount] = useState("");
-  const [status, setStatus] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const credited = useCallback( async (payload) =>{
-    setStatus("Transfer successful!");
-    setTimeout(()=>{setStatus("");}, 5000);
+    setShowSuccess(true);
+    setTimeout(()=>{setShowSuccess(false);}, 5000);
   }, []);
 
   useEffect(()=>{
@@ -195,72 +151,38 @@ function SendPanel() {
   };
 
   return html`
-    <form onSubmit=${onSendSubmit} class="ui form">
-      ${makeLabel("To:", "Receiver account", receiver, true, setReceiver)}
-      ${makeLabel("Token:", "Token", token, true, setToken)}
-      ${makeLabel("Amount: $", "Amount", amount, false, setAmount)}
-      <${SubmitButton} callback=${onSendSubmit} />
-    </form>
-    <p>${status}</p>
+    <${Form} onSubmit=${onSendSubmit}>
+      <${Form.Field}>
+        <${Input} fluid label='To:' placeholder='Receiver account' disabled defaultValue='${receiver}'/>
+      </${Form.Field}>
+      <${Form.Field}>
+        <${Input} fluid label='Token:' placeholder='Token' disabled defaultValue='${token}'/>
+      </${Form.Field}>
+      <${Form.Field}>
+        <${Input} fluid label='Amount: $' placeholder='Amount' defaultValue='${amount}' onChange=${(e)=>{setAmount(e.target.value);}}/>
+      </${Form.Field}>
+      <${Form.Field}>
+        <${Button} primary onClick=${onSendSubmit}>Send</${Button}>
+      </${Form.Field}>
+    </${Form}>
+    <${GetMessage} show=${showSuccess}/>
   `;
 }
 
-class ToolsTabs extends React.Component {
-  state = {
-    tabs: [
-      {
-        title: "Send",
-        panel: html`<${SendPanel} />`,
-        class: "active",
-      },
-      {
-        title: "Swap",
-        panel: html`<${EmptyPanel} />`,
-        class: "",
-      },
-    ],
-  };
-
-  onTabClicked = (index) => {
-    return () => {
-      var tabs = this.state.tabs;
-      tabs.forEach((t, i) => {
-        t.class = i === index ? "active" : "";
-      });
-      this.setState({ tabs: tabs });
-    };
-  };
-
-  render() {
-    return html`
-      <div class="ui container">
-        <div class="ui top attached tabular menu">
-          ${this.state.tabs.map((t, index) => {
-            return html`
-              <div
-                key=${t.title}
-                onClick=${this.onTabClicked(index)}
-                class="item ${t.class}"
-              >
-                ${t.title}
-              </div>
-            `;
-          })}
-        </div>
-        ${this.state.tabs.map((t) => {
-          return html`
-            <div
-              key=${t.title}
-              class="ui bottom attached tab segment ${t.class}"
-            >
-              ${t.panel}
-            </div>
-          `;
-        })}
-      </div>
-    `;
-  }
-}
+const panes = [
+  { 
+    menuItem: 'Send', 
+    render: () => {
+      return html`<${Tab.Pane}><${SendPanel} /></${Tab.Pane}>`; 
+    },
+  },
+  { 
+    menuItem: 'Swap', 
+    render: () => {
+      return html`<${Tab.Pane}><${EmptyPanel} /></${Tab.Pane}>`;
+    },
+  },
+];
 
 function App() {
 
@@ -275,11 +197,11 @@ function App() {
   }, []);
 
   return html`
-    <div class="ui container">
-      <h1>Wallet</h1>
+    <${Container}>
+      <${Header} as='h1'>Wallet</${Header}>
       <${BalanceTable } loggedInUser=${user} />
-      <${ToolsTabs} />
-    </div>
+      <${Tab} panes=${panes} />
+    </${Container}>
   `;
 }
 
