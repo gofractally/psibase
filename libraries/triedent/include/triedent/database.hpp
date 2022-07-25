@@ -265,6 +265,10 @@ namespace triedent
                              std::string_view                    key,
                              std::vector<char>*                  result_bytes,
                              std::vector<std::shared_ptr<root>>* result_roots) const;
+      bool get_less_than(const std::shared_ptr<root>&        r,
+                         std::string_view                    key,
+                         std::vector<char>*                  result_bytes,
+                         std::vector<std::shared_ptr<root>>* result_roots) const;
 
       void print(const std::shared_ptr<root>& r);
       void validate(const std::shared_ptr<root>& r);
@@ -300,6 +304,13 @@ namespace triedent
           const std::shared_ptr<triedent::root>&        ancestor,
           object_id                                     root,
           std::string_view                              key,
+          std::vector<char>*                            result_bytes,
+          std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
+
+      bool unguarded_get_less_than(
+          const std::shared_ptr<triedent::root>&        ancestor,
+          object_id                                     root,
+          std::optional<std::string_view>               key,
           std::vector<char>*                            result_bytes,
           std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
@@ -1695,8 +1706,75 @@ namespace triedent
             return true;
          b   = in.lower_bound(b + 1);
          key = {};
-      };
+      }
    }  // unguarded_get_greater_equal
+
+   template <typename AccessMode>
+   bool session<AccessMode>::get_less_than(const std::shared_ptr<root>&        r,
+                                           std::string_view                    key,
+                                           std::vector<char>*                  result_bytes,
+                                           std::vector<std::shared_ptr<root>>* result_roots) const
+   {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _db->ensure_free_space();
+      swap_guard g(*this);
+      return unguarded_get_less_than(r, get_id(r), to_key6(key), result_bytes, result_roots);
+   }
+
+   template <typename AccessMode>
+   bool session<AccessMode>::unguarded_get_less_than(
+       const std::shared_ptr<triedent::root>&        ancestor,
+       object_id                                     root,
+       std::optional<std::string_view>               key,
+       std::vector<char>*                            result_bytes,
+       std::vector<std::shared_ptr<triedent::root>>* result_roots) const
+   {
+      if (!root)
+         return false;
+      auto n = get_by_id(root);
+      if (n.is_leaf_node())
+      {
+         auto& vn = n.as_value_node();
+         if (key && vn.key() >= *key)
+            return false;
+         return fill_result(ancestor, vn, n.type(), result_bytes, result_roots);
+      }
+      auto&   in     = n.as_inner_node();
+      uint8_t last_b = 63;
+      if (key)
+      {
+         auto in_key = in.key();
+         if (in_key >= *key)
+            return false;
+         auto cpre = common_prefix(in_key, key);
+         if (cpre == in_key)
+         {
+            last_b = (*key)[cpre.size()];
+            key    = key->substr(cpre.size() + 1);
+         }
+         else
+            key = std::nullopt;
+      }
+      auto b = in.reverse_lower_bound(last_b);
+      if (b < last_b)
+         key = std::nullopt;
+      while (b >= 0)
+      {
+         if (unguarded_get_less_than(ancestor, in.branch(b), key, result_bytes, result_roots))
+            return true;
+         if (b < 1)
+            break;
+         b   = in.reverse_lower_bound(b - 1);
+         key = std::nullopt;
+      }
+      if (in.value())
+      {
+         auto  v  = get_by_id(in.value());
+         auto& vn = v.as_value_node();
+         return fill_result(ancestor, vn, v.type(), result_bytes, result_roots);
+      }
+      return false;
+   }  // unguarded_get_less_than
 
    inline int write_session::remove(std::shared_ptr<root>& r, string_view key)
    {
