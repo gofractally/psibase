@@ -35,6 +35,8 @@ anyone-->>FractallySys: triggerEvents()
 FractallySys-->>FractallySys: emit(submissionsEnd)
 anyone-->>FractallySys: triggerEvents()
 FractallySys-->>FractallySys: emit(respectIssued)
+note right of alice: Q: auto-credit dispursements from escrow each week?
+note right of alice: Q: or convert to Respect in escrow and allow withdraws
 ```
 
 ## Member Self-Admin Actions

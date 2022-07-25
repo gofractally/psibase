@@ -16,10 +16,18 @@ founder->>TokenSys: credit(token, receiver: FractallySys, qty, memo)
 founder->>FractallySys: createFractal(acct: "Fractal1", name: "New Fractal", councilName: "Nicea")
 activate FractallySys
 note right of FractallySys: TODO: create account for Council
-note right of FractallySys: Fall back to founder if fall under 3 teams
-note right of FractallySys: founder is initial manager of ƒractal
-note right of FractallySys: Council will become manager of ƒractal later on
-note right of FractallySys: founder *is* the Council intially
+FractallySys->>AccountSys: newAccount("Fractal1")
+activate AccountSys
+AccountSys->>FractallySys: credit(account: "Fractal1")
+deactivate AccountSys
+FractallySys->>TransactionSys: setCode("Fractal1", <hash of latest fractal contract>)
+FractallySys->>AccountSys: newAccount("Nicea")
+activate AccountSys
+AccountSys->>FractallySys: credit(account: "Nicea")
+deactivate AccountSys
+FractallySys->>TransactionSys: setCode("Nicea", <hash of latest Council contract>)
+note right of FractallySys: founder will act *as* the Council until sufficient membership for a full Council
+note right of FractallySys: Fall back to founder as Council if fall under 3 teams
 FractallySys->>TokenSys: debit(token, sender: founder, qty, memo)
 founder->>FractallySys: setMission()
 deactivate FractallySys
