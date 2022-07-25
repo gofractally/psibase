@@ -273,8 +273,8 @@ namespace triedent
       // void                       prev(iterator& itr) const;
       // iterator                   find(id n, string_view key) const;
       void                       print(id n, string_view prefix = "", std::string k = "");
-      inline deref<node>         get(ring_allocator::id i) const;
-      inline deref<node>         get(ring_allocator::id i, bool& unique) const;
+      inline deref<node>         get_by_id(ring_allocator::id i) const;
+      inline deref<node>         get_by_id(ring_allocator::id i, bool& unique) const;
       std::optional<string_view> get(id root, string_view key) const;
 
       inline id   retain(id);
@@ -574,14 +574,14 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   inline deref<node> session<AccessMode>::get(id i) const
+   inline deref<node> session<AccessMode>::get_by_id(id i) const
    {
       auto [ptr, type, ref] = _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
       return {i, ptr, type};
    }
 
    template <typename AccessMode>
-   inline deref<node> session<AccessMode>::get(id i, bool& unique) const
+   inline deref<node> session<AccessMode>::get_by_id(id i, bool& unique) const
    {
       auto [ptr, type, ref] = _db->_ring->get_cache<std::is_same_v<AccessMode, write_access>>(i);
       unique &= ref == 1;
@@ -816,7 +816,7 @@ namespace triedent
          auto locked = lock(n);
          if (locked->value())
          {
-            auto  v  = get(locked->value());
+            auto  v  = get_by_id(locked->value());
             auto& vn = v.as_value_node();
             if (v.type() == type && vn.data_size() == val.size() &&
                 _db->_ring->ref(locked->value()) == 1)
@@ -856,7 +856,7 @@ namespace triedent
       if (not root)  // empty case
          return make_value(type, key, val);
 
-      auto n = get(root, unique);
+      auto n = get_by_id(root, unique);
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
@@ -875,7 +875,7 @@ namespace triedent
       if (in_key == key)  // whose prefix is same as key, therefore set the value
       {
          if (in.value())
-            old_size = get(in.value()).as_value_node().data_size();
+            old_size = get_by_id(in.value()).as_value_node().data_size();
          return set_inner_value(n, unique, type, val);
       }
 
@@ -1012,7 +1012,7 @@ namespace triedent
             return;
 
          auto& c = itr.path().back();
-         auto  n = get(c.first);
+         auto  n = get_by_id(c.first);
 
          if (c.second <= 0)
          {
@@ -1040,14 +1040,14 @@ namespace triedent
       for (;;)
       {
          auto& c = itr.path().back();
-         auto  n = get(c.first);
+         auto  n = get_by_id(c.first);
 
          if (n.is_leaf_node())
             return;
 
          auto& in = n.as_inner_node();
          auto  b  = in.branch(c.second);
-         auto  bi = get(b);
+         auto  bi = get_by_id(b);
 
          if (bi.is_leaf_node())
          {
@@ -1065,7 +1065,7 @@ namespace triedent
       {
          auto& c = itr.path().back();
 
-         auto n = get(c.first);
+         auto n = get_by_id(c.first);
 
          if (not n.is_leaf_node())
          {
@@ -1077,14 +1077,14 @@ namespace triedent
                // find first
                for (;;)
                {
-                  auto n = get(itr.path().back().first);
+                  auto n = get_by_id(itr.path().back().first);
                   if (n.is_leaf_node())
                      return;
 
                   auto& in = n.as_inner_node();
 
                   auto  b   = in.branch(itr.path().back().second);
-                  auto  bi  = get(b);
+                  auto  bi  = get_by_id(b);
                   auto& bin = bi.as_inner_node();
 
                   if (bin.value())
@@ -1119,14 +1119,14 @@ namespace triedent
    {
       if (path().size() == 0)
          return std::string_view();
-      auto n = _session->get(path().back().first);
+      auto n = _session->get_by_id(path().back().first);
       if (n.is_leaf_node())
       {
          return n.as_value_node().data();
       }
       else
       {
-         return _session->get(n.as_inner_node().value()).as_value_node().data();
+         return _session->get_by_id(n.as_inner_node().value()).as_value_node().data();
       }
    }
 
@@ -1149,7 +1149,7 @@ namespace triedent
 
       for (auto& e : path())
       {
-         auto n = _session->get(e.first);
+         auto n = _session->get_by_id(e.first);
          s += n->key_size();
       }
       return s;
@@ -1173,7 +1173,7 @@ namespace triedent
 
       for (auto& e : path())
       {
-         auto n = _session->get(e.first);
+         auto n = _session->get_by_id(e.first);
          auto b = n->key_size();
          if (b > 0)
          {
@@ -1235,7 +1235,7 @@ namespace triedent
 
       for (;;)
       {
-         auto n = get(root);
+         auto n = get_by_id(root);
          if (n.is_leaf_node())
          {
             result.path().emplace_back(root, -1);
@@ -1268,7 +1268,7 @@ namespace triedent
 
       for (;;)
       {
-         auto n = get(root);
+         auto n = get_by_id(root);
          if (n.is_leaf_node())
          {
             result.path().emplace_back(root, -1);
@@ -1312,7 +1312,7 @@ namespace triedent
 
       for (;;)
       {
-         auto n = get(root);
+         auto n = get_by_id(root);
          if (n.is_leaf_node())
          {
             auto& vn = n.as_value_node();
@@ -1334,7 +1334,7 @@ namespace triedent
          {
             for (;;)  // find last
             {
-               auto n = get(root);
+               auto n = get_by_id(root);
 
                if (n.is_leaf_node())
                {
@@ -1393,7 +1393,7 @@ namespace triedent
       swap_guard g(*this);
       for (;;)
       {
-         auto n = get(root);
+         auto n = get_by_id(root);
          if (n.is_leaf_node())
          {
             auto& vn = n.as_value_node();
@@ -1456,7 +1456,7 @@ namespace triedent
       swap_guard g(*this);
       for (;;)
       {
-         auto n = get(root);
+         auto n = get_by_id(root);
          if (n.is_leaf_node())
          {
             auto& vn = n.as_value_node();
@@ -1545,7 +1545,7 @@ namespace triedent
 
       for (;;)
       {
-         auto n = get(root);
+         auto n = get_by_id(root);
          if (n.is_leaf_node())
          {
             auto& vn = n.as_value_node();
@@ -1603,7 +1603,7 @@ namespace triedent
       if (not root)
          return root;
 
-      auto n = get(root, unique);
+      auto n = get_by_id(root, unique);
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
@@ -1626,12 +1626,12 @@ namespace triedent
          auto iv = in.value();
          if (not iv)
             return root;
-         removed_size = get(iv).as_value_node().data_size();
+         removed_size = get_by_id(iv).as_value_node().data_size();
 
          if (in.num_branches() == 1)
          {
             char        b  = std::countr_zero(in.branches());
-            auto        bn = get(*in.children());
+            auto        bn = get_by_id(*in.children());
             std::string new_key;
             new_key += in_key;
             new_key += b;
@@ -1709,7 +1709,7 @@ namespace triedent
                // in this case, not branches means it must have a value
                assert(in.value() and "expected value because we removed a branch");
 
-               auto  cur_v = get(in.value());
+               auto  cur_v = get_by_id(in.value());
                auto& cv    = cur_v.as_value_node();
                return make_value(cur_v.type(), in_key, cv.data());
             }
@@ -1720,7 +1720,7 @@ namespace triedent
                auto  lb          = std::countr_zero(in.branches() ^ inner_node::branches(b));
                auto& last_branch = in.branch(lb);
                // the one branch is either a value or a inner node
-               auto cur_v = get(last_branch);
+               auto cur_v = get_by_id(last_branch);
                if (cur_v.is_leaf_node())
                {
                   auto&       cv = cur_v.as_value_node();
@@ -1769,7 +1769,7 @@ namespace triedent
          return;
       }
 
-      auto dr = get(r);
+      auto dr = get_by_id(r);
       if (dr.is_leaf_node())
       {
          auto dat = dr.as_value_node().data();
@@ -1783,7 +1783,7 @@ namespace triedent
       {
          auto& in = dr.as_inner_node();
          std::cerr << " '" << from_key(in.key()) << "' = "
-                   << (in.value().id ? get(in.value()).as_value_node().data()
+                   << (in.value().id ? get_by_id(in.value()).as_value_node().data()
                                      : std::string_view("''"))
                    << ": i# " << r.id << " v#" << in.value().id << "  vr"
                    << _db->_ring->ref(in.value()) << "  nr" << _db->_ring->ref(r) << "   ";
@@ -1833,7 +1833,7 @@ namespace triedent
       if (cur_ref_count > 1)  // 1 is the default ref when resetting all
          return;              // retaining this node indirectly retains all children
 
-      auto dr = get(r);
+      auto dr = get_by_id(r);
       if (not dr.is_leaf_node())
       {
          auto& in = dr.as_inner_node();
@@ -1891,7 +1891,7 @@ namespace triedent
 
       validate_id(r);
 
-      auto dr = get(r);
+      auto dr = get_by_id(r);
       if (not dr.is_leaf_node())
       {
          auto& in = dr.as_inner_node();
