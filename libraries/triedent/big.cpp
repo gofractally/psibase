@@ -339,7 +339,7 @@ int main(int argc, char** argv)
       for (auto& [k, v] : comparison_map)
       {
          std::vector<char> read_value;
-         if (!s->get(root, k, read_value))
+         if (!s->get(root, k, &read_value, nullptr))
             ++missing;
          else if (std::string_view{read_value.data(), read_value.size()} != v)
             ++mismatched;

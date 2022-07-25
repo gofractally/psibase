@@ -255,7 +255,10 @@ namespace triedent
       // iterator lower_bound(const std::shared_ptr<root>& r, string_view key) const;
       // iterator last_with_prefix(const std::shared_ptr<root>& r, string_view prefix) const;
 
-      bool get(const std::shared_ptr<root>& r, string_view key, std::vector<char>& result) const;
+      bool                             get(const std::shared_ptr<root>&        r,
+                                           std::string_view                    key,
+                                           std::vector<char>*                  result_bytes,
+                                           std::vector<std::shared_ptr<root>>* result_roots) const;
       std::optional<std::vector<char>> get(const std::shared_ptr<root>& r, string_view key) const;
 
       void print(const std::shared_ptr<root>& r);
@@ -272,10 +275,21 @@ namespace triedent
       // void                       next(iterator& itr) const;
       // void                       prev(iterator& itr) const;
       // iterator                   find(id n, string_view key) const;
-      void                       print(id n, string_view prefix = "", std::string k = "");
-      inline deref<node>         get_by_id(ring_allocator::id i) const;
-      inline deref<node>         get_by_id(ring_allocator::id i, bool& unique) const;
-      std::optional<string_view> get(id root, string_view key) const;
+      void               print(id n, string_view prefix = "", std::string k = "");
+      inline deref<node> get_by_id(ring_allocator::id i) const;
+      inline deref<node> get_by_id(ring_allocator::id i, bool& unique) const;
+
+      bool unguarded_get(const std::shared_ptr<triedent::root>&        ancestor,
+                         object_id                                     root,
+                         std::string_view                              key,
+                         std::vector<char>*                            result_bytes,
+                         std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
+
+      bool fill_result(const std::shared_ptr<root>&        ancestor,
+                       const value_node&                   vn,
+                       node_type                           type,
+                       std::vector<char>*                  result_bytes,
+                       std::vector<std::shared_ptr<root>>* result_roots) const;
 
       inline id   retain(id);
       inline void release(id);
@@ -1507,41 +1521,33 @@ namespace triedent
                                                              string_view                  key) const
    {
       std::vector<char> result;
-      if (get(r, key, result))
+      if (get(r, key, &result, nullptr))
          return std::optional(std::move(result));
       return std::nullopt;
    }
 
    template <typename AccessMode>
-   bool session<AccessMode>::get(const std::shared_ptr<root>& r,
-                                 string_view                  key,
-                                 std::vector<char>&           result) const
+   bool session<AccessMode>::get(const std::shared_ptr<root>&        r,
+                                 std::string_view                    key,
+                                 std::vector<char>*                  result_bytes,
+                                 std::vector<std::shared_ptr<root>>* result_roots) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
-
-      auto       k6 = to_key6(key);
       swap_guard g(*this);
-
-      auto v = get(get_id(r), k6);
-      if (v)
-      {
-         result.resize(v->size());
-         memcpy(result.data(), v->data(), v->size());
-         return true;
-      }
-      else
-      {
-         result.resize(0);
-         return false;
-      }
+      return unguarded_get(r, get_id(r), to_key6(key), result_bytes, result_roots);
    }
 
    template <typename AccessMode>
-   std::optional<std::string_view> session<AccessMode>::get(id root, string_view key) const
+   bool session<AccessMode>::unguarded_get(
+       const std::shared_ptr<triedent::root>&        ancestor,
+       object_id                                     root,
+       std::string_view                              key,
+       std::vector<char>*                            result_bytes,
+       std::vector<std::shared_ptr<triedent::root>>* result_roots) const
    {
       if (not root)
-         return std::nullopt;
+         return false;
 
       for (;;)
       {
@@ -1550,21 +1556,21 @@ namespace triedent
          {
             auto& vn = n.as_value_node();
             if (vn.key() == key)
-               return vn.data();
-            return std::nullopt;
+               return fill_result(ancestor, vn, n.type(), result_bytes, result_roots);
+            return false;
          }
          auto& in     = n.as_inner_node();
          auto  in_key = in.key();
 
          if (key.size() < in_key.size())
-            return std::nullopt;
+            return false;
 
          if (key == in_key)
          {
             root = in.value();
 
             if (not root)
-               return std::nullopt;
+               return false;
 
             key = string_view();
             continue;
@@ -1572,17 +1578,46 @@ namespace triedent
 
          auto cpre = common_prefix(key, in_key);
          if (cpre != in_key)
-            return std::nullopt;
+            return false;
 
          auto b = key[cpre.size()];
 
          if (not in.has_branch(b))
-            return std::nullopt;
+            return false;
 
          key  = key.substr(cpre.size() + 1);
          root = in.branch(b);
       }
-      return std::nullopt;
+      return false;
+   }
+
+   template <typename AccessMode>
+   bool session<AccessMode>::fill_result(const std::shared_ptr<root>&        ancestor,
+                                         const value_node&                   vn,
+                                         node_type                           type,
+                                         std::vector<char>*                  result_bytes,
+                                         std::vector<std::shared_ptr<root>>* result_roots) const
+   {
+      if (result_bytes)
+      {
+         auto sz = vn.data_size();
+         result_bytes->resize(sz);
+         memcpy(result_bytes->data(), vn.data_ptr(), sz);
+      }
+      if (result_roots)
+      {
+         if (type == node_type::roots)
+         {
+            auto  nr  = vn.num_roots();
+            auto* src = vn.roots();
+            result_roots->resize(nr);
+            for (uint32_t i = 0; i < nr; ++i)
+               (*result_roots)[i] = std::make_shared<root>(root{_db, ancestor, src[i]});
+         }
+         else
+            result_roots->clear();
+      }
+      return true;
    }
 
    inline int write_session::remove(std::shared_ptr<root>& r, string_view key)
