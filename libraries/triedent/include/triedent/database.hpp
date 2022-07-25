@@ -261,6 +261,11 @@ namespace triedent
                                            std::vector<std::shared_ptr<root>>* result_roots) const;
       std::optional<std::vector<char>> get(const std::shared_ptr<root>& r, string_view key) const;
 
+      bool get_greater_equal(const std::shared_ptr<root>&        r,
+                             std::string_view                    key,
+                             std::vector<char>*                  result_bytes,
+                             std::vector<std::shared_ptr<root>>* result_roots) const;
+
       void print(const std::shared_ptr<root>& r);
       void validate(const std::shared_ptr<root>& r);
 
@@ -290,6 +295,13 @@ namespace triedent
                        node_type                           type,
                        std::vector<char>*                  result_bytes,
                        std::vector<std::shared_ptr<root>>* result_roots) const;
+
+      bool unguarded_get_greater_equal(
+          const std::shared_ptr<triedent::root>&        ancestor,
+          object_id                                     root,
+          std::string_view                              key,
+          std::vector<char>*                            result_bytes,
+          std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
       inline id   retain(id);
       inline void release(id);
@@ -1619,6 +1631,72 @@ namespace triedent
       }
       return true;
    }
+
+   template <typename AccessMode>
+   bool session<AccessMode>::get_greater_equal(
+       const std::shared_ptr<root>&        r,
+       std::string_view                    key,
+       std::vector<char>*                  result_bytes,
+       std::vector<std::shared_ptr<root>>* result_roots) const
+   {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _db->ensure_free_space();
+      swap_guard g(*this);
+      return unguarded_get_greater_equal(r, get_id(r), to_key6(key), result_bytes, result_roots);
+   }
+
+   template <typename AccessMode>
+   bool session<AccessMode>::unguarded_get_greater_equal(
+       const std::shared_ptr<triedent::root>&        ancestor,
+       object_id                                     root,
+       std::string_view                              key,
+       std::vector<char>*                            result_bytes,
+       std::vector<std::shared_ptr<triedent::root>>* result_roots) const
+   {
+      if (!root)
+         return false;
+      auto n = get_by_id(root);
+      if (n.is_leaf_node())
+      {
+         auto& vn = n.as_value_node();
+         if (vn.key() < key)
+            return false;
+         return fill_result(ancestor, vn, n.type(), result_bytes, result_roots);
+      }
+      auto& in     = n.as_inner_node();
+      auto  in_key = in.key();
+      auto  cpre   = common_prefix(in_key, key);
+      if (cpre == in_key)
+         key = key.substr(cpre.size());
+      else if (in_key < key)
+         return false;
+      else
+         key = {};
+      uint8_t start_b = 0;
+      if (!key.empty())
+      {
+         start_b = key[0];
+         key     = key.substr(1);
+      }
+      else if (in.value())
+      {
+         auto  v  = get_by_id(in.value());
+         auto& vn = v.as_value_node();
+         return fill_result(ancestor, vn, v.type(), result_bytes, result_roots);
+      }
+      auto b = in.lower_bound(start_b);
+      if (b > start_b)
+         key = {};
+      while (true)
+      {
+         if (b >= 64)
+            return false;
+         if (unguarded_get_greater_equal(ancestor, in.branch(b), key, result_bytes, result_roots))
+            return true;
+         b   = in.lower_bound(b + 1);
+         key = {};
+      };
+   }  // unguarded_get_greater_equal
 
    inline int write_session::remove(std::shared_ptr<root>& r, string_view key)
    {
