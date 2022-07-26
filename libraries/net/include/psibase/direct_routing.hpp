@@ -21,20 +21,21 @@ namespace psibase::net
       explicit direct_routing(boost::asio::io_context& ctx) : _ctx(ctx), _resolver(_ctx) {}
       boost::asio::ip::tcp::endpoint listen(const boost::asio::ip::tcp::endpoint& endpoint)
       {
-         _acceptors.emplace_back(std::make_unique<boost::asio::ip::tcp::acceptor>(_ctx, endpoint));
-         async_accept(*_acceptors.back());
+         _acceptors.emplace_back(std::make_shared<boost::asio::ip::tcp::acceptor>(_ctx, endpoint));
+         async_accept(_acceptors.back());
          return _acceptors.back()->local_endpoint();
       }
-      void async_accept(boost::asio::ip::tcp::acceptor& a)
+      void async_accept(std::shared_ptr<boost::asio::ip::tcp::acceptor> a)
       {
-         a.async_accept([this, &a](const std::error_code& ec, boost::asio::ip::tcp::socket&& sock){
-            if(!ec)
+         auto p = a.get();
+         p->async_accept([this, a=std::move(a)](const std::error_code& ec, boost::asio::ip::tcp::socket&& sock) mutable {
+            if(!ec && a->is_open())
             {
                std::cout << "Accepted connection from: " << sock.remote_endpoint() << std::endl;
                auto id = next_peer_id++;
                _connections.try_emplace(id, std::make_shared<connection>(std::move(sock)));
                start_connection(id);
-               async_accept(a);
+               async_accept(std::move(a));
             }
          });
       }
@@ -116,13 +117,28 @@ namespace psibase::net
       void async_recv(peer_id id, std::shared_ptr<connection>&& c)
       {
          using message_type = std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type;
-         c->async_read([this, c=std::move(c), id](const std::error_code& ec, std::vector<char>&& buf) mutable {
-            if(!ec)
+         auto p = c.get();
+         p->async_read([this, c=std::move(c), id](const std::error_code& ec, std::vector<char>&& buf) mutable {
+            if(ec && ec != make_error_code(boost::asio::error::operation_aborted))
+            {
+               disconnect(id);
+            }
+            else if(!ec && c->is_open())
             {
                std::visit([this, id](auto&& data) mutable { recv(id, data); }, psio::from_frac<message_type>(buf));
                async_recv(id, std::move(c));
             }
          });
+      }
+      void disconnect(peer_id id)
+      {
+         auto iter = _connections.find(id);
+         if(iter != _connections.end())
+         {
+            static_cast<Derived*>(this)->consensus().disconnect(id);
+            iter->second->close();
+            _connections.erase(iter);
+         }
       }
       void recv(peer_id peer, const auto& msg)
       {
@@ -134,15 +150,17 @@ namespace psibase::net
          explicit connection(boost::asio::ip::tcp::socket&& socket) : _socket(std::move(socket)) {}
          explicit connection(boost::asio::io_context& ctx) : _socket(ctx) {}
          boost::asio::ip::tcp::socket _socket;
+         bool is_open() const { return _socket.is_open(); }
+         void close() { _socket.close(); }
          template<typename F>
          void async_read(F&& f)
          {
             
             boost::asio::async_read(_socket, boost::asio::buffer(reinterpret_cast<char*>(&_msg_size), sizeof(_msg_size)),
-                                    [this, f=std::move(f)](const std::error_code& ec, std::size_t size) mutable{
+                                    [this, f=std::forward<F>(f)](const std::error_code& ec, std::size_t size) mutable {
                                        if(!ec)
                                        {
-                                          async_read_buf(std::move(f));
+                                          async_read_buf(std::forward<F>(f));
                                        }
                                        else
                                        {
@@ -231,7 +249,7 @@ namespace psibase::net
       peer_id next_peer_id = 0;
       boost::asio::io_context& _ctx;
       boost::asio::ip::tcp::resolver _resolver;
-      std::vector<std::unique_ptr<boost::asio::ip::tcp::acceptor>> _acceptors;
+      std::vector<std::shared_ptr<boost::asio::ip::tcp::acceptor>> _acceptors;
       std::map<peer_id, std::shared_ptr<connection>> _connections;
    };
 
