@@ -32,9 +32,8 @@ namespace psibase::net
             {
                std::cout << "Accepted connection from: " << sock.remote_endpoint() << std::endl;
                auto id = next_peer_id++;
-               _connections.try_emplace(id, std::move(sock));
-               async_recv(*_connections.find(id));
-               static_cast<Derived*>(this)->consensus().connect(id);
+               _connections.try_emplace(id, std::make_shared<connection>(std::move(sock)));
+               start_connection(id);
                async_accept(a);
             }
          });
@@ -42,8 +41,8 @@ namespace psibase::net
       void async_connect(const boost::asio::ip::tcp::endpoint& endpoint)
       {
          auto id = next_peer_id++;
-         auto [iter,_] = _connections.try_emplace(id, _ctx);
-         iter->second._socket.async_connect(endpoint, [this,id,endpoint](const std::error_code& ec){
+         auto [iter,_] = _connections.try_emplace(id, std::make_shared<connection>(_ctx));
+         iter->second->_socket.async_connect(endpoint, [this,id,endpoint](const std::error_code& ec){
                if(ec)
                {
                   std::cout << "Failed connecting" << std::endl;
@@ -52,8 +51,7 @@ namespace psibase::net
                else
                {
                   std::cout << "Connected to: " << endpoint << std::endl;
-                  async_recv(*_connections.find(id));
-                  static_cast<Derived*>(this)->consensus().connect(id);
+                  start_connection(id);
                }
             });
       }
@@ -64,7 +62,7 @@ namespace psibase::net
             if(!ec)
             {
                auto id = next_peer_id++;
-               auto [iter,_] = _connections.try_emplace(id, _ctx);
+               auto [iter,_] = _connections.try_emplace(id, std::make_shared<connection>(_ctx));
                boost::asio::async_connect(iter->second._socket, endpoints, [this,id](const std::error_code& ec, const boost::asio::ip::tcp::endpoint& e){
                      if(ec)
                      {
@@ -74,8 +72,7 @@ namespace psibase::net
                      else
                      {
                         std::cout << "Connected to: " << e << std::endl;
-                        async_recv(*_connections.find(id));
-                        static_cast<Derived*>(this)->consensus().connect(id);
+                        start_connection(id);
                      }
                   });
             }
@@ -90,7 +87,7 @@ namespace psibase::net
             throw std::runtime_error("unknown peer");
          }
          using message_type = std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type;
-         iter->second.async_write(psio::to_frac(message_type{msg}), std::forward<F>(f));
+         iter->second->async_write(psio::to_frac(message_type{msg}), std::forward<F>(f));
       }
       template<typename Msg>
       void multicast_producers(const Msg& msg)
@@ -98,7 +95,7 @@ namespace psibase::net
          for(auto& [id, conn] : _connections)
          {
             using message_type = std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type;
-            conn.async_write(psio::to_frac(message_type{msg}), [](const std::error_code& ec){});
+            conn->async_write(psio::to_frac(message_type{msg}), [](const std::error_code& ec){});
          }
       }
       template<typename Msg>
@@ -107,12 +104,24 @@ namespace psibase::net
          // TODO: identify peers as producers when establishing a new connection
          multicast_producers(msg);
       }
-      void async_recv(auto& c)
+      struct connection;
+      void start_connection(peer_id id)
+      {
+         auto iter = _connections.find(id);
+         assert(iter != _connections.end());
+         auto copy = iter->second;
+         async_recv(id, std::move(copy));
+         static_cast<Derived*>(this)->consensus().connect(id);
+      }
+      void async_recv(peer_id id, std::shared_ptr<connection>&& c)
       {
          using message_type = std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type;
-         c.second.async_read([this, &c](std::vector<char>&& buf){
-            std::visit([this, &c](auto&& data){ recv(c.first, data); }, psio::from_frac<message_type>(buf));
-            async_recv(c);
+         c->async_read([this, c=std::move(c), id](const std::error_code& ec, std::vector<char>&& buf) mutable {
+            if(!ec)
+            {
+               std::visit([this, id](auto&& data) mutable { recv(id, data); }, psio::from_frac<message_type>(buf));
+               async_recv(id, std::move(c));
+            }
          });
       }
       void recv(peer_id peer, const auto& msg)
@@ -130,14 +139,15 @@ namespace psibase::net
          {
             
             boost::asio::async_read(_socket, boost::asio::buffer(reinterpret_cast<char*>(&_msg_size), sizeof(_msg_size)),
-                                    [this, f=std::move(f)](const std::error_code& ec, std::size_t size){
+                                    [this, f=std::move(f)](const std::error_code& ec, std::size_t size) mutable{
                                        if(!ec)
                                        {
-                                          async_read_buf(f);
+                                          async_read_buf(std::move(f));
                                        }
                                        else
                                        {
                                           std::cout << "error: " << ec.message() << std::endl;
+                                          f(ec, std::move(_read_buf));
                                        }
                                     });
          }
@@ -146,8 +156,8 @@ namespace psibase::net
          {
             _read_buf.resize(_msg_size);
             boost::asio::async_read(_socket, boost::asio::buffer(_read_buf),
-                                    [this, f](const std::error_code& ec, std::size_t sz){
-                                       f(std::move(_read_buf));
+                                    [this, f=std::forward<F>(f)](const std::error_code& ec, std::size_t sz) mutable {
+                                       f(ec, std::move(_read_buf));
                                     });
          }
          template<typename F>
@@ -222,7 +232,7 @@ namespace psibase::net
       boost::asio::io_context& _ctx;
       boost::asio::ip::tcp::resolver _resolver;
       std::vector<std::unique_ptr<boost::asio::ip::tcp::acceptor>> _acceptors;
-      std::map<peer_id, connection> _connections;
+      std::map<peer_id, std::shared_ptr<connection>> _connections;
    };
 
 }
