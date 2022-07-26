@@ -130,6 +130,15 @@ namespace psibase::net
             }
          });
       }
+      void disconnect_all()
+      {
+         for(auto& [id,conn] : _connections)
+         {
+            static_cast<Derived*>(this)->consensus().disconnect(id);
+            conn->close();
+         }
+         _connections.clear();
+      }
       void disconnect(peer_id id)
       {
          auto iter = _connections.find(id);
