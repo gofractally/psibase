@@ -4,6 +4,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/read.hpp>
+#include <boost/mp11/algorithm.hpp>
 #include <psio/fracpack.hpp>
 #include <psibase/net_base.hpp>
 #include <vector>
@@ -13,6 +14,11 @@
 
 namespace psibase::net
 {
+#ifndef PSIO_REFLECT_INLINE
+#define PSIO_REFLECT_INLINE(name, ...)\
+   PSIO_REFLECT(name, __VA_ARGS__) \
+   friend reflect_impl_ ## name get_reflect_impl(const name&) { return {}; }
+#endif
 
    // This requires all producers to be peers
    template<typename Derived>
@@ -79,6 +85,14 @@ namespace psibase::net
             }
          });
       }
+      struct producer_message
+      {
+         producer_id producer;
+         PSIO_REFLECT_INLINE(producer_message, producer)
+      };
+      auto get_message_impl() {
+         return boost::mp11::mp_push_back<typename std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type, producer_message>{};
+      }
       template<typename Msg, typename F>
       void async_send_block(peer_id id, const Msg& msg, F&& f)
       {
@@ -87,7 +101,7 @@ namespace psibase::net
          {
             throw std::runtime_error("unknown peer");
          }
-         using message_type = std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type;
+         using message_type = decltype(get_message_impl());
          iter->second->async_write(psio::to_frac(message_type{msg}), std::forward<F>(f));
       }
       template<typename Msg>
@@ -95,7 +109,7 @@ namespace psibase::net
       {
          for(auto& [id, conn] : _connections)
          {
-            using message_type = std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type;
+            using message_type = decltype(get_message_impl());
             conn->async_write(psio::to_frac(message_type{msg}), [](const std::error_code& ec){});
          }
       }
@@ -103,7 +117,12 @@ namespace psibase::net
       void sendto(producer_id prod, const Msg& msg)
       {
          // TODO: identify peers as producers when establishing a new connection
-         multicast_producers(msg);
+         for(const auto& [id, conn] : _connections)
+         {
+            if(conn->producer == prod) {
+               async_send_block(id, msg, [](const std::error_code&){});
+            }
+         }
       }
       struct connection;
       void start_connection(peer_id id)
@@ -112,11 +131,15 @@ namespace psibase::net
          assert(iter != _connections.end());
          auto copy = iter->second;
          async_recv(id, std::move(copy));
+         if(auto producer = static_cast<Derived*>(this)->consensus().producer_name())
+         {
+            async_send_block(id, producer_message{producer}, [](const std::error_code&){});
+         }
          static_cast<Derived*>(this)->consensus().connect(id);
       }
       void async_recv(peer_id id, std::shared_ptr<connection>&& c)
       {
-         using message_type = std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type;
+         using message_type = decltype(get_message_impl());
          auto p = c.get();
          p->async_read([this, c=std::move(c), id](const std::error_code& ec, std::vector<char>&& buf) mutable {
             if(ec && ec != make_error_code(boost::asio::error::operation_aborted))
@@ -147,6 +170,14 @@ namespace psibase::net
             static_cast<Derived*>(this)->consensus().disconnect(id);
             iter->second->close();
             _connections.erase(iter);
+         }
+      }
+      void recv(peer_id peer, const producer_message& msg)
+      {
+         auto iter = _connections.find(peer);
+         if(iter != _connections.end())
+         {
+            iter->second->producer = msg.producer;
          }
       }
       void recv(peer_id peer, const auto& msg)
@@ -254,6 +285,8 @@ namespace psibase::net
          // read buffer
          std::uint32_t _msg_size;
          std::vector<char> _read_buf;
+         //
+         producer_id producer = 0;
       };
       peer_id next_peer_id = 0;
       boost::asio::io_context& _ctx;

@@ -18,9 +18,11 @@
 
 namespace psibase::net
 {
+#ifndef PSIO_REFLECT_INLINE
 #define PSIO_REFLECT_INLINE(name, ...)\
    PSIO_REFLECT(name, __VA_ARGS__) \
    friend reflect_impl_ ## name get_reflect_impl(const name&) { return {}; }
+#endif
 
    // round tp to the nearest multiple of d towards negative infinity
    template<typename Clock, typename Duration1, typename Duration2>
