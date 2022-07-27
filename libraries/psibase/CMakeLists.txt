@@ -134,6 +134,7 @@ function(add suffix)
             ../../contracts/system/VerifyEcSys/include
             ../../contracts/user/CommonSys/include
             ../../contracts/user/ExploreSys/include
+            ../../contracts/user/FractalGovSys/include
         )
         target_include_directories(psitestlib${suffix} PRIVATE
             ../../contracts/system/VerifyEcSys/include

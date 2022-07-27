@@ -11,12 +11,14 @@
 #include <contracts/system/TransactionSys.hpp>
 #include <contracts/system/VerifyEcSys.hpp>
 #include <contracts/user/ExploreSys.hpp>
+#include <contracts/user/FractalGovSys.hpp>
 #include <psibase/contractEntry.hpp>
 #include <utility>
 #include <vector>
 
 using namespace psibase;
 using namespace system_contract;
+using namespace UserContract;
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts /* = {{}} */,
@@ -99,6 +101,12 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                          .authContract = AuthFakeSys::contract,
                          .flags        = 0,
                          .code         = read_whole_file("ExploreSys.wasm"),
+                    },
+                     {
+                         .contract     = FractalGovSys::contract,
+                         .authContract = AuthFakeSys::contract,
+                         .flags        = 0,
+                         .code         = read_whole_file("FractalGovSys.wasm"),
                     },
                      {
                          .contract     = RAuthEcSys::contract,
@@ -211,26 +219,32 @@ void DefaultTestChain::registerSysRpc()
        transactor<ProxySys>{AccountSys::contract, r}.registerServer(RAccountSys::contract),
        transactor<ProxySys>{ExploreSys::contract, r}.registerServer(ExploreSys::contract),
        transactor<ProxySys>{AuthEcSys::contract, r}.registerServer(RAuthEcSys::contract),
-       transactor<ProxySys>{ProxySys::contract, r}.registerServer(RProxySys::contract)};
+       transactor<ProxySys>{ProxySys::contract, r}.registerServer(RProxySys::contract),
+       transactor<ProxySys>{FractalGovSys::contract, r}.registerServer(FractalGovSys::contract)
+       //
+   };
 
    auto trace = pushTransaction(make_transaction(std::move(a)));
    check(psibase::show(false, trace) == "", "Failed to register system rpc contracts");
 
-   transactor<CommonSys>   rpcCommon(CommonSys::contract, CommonSys::contract);
-   transactor<RAccountSys> rpcAccount(RAccountSys::contract, RAccountSys::contract);
-   transactor<ExploreSys>  rpcExplore(ExploreSys::contract, ExploreSys::contract);
-   transactor<RAuthEcSys>  rpcAuthEc(RAuthEcSys::contract, RAuthEcSys::contract);
+   transactor<CommonSys>     rpcCommon(CommonSys::contract, CommonSys::contract);
+   transactor<RAccountSys>   rpcAccount(RAccountSys::contract, RAccountSys::contract);
+   transactor<ExploreSys>    rpcExplore(ExploreSys::contract, ExploreSys::contract);
+   transactor<FractalGovSys> rpcFractalGov(FractalGovSys::contract, FractalGovSys::contract);
+   transactor<RAuthEcSys>    rpcAuthEc(RAuthEcSys::contract, RAuthEcSys::contract);
 
    // Store UI files
    std::string cdir      = "../contracts";
    std::string comDir    = cdir + "/user/CommonSys";
    std::string accDir    = cdir + "/system/AccountSys";
    std::string expDir    = cdir + "/user/ExploreSys";
+   std::string fGovDir   = cdir + "/user/FractalGovSys";
    std::string authEcDir = cdir + "/system/AuthEcSys";
    std::string thirdPty  = comDir + "/common/thirdParty/src";
 
    const std::string html = "text/html";
    const std::string js   = "text/javascript";
+   const std::string css  = "text/css";
 
    std::vector<psibase::Action> b{
        // CommonSys
@@ -276,7 +290,19 @@ void DefaultTestChain::registerSysRpc()
        rpcAuthEc.storeSys("/ui/index.js", js, read_whole_file(authEcDir + "/ui/index.js")),
 
        // ExploreSys
-       rpcExplore.storeSys("/ui/index.js", js, read_whole_file(expDir + "/ui/index.js"))};
+       rpcExplore.storeSys("/ui/index.js", js, read_whole_file(expDir + "/ui/index.js")),
+
+       // FractalGovSys
+    //    rpcFractalGov.storeSys("/", html, read_whole_file(fGovDir + "/ui/index.html")),
+    //    rpcFractalGov.storeSys("/simplepeer.min.js", js,
+    //                           read_whole_file(fGovDir + "/ui/simplepeer.min.js")),
+    //    rpcFractalGov.storeSys("/assets/index.57453e06.js", js,
+    //                           read_whole_file(fGovDir + "/ui/assets/index.57453e06.js")),
+    //    rpcFractalGov.storeSys("/assets/index.449b90c1.css", css,
+    //                           read_whole_file(fGovDir + "/ui/assets/index.449b90c1.css")),
+
+       //
+   };
 
    trace = pushTransaction(make_transaction(std::move(b)));
    check(psibase::show(false, trace) == "", "Failed to add UI files to system rpc contracts");

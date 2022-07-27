@@ -4,6 +4,7 @@ function(add_user_contract suffix name)
         include
         ../CommonSys/include
         ../ExchangeSys/include
+        ../FractalGovSys/include
         ../NameSys/include
         ../NftSys/include
         ../SymbolSys/include
@@ -25,6 +26,7 @@ function(add_user_test suffix name)
       ../include
       ../../CommonSys/include
       ../../ExchangeSys/include
+      ../../FractalGovSys/include
       ../../NameSys/include
       ../../NftSys/include
       ../../SymbolSys/include
@@ -65,6 +67,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(CommonSys)
     add_subdirectory(ExchangeSys)
     add_subdirectory(ExploreSys)
+    add_subdirectory(FractalGovSys)
     add_subdirectory(mincon)
     add_subdirectory(NameSys)
     add_subdirectory(NftSys)

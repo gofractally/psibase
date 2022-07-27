@@ -39,6 +39,12 @@ let contracts = [
     contract: "token-sys",
     color: "blue",
   },
+  {
+    title: "Fractal Governance",
+    description: "Participate in fractal governance and earn community $Respect!",
+    contract: "fgov-sys",
+    color: "pink",
+  },
 ];
 
 function activeIf(cName) {
