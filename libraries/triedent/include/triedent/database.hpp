@@ -269,6 +269,11 @@ namespace triedent
                          std::string_view                    key,
                          std::vector<char>*                  result_bytes,
                          std::vector<std::shared_ptr<root>>* result_roots) const;
+      bool get_max(const std::shared_ptr<root>&        r,
+                   std::string_view                    prefix,
+                   std::vector<char>*                  result_key,
+                   std::vector<char>*                  result_bytes,
+                   std::vector<std::shared_ptr<root>>* result_roots) const;
 
       void print(const std::shared_ptr<root>& r);
       void validate(const std::shared_ptr<root>& r);
@@ -313,6 +318,14 @@ namespace triedent
           std::optional<std::string_view>               key,
           std::vector<char>*                            result_bytes,
           std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
+
+      bool unguarded_get_max(const std::shared_ptr<triedent::root>&        ancestor,
+                             object_id                                     root,
+                             std::string_view                              prefix_min,
+                             std::string_view                              prefix_max,
+                             std::vector<char>&                            result_key,
+                             std::vector<char>*                            result_bytes,
+                             std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
       inline id   retain(id);
       inline void release(id);
@@ -1775,6 +1788,90 @@ namespace triedent
       }
       return false;
    }  // unguarded_get_less_than
+
+   template <typename AccessMode>
+   bool session<AccessMode>::get_max(const std::shared_ptr<root>&        r,
+                                     std::string_view                    prefix,
+                                     std::vector<char>*                  result_key,
+                                     std::vector<char>*                  result_bytes,
+                                     std::vector<std::shared_ptr<root>>* result_roots) const
+   {
+      if constexpr (std::is_same_v<AccessMode, write_access>)
+         _db->ensure_free_space();
+      swap_guard  g(*this);
+      auto        prefix_min = to_key6(prefix);
+      auto        extra_bits = prefix_min.size() * 6 - prefix.size() * 8;
+      std::string prefix_max = prefix_min;
+      if (!prefix_max.empty())
+         prefix_max.back() |= (1 << extra_bits) - 1;
+      std::vector<char> result_key6;
+      if (!unguarded_get_max(r, get_id(r), prefix_min, prefix_max, result_key6, result_bytes,
+                             result_roots))
+         return false;
+      if (result_key)
+      {
+         auto s = from_key6({result_key6.data(), result_key6.size()});
+         result_key->assign(s.begin(), s.end());
+      }
+      return true;
+   }
+
+   template <typename AccessMode>
+   bool session<AccessMode>::unguarded_get_max(
+       const std::shared_ptr<triedent::root>&        ancestor,
+       object_id                                     root,
+       std::string_view                              prefix_min,
+       std::string_view                              prefix_max,
+       std::vector<char>&                            result_key,
+       std::vector<char>*                            result_bytes,
+       std::vector<std::shared_ptr<triedent::root>>* result_roots) const
+   {
+      if (!root)
+         return false;
+
+      while (true)
+      {
+         auto n = get_by_id(root);
+         if (n.is_leaf_node())
+         {
+            auto& vn     = n.as_value_node();
+            auto  vn_key = vn.key();
+            if (vn_key.size() < prefix_min.size() ||
+                memcmp(vn_key.data(), prefix_min.data(), prefix_min.size()) < 0 ||
+                memcmp(vn_key.data(), prefix_max.data(), prefix_max.size()) > 0)
+               return false;
+            result_key.insert(result_key.end(), vn_key.begin(), vn_key.end());
+            return fill_result(ancestor, vn, n.type(), result_bytes, result_roots);
+         }
+
+         auto& in     = n.as_inner_node();
+         auto  in_key = in.key();
+         auto  l      = std::min(in_key.size(), prefix_min.size());
+         if (memcmp(in_key.data(), prefix_min.data(), l) < 0 ||
+             memcmp(in_key.data(), prefix_max.data(), l) > 0)
+            return false;
+
+         result_key.insert(result_key.end(), in_key.begin(), in_key.end());
+         prefix_min = prefix_min.substr(l);
+         prefix_max = prefix_max.substr(l);
+
+         int8_t first_b = 0;
+         int8_t last_b  = 63;
+         if (!prefix_min.empty())
+         {
+            first_b    = prefix_min[0];
+            last_b     = prefix_max[0];
+            prefix_min = prefix_min.substr(1);
+            prefix_max = prefix_max.substr(1);
+         }
+
+         auto b = in.reverse_lower_bound(last_b);
+         if (b < first_b)
+            return false;
+         result_key.push_back(b);
+         root = in.branch(b);
+      }
+   }  // unguarded_get_max
 
    inline int write_session::remove(std::shared_ptr<root>& r, string_view key)
    {
