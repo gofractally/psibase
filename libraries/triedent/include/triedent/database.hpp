@@ -263,10 +263,12 @@ namespace triedent
 
       bool get_greater_equal(const std::shared_ptr<root>&        r,
                              std::string_view                    key,
+                             std::vector<char>*                  result_key,
                              std::vector<char>*                  result_bytes,
                              std::vector<std::shared_ptr<root>>* result_roots) const;
       bool get_less_than(const std::shared_ptr<root>&        r,
                          std::string_view                    key,
+                         std::vector<char>*                  result_key,
                          std::vector<char>*                  result_bytes,
                          std::vector<std::shared_ptr<root>>* result_roots) const;
       bool get_max(const std::shared_ptr<root>&        r,
@@ -309,6 +311,7 @@ namespace triedent
           const std::shared_ptr<triedent::root>&        ancestor,
           object_id                                     root,
           std::string_view                              key,
+          std::vector<char>&                            result_key,
           std::vector<char>*                            result_bytes,
           std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
@@ -316,6 +319,7 @@ namespace triedent
           const std::shared_ptr<triedent::root>&        ancestor,
           object_id                                     root,
           std::optional<std::string_view>               key,
+          std::vector<char>&                            result_key,
           std::vector<char>*                            result_bytes,
           std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
@@ -1660,13 +1664,23 @@ namespace triedent
    bool session<AccessMode>::get_greater_equal(
        const std::shared_ptr<root>&        r,
        std::string_view                    key,
+       std::vector<char>*                  result_key,
        std::vector<char>*                  result_bytes,
        std::vector<std::shared_ptr<root>>* result_roots) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
-      swap_guard g(*this);
-      return unguarded_get_greater_equal(r, get_id(r), to_key6(key), result_bytes, result_roots);
+      swap_guard        g(*this);
+      std::vector<char> result_key6;
+      if (!unguarded_get_greater_equal(r, get_id(r), to_key6(key), result_key6, result_bytes,
+                                       result_roots))
+         return false;
+      if (result_key)
+      {
+         auto s = from_key6({result_key6.data(), result_key6.size()});
+         result_key->assign(s.begin(), s.end());
+      }
+      return true;
    }
 
    template <typename AccessMode>
@@ -1674,6 +1688,7 @@ namespace triedent
        const std::shared_ptr<triedent::root>&        ancestor,
        object_id                                     root,
        std::string_view                              key,
+       std::vector<char>&                            result_key,
        std::vector<char>*                            result_bytes,
        std::vector<std::shared_ptr<triedent::root>>* result_roots) const
    {
@@ -1682,9 +1697,11 @@ namespace triedent
       auto n = get_by_id(root);
       if (n.is_leaf_node())
       {
-         auto& vn = n.as_value_node();
-         if (vn.key() < key)
+         auto& vn     = n.as_value_node();
+         auto  vn_key = vn.key();
+         if (vn_key < key)
             return false;
+         result_key.insert(result_key.end(), vn_key.begin(), vn_key.end());
          return fill_result(ancestor, vn, n.type(), result_bytes, result_roots);
       }
       auto& in     = n.as_inner_node();
@@ -1696,6 +1713,7 @@ namespace triedent
          return false;
       else
          key = {};
+      result_key.insert(result_key.end(), in_key.begin(), in_key.end());
       uint8_t start_b = 0;
       if (!key.empty())
       {
@@ -1715,8 +1733,11 @@ namespace triedent
       {
          if (b >= 64)
             return false;
+         auto rk = result_key.size();
+         result_key.push_back(b);
          if (unguarded_get_greater_equal(ancestor, in.branch(b), key, result_bytes, result_roots))
             return true;
+         result_key.resize(rk);
          b   = in.lower_bound(b + 1);
          key = {};
       }
@@ -1725,13 +1746,23 @@ namespace triedent
    template <typename AccessMode>
    bool session<AccessMode>::get_less_than(const std::shared_ptr<root>&        r,
                                            std::string_view                    key,
+                                           std::vector<char>*                  result_key,
                                            std::vector<char>*                  result_bytes,
                                            std::vector<std::shared_ptr<root>>* result_roots) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
-      swap_guard g(*this);
-      return unguarded_get_less_than(r, get_id(r), to_key6(key), result_bytes, result_roots);
+      swap_guard        g(*this);
+      std::vector<char> result_key6;
+      if (!unguarded_get_less_than(r, get_id(r), to_key6(key), result_key6, result_bytes,
+                                   result_roots))
+         return false;
+      if (result_key)
+      {
+         auto s = from_key6({result_key6.data(), result_key6.size()});
+         result_key->assign(s.begin(), s.end());
+      }
+      return true;
    }
 
    template <typename AccessMode>
@@ -1739,6 +1770,7 @@ namespace triedent
        const std::shared_ptr<triedent::root>&        ancestor,
        object_id                                     root,
        std::optional<std::string_view>               key,
+       std::vector<char>&                            result_key,
        std::vector<char>*                            result_bytes,
        std::vector<std::shared_ptr<triedent::root>>* result_roots) const
    {
@@ -1747,16 +1779,18 @@ namespace triedent
       auto n = get_by_id(root);
       if (n.is_leaf_node())
       {
-         auto& vn = n.as_value_node();
-         if (key && vn.key() >= *key)
+         auto& vn     = n.as_value_node();
+         auto  vn_key = vn.key();
+         if (key && vn_key >= *key)
             return false;
+         result_key.insert(result_key.end(), vn_key.begin(), vn_key.end());
          return fill_result(ancestor, vn, n.type(), result_bytes, result_roots);
       }
       auto&   in     = n.as_inner_node();
+      auto    in_key = in.key();
       uint8_t last_b = 63;
       if (key)
       {
-         auto in_key = in.key();
          if (in_key >= *key)
             return false;
          auto cpre = common_prefix(in_key, key);
@@ -1768,13 +1802,17 @@ namespace triedent
          else
             key = std::nullopt;
       }
+      result_key.insert(result_key.end(), in_key.begin(), in_key.end());
       auto b = in.reverse_lower_bound(last_b);
       if (b < last_b)
          key = std::nullopt;
       while (b >= 0)
       {
+         auto rk = result_key.size();
+         result_key.push_back(b);
          if (unguarded_get_less_than(ancestor, in.branch(b), key, result_bytes, result_roots))
             return true;
+         result_key.resize(rk);
          if (b < 1)
             break;
          b   = in.reverse_lower_bound(b - 1);
