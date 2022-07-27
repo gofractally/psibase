@@ -170,9 +170,10 @@ namespace triedent
          auto& atomic = lock.db->_header->objects[lock.id];
          auto  obj    = atomic.load();
          while (!atomic.compare_exchange_weak(
-             obj, obj_val({.offset = offset, .cache = cache, .type = extract_type(obj)},
-                          extract_ref(obj)) |
-                      position_lock_mask))
+             obj,
+             obj_val(object_location{.offset = offset, .cache = cache, .type = extract_type(obj)},
+                     extract_ref(obj)) |
+                 position_lock_mask))
          {
          }
       }
@@ -330,7 +331,8 @@ namespace triedent
          ++_header->first_unallocated.id;
          auto  r   = _header->first_unallocated;
          auto& obj = _header->objects[r.id];
-         obj.store(obj_val({.type = type}, 1) | position_lock_mask);  // init ref count 1
+         obj.store(obj_val(object_location{.type = type}, 1) |
+                   position_lock_mask);  // init ref count 1
          assert(r.id != 0);
 
          location_lock lock;
@@ -345,7 +347,7 @@ namespace triedent
              ff, extract_next_ptr(_header->objects[ff].load())))
          {
          }
-         _header->objects[ff].store(obj_val({.type = type}, 1) |
+         _header->objects[ff].store(obj_val(object_location{.type = type}, 1) |
                                     position_lock_mask);  // init ref count 1
 
          location_lock lock;
