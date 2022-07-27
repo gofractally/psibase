@@ -34,7 +34,7 @@ auto createDb()
                                   .cold_pages  = 30,
                               });
    return std::make_shared<database>(  //
-       "testdb", database::read_write);
+       "testdb", database::read_write, true);
 }
 
 TEST_CASE("key round trip")

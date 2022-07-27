@@ -38,7 +38,7 @@ namespace triedent
 
       swap_position get_swap_pos() const;
 
-      ring_allocator(std::filesystem::path dir, access_mode mode);
+      ring_allocator(std::filesystem::path dir, access_mode mode, bool allow_slow);
       static void create(std::filesystem::path dir, config cfg);
 
       std::pair<location_lock, char*> alloc(size_t num_bytes, node_type type);
@@ -208,7 +208,8 @@ namespace triedent
 
       managed_ring(std::filesystem::path            filename,
                    ring_allocator::cache_level_type level,
-                   bool                             pin = false);
+                   bool                             pin,
+                   bool                             allow_slow);
 
       static void create(std::filesystem::path filename, uint8_t logsize);
 

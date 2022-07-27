@@ -15,7 +15,7 @@ namespace triedent
    std::atomic<int>      database::_read_thread_number = 0;
    thread_local uint32_t database::_thread_num         = 0;
 
-   database::database(std::filesystem::path dir, access_mode allow_write)
+   database::database(std::filesystem::path dir, access_mode allow_write, bool allow_slow)
    {
       auto db = dir / "db";
       if (not std::filesystem::exists(dir))
@@ -30,7 +30,7 @@ namespace triedent
 
       _dbm = reinterpret_cast<database_memory*>(_region->get_address());
 
-      _ring.reset(new ring_allocator(dir / "data", ring_allocator::read_write));
+      _ring.reset(new ring_allocator(dir / "data", ring_allocator::read_write, allow_slow));
 
       _ring->_try_claim_free = [this]() { claim_free(); };
    }

@@ -27,7 +27,8 @@ namespace triedent
 
    managed_ring::managed_ring(std::filesystem::path            filename,
                               ring_allocator::cache_level_type lev,
-                              bool                             pin)
+                              bool                             pin,
+                              bool                             allow_slow)
        : level(lev)
    {
       if (not std::filesystem::exists(filename))
@@ -51,8 +52,9 @@ namespace triedent
       if (pin)
       {
          if (mlock(_map_region->get_address(), file_size) < 0)
-            throw std::runtime_error("Attempt to pin memory for " + filename.generic_string() +
-                                     " failed");
+            if (!allow_slow)
+               throw std::runtime_error("Attempt to pin memory for " + filename.generic_string() +
+                                        " failed");
       }
       _begin = _head->begin.get();
       _end   = _head->end.get();
@@ -93,16 +95,16 @@ namespace triedent
          throw std::runtime_error("cannot shrink memory");
    }
 
-   ring_allocator::ring_allocator(std::filesystem::path dir, access_mode mode)
+   ring_allocator::ring_allocator(std::filesystem::path dir, access_mode mode, bool allow_slow)
    {
       _try_claim_free = [&]() { claim_free(); };
 
-      _obj_ids = std::make_unique<object_db>(dir / "obj_ids", mode == read_write);
+      _obj_ids = std::make_unique<object_db>(dir / "obj_ids", mode == read_write, allow_slow);
 
-      _levels[hot_cache].reset(new managed_ring(dir / "hot", hot_cache, true));
-      _levels[warm_cache].reset(new managed_ring(dir / "warm", warm_cache, true));
-      _levels[cool_cache].reset(new managed_ring(dir / "cool", cool_cache, true));
-      _levels[cold_cache].reset(new managed_ring(dir / "cold", cold_cache, false));
+      _levels[hot_cache].reset(new managed_ring(dir / "hot", hot_cache, true, allow_slow));
+      _levels[warm_cache].reset(new managed_ring(dir / "warm", warm_cache, true, allow_slow));
+      _levels[cool_cache].reset(new managed_ring(dir / "cool", cool_cache, true, allow_slow));
+      _levels[cold_cache].reset(new managed_ring(dir / "cold", cold_cache, false, allow_slow));
 
       _swap_thread = std::make_unique<std::thread>(
           [this]()

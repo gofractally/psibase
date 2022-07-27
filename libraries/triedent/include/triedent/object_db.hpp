@@ -111,7 +111,7 @@ namespace triedent
      public:
       using object_id = triedent::object_id;
 
-      object_db(std::filesystem::path idfile, bool allow_write);
+      object_db(std::filesystem::path idfile, bool allow_write, bool allow_slow);
       static void create(std::filesystem::path idfile, uint64_t max_id);
 
       // Bumps the reference count by 1 if possible
@@ -290,7 +290,7 @@ namespace triedent
       header->max_unallocated.id = (idfile_size - sizeof(object_db_header)) / 8;
    }
 
-   inline object_db::object_db(std::filesystem::path idfile, bool allow_write)
+   inline object_db::object_db(std::filesystem::path idfile, bool allow_write, bool allow_slow)
    {
       if (not std::filesystem::exists(idfile))
          throw std::runtime_error("file does not exist: " + idfile.generic_string());
@@ -308,7 +308,8 @@ namespace triedent
       _region = std::make_unique<bip::mapped_region>(*_file, mode);
 
       if (mlock(_region->get_address(), existing_size) < 0)
-         throw std::runtime_error("unable to lock memory for " + idfile.generic_string());
+         if (!allow_slow)
+            throw std::runtime_error("unable to lock memory for " + idfile.generic_string());
 
       _header = reinterpret_cast<object_db_header*>(_region->get_address());
 

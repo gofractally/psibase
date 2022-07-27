@@ -18,7 +18,7 @@ add_executable(triedent-tests triedent-tests.cpp)
 target_link_libraries(triedent-tests PUBLIC catch2 triedent)
 target_include_directories(triedent-tests PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
 set_target_properties(triedent-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
-# native_test(triedent-tests)
+native_test(triedent-tests)
 
 add_executable(mermaid mermaid.cpp)
 target_link_libraries(mermaid PUBLIC Boost::program_options triedent)

@@ -447,7 +447,7 @@ namespace triedent
       using string_view = std::string_view;
       using id          = object_id;
 
-      database(std::filesystem::path dir, access_mode allow_write);
+      database(std::filesystem::path dir, access_mode allow_write, bool allow_slow = false);
       ~database();
 
       static void create(std::filesystem::path dir, config);
