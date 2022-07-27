@@ -273,7 +273,7 @@ namespace triedent
       if (std::filesystem::exists(idfile))
          throw std::runtime_error("file already exists: " + idfile.generic_string());
 
-      std::cerr << "creating " << idfile << std::endl;
+      // std::cerr << "creating " << idfile << std::endl;
       {
          std::ofstream out(idfile.generic_string(), std::ofstream::trunc);
          out.close();
@@ -297,8 +297,8 @@ namespace triedent
 
       auto existing_size = std::filesystem::file_size(idfile);
 
-      std::cerr << "mapping '" << idfile << "' in "  //
-                << (allow_write ? "read/write" : "read only") << " mode\n";
+      // std::cerr << "mapping '" << idfile << "' in "  //
+      //           << (allow_write ? "read/write" : "read only") << " mode\n";
 
       auto mode = allow_write ? bip::read_write : bip::read_only;
 
@@ -392,7 +392,7 @@ namespace triedent
 
       assert(new_count != ref_count_mask);
       //   if( new_count == ref_count_mask )[[unlikely]] {
-      //      WARN( "id: ", id.id );
+      //      TRIEDENT_WARN( "id: ", id.id );
       //      assert( !"somethign went wrong with ref, released ref count of 0" );
       //      throw std::runtime_error( "something went wrong with ref counts" );
       //   }
@@ -473,8 +473,8 @@ namespace triedent
       std::cerr << std::setw(12) << std::left << (" " + std::to_string(total)) << "|";
       std::cerr << std::endl;
       /*
-      DEBUG("first unallocated  ", _header->first_unallocated.id);
-      DEBUG("total objects: ", total, " zero ref: ", zero_ref, "  non zero: ", total - zero_ref);
+      TRIEDENT_DEBUG("first unallocated  ", _header->first_unallocated.id);
+      TRIEDENT_DEBUG("total objects: ", total, " zero ref: ", zero_ref, "  non zero: ", total - zero_ref);
       */
    }
 

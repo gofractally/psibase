@@ -159,7 +159,7 @@ int main(int argc, char** argv)
             }
 
             v = r.load();
-            //  WARN( "revs[",c,"] = ", v );
+            //  TRIEDENT_WARN( "revs[",c,"] = ", v );
             revs[c].store(v);
          }
       }
@@ -184,10 +184,10 @@ int main(int argc, char** argv)
                 if (r.load() < min)
                    min = r.load();
              }
-             //     WARN( "min: ", min );
+             //     TRIEDENT_WARN( "min: ", min );
              if (min > last_r)
              {
-                //            WARN( "release revision: ", (min-6)%16, "  r: ", min );
+                //            TRIEDENT_WARN( "release revision: ", (min-6)%16, "  r: ", min );
                 root_t r;
                 {
                    std::lock_guard lock{revisions_mutex};
@@ -198,7 +198,7 @@ int main(int argc, char** argv)
              }
              usleep(100);
           }
-          WARN("exit GC");
+          // TRIEDENT_WARN("exit GC");
        }));
 
    auto get_total_lookups = [&]()
@@ -213,7 +213,7 @@ int main(int argc, char** argv)
 
    int64_t     read_start = 0;
    std::string k;
-   WARN("INSERT COUNT: ", insert_count);
+   // TRIEDENT_WARN("INSERT COUNT: ", insert_count);
    std::map<std::string, std::string> comparison_map;
    for (uint64_t i = 0; i < insert_count; ++i)
    {
@@ -232,7 +232,7 @@ int main(int argc, char** argv)
 
             if (++r == 6)
             {
-               WARN("STARTING READ THREADS");
+               // TRIEDENT_WARN("STARTING READ THREADS");
                for (int x = 0; x < num_read_threads; ++x)
                {
                   rthreads.emplace_back(new std::thread([&, x]() { read_loop(x); }));
@@ -292,7 +292,7 @@ int main(int argc, char** argv)
                inserted = s->upsert(root, str, str);
                if (inserted >= 0)
                {
-                  WARN("failed to insert: ", h);
+                  // TRIEDENT_WARN("failed to insert: ", h);
                   break;
                }
                assert(inserted < 0);
@@ -305,7 +305,7 @@ int main(int argc, char** argv)
                inserted = s->upsert(root, hk, hk);
                if (inserted >= 0)
                {
-                  WARN("failed to insert: ", h);
+                  // TRIEDENT_WARN("failed to insert: ", h);
                   break;
                }
                assert(inserted < 0);

@@ -9,7 +9,7 @@ namespace triedent
    {
       if (s > 38)
       {
-         WARN("size: ", s);
+         // TRIEDENT_WARN("size: ", s);
          throw std::runtime_error("max rig size level = 38 or 2^40 bytes");
       }
       auto data_size   = 1ull << s;
@@ -40,7 +40,7 @@ namespace triedent
 
       if (std::popcount(data_size) != 1)
       {
-         std::cerr << "data size: " << data_size << std::endl;
+         // std::cerr << "data size: " << data_size << std::endl;
          throw std::runtime_error("file has invalid size: " + filename.generic_string());
       }
 
@@ -76,7 +76,7 @@ namespace triedent
          std::ofstream file(filename.generic_string(), std::ofstream::trunc);
          file.close();
       }
-      std::cerr << "creating " << filename << " size: " << max_size << std::endl;
+      // std::cerr << "creating " << filename << " size: " << max_size << std::endl;
       std::filesystem::resize_file(filename, max_size);
 
       bip::file_mapping  fm(filename.generic_string().c_str(), bip::read_write);
@@ -87,7 +87,7 @@ namespace triedent
 
    void managed_ring::header::update_size(uint64_t new_size)
    {
-      WARN("new size: ", new_size, "  cur size: ", size);
+      // TRIEDENT_WARN("new size: ", new_size, "  cur size: ", size);
       if (new_size > size)
          throw std::runtime_error("cannot grow memory");
 
@@ -160,9 +160,9 @@ namespace triedent
       //      return;
       //   assert((char*)_head->get_alloc_pos() - begin_pos() == _head->alloc_p);
 
-      WARN("*end - *begin: ", (char*)e - (char*)b);
-      DEBUG("alloc - swap: ", _head->alloc_p - _head->swap_p);
-      DEBUG("*alloc - *swap: ", (char*)a - (char*)s);
+      TRIEDENT_WARN("*end - *begin: ", (char*)e - (char*)b);
+      TRIEDENT_DEBUG("alloc - swap: ", _head->alloc_p - _head->swap_p);
+      TRIEDENT_DEBUG("*alloc - *swap: ", (char*)a - (char*)s);
 
       auto totals = (_head->alloc_p - _head->swap_p);
 
@@ -243,7 +243,7 @@ namespace triedent
             }
             if (o->size == 0)
             {
-               WARN(" 0 SIZE");
+               TRIEDENT_WARN(" 0 SIZE");
                return;
             }
             p += o->data_capacity() + 8;
@@ -306,7 +306,7 @@ namespace triedent
             auto o = to_obj(sp);
             if (o->size == 0)
             {
-               WARN("SIZE: 0  free area size:", o->free_area_size());
+               TRIEDENT_WARN("SIZE: 0  free area size:", o->free_area_size());
                deleted += o->free_area_size();
                sp += o->free_area_size();
             }

@@ -402,10 +402,10 @@ void test_trie_remove()
 
    auto v = s->get(to_key6("sheman"));
    if (v)
-      WARN("v.size: ", v->size(), " back: ", v->back());
+      TRIEDENT_WARN("v.size: ", v->size(), " back: ", v->back());
    else
    {
-      WARN("NOT FOUND");
+      TRIEDENT_WARN("NOT FOUND");
    }
 
    s->upsert(to_key6("hell"), "hell");
@@ -465,13 +465,13 @@ void test_trie(int argc, char** argv)
             //    if (i % 10000 == 999)
             //       db.swap();
 
-            ////    DEBUG( "first upsert ", values[i] );
+            ////    TRIEDENT_DEBUG( "first upsert ", values[i] );
             //   std::cout << "==================================\n";
             bool in = s->upsert(values[i], values[i]);
             if (not in)
             {
                //   s->print();
-               WARN("failed to insert: ", values[i], "  i = ", i);
+               TRIEDENT_WARN("failed to insert: ", values[i], "  i = ", i);
                //  return;
             }
          }
@@ -490,12 +490,12 @@ void test_trie(int argc, char** argv)
             //      db.swap();
 
             //   std::cout << "==================================\n";
-            //DEBUG( "second upsert ", values[i] );
+            //TRIEDENT_DEBUG( "second upsert ", values[i] );
             bool in = s->upsert(values[i], values[i]);
             if (in)
             {
                //   s->print();
-               WARN("expected to update: ", values[i], "  i = ", i);
+               TRIEDENT_WARN("expected to update: ", values[i], "  i = ", i);
                //  return;
             }
          }
@@ -511,18 +511,18 @@ void test_trie(int argc, char** argv)
          for (uint32_t i = 0; i < values.size(); ++i)
          {
             //   std::cout << "==================================\n";
-            //DEBUG( "upsert ", values[i] );
+            //TRIEDENT_DEBUG( "upsert ", values[i] );
             auto in = s->get(values[i]);
             if (not in)
             {
-               WARN("failed to get: ", values[i]);
+               TRIEDENT_WARN("failed to get: ", values[i]);
                s->print();
-               WARN("failed to get: ", values[i]);
+               TRIEDENT_WARN("failed to get: ", values[i]);
                return;
             }
             else
             {
-               //   WARN("found: ", values[i]);
+               //   TRIEDENT_WARN("found: ", values[i]);
             }
             assert(in);
             //   s->print();
@@ -543,17 +543,17 @@ void test_trie(int argc, char** argv)
          for (uint32_t i = 0; i < values.size(); ++i)
          {
             //   std::cout << "==================================\n";
-            //DEBUG( "upsert ", values[i] );
+            //TRIEDENT_DEBUG( "upsert ", values[i] );
             auto in = rs->get(values[i]);
             if (not in)
             {
                rs->print();
-               WARN("failed to get in read session: ", values[i]);
+               TRIEDENT_WARN("failed to get in read session: ", values[i]);
                return;
             }
             else
             {
-               //   WARN("found: ", values[i]);
+               //   TRIEDENT_WARN("found: ", values[i]);
             }
             assert(in);
             //   s->print();
@@ -570,16 +570,16 @@ void test_trie(int argc, char** argv)
          for (uint32_t i = 0; i < values.size(); ++i)
          {
             //   std::cout << "==================================\n";
-            //DEBUG( "upsert ", values[i] );
+            //TRIEDENT_DEBUG( "upsert ", values[i] );
             auto in = s->find(values[i]);
             if (not in.valid())
             {
-               WARN("failed to find: ", values[i]);
+               TRIEDENT_WARN("failed to find: ", values[i]);
                return;
             }
             else
             {
-               //     WARN("found: ", values[i]);
+               //     TRIEDENT_WARN("found: ", values[i]);
             }
             assert(in);
             //   s->print();
@@ -599,16 +599,16 @@ void test_trie(int argc, char** argv)
          for (uint32_t i = 0; i < values.size(); ++i)
          {
             //   std::cout << "==================================\n";
-            //DEBUG( "upsert ", values[i] );
+            //TRIEDENT_DEBUG( "upsert ", values[i] );
             auto in = rs->find(values[i]);
             if (not in.valid())
             {
-               WARN("failed to find: ", values[i]);
+               TRIEDENT_WARN("failed to find: ", values[i]);
                return;
             }
             else
             {
-               //     WARN("found: ", values[i]);
+               //     TRIEDENT_WARN("found: ", values[i]);
             }
             assert(in);
             //   s->print();
@@ -625,19 +625,19 @@ void test_trie(int argc, char** argv)
          for (uint32_t i = 0; i < values.size(); ++i)
          {
             //   std::cout << "==================================\n";
-            //DEBUG( "upsert ", values[i] );
+            //TRIEDENT_DEBUG( "upsert ", values[i] );
             auto in = s->lower_bound(values[i]);
             if (not in.valid())
             {
-               WARN("failed to lower bound: ", values[i]);
+               TRIEDENT_WARN("failed to lower bound: ", values[i]);
                return;
             }
             else
             {
                //  if( in.key() != keys[i] ) {
-               //     WARN( "unexpected lower bound for ", values[i] );
+               //     TRIEDENT_WARN( "unexpected lower bound for ", values[i] );
                //  }
-               //      WARN("lower found: ", values[i]);
+               //      TRIEDENT_WARN("lower found: ", values[i]);
             }
             assert(in);
             //   s->print();
@@ -657,19 +657,19 @@ void test_trie(int argc, char** argv)
          for (uint32_t i = 0; i < values.size(); ++i)
          {
             //   std::cout << "==================================\n";
-            //DEBUG( "upsert ", values[i] );
+            //TRIEDENT_DEBUG( "upsert ", values[i] );
             auto in = rs->lower_bound(values[i]);
             if (not in.valid())
             {
-               WARN("failed to lower bound: ", values[i]);
+               TRIEDENT_WARN("failed to lower bound: ", values[i]);
                return;
             }
             else
             {
                //  if( in.key() != keys[i] ) {
-               //     WARN( "unexpected lower bound for ", values[i] );
+               //     TRIEDENT_WARN( "unexpected lower bound for ", values[i] );
                //  }
-               //      WARN("lower found: ", values[i]);
+               //      TRIEDENT_WARN("lower found: ", values[i]);
             }
             assert(in);
             //   s->print();

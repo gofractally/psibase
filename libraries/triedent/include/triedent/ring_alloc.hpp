@@ -120,7 +120,7 @@ namespace triedent
                std::this_thread::sleep_for(10us);
             }
          }
-         WARN("EXIT SWAP LOOP");
+         // TRIEDENT_WARN("EXIT SWAP LOOP");
       }
    };
 
@@ -287,12 +287,12 @@ namespace triedent
 
    inline uint64_t ring_allocator::wait_on_free_space(managed_ring& ring, uint64_t used_size)
    {
-      WARN("wait on free space");
+      // TRIEDENT_WARN("wait on free space");
 
       uint64_t max_contig = 0;
       while ((ring._head->get_potential_free_space()) < used_size)
       {
-         WARN("WAITING ON FREE SPACE: level: ", ring.level);
+         // TRIEDENT_WARN("WAITING ON FREE SPACE: level: ", ring.level);
          using namespace std::chrono_literals;
          std::this_thread::sleep_for(10us);
          _try_claim_free();
@@ -312,13 +312,14 @@ namespace triedent
             if (ring.get_free_space() < used_size)
             {
                // there is potential free space, but a reader is blocking us?
-               WARN("what happened here?!!  level: ", ring.level,
-                    "  ef: ", ring._head->end_free_p.load(), "  ap: ", ring._head->alloc_p.load(),
-                    "  used_size: ", used_size, " max c: ", max_contig,
-                    " delta: ", ring._head->end_free_p.load() - ring._head->alloc_p.load(),
-                    " swap p: ", ring._head->swap_p.load(),
-                    " pot fre: ", ring._head->get_potential_free_space(),
-                    " free: ", ring._head->get_free_space());
+               TRIEDENT_WARN("what happened here?!!  level: ", ring.level,
+                             "  ef: ", ring._head->end_free_p.load(),
+                             "  ap: ", ring._head->alloc_p.load(), "  used_size: ", used_size,
+                             " max c: ", max_contig,
+                             " delta: ", ring._head->end_free_p.load() - ring._head->alloc_p.load(),
+                             " swap p: ", ring._head->swap_p.load(),
+                             " pot fre: ", ring._head->get_potential_free_space(),
+                             " free: ", ring._head->get_free_space());
                dump();
 
                using namespace std::chrono_literals;

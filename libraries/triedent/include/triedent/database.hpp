@@ -1966,14 +1966,14 @@ namespace triedent
             {
                auto& vn = bn.as_value_node();
                new_key += vn.key();
-               //           DEBUG( "clone value" );
+               //           TRIEDENT_DEBUG( "clone value" );
                return make_value(bn.type(), new_key, vn.data());
             }
             else
             {
                auto& bin = bn.as_inner_node();
                new_key += bin.key();
-               //          DEBUG( "clone inner " );
+               //          TRIEDENT_DEBUG( "clone inner " );
                return make_inner(bin, new_key, retain(bin.value()), bin.branches());
             }
          }
@@ -2024,12 +2024,12 @@ namespace triedent
             auto new_branches = in.branches() & ~inner_node::branches(b);
             if (std::popcount(new_branches) + bool(in.value()) > 1)
             {  // multiple branches remain, nothing to merge up, just realloc without branch
-               //   WARN( "clone without branch" );
+               //   TRIEDENT_WARN( "clone without branch" );
                return make_inner(in, in.key(), retain(in.value()), new_branches);
             }
             if (not new_branches)
             {
-               //    WARN( "merge inner.key() + value.key() and return new value node" );
+               //    TRIEDENT_WARN( "merge inner.key() + value.key() and return new value node" );
                // since we can only remove one item at a time, and this node exists
                // then it means it either had 2 branches before or 1 branch and a value
                // in this case, not branches means it must have a value
@@ -2041,7 +2041,7 @@ namespace triedent
             }
             else
             {  // there must be only 1 branch left
-               //     WARN( "merge inner.key() + b + value.key() and return new value node" );
+               //     TRIEDENT_WARN( "merge inner.key() + b + value.key() and return new value node" );
 
                auto  lb          = std::countr_zero(in.branches() ^ inner_node::branches(b));
                auto& last_branch = in.branch(lb);
