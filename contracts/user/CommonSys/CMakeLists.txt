@@ -12,5 +12,7 @@ downloadThirdParty("react-dom.production" "https://unpkg.com/react-dom@18/umd/re
 downloadThirdParty("react.development" "https://unpkg.com/react@18/umd/react.development.js")
 downloadThirdParty("react-dom.development" "https://unpkg.com/react-dom@18/umd/react-dom.development.js")
 downloadThirdParty("react-router-dom" "https://unpkg.com/react-router-dom@5.3.3/umd/react-router-dom.min.js")
+downloadThirdParty("semantic-ui-react" "https://cdn.jsdelivr.net/npm/semantic-ui-react/dist/umd/semantic-ui-react.min.js")
+downloadThirdParty("use-local-storage-state" "https://cdn.jsdelivr.net/npm/use-local-storage-state@18.1.0/src/useLocalStorageState.js")
 
 conditional_add()

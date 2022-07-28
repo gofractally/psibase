@@ -1,9 +1,7 @@
 #include <contracts/system/AuthEcSys.hpp>
 
 #include <contracts/system/VerifyEcSys.hpp>
-#include <psibase/crypto.hpp>
 #include <psibase/dispatch.hpp>
-#include <psibase/nativeTables.hpp>
 #include <psibase/print.hpp>
 
 using namespace psibase;
@@ -12,29 +10,15 @@ static constexpr bool enable_print = false;
 
 namespace system_contract
 {
-   // TODO: switch to table wrapper
-   using table_num                       = uint32_t;
-   static constexpr table_num auth_table = 1;
-
-   inline auto auth_key(AccountNumber account)
-   {
-      return std::tuple{AuthEcSys::contract, auth_table, account};
-   }
-   struct auth_row
-   {
-      AccountNumber account;
-      PublicKey     pubkey;
-
-      auto key() { return auth_key(account); }
-   };
-   PSIO_REFLECT(auth_row, account, pubkey)
-
    void AuthEcSys::checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims)
    {
       if (enable_print)
          print("auth_check\n");
-      auto row = kvGet<auth_row>(auth_key(action.sender));
-      check(!!row, "sender does not have a public key");
+
+      auto row = db.open<AuthTable_t>().getIndex<0>().get(action.sender);
+
+      check(row.has_value(), "sender does not have a public key");
+
       auto expected = psio::convert_to_frac(row->pubkey);
       for (auto& claim : claims)
          if (claim.contract == VerifyEcSys::contract && claim.rawData == expected)
@@ -46,8 +30,9 @@ namespace system_contract
    {
       // TODO: charge resources? provide for free with all accounts?
       check(key.data.index() == 0, "only k1 currently supported");
-      auth_row row{getSender(), key};
-      kvPut(row.key(), row);
+
+      auto authTable = db.open<AuthTable_t>();
+      authTable.put(AuthRecord{.account = getSender(), .pubkey = key});
    }
 }  // namespace system_contract
 
