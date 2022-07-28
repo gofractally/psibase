@@ -3,6 +3,14 @@
 #include <boost/filesystem/operations.hpp>
 #include <triedent/database.hpp>
 
+// #define SANITY_CHECK
+
+#ifdef SANITY_CHECK
+inline constexpr bool sanityCheck = true;
+#else
+inline constexpr bool sanityCheck = false;
+#endif
+
 namespace psibase
 {
    // TODO: move triedent::root destruction to a gc thread
@@ -10,6 +18,79 @@ namespace psibase
    {
       std::shared_ptr<triedent::root> topRoot;
       std::shared_ptr<triedent::root> roots[numDatabases];
+
+#ifdef SANITY_CHECK
+      std::map<std::vector<char>, std::vector<char>, blob_less> _sanity[numDatabases];
+
+      auto& sanity()
+      {
+         return _sanity;
+      }
+
+      auto& sanity() const
+      {
+         return _sanity;
+      }
+#else
+      std::map<std::vector<char>, std::vector<char>, blob_less> (&sanity())[];
+      const std::map<std::vector<char>, std::vector<char>, blob_less> (&sanity() const)[];
+#endif
+
+      void dumpExpectedKeys(DbId db)
+      {
+         if constexpr (sanityCheck)
+         {
+            auto& m = sanity()[(int)db];
+            printf("expected keys:\n");
+            for (auto& [k, v] : m)
+               printf("  %s\n", psio::convert_to_json(k).c_str());
+         }
+      }
+
+      void checkContent(const char* f, DbId db, triedent::write_session& s)
+      {
+         if constexpr (sanityCheck)
+         {
+            auto&             r = roots[(int)db];
+            auto&             m = sanity()[(int)db];
+            std::vector<char> k, v;
+            auto              it = m.begin();
+            while (true)
+            {
+               static int i    = 0;
+               bool       have = s.get_greater_equal(r, {k.data(), k.size()}, &k, &v, nullptr);
+               if (!have && it == m.end())
+               {
+                  // printf("%s: content ok\n", f);
+                  break;
+               }
+               if (!have)
+                  printf("sanity check failure (%d): %s: key missing\n", i, f);
+               else if (it == m.end())
+                  printf("sanity check failure (%d): %s: extra key\n", i, f);
+               else if (it->first != k)
+               {
+                  printf(
+                      "sanity check failure (%d): %s: different key\n  expected: %s\n  got:      "
+                      "%s\n",
+                      i, f, psio::convert_to_json(it->first).c_str(),
+                      psio::convert_to_json(k).c_str());
+                  dumpExpectedKeys(db);
+               }
+               else if (it->second != v)
+                  printf("sanity check failure (%d): %s: different value\n", i, f);
+               else
+               {
+                  // printf("... %s\n", f);
+                  k.push_back(0);
+                  ++it;
+                  ++i;
+                  continue;
+               }
+               break;
+            }
+         }
+      }
    };
 
    // TODO: fork database
@@ -203,8 +284,12 @@ namespace psibase
       impl->write(
           [&](auto& session, auto& revision)
           {
-             //
              session.upsert(revision.roots[(int)db], key.string_view(), value.string_view());
+             if constexpr (sanityCheck)
+             {
+                revision.sanity()[(int)db][key.vector()] = value.vector();
+                revision.checkContent("kvPutRaw", db, session);
+             }
           });
    }
 
@@ -213,8 +298,12 @@ namespace psibase
       impl->write(
           [&](auto& session, auto& revision)
           {
-             //
              session.remove(revision.roots[(int)db], key.string_view());
+             if constexpr (sanityCheck)
+             {
+                revision.sanity()[(int)db].erase(key.vector());
+                revision.checkContent("kvRemoveRaw", db, session);
+             }
           });
    }
 
@@ -225,7 +314,24 @@ namespace psibase
           {
              if (!session.get(revision.roots[(int)db], key.string_view(), &impl->valueBuffer,
                               nullptr))
+             {
+                if constexpr (sanityCheck)
+                {
+                   auto it = revision.sanity()[(int)db].find(key.vector());
+                   if (it != revision.sanity()[(int)db].end())
+                      printf("sanity check failure: kvGetRaw: data missing");
+                }
                 return {};
+             }
+
+             if constexpr (sanityCheck)
+             {
+                auto it = revision.sanity()[(int)db].find(key.vector());
+                if (it == revision.sanity()[(int)db].end())
+                   printf("sanity check failure: kvGetRaw: data exists");
+                if (it->second != impl->valueBuffer)
+                   printf("sanity check failure: kvGetRaw: data is different");
+             }
              return {{impl->valueBuffer}};
           });
    }
