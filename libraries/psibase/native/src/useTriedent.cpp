@@ -36,6 +36,21 @@ namespace psibase
       const std::map<std::vector<char>, std::vector<char>, blob_less> (&sanity() const)[];
 #endif
 
+      // Simulate kvMaxRaw. Won't be accurate if max key size grows too much.
+      auto approx_max(DbId db, psio::input_stream prefix) const
+      {
+         auto& m = sanity()[(int)db];
+         auto  k = prefix.vector();
+         k.insert(k.end(), 255, 0xff);
+         auto it = m.lower_bound(k);
+         if (it != m.begin())
+            --it;
+         if (it != m.end() && it->first.size() >= prefix.remaining() &&
+             !memcmp(it->first.data(), prefix.pos, prefix.remaining()))
+            return it;
+         return m.end();
+      }
+
       void dumpExpectedKeys(DbId db)
       {
          if constexpr (sanityCheck)
@@ -319,7 +334,7 @@ namespace psibase
                 {
                    auto it = revision.sanity()[(int)db].find(key.vector());
                    if (it != revision.sanity()[(int)db].end())
-                      printf("sanity check failure: kvGetRaw: data missing");
+                      printf("sanity check failure: kvGetRaw: data missing\n");
                 }
                 return {};
              }
@@ -328,13 +343,13 @@ namespace psibase
              {
                 auto it = revision.sanity()[(int)db].find(key.vector());
                 if (it == revision.sanity()[(int)db].end())
-                   printf("sanity check failure: kvGetRaw: data exists");
-                if (it->second != impl->valueBuffer)
-                   printf("sanity check failure: kvGetRaw: data is different");
+                   printf("sanity check failure: kvGetRaw: data exists\n");
+                else if (it->second != impl->valueBuffer)
+                   printf("sanity check failure: kvGetRaw: data is different\n");
              }
              return {{impl->valueBuffer}};
           });
-   }
+   }  // Database::kvGetRaw
 
    std::optional<Database::KVResult> Database::kvGreaterEqualRaw(DbId               db,
                                                                  psio::input_stream key,
@@ -345,10 +360,29 @@ namespace psibase
           {
              if (!session.get_greater_equal(revision.roots[(int)db], key.string_view(),
                                             &impl->keyBuffer, &impl->valueBuffer, nullptr))
+             {
+                if constexpr (sanityCheck)
+                {
+                   auto it = revision.sanity()[(int)db].lower_bound(key.vector());
+                   if (it != revision.sanity()[(int)db].end())
+                      printf("sanity check failure: kvGreaterEqualRaw: data missing\n");
+                }
                 return {};
+             }
+
+             if constexpr (sanityCheck)
+             {
+                auto it = revision.sanity()[(int)db].lower_bound(key.vector());
+                if (it == revision.sanity()[(int)db].end())
+                   printf("sanity check failure: kvGreaterEqualRaw: data exists\n");
+                else if (it->first != impl->keyBuffer)
+                   printf("sanity check failure: kvGreaterEqualRaw: key is different\n");
+                else if (it->second != impl->valueBuffer)
+                   printf("sanity check failure: kvGreaterEqualRaw: data is different\n");
+             }
              return {{{impl->keyBuffer}, {impl->valueBuffer}}};
           });
-   }
+   }  // Database::kvGreaterEqualRaw
 
    std::optional<Database::KVResult> Database::kvLessThanRaw(DbId               db,
                                                              psio::input_stream key,
@@ -359,10 +393,33 @@ namespace psibase
           {
              if (!session.get_less_than(revision.roots[(int)db], key.string_view(),
                                         &impl->keyBuffer, &impl->valueBuffer, nullptr))
+             {
+                if constexpr (sanityCheck)
+                {
+                   auto it = revision.sanity()[(int)db].lower_bound(key.vector());
+                   if (it != revision.sanity()[(int)db].begin())
+                      --it;
+                   if (it != revision.sanity()[(int)db].end())
+                      printf("sanity check failure: kvLessThanRaw: data missing\n");
+                }
                 return {};
+             }
+
+             if constexpr (sanityCheck)
+             {
+                auto it = revision.sanity()[(int)db].lower_bound(key.vector());
+                if (it != revision.sanity()[(int)db].begin())
+                   --it;
+                if (it == revision.sanity()[(int)db].end())
+                   printf("sanity check failure: kvLessThanRaw: data exists\n");
+                else if (it->first != impl->keyBuffer)
+                   printf("sanity check failure: kvLessThanRaw: key is different\n");
+                else if (it->second != impl->valueBuffer)
+                   printf("sanity check failure: kvLessThanRaw: data is different\n");
+             }
              return {{{impl->keyBuffer}, {impl->valueBuffer}}};
           });
-   }
+   }  // Database::kvLessThanRaw
 
    std::optional<Database::KVResult> Database::kvMaxRaw(DbId db, psio::input_stream key)
    {
@@ -371,9 +428,28 @@ namespace psibase
           {
              if (!session.get_max(revision.roots[(int)db], key.string_view(), &impl->keyBuffer,
                                   &impl->valueBuffer, nullptr))
+             {
+                if constexpr (sanityCheck)
+                {
+                   auto it = revision.approx_max(db, key.vector());
+                   if (it != revision.sanity()[(int)db].end())
+                      printf("sanity check failure: kvMaxRaw: data missing\n");
+                }
                 return {};
+             }
+
+             if constexpr (sanityCheck)
+             {
+                auto it = revision.approx_max(db, key.vector());
+                if (it == revision.sanity()[(int)db].end())
+                   printf("sanity check failure: kvMaxRaw: data exists\n");
+                else if (it->first != impl->keyBuffer)
+                   printf("sanity check failure: kvMaxRaw: key is different\n");
+                else if (it->second != impl->valueBuffer)
+                   printf("sanity check failure: kvMaxRaw: data is different\n");
+             }
              return {{{impl->keyBuffer}, {impl->valueBuffer}}};
           });
-   }
+   }  // Database::kvMaxRaw
 
 }  // namespace psibase
