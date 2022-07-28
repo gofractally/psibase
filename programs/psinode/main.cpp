@@ -186,13 +186,14 @@ void run(const std::string& db_path,
          bool               produce,
          const std::string& host,
          bool               host_perf,
-         uint32_t           leeway_us)
+         uint32_t           leeway_us,
+         bool               allow_slow)
 {
    ExecutionContext::registerHostFunctions();
 
    // TODO: configurable WasmCache size
    auto sharedState =
-       std::make_shared<psibase::SharedState>(SharedDatabase{db_path}, WasmCache{128});
+       std::make_shared<psibase::SharedState>(SharedDatabase{db_path, allow_slow}, WasmCache{128});
    auto system = sharedState->getSystemContext();
    auto queue  = std::make_shared<transaction_queue>();
 
@@ -293,10 +294,11 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 int main(int argc, char* argv[])
 {
    std::string db_path;
-   bool        produce   = false;
-   std::string host      = {};
-   bool        host_perf = false;
-   uint32_t    leeway_us = 30000;  // TODO: find a good default
+   bool        produce    = false;
+   std::string host       = {};
+   bool        host_perf  = false;
+   uint32_t    leeway_us  = 30000;  // TODO: find a good default
+   bool        allow_slow = false;
 
    namespace po = boost::program_options;
 
@@ -309,6 +311,9 @@ int main(int argc, char* argv[])
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
        "Transaction leeway, in us. Defaults to 30000.");
+   opt("slow", po::bool_switch(&produce),
+       "Don't complain if unable to lock memory for database. This will still attempt to lock "
+       "memory, but if it fails it will continue to run, but more slowly.");
    opt("help,h", "Show this message");
 
    po::positional_options_description p;
@@ -324,31 +329,26 @@ int main(int argc, char* argv[])
    {
       if (!vm.count("help"))
       {
-         std::cerr << e.what() << "\n";
+         std::cout << e.what() << "\n";
          return 1;
       }
-   }
-   catch (...)
-   {
-      std::cerr << "\n\nx3\n\n";
-      return 1;
    }
 
    if (vm.count("help"))
    {
-      std::cerr << usage << "\n\n";
-      std::cerr << desc << "\n";
+      std::cout << usage << "\n\n";
+      std::cout << desc << "\n";
       return 1;
    }
 
    try
    {
-      run(db_path, produce, host, host_perf, leeway_us);
+      run(db_path, produce, host, host_perf, leeway_us, allow_slow);
       return 0;
    }
    catch (std::exception& e)
    {
-      std::cerr << "std::exception: " << e.what() << "\n";
+      std::cout << "std::exception: " << e.what() << "\n";
    }
    return 1;
 }

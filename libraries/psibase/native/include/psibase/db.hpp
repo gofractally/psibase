@@ -18,7 +18,7 @@ namespace psibase
       std::shared_ptr<SharedDatabaseImpl> impl;
 
       SharedDatabase() = default;
-      SharedDatabase(const boost::filesystem::path& dir);
+      SharedDatabase(const boost::filesystem::path& dir, bool allowSlow);
       SharedDatabase(const SharedDatabase&) = default;
       SharedDatabase(SharedDatabase&&)      = default;
 
@@ -80,6 +80,9 @@ namespace psibase
       Session startWrite();
       void    commit(Session&);
       void    abort(Session&);
+
+      // TODO: kvPutRaw, kvRemoveRaw: return deltas
+      // TODO: getters: pass in input buffers instead of returning KVResult
 
       void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
       void kvRemoveRaw(DbId db, psio::input_stream key);

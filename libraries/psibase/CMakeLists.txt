@@ -150,18 +150,18 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm mdbx-static ${Boost_LIBRARIES})
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm mdbx-static triedent ${Boost_LIBRARIES})
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include
             ../../external/libmdbx)
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
-            native/src/db.cpp
             native/src/ExecutionContext.cpp
             native/src/NativeFunctions.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
+            native/src/useTriedent.cpp
         )
 
         add_subdirectory(common/tests)

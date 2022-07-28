@@ -136,7 +136,7 @@ struct test_chain
    {
       psibase::check(snapshot.empty(), "snapshots not implemented");
       dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-      db  = {dir};
+      db  = {dir, true};
       sys = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
