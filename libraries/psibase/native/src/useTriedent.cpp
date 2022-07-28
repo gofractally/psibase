@@ -203,16 +203,18 @@ namespace psibase
       impl->write(
           [&](auto& session, auto& revision)
           {
-             session.upsert(revision.roots[(int)db], {key.pos, key.remaining()},
-                            {value.pos, value.remaining()});
+             //
+             session.upsert(revision.roots[(int)db], key.string_view(), value.string_view());
           });
    }
 
    void Database::kvRemoveRaw(DbId db, psio::input_stream key)
    {
       impl->write(
-          [&](auto& session, auto& revision) {
-             session.remove(revision.roots[(int)db], {key.pos, key.remaining()});
+          [&](auto& session, auto& revision)
+          {
+             //
+             session.remove(revision.roots[(int)db], key.string_view());
           });
    }
 
@@ -221,10 +223,10 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<psio::input_stream>
           {
-             if (!session.get(revision.roots[(int)db], {key.pos, key.remaining()},
-                              &impl->valueBuffer, nullptr))
+             if (!session.get(revision.roots[(int)db], key.string_view(), &impl->valueBuffer,
+                              nullptr))
                 return {};
-             return {{impl->valueBuffer.data(), impl->valueBuffer.size()}};
+             return {{impl->valueBuffer}};
           });
    }
 
@@ -235,11 +237,10 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             if (!session.get_greater_equal(revision.roots[(int)db], {key.pos, key.remaining()},
+             if (!session.get_greater_equal(revision.roots[(int)db], key.string_view(),
                                             &impl->keyBuffer, &impl->valueBuffer, nullptr))
                 return {};
-             return {{{impl->keyBuffer.data(), impl->keyBuffer.size()},
-                      {impl->valueBuffer.data(), impl->valueBuffer.size()}}};
+             return {{{impl->keyBuffer}, {impl->valueBuffer}}};
           });
    }
 
@@ -250,11 +251,10 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             if (!session.get_less_than(revision.roots[(int)db], {key.pos, key.remaining()},
+             if (!session.get_less_than(revision.roots[(int)db], key.string_view(),
                                         &impl->keyBuffer, &impl->valueBuffer, nullptr))
                 return {};
-             return {{{impl->keyBuffer.data(), impl->keyBuffer.size()},
-                      {impl->valueBuffer.data(), impl->valueBuffer.size()}}};
+             return {{{impl->keyBuffer}, {impl->valueBuffer}}};
           });
    }
 
@@ -263,11 +263,10 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             if (!session.get_max(revision.roots[(int)db], {key.pos, key.remaining()},
-                                  &impl->keyBuffer, &impl->valueBuffer, nullptr))
+             if (!session.get_max(revision.roots[(int)db], key.string_view(), &impl->keyBuffer,
+                                  &impl->valueBuffer, nullptr))
                 return {};
-             return {{{impl->keyBuffer.data(), impl->keyBuffer.size()},
-                      {impl->valueBuffer.data(), impl->valueBuffer.size()}}};
+             return {{{impl->keyBuffer}, {impl->valueBuffer}}};
           });
    }
 

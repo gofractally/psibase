@@ -282,6 +282,9 @@ namespace psio
 
       input_stream& operator=(const input_stream&) = default;
 
+      std::string_view  string_view() const { return {pos, remaining()}; }
+      std::vector<char> vector() const { return {pos, pos + remaining()}; }
+
       size_t remaining() const { return end - pos; }
 
       void check_available(size_t size) const
