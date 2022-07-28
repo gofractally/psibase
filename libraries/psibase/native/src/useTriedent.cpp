@@ -36,6 +36,28 @@ namespace psibase
       const std::map<std::vector<char>, std::vector<char>, blob_less> (&sanity() const)[];
 #endif
 
+      Revision()                           = default;
+      Revision(const Revision&)            = delete;
+      Revision(Revision&&)                 = default;
+      Revision& operator=(const Revision&) = delete;
+      Revision& operator=(Revision&&)      = default;
+
+      std::shared_ptr<Revision> clone() const
+      {
+         std::shared_ptr<Revision> result = std::make_shared<Revision>();
+
+         result->topRoot = topRoot;
+         for (uint32_t i = 0; i < numDatabases; ++i)
+            result->roots[i] = roots[i];
+
+#ifdef SANITY_CHECK
+         for (uint32_t i = 0; i < numDatabases; ++i)
+            result->_sanity[i] = _sanity[i];
+#endif
+
+         return result;
+      }
+
       // Simulate kvMaxRaw. Won't be accurate if max key size grows too much.
       auto approx_max(DbId db, psio::input_stream prefix) const
       {
@@ -191,7 +213,7 @@ namespace psibase
       template <typename F>
       auto read(F f)
       {
-         const auto& revision = [this]
+         const auto& revision = [this]() -> const Revision&
          {
             if (readOnlyRevision)
                return *readOnlyRevision;
@@ -231,9 +253,9 @@ namespace psibase
             readSession  = nullptr;
          }
          if (writeRevisions.empty())
-            writeRevisions.push_back(std::make_shared<Revision>(*shared.impl->getHead()));
+            writeRevisions.push_back(shared.impl->getHead()->clone());
          else
-            writeRevisions.push_back(writeRevisions.back());
+            writeRevisions.push_back(writeRevisions.back()->clone());
       }
 
       void commit()
