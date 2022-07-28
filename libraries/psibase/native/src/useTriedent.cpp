@@ -358,13 +358,22 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             if (!session.get_greater_equal(revision.roots[(int)db], key.string_view(),
-                                            &impl->keyBuffer, &impl->valueBuffer, nullptr))
+             auto found = session.get_greater_equal(revision.roots[(int)db], key.string_view(),
+                                                    &impl->keyBuffer, &impl->valueBuffer, nullptr);
+             if (found && (impl->keyBuffer.size() < matchKeySize ||
+                           memcmp(impl->keyBuffer.data(), key.pos, matchKeySize)))
+                found = false;
+
+             if (!found)
              {
                 if constexpr (sanityCheck)
                 {
-                   auto it = revision.sanity()[(int)db].lower_bound(key.vector());
-                   if (it != revision.sanity()[(int)db].end())
+                   auto& m  = revision.sanity()[(int)db];
+                   auto  it = m.lower_bound(key.vector());
+                   if (it != m.end() && (it->first.size() < matchKeySize ||
+                                         memcmp(it->first.data(), key.pos, matchKeySize)))
+                      it = m.end();
+                   if (it != m.end())
                       printf("sanity check failure: kvGreaterEqualRaw: data missing\n");
                 }
                 return {};
@@ -372,8 +381,12 @@ namespace psibase
 
              if constexpr (sanityCheck)
              {
-                auto it = revision.sanity()[(int)db].lower_bound(key.vector());
-                if (it == revision.sanity()[(int)db].end())
+                auto& m  = revision.sanity()[(int)db];
+                auto  it = m.lower_bound(key.vector());
+                if (it != m.end() && (it->first.size() < matchKeySize ||
+                                      memcmp(it->first.data(), key.pos, matchKeySize)))
+                   it = m.end();
+                if (it == m.end())
                    printf("sanity check failure: kvGreaterEqualRaw: data exists\n");
                 else if (it->first != impl->keyBuffer)
                    printf("sanity check failure: kvGreaterEqualRaw: key is different\n");
@@ -391,26 +404,48 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             if (!session.get_less_than(revision.roots[(int)db], key.string_view(),
-                                        &impl->keyBuffer, &impl->valueBuffer, nullptr))
+             auto found = session.get_less_than(revision.roots[(int)db], key.string_view(),
+                                                &impl->keyBuffer, &impl->valueBuffer, nullptr);
+             if (found && (impl->keyBuffer.size() < matchKeySize ||
+                           memcmp(impl->keyBuffer.data(), key.pos, matchKeySize)))
+                found = false;
+
+             if (!found)
              {
                 if constexpr (sanityCheck)
                 {
-                   auto it = revision.sanity()[(int)db].lower_bound(key.vector());
-                   if (it != revision.sanity()[(int)db].begin())
+                   auto& m  = revision.sanity()[(int)db];
+                   auto  it = m.lower_bound(key.vector());
+                   if (it != m.begin())
                       --it;
-                   if (it != revision.sanity()[(int)db].end())
+                   else
+                      it = m.end();
+                   if (it != m.end() && (it->first.size() < matchKeySize ||
+                                         memcmp(it->first.data(), key.pos, matchKeySize)))
+                      it = m.end();
+                   if (it != m.end())
+                   {
                       printf("sanity check failure: kvLessThanRaw: data missing\n");
+                      printf("  key:   %s\n", psio::convert_to_json(key).c_str());
+                      printf("  mks:   %d\n", int(matchKeySize));
+                      printf("  needs: %s\n", psio::convert_to_json(it->first).c_str());
+                   }
                 }
                 return {};
              }
 
              if constexpr (sanityCheck)
              {
-                auto it = revision.sanity()[(int)db].lower_bound(key.vector());
-                if (it != revision.sanity()[(int)db].begin())
+                auto& m  = revision.sanity()[(int)db];
+                auto  it = m.lower_bound(key.vector());
+                if (it != m.begin())
                    --it;
-                if (it == revision.sanity()[(int)db].end())
+                else
+                   it = m.end();
+                if (it != m.end() && (it->first.size() < matchKeySize ||
+                                      memcmp(it->first.data(), key.pos, matchKeySize)))
+                   it = m.end();
+                if (it == m.end())
                    printf("sanity check failure: kvLessThanRaw: data exists\n");
                 else if (it->first != impl->keyBuffer)
                    printf("sanity check failure: kvLessThanRaw: key is different\n");
