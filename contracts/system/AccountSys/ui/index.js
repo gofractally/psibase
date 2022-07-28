@@ -1,5 +1,6 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
 import { getJson, initializeApplet, addRoute, push, action } from '/common/rpc.mjs';
+import { genKeyPair, KeyType } from '/common/keyConversions.mjs';
 
 const html = htm.bind(React.createElement);
 
@@ -67,7 +68,7 @@ async function newAccount(name, pubkey, addMsg, clearMsg) {
         if (pubkey)
             actions = actions.concat([
                 await action('auth-ec-sys', 'setKey', {key: pubkey}, name),
-                await action('auth-ec-sys', 'setAuthCntr', {authContract: ''}, name), 
+                await action('account-sys', 'setAuthCntr', {authContract: 'auth-ec-sys'}, name), 
             ]);
 
         push(transactionTypes.newacc, actions);
@@ -118,6 +119,37 @@ function useMsg() {
     return { msg, addMsg, clearMsg };
 }
 
+function KeyPair() 
+{
+    const [pub, setPub] = React.useState('');
+    const [priv, setPriv] = React.useState('');
+
+    let generateKeyPair = () => {
+        let kp = genKeyPair(KeyType.k1);
+        setPub(kp.pub);
+        setPriv(kp.priv);
+    };
+
+    return html`
+        <div>
+            <table><tbody>
+                <tr>
+                        <td></td>
+                        <td><button onClick=${generateKeyPair}>Generate</button></td>
+                </tr>    
+                <tr>
+                    <td>Public key</td>
+                    <td><input type="text" disabled value=${pub}></input></td>
+                </tr>
+                <tr>
+                    <td>Private key</td>
+                    <td><input type="text" disabled value=${priv}></input></td>
+                </tr>
+            </tbody></table>
+        </div>
+    `;
+}
+
 function App() {
     const [trx, setTrx] = React.useState('');
     const { msg, addMsg, clearMsg } = useMsg();
@@ -125,6 +157,8 @@ function App() {
         <h1>account_sys</h1>
         <h2>Accounts</h2>
         ${AccountList(addMsg, clearMsg)}
+        <h2>Generate Key Pair</h2>
+        <${KeyPair} />
         <h2>Create Account</h2>
         ${AccountForm(addMsg, clearMsg)}
         <h2>Messages</h2>

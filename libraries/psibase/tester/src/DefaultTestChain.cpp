@@ -266,6 +266,10 @@ void DefaultTestChain::registerSysRpc()
                           read_whole_file(thirdPty + "/react.development.js")),
        rpcCommon.storeSys("/common/react-dom.development.js", js,
                           read_whole_file(thirdPty + "/react-dom.development.js")),
+       rpcCommon.storeSys("/common/semantic-ui-react.min.js", js,
+                          read_whole_file(thirdPty + "/semantic-ui-react.min.js")),
+       rpcCommon.storeSys("/common/use-local-storage-state.mjs", js,
+                          read_whole_file(thirdPty + "/useLocalStorageState.js")),
 
        // AccountSys
        rpcAccount.storeSys("/", html, read_whole_file(accDir + "/ui/index.html")),
