@@ -160,6 +160,7 @@ namespace psibase
                --iter;
                if(iter->second == id)
                {
+                  execute_fork(iter, _by_blocknum_idx.end());
                   break;
                }
                assert(iter->first > _commit_index);
@@ -168,6 +169,20 @@ namespace psibase
             }
             _head = new_head;
             callback(_head);
+         }
+      }
+      void execute_fork(auto iter, auto end)
+      {
+         if(iter != end)
+         {
+            auto* state = get_state(iter->second);
+            ++iter;
+            for(; iter != end; ++iter)
+            {
+               auto* block = get(iter->second);
+               auto* next_state = get_state(iter->second);
+               next_state->execute(*state, *block);
+            }
          }
       }
       BlockState* get_state(const id_type& id)
@@ -204,6 +219,8 @@ namespace psibase
          _current_block = std::nullopt;
          auto [iter, _] = _blocks.try_emplace(block.id, block);
          auto [state_iter, ins2] = _states.try_emplace(iter->first, *_head, iter->second);
+         // TODO: The block builder should provide a BlockState that has already been executed
+         state_iter->second.execute(*_head, iter->second);
          _by_order_idx.insert({state_iter->second.order(), state_iter->second.id});
          link_successors(state_iter);
          _head = &state_iter->second;

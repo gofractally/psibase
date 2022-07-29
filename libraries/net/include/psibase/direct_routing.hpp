@@ -85,13 +85,19 @@ namespace psibase::net
             }
          });
       }
+      static const std::uint32_t protocol_version = 0;
+      struct init_message
+      {
+         std::uint32_t version = protocol_version;
+         PSIO_REFLECT_INLINE(init_message, version);
+      };
       struct producer_message
       {
          producer_id producer;
          PSIO_REFLECT_INLINE(producer_message, producer)
       };
       auto get_message_impl() {
-         return boost::mp11::mp_push_back<typename std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type, producer_message>{};
+         return boost::mp11::mp_push_back<typename std::remove_cvref_t<decltype(static_cast<Derived*>(this)->consensus())>::message_type, init_message, producer_message>{};
       }
       template<typename Msg, typename F>
       void async_send_block(peer_id id, const Msg& msg, F&& f)
@@ -131,6 +137,7 @@ namespace psibase::net
          assert(iter != _connections.end());
          auto copy = iter->second;
          async_recv(id, std::move(copy));
+         async_send_block(id, init_message{}, [](const std::error_code&){});
          if(auto producer = static_cast<Derived*>(this)->consensus().producer_name())
          {
             async_send_block(id, producer_message{producer}, [](const std::error_code&){});
@@ -170,6 +177,13 @@ namespace psibase::net
             static_cast<Derived*>(this)->consensus().disconnect(id);
             iter->second->close();
             _connections.erase(iter);
+         }
+      }
+      void recv(peer_id peer, const init_message& msg)
+      {
+         if(msg.version != protocol_version)
+         {
+            disconnect(peer);
          }
       }
       void recv(peer_id peer, const producer_message& msg)

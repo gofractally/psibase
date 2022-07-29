@@ -82,12 +82,31 @@ namespace psibase::net
       }
    };
 
+#if 0
+   struct BlockBuilder
+   {
+      Block _result;
+      Block finish() &&
+      {
+         return std::move(_result);
+      }
+   };
+
+   struct BlockHeaderState : BlockHeader
+   {
+      BlockHeaderState() : BlockHeader{} {}
+      BlockHeaderState(const BlockState& prev, const BlockHeader& header) : BlockHeader(header) {}
+      BlockBuilder next(TimePointSec time, AccountNum producer, std::uint32_t term) {}
+      // optional db snapshot
+   };
+#endif
+
    template<typename TimePoint>
    struct block_header_state : block_header<TimePoint>
    {
       using builder_type = block_header_builder<TimePoint>;
       // Genesis state
-      block_header_state() : block_header<TimePoint>() {}
+      block_header_state() : block_header<TimePoint>(), executed(true) {}
       // State transition
       block_header_state(const block_header_state& prev, const block_header<TimePoint>& header)
          : block_header<TimePoint>(header)
@@ -98,6 +117,12 @@ namespace psibase::net
       {
          return {{.id = 0, .producer = producer, .term = term, .num = this->num + 1, .prev = this->id, .timestamp = start_time}};
       }
+      bool execute(const block_header_state& prev, const block_header<TimePoint>& header)
+      {
+         assert(prev.executed);
+         executed = true;
+         return true;
+      }
       augmented_block_id info() const {
          return {this->id, this->num};
       }
@@ -105,6 +130,7 @@ namespace psibase::net
       {
          return std::tie(this->term, this->num, this->id);
       }
+      bool executed = false;
    };
 
    // This protocol is based on RAFT, with some simplifications.
