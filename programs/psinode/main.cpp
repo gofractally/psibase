@@ -258,7 +258,7 @@ void run(const std::string& db_path,
             std::swap(entries, queue->entries);
          }
 
-         BlockContext bc{*system, true, true};
+         BlockContext bc{*system, true};
          bc.start(t);
          bc.callStartBlock();
 

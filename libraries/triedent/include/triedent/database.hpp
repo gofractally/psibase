@@ -514,7 +514,6 @@ namespace triedent
    {
       using id = object_id;
 
-      deref() = default;
       deref(std::pair<id, value_node*> p, node_type t)
           : _id(p.first), ptr((char*)p.second), _type(t)
       {

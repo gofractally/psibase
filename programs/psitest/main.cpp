@@ -160,7 +160,7 @@ struct test_chain
    {
       // TODO: undo control
       finish_block();
-      blockContext = std::make_unique<psibase::BlockContext>(*sys, true, true);
+      blockContext = std::make_unique<psibase::BlockContext>(*sys, true);
 
       uint32_t skipAdditional = 0;
       if (skip_miliseconds != 0)
