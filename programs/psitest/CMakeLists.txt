@@ -2,7 +2,6 @@ find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
 
 add_executable(psitest main.cpp)
 target_link_libraries(psitest
-    -static
     psibase
     debug_eos_vm
     ${Boost_LIBRARIES}

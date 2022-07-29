@@ -1,6 +1,5 @@
 add_executable(psinode main.cpp)
 target_link_libraries(psinode
-    -static
     contracts_system
     psibase_http
     debug_eos_vm
