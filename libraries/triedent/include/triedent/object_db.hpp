@@ -318,7 +318,8 @@ namespace triedent
 
       // Objects may have been locked for move when process was SIGKILLed. If any objects
       // were locked because they were being written to, their root will not be reachable
-      // from database_memory::_root_revision, and will be leaked. TODO: make this be true.
+      // from database_memory::_root_revision, and will be leaked. Mermaid can clean this
+      // leak.
       for (uint64_t i = 0; i <= _header->first_unallocated.id; ++i)
          _header->objects[i] &= ~position_lock_mask;
    }
