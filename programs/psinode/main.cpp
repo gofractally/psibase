@@ -311,7 +311,7 @@ int main(int argc, char* argv[])
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
        "Transaction leeway, in us. Defaults to 30000.");
-   opt("slow", po::bool_switch(&produce),
+   opt("slow", po::bool_switch(&allow_slow),
        "Don't complain if unable to lock memory for database. This will still attempt to lock "
        "memory, but if it fails it will continue to run, but more slowly.");
    opt("help,h", "Show this message");
