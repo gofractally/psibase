@@ -12,7 +12,7 @@ namespace triedent
 {
    namespace bip = boost::interprocess;
 
-   enum class node_type
+   enum class node_type : uint8_t
    {
       inner,
       bytes,
