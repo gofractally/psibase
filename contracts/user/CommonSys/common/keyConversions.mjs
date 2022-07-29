@@ -187,6 +187,15 @@ export function signatureToFracpack({ keyType, signature }) {
     ].concat(r, s));
 }
 
+export function genKeyPair(keyType) {
+    let keypair = { keyType, keyPair: getK1().genKeyPair() };
+
+    return {
+        pub: publicKeyPairToString(keypair),
+        priv: privateKeyPairToString(keypair),
+    };
+}
+
 // console.log(privateKeyPairToString(privateStringToKeyPair('PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3')));
 // console.log(publicKeyPairToString(privateStringToKeyPair('PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3')));
 // console.log(publicKeyPairToString(publicStringToKeyPair('PUB_R1_7pGpnu7HZVwi8kiLLDK2MJ6aYYS23eRJYmDXSLq5WZFCN6WEqY')));
