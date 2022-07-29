@@ -143,6 +143,22 @@ namespace psibase
          for (size_t i = 0; i < roots.size(); ++i)
             revision->roots[i] = std::move(roots[i]);
       }
+
+      if constexpr (sanityCheck)
+      {
+         for (int db = 0; db < (int)numDatabases; ++db)
+         {
+            auto&             r = revision->roots[db];
+            auto&             m = revision->sanity()[db];
+            std::vector<char> k, v;
+            while (s.get_greater_equal(r, {k.data(), k.size()}, &k, &v, nullptr))
+            {
+               m[k] = v;
+               k.push_back(0);
+            }
+         }
+      }
+
       return revision;
    }
 
