@@ -22,26 +22,26 @@ sequenceDiagram
    Core applet-->>Alice: 
 
    note over Alice: Notices she has available invite credits
-   Alice-->>Account applet: Generate an invite link
+   Alice->>Account applet: Generate invite link
    Note over Account applet: Embeds public key and an auth contract<br> (auth-ec-sys) inside the invite object
    Account applet-->>Psibase blockchain: Store invite obj on chain, mapped to Alice
-   Account applet-->>Alice: Show modal
-   Note over Alice: See invite link with embedded priv key
-   Alice-->>Bob: Send invite link (off-chain through text/email/etc)
-   
-   Bob-->>Psibase blockchain: Navigate to invite link, request Account applet
+   Psibase blockchain-->>Account applet: 
+   Account applet-->>Alice: Show invite link
+   Alice->>Bob: Send invite link <br>(off-chain)
+
+   Bob->>Psibase blockchain: Request Account applet (Clicking invite link)
    Psibase blockchain-->>Bob: 
 
-   Account applet-->>Bob: Shows the "invite" interface, names Alice
-   Bob-->>Account applet: Specify new account name, recovery partner(s) (Alice?), click "Join"
-   Note over Account applet: Adds action to transaction to burn invite credit, add resources to new account, and subsidize current transaction
+   Note over Bob: Sees "invite from Alice" interface
+   Bob->>Account applet: Specify new account name, recovery partner(s) (Alice?), click "Join"
+   Note over Account applet: Adds action to transaction to burn invite credit,<br> add resources to new account,<br> and subsidize current transaction
    Account applet-->>Core applet: Create new account
    Core applet-->>Auth applet: Create new account
-   Auth applet-->>Bob: Show modal
-   Note over Bob: View Modal: <br> #9744; Create new account
-   Note over Auth applet: Stores a new private key in local storage<br>Calls setnewkey on new account with new public key
+   Note over Auth applet: Generates keypair <br>Stores private key in local storage
+   Auth applet-->>Psibase blockchain: Calls setnewkey
+   Psibase blockchain-->>Auth applet: 
    Auth applet-->>Core applet: 
    Core applet-->>Account applet: 
-   Account applet-->>Bob: Show modal: Congrats, link to account wizard applet (sets up profile, recovery partners, helpful links to learn stuff)
-
+   Account applet-->>Bob: Show modal
+   Note over Bob: Congrats & link to achievement applet<br> (Achievements for profile, recovery <br>partners, learning)
 ```
