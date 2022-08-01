@@ -4,6 +4,11 @@
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
 
+#include <boost/program_options/cmdline.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/variables_map.hpp>
+
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -177,17 +182,22 @@ void pushTransaction(BlockContext&             bc,
    }
 }  // pushTransaction
 
-void run(const char* db_path, bool produce, const char* host, bool host_perf, uint32_t leeway_us)
+void run(const std::string& db_path,
+         bool               produce,
+         const std::string& host,
+         bool               host_perf,
+         uint32_t           leeway_us,
+         bool               allow_slow)
 {
    ExecutionContext::registerHostFunctions();
 
    // TODO: configurable WasmCache size
    auto sharedState =
-       std::make_shared<psibase::SharedState>(SharedDatabase{db_path}, WasmCache{128});
+       std::make_shared<psibase::SharedState>(SharedDatabase{db_path, allow_slow}, WasmCache{128});
    auto system = sharedState->getSystemContext();
    auto queue  = std::make_shared<transaction_queue>();
 
-   if (host)
+   if (!host.empty())
    {
       // TODO: command-line options
       auto http_config = std::make_shared<http::http_config>(http::http_config{
@@ -248,7 +258,7 @@ void run(const char* db_path, bool produce, const char* host, bool host_perf, ui
             std::swap(entries, queue->entries);
          }
 
-         BlockContext bc{*system, true, true};
+         BlockContext bc{*system, true};
          bc.start(t);
          bc.callStartBlock();
 
@@ -278,73 +288,67 @@ void run(const char* db_path, bool produce, const char* host, bool host_perf, ui
    }
 }
 
-const char usage[] = "USAGE: psinode [OPTIONS] database\n";
-const char help[]  = R"(
-OPTIONS:
-      -p, --produce
-            Produce blocks
-
-      -o, --host <name>
-            Host http server
-
-      -O, --host-perf
-            Show various metrics
-
-      -l, --leeway <amount>
-            Transaction leeway, in us. Defaults to 30000.
-
-      -h, --help
-            Show this message
-)";
+const char usage[] = "USAGE: psinode [OPTIONS] database";
 
 // TODO: use a command-line parser
 int main(int argc, char* argv[])
 {
-   bool        show_usage = false;
-   bool        error      = false;
+   std::string db_path;
    bool        produce    = false;
-   const char* host       = nullptr;
+   std::string host       = {};
    bool        host_perf  = false;
    uint32_t    leeway_us  = 30000;  // TODO: find a good default
-   int         next_arg   = 1;
-   while (next_arg < argc && argv[next_arg][0] == '-')
-   {
-      if (!strcmp(argv[next_arg], "-h") || !strcmp(argv[next_arg], "--help"))
-         show_usage = true;
-      else if (!strcmp(argv[next_arg], "-p") || !strcmp(argv[next_arg], "--produce"))
-         produce = true;
-      else if ((!strcmp(argv[next_arg], "-o") || !strcmp(argv[next_arg], "--host")) &&
-               next_arg + 1 < argc)
-         host = argv[++next_arg];
-      else if (!strcmp(argv[next_arg], "-O") || !strcmp(argv[next_arg], "--host-perf"))
-         host_perf = true;
-      else if ((!strcmp(argv[next_arg], "-l") || !strcmp(argv[next_arg], "--leeway")) &&
-               next_arg + 1 < argc)
-         leeway_us = std::stoi(argv[++next_arg]);
-      else
-      {
-         std::cerr << "unknown option: " << argv[next_arg] << "\n";
-         error = true;
-      }
-      ++next_arg;
-   }
-   if (next_arg != argc - 1)
-      error = true;
-   if (show_usage || error)
-   {
-      std::cerr << usage;
-      if (show_usage)
-         std::cerr << help;
-      return error;
-   }
+   bool        allow_slow = false;
+
+   namespace po = boost::program_options;
+
+   po::options_description desc("psinode");
+   auto                    opt = desc.add_options();
+   opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
+       "Path to database");
+   opt("produce,p", po::bool_switch(&produce), "Produce blocks");
+   opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
+   opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
+   opt("leeway,l", po::value<uint32_t>(&leeway_us),
+       "Transaction leeway, in us. Defaults to 30000.");
+   opt("slow", po::bool_switch(&allow_slow),
+       "Don't complain if unable to lock memory for database. This will still attempt to lock "
+       "memory, but if it fails it will continue to run, but more slowly.");
+   opt("help,h", "Show this message");
+
+   po::positional_options_description p;
+   p.add("database", 1);
+
+   po::variables_map vm;
+   po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
    try
    {
-      run(argv[next_arg], produce, host, host_perf, leeway_us);
+      po::notify(vm);
+   }
+   catch (std::exception& e)
+   {
+      if (!vm.count("help"))
+      {
+         std::cout << e.what() << "\n";
+         return 1;
+      }
+   }
+
+   if (vm.count("help"))
+   {
+      std::cout << usage << "\n\n";
+      std::cout << desc << "\n";
+      return 1;
+   }
+
+   try
+   {
+      run(db_path, produce, host, host_perf, leeway_us, allow_slow);
       return 0;
    }
    catch (std::exception& e)
    {
-      std::cerr << "std::exception: " << e.what() << "\n";
+      std::cout << "std::exception: " << e.what() << "\n";
    }
    return 1;
 }

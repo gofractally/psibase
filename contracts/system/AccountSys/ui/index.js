@@ -1,22 +1,39 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, getTaposForHeadBlock, packAndPushSignedTransaction } from '/common/rpc.mjs';
+import { getJson, initializeApplet, addRoute, push, action } from '/common/rpc.mjs';
+import { genKeyPair, KeyType } from '/common/keyConversions.mjs';
 
-await import('https://unpkg.com/react@18/umd/react.production.min.js');
-await import('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
 const html = htm.bind(React.createElement);
+
+await initializeApplet();
+const thisApplet = await getJson('/common/thiscontract');
+
+let transactionTypes = {
+    newacc: 0,
+};
 
 function useAccounts(addMsg, clearMsg) {
     const [accounts, setAccounts] = React.useState([]);
-    React.useEffect(() => {
+
+    const refreshAccounts = React.useCallback((trace) => {
         (async () => {
+            addMsg(JSON.stringify(trace, null, 4));
             try {
                 setAccounts(await getJson('/accounts'));
-            } catch (e) {
+            }
+            catch (e) {
                 clearMsg();
                 addMsg(e);
             }
         })();
     }, []);
+
+    React.useEffect(refreshAccounts, []);
+
+    React.useEffect(()=>{
+        addRoute("accCreated", transactionTypes.newacc, refreshAccounts);
+    }, [refreshAccounts]);
+    
+
     return accounts;
 }
 
@@ -36,34 +53,26 @@ async function newAccount(name, pubkey, addMsg, clearMsg) {
     try {
         clearMsg();
         addMsg("Pushing transaction...");
-        let actions = [{
-            sender: 'account-sys',
-            contract: 'account-sys',
-            method: 'newAccount',
-            data: { name, authContract: 'auth-fake-sys', requireNew: true },
-        }];
+
+        var actions = [await action(
+            thisApplet, 
+            "newAccount", 
+            { 
+                name, 
+                authContract: 'auth-fake-sys', 
+                requireNew: true 
+            },
+            thisApplet,
+          )];
+
         if (pubkey)
-            actions = actions.concat([{
-                sender: name,
-                contract: 'auth-ec-sys',
-                method: 'setKey',
-                data: { key: pubkey },
-            }, {
-                sender: name,
-                contract: 'account-sys',
-                method: 'setAuthCntr',
-                data: { authContract: 'auth-ec-sys' },
-            }]);
-        const trace = await packAndPushSignedTransaction('', {
-            transaction: {
-                tapos: {
-                    ...await getTaposForHeadBlock(),
-                    expiration: new Date(Date.now() + 10_000),
-                },
-                actions,
-            }
-        });
-        addMsg(JSON.stringify(trace, null, 4));
+            actions = actions.concat([
+                await action('auth-ec-sys', 'setKey', {key: pubkey}, name),
+                await action('account-sys', 'setAuthCntr', {authContract: 'auth-ec-sys'}, name), 
+            ]);
+
+        push(transactionTypes.newacc, actions);
+
     } catch (e) {
         console.error(e);
         addMsg('');
@@ -110,6 +119,37 @@ function useMsg() {
     return { msg, addMsg, clearMsg };
 }
 
+function KeyPair() 
+{
+    const [pub, setPub] = React.useState('');
+    const [priv, setPriv] = React.useState('');
+
+    let generateKeyPair = () => {
+        let kp = genKeyPair(KeyType.k1);
+        setPub(kp.pub);
+        setPriv(kp.priv);
+    };
+
+    return html`
+        <div>
+            <table><tbody>
+                <tr>
+                        <td></td>
+                        <td><button onClick=${generateKeyPair}>Generate</button></td>
+                </tr>    
+                <tr>
+                    <td>Public key</td>
+                    <td><input type="text" disabled value=${pub}></input></td>
+                </tr>
+                <tr>
+                    <td>Private key</td>
+                    <td><input type="text" disabled value=${priv}></input></td>
+                </tr>
+            </tbody></table>
+        </div>
+    `;
+}
+
 function App() {
     const [trx, setTrx] = React.useState('');
     const { msg, addMsg, clearMsg } = useMsg();
@@ -117,6 +157,8 @@ function App() {
         <h1>account_sys</h1>
         <h2>Accounts</h2>
         ${AccountList(addMsg, clearMsg)}
+        <h2>Generate Key Pair</h2>
+        <${KeyPair} />
         <h2>Create Account</h2>
         ${AccountForm(addMsg, clearMsg)}
         <h2>Messages</h2>

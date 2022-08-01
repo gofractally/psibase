@@ -26,7 +26,7 @@ namespace psibase
       bool              started            = false;
       bool              active             = false;
 
-      BlockContext(SystemContext& systemContext, bool isProducing, bool enableUndo);
+      BlockContext(SystemContext& systemContext, bool isProducing);
       BlockContext(SystemContext& systemContext, ReadOnly);
 
       void checkActive() { check(active, "block is not active"); }

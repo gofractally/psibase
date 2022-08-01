@@ -27,6 +27,8 @@ namespace psibase
    {
       using variant_type = std::variant<EccPublicKey, EccPublicKey>;  // k1, r1
       variant_type data;
+
+      bool operator==(const PublicKey& other) const { return data == other.data; }
    };
    PSIO_REFLECT(PublicKey, definitionWillNotChange(), data)
 

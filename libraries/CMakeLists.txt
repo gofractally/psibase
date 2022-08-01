@@ -1,5 +1,9 @@
 enable_testing()
 
+if(DEFINED IS_NATIVE)
+  add_subdirectory(triedent)
+endif()
+
 add_subdirectory(psio)
 add_subdirectory(psibase)
 
