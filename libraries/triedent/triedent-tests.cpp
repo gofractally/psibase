@@ -63,8 +63,8 @@ TEST_CASE("accidental inner removal")
    auto db      = createDb();
    auto session = db->start_write_session();
    auto root    = session->get_top_root();
-   session->upsert(root, {"\x00\x01\x02", 3}, {"value 1"});
-   session->upsert(root, {"\x00\x01\x03", 3}, {"value 2"});
+   session->upsert(root, {"\x00\x01\x02", 3}, {"value 1", 7});
+   session->upsert(root, {"\x00\x01\x03", 3}, {"value 2", 7});
    REQUIRE(osv(session->get(root, {"\x00\x01\x02", 3})) ==
            std::optional{std::string_view{"value 1"}});
    REQUIRE(osv(session->get(root, {"\x00\x01\x03", 3})) ==
