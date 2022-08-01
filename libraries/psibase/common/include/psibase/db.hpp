@@ -109,7 +109,11 @@ namespace psibase
       /// * [kvPutSequential]
       /// * [kvGetSequential]
       merkleEvent,
+
+      numDatabases,
    };
+
+   inline constexpr uint32_t numDatabases = (uint32_t)DbId::numDatabases;
 
    struct KvResourceKey
    {

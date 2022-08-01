@@ -112,13 +112,7 @@ namespace triedent
       root()            = default;
       root(const root&) = delete;
       root(root&&)      = default;
-      ~root()
-      {
-         if (db && id && !ancestor)
-         {
-            // TODO
-         }
-      }
+      ~root();
 
       root& operator=(const root&) = delete;
       root& operator=(root&&)      = default;
@@ -127,6 +121,7 @@ namespace triedent
    class session_base
    {
       friend database;
+      friend root;
 
      public:
       using string_view = std::string_view;
@@ -427,8 +422,10 @@ namespace triedent
 
       friend write_session;
       friend session_base;
+      friend root;
 
      public:
+      // TODO: rename *_pages
       struct config
       {
          uint64_t max_objects = 1000 * 1000ull;
@@ -497,14 +494,26 @@ namespace triedent
       mutable std::mutex         _active_sessions_mutex;
       std::vector<session_base*> _active_sessions;
       bool                       _have_write_session;
+
+      std::mutex   _root_release_session_mutex;
+      session_base _root_release_session;
    };
+
+   inline root::~root()
+   {
+      if (db && id && !ancestor)
+      {
+         std::lock_guard<std::mutex> lock(db->_root_release_session_mutex);
+         session_base::swap_guard    guard(*db, db->_root_release_session);
+         db->release(id);
+      }
+   }
 
    template <typename T>
    struct deref
    {
       using id = object_id;
 
-      deref() = default;
       deref(std::pair<id, value_node*> p, node_type t)
           : _id(p.first), ptr((char*)p.second), _type(t)
       {
@@ -1735,7 +1744,8 @@ namespace triedent
             return false;
          auto rk = result_key.size();
          result_key.push_back(b);
-         if (unguarded_get_greater_equal(ancestor, in.branch(b), key, result_bytes, result_roots))
+         if (unguarded_get_greater_equal(ancestor, in.branch(b), key, result_key, result_bytes,
+                                         result_roots))
             return true;
          result_key.resize(rk);
          b   = in.lower_bound(b + 1);
@@ -1793,7 +1803,7 @@ namespace triedent
       {
          if (in_key >= *key)
             return false;
-         auto cpre = common_prefix(in_key, key);
+         auto cpre = common_prefix(in_key, *key);
          if (cpre == in_key)
          {
             last_b = (*key)[cpre.size()];
@@ -1810,7 +1820,8 @@ namespace triedent
       {
          auto rk = result_key.size();
          result_key.push_back(b);
-         if (unguarded_get_less_than(ancestor, in.branch(b), key, result_bytes, result_roots))
+         if (unguarded_get_less_than(ancestor, in.branch(b), key, result_key, result_bytes,
+                                     result_roots))
             return true;
          result_key.resize(rk);
          if (b < 1)
@@ -1836,10 +1847,10 @@ namespace triedent
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
-      swap_guard  g(*this);
-      auto        prefix_min = to_key6(prefix);
-      auto        extra_bits = prefix_min.size() * 6 - prefix.size() * 8;
-      std::string prefix_max = prefix_min;
+      swap_guard g(*this);
+      auto       prefix_min = to_key6(prefix);
+      auto       extra_bits = prefix_min.size() * 6 - prefix.size() * 8;
+      auto       prefix_max = (std::string)prefix_min;
       if (!prefix_max.empty())
          prefix_max.back() |= (1 << extra_bits) - 1;
       std::vector<char> result_key6;

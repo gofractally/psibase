@@ -17,6 +17,8 @@ namespace triedent
 
    database::database(std::filesystem::path dir, access_mode allow_write, bool allow_slow)
    {
+      _active_sessions.push_back(&_root_release_session);
+
       auto db = dir / "db";
       if (not std::filesystem::exists(dir))
          throw std::runtime_error("directory does not exist: '" + dir.generic_string() + "'");

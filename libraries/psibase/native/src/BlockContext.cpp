@@ -3,15 +3,12 @@
 
 namespace psibase
 {
-   BlockContext::BlockContext(psibase::SystemContext& systemContext,
-                              bool                    isProducing,
-                              bool                    enableUndo)
+   BlockContext::BlockContext(psibase::SystemContext& systemContext, bool isProducing)
        : systemContext{systemContext},
          db{systemContext.sharedDatabase},
          session{db.startWrite()},
          isProducing{isProducing}
    {
-      check(enableUndo, "TODO: revisit enableUndo option");
    }
 
    BlockContext::BlockContext(psibase::SystemContext& systemContext, ReadOnly)
@@ -191,9 +188,7 @@ namespace psibase
          checkActive();
          check(enableUndo || commit, "neither enableUndo or commit is set");
 
-         // if !enableUndo then BlockContext becomes unusable if transaction
-         // fails. This will cascade to a busy lock (database corruption) if
-         // BlockContext::enableUndo is also false.
+         // if !enableUndo then BlockContext becomes unusable if transaction fails.
          active = enableUndo;
 
          TransactionContext t{*this, trx, trace, enableUndo};

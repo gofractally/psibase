@@ -136,7 +136,7 @@ struct test_chain
    {
       psibase::check(snapshot.empty(), "snapshots not implemented");
       dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-      db  = {dir};
+      db  = {dir, true};
       sys = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
@@ -160,7 +160,7 @@ struct test_chain
    {
       // TODO: undo control
       finish_block();
-      blockContext = std::make_unique<psibase::BlockContext>(*sys, true, true);
+      blockContext = std::make_unique<psibase::BlockContext>(*sys, true);
 
       uint32_t skipAdditional = 0;
       if (skip_miliseconds != 0)
