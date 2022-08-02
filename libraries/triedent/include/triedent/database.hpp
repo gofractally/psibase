@@ -383,7 +383,10 @@ namespace triedent
 
       void recursive_retain(object_id id);
 
-      inline mutable_deref<value_node> make_value(node_type type, string_view k, string_view v);
+      inline mutable_deref<value_node> make_value(node_type   type,
+                                                  string_view k,
+                                                  string_view v,
+                                                  bool        bump_root_refs = false);
       inline mutable_deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
       inline mutable_deref<inner_node> make_inner(const inner_node& cpy,
                                                   string_view       pre,
@@ -411,9 +414,11 @@ namespace triedent
       inline id combine_value_nodes(node_type   t1,
                                     string_view k1,
                                     string_view v1,
+                                    bool        bump_root_refs1,
                                     node_type   t2,
                                     string_view k2,
-                                    string_view v2);
+                                    string_view v2,
+                                    bool        bump_root_refs2);
    };
 
    class database : public std::enable_shared_from_this<database>
@@ -756,9 +761,10 @@ namespace triedent
 
    inline mutable_deref<value_node> write_session::make_value(node_type   type,
                                                               string_view key,
-                                                              string_view val)
+                                                              string_view val,
+                                                              bool        bump_root_refs)
    {
-      return {value_node::make(*_db->_ring, key, val, type, false), type};
+      return {value_node::make(*_db->_ring, key, val, type, bump_root_refs), type};
    }
 
    inline mutable_deref<inner_node> write_session::make_inner(string_view pre,
@@ -788,12 +794,14 @@ namespace triedent
    database::id write_session::combine_value_nodes(node_type   t1,
                                                    string_view k1,
                                                    string_view v1,
+                                                   bool        bump_root_refs1,
                                                    node_type   t2,
                                                    string_view k2,
-                                                   string_view v2)
+                                                   string_view v2,
+                                                   bool        bump_root_refs2)
    {
       if (k1.size() > k2.size())
-         return combine_value_nodes(t2, k2, v2, t1, k1, v1);
+         return combine_value_nodes(t2, k2, v2, bump_root_refs2, t1, k1, v1, bump_root_refs1);
 
       //std::cerr << __func__ << ":" << __LINE__ << "\n";
       auto cpre = common_prefix(k1, k2);
@@ -801,14 +809,14 @@ namespace triedent
       if (cpre == k1)
       {
          //  std::cerr << __func__ << ":" << __LINE__ << "\n";
-         auto inner_value = make_value(t1, string_view(), v1);
+         auto inner_value = make_value(t1, string_view(), v1, bump_root_refs1);
          auto k2sfx       = k2.substr(cpre.size());
          auto b2          = k2sfx.front();
 
          auto in = make_inner(cpre, id(), 1ull << b2);
          in->set_value(inner_value);
 
-         in->branch(b2) = make_value(t2, k2sfx.substr(1), v2);
+         in->branch(b2) = make_value(t2, k2sfx.substr(1), v2, bump_root_refs2);
 
          return in;
       }
@@ -819,8 +827,8 @@ namespace triedent
          auto b2sfx = k2.substr(cpre.size());
          auto b1    = b1sfx.front();
          auto b2    = b2sfx.front();
-         auto b1v   = make_value(t1, b1sfx.substr(1), v1);
-         auto b2v   = make_value(t2, b2sfx.substr(1), v2);
+         auto b1v   = make_value(t1, b1sfx.substr(1), v1, bump_root_refs1);
+         auto b2v   = make_value(t2, b2sfx.substr(1), v2, bump_root_refs2);
 
          //auto in        = make_inner(cpre, (1ull << b2) | (1ul << b1), _version);
          auto in        = make_inner(cpre, id(), inner_node::branches(b1, b2));
@@ -925,7 +933,8 @@ namespace triedent
       {
          auto& vn = n.as_value_node();
          if (vn.key() != key)
-            return combine_value_nodes(n.type(), vn.key(), vn.data(), type, key, val);
+            return combine_value_nodes(n.type(), vn.key(), vn.data(), n.type() == node_type::roots,
+                                       type, key, val, false);
          else
          {
             old_size = vn.data_size();
