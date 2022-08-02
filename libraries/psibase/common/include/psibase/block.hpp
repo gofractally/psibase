@@ -150,7 +150,10 @@ namespace psibase
 
       // TODO: switch to fracpack for sha
       // TODO: don't repack to compute sha
-      BlockInfo(const Block& b) : header{b.header}, blockId{sha256(b)} {}
+      BlockInfo(const Block& b) : header{b.header}, blockId{sha256(b)}
+      {
+         memcpy(blockId.data(), &header.blockNum, sizeof(header.blockNum));
+      }
    };
    PSIO_REFLECT(BlockInfo, header, blockId)
 }  // namespace psibase

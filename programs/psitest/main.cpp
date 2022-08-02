@@ -125,6 +125,7 @@ struct test_chain
    std::set<test_chain_ref*>                    refs;
    boost::filesystem::path                      dir;
    psibase::SharedDatabase                      db;
+   psibase::WriterPtr                           writer;
    std::unique_ptr<psibase::SystemContext>      sys;
    std::unique_ptr<psibase::BlockContext>       blockContext;
    std::unique_ptr<psibase::TransactionTrace>   nativeFunctionsTrace;
@@ -135,9 +136,10 @@ struct test_chain
    test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
    {
       psibase::check(snapshot.empty(), "snapshots not implemented");
-      dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-      db  = {dir, true};
-      sys = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
+      dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
+      db     = {dir, true};
+      writer = db.createWriter();
+      sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
    test_chain(const test_chain&)            = delete;
@@ -152,7 +154,8 @@ struct test_chain
       nativeFunctionsTransactionContext.reset();
       blockContext.reset();
       sys.reset();
-      db = {};
+      writer = {};
+      db     = {};
       boost::filesystem::remove_all(dir);
    }
 
@@ -160,7 +163,7 @@ struct test_chain
    {
       // TODO: undo control
       finish_block();
-      blockContext = std::make_unique<psibase::BlockContext>(*sys, true);
+      blockContext = std::make_unique<psibase::BlockContext>(*sys, db.getHead(), writer, true);
 
       uint32_t skipAdditional = 0;
       if (skip_miliseconds != 0)
@@ -190,7 +193,9 @@ struct test_chain
          nativeFunctions.reset();
          nativeFunctionsActionContext.reset();
          nativeFunctionsTransactionContext.reset();
-         blockContext->commit();
+         auto [revision, blockId] = blockContext->writeRevision();
+         db.setHead(*writer, revision);
+         db.removeForks(*writer, blockId);  // temp rule: head is now irreversible
          blockContext.reset();
       }
    }
@@ -204,7 +209,7 @@ struct test_chain
          nativeFunctionsTrace = std::make_unique<psibase::TransactionTrace>();
          nativeFunctionsTrace->actionTraces.resize(1);
          nativeFunctionsTransactionContext = std::make_unique<psibase::TransactionContext>(
-             *blockContext, dummyTransaction, *nativeFunctionsTrace, false);
+             *blockContext, dummyTransaction, *nativeFunctionsTrace);
          nativeFunctionsActionContext = std::make_unique<psibase::ActionContext>(
              psibase::ActionContext{*nativeFunctionsTransactionContext, dummyAction,
                                     nativeFunctionsTrace->actionTraces[0]});

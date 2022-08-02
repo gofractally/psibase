@@ -23,16 +23,13 @@ namespace psibase
 
    TransactionContext::TransactionContext(BlockContext&            blockContext,
                                           const SignedTransaction& signedTransaction,
-                                          TransactionTrace&        transactionTrace,
-                                          bool                     enableUndo)
+                                          TransactionTrace&        transactionTrace)
        : blockContext{blockContext},
          signedTransaction{signedTransaction},
          transactionTrace{transactionTrace},
          startTime{std::chrono::steady_clock::now()},
          impl{std::make_unique<TransactionContextImpl>()}
    {
-      if (enableUndo)
-         session = blockContext.db.startWrite();
    }
 
    TransactionContext::~TransactionContext()
