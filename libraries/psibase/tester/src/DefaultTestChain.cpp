@@ -259,8 +259,6 @@ void DefaultTestChain::registerSysRpc()
                           read_whole_file(comDir + "/common/SimpleUI.mjs")),
        rpcCommon.storeSys("/common/keyConversions.mjs", js,
                           read_whole_file(comDir + "/common/keyConversions.mjs")),
-       rpcCommon.storeSys("/common/widgets.mjs", js,
-                          read_whole_file(comDir + "/common/widgets.mjs")),
        rpcCommon.storeSys("/ui/index.js", js, read_whole_file(comDir + "/ui/index.js")),
 
        // CommonSys - 3rd party
@@ -293,13 +291,13 @@ void DefaultTestChain::registerSysRpc()
        rpcExplore.storeSys("/ui/index.js", js, read_whole_file(expDir + "/ui/index.js")),
 
        // FractalGovSys
-    //    rpcFractalGov.storeSys("/", html, read_whole_file(fGovDir + "/ui/index.html")),
-    //    rpcFractalGov.storeSys("/simplepeer.min.js", js,
-    //                           read_whole_file(fGovDir + "/ui/simplepeer.min.js")),
-    //    rpcFractalGov.storeSys("/assets/index.57453e06.js", js,
-    //                           read_whole_file(fGovDir + "/ui/assets/index.57453e06.js")),
-    //    rpcFractalGov.storeSys("/assets/index.449b90c1.css", css,
-    //                           read_whole_file(fGovDir + "/ui/assets/index.449b90c1.css")),
+       rpcFractalGov.storeSys("/", html, read_whole_file(fGovDir + "/ui/index.html")),
+       rpcFractalGov.storeSys("/simplepeer.min.js", js,
+                              read_whole_file(fGovDir + "/ui/simplepeer.min.js")),
+       rpcFractalGov.storeSys("/assets/index.57453e06.js", js,
+                              read_whole_file(fGovDir + "/ui/assets/index.57453e06.js")),
+       rpcFractalGov.storeSys("/assets/index.449b90c1.css", css,
+                              read_whole_file(fGovDir + "/ui/assets/index.449b90c1.css")),
 
        //
    };
