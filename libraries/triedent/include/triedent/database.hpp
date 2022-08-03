@@ -2042,7 +2042,7 @@ namespace triedent
                auto& vn = bn.as_value_node();
                new_key += vn.key();
                //           TRIEDENT_DEBUG( "clone value" );
-               return make_value(bn.type(), new_key, vn.data());
+               return make_value(bn.type(), new_key, vn.data(), bn.type() == node_type::roots);
             }
             else
             {
@@ -2112,7 +2112,7 @@ namespace triedent
 
                auto  cur_v = get_by_id(in.value());
                auto& cv    = cur_v.as_value_node();
-               return make_value(cur_v.type(), in_key, cv.data());
+               return make_value(cur_v.type(), in_key, cv.data(), cur_v.type() == node_type::roots);
             }
             else
             {  // there must be only 1 branch left
@@ -2129,7 +2129,8 @@ namespace triedent
                   new_key += in.key();
                   new_key += char(lb);
                   new_key += cv.key();
-                  return make_value(cur_v.type(), new_key, cv.data());
+                  return make_value(cur_v.type(), new_key, cv.data(),
+                                    cur_v.type() == node_type::roots);
                }
                else
                {
