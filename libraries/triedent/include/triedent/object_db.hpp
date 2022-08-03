@@ -281,7 +281,7 @@ namespace triedent
          if constexpr (debug_id)
          {
             auto obj = _header->objects[id].load();
-            std::cout << id << ": " << msg << ": "
+            std::cout << id << ": " << msg << ":"
                       << " ref=" << extract_ref(obj) << " type=" << (int)extract_type(obj)
                       << " cache=" << extract_cache(obj) << " offset=" << extract_offset(obj)
                       << std::endl;
@@ -411,6 +411,8 @@ namespace triedent
     */
    inline std::pair<object_location, uint16_t> object_db::release(object_id id)
    {
+      debug(id.id, "about to release");
+
       auto& obj       = _header->objects[id.id];
       auto  val       = obj.fetch_sub(1) - 1;
       auto  new_count = (val & ref_count_mask);

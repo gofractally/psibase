@@ -588,6 +588,8 @@ namespace triedent
       inline T* operator->() const { return reinterpret_cast<T*>(this->ptr); }
       inline T& operator*() const { return *reinterpret_cast<T*>(this->ptr); }
 
+      auto get_id() { return lock.get_id(); }
+
      private:
       location_lock lock;
    };  // mutable_deref
@@ -737,9 +739,15 @@ namespace triedent
       auto                        current = _db->_dbm->top_root.load();
       auto                        id      = get_id(r);
       if (current == id.id)
+      {
+         if constexpr (debug_roots)
+            std::cout << id.id << ": set_top_root: already matches" << std::endl;
          return;
+      }
 
       swap_guard g(*this);
+      if constexpr (debug_roots)
+         std::cout << id.id << ": set_top_root: old=" << current << std::endl;
       id = retain(id);
       _db->_dbm->top_root.store(id.id);
       release({current});
@@ -758,6 +766,8 @@ namespace triedent
          // Either there was no change, or it was edited in place (but only if
          // unique). For either case, the refcount wasn't bumped and it doesn't
          // need to be bumped.
+         if constexpr (debug_roots)
+            std::cout << id.id << ": update_root keep" << std::endl;
          return;
       }
       else if (get_unique(r))
@@ -765,11 +775,19 @@ namespace triedent
          // Even though it is unique, it wasn't edited in place (r->id != id).
          // The new id (if not 0) has a refcount of 1, so doesn't need to be
          // bumped.
+         if constexpr (debug_roots)
+            std::cout << id.id << ": update_root replacing:" << r->id.id << std::endl;
          release(r->id);
          r->id = id;
       }
       else
       {
+         if constexpr (debug_roots)
+            if (r == nullptr)
+               std::cout << id.id << ": update_root original was nullptr" << std::endl;
+            else
+               std::cout << id.id << ": update_root replacing as new root:" << r->id.id
+                         << std::endl;
          r = std::make_shared<root>(root{_db, nullptr, id});
       }
    }
@@ -858,6 +876,14 @@ namespace triedent
    {
       if (mut.type() == node_type::roots)
       {
+         if constexpr (debug_roots)
+         {
+            std::cout << mut.get_id().id << ": modify_value; old:";
+            for (unsigned i = 0; i < mut->num_roots(); ++i)
+               std::cout << " " << mut->roots()[i].id;
+            std::cout << std::endl;
+         }
+
          auto* src  = reinterpret_cast<const object_id*>(val.data());
          auto* dest = mut->roots();
          auto  n    = mut->num_roots();
@@ -866,6 +892,14 @@ namespace triedent
             auto prev = *dest;
             *dest++   = *src++;
             release(prev);
+         }
+
+         if constexpr (debug_roots)
+         {
+            std::cout << mut.get_id().id << ": modify_value; new:";
+            for (unsigned i = 0; i < mut->num_roots(); ++i)
+               std::cout << " " << mut->roots()[i].id;
+            std::cout << std::endl;
          }
       }
       else

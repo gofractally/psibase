@@ -72,13 +72,13 @@ namespace triedent
          {
             if constexpr (debug_nodes)
             {
-               std::cout << "value_node(): key_size=" << _key_size
+               std::cout << "value_node(): key_size=" << (int)_key_size
                          << " data_size=" << (int)val.size()
                          << " bump roots=" << val.size() / sizeof(object_id) << "\n    ";
                auto n   = val.size() / sizeof(object_id);
                auto src = reinterpret_cast<const object_id*>(val.data());
                while (n--)
-                  std::cout << src++->id << "\n";
+                  std::cout << src++->id << " ";
                std::cout << std::endl;
             }
             assert(val.size() % sizeof(object_id) == 0);
@@ -91,8 +91,8 @@ namespace triedent
          else
          {
             if constexpr (debug_nodes)
-               std::cout << "value_node(): key_size=" << _key_size << " data_size=" << val.size()
-                         << std::endl;
+               std::cout << "value_node(): key_size=" << (int)_key_size
+                         << " data_size=" << val.size() << std::endl;
             memcpy(data_ptr(), val.data(), val.size());
          }
       }
@@ -204,7 +204,7 @@ namespace triedent
          _present_bits(branches)
    {
       if constexpr (debug_nodes)
-         std::cout << id.id << ": value=" << val.id << std::endl;
+         std::cout << id.id << ": inner_node(): value=" << val.id << std::endl;
       memset(children(), 0, sizeof(object_id) * num_branches());
       memcpy(key_ptr(), prefix.data(), prefix.size());
    }
@@ -224,7 +224,7 @@ namespace triedent
          _present_bits(branches)
    {
       if constexpr (debug_nodes)
-         std::cout << id.id << ": value=" << val.id << std::endl;
+         std::cout << id.id << ": inner_node(): value=" << val.id << std::endl;
       if (in._present_bits == branches)
       {
          // memcpy( (char*)children(), (char*)in.children(), num_branches()*sizeof(object_id) );
@@ -234,7 +234,7 @@ namespace triedent
          while (c != e)
          {
             if constexpr (debug_nodes)
-               std::cout << id.id << ": bump child" << ic->id << std::endl;
+               std::cout << id.id << ": inner_node(copy): bump child " << ic->id << std::endl;
             *c = bump_refcount_or_copy(a, *ic);
             ++c;
             ++ic;
@@ -247,7 +247,8 @@ namespace triedent
          while (fb < 64)
          {
             if constexpr (debug_nodes)
-               std::cout << id.id << ": bump child " << in.branch(fb).id << std::endl;
+               std::cout << id.id << ": inner_node(copy): bump child " << in.branch(fb).id
+                         << std::endl;
             branch(fb) = bump_refcount_or_copy(a, in.branch(fb));
             common_branches ^= 1ull << fb;
             fb = std::countr_zero(common_branches);
