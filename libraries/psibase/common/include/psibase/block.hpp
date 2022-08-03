@@ -148,11 +148,13 @@ namespace psibase
       BlockInfo()                 = default;
       BlockInfo(const BlockInfo&) = default;
 
-      // TODO: switch to fracpack for sha
       // TODO: don't repack to compute sha
       BlockInfo(const Block& b) : header{b.header}, blockId{sha256(b)}
       {
-         memcpy(blockId.data(), &header.blockNum, sizeof(header.blockNum));
+         auto* src  = (const char*)&header.blockNum + sizeof(&header.blockNum);
+         auto* dest = blockId.data();
+         while (src != (const char*)&header.blockNum)
+            *dest++ = *--src;
       }
    };
    PSIO_REFLECT(BlockInfo, header, blockId)
