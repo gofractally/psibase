@@ -8,6 +8,8 @@
 
 namespace triedent
 {
+   inline constexpr bool debug_roots = false;
+
    template <typename AccessMode>
    class session;
 
@@ -106,6 +108,10 @@ namespace triedent
       root(std::shared_ptr<database> db, std::shared_ptr<root> ancestor, object_id id)
           : db(std::move(db)), ancestor(std::move(ancestor)), id(id)
       {
+         if constexpr (debug_roots)
+            if (db)
+               std::cout << id.id << ": root(): ancestor=" << (ancestor ? ancestor->id.id : 0)
+                         << std::endl;
       }
 
      public:
@@ -507,6 +513,10 @@ namespace triedent
 
    inline root::~root()
    {
+      if constexpr (debug_roots)
+         if (db && id)
+            std::cout << id.id << ": ~root(): ancestor=" << (ancestor ? ancestor->id.id : 0)
+                      << std::endl;
       if (db && id && !ancestor)
       {
          std::lock_guard<std::mutex> lock(db->_root_release_session_mutex);
@@ -660,6 +670,11 @@ namespace triedent
    template <typename AccessMode>
    inline void session<AccessMode>::release(std::shared_ptr<root>& r)
    {
+      if constexpr (debug_roots)
+         if (r.use_count() == 1 && r->db && r->id)
+            std::cout << r->id.id
+                      << ": release(root): ancestor=" << (r->ancestor ? r->ancestor->id.id : 0)
+                      << std::endl;
       if (r.use_count() == 1 && r->db && !r->ancestor && r->id)
       {
          auto id = r->id;

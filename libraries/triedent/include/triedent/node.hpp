@@ -4,6 +4,8 @@
 
 namespace triedent
 {
+   inline constexpr bool debug_nodes = false;
+
    using key_view   = std::string_view;
    using value_view = std::string_view;
    using key_type   = std::string;
@@ -54,6 +56,9 @@ namespace triedent
          assert(val.size() < 0xffffff - key.size() - sizeof(value_node));
          uint32_t alloc_size = sizeof(value_node) + key.size() + val.size();
          auto     r          = a.alloc(alloc_size, type);
+         if constexpr (debug_nodes)
+            std::cout << r.first.get_id().id << ": construct value_node: type=" << (int)type
+                      << std::endl;
          return std::make_pair(std::move(r.first),
                                new (r.second) value_node(a, key, val, bump_root_refs));
       }
@@ -65,6 +70,17 @@ namespace triedent
          memcpy(key_ptr(), key.data(), key_size());
          if (bump_root_refs)
          {
+            if constexpr (debug_nodes)
+            {
+               std::cout << "value_node(): key_size=" << _key_size
+                         << " data_size=" << (int)val.size()
+                         << " bump roots=" << val.size() / sizeof(object_id) << "\n    ";
+               auto n   = val.size() / sizeof(object_id);
+               auto src = reinterpret_cast<const object_id*>(val.data());
+               while (n--)
+                  std::cout << src++->id << "\n";
+               std::cout << std::endl;
+            }
             assert(val.size() % sizeof(object_id) == 0);
             auto n    = val.size() / sizeof(object_id);
             auto src  = reinterpret_cast<const object_id*>(val.data());
@@ -73,7 +89,12 @@ namespace triedent
                *dest++ = bump_refcount_or_copy(ra, *src++);
          }
          else
+         {
+            if constexpr (debug_nodes)
+               std::cout << "value_node(): key_size=" << _key_size << " data_size=" << val.size()
+                         << std::endl;
             memcpy(data_ptr(), val.data(), val.size());
+         }
       }
       //  uint32_t sizes;
       uint8_t _key_size;
@@ -128,12 +149,13 @@ namespace triedent
       }
 
      private:
-      inner_node(ring_allocator&   a,
+      inner_node(object_id         id,
+                 ring_allocator&   a,
                  const inner_node& in,
                  key_view          prefix,
                  object_id         val,
                  uint64_t          branches);
-      inner_node(key_view prefix, object_id val, uint64_t branches);
+      inner_node(object_id id, key_view prefix, object_id val, uint64_t branches);
 
       uint8_t   _prefix_length = 0;  // mirrors value nodes to signal type and prefix length
       uint8_t   _reserved_a    = 0;  // future use
@@ -151,9 +173,12 @@ namespace triedent
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
-      auto p = a.alloc(alloc_size, node_type::inner);
+      auto p  = a.alloc(alloc_size, node_type::inner);
+      auto id = p.first.get_id();
+      if constexpr (debug_nodes)
+         std::cout << id.id << ": construct inner_node" << std::endl;
       return std::make_pair(std::move(p.first),
-                            new (p.second) inner_node(a, in, prefix, val, branches));
+                            new (p.second) inner_node(id, a, in, prefix, val, branches));
    }
 
    inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator& a,
@@ -163,24 +188,31 @@ namespace triedent
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
-      auto p = a.alloc(alloc_size, node_type::inner);
-      return std::make_pair(std::move(p.first), new (p.second) inner_node(prefix, val, branches));
+      auto p  = a.alloc(alloc_size, node_type::inner);
+      auto id = p.first.get_id();
+      if constexpr (debug_nodes)
+         std::cout << id.id << ": construct inner_node" << std::endl;
+      return std::make_pair(std::move(p.first),
+                            new (p.second) inner_node(id, prefix, val, branches));
    }
 
-   inline inner_node::inner_node(key_view prefix, object_id val, uint64_t branches)
+   inline inner_node::inner_node(object_id id, key_view prefix, object_id val, uint64_t branches)
        : _prefix_length(prefix.size()),
          _reserved_a(0),
          _reserved_b(0),
          _value(val),
          _present_bits(branches)
    {
+      if constexpr (debug_nodes)
+         std::cout << id.id << ": value=" << val.id << std::endl;
       memset(children(), 0, sizeof(object_id) * num_branches());
       memcpy(key_ptr(), prefix.data(), prefix.size());
    }
    /*
     *  Constructs a copy of in with the branches selected by 'branches'
     */
-   inline inner_node::inner_node(ring_allocator&   a,
+   inline inner_node::inner_node(object_id         id,
+                                 ring_allocator&   a,
                                  const inner_node& in,
                                  key_view          prefix,
                                  object_id         val,
@@ -191,6 +223,8 @@ namespace triedent
          _value(val),
          _present_bits(branches)
    {
+      if constexpr (debug_nodes)
+         std::cout << id.id << ": value=" << val.id << std::endl;
       if (in._present_bits == branches)
       {
          // memcpy( (char*)children(), (char*)in.children(), num_branches()*sizeof(object_id) );
@@ -199,6 +233,8 @@ namespace triedent
          auto e  = c + num_branches();
          while (c != e)
          {
+            if constexpr (debug_nodes)
+               std::cout << id.id << ": bump child" << ic->id << std::endl;
             *c = bump_refcount_or_copy(a, *ic);
             ++c;
             ++ic;
@@ -210,6 +246,8 @@ namespace triedent
          auto fb              = std::countr_zero(common_branches);
          while (fb < 64)
          {
+            if constexpr (debug_nodes)
+               std::cout << id.id << ": bump child " << in.branch(fb).id << std::endl;
             branch(fb) = bump_refcount_or_copy(a, in.branch(fb));
             common_branches ^= 1ull << fb;
             fb = std::countr_zero(common_branches);
@@ -281,6 +319,8 @@ namespace triedent
       if (ptr && type == node_type::inner)
       {
          auto& in = *reinterpret_cast<inner_node*>(ptr);
+         if constexpr (debug_nodes)
+            std::cout << obj.id << ": destroying; release value " << in.value().id << std::endl;
          release_node(ra, in.value());
          auto nb  = in.num_branches();
          auto pos = in.children();
@@ -288,6 +328,8 @@ namespace triedent
          while (pos != end)
          {
             assert(*pos);
+            if constexpr (debug_nodes)
+               std::cout << obj.id << ": destroying; release child " << pos->id << std::endl;
             release_node(ra, *pos);
             ++pos;
          }
@@ -298,7 +340,11 @@ namespace triedent
          auto  n     = vn.num_roots();
          auto  roots = vn.roots();
          while (n--)
+         {
+            if constexpr (debug_nodes)
+               std::cout << obj.id << ": destroying; release root " << roots->id << std::endl;
             release_node(ra, *roots++);
+         }
       }
    }
 
@@ -324,6 +370,8 @@ namespace triedent
    {
       if (!id)
          return id;
+      if constexpr (debug_nodes)
+         std::cout << id.id << ": bump_refcount_or_copy" << std::endl;
       if (ra.bump_count(id))
          return id;
       auto [ptr, type, ref] = ra.get_cache<false>(id);

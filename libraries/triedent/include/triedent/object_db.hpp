@@ -10,6 +10,8 @@
 
 namespace triedent
 {
+   inline constexpr bool debug_id = false;
+
    namespace bip = boost::interprocess;
 
    enum class node_type : uint8_t
@@ -121,9 +123,15 @@ namespace triedent
          auto  obj    = atomic.load();
          do
          {
-            if ((obj & ref_count_mask) == ref_count_mask)
+            // All 1's isn't used; that helps detect bugs (e.g. decrementing 0)
+            if ((obj & ref_count_mask) == ref_count_mask - 1)
+            {
+               debug(id.id, "bump failed; need copy");
                return false;
+            }
          } while (!atomic.compare_exchange_weak(obj, obj + 1));
+
+         debug(id.id, "bump");
          return true;
       }
 
@@ -176,6 +184,7 @@ namespace triedent
                  position_lock_mask))
          {
          }
+         lock.db->debug(lock.id, "move");
       }
 
      private:
@@ -266,6 +275,18 @@ namespace triedent
       std::unique_ptr<bip::mapped_region> _region;
 
       object_db_header* _header;
+
+      void debug(uint64_t id, const char* msg)
+      {
+         if constexpr (debug_id)
+         {
+            auto obj = _header->objects[id].load();
+            std::cout << id << ": " << msg << ": "
+                      << " ref=" << extract_ref(obj) << " type=" << (int)extract_type(obj)
+                      << " cache=" << extract_cache(obj) << " offset=" << extract_offset(obj)
+                      << std::endl;
+         }
+      }
    };
 
    inline void object_db::create(std::filesystem::path idfile, uint64_t max_id)
@@ -340,6 +361,7 @@ namespace triedent
          location_lock lock;
          lock.db = this;
          lock.id = r.id;
+         debug(lock.id, "alloc");
          return lock;
       }
       else
@@ -355,9 +377,11 @@ namespace triedent
          location_lock lock;
          lock.db = this;
          lock.id = ff;
+         debug(lock.id, "alloc");
          return lock;
       }
    }
+
    inline void object_db::dangerous_retain(object_id id)
    {
       assert(id.id <= _header->first_unallocated.id);
@@ -409,6 +433,8 @@ namespace triedent
             obj.store(create_next_ptr(ff));
          } while (not _header->first_free.compare_exchange_strong(ff, id.id));
       }
+
+      debug(id.id, "release");
       return {object_location{.offset = extract_offset(val),
                               .cache  = extract_cache(val),
                               .type   = extract_type(val)},
@@ -451,6 +477,9 @@ namespace triedent
       r.type   = extract_type(val);
       ref      = extract_ref(val);
       //  std::atomic_thread_fence(std::memory_order_acquire);
+
+      debug(id.id, "get");
+
       return r;
    }
 
