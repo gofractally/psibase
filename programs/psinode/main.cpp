@@ -238,6 +238,7 @@ void run(const std::string& db_path,
 
    // TODO: temporary loop
    // TODO: replay
+   auto writer = system->sharedDatabase.createWriter();
    while (true)
    {
       std::this_thread::sleep_for(std::chrono::milliseconds{100});
@@ -245,7 +246,7 @@ void run(const std::string& db_path,
       {
          TimePointSec t{(uint32_t)time(nullptr)};
          {
-            Database db{system->sharedDatabase};
+            Database db{system->sharedDatabase, system->sharedDatabase.getHead()};
             auto     session = db.startRead();
             auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
             if (status && status->head && status->head->header.time >= t)
@@ -258,7 +259,7 @@ void run(const std::string& db_path,
             std::swap(entries, queue->entries);
          }
 
-         BlockContext bc{*system, true};
+         BlockContext bc{*system, system->sharedDatabase.getHead(), writer, true};
          bc.start(t);
          bc.callStartBlock();
 
@@ -282,7 +283,11 @@ void run(const std::string& db_path,
             }
             continue;
          }
-         bc.commit();
+         auto [revision, blockId] = bc.writeRevision();
+         system->sharedDatabase.setHead(*writer, revision);
+         system->sharedDatabase.removeForks(*writer,
+                                            blockId);  // temp rule: head is now irreversible
+
          std::cout << psio::convert_to_json(bc.current.header) << "\n";
       }
    }

@@ -13,10 +13,12 @@ inline constexpr bool sanityCheck = false;
 
 namespace psibase
 {
+   static constexpr uint8_t headPrefix = 0;
+   static constexpr uint8_t byIdPrefix = 1;
+
    // TODO: move triedent::root destruction to a gc thread
    struct Revision
    {
-      std::shared_ptr<triedent::root> topRoot;
       std::shared_ptr<triedent::root> roots[numDatabases];
 
 #ifdef SANITY_CHECK
@@ -46,7 +48,6 @@ namespace psibase
       {
          std::shared_ptr<Revision> result = std::make_shared<Revision>();
 
-         result->topRoot = topRoot;
          for (uint32_t i = 0; i < numDatabases; ++i)
             result->roots[i] = roots[i];
 
@@ -128,21 +129,33 @@ namespace psibase
             }
          }
       }
-   };
+   };  // Revision
 
-   // TODO: fork database
-   std::shared_ptr<Revision> loadRevision(triedent::write_session&        s,
-                                          std::shared_ptr<triedent::root> topRoot)
+   static const char headRevisionKey[] = {headPrefix};
+
+   static auto byId(const Checksum256& blockId)
    {
-      auto revision     = std::make_shared<Revision>();
-      revision->topRoot = std::move(topRoot);
+      std::array<char, std::tuple_size<Checksum256>() + 1> result;
+      result[0] = byIdPrefix;
+      memcpy(result.data() + 1, blockId.data(), blockId.size());
+      return result;
+   }
+
+   static std::shared_ptr<Revision> loadRevision(triedent::write_session&               s,
+                                                 const std::shared_ptr<triedent::root>& topRoot,
+                                                 std::span<const char>                  key,
+                                                 bool nullIfNotFound = false)
+   {
+      auto                                         revision = std::make_shared<Revision>();
       std::vector<std::shared_ptr<triedent::root>> roots;
-      if (s.get(revision->topRoot, {}, nullptr, &roots))
+      if (s.get(topRoot, key, nullptr, &roots))
       {
          check(roots.size() == numDatabases, "wrong number of roots in database");
          for (size_t i = 0; i < roots.size(); ++i)
             revision->roots[i] = std::move(roots[i]);
       }
+      else if (nullIfNotFound)
+         return nullptr;
 
       if constexpr (sanityCheck)
       {
@@ -160,12 +173,6 @@ namespace psibase
       }
 
       return revision;
-   }
-
-   // TODO: fork database
-   void writeRevision(triedent::write_session& s, Revision& r)
-   {
-      s.upsert(r.topRoot, {}, r.roots);
    }
 
    struct SharedDatabaseImpl
@@ -195,7 +202,7 @@ namespace psibase
          trie   = std::make_shared<triedent::database>(dir.c_str(), triedent::database::read_write,
                                                      allowSlow);
          auto s = trie->start_write_session();
-         head   = loadRevision(*s, s->get_top_root());
+         head   = loadRevision(*s, s->get_top_root(), headRevisionKey);
       }
 
       auto getHead()
@@ -204,21 +211,58 @@ namespace psibase
          return head;
       }
 
-      void setHead(std::shared_ptr<const Revision> h)
+      void setHead(triedent::write_session& session, std::shared_ptr<const Revision> r)
       {
+         auto topRoot = session.get_top_root();
+         session.upsert(topRoot, headRevisionKey, r->roots);
+         session.set_top_root(topRoot);
+
          std::lock_guard<std::mutex> lock(headMutex);
-         head = std::move(h);
+         head = std::move(r);
       }
-   };
+
+      void writeRevision(triedent::write_session& session,
+                         const Checksum256&       blockId,
+                         const Revision&          r)
+      {
+         auto topRoot = session.get_top_root();
+         session.upsert(topRoot, byId(blockId), r.roots);
+         session.set_top_root(topRoot);
+      }
+   };  // SharedDatabaseImpl
 
    SharedDatabase::SharedDatabase(const boost::filesystem::path& dir, bool allowSlow)
        : impl{std::make_shared<SharedDatabaseImpl>(dir.c_str(), allowSlow)}
    {
    }
 
+   ConstRevisionPtr SharedDatabase::getHead()
+   {
+      return impl->getHead();
+   }
+
+   WriterPtr SharedDatabase::createWriter()
+   {
+      return impl->trie->start_write_session();
+   }
+
+   void SharedDatabase::setHead(Writer& writer, ConstRevisionPtr revision)
+   {
+      return impl->setHead(writer, revision);
+   }
+
+   ConstRevisionPtr SharedDatabase::getFork(Writer& writer, const Checksum256& blockId)
+   {
+      return loadRevision(writer, writer.get_top_root(), byId(blockId), true);
+   }
+
+   // TODO
+   void SharedDatabase::removeForks(Writer& writer, const Checksum256& irreversible) {}
+
    struct DatabaseImpl
    {
       SharedDatabase                           shared;
+      std::shared_ptr<const Revision>          baseRevision;
       std::shared_ptr<triedent::write_session> writeSession;
       std::shared_ptr<triedent::read_session>  readSession;
       std::vector<std::shared_ptr<Revision>>   writeRevisions;
@@ -252,24 +296,32 @@ namespace psibase
          return f(*writeSession, *writeRevisions.back());
       }
 
-      void startRead()
+      // TODO: release old revision roots in GC thread
+      void setRevision(ConstRevisionPtr revision)
       {
-         check(writeRevisions.empty() && !readOnlyRevision, "database session already active");
-         if (!readSession && !writeSession)
-            readSession = shared.impl->trie->start_read_session();
-         readOnlyRevision = shared.impl->getHead();
+         check(writeRevisions.empty() && !readOnlyRevision,
+               "setRevision: database session is active");
+         check(revision != nullptr, "null revision");
+         baseRevision = std::move(revision);
       }
 
-      void startWrite()
+      void startRead()
       {
-         check(!readOnlyRevision, "can't mix read and write revisions");
-         if (!writeSession)
-         {
-            writeSession = shared.impl->trie->start_write_session();
-            readSession  = nullptr;
-         }
+         check(writeRevisions.empty() && !readOnlyRevision,
+               "startRead: database session already active");
+         if (!readSession && !writeSession)
+            readSession = shared.impl->trie->start_read_session();
+         readOnlyRevision = baseRevision;
+      }
+
+      void startWrite(WriterPtr writer)
+      {
+         check(!readOnlyRevision, "startWrite: can't mix read and write revisions");
+         check(writer != nullptr, "startWrite: writer is null");
+         writeSession = std::move(writer);
+         readSession  = nullptr;
          if (writeRevisions.empty())
-            writeRevisions.push_back(shared.impl->getHead()->clone());
+            writeRevisions.push_back(baseRevision->clone());
          else
             writeRevisions.push_back(writeRevisions.back()->clone());
       }
@@ -279,19 +331,22 @@ namespace psibase
          if (readOnlyRevision)
             readOnlyRevision = nullptr;
          else if (writeRevisions.size() == 1)
-         {
-            // TODO: fork db
-            check((bool)writeSession, "writeSession is missing");
-            auto& rev = writeRevisions.back();
-            writeRevision(*writeSession, *rev);
-            writeSession->set_top_root(rev->topRoot);
-            shared.impl->setHead(rev);
-            writeRevisions.pop_back();
-         }
+            throw std::runtime_error("final commit needs writeRevision()");
          else if (writeRevisions.size() > 1)
             writeRevisions.erase(writeRevisions.end() - 2);
          else
             throw std::runtime_error("mismatched commit");
+      }
+
+      ConstRevisionPtr writeRevision(const Checksum256& blockId)
+      {
+         check((bool)writeSession, "writeSession is missing");
+         check(writeRevisions.size() == 1, "not final commit");
+         auto rev = writeRevisions.back();
+         shared.impl->writeRevision(*writeSession, blockId, *rev);
+         baseRevision = std::move(rev);
+         writeRevisions.pop_back();
+         return baseRevision;
       }
 
       void abort()
@@ -303,12 +358,24 @@ namespace psibase
       }
    };  // DatabaseImpl
 
-   Database::Database(SharedDatabase shared)
-       : impl{std::make_unique<DatabaseImpl>(DatabaseImpl{std::move(shared)})}
+   Database::Database(SharedDatabase shared, ConstRevisionPtr revision)
    {
+      check(shared.impl != nullptr, "SharedDatabase is null");
+      check(revision != nullptr, "Revision is null");
+      impl = std::make_unique<DatabaseImpl>(DatabaseImpl{std::move(shared), std::move(revision)});
    }
 
    Database::~Database() {}
+
+   void Database::setRevision(ConstRevisionPtr revision)
+   {
+      impl->setRevision(std::move(revision));
+   }
+
+   ConstRevisionPtr Database::getRevision()
+   {
+      return impl->baseRevision;
+   }
 
    Database::Session Database::startRead()
    {
@@ -316,15 +383,20 @@ namespace psibase
       return {this};
    }
 
-   Database::Session Database::startWrite()
+   Database::Session Database::startWrite(WriterPtr writer)
    {
-      impl->startWrite();
+      impl->startWrite(writer);
       return {this};
    }
 
    void Database::commit(Database::Session&)
    {
       impl->commit();
+   }
+
+   ConstRevisionPtr Database::writeRevision(Database::Session& session, const Checksum256& blockId)
+   {
+      return impl->writeRevision(blockId);
    }
 
    void Database::abort(Database::Session&)

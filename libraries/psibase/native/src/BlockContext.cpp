@@ -3,17 +3,22 @@
 
 namespace psibase
 {
-   BlockContext::BlockContext(psibase::SystemContext& systemContext, bool isProducing)
+   BlockContext::BlockContext(psibase::SystemContext&         systemContext,
+                              std::shared_ptr<const Revision> revision,
+                              WriterPtr                       writer,
+                              bool                            isProducing)
        : systemContext{systemContext},
-         db{systemContext.sharedDatabase},
-         session{db.startWrite()},
+         db{systemContext.sharedDatabase, std::move(revision)},
+         writer{std::move(writer)},
+         session{db.startWrite(this->writer)},
          isProducing{isProducing}
    {
    }
 
-   BlockContext::BlockContext(psibase::SystemContext& systemContext, ReadOnly)
+   BlockContext::BlockContext(psibase::SystemContext&         systemContext,
+                              std::shared_ptr<const Revision> revision)
        : systemContext{systemContext},
-         db{systemContext.sharedDatabase},
+         db{systemContext.sharedDatabase, std::move(revision)},
          session{db.startRead()},
          isProducing{true},  // a read_only block is never replayed
          isReadOnly{true}
@@ -97,7 +102,7 @@ namespace psibase
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, false};
+      TransactionContext tc{*this, trx, trace};
       auto&              atrace = trace.actionTraces.emplace_back();
 
       // Failure here aborts the block since transaction-sys relies on startBlock
@@ -109,11 +114,10 @@ namespace psibase
       tc.execNonTrxAction(0, action, atrace);
       // printf("%s\n", prettyTrace(atrace).c_str());
 
-      tc.session.commit();
       active = true;
    }
 
-   void BlockContext::commit()
+   std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision()
    {
       checkActive();
       check(!needGenesisAction, "missing genesis action in block");
@@ -136,12 +140,11 @@ namespace psibase
 
       db.kvPut(StatusRow::db, status->key(), *status);
 
-      // TODO: store block IDs somewhere?
       // TODO: store block proofs somewhere
       // TODO: avoid repacking
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
 
-      session.commit();
+      return {session.writeRevision(status->head->blockId), status->head->blockId};
    }
 
    void BlockContext::pushTransaction(const SignedTransaction&                 trx,
@@ -176,7 +179,6 @@ namespace psibase
    }
 
    // TODO: limit charged CPU & NET which can go into a block
-   // TODO: duplicate detection
    void BlockContext::exec(const SignedTransaction&                 trx,
                            TransactionTrace&                        trace,
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,
@@ -188,21 +190,25 @@ namespace psibase
          checkActive();
          check(enableUndo || commit, "neither enableUndo or commit is set");
 
+         // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
+         check(!commit || !(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast_flag),
+               "cannot commit a do_not_broadcast transaction");
+
          // if !enableUndo then BlockContext becomes unusable if transaction fails.
          active = enableUndo;
 
-         TransactionContext t{*this, trx, trace, enableUndo};
+         Database::Session session;
+         if (enableUndo)
+            session = db.startWrite(writer);
+
+         TransactionContext t{*this, trx, trace};
          if (initialWatchdogLimit)
             t.setWatchdog(*initialWatchdogLimit);
          t.execTransaction();
 
          if (commit)
          {
-            // TODO: limit billed time in block
-            // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
-            check(!(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast_flag),
-                  "cannot commit a do_not_broadcast transaction");
-            t.session.commit();
+            session.commit();
             active = true;
          }
       }

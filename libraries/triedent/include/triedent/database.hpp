@@ -251,23 +251,24 @@ namespace triedent
       // iterator last_with_prefix(const std::shared_ptr<root>& r, string_view prefix) const;
 
       bool                             get(const std::shared_ptr<root>&        r,
-                                           std::string_view                    key,
+                                           std::span<const char>               key,
                                            std::vector<char>*                  result_bytes,
                                            std::vector<std::shared_ptr<root>>* result_roots) const;
-      std::optional<std::vector<char>> get(const std::shared_ptr<root>& r, string_view key) const;
+      std::optional<std::vector<char>> get(const std::shared_ptr<root>& r,
+                                           std::span<const char>        key) const;
 
       bool get_greater_equal(const std::shared_ptr<root>&        r,
-                             std::string_view                    key,
+                             std::span<const char>               key,
                              std::vector<char>*                  result_key,
                              std::vector<char>*                  result_bytes,
                              std::vector<std::shared_ptr<root>>* result_roots) const;
       bool get_less_than(const std::shared_ptr<root>&        r,
-                         std::string_view                    key,
+                         std::span<const char>               key,
                          std::vector<char>*                  result_key,
                          std::vector<char>*                  result_bytes,
                          std::vector<std::shared_ptr<root>>* result_roots) const;
       bool get_max(const std::shared_ptr<root>&        r,
-                   std::string_view                    prefix,
+                   std::span<const char>               prefix,
                    std::vector<char>*                  result_key,
                    std::vector<char>*                  result_bytes,
                    std::vector<std::shared_ptr<root>>* result_roots) const;
@@ -350,7 +351,7 @@ namespace triedent
       std::shared_ptr<root> get_top_root();
       void                  set_top_root(const std::shared_ptr<root>& r);
 
-      int upsert(std::shared_ptr<root>& r, string_view key, string_view val);
+      int upsert(std::shared_ptr<root>& r, std::span<const char> key, std::span<const char> val);
 
       // Caution: r (the reference) must not reference any of the shared_ptrs
       //          within roots. It may be a copy of a shared_ptr within roots.
@@ -359,10 +360,10 @@ namespace triedent
       //          The newer tree will still have structural sharing with the older
       //          tree.
       int upsert(std::shared_ptr<root>&                 r,
-                 string_view                            key,
+                 std::span<const char>                  key,
                  std::span<const std::shared_ptr<root>> roots);
 
-      int remove(std::shared_ptr<root>& r, string_view key);
+      int remove(std::shared_ptr<root>& r, std::span<const char> key);
 
       /**
           *  These methods are used to recover the database after a crash,
@@ -382,7 +383,10 @@ namespace triedent
 
       void recursive_retain(object_id id);
 
-      inline mutable_deref<value_node> make_value(node_type type, string_view k, string_view v);
+      inline mutable_deref<value_node> make_value(node_type   type,
+                                                  string_view k,
+                                                  string_view v,
+                                                  bool        bump_root_refs = false);
       inline mutable_deref<inner_node> make_inner(string_view pre, id val, uint64_t branches);
       inline mutable_deref<inner_node> make_inner(const inner_node& cpy,
                                                   string_view       pre,
@@ -410,9 +414,11 @@ namespace triedent
       inline id combine_value_nodes(node_type   t1,
                                     string_view k1,
                                     string_view v1,
+                                    bool        bump_root_refs1,
                                     node_type   t2,
                                     string_view k2,
-                                    string_view v2);
+                                    string_view v2,
+                                    bool        bump_root_refs2);
    };
 
    class database : public std::enable_shared_from_this<database>
@@ -755,9 +761,10 @@ namespace triedent
 
    inline mutable_deref<value_node> write_session::make_value(node_type   type,
                                                               string_view key,
-                                                              string_view val)
+                                                              string_view val,
+                                                              bool        bump_root_refs)
    {
-      return {value_node::make(*_db->_ring, key, val, type, false), type};
+      return {value_node::make(*_db->_ring, key, val, type, bump_root_refs), type};
    }
 
    inline mutable_deref<inner_node> write_session::make_inner(string_view pre,
@@ -787,12 +794,14 @@ namespace triedent
    database::id write_session::combine_value_nodes(node_type   t1,
                                                    string_view k1,
                                                    string_view v1,
+                                                   bool        bump_root_refs1,
                                                    node_type   t2,
                                                    string_view k2,
-                                                   string_view v2)
+                                                   string_view v2,
+                                                   bool        bump_root_refs2)
    {
       if (k1.size() > k2.size())
-         return combine_value_nodes(t2, k2, v2, t1, k1, v1);
+         return combine_value_nodes(t2, k2, v2, bump_root_refs2, t1, k1, v1, bump_root_refs1);
 
       //std::cerr << __func__ << ":" << __LINE__ << "\n";
       auto cpre = common_prefix(k1, k2);
@@ -800,14 +809,14 @@ namespace triedent
       if (cpre == k1)
       {
          //  std::cerr << __func__ << ":" << __LINE__ << "\n";
-         auto inner_value = make_value(t1, string_view(), v1);
+         auto inner_value = make_value(t1, string_view(), v1, bump_root_refs1);
          auto k2sfx       = k2.substr(cpre.size());
          auto b2          = k2sfx.front();
 
          auto in = make_inner(cpre, id(), 1ull << b2);
          in->set_value(inner_value);
 
-         in->branch(b2) = make_value(t2, k2sfx.substr(1), v2);
+         in->branch(b2) = make_value(t2, k2sfx.substr(1), v2, bump_root_refs2);
 
          return in;
       }
@@ -818,8 +827,8 @@ namespace triedent
          auto b2sfx = k2.substr(cpre.size());
          auto b1    = b1sfx.front();
          auto b2    = b2sfx.front();
-         auto b1v   = make_value(t1, b1sfx.substr(1), v1);
-         auto b2v   = make_value(t2, b2sfx.substr(1), v2);
+         auto b1v   = make_value(t1, b1sfx.substr(1), v1, bump_root_refs1);
+         auto b2v   = make_value(t2, b2sfx.substr(1), v2, bump_root_refs2);
 
          //auto in        = make_inner(cpre, (1ull << b2) | (1ul << b1), _version);
          auto in        = make_inner(cpre, id(), inner_node::branches(b1, b2));
@@ -924,7 +933,8 @@ namespace triedent
       {
          auto& vn = n.as_value_node();
          if (vn.key() != key)
-            return combine_value_nodes(n.type(), vn.key(), vn.data(), type, key, val);
+            return combine_value_nodes(n.type(), vn.key(), vn.data(), n.type() == node_type::roots,
+                                       type, key, val, false);
          else
          {
             old_size = vn.data_size();
@@ -1009,7 +1019,9 @@ namespace triedent
       }
    }  // write_session::add_child
 
-   inline int write_session::upsert(std::shared_ptr<root>& r, string_view key, string_view val)
+   inline int write_session::upsert(std::shared_ptr<root>& r,
+                                    std::span<const char>  key,
+                                    std::span<const char>  val)
    {
       _db->ensure_free_space();
       swap_guard g(*this);
@@ -1017,14 +1029,15 @@ namespace triedent
 
       int  old_size = -1;
       auto new_root =
-          add_child(get_id(r), get_unique(r), node_type::bytes, to_key6(key), val, old_size);
+          add_child(get_id(r), get_unique(r), node_type::bytes, to_key6({key.data(), key.size()}),
+                    {val.data(), val.size()}, old_size);
       assert(new_root.id);
       update_root(r, new_root);
       return old_size;
    }
 
    inline int write_session::upsert(std::shared_ptr<root>&                 r,
-                                    string_view                            key,
+                                    std::span<const char>                  key,
                                     std::span<const std::shared_ptr<root>> roots)
    {
       _db->ensure_free_space();
@@ -1038,7 +1051,7 @@ namespace triedent
 
       int  old_size = -1;
       auto new_root = add_child(
-          get_id(r), get_unique(r), node_type::roots, to_key6(key),
+          get_id(r), get_unique(r), node_type::roots, to_key6({key.data(), key.size()}),
           {reinterpret_cast<const char*>(ids.data()), ids.size() * sizeof(object_id)}, old_size);
       assert(new_root.id);
       update_root(r, new_root);
@@ -1567,7 +1580,7 @@ namespace triedent
 
    template <typename AccessMode>
    std::optional<std::vector<char>> session<AccessMode>::get(const std::shared_ptr<root>& r,
-                                                             string_view                  key) const
+                                                             std::span<const char>        key) const
    {
       std::vector<char> result;
       if (get(r, key, &result, nullptr))
@@ -1577,14 +1590,15 @@ namespace triedent
 
    template <typename AccessMode>
    bool session<AccessMode>::get(const std::shared_ptr<root>&        r,
-                                 std::string_view                    key,
+                                 std::span<const char>               key,
                                  std::vector<char>*                  result_bytes,
                                  std::vector<std::shared_ptr<root>>* result_roots) const
    {
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
       swap_guard g(*this);
-      return unguarded_get(r, get_id(r), to_key6(key), result_bytes, result_roots);
+      return unguarded_get(r, get_id(r), to_key6({key.data(), key.size()}), result_bytes,
+                           result_roots);
    }
 
    template <typename AccessMode>
@@ -1672,7 +1686,7 @@ namespace triedent
    template <typename AccessMode>
    bool session<AccessMode>::get_greater_equal(
        const std::shared_ptr<root>&        r,
-       std::string_view                    key,
+       std::span<const char>               key,
        std::vector<char>*                  result_key,
        std::vector<char>*                  result_bytes,
        std::vector<std::shared_ptr<root>>* result_roots) const
@@ -1681,8 +1695,8 @@ namespace triedent
          _db->ensure_free_space();
       swap_guard        g(*this);
       std::vector<char> result_key6;
-      if (!unguarded_get_greater_equal(r, get_id(r), to_key6(key), result_key6, result_bytes,
-                                       result_roots))
+      if (!unguarded_get_greater_equal(r, get_id(r), to_key6({key.data(), key.size()}), result_key6,
+                                       result_bytes, result_roots))
          return false;
       if (result_key)
       {
@@ -1755,7 +1769,7 @@ namespace triedent
 
    template <typename AccessMode>
    bool session<AccessMode>::get_less_than(const std::shared_ptr<root>&        r,
-                                           std::string_view                    key,
+                                           std::span<const char>               key,
                                            std::vector<char>*                  result_key,
                                            std::vector<char>*                  result_bytes,
                                            std::vector<std::shared_ptr<root>>* result_roots) const
@@ -1764,8 +1778,8 @@ namespace triedent
          _db->ensure_free_space();
       swap_guard        g(*this);
       std::vector<char> result_key6;
-      if (!unguarded_get_less_than(r, get_id(r), to_key6(key), result_key6, result_bytes,
-                                   result_roots))
+      if (!unguarded_get_less_than(r, get_id(r), to_key6({key.data(), key.size()}), result_key6,
+                                   result_bytes, result_roots))
          return false;
       if (result_key)
       {
@@ -1840,7 +1854,7 @@ namespace triedent
 
    template <typename AccessMode>
    bool session<AccessMode>::get_max(const std::shared_ptr<root>&        r,
-                                     std::string_view                    prefix,
+                                     std::span<const char>               prefix,
                                      std::vector<char>*                  result_key,
                                      std::vector<char>*                  result_bytes,
                                      std::vector<std::shared_ptr<root>>* result_roots) const
@@ -1848,7 +1862,7 @@ namespace triedent
       if constexpr (std::is_same_v<AccessMode, write_access>)
          _db->ensure_free_space();
       swap_guard g(*this);
-      auto       prefix_min = to_key6(prefix);
+      auto       prefix_min = to_key6({prefix.data(), prefix.size()});
       auto       extra_bits = prefix_min.size() * 6 - prefix.size() * 8;
       auto       prefix_max = (std::string)prefix_min;
       if (!prefix_max.empty())
@@ -1922,12 +1936,13 @@ namespace triedent
       }
    }  // unguarded_get_max
 
-   inline int write_session::remove(std::shared_ptr<root>& r, string_view key)
+   inline int write_session::remove(std::shared_ptr<root>& r, std::span<const char> key)
    {
       _db->ensure_free_space();
       swap_guard g(*this);
       int        removed_size = -1;
-      auto       new_root     = remove_child(get_id(r), get_unique(r), to_key6(key), removed_size);
+      auto       new_root =
+          remove_child(get_id(r), get_unique(r), to_key6({key.data(), key.size()}), removed_size);
       update_root(r, new_root);
       return removed_size;
    }

@@ -6,15 +6,11 @@
 
 namespace psibase
 {
-   struct ReadOnly
-   {
-   };
-
-   // Note: forking must occur before a BlockContext is created
    struct BlockContext
    {
       SystemContext&    systemContext;
       Database          db;
+      WriterPtr         writer;
       Database::Session session;
       Block             current;
       DatabaseStatusRow databaseStatus;
@@ -26,15 +22,20 @@ namespace psibase
       bool              started            = false;
       bool              active             = false;
 
-      BlockContext(SystemContext& systemContext, bool isProducing);
-      BlockContext(SystemContext& systemContext, ReadOnly);
+      BlockContext(SystemContext&                  systemContext,
+                   std::shared_ptr<const Revision> revision,
+                   WriterPtr                       writer,
+                   bool                            isProducing);
+
+      BlockContext(SystemContext&                  systemContext,
+                   std::shared_ptr<const Revision> revision);  // Read-only mode
 
       void checkActive() { check(active, "block is not active"); }
 
-      StatusRow start(std::optional<TimePointSec> time = {});
-      void      start(Block&& src);
-      void      callStartBlock();
-      void      commit();
+      StatusRow                                start(std::optional<TimePointSec> time = {});
+      void                                     start(Block&& src);
+      void                                     callStartBlock();
+      std::pair<ConstRevisionPtr, Checksum256> writeRevision();
 
       void pushTransaction(const SignedTransaction&                 trx,
                            TransactionTrace&                        trace,

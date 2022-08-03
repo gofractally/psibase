@@ -19,7 +19,6 @@ namespace psibase
    struct TransactionContext
    {
       BlockContext&                               blockContext;
-      Database::Session                           session;
       const SignedTransaction&                    signedTransaction;
       TransactionTrace&                           transactionTrace;
       KvResourceMap                               kvResourceDeltas;
@@ -29,8 +28,7 @@ namespace psibase
 
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,
-                         TransactionTrace&        transactionTrace,
-                         bool                     enableUndo);
+                         TransactionTrace&        transactionTrace);
       ~TransactionContext();
 
       void execTransaction();
