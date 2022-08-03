@@ -1,6 +1,7 @@
 ```mermaid
 
 sequenceDiagram
+
    title Alice invites Bob as a new user of the chain
    actor Bob
    actor Alice
@@ -11,37 +12,32 @@ sequenceDiagram
 
    note over Bob, Auth applet: client-side
 
-   Alice->>Psibase blockchain: Request core applet (Browser navigate to psinet home page)
-   activate Psibase blockchain
-   Psibase blockchain-->>Alice: 
-   deactivate Psibase blockchain
-
-   Alice->>Core applet: Navigate to Account applet
-   Core applet-->>Psibase blockchain: Request Account applet
-   Psibase blockchain-->>Core applet: 
-   Core applet-->>Alice: 
-
    note over Alice: Notices she has available invite credits
    Alice->>Account applet: Generate invite link
-   Note over Account applet: Embeds public key and an auth contract<br> (auth-ec-sys) inside the invite object
-   Account applet-->>Psibase blockchain: Store invite obj on chain, mapped to Alice
+   Account applet-->>Psibase blockchain: [alice@account-sys] NewInvite(invite)
+   Note over Psibase blockchain: Invite object: <br>  - Referrer_app (account-sys)<br>  - Referrer_acc (alice)<br>  - Invite_pubkey
    Psibase blockchain-->>Account applet: 
    Account applet-->>Alice: Show invite link
    Alice->>Bob: Send invite link <br>(off-chain)
 
-   Bob->>Psibase blockchain: Request Account applet (Clicking invite link)
-   Psibase blockchain-->>Bob: 
-
-   Note over Bob: Sees "invite from Alice" interface
-   Bob->>Account applet: Specify new account name, recovery partner(s) (Alice?), click "Join"
-   Note over Account applet: Adds action to transaction to burn invite credit,<br> add resources to new account,<br> and subsidize current transaction
-   Account applet-->>Core applet: Create new account
-   Core applet-->>Auth applet: Create new account
-   Note over Auth applet: Generates keypair <br>Stores private key in local storage
-   Auth applet-->>Psibase blockchain: Calls setnewkey
-   Psibase blockchain-->>Auth applet: 
+   Note over Bob: Navigates to link<br>Sees "invite from Alice" interface
+   Bob->>Account applet: Specify new account name (Optional advanced auth config), click "Join"
+   Account applet-->>Core applet: Get new account payload
+   Core applet-->>Bob: Show Master Password wizard
+   Note over Bob: Saves master password
+   Bob-->>Core applet: 
+   Core applet-->>Auth applet: Get new account payload
+   Note over Auth applet: Generates payload that the auth contract<br> expects from account-sys (eg auth-ec-sys:<br>generates keypair, stores private key <br>in local storage, returns pubkey as payload)
    Auth applet-->>Core applet: 
    Core applet-->>Account applet: 
+   Account applet-->>Psibase blockchain: [invitepubkey@account-sys] CreateNewAccount(NewAccount)
+   Note over Psibase blockchain: account-sys:CreateNewAccount only accepted if signed with invitepubkey
+   Note over Psibase blockchain: NewAccount object: <br>  - New_acc_name (bob)<br>  - Auth_cntr (auth-ec-sys)<br>  - payload (pubkey)
+   Note over Psibase blockchain: Stores new account details in account-sys
+   Psibase blockchain-->>Psibase blockchain: [account-sys@auth-contract] CreateNewAccount(payload)
+   Note over Psibase blockchain: auth-contract:CreateNewAccount only accepted if sender is account-sys
+   Note over Psibase blockchain: Stores auth for new account (eg bob->pubkey mapping)
+   Psibase blockchain-->>Account applet: 
    Account applet-->>Bob: Show modal
-   Note over Bob: Congrats & link to achievement applet<br> (Achievements for profile, recovery <br>partners, learning)
+   Note over Bob: Congrats
 ```
