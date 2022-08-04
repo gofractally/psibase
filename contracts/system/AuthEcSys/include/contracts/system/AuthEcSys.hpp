@@ -19,7 +19,7 @@ namespace system_contract
      public:
       static constexpr auto contract = psibase::AccountNumber("auth-ec-sys");
       using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::pubkey>;
-      using Tables    = psibase::ContractTables<AuthTable, psibase::WebContentTable>;
+      using Tables    = psibase::ContractTables<AuthTable>;
 
       void checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims);
       void newAccount(psibase::AccountNumber account, psibase::PublicKey payload);

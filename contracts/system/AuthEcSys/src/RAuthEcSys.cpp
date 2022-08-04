@@ -3,7 +3,6 @@
 #include <contracts/system/AuthEcSys.hpp>
 #include <contracts/system/ProxySys.hpp>
 #include <psibase/dispatch.hpp>
-#include <psibase/serveContent.hpp>
 #include <psibase/serveSimpleUI.hpp>
 
 #include <string>
@@ -17,7 +16,7 @@ namespace system_contract
 {
    std::optional<RpcReplyData> RAuthEcSys::serveSys(RpcRequestData request)
    {
-      if (auto result = psibase::serveContent(request, AuthEcSys::Tables{getReceiver()}))
+      if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
          return result;
 
       if (auto result = servePackAction<AuthEcSys>(request))
@@ -37,7 +36,7 @@ namespace system_contract
    {
       psibase::check(getSender() == getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
-                            AuthEcSys::Tables{getReceiver()});
+                            Tables{getReceiver()});
    }
 
    std::optional<RpcReplyData> RAuthEcSys::serveRestEndpoints(RpcRequestData& request)
