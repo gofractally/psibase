@@ -409,9 +409,17 @@ namespace psibase
       impl->setRevision(std::move(revision));
    }
 
-   ConstRevisionPtr Database::getRevision()
+   ConstRevisionPtr Database::getBaseRevision()
    {
       return impl->baseRevision;
+   }
+
+   ConstRevisionPtr Database::getModifiedRevision()
+   {
+      if (!impl->writeRevisions.empty())
+         return impl->writeRevisions.back();
+      else
+         return impl->baseRevision;
    }
 
    Database::Session Database::startRead()

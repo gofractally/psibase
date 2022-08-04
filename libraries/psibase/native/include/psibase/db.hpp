@@ -104,7 +104,8 @@ namespace psibase
       ~Database();
 
       void             setRevision(ConstRevisionPtr revision);
-      ConstRevisionPtr getRevision();
+      ConstRevisionPtr getBaseRevision();
+      ConstRevisionPtr getModifiedRevision();
       Session          startRead();
       Session          startWrite(WriterPtr writer);
       void             commit(Session& session);
