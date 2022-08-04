@@ -20,7 +20,19 @@ namespace system_contract
    PSIO_REFLECT(Status, totalAccounts)
    using StatusTable = Table<Status, &Status::key>;
 
-   using Tables = ContractTables<StatusTable>;
+   struct SingletonKey
+   {
+   };
+   PSIO_REFLECT(SingletonKey);
+   struct CreatorRecord
+   {
+      SingletonKey  key;
+      AccountNumber accountCreator;
+   };
+   PSIO_REFLECT(CreatorRecord, key, accountCreator);
+   using CreatorTable = Table<CreatorRecord, &CreatorRecord::key>;
+
+   using Tables = ContractTables<StatusTable, CreatorTable>;
 
    void AccountSys::startup()
    {
@@ -38,7 +50,6 @@ namespace system_contract
       statusTable.put({.totalAccounts = totalAccounts});
    }
 
-   // TODO: limit who can create accounts
    // TODO: limit who can use -sys suffix
    // TODO: verify name round-trips through strings
    void AccountSys::newAccount(AccountNumber name, AccountNumber authContract, bool requireNew)
@@ -48,6 +59,15 @@ namespace system_contract
       auto   statusIndex = statusTable.getIndex<0>();
       auto   status      = statusIndex.get(std::tuple{});
       check(status.has_value(), "not started");
+
+      auto creatorTable = Tables{getReceiver()}.open<CreatorTable>();
+      auto creator      = creatorTable.getIndex<0>().get(SingletonKey{});
+      if (creator.has_value())
+      {
+         check(
+             (*creator).accountCreator == getSender(),
+             "Only " + (*creator).accountCreator.str() + " is authorized to create new accounts.");
+      }
 
       if (enable_print)
       {
@@ -87,6 +107,15 @@ namespace system_contract
    bool AccountSys::exists(AccountNumber num)
    {
       return !!kvGet<AccountRow>(AccountRow::db, accountKey(num));
+   }
+
+   void AccountSys::setCreator(psibase::AccountNumber creator)
+   {
+      check(getSender() == AccountSys::contract,
+            "Only " + AccountSys::contract.str() + " can set the creator account");
+
+      Tables{getReceiver()}.open<CreatorTable>().put(
+          CreatorRecord{.key = SingletonKey{}, .accountCreator = creator});
    }
 
 }  // namespace system_contract

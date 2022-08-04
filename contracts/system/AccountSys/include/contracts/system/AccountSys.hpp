@@ -6,9 +6,7 @@
 
 namespace system_contract
 {
-   // TODO: account deletion, with an index to prevent reusing IDs
-   // TODO: a mode which restricts which account may use newAccount.
-   //       also let the UI know.
+   // TODO: account deletion, with an index to prevent reusing ID
    class AccountSys : public psibase::Contract<AccountSys>
    {
      public:
@@ -22,6 +20,8 @@ namespace system_contract
                       bool                   requireNew);
       void setAuthCntr(psibase::AccountNumber authContract);
       bool exists(psibase::AccountNumber num);
+
+      void setCreator(psibase::AccountNumber creator);
 
       struct Events
       {
@@ -42,5 +42,8 @@ namespace system_contract
                 method(startup, existing_accounts),
                 method(newAccount, name, authContract, requireNew),
                 method(setAuthCntr, authContract),
-                method(exists, num))
+                method(exists, num),
+                method(setCreator, creator)
+                //
+   )
 }  // namespace system_contract
