@@ -1,6 +1,5 @@
 #include <contracts/system/AccountSys.hpp>
 #include <contracts/system/commonErrors.hpp>
-#include <contracts/user/NameSys.hpp>
 #include <contracts/user/NftSys.hpp>
 #include <psibase/Bitset.hpp>
 #include <psibase/dispatch.hpp>
