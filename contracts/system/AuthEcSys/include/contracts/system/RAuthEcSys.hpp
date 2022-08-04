@@ -13,7 +13,7 @@ namespace system_contract
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
      private:
-      std::optional<psibase::RpcReplyData> _serveRestEndpoints(psibase::RpcRequestData& request);
+      std::optional<psibase::RpcReplyData> serveRestEndpoints(psibase::RpcRequestData& request);
    };
    PSIO_REFLECT(RAuthEcSys,  //
                 method(serveSys, request),

@@ -10,7 +10,7 @@ const { Segment, Header, Form, Table, Input, Button, Message, Tab, Container } =
 
 await initializeApplet();
 
-export const thisApplet = await getJson('/common/thiscontract');
+const thisApplet = await getJson('/common/thiscontract');
 
 const transactionTypes = {
   credit: 0,

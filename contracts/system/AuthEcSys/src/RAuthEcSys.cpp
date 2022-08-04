@@ -23,7 +23,7 @@ namespace system_contract
       if (auto result = servePackAction<AuthEcSys>(request))
          return result;
 
-      if (auto result = _serveRestEndpoints(request))
+      if (auto result = serveRestEndpoints(request))
          return result;
 
       if (auto result = psibase::serveSimpleUI<AuthEcSys, true>(request))
@@ -40,7 +40,7 @@ namespace system_contract
                             AuthEcSys::Tables{getReceiver()});
    }
 
-   std::optional<RpcReplyData> RAuthEcSys::_serveRestEndpoints(RpcRequestData& request)
+   std::optional<RpcReplyData> RAuthEcSys::serveRestEndpoints(RpcRequestData& request)
    {
       auto to_json = [](const auto& obj)
       {
@@ -60,21 +60,17 @@ namespace system_contract
             check(pubkeyParam.find('/') == string::npos, "invalid public key: " + pubkeyParam);
 
             AuthEcSys::Tables db{AuthEcSys::contract};
-            auto              authIdx = db.open<AuthEcSys::AuthTable_t>().getIndex<0>();
-            check(authIdx.begin() != authIdx.end(), "No tokens");
+            auto              authIdx = db.open<AuthEcSys::AuthTable>().getIndex<1>();
 
             auto pubkey = publicKeyFromString(string_view{pubkeyParam});
 
-            std::vector<AccountNumber> accounts;
-            for (auto itr = authIdx.begin(); itr != authIdx.end(); ++itr)
+            std::vector<AuthRecord> auths;
+            for (auto itr = authIdx.lower_bound(pubkey); itr != authIdx.upper_bound(pubkey); ++itr)
             {
-               if ((*itr).pubkey == pubkey)
-               {
-                  accounts.push_back((*itr).account);
-               }
+               auths.push_back((*itr));
             }
 
-            return to_json(accounts);
+            return to_json(auths);
          }
       }
 
