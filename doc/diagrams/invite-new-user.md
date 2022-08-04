@@ -2,15 +2,13 @@
 
 sequenceDiagram
 
-   title Alice invites Bob as a new user of the chain
+   title Alice creates an invite to share with Bob
    actor Bob
    actor Alice
-   participant Core applet
    participant Account applet
-   participant Auth applet
    participant Psibase blockchain
 
-   note over Bob, Auth applet: client-side
+   note over Bob, Account applet: client-side
 
    note over Alice: Notices she has available invite credits
    Alice->>Account applet: Generate invite link
@@ -19,6 +17,19 @@ sequenceDiagram
    Psibase blockchain-->>Account applet: 
    Account applet-->>Alice: Show invite link
    Alice->>Bob: Send invite link <br>(off-chain)
+```
+
+```mermaid
+sequenceDiagram
+
+   title Bob accepts Alice's invite to the chain
+   actor Bob
+   actor Alice
+   participant Core applet
+   participant Account applet
+   participant Auth applet
+   participant Psibase blockchain
+   note over Bob, Auth applet: client-side
 
    Note over Bob: Navigates to link<br>Sees "invite from Alice" interface
    Bob->>Account applet: Specify new account name (Optional advanced auth config), click "Join"
@@ -28,14 +39,15 @@ sequenceDiagram
    Bob-->>Core applet: 
    Core applet-->>Auth applet: Get new account payload
    Note over Auth applet: Generates payload that the auth contract<br> expects from account-sys (eg auth-ec-sys:<br>generates keypair, stores private key <br>in local storage, returns pubkey as payload)
+   Note over Auth applet: Version 1.0 may not support generic payloads, <br>and require a k1 public key
    Auth applet-->>Core applet: 
    Core applet-->>Account applet: 
-   Account applet-->>Psibase blockchain: [invitepubkey@account-sys] CreateNewAccount(NewAccount)
-   Note over Psibase blockchain: account-sys:CreateNewAccount only accepted if signed with invitepubkey
+   Account applet-->>Psibase blockchain: [invitepubkey@account-sys] acceptInvite(NewAccount)
+   Note over Psibase blockchain: account-sys:acceptInvite only accepted if signed with invitepubkey
    Note over Psibase blockchain: NewAccount object: <br>  - New_acc_name (bob)<br>  - Auth_cntr (auth-ec-sys)<br>  - payload (pubkey)
    Note over Psibase blockchain: Stores new account details in account-sys
-   Psibase blockchain-->>Psibase blockchain: [account-sys@auth-contract] CreateNewAccount(payload)
-   Note over Psibase blockchain: auth-contract:CreateNewAccount only accepted if sender is account-sys
+   Psibase blockchain-->>Psibase blockchain: [account-sys@auth-contract] newAccount(payload)
+   Note over Psibase blockchain: auth-contract:newAccount only accepted if sender is account-sys
    Note over Psibase blockchain: Stores auth for new account (eg bob->pubkey mapping)
    Psibase blockchain-->>Account applet: 
    Account applet-->>Bob: Show modal
