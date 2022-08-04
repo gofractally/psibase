@@ -79,7 +79,12 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
             for (auto& trx : transactions)
             {
                trace = {};
-               bc.pushTransaction(trx, trace, std::nullopt);
+               if (!trx.proofs.empty())
+                  // Proofs execute as of the state at the beginning of a block.
+                  // That state is empty, so there are no proof contracts installed.
+                  trace.error = "Transactions in boot block may not have proofs";
+               else
+                  bc.pushTransaction(trx, trace, std::nullopt);
             }
          }
       }
@@ -128,9 +133,12 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
    return false;
 }  // push_boot
 
-void pushTransaction(BlockContext&             bc,
-                     transaction_queue::entry& entry,
-                     std::chrono::microseconds initialWatchdogLimit)
+void pushTransaction(psibase::SharedState&                  sharedState,
+                     const std::shared_ptr<const Revision>& revisionAtBlockStart,
+                     BlockContext&                          bc,
+                     transaction_queue::entry&              entry,
+                     std::chrono::microseconds              proofWatchdogLimit,
+                     std::chrono::microseconds              initialWatchdogLimit)
 {
    try
    {
@@ -144,7 +152,30 @@ void pushTransaction(BlockContext&             bc,
          if (bc.needGenesisAction)
             trace.error = "Need genesis block; use 'psibase boot' to boot chain";
          else
+         {
+            // All proofs execute as of the state at block begin. This will allow
+            // consistent parallel execution of all proofs within a block during
+            // replay. Proofs don't have direct database access, but they do rely
+            // on the set of contracts stored within the database (they may call
+            // other contracts; e.g. to call crypto functions).
+            //
+            // TODO: move proof execution to background threads
+            // TODO: track CPU usage of proofs and pass it somehow to the main
+            //       execution for charging
+            // TODO: If the first proof and the first auth pass, but the transaction
+            //       fails (including other proof failures), then charge the first
+            //       authorizer
+            auto         proofSystem = sharedState.getSystemContext();
+            BlockContext proofBC{*proofSystem, revisionAtBlockStart};
+            proofBC.start(bc.current.header.time);
+            for (size_t i = 0; i < trx.proofs.size(); ++i)
+            {
+               proofBC.verifyProof(trx, trace, i, proofWatchdogLimit);
+               trace = {};
+            }
+
             bc.pushTransaction(trx, trace, initialWatchdogLimit);
+         }
       }
       RETHROW_BAD_ALLOC
       catch (...)
@@ -259,7 +290,8 @@ void run(const std::string& db_path,
             std::swap(entries, queue->entries);
          }
 
-         BlockContext bc{*system, system->sharedDatabase.getHead(), writer, true};
+         auto         revisionAtBlockStart = system->sharedDatabase.getHead();
+         BlockContext bc{*system, revisionAtBlockStart, writer, true};
          bc.start(t);
          bc.callStartBlock();
 
@@ -269,7 +301,9 @@ void run(const std::string& db_path,
             if (entry.is_boot)
                abort_boot = !push_boot(bc, entry);
             else
-               pushTransaction(bc, entry, std::chrono::microseconds(leeway_us));
+               pushTransaction(*sharedState, revisionAtBlockStart, bc, entry,
+                               std::chrono::microseconds(100'000),  // TODO
+                               std::chrono::microseconds(leeway_us));
          }
          if (abort_boot)
             continue;

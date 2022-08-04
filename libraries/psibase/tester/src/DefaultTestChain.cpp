@@ -26,6 +26,7 @@ DefaultTestChain::DefaultTestChain(
 {
    start_block();
    deploySystemContracts();
+   start_block();
    createSysContractAccounts();
    registerSysRpc();
 
@@ -37,84 +38,86 @@ DefaultTestChain::DefaultTestChain(
 
 void DefaultTestChain::deploySystemContracts(bool show /* = false */)
 {
-   auto trace = pushTransaction(make_transaction(  //
-       {                                           //
-        Action{
-            .sender   = AccountNumber{"foo"},  // ignored
-            .contract = AccountNumber{"bar"},  // ignored
-            .method   = {},
-            .rawData  = psio::convert_to_frac(GenesisActionData{
-                 .contracts =  // g.a.d--^ is config file for gen
-                {
-                     {
-                         .contract     = system_contract::TransactionSys::contract,
-                         .authContract = system_contract::AuthFakeSys::contract,
-                         .flags        = system_contract::TransactionSys::contractFlags,
-                         .code         = read_whole_file("TransactionSys.wasm"),
+   auto trace = pushTransaction(  //
+       make_transaction(          //
+           {                      //
+            Action{
+                .sender   = AccountNumber{"foo"},  // ignored
+                .contract = AccountNumber{"bar"},  // ignored
+                .method   = {},
+                .rawData  = psio::convert_to_frac(GenesisActionData{
+                     .contracts =  // g.a.d--^ is config file for gen
+                    {
+                         {
+                             .contract     = system_contract::TransactionSys::contract,
+                             .authContract = system_contract::AuthFakeSys::contract,
+                             .flags        = system_contract::TransactionSys::contractFlags,
+                             .code         = read_whole_file("TransactionSys.wasm"),
+                        },
+                         {
+                             .contract     = system_contract::AccountSys::contract,
+                             .authContract = system_contract::AuthFakeSys::contract,
+                             .flags        = system_contract::AccountSys::contractFlags,
+                             .code         = read_whole_file("AccountSys.wasm"),
+                        },
+                         {
+                             .contract     = ProxySys::contract,
+                             .authContract = AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("ProxySys.wasm"),
+                        },
+                         {
+                             .contract     = system_contract::AuthFakeSys::contract,
+                             .authContract = system_contract::AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("AuthFakeSys.wasm"),
+                        },
+                         {
+                             .contract     = system_contract::AuthEcSys::contract,
+                             .authContract = system_contract::AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("AuthEcSys.wasm"),
+                        },
+                         {
+                             .contract     = system_contract::VerifyEcSys::contract,
+                             .authContract = system_contract::AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("VerifyEcSys.wasm"),
+                        },
+                         {
+                             .contract     = CommonSys::contract,
+                             .authContract = AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("CommonSys.wasm"),
+                        },
+                         {
+                             .contract     = RAccountSys::contract,
+                             .authContract = AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("RAccountSys.wasm"),
+                        },
+                         {
+                             .contract     = ExploreSys::contract,
+                             .authContract = AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("ExploreSys.wasm"),
+                        },
+                         {
+                             .contract     = RAuthEcSys::contract,
+                             .authContract = AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("RAuthEcSys.wasm"),
+                        },
+                         {
+                             .contract     = RProxySys::contract,
+                             .authContract = AuthFakeSys::contract,
+                             .flags        = 0,
+                             .code         = read_whole_file("RProxySys.wasm"),
+                        },
                     },
-                     {
-                         .contract     = system_contract::AccountSys::contract,
-                         .authContract = system_contract::AuthFakeSys::contract,
-                         .flags        = system_contract::AccountSys::contractFlags,
-                         .code         = read_whole_file("AccountSys.wasm"),
-                    },
-                     {
-                         .contract     = ProxySys::contract,
-                         .authContract = AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("ProxySys.wasm"),
-                    },
-                     {
-                         .contract     = system_contract::AuthFakeSys::contract,
-                         .authContract = system_contract::AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("AuthFakeSys.wasm"),
-                    },
-                     {
-                         .contract     = system_contract::AuthEcSys::contract,
-                         .authContract = system_contract::AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("AuthEcSys.wasm"),
-                    },
-                     {
-                         .contract     = system_contract::VerifyEcSys::contract,
-                         .authContract = system_contract::AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("VerifyEcSys.wasm"),
-                    },
-                     {
-                         .contract     = CommonSys::contract,
-                         .authContract = AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("CommonSys.wasm"),
-                    },
-                     {
-                         .contract     = RAccountSys::contract,
-                         .authContract = AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("RAccountSys.wasm"),
-                    },
-                     {
-                         .contract     = ExploreSys::contract,
-                         .authContract = AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("ExploreSys.wasm"),
-                    },
-                     {
-                         .contract     = RAuthEcSys::contract,
-                         .authContract = AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("RAuthEcSys.wasm"),
-                    },
-                     {
-                         .contract     = RProxySys::contract,
-                         .authContract = AuthFakeSys::contract,
-                         .flags        = 0,
-                         .code         = read_whole_file("RProxySys.wasm"),
-                    },
-                },
-            }),
-        }}));
+                }),
+            }}),
+       {});
 
    check(psibase::show(show, trace) == "", "Failed to deploy genesis contracts");
 }

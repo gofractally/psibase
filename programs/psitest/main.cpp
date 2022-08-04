@@ -127,6 +127,7 @@ struct test_chain
    psibase::SharedDatabase                      db;
    psibase::WriterPtr                           writer;
    std::unique_ptr<psibase::SystemContext>      sys;
+   std::shared_ptr<const psibase::Revision>     revisionAtBlockStart;
    std::unique_ptr<psibase::BlockContext>       blockContext;
    std::unique_ptr<psibase::TransactionTrace>   nativeFunctionsTrace;
    std::unique_ptr<psibase::TransactionContext> nativeFunctionsTransactionContext;
@@ -153,6 +154,7 @@ struct test_chain
       nativeFunctionsActionContext.reset();
       nativeFunctionsTransactionContext.reset();
       blockContext.reset();
+      revisionAtBlockStart.reset();
       sys.reset();
       writer = {};
       db     = {};
@@ -163,7 +165,9 @@ struct test_chain
    {
       // TODO: undo control
       finish_block();
-      blockContext = std::make_unique<psibase::BlockContext>(*sys, db.getHead(), writer, true);
+      revisionAtBlockStart = db.getHead();
+      blockContext =
+          std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
 
       uint32_t skipAdditional = 0;
       if (skip_miliseconds != 0)
@@ -197,6 +201,7 @@ struct test_chain
          db.setHead(*writer, revision);
          db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
          blockContext.reset();
+         revisionAtBlockStart.reset();
       }
    }
 
@@ -697,7 +702,10 @@ struct callbacks
       auto                      start_time = std::chrono::steady_clock::now();
       try
       {
-         // TODO: undo and commit control
+         psibase::BlockContext proofBC{*chain.sys, chain.revisionAtBlockStart};
+         proofBC.start(chain.blockContext->current.header.time);
+         for (size_t i = 0; i < signed_trx.proofs.size(); ++i)
+            proofBC.verifyProof(signed_trx, trace, i, std::nullopt);
          chain.blockContext->pushTransaction(signed_trx, trace, std::nullopt);
       }
       catch (const std::exception& e)

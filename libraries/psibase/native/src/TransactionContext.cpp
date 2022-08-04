@@ -52,7 +52,6 @@ namespace psibase
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
    static void execProcessTransaction(TransactionContext& self);
-   static void execVerifyProofs(TransactionContext& self);
 
    void TransactionContext::execTransaction()
    {
@@ -73,7 +72,6 @@ namespace psibase
       }
       else
       {
-         execVerifyProofs(*this);
          execProcessTransaction(*this);
       }
 
@@ -131,48 +129,36 @@ namespace psibase
       ec.execProcessTransaction(ac);
    }
 
-   // TODO: disable access to db?
-   // TODO: verifiers may need access to previous block state?
-   // TODO: potential replacement concept: wasms can spawn threads which
-   //       * can only read previous block's state
-   //       * can't return values
-   //       * can't write
-   //       * can be skipped on replay
-   //       * transaction-sys uses this for proof verification
-   //       * make these independent call flags?
-   // TODO: parallel execution
-   // TODO: separate execution memories with smaller number of max active wasms
-   // TODO: separate ExecutionContext pool for executing each proof
-   // TODO: separate time limits for proofs?
-   // TODO: provide execution time to subjective contract, separated from rest of execution time
-   static void execVerifyProofs(TransactionContext& self)
+   void TransactionContext::execVerifyProof(size_t i)
    {
+      auto& db     = blockContext.db;
+      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
+
+      // TODO: separate config for proof execution
+      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+
       // TODO: fracpack validation, allowing new fields in inner transaction. Might be redundant elsewhere?
-      auto trxView    = *self.signedTransaction.transaction;
+      auto trxView    = *signedTransaction.transaction;
       auto claimsView = *trxView.claims();
-      check(self.signedTransaction.proofs.size() == claimsView.size(),
+      check(signedTransaction.proofs.size() == claimsView.size(),
             "proofs and claims must have same size");
-      auto id = sha256(self.signedTransaction.transaction.data(),
-                       self.signedTransaction.transaction.size());
-      for (size_t i = 0; i < self.signedTransaction.proofs.size(); ++i)
-      {
-         auto&      proof = self.signedTransaction.proofs[i];
-         VerifyData data{
-             .transactionHash = id,
-             .claim           = claimsView[i],
-             .proof           = proof,
-         };
-         Action action{
-             .sender   = {},
-             .contract = data.claim.contract,
-             .rawData  = psio::convert_to_frac(data),
-         };
-         auto& atrace     = self.transactionTrace.actionTraces.emplace_back();
-         atrace.action    = action;
-         ActionContext ac = {self, action, atrace};
-         auto&         ec = self.getExecutionContext(action.contract);
-         ec.execVerify(ac);
-      }
+      auto  id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());
+      auto& proof = signedTransaction.proofs[i];
+      VerifyData data{
+          .transactionHash = id,
+          .claim           = claimsView[i],
+          .proof           = proof,
+      };
+      Action action{
+          .sender   = {},
+          .contract = data.claim.contract,
+          .rawData  = psio::convert_to_frac(data),
+      };
+      auto& atrace     = transactionTrace.actionTraces.emplace_back();
+      atrace.action    = action;
+      ActionContext ac = {*this, action, atrace};
+      auto&         ec = getExecutionContext(action.contract);
+      ec.execVerify(ac);
    }
 
    void TransactionContext::execNonTrxAction(uint64_t      callerFlags,

@@ -147,6 +147,34 @@ namespace psibase
       return {session.writeRevision(status->head->blockId), status->head->blockId};
    }
 
+   void BlockContext::verifyProof(const SignedTransaction&                 trx,
+                                  TransactionTrace&                        trace,
+                                  size_t                                   i,
+                                  std::optional<std::chrono::microseconds> watchdogLimit)
+   {
+      try
+      {
+         checkActive();
+         TransactionContext t{*this, trx, trace, false, false, false};
+         if (watchdogLimit)
+            t.setWatchdog(*watchdogLimit);
+         t.execVerifyProof(i);
+         if (!current.subjectiveData.empty())
+            throw std::runtime_error("proof called a subjective contract");
+      }
+      catch (const std::exception& e)
+      {
+         current.subjectiveData.clear();
+         trace.error = e.what();
+         throw;
+      }
+      catch (...)
+      {
+         current.subjectiveData.clear();
+         throw;
+      }
+   }
+
    void BlockContext::pushTransaction(const SignedTransaction&                 trx,
                                       TransactionTrace&                        trace,
                                       std::optional<std::chrono::microseconds> initialWatchdogLimit,
@@ -167,6 +195,7 @@ namespace psibase
    }
 
    // TODO: call callStartBlock() here? caller's responsibility?
+   // TODO: caller needs to verify proofs
    void BlockContext::execAllInBlock()
    {
       for (auto& trx : current.transactions)
