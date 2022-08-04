@@ -23,11 +23,17 @@ namespace psibase
 
    TransactionContext::TransactionContext(BlockContext&            blockContext,
                                           const SignedTransaction& signedTransaction,
-                                          TransactionTrace&        transactionTrace)
+                                          TransactionTrace&        transactionTrace,
+                                          bool                     allowDbRead,
+                                          bool                     allowDbWrite,
+                                          bool                     allowDbReadSubjective)
        : blockContext{blockContext},
          signedTransaction{signedTransaction},
          transactionTrace{transactionTrace},
          startTime{std::chrono::steady_clock::now()},
+         allowDbRead{allowDbRead},
+         allowDbWrite{allowDbWrite},
+         allowDbReadSubjective{allowDbReadSubjective},
          impl{std::make_unique<TransactionContextImpl>()}
    {
    }

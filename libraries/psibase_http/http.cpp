@@ -216,7 +216,7 @@ namespace psibase::http
                            .rawData  = psio::convert_to_frac(data),
             };
             TransactionTrace   trace;
-            TransactionContext tc{bc, trx, trace};
+            TransactionContext tc{bc, trx, trace, true, false, true};
             ActionTrace        atrace;
             auto               startExecTime = steady_clock::now();
             tc.execServe(action, atrace);

@@ -25,10 +25,16 @@ namespace psibase
       int                                         callDepth = 0;
       const std::chrono::steady_clock::time_point startTime;
       std::chrono::steady_clock::duration         databaseTime;
+      bool                                        allowDbRead;
+      bool                                        allowDbWrite;
+      bool                                        allowDbReadSubjective;
 
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,
-                         TransactionTrace&        transactionTrace);
+                         TransactionTrace&        transactionTrace,
+                         bool                     allowDbRead,
+                         bool                     allowDbWrite,
+                         bool                     allowDbReadSubjective);
       ~TransactionContext();
 
       void execTransaction();

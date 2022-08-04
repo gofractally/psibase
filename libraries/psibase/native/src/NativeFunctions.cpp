@@ -27,6 +27,7 @@ namespace psibase
 
       DbId getDbRead(NativeFunctions& self, uint32_t db)
       {
+         check(self.allowDbRead, "database access disabled during proof verification or first auth");
          if (db == uint32_t(DbId::contract))
             return (DbId)db;
          if (db == uint32_t(DbId::nativeConstrained))
@@ -39,19 +40,21 @@ namespace psibase
             //       However, there's a possibility this may make it easier on an active attacker.
             //       Make this capability a node configuration toggle? Allow node config to whitelist
             //       contracts for this?
-            if ((self.contractAccount.flags & AccountRow::isSubjective) || self.isReadOnly)
+            if ((self.contractAccount.flags & AccountRow::isSubjective) ||
+                self.allowDbReadSubjective)
                return (DbId)db;
          }
-         if (db == uint32_t(DbId::writeOnly) && self.isReadOnly)
+         if (db == uint32_t(DbId::writeOnly) && self.allowDbReadSubjective)
             return (DbId)db;
-         if (db == uint32_t(DbId::blockLog) && self.isReadOnly)
+         if (db == uint32_t(DbId::blockLog) && self.allowDbReadSubjective)
             return (DbId)db;
          throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
 
       DbId getDbReadSequential(NativeFunctions& self, uint32_t db)
       {
-         if (self.isReadOnly || (self.contractAccount.flags & AccountRow::isSubjective))
+         check(self.allowDbRead, "database access disabled during proof verification or first auth");
+         if (self.allowDbReadSubjective || (self.contractAccount.flags & AccountRow::isSubjective))
          {
             if (db == uint32_t(DbId::historyEvent))
                return (DbId)db;
@@ -76,7 +79,8 @@ namespace psibase
 
       Writable getDbWrite(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
-         check(!self.isReadOnly, "writes disabled during query");
+         check(self.allowDbRead, "database access disabled during proof verification or first auth");
+         check(self.allowDbWrite, "database writes disabled during query");
 
          if (keyHasContractPrefix(db))
          {
@@ -128,7 +132,8 @@ namespace psibase
       //          functions which call it need to adjust their logic.
       DbId getDbWriteSequential(NativeFunctions& self, uint32_t db)
       {
-         check(!self.isReadOnly, "writes disabled during query");
+         check(self.allowDbRead, "database access disabled during proof verification or first auth");
+         check(self.allowDbWrite, "writes disabled during query");
 
          // Prevent poison block; subjective contracts skip execution during replay
          check(!(self.contractAccount.flags & AccountRow::isSubjective),

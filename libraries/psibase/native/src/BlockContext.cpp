@@ -102,7 +102,7 @@ namespace psibase
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace};
+      TransactionContext tc{*this, trx, trace, true, true, false};
       auto&              atrace = trace.actionTraces.emplace_back();
 
       // Failure here aborts the block since transaction-sys relies on startBlock
@@ -201,7 +201,7 @@ namespace psibase
          if (enableUndo)
             session = db.startWrite(writer);
 
-         TransactionContext t{*this, trx, trace};
+         TransactionContext t{*this, trx, trace, true, !isReadOnly, false};
          if (initialWatchdogLimit)
             t.setWatchdog(*initialWatchdogLimit);
          t.execTransaction();

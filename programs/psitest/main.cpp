@@ -209,13 +209,15 @@ struct test_chain
          nativeFunctionsTrace = std::make_unique<psibase::TransactionTrace>();
          nativeFunctionsTrace->actionTraces.resize(1);
          nativeFunctionsTransactionContext = std::make_unique<psibase::TransactionContext>(
-             *blockContext, dummyTransaction, *nativeFunctionsTrace);
+             *blockContext, dummyTransaction, *nativeFunctionsTrace, true, false, true);
          nativeFunctionsActionContext = std::make_unique<psibase::ActionContext>(
              psibase::ActionContext{*nativeFunctionsTransactionContext, dummyAction,
                                     nativeFunctionsTrace->actionTraces[0]});
          nativeFunctions = std::make_unique<psibase::NativeFunctions>(
              psibase::NativeFunctions{blockContext->db,
                                       *nativeFunctionsTransactionContext,
+                                      true,
+                                      false,
                                       true,
                                       {},
                                       &*nativeFunctionsActionContext});

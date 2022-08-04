@@ -149,7 +149,8 @@ namespace psibase
                            ExecutionMemory&    memory,
                            AccountNumber       contract)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
-                            transactionContext.blockContext.isReadOnly},
+                            transactionContext.allowDbRead, transactionContext.allowDbWrite,
+                            transactionContext.allowDbReadSubjective},
             wa{memory.impl->wa}
       {
          auto ca = database.kvGet<AccountRow>(AccountRow::db, accountKey(contract));
