@@ -285,8 +285,8 @@ void run(const std::string& db_path,
          }
          auto [revision, blockId] = bc.writeRevision();
          system->sharedDatabase.setHead(*writer, revision);
-         system->sharedDatabase.removeForks(*writer,
-                                            blockId);  // temp rule: head is now irreversible
+         system->sharedDatabase.removeRevisions(*writer,
+                                                blockId);  // temp rule: head is now irreversible
 
          std::cout << psio::convert_to_json(bc.current.header) << "\n";
       }

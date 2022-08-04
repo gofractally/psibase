@@ -195,7 +195,7 @@ struct test_chain
          nativeFunctionsTransactionContext.reset();
          auto [revision, blockId] = blockContext->writeRevision();
          db.setHead(*writer, revision);
-         db.removeForks(*writer, blockId);  // temp rule: head is now irreversible
+         db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
          blockContext.reset();
       }
    }

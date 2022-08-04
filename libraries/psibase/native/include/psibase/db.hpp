@@ -39,8 +39,8 @@ namespace psibase
       ConstRevisionPtr getHead();
       WriterPtr        createWriter();
       void             setHead(Writer& writer, ConstRevisionPtr revision);
-      ConstRevisionPtr getFork(Writer& writer, const Checksum256& blockId);
-      void             removeForks(Writer& writer, const Checksum256& irreversible);
+      ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
+      void             removeRevisions(Writer& writer, const Checksum256& irreversible);
    };
 
    struct DatabaseImpl;

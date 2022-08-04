@@ -8,6 +8,8 @@
 
 namespace triedent
 {
+   inline constexpr bool debug_roots = false;
+
    template <typename AccessMode>
    class session;
 
@@ -106,6 +108,10 @@ namespace triedent
       root(std::shared_ptr<database> db, std::shared_ptr<root> ancestor, object_id id)
           : db(std::move(db)), ancestor(std::move(ancestor)), id(id)
       {
+         if constexpr (debug_roots)
+            if (db)
+               std::cout << id.id << ": root(): ancestor=" << (ancestor ? ancestor->id.id : 0)
+                         << std::endl;
       }
 
      public:
@@ -507,6 +513,10 @@ namespace triedent
 
    inline root::~root()
    {
+      if constexpr (debug_roots)
+         if (db && id)
+            std::cout << id.id << ": ~root(): ancestor=" << (ancestor ? ancestor->id.id : 0)
+                      << std::endl;
       if (db && id && !ancestor)
       {
          std::lock_guard<std::mutex> lock(db->_root_release_session_mutex);
@@ -577,6 +587,8 @@ namespace triedent
 
       inline T* operator->() const { return reinterpret_cast<T*>(this->ptr); }
       inline T& operator*() const { return *reinterpret_cast<T*>(this->ptr); }
+
+      auto get_id() { return lock.get_id(); }
 
      private:
       location_lock lock;
@@ -660,6 +672,11 @@ namespace triedent
    template <typename AccessMode>
    inline void session<AccessMode>::release(std::shared_ptr<root>& r)
    {
+      if constexpr (debug_roots)
+         if (r.use_count() == 1 && r->db && r->id)
+            std::cout << r->id.id
+                      << ": release(root): ancestor=" << (r->ancestor ? r->ancestor->id.id : 0)
+                      << std::endl;
       if (r.use_count() == 1 && r->db && !r->ancestor && r->id)
       {
          auto id = r->id;
@@ -722,9 +739,15 @@ namespace triedent
       auto                        current = _db->_dbm->top_root.load();
       auto                        id      = get_id(r);
       if (current == id.id)
+      {
+         if constexpr (debug_roots)
+            std::cout << id.id << ": set_top_root: already matches" << std::endl;
          return;
+      }
 
       swap_guard g(*this);
+      if constexpr (debug_roots)
+         std::cout << id.id << ": set_top_root: old=" << current << std::endl;
       id = retain(id);
       _db->_dbm->top_root.store(id.id);
       release({current});
@@ -743,6 +766,8 @@ namespace triedent
          // Either there was no change, or it was edited in place (but only if
          // unique). For either case, the refcount wasn't bumped and it doesn't
          // need to be bumped.
+         if constexpr (debug_roots)
+            std::cout << id.id << ": update_root keep" << std::endl;
          return;
       }
       else if (get_unique(r))
@@ -750,11 +775,19 @@ namespace triedent
          // Even though it is unique, it wasn't edited in place (r->id != id).
          // The new id (if not 0) has a refcount of 1, so doesn't need to be
          // bumped.
+         if constexpr (debug_roots)
+            std::cout << id.id << ": update_root replacing:" << r->id.id << std::endl;
          release(r->id);
          r->id = id;
       }
       else
       {
+         if constexpr (debug_roots)
+            if (r == nullptr)
+               std::cout << id.id << ": update_root original was nullptr" << std::endl;
+            else
+               std::cout << id.id << ": update_root replacing as new root:" << r->id.id
+                         << std::endl;
          r = std::make_shared<root>(root{_db, nullptr, id});
       }
    }
@@ -843,6 +876,14 @@ namespace triedent
    {
       if (mut.type() == node_type::roots)
       {
+         if constexpr (debug_roots)
+         {
+            std::cout << mut.get_id().id << ": modify_value; old:";
+            for (unsigned i = 0; i < mut->num_roots(); ++i)
+               std::cout << " " << mut->roots()[i].id;
+            std::cout << std::endl;
+         }
+
          auto* src  = reinterpret_cast<const object_id*>(val.data());
          auto* dest = mut->roots();
          auto  n    = mut->num_roots();
@@ -851,6 +892,14 @@ namespace triedent
             auto prev = *dest;
             *dest++   = *src++;
             release(prev);
+         }
+
+         if constexpr (debug_roots)
+         {
+            std::cout << mut.get_id().id << ": modify_value; new:";
+            for (unsigned i = 0; i < mut->num_roots(); ++i)
+               std::cout << " " << mut->roots()[i].id;
+            std::cout << std::endl;
          }
       }
       else
@@ -1993,7 +2042,7 @@ namespace triedent
                auto& vn = bn.as_value_node();
                new_key += vn.key();
                //           TRIEDENT_DEBUG( "clone value" );
-               return make_value(bn.type(), new_key, vn.data());
+               return make_value(bn.type(), new_key, vn.data(), bn.type() == node_type::roots);
             }
             else
             {
@@ -2063,7 +2112,7 @@ namespace triedent
 
                auto  cur_v = get_by_id(in.value());
                auto& cv    = cur_v.as_value_node();
-               return make_value(cur_v.type(), in_key, cv.data());
+               return make_value(cur_v.type(), in_key, cv.data(), cur_v.type() == node_type::roots);
             }
             else
             {  // there must be only 1 branch left
@@ -2080,7 +2129,8 @@ namespace triedent
                   new_key += in.key();
                   new_key += char(lb);
                   new_key += cv.key();
-                  return make_value(cur_v.type(), new_key, cv.data());
+                  return make_value(cur_v.type(), new_key, cv.data(),
+                                    cur_v.type() == node_type::roots);
                }
                else
                {

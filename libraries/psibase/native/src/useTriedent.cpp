@@ -13,8 +13,18 @@ inline constexpr bool sanityCheck = false;
 
 namespace psibase
 {
-   static constexpr uint8_t headPrefix = 0;
-   static constexpr uint8_t byIdPrefix = 1;
+   static constexpr uint8_t revisionHeadPrefix = 0;
+   static constexpr uint8_t revisionByIdPrefix = 1;
+
+   static const char revisionHeadKey[] = {revisionHeadPrefix};
+
+   static auto revisionById(const Checksum256& blockId)
+   {
+      std::array<char, std::tuple_size<Checksum256>() + 1> result;
+      result[0] = revisionByIdPrefix;
+      memcpy(result.data() + 1, blockId.data(), blockId.size());
+      return result;
+   }
 
    // TODO: move triedent::root destruction to a gc thread
    struct Revision
@@ -131,16 +141,6 @@ namespace psibase
       }
    };  // Revision
 
-   static const char headRevisionKey[] = {headPrefix};
-
-   static auto byId(const Checksum256& blockId)
-   {
-      std::array<char, std::tuple_size<Checksum256>() + 1> result;
-      result[0] = byIdPrefix;
-      memcpy(result.data() + 1, blockId.data(), blockId.size());
-      return result;
-   }
-
    static std::shared_ptr<Revision> loadRevision(triedent::write_session&               s,
                                                  const std::shared_ptr<triedent::root>& topRoot,
                                                  std::span<const char>                  key,
@@ -202,7 +202,7 @@ namespace psibase
          trie   = std::make_shared<triedent::database>(dir.c_str(), triedent::database::read_write,
                                                      allowSlow);
          auto s = trie->start_write_session();
-         head   = loadRevision(*s, s->get_top_root(), headRevisionKey);
+         head   = loadRevision(*s, s->get_top_root(), revisionHeadKey);
       }
 
       auto getHead()
@@ -214,7 +214,7 @@ namespace psibase
       void setHead(triedent::write_session& session, std::shared_ptr<const Revision> r)
       {
          auto topRoot = session.get_top_root();
-         session.upsert(topRoot, headRevisionKey, r->roots);
+         session.upsert(topRoot, revisionHeadKey, r->roots);
          session.set_top_root(topRoot);
 
          std::lock_guard<std::mutex> lock(headMutex);
@@ -226,7 +226,7 @@ namespace psibase
                          const Revision&          r)
       {
          auto topRoot = session.get_top_root();
-         session.upsert(topRoot, byId(blockId), r.roots);
+         session.upsert(topRoot, revisionById(blockId), r.roots);
          session.set_top_root(topRoot);
       }
    };  // SharedDatabaseImpl
@@ -251,13 +251,50 @@ namespace psibase
       return impl->setHead(writer, revision);
    }
 
-   ConstRevisionPtr SharedDatabase::getFork(Writer& writer, const Checksum256& blockId)
+   ConstRevisionPtr SharedDatabase::getRevision(Writer& writer, const Checksum256& blockId)
    {
-      return loadRevision(writer, writer.get_top_root(), byId(blockId), true);
+      return loadRevision(writer, writer.get_top_root(), revisionById(blockId), true);
    }
 
-   // TODO
-   void SharedDatabase::removeForks(Writer& writer, const Checksum256& irreversible) {}
+   // TODO: move triedent::root destruction to a gc thread
+   void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
+   {
+      auto              topRoot = writer.get_top_root();
+      std::vector<char> key{revisionByIdPrefix};
+
+      // Remove everything with a blockNum <= irreversible's, except irreversible.
+      while (writer.get_greater_equal(topRoot, key, &key, nullptr, nullptr))
+      {
+         if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix ||
+             memcmp(key.data() + 1, irreversible.data(), sizeof(BlockNum)) > 0)
+            break;
+         if (!memcmp(key.data() + 1, irreversible.data(), irreversible.size()))
+            writer.remove(topRoot, key);
+         key.push_back(0);
+      }
+
+      // Remove everything with a blockNum > irreversible's which builds on a block
+      // no longer present.
+      std::vector<std::shared_ptr<triedent::root>> roots;
+      std::vector<char>                            statusBytes;
+      auto                                         sk = psio::convert_to_key(statusKey());
+      while (writer.get_greater_equal(topRoot, key, &key, nullptr, &roots))
+      {
+         if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)
+            break;
+         check(roots.size() == numDatabases, "wrong number of roots in fork");
+         if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
+            throw std::runtime_error("Status row missing in fork");
+         auto status = psio::convert_from_frac<StatusRow>(statusBytes);
+         if (!status.head)
+            throw std::runtime_error("Status row is missing head information in fork");
+         if (!writer.get(topRoot, revisionById(status.head->header.previous), nullptr, nullptr))
+            writer.remove(topRoot, key);
+         key.push_back(0);
+      }
+
+      writer.set_top_root(topRoot);
+   }  // removeRevisions
 
    struct DatabaseImpl
    {
