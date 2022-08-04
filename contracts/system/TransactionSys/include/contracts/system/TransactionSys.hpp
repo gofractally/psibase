@@ -9,8 +9,14 @@ namespace system_contract
    {
       // TODO: return error message instead?
       void checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims);
+      // TODO: payload should be a blob, and auth contracts interpret the blob however they want
+      void newAccount(psibase::AccountNumber account, psibase::PublicKey payload);
    };
-   PSIO_REFLECT(AuthInterface, method(checkAuthSys, action, claims))
+   PSIO_REFLECT(AuthInterface,  //
+                method(checkAuthSys, action, claims),
+                method(newAccount, account, payload)
+                //
+   )
 
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary

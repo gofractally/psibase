@@ -18,10 +18,11 @@ namespace system_contract
    {
      public:
       static constexpr auto contract = psibase::AccountNumber("auth-ec-sys");
-      using AuthTable_t              = psibase::Table<AuthRecord, &AuthRecord::account>;
-      using Tables = psibase::ContractTables<AuthTable_t, psibase::WebContentTable>;
+      using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::pubkey>;
+      using Tables    = psibase::ContractTables<AuthTable, psibase::WebContentTable>;
 
       void checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims);
+      void newAccount(psibase::AccountNumber account, psibase::PublicKey payload);
       void setKey(psibase::PublicKey key);
 
      private:
@@ -29,5 +30,6 @@ namespace system_contract
    };
    PSIO_REFLECT(AuthEcSys,  //
                 method(checkAuthSys, action, claims),
-                method(setKey, key))
+                method(setKey, key),
+                method(newAccount, account, key))
 }  // namespace system_contract
