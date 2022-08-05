@@ -34,6 +34,12 @@ namespace system_contract
       // TODO: expire transaction IDs
    }
 
+   static Transaction trx;
+   Transaction        TransactionSys::getTransaction() const
+   {
+      return trx;
+   }
+
    psibase::BlockNum TransactionSys::headBlockNum() const
    {
       auto& stat = getStatus();
@@ -119,8 +125,8 @@ namespace system_contract
       auto top_act = getCurrentAction();
       // TODO: avoid copying inner rawData during unpack
       // TODO: verify fracpack (no unknown, no extra data)
-      auto trx = psio::convert_from_frac<Transaction>(top_act.rawData);
-      auto id  = sha256(top_act.rawData.data(), top_act.rawData.size());
+      trx     = psio::convert_from_frac<Transaction>(top_act.rawData);
+      auto id = sha256(top_act.rawData.data(), top_act.rawData.size());
 
       check(trx.actions.size() > 0, "transaction has no actions");
 

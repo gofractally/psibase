@@ -78,6 +78,8 @@ namespace system_contract
       // Called by native code at the beginning of each block
       void startBlock();
 
+      psibase::Transaction getTransaction() const;
+
       // TODO: currentBlockNum(), currentBlockTime(): fetch from new status fields
       //       also update contracts which use `head + 1`
       psibase::BlockNum     headBlockNum() const;
@@ -91,6 +93,7 @@ namespace system_contract
    };
    PSIO_REFLECT(TransactionSys,
                 method(startBlock),
+                method(getTransaction),
                 method(setCode, contact, vmType, vmVersion, code),
                 method(headBlockNum),
                 method(headBlockTime))
