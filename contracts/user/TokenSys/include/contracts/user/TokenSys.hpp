@@ -81,8 +81,8 @@ namespace UserContract
      private:
       Tables db{contract};
 
-      void _checkAccountValid(psibase::AccountNumber account);
-      bool _isSenderIssuer(TID tokenId);
+      void checkAccountValid(psibase::AccountNumber account);
+      bool isSenderIssuer(TID tokenId);
 
      public:
       struct Events

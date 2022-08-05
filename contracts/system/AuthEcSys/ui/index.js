@@ -121,7 +121,7 @@ function App() {
     <${Container}>
       <${Header} as='h1'>Manage Accounts</${Header}>
       <${Segment}>
-      <${Header} as='h2'>Existing accounts</${Header}>
+      <${Header} as='h2'>Managed accounts</${Header}>
         <${Table} celled>
           <${Table.Header}>
             <${Table.Row}>

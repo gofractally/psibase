@@ -127,7 +127,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
    auto balance = getBalance(tokenId, sender);
 
    check(amount.value > 0, quantityGt0);
-   check(_isSenderIssuer(tokenId), missingRequiredAuth);
+   check(isSenderIssuer(tokenId), missingRequiredAuth);
    check(not sumExceeds(token.currentSupply.value, amount.value, token.maxSupply.value),
          maxSupplyExceeded);
 
@@ -178,7 +178,7 @@ void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
 
 void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
 {
-   check(_isSenderIssuer(tokenId), missingRequiredAuth);
+   check(isSenderIssuer(tokenId), missingRequiredAuth);
    if (flag == tokenConfig::unrecallable)
    {
       check(enable, invalidConfigUpdate);
@@ -202,7 +202,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
 
    check(amount.value > 0, quantityGt0);
    check(amount.value <= balance.balance, insufficientBalance);
-   if (not _isSenderIssuer(tokenId))
+   if (not isSenderIssuer(tokenId))
    {  // Token issuer may still distribute untradeable tokens
       check(untradeable == false, tokenUntradeable);
    }
@@ -289,7 +289,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    auto fromBalance     = getBalance(tokenId, from);
    auto unrecallableBit = TokenRecord::Configurations::getIndex(tokenConfig::unrecallable);
 
-   check(_isSenderIssuer(tokenId), missingRequiredAuth);
+   check(isSenderIssuer(tokenId), missingRequiredAuth);
    check(not token.config.get(unrecallableBit), tokenUnrecallable);
    check(amount.value > 0, quantityGt0);
    check(fromBalance.balance >= amount.value, insufficientBalance);
@@ -313,7 +313,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
    check(symbol.ownerNft != NID{0}, symbolDNE);
    check(nftContract.exists(symbol.ownerNft), missingRequiredAuth);
    check(token.symbolId == SID{0}, tokenHasSymbol);
-   check(_isSenderIssuer(tokenId), missingRequiredAuth);
+   check(isSenderIssuer(tokenId), missingRequiredAuth);
 
    // Take ownership of the symbol owner NFT
    auto debitMemo = "Mapping symbol " + symbolId.str() + " to token " + std::to_string(tokenId);
@@ -391,8 +391,8 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
    }
    else
    {
-      _checkAccountValid(creditor);
-      _checkAccountValid(debitor);
+      checkAccountValid(creditor);
+      checkAccountValid(debitor);
       check(creditor != debitor, creditorIsDebitor);
       check(exists(tokenId), tokenDNE);
 
@@ -415,7 +415,7 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
    }
    else
    {
-      _checkAccountValid(account);
+      checkAccountValid(account);
       record = TokenHolderRecord{account};
    }
 
@@ -443,13 +443,13 @@ bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit flag)
    return token.config.get(flagIndex);
 }
 
-void TokenSys::_checkAccountValid(psibase::AccountNumber account)
+void TokenSys::checkAccountValid(psibase::AccountNumber account)
 {
    check(at<AccountSys>().exists(account), invalidAccount);
    check(account != AccountSys::nullAccount, invalidAccount);
 }
 
-bool TokenSys::_isSenderIssuer(TID tokenId)
+bool TokenSys::isSenderIssuer(TID tokenId)
 {
    auto token       = getToken(tokenId);
    auto nftContract = at<NftSys>();

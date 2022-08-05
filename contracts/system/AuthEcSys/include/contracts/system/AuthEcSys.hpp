@@ -31,5 +31,5 @@ namespace system_contract
    PSIO_REFLECT(AuthEcSys,  //
                 method(checkAuthSys, action, claims),
                 method(setKey, key),
-                method(newAccount, account, key))
+                method(newAccount, account, payload))
 }  // namespace system_contract
