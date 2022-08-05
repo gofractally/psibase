@@ -31,8 +31,7 @@ namespace UserContract
                 activePrice,
                 createCounter,
                 lastPriceUpdateTime);
-   using SymbolLengthTable_t =
-       psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
+   using SymbolLengthTable = psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
 
    struct PriceAdjustmentRecord
    {
@@ -41,7 +40,7 @@ namespace UserContract
       uint8_t decreasePct;
    };
    PSIO_REFLECT(PriceAdjustmentRecord, key, increasePct, decreasePct);
-   using PriceAdjustmentSingleton_t =
+   using PriceAdjustmentSingleton =
        psibase::Table<PriceAdjustmentRecord, &PriceAdjustmentRecord::key>;
 
    struct SaleDetails
@@ -68,6 +67,6 @@ namespace UserContract
       friend std::strong_ordering operator<=>(const SymbolRecord&, const SymbolRecord&) = default;
    };
    PSIO_REFLECT(SymbolRecord, symbolId, ownerNft, saleDetails);
-   using SymbolTable_t = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
+   using SymbolTable = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
 
 }  // namespace UserContract

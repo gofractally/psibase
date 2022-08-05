@@ -99,10 +99,10 @@ std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& reque
          psibase::AccountNumber acc(string_view{user});
 
          TokenSys::Tables db{TokenSys::contract};
-         auto             idx = db.open<TokenTable_t>().getIndex<0>();
+         auto             idx = db.open<TokenTable>().getIndex<0>();
          check(idx.begin() != idx.end(), "No tokens");
 
-         auto                        balIdx = db.open<BalanceTable_t>().getIndex<0>();
+         auto                        balIdx = db.open<BalanceTable>().getIndex<0>();
          std::vector<AccountBalance> balances;
          TID                         tokenId = 1;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)

@@ -36,13 +36,13 @@ namespace
 
    namespace userConfig
    {
-      constexpr auto manualDebit = psibase::NamedBit_t{"manualDebit"};
+      constexpr auto manualDebit = psibase::NamedBit{"manualDebit"};
    }
 
    namespace tokenConfig
    {
-      constexpr auto unrecallable = psibase::NamedBit_t{"unrecallable"};
-      constexpr auto untradeable  = psibase::NamedBit_t{"untradeable"};
+      constexpr auto unrecallable = psibase::NamedBit{"unrecallable"};
+      constexpr auto untradeable  = psibase::NamedBit{"untradeable"};
    }  // namespace tokenConfig
 
 }  // namespace
@@ -52,7 +52,7 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable_t>().getIndex<0>().get(SingletonKey{});
+      auto initRecord = db.open<InitTable>().getIndex<0>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -60,7 +60,7 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
 void TokenSys::init()
 {
    // Set initialized flag
-   auto initTable = db.open<InitTable_t>();
+   auto initTable = db.open<InitTable>();
    auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
@@ -91,7 +91,7 @@ void TokenSys::init()
 TID TokenSys::create(Precision precision, Quantity maxSupply)
 {
    auto creator     = getSender();
-   auto tokenTable  = db.open<TokenTable_t>();
+   auto tokenTable  = db.open<TokenTable>();
    auto tokenIdx    = tokenTable.getIndex<0>();
    auto nftContract = at<NftSys>();
 
@@ -133,8 +133,8 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
 
    token.currentSupply += amount;
    balance.balance += amount.value;
-   db.open<TokenTable_t>().put(token);
-   db.open<BalanceTable_t>().put(balance);
+   db.open<TokenTable>().put(token);
+   db.open<BalanceTable>().put(balance);
 
    emit().ui().minted(tokenId, sender, amount, memo);
 }
@@ -152,17 +152,17 @@ void TokenSys::burn(TID tokenId, Quantity amount)
 
    if (balance.balance == 0)
    {
-      db.open<BalanceTable_t>().erase(BalanceKey_t{sender, tokenId});
+      db.open<BalanceTable>().erase(BalanceKey{sender, tokenId});
    }
    else
    {
-      db.open<BalanceTable_t>().put(balance);
+      db.open<BalanceTable>().put(balance);
    }
 
    emit().ui().burned(tokenId, sender, amount);
 }
 
-void TokenSys::setUserConf(psibase::NamedBit_t flag, bool enable)
+void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
 {
    auto sender  = getSender();
    auto hodler  = getTokenHolder(sender);
@@ -171,12 +171,12 @@ void TokenSys::setUserConf(psibase::NamedBit_t flag, bool enable)
    check(not hodler.config.get(flagBit) == enable, redundantUpdate);
 
    hodler.config.set(flagBit, enable);
-   db.open<TokenHolderTable_t>().put(hodler);
+   db.open<TokenHolderTable>().put(hodler);
 
    emit().ui().userConfSet(sender, flag, enable);
 }
 
-void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit_t flag, bool enable)
+void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
 {
    check(_isSenderIssuer(tokenId), missingRequiredAuth);
    if (flag == tokenConfig::unrecallable)
@@ -188,7 +188,7 @@ void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit_t flag, bool enable)
    auto flagIndex = TokenRecord::Configurations::getIndex(flag);
 
    token.config.set(flagIndex, enable);
-   db.open<TokenTable_t>().put(token);
+   db.open<TokenTable>().put(token);
 
    emit().ui().tokenConfSet(tokenId, getSender(), flag, enable);
 }
@@ -208,7 +208,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    }
 
    balance.balance -= amount.value;
-   db.open<BalanceTable_t>().put(balance);
+   db.open<BalanceTable>().put(balance);
 
    emit().ui().credited(tokenId, sender, receiver, amount, memo);
    auto manualDebitFlag = TokenHolderConfig::getIndex(userConfig::manualDebit);
@@ -217,13 +217,13 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    {
       auto sharedBalance = getSharedBal(tokenId, sender, receiver);
       sharedBalance.balance += amount.value;
-      db.open<SharedBalanceTable_t>().put(sharedBalance);
+      db.open<SharedBalanceTable>().put(sharedBalance);
    }
    else
    {
       auto balance = getBalance(tokenId, receiver);
       balance.balance += amount.value;
-      db.open<BalanceTable_t>().put(balance);
+      db.open<BalanceTable>().put(balance);
       emit().ui().transferred(tokenId, sender, receiver, amount, memo);
    }
 }
@@ -246,13 +246,13 @@ void TokenSys::uncredit(TID                tokenId,
 
    if (sharedBalance.balance == 0)
    {
-      db.open<SharedBalanceTable_t>().erase(SharedBalanceKey_t{sender, receiver, tokenId});
+      db.open<SharedBalanceTable>().erase(SharedBalanceKey{sender, receiver, tokenId});
    }
    else
    {
-      db.open<SharedBalanceTable_t>().put(sharedBalance);
+      db.open<SharedBalanceTable>().put(sharedBalance);
    }
-   db.open<BalanceTable_t>().put(creditorBalance);
+   db.open<BalanceTable>().put(creditorBalance);
 
    emit().ui().uncredited(tokenId, sender, receiver, uncreditAmt, memo);
 }
@@ -271,13 +271,13 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
    if (sharedBalance.balance == 0)
    {
-      db.open<SharedBalanceTable_t>().erase(SharedBalanceKey_t{sender, receiver, tokenId});
+      db.open<SharedBalanceTable>().erase(SharedBalanceKey{sender, receiver, tokenId});
    }
    else
    {
-      db.open<SharedBalanceTable_t>().put(sharedBalance);
+      db.open<SharedBalanceTable>().put(sharedBalance);
    }
-   db.open<BalanceTable_t>().put(receiverBalance);
+   db.open<BalanceTable>().put(receiverBalance);
 
    emit().ui().transferred(tokenId, sender, receiver, amount, memo);
 }
@@ -297,7 +297,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    // Recall is ultimately a remote burn
    fromBalance.balance -= amount.value;
 
-   auto balanceTable = db.open<BalanceTable_t>();
+   auto balanceTable = db.open<BalanceTable>();
    balanceTable.put(fromBalance);
 
    emit().ui().recalled(tokenId, from, amount, memo);
@@ -321,7 +321,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 
    // Store mapping
    token.symbolId = symbolId;
-   db.open<TokenTable_t>().put(token);
+   db.open<TokenTable>().put(token);
 
    // Destroy symbol owner NFT, it can never be used or traded again
    nftContract.burn(symbol.ownerNft);
@@ -332,7 +332,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 
 TokenRecord TokenSys::getToken(TID tokenId)
 {
-   auto tokenTable = db.open<TokenTable_t>();
+   auto tokenTable = db.open<TokenTable>();
    auto tokenIdx   = tokenTable.getIndex<0>();
    auto tokenOpt   = tokenIdx.get(tokenId);
    psibase::check(tokenOpt.has_value(), tokenDNE);
@@ -350,14 +350,14 @@ SID TokenSys::getTokenSymbol(TID tokenId)
 
 bool TokenSys::exists(TID tokenId)
 {
-   return db.open<TokenTable_t>().getIndex<0>().get(tokenId).has_value();
+   return db.open<TokenTable>().getIndex<0>().get(tokenId).has_value();
 }
 
 BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
 {
-   auto balanceTable = db.open<BalanceTable_t>();
+   auto balanceTable = db.open<BalanceTable>();
    auto balanceIdx   = balanceTable.getIndex<0>();
-   auto balanceOpt   = balanceIdx.get(BalanceKey_t{account, tokenId});
+   auto balanceOpt   = balanceIdx.get(BalanceKey{account, tokenId});
 
    BalanceRecord record;
    if (balanceOpt != std::nullopt)
@@ -379,10 +379,10 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
                                            AccountNumber creditor,
                                            AccountNumber debitor)
 {
-   auto               sharedBalanceTable = db.open<SharedBalanceTable_t>();
-   auto               sbIdx              = sharedBalanceTable.getIndex<0>();
-   SharedBalanceKey_t key                = {creditor, debitor, tokenId};
-   auto               sbOpt              = sbIdx.get(key);
+   auto             sharedBalanceTable = db.open<SharedBalanceTable>();
+   auto             sbIdx              = sharedBalanceTable.getIndex<0>();
+   SharedBalanceKey key                = {creditor, debitor, tokenId};
+   auto             sbOpt              = sbIdx.get(key);
 
    SharedBalanceRecord record;
    if (sbOpt != std::nullopt)
@@ -404,7 +404,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
 
 TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
 {
-   auto acTable = db.open<TokenHolderTable_t>();
+   auto acTable = db.open<TokenHolderTable>();
    auto acIdx   = acTable.getIndex<0>();
    auto acOpt   = acIdx.get(account);
 
@@ -422,9 +422,9 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
    return record;
 }
 
-bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit_t flag)
+bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
 {
-   auto hodler = db.open<TokenHolderTable_t>().getIndex<0>().get(account);
+   auto hodler = db.open<TokenHolderTable>().getIndex<0>().get(account);
    if (hodler.has_value() == false)
    {
       return false;
@@ -435,7 +435,7 @@ bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit_t f
    }
 }
 
-bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit_t flag)
+bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit flag)
 {
    auto token     = getToken(tokenId);
    auto flagIndex = TokenRecord::Configurations::getIndex(flag);

@@ -76,8 +76,8 @@ namespace psibase
    PSIO_REFLECT(Bitset_32, bits);
    PSIO_REFLECT(Bitset_64, bits);
 
-   using NamedBit_t = psibase::MethodNumber;
-   template <NamedBit_t... Args>
+   using NamedBit = psibase::MethodNumber;
+   template <NamedBit... Args>
    class NamedBits
    {
      public:
@@ -85,7 +85,7 @@ namespace psibase
       // TODO: rename; UPPERCASE_IS_FOR_MACROS_ONLY
       static constexpr uint8_t INVALID = std::numeric_limits<uint8_t>::max();
 
-      static constexpr uint8_t getIndex(NamedBit_t flag)
+      static constexpr uint8_t getIndex(NamedBit flag)
       {
          std::size_t i = 0;
          while (i < _flags.size())
@@ -101,7 +101,7 @@ namespace psibase
       }
 
      private:
-      static constexpr std::array<NamedBit_t, nrBits> _flags = {{Args...}};
+      static constexpr std::array<NamedBit, nrBits> _flags = {{Args...}};
    };
 
 }  // namespace psibase
