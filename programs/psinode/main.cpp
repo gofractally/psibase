@@ -137,6 +137,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
                      const std::shared_ptr<const Revision>& revisionAtBlockStart,
                      BlockContext&                          bc,
                      transaction_queue::entry&              entry,
+                     std::chrono::microseconds              firstAuthWatchdogLimit,
                      std::chrono::microseconds              proofWatchdogLimit,
                      std::chrono::microseconds              initialWatchdogLimit)
 {
@@ -156,12 +157,17 @@ void pushTransaction(psibase::SharedState&                  sharedState,
             // All proofs execute as of the state at block begin. This will allow
             // consistent parallel execution of all proofs within a block during
             // replay. Proofs don't have direct database access, but they do rely
-            // on the set of contracts stored within the database (they may call
-            // other contracts; e.g. to call crypto functions).
+            // on the set of contracts stored within the database. They may call
+            // other contracts; e.g. to call crypto functions.
             //
             // TODO: move proof execution to background threads
             // TODO: track CPU usage of proofs and pass it somehow to the main
             //       execution for charging
+            // TODO: If by the time the transaction executes it's on a different
+            //       block than the proofs were verified on, then either the proofs
+            //       need to be rerun, or the hashes of the contracts which ran
+            //       during the proofs need to be compared against the current
+            //       contract hashes. This will prevent a poison block.
             // TODO: If the first proof and the first auth pass, but the transaction
             //       fails (including other proof failures), then charge the first
             //       authorizer
@@ -173,6 +179,41 @@ void pushTransaction(psibase::SharedState&                  sharedState,
                proofBC.verifyProof(trx, trace, i, proofWatchdogLimit);
                trace = {};
             }
+
+            // TODO: in another thread: check first auth and first proof. After
+            //       they pass, schedule the remaining proofs. After they pass,
+            //       schedule the transaction for execution in the main thread.
+            //
+            // The first auth check is a prefiltering measure and is mostly redundant
+            // with main execution. Unlike the proofs, the first auth check is allowed
+            // to run with any state on any fork. This is OK since the main execution
+            // checks all auths including the first; the worst that could happen is
+            // the transaction being rejected because it passes on one fork but not
+            // another, potentially charging the user for the failed transaction. The
+            // first auth check, when not part of the main execution, runs in read-only
+            // mode. TransactionSys lets the account's auth contract know it's in a
+            // read-only mode so it doesn't fail the transaction trying to update its
+            // tables.
+            //
+            // Replay doesn't run the first auth check separately. This separate
+            // execution is a subjective measure; it's possible, but not advisable,
+            // for a modified node to skip it during production. This won't hurt
+            // consensus since replay never uses read-only mode for auth checks.
+            auto saveTrace = trace;
+            proofBC.checkFirstAuth(trx, trace, firstAuthWatchdogLimit);
+            trace = std::move(saveTrace);
+
+            // TODO: RPC: don't forward failed transactions to P2P; this gives users
+            //       feedback.
+            // TODO: P2P: do forward failed transactions; this enables producers to
+            //       bill failed transactions which have tied up P2P nodes.
+            // TODO: If the first authorizer doesn't have enough to bill for failure,
+            //       then drop before running any other checks. Don't propagate.
+            // TODO: Don't propagate failed transactions which have
+            //       do_not_broadcast_flag.
+            // TODO: Revisit all of this. It doesn't appear to eliminate the need to
+            //       shadow bill, and once shadow billing is in place, failed
+            //       transaction billing seems unnecessary.
 
             bc.pushTransaction(trx, trace, initialWatchdogLimit);
          }
@@ -302,6 +343,7 @@ void run(const std::string& db_path,
                abort_boot = !push_boot(bc, entry);
             else
                pushTransaction(*sharedState, revisionAtBlockStart, bc, entry,
+                               std::chrono::microseconds(100'000),  // TODO
                                std::chrono::microseconds(100'000),  // TODO
                                std::chrono::microseconds(leeway_us));
          }

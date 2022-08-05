@@ -55,7 +55,7 @@ namespace psibase
 
       static void registerHostFunctions();
 
-      void execProcessTransaction(ActionContext& actionContext);
+      void execProcessTransaction(ActionContext& actionContext, bool checkFirstAuthAndExit);
       void execCalled(uint64_t callerFlags, ActionContext& actionContext);
       void execVerify(ActionContext& actionContext);
       void execServe(ActionContext& actionContext);

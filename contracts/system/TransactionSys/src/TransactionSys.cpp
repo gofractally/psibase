@@ -27,7 +27,7 @@ namespace system_contract
 
       Tables tables(TransactionSys::contract);
 
-      // Add head block to BlockSummaryTable; process_transaction uses it to
+      // Add head block to BlockSummaryTable; processTransaction uses it to
       // verify TAPoS on transactions.
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
@@ -106,10 +106,11 @@ namespace system_contract
    // for chain operations. A bug here can stop any new transactions
    // from entering the chain, including transactions which try to
    // fix the problem.
-   extern "C" [[clang::export_name("process_transaction")]] void process_transaction()
+   extern "C" [[clang::export_name("processTransaction")]] void processTransaction(
+       bool checkFirstAuthAndExit)
    {
       if constexpr (enable_print)
-         print("process_transaction\n");
+         print("processTransaction\n");
 
       // TODO: check max_net_usage_words, max_cpu_usage_ms
       // TODO: resource billing
@@ -139,9 +140,16 @@ namespace system_contract
       auto summaryIdx    = summaryTable.getIndex<0>();
 
       check(!includedIdx.get(id), "duplicate transaction");
-      includedTable.put({id, trx.tapos.expiration});
+      if (!checkFirstAuthAndExit)
+         includedTable.put({id, trx.tapos.expiration});
 
-      if (auto summary = summaryIdx.get(std::tuple<>{}))
+      std::optional<BlockSummary> summary;
+      if (checkFirstAuthAndExit)
+         summary = getBlockSummary();  // startBlock() might not have run
+      else
+         summary = summaryIdx.get(std::tuple<>{});
+
+      if (summary)
       {
          if (trx.tapos.refBlockIndex & 0x80)
             check(((trx.tapos.refBlockIndex - 2) & 0x7f) <= (stat.head->header.blockNum >> 13) - 2,
@@ -172,7 +180,9 @@ namespace system_contract
             print("call checkAuthSys on ", account->authContract.str(), " for account ",
                   act.sender.str(), "\n");
          Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
-         auth.checkAuthSys(act, trx.claims);
+         auth.checkAuthSys(act, trx.claims, &act == &trx.actions[0], checkFirstAuthAndExit);
+         if (checkFirstAuthAndExit)
+            break;
          if constexpr (enable_print)
             print("call action\n");
          call(act);  // TODO: avoid copy (serializing)

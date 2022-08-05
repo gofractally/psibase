@@ -704,8 +704,25 @@ struct callbacks
       {
          psibase::BlockContext proofBC{*chain.sys, chain.revisionAtBlockStart};
          proofBC.start(chain.blockContext->current.header.time);
+         psibase::check(!proofBC.isGenesisBlock || signed_trx.proofs.empty(),
+                        "Genesis block may not have proofs");
          for (size_t i = 0; i < signed_trx.proofs.size(); ++i)
             proofBC.verifyProof(signed_trx, trace, i, std::nullopt);
+
+         if (!proofBC.needGenesisAction)
+         {
+            // checkFirstAuth isn't necessary here, but including it catches
+            // the case where an auth contract modifies its tables while
+            // running in read-only mode.
+            //
+            // We run the check within blockContext to make it easier for
+            // tests to chain transactions which modify auth. psinode
+            // doesn't provide this luxury.
+            auto saveTrace = trace;
+            chain.blockContext->checkFirstAuth(signed_trx, trace, std::nullopt);
+            trace = std::move(saveTrace);
+         }
+
          chain.blockContext->pushTransaction(signed_trx, trace, std::nullopt);
       }
       catch (const std::exception& e)

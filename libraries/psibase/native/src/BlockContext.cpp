@@ -108,7 +108,7 @@ namespace psibase
       // Failure here aborts the block since transaction-sys relies on startBlock
       // functioning correctly. Fixing this type of failure requires forking
       // the chain, just like fixing bugs which block transactions within
-      // transaction-sys's process_transaction may require forking the chain.
+      // transaction-sys's processTransaction may require forking the chain.
       //
       // TODO: log failure
       tc.execNonTrxAction(0, action, atrace);
@@ -161,6 +161,32 @@ namespace psibase
          t.execVerifyProof(i);
          if (!current.subjectiveData.empty())
             throw std::runtime_error("proof called a subjective contract");
+      }
+      catch (const std::exception& e)
+      {
+         current.subjectiveData.clear();
+         trace.error = e.what();
+         throw;
+      }
+      catch (...)
+      {
+         current.subjectiveData.clear();
+         throw;
+      }
+   }
+
+   void BlockContext::checkFirstAuth(const SignedTransaction&                 trx,
+                                     TransactionTrace&                        trace,
+                                     std::optional<std::chrono::microseconds> watchdogLimit)
+   {
+      try
+      {
+         checkActive();
+         TransactionContext t{*this, trx, trace, true, false, false};
+         if (watchdogLimit)
+            t.setWatchdog(*watchdogLimit);
+         t.checkFirstAuth();
+         current.subjectiveData.clear();
       }
       catch (const std::exception& e)
       {

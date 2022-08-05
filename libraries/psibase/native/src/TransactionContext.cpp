@@ -51,7 +51,7 @@ namespace psibase
    }
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
-   static void execProcessTransaction(TransactionContext& self);
+   static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit);
 
    void TransactionContext::execTransaction()
    {
@@ -72,13 +72,25 @@ namespace psibase
       }
       else
       {
-         execProcessTransaction(*this);
+         execProcessTransaction(*this, false);
       }
 
       // If the transaction adjusted numExecutionMemories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
       status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
       blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+   }
+
+   void TransactionContext::checkFirstAuth()
+   {
+      auto& db     = blockContext.db;
+      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
+
+      // TODO: different limit since this will execute in background threads
+      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+
+      check(!blockContext.needGenesisAction, "checkFirstAuth does not handle genesis");
+      execProcessTransaction(*this, true);
    }
 
    static void execGenesisAction(TransactionContext& self, const Action& action)
@@ -113,7 +125,7 @@ namespace psibase
       }
    }
 
-   static void execProcessTransaction(TransactionContext& self)
+   static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit)
    {
       Action action{
           .sender   = AccountNumber(),
@@ -126,7 +138,7 @@ namespace psibase
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
       ActionContext ac = {self, action, self.transactionTrace.actionTraces.back()};
       auto&         ec = self.getExecutionContext(transactionContractNum);
-      ec.execProcessTransaction(ac);
+      ec.execProcessTransaction(ac, checkFirstAuthAndExit);
    }
 
    void TransactionContext::execVerifyProof(size_t i)

@@ -37,9 +37,11 @@ namespace psibase
                          bool                     allowDbReadSubjective);
       ~TransactionContext();
 
-      // Caution: each call to execVerifyProof() or execTransaction()
-      //          must be in a fresh TransactionContext instance.
+      // Caution: each call to execVerifyProof(), checkFirstAuth(),
+      //          or execTransaction() must be in a fresh
+      //          TransactionContext instance.
       void execVerifyProof(size_t i);
+      void checkFirstAuth();
       void execTransaction();
 
       void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
