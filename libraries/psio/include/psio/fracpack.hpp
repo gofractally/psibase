@@ -1315,7 +1315,7 @@ namespace psio
       }
       else if constexpr (is_shared_view_ptr<T>::value)
       {
-         return fracvalidate<is_shared_view_ptr<T>::value_type>(b, e);
+         return fracvalidate<typename is_shared_view_ptr<T>::value_type>(b, e);
       }
       else if constexpr (not may_use_heap<T>())
       {

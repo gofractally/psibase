@@ -2,7 +2,7 @@
 
 #include <psibase/net_base.hpp>
 #include <psibase/random_timer.hpp>
-#include <psibase/fork_database.hpp>
+#include <psibase/ForkDb.hpp>
 #include <psio/reflect.hpp>
 
 #include <cassert>
@@ -37,101 +37,17 @@ namespace psibase::net
       return tp - d1;
    }
 
-   template<typename TimePoint>
-   struct block_timestamp
+   std::string to_string(const Checksum256& c)
    {
-      block_timestamp() = default;
-      block_timestamp(TimePoint tp) : count(tp.time_since_epoch().count()) {}
-      operator TimePoint() const { return get(); }
-      TimePoint get() const { return TimePoint{typename TimePoint::duration{count}}; }
-      std::int64_t count;
-      PSIO_REFLECT_INLINE(block_timestamp, count)
-   };
-
-   template<typename TimePoint>
-   struct block_header
-   {
-      int id;
-      producer_id producer;
-      std::uint64_t term;
-      std::uint32_t num;
-      int prev;
-      block_timestamp<TimePoint> timestamp;
-      PSIO_REFLECT_INLINE(block_header, id, producer, term, num, prev, timestamp)
-   };
-
-   struct augmented_block_id
-   {
-      int _id;
-      std::uint32_t _num;
-      int id() const { return _id; }
-      std::uint32_t num() const { return _num; }
-      friend bool operator==(const augmented_block_id&, const augmented_block_id&) = default;
-      PSIO_REFLECT_INLINE(augmented_block_id, _id, _num)
-   };
-
-   template<typename TimePoint>
-   struct block_header_builder
-   {
-      block_header<TimePoint> _result;
-      block_header<TimePoint> finish() &&
+      std::string result;
+      for(auto ch : c)
       {
-         static int nextid = 1;
-         _result.id = nextid++;
-         return _result;
+         static const char xdigits[] = "0123456789ABCDEF";
+         result += xdigits[ch & 0xF];
+         result += xdigits[(ch >> 4) & 0xF];
       }
-   };
-
-#if 0
-   struct BlockBuilder
-   {
-      Block _result;
-      Block finish() &&
-      {
-         return std::move(_result);
-      }
-   };
-
-   struct BlockHeaderState : BlockHeader
-   {
-      BlockHeaderState() : BlockHeader{} {}
-      BlockHeaderState(const BlockState& prev, const BlockHeader& header) : BlockHeader(header) {}
-      BlockBuilder next(TimePointSec time, AccountNum producer, std::uint32_t term) {}
-      // optional db snapshot
-   };
-#endif
-
-   template<typename TimePoint>
-   struct block_header_state : block_header<TimePoint>
-   {
-      using builder_type = block_header_builder<TimePoint>;
-      // Genesis state
-      block_header_state() : block_header<TimePoint>(), executed(true) {}
-      // State transition
-      block_header_state(const block_header_state& prev, const block_header<TimePoint>& header)
-         : block_header<TimePoint>(header)
-      {
-      }
-      //
-      block_header_builder<TimePoint> next(TimePoint start_time, producer_id producer, std::uint64_t term)
-      {
-         return {{.id = 0, .producer = producer, .term = term, .num = this->num + 1, .prev = this->id, .timestamp = start_time}};
-      }
-      bool execute(const block_header_state& prev, const block_header<TimePoint>& header)
-      {
-         assert(prev.executed);
-         executed = true;
-         return true;
-      }
-      augmented_block_id info() const {
-         return {this->id, this->num};
-      }
-      auto order() const
-      {
-         return std::tie(this->term, this->num, this->id);
-      }
-      bool executed = false;
-   };
+      return result;
+   }
 
    // This protocol is based on RAFT, with some simplifications.
    // i.e. the blockchain structure is sufficient to guarantee log matching.
@@ -141,7 +57,7 @@ namespace psibase::net
       using term_id = std::uint64_t;
       using block_num = std::uint32_t;
       using id_type = int;
-      static constexpr producer_id null_producer = 0;
+      static constexpr producer_id null_producer = {};
 
       auto& network()
       {
@@ -161,8 +77,8 @@ namespace psibase::net
 
       struct hello_request
       {
-         augmented_block_id xid;
-         std::string to_string() const { return "hello: id=" + std::to_string(xid.id()) + " num=" + std::to_string(xid.num()); }
+         ExtendedBlockId xid;
+         std::string to_string() const { return "hello: id=" + net::to_string(xid.id()) + " num=" + std::to_string(xid.num()); }
          PSIO_REFLECT_INLINE(hello_request, xid)
       };
 
@@ -177,8 +93,8 @@ namespace psibase::net
       {
          explicit peer_connection(peer_id id) : id(id) {}
          ~peer_connection() { std::memset(this, 0xCC, sizeof(*this)); }
-         augmented_block_id last_sent;
-         augmented_block_id last_received;
+         ExtendedBlockId last_sent;
+         ExtendedBlockId last_received;
          bool syncing = false;
          peer_id id;
          bool ready = false;
@@ -216,12 +132,13 @@ namespace psibase::net
       {
          term_id term;
          producer_id leader_id;
-         block_num leader_commit;
-         block_header<typename Timer::time_point> block;
+         BlockNum leader_commit;
+         SignedBlock block;
          PSIO_REFLECT_INLINE(append_entries_request, term, leader_id, leader_commit, block)
          std::string to_string() const
          {
-            return "append_entries: term=" + std::to_string(term) + " leader=" + std::to_string(leader_id) + " id=" + std::to_string(block.id) + " blocknum=" + std::to_string(block.num) + " irreversible=" + std::to_string(leader_commit);
+            BlockInfo info{block.block};
+            return "append_entries: term=" + std::to_string(term) + " leader=" + leader_id.str() + " id=" + net::to_string(info.blockId) + " blocknum=" + std::to_string(block.block.header.blockNum) + " irreversible=" + std::to_string(leader_commit);
          }
       };
 
@@ -229,11 +146,11 @@ namespace psibase::net
       {
          term_id term;
          producer_id follower_id;
-         block_num head_num;
+         BlockNum head_num;
          PSIO_REFLECT_INLINE(append_entries_response, term, follower_id, head_num);
          std::string to_string() const
          {
-            return "append_entries response: term=" + std::to_string(term) + " follower=" + std::to_string(follower_id) + " blocknum=" + std::to_string(head_num);
+            return "append_entries response: term=" + std::to_string(term) + " follower=" + follower_id.str() + " blocknum=" + std::to_string(head_num);
          }
       };
 
@@ -246,7 +163,7 @@ namespace psibase::net
          PSIO_REFLECT_INLINE(request_vote_request, term, candidate_id, last_log_index, last_log_term)
          std::string to_string() const
          {
-            return "request_vote: term=" + std::to_string(term) + " candidate=" + std::to_string(candidate_id);
+            return "request_vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str();
          }
       };
       struct request_vote_response
@@ -258,7 +175,7 @@ namespace psibase::net
          PSIO_REFLECT_INLINE(request_vote_response, term, candidate_id, voter_id, vote_granted)
          std::string to_string() const
          {
-            return "vote: term=" + std::to_string(term) + " candidate=" + std::to_string(candidate_id) + " voter=" + std::to_string(voter_id) + " vote granted=" + std::to_string(vote_granted);
+            return "vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str() + " voter=" + voter_id.str() + " vote granted=" + std::to_string(vote_granted);
          }
       };
 
@@ -305,7 +222,7 @@ namespace psibase::net
          _peers.push_back(std::make_unique<peer_connection>(id));
          peer_connection& connection = get_connection(id);
          connection.hello_sent = false;
-         connection.hello.xid = chain().get_head_state()->info();
+         connection.hello.xid = chain().get_head_state()->xid();
          async_send_hello(connection);
       }
       void async_send_hello(peer_connection& connection)
@@ -313,10 +230,10 @@ namespace psibase::net
          if(connection.hello_sent)
          {
             auto* b = chain().get(connection.hello.xid.id());
-            auto prev = chain().get(b->prev);
+            auto prev = chain().get(b->block.header.previous);
             if(prev)
             {
-               connection.hello = {prev->id, prev->num};
+               connection.hello = {b->block.header.previous, b->block.header.blockNum - 1};
             }
             else
             {
@@ -346,17 +263,20 @@ namespace psibase::net
          {
             // TODO: if the block num is not known, then we've failed to find a common ancestor
             // so bail (only possible with a truncated block log)
-            connection.hello.xid = {chain().get_block_by_num(request.xid.num())->id, request.xid.num()};
+            connection.hello.xid = {chain().get_block_id(request.xid.num()), request.xid.num()};
             connection.hello_sent = false;
          }
-         if(auto* b = chain().get_state(request.xid.id()))
+         if(auto* b = chain().get(request.xid.id()))
          {
-            connection.last_received = {b->id, b->num};
+            // Ensure that the block number is accurate.  I have not worked out
+            // what happens if the peer lies, but at least this way we guarantee
+            // that our local invariants hold.
+            connection.last_received = {request.xid.id(), b->block.header.blockNum};
             connection.last_sent = chain().get_common_ancestor(connection.last_received);
             // async_send_fork will reset syncing if there is nothing to sync
             connection.syncing = true;
             connection.ready = true;
-            std::cout << "ready: received=" << connection.last_received.id() << " common=" << connection.last_sent.id() << std::endl;
+            std::cout << "ready: received=" << to_string(connection.last_received.id()) << " common=" << to_string(connection.last_sent.id()) << std::endl;
             // FIXME: blocks and hellos need to be sequenced correctly
             network().async_send_block(connection.id, hello_response{}, [this, &connection](const std::error_code&){
                async_send_fork(connection);
@@ -410,11 +330,12 @@ namespace psibase::net
          // - The last block interval boundary before the current time
          // - The head block time + the block interval
          //
-         auto block_start = std::max(chain().get_head()->timestamp.get() + _block_interval,
+         auto head_time = typename Timer::time_point{std::chrono::seconds(chain().get_head()->time.seconds)};
+         auto block_start = std::max(head_time + _block_interval,
                                      floor2(Timer::clock_type::now(), _block_interval));
          _block_timer.expires_at(block_start + _block_interval);
          // TODO: consensus should be responsible for most of the block header
-         chain().start_block(block_start, self, current_term);
+         chain().start_block(TimePointSec{static_cast<uint32_t>(duration_cast<std::chrono::seconds>(block_start.time_since_epoch()).count())}, self, current_term);
          _block_timer.async_wait([this](const std::error_code& ec){
             if(ec)
             {
@@ -423,9 +344,9 @@ namespace psibase::net
             else if(_state == producer_state::leader)
             {
                auto* b = chain().finish_block();
-               update_match_index(self, b->num);
+               update_match_index(self, b->blockNum());
                update_committed();
-               on_fork_switch(b);
+               on_fork_switch(&b->info.header);
                start_leader();
             }
          });
@@ -468,15 +389,16 @@ namespace psibase::net
             disconnect(peer.id);
             return;
          }
-         if(peer.last_sent.num() != chain().get_head()->num)
+         if(peer.last_sent.num() != chain().get_head()->blockNum)
          {
-            auto next_block = chain().get_block_by_num(peer.last_sent.num() + 1);
-            peer.last_sent = {next_block->id, peer.last_sent.num() + 1};
+            auto next_block_id = chain().get_block_id(peer.last_sent.num() + 1);
+            peer.last_sent = {next_block_id, peer.last_sent.num() + 1};
+            auto next_block = chain().get(next_block_id);
             network().async_send_block(
                 peer.id,
                 // TODO: This should probably use the current term/leader not the
                 // term leader associated with the block.
-                append_entries_request{next_block->term, next_block->producer, chain().commit_index(), *next_block},
+                append_entries_request{next_block->block.header.term, next_block->block.header.producer, chain().commit_index(), *next_block},
                 [this, &peer](const std::error_code& e){
                    async_send_fork(peer);
                 });
@@ -490,11 +412,11 @@ namespace psibase::net
       // Note: this needs to run before orphaned blocks in the old fork
       // are pruned.  It must remove references to blocks that are not
       // part of the new best fork.
-      void on_fork_switch(block_header<typename Timer::time_point>* new_head)
+      void on_fork_switch(BlockHeader* new_head)
       {
-         if(_state == producer_state::follower && new_head->term == current_term && new_head->num > chain().commit_index())
+         if(_state == producer_state::follower && new_head->term == current_term && new_head->blockNum > chain().commit_index())
          {
-            network().sendto(new_head->producer, append_entries_response{current_term, self, new_head->num});
+            network().sendto(new_head->producer, append_entries_response{current_term, self, new_head->blockNum});
          }
          // TODO: how do we handle a fork switch during connection startup?
          for (auto& peer : _peers)
@@ -528,7 +450,7 @@ namespace psibase::net
          }
       }
 
-      void on_recv_block(auto& peer, const augmented_block_id& xid)
+      void on_recv_block(auto& peer, const ExtendedBlockId& xid)
       {
          peer.last_received = xid;
          if(chain().in_best_chain(xid) && xid.num() > peer.last_sent.num())
@@ -589,7 +511,7 @@ namespace psibase::net
          votes_for_me.push_back(self);
          randomize_timer();
          _state = producer_state::candidate;
-         network().multicast_producers(request_vote_request{current_term, self, chain().get_head()->num, chain().get_head()->term});
+         network().multicast_producers(request_vote_request{current_term, self, chain().get_head()->blockNum, chain().get_head()->term});
       }
       // ----------- handling of incoming messages -------------
       void recv(peer_id origin, const append_entries_request& request)
@@ -600,39 +522,19 @@ namespace psibase::net
          {
             _election_timer.restart();
          }
-         auto max_commit = std::min(request.leader_commit, request.block.num);
+         auto max_commit = std::min(request.leader_commit, request.block.block.header.blockNum);
          // TODO: should the leader ever accept a block from another source?
-         if(auto res = chain().insert(request.block); res == insert_result::success)
+         if(chain().insert(request.block))
          {
-            augmented_block_id xid = {request.block.id, request.block.num};
+            BlockInfo info{request.block.block};
+            ExtendedBlockId xid = {info.blockId, info.header.blockNum};
             on_recv_block(connection, xid);
-            std::cout << "recv node=" << self << " id=" << request.block.id << std::endl;
-            chain().async_switch_fork([this, max_commit](block_header<typename Timer::time_point>* h){
+            std::cout << "recv node=" << self.str() << " id=" << to_string(xid.id()) << std::endl;
+            chain().async_switch_fork([this, max_commit](BlockHeader* h){
                chain().commit(max_commit);
                on_fork_switch(h);
             });
          }
-         else
-         {
-            if(res == insert_result::rejected)
-            {
-               std::cout << "reject node=" << self << " id=" << request.block.id << std::endl;
-            }
-            if(res == insert_result::duplicate)
-            {
-               std::cout << "duplicate node=" << self << " id=" << request.block.id << std::endl;
-            }
-            if(res == insert_result::buffered)
-            {
-               // TODO: send to immediate peer instead of leader
-               // TODO: deduplicate requests
-               //network().sendto(request.leader_id, append_entries_response2{self, chain().get_missing_ancestor(request.block.prev)});
-               // TODO: This will be possible once we start pruning orphaned forks
-               assert(!"unlinkable block");
-            }
-         }
-         // If the block
-         // - has a higher term than head
       }
       void recv(peer_id, const append_entries_response& response)
       {
@@ -662,11 +564,11 @@ namespace psibase::net
          bool vote_granted = false;
          // Can we vote for this candidate?
          if(_state == producer_state::follower) {
-            if(request.term >= current_term && (!voted_for || voted_for == request.candidate_id))
+            if(request.term >= current_term && (voted_for == null_producer || voted_for == request.candidate_id))
             {
                // Is the candidate up-to-date?
                auto head = chain().get_head();
-               if(request.last_log_term > head->term|| (request.last_log_term == head->term && request.last_log_index >= head->num))
+               if(request.last_log_term > head->term || (request.last_log_term == head->term && request.last_log_index >= head->blockNum))
                {
                   _election_timer.restart();
                   vote_granted = true;

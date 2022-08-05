@@ -138,7 +138,7 @@ namespace psibase::net
          auto copy = iter->second;
          async_recv(id, std::move(copy));
          async_send_block(id, init_message{}, [](const std::error_code&){});
-         if(auto producer = static_cast<Derived*>(this)->consensus().producer_name())
+         if(auto producer = static_cast<Derived*>(this)->consensus().producer_name(); producer != AccountNumber())
          {
             async_send_block(id, producer_message{producer}, [](const std::error_code&){});
          }
@@ -300,7 +300,7 @@ namespace psibase::net
          std::uint32_t _msg_size;
          std::vector<char> _read_buf;
          //
-         producer_id producer = 0;
+         producer_id producer = {};
       };
       peer_id next_peer_id = 0;
       boost::asio::io_context& _ctx;

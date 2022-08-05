@@ -2,7 +2,7 @@
 #include <psibase/node.hpp>
 #include <psibase/direct_routing.hpp>
 #include <psibase/mock_timer.hpp>
-#include <psibase/fork_database.hpp>
+#include <psibase/ForkDb.hpp>
 
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/io_context.hpp>
@@ -41,16 +41,17 @@ void loop(Timer& timer, F&& f)
 
 TEST_CASE("")
 {
-   using chain_type = fork_database<block_header<timer_type::time_point>, block_header_state<timer_type::time_point>, mapdb>;
+   using chain_type = ForkDb;
    using node_type = node<null_link, direct_routing, fail_stop_consensus, chain_type>;
    boost::asio::io_context ctx;
    node_type a(ctx), b(ctx), c(ctx);
-   a.set_producer_id(1);
-   b.set_producer_id(2);
-   c.set_producer_id(3);
-   a.set_producers({1, 2, 3});
-   b.set_producers({1, 2, 3});
-   c.set_producers({1, 2, 3});
+   a.set_producer_id(psibase::AccountNumber{"a"});
+   b.set_producer_id(psibase::AccountNumber{"b"});
+   c.set_producer_id(psibase::AccountNumber{"c"});
+   std::vector producers{a.producer_name(), b.producer_name(), c.producer_name()};
+   a.set_producers(producers);
+   b.set_producers(producers);
+   c.set_producers(producers);
    auto a_addr = a.listen({boost::asio::ip::tcp::v4(), 0});
    auto b_addr = b.listen({boost::asio::ip::tcp::v4(), 0});
    auto c_addr = c.listen({boost::asio::ip::tcp::v4(), 0});
@@ -63,12 +64,12 @@ TEST_CASE("")
    {
       if(old_state && !new_state)
       {
-         std::cout << "stop node " << n->producer_name() << std::endl;
+         std::cout << "stop node " << n->producer_name().str() << std::endl;
          n->disconnect_all();
       }
       else if(!old_state && new_state)
       {
-         std::cout << "start node " << n->producer_name() << std::endl;
+         std::cout << "start node " << n->producer_name().str() << std::endl;
       }
    };
    auto adjust_connection = [&](node_type* n1, auto addr, bool old_state, bool new_state)

@@ -16,4 +16,4 @@ target_link_libraries(test_direct_routing PUBLIC psio catch2)
 
 add_executable(test_integrated test_integrated.cpp mock_timer.cpp)
 target_include_directories(test_integrated PUBLIC ../include)
-target_link_libraries(test_integrated PUBLIC psio catch2)
+target_link_libraries(test_integrated PUBLIC psio catch2 psibase)
