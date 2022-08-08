@@ -386,7 +386,7 @@ struct callbacks
       throw ::assert_exception(span_str(msg));
    }
 
-   void prints_l(span<const char> str) { std::cout.write(str.data(), str.size()); }
+   void writeConsole(span<const char> str) { std::cout.write(str.data(), str.size()); }
 
    void tester_get_arg_counts(wasm_ptr<uint32_t> argc, wasm_ptr<uint32_t> argv_buf_size)
    {
@@ -786,7 +786,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::tester_abort>("env", "tester_abort");
    rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");  // TODO: rename
    rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
-   rhf_t::add<&callbacks::prints_l>("env", "prints_l");  // TODO: replace with writeConsole
+   rhf_t::add<&callbacks::writeConsole>("env", "writeConsole");
    rhf_t::add<&callbacks::tester_get_arg_counts>("env", "tester_get_arg_counts");
    rhf_t::add<&callbacks::tester_get_args>("env", "tester_get_args");
    rhf_t::add<&callbacks::tester_clock_time_get>("env", "tester_clock_time_get");
