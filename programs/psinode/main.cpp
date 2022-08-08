@@ -341,7 +341,6 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 int main(int argc, char* argv[])
 {
    std::string db_path;
-   bool        produce    = false;
    std::string producer   = {};
    std::vector<std::string> prods;
    std::string host       = {};
@@ -356,8 +355,7 @@ int main(int argc, char* argv[])
    auto                    opt = desc.add_options();
    opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
        "Path to database");
-   opt("produce,p", po::bool_switch(&produce), "Produce blocks");
-   opt("producer", po::value<std::string>(&producer), "Name of this producer");
+   opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
    opt("prods", po::value(&prods), "Names of all producers");
    opt("peer", po::value(&peers), "Peer endpoint");
    opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
