@@ -151,7 +151,7 @@ namespace psibase
       // TODO: don't repack to compute sha
       BlockInfo(const Block& b) : header{b.header}, blockId{sha256(b)}
       {
-         auto* src  = (const char*)&header.blockNum + sizeof(&header.blockNum);
+         auto* src  = (const char*)&header.blockNum + sizeof(header.blockNum);
          auto* dest = blockId.data();
          while (src != (const char*)&header.blockNum)
             *dest++ = *--src;
