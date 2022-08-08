@@ -368,16 +368,16 @@ struct callbacks
       memcpy(alloc(cb_alloc_data, cb_alloc, data.size()), data.data(), data.size());
    }
 
-   void tester_abort()
+   void testerAbort()
    {
       backtrace();
-      throw std::runtime_error("called tester_abort");
+      throw std::runtime_error("called testerAbort");
    }
 
-   void eosio_exit(int32_t)
+   void testerExit(int32_t)
    {
       backtrace();
-      throw std::runtime_error("called eosio_exit");
+      throw std::runtime_error("called testerExit");
    }
 
    void abortMessage(span<const char> msg)
@@ -388,7 +388,7 @@ struct callbacks
 
    void writeConsole(span<const char> str) { std::cout.write(str.data(), str.size()); }
 
-   void tester_get_arg_counts(wasm_ptr<uint32_t> argc, wasm_ptr<uint32_t> argv_buf_size)
+   void testerGetArgCounts(wasm_ptr<uint32_t> argc, wasm_ptr<uint32_t> argv_buf_size)
    {
       uint32_t size = 0;
       for (auto& a : state.args)
@@ -398,7 +398,7 @@ struct callbacks
    };
 
    // uint8_t** argv, uint8_t* argv_buf
-   void tester_get_args(uint32_t argv, uint32_t argv_buf)
+   void testerGetArgs(uint32_t argv, uint32_t argv_buf)
    {
       auto* memory   = state.backend.get_context().linear_memory();
       auto  get_argv = [&]() -> uint32_t& { return *reinterpret_cast<uint32_t*>(memory + argv); };
@@ -419,7 +419,7 @@ struct callbacks
       }
    };
 
-   int32_t tester_clock_time_get(uint32_t id, uint64_t precision, wasm_ptr<uint64_t> time)
+   int32_t testerClockTimeGet(uint32_t id, uint64_t precision, wasm_ptr<uint64_t> time)
    {
       std::chrono::nanoseconds result;
       if (id == 0)
@@ -446,11 +446,11 @@ struct callbacks
       return &state.files[file_index];
    }
 
-   uint32_t tester_fdstat_get(int32_t            fd,
-                              wasm_ptr<uint8_t>  fs_filetype,
-                              wasm_ptr<uint16_t> fs_flags,
-                              wasm_ptr<uint64_t> fs_rights_base,
-                              wasm_ptr<uint64_t> fs_rights_inheriting)
+   uint32_t testerFdstatGet(int32_t            fd,
+                            wasm_ptr<uint8_t>  fs_filetype,
+                            wasm_ptr<uint16_t> fs_flags,
+                            wasm_ptr<uint64_t> fs_rights_base,
+                            wasm_ptr<uint64_t> fs_rights_inheriting)
    {
       if (fd == STDIN_FILENO)
       {
@@ -487,11 +487,11 @@ struct callbacks
       return wasi_errno_badf;
    }
 
-   uint32_t tester_open_file(span<const char>  path,
-                             uint32_t          oflags,
-                             uint64_t          fs_rights_base,
-                             uint32_t          fdflags,
-                             wasm_ptr<int32_t> opened_fd)
+   uint32_t testerOpenFile(span<const char>  path,
+                           uint32_t          oflags,
+                           uint64_t          fs_rights_base,
+                           uint32_t          fdflags,
+                           wasm_ptr<int32_t> opened_fd)
    {
       if (oflags & wasi_oflags_directory)
          return wasi_errno_inval;
@@ -560,7 +560,7 @@ struct callbacks
       return 0;
    }
 
-   uint32_t tester_close_file(int32_t fd)
+   uint32_t testerCloseFile(int32_t fd)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -569,7 +569,7 @@ struct callbacks
       return 0;
    }
 
-   uint32_t tester_write_file(int32_t fd, span<const char> content)
+   uint32_t testerWriteFile(int32_t fd, span<const char> content)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -579,7 +579,7 @@ struct callbacks
       return wasi_errno_io;
    }
 
-   uint32_t tester_read_file(int32_t fd, span<char> content, wasm_ptr<int32_t> result)
+   uint32_t testerReadFile(int32_t fd, span<char> content, wasm_ptr<int32_t> result)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -783,18 +783,18 @@ void backtrace()
 
 void register_callbacks()
 {
-   rhf_t::add<&callbacks::tester_abort>("env", "tester_abort");
-   rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");  // TODO: rename
+   rhf_t::add<&callbacks::testerAbort>("env", "testerAbort");
+   rhf_t::add<&callbacks::testerExit>("env", "testerExit");
    rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
    rhf_t::add<&callbacks::writeConsole>("env", "writeConsole");
-   rhf_t::add<&callbacks::tester_get_arg_counts>("env", "tester_get_arg_counts");
-   rhf_t::add<&callbacks::tester_get_args>("env", "tester_get_args");
-   rhf_t::add<&callbacks::tester_clock_time_get>("env", "tester_clock_time_get");
-   rhf_t::add<&callbacks::tester_fdstat_get>("env", "tester_fdstat_get");
-   rhf_t::add<&callbacks::tester_open_file>("env", "tester_open_file");
-   rhf_t::add<&callbacks::tester_close_file>("env", "tester_close_file");
-   rhf_t::add<&callbacks::tester_write_file>("env", "tester_write_file");
-   rhf_t::add<&callbacks::tester_read_file>("env", "tester_read_file");
+   rhf_t::add<&callbacks::testerGetArgCounts>("env", "testerGetArgCounts");
+   rhf_t::add<&callbacks::testerGetArgs>("env", "testerGetArgs");
+   rhf_t::add<&callbacks::testerClockTimeGet>("env", "testerClockTimeGet");
+   rhf_t::add<&callbacks::testerFdstatGet>("env", "testerFdstatGet");
+   rhf_t::add<&callbacks::testerOpenFile>("env", "testerOpenFile");
+   rhf_t::add<&callbacks::testerCloseFile>("env", "testerCloseFile");
+   rhf_t::add<&callbacks::testerWriteFile>("env", "testerWriteFile");
+   rhf_t::add<&callbacks::testerReadFile>("env", "testerReadFile");
    rhf_t::add<&callbacks::testerReadWholeFile>("env", "testerReadWholeFile");
    rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
    rhf_t::add<&callbacks::testerCreateChain>("env", "testerCreateChain");
