@@ -230,6 +230,10 @@ namespace psibase::net
          if(connection.hello_sent)
          {
             auto* b = chain().get(connection.hello.xid.id());
+            if(!b)
+            {
+               return;
+            }
             auto prev = chain().get(b->block.header.previous);
             if(prev)
             {
