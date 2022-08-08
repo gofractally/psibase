@@ -53,7 +53,8 @@ namespace psibase
       account->vmVersion = vmVersion;
       database.kvPut(AccountRow::db, account->key(), *account);
 
-      auto codeObj = database.kvGet<codeRow>(codeRow::db, codeKey(codeHash, vmType, vmVersion));
+      auto codeObj = database.kvGet<CodeByHashRow>(CodeByHashRow::db,
+                                                   codeByHashKey(codeHash, vmType, vmVersion));
       if (!codeObj)
       {
          codeObj.emplace();
@@ -63,7 +64,7 @@ namespace psibase
          codeObj->code.assign(code.pos, code.end);
       }
       ++codeObj->numRefs;
-      database.kvPut(codeRow::db, codeObj->key(), *codeObj);
+      database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
    }  // setCode
 
    struct BackendEntry
@@ -157,9 +158,9 @@ namespace psibase
          check(ca.has_value(), "unknown contract account");
          check(ca->codeHash != Checksum256{}, "account has no code");
          contractAccount = std::move(*ca);
-         auto code       = database.kvGet<codeRow>(
-             codeRow::db,
-             codeKey(contractAccount.codeHash, contractAccount.vmType, contractAccount.vmVersion));
+         auto code       = database.kvGet<CodeByHashRow>(
+             CodeByHashRow::db, codeByHashKey(contractAccount.codeHash, contractAccount.vmType,
+                                                    contractAccount.vmVersion));
          check(code.has_value(), "code record is missing");
          check(code->vmType == 0, "vmType is not 0");
          check(code->vmVersion == 0, "vmVersion is not 0");

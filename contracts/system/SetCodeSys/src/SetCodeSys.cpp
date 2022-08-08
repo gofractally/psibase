@@ -20,8 +20,9 @@ namespace system_contract
          return 0;
       if (account->codeHash != Checksum256{})
       {
-         auto code_obj = kvGet<codeRow>(
-             codeRow::db, codeKey(account->codeHash, account->vmType, account->vmVersion));
+         auto code_obj = kvGet<CodeByHashRow>(
+             CodeByHashRow::db,
+             codeByHashKey(account->codeHash, account->vmType, account->vmVersion));
          check(code_obj.has_value(), "missing code object");
          if (--code_obj->numRefs)
             kvPut(code_obj->db, code_obj->key(), *code_obj);
@@ -34,11 +35,11 @@ namespace system_contract
       account->vmVersion = vmVersion;
       kvPut(account->db, account->key(), *account);
 
-      auto code_obj = kvGet<codeRow>(
-          codeRow::db, codeKey(account->codeHash, account->vmType, account->vmVersion));
+      auto code_obj = kvGet<CodeByHashRow>(
+          CodeByHashRow::db, codeByHashKey(account->codeHash, account->vmType, account->vmVersion));
       if (!code_obj)
       {
-         code_obj.emplace(codeRow{
+         code_obj.emplace(CodeByHashRow{
              .codeHash  = account->codeHash,
              .vmType    = account->vmType,
              .vmVersion = account->vmVersion,

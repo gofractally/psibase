@@ -9,7 +9,7 @@ namespace psibase
 
    static constexpr NativeTableNum statusTable         = 1;
    static constexpr NativeTableNum accountTable        = 2;
-   static constexpr NativeTableNum codeTable           = 3;
+   static constexpr NativeTableNum codeByHashTable     = 3;
    static constexpr NativeTableNum databaseStatusTable = 4;
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
@@ -61,20 +61,18 @@ namespace psibase
    };
    PSIO_REFLECT(AccountRow, num, authContract, flags, codeHash, vmType, vmVersion)
 
-   inline auto codeKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
+   inline auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
    {
       // TODO: leave space for secondary index?
-      return std::tuple{codeTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
+      return std::tuple{codeByHashTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
    }
 
    /// where code is actually stored, duplicate contracts are reused
-   struct codeRow
+   struct CodeByHashRow
    {
-      // primary key
       Checksum256 codeHash  = {};
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
-      //==================
 
       uint32_t             numRefs = 0;   // number accounts that ref this
       std::vector<uint8_t> code    = {};  // actual code, TODO: compressed
@@ -84,9 +82,9 @@ namespace psibase
       // that could happen if the key->code map doesn't match the
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto db = psibase::DbId::nativeConstrained;
-      auto                  key() const { return codeKey(codeHash, vmType, vmVersion); }
+      auto                  key() const { return codeByHashKey(codeHash, vmType, vmVersion); }
    };
-   PSIO_REFLECT(codeRow, codeHash, vmType, vmVersion, numRefs, code)
+   PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
 
    inline auto databaseStatusKey()
    {

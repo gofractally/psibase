@@ -155,13 +155,14 @@ namespace psibase
          //
          // TODO: use a view here instead of unpacking to a rich object
          // TODO: verify fracpack; no unknown
-         auto code     = psio::convert_from_frac<codeRow>(psio::input_stream(value.pos, value.end));
+         auto code =
+             psio::convert_from_frac<CodeByHashRow>(psio::input_stream(value.pos, value.end));
          auto codeHash = sha256(code.code.data(), code.code.size());
-         check(code.codeHash == codeHash, "codeRow has incorrect codeHash");
+         check(code.codeHash == codeHash, "CodeByHashRow has incorrect codeHash");
          auto expected_key = psio::convert_to_key(code.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
-               "codeRow has incorrect key");
+               "CodeByHashRow has incorrect key");
       }
 
       uint32_t clearResult(NativeFunctions& self)
