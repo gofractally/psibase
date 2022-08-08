@@ -13,38 +13,24 @@ namespace
       // TODO: fix naming
 
       // clang-format off
-      [[clang::import_name("tester_create_chain")]]                uint32_t tester_create_chain(const char* snapshot, uint32_t snapshot_size, uint64_t state_size);
-      [[clang::import_name("tester_destroy_chain")]]               void     tester_destroy_chain(uint32_t chain);
-      [[clang::import_name("tester_execute")]]                     int32_t  tester_execute(const char* command, uint32_t command_size);
-      [[clang::import_name("tester_finish_block")]]                void     tester_finish_block(uint32_t chain_index);
-      [[clang::import_name("tester_get_chain_path")]]              uint32_t tester_get_chain_path(uint32_t chain, char* dest, uint32_t dest_size);
-      [[clang::import_name("tester_get_head_block_info")]]         void     tester_get_head_block_info(uint32_t chain_index, void* cb_alloc_data, cb_alloc_type cb_alloc);
-      [[clang::import_name("tester_push_transaction")]]            void     tester_push_transaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size, void* cb_alloc_data, cb_alloc_type cb_alloc);
-      [[clang::import_name("tester_read_whole_file")]]             bool     tester_read_whole_file(const char* filename, uint32_t filename_size, void* cb_alloc_data, cb_alloc_type cb_alloc);
-      [[clang::import_name("tester_select_chain_for_db")]]         void     tester_select_chain_for_db(uint32_t chain_index);
-      [[clang::import_name("tester_shutdown_chain")]]              void     tester_shutdown_chain(uint32_t chain);
-      [[clang::import_name("tester_sign")]]                        uint32_t tester_sign(const void* key, uint32_t keylen, const void* digest, void* sig, uint32_t siglen);
-      [[clang::import_name("tester_start_block")]]                 void     tester_start_block(uint32_t chain_index, int64_t skip_miliseconds);
+      [[clang::import_name("testerCreateChain")]]        uint32_t testerCreateChain();
+      [[clang::import_name("testerDestroyChain")]]       void     testerDestroyChain(uint32_t chain);
+      [[clang::import_name("testerExecute")]]            int32_t  testerExecute(const char* command, uint32_t command_size);
+      [[clang::import_name("testerFinishBlock")]]        void     testerFinishBlock(uint32_t chain_index);
+      [[clang::import_name("testerGetChainPath")]]       uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
+      [[clang::import_name("testerPushTransaction")]]    void     testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size, void* cb_alloc_data, cb_alloc_type cb_alloc);
+      [[clang::import_name("testerReadWholeFile")]]      bool     testerReadWholeFile(const char* filename, uint32_t filename_size, void* cb_alloc_data, cb_alloc_type cb_alloc);
+      [[clang::import_name("testerSelectChainForDb")]]   void     testerSelectChainForDb(uint32_t chain_index);
+      [[clang::import_name("testerShutdownChain")]]      void     testerShutdownChain(uint32_t chain);
+      [[clang::import_name("testerStartBlock")]]         void     testerStartBlock(uint32_t chain_index, int64_t skip_miliseconds);
       // clang-format on
    }
 
    template <typename Alloc_fn>
-   inline bool read_whole_file(const char* filename_begin,
-                               uint32_t    filename_size,
-                               Alloc_fn    alloc_fn)
+   inline bool readWholeFile(const char* filename_begin, uint32_t filename_size, Alloc_fn alloc_fn)
    {
       // TODO: fix memory issue when file not found
-      return tester_read_whole_file(filename_begin, filename_size, &alloc_fn,
-                                    [](void* cb_alloc_data, size_t size) -> void*
-                                    {  //
-                                       return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
-                                    });
-   }
-
-   template <typename Alloc_fn>
-   inline void get_head_block_info(uint32_t chain, Alloc_fn alloc_fn)
-   {
-      tester_get_head_block_info(chain, &alloc_fn,
+      return testerReadWholeFile(filename_begin, filename_size, &alloc_fn,
                                  [](void* cb_alloc_data, size_t size) -> void*
                                  {  //
                                     return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
@@ -57,11 +43,11 @@ namespace
                                uint32_t    args_size,
                                Alloc_fn    alloc_fn)
    {
-      tester_push_transaction(chain, args_begin, args_size, &alloc_fn,
-                              [](void* cb_alloc_data, size_t size) -> void*
-                              {  //
-                                 return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
-                              });
+      testerPushTransaction(chain, args_begin, args_size, &alloc_fn,
+                            [](void* cb_alloc_data, size_t size) -> void*
+                            {  //
+                               return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
+                            });
    }
 
    template <typename Alloc_fn>
@@ -115,6 +101,7 @@ bool psibase::TraceResult::failed(std::string_view expected)
    return false;
 }
 
+// TODO
 bool psibase::TraceResult::diskConsumed(
     const std::vector<std::pair<AccountNumber, int64_t>>& consumption)
 {
@@ -146,22 +133,22 @@ bool psibase::TraceResult::diskConsumed(
    return true;
 }
 
-std::vector<char> psibase::read_whole_file(std::string_view filename)
+std::vector<char> psibase::readWholeFile(std::string_view filename)
 {
    std::vector<char> result;
-   if (!::read_whole_file(filename.data(), filename.size(),
-                          [&](size_t size)
-                          {
-                             result.resize(size);
-                             return result.data();
-                          }))
+   if (!::readWholeFile(filename.data(), filename.size(),
+                        [&](size_t size)
+                        {
+                           result.resize(size);
+                           return result.data();
+                        }))
       check(false, "read " + std::string(filename) + " failed");
    return result;
 }
 
 int32_t psibase::execute(std::string_view command)
 {
-   return ::tester_execute(command.data(), command.size());
+   return ::testerExecute(command.data(), command.size());
 }
 
 void psibase::expect(TransactionTrace t, const std::string& expected, bool always_show)
@@ -216,119 +203,110 @@ void psibase::internal_use_do_not_use::hex(const uint8_t* begin,
    }
 }
 
-// TODO: change defaults //
-const psibase::PublicKey psibase::test_chain::default_pub_key =
-    psibase::publicKeyFromString("EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV");
-const psibase::PrivateKey psibase::test_chain::default_priv_key =
-    psibase::privateKeyFromString("5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
+// TODO: change defaults
+const psibase::PublicKey psibase::TestChain::defaultPubKey =
+    psibase::publicKeyFromString("PUB_K1_8UUMcamEE6dnK4kyrSPnAEAPTWZduZtE9SuFvURr3UjGDpF9LX");
+const psibase::PrivateKey psibase::TestChain::defaultPrivKey =
+    psibase::privateKeyFromString("PVT_K1_27Hseiioosmff4ue31Jv37pC1NWfhbjuKuSBxEkqCTzbJtxQD2");
 
 // We only allow one chain to exist at a time in the tester.
 // If we ever find that we need multiple chains, this will
 // need to be kept in sync with whatever updates the native layer.
-static psibase::test_chain* current_chain = nullptr;
+static psibase::TestChain* currentChain = nullptr;
 
-psibase::test_chain::test_chain(const char* snapshot, uint64_t state_size)
-    : id{::tester_create_chain(snapshot ? snapshot : "",
-                               snapshot ? strlen(snapshot) : 0,
-                               state_size)}
+psibase::TestChain::TestChain() : id{::testerCreateChain()}
 {
-   current_chain = this;
+   currentChain = this;
 }
 
-psibase::test_chain::~test_chain()
+psibase::TestChain::~TestChain()
 {
-   current_chain = nullptr;
-   ::tester_destroy_chain(id);
+   currentChain = nullptr;
+   ::testerDestroyChain(id);
 }
 
-void psibase::test_chain::shutdown()
+void psibase::TestChain::shutdown()
 {
-   ::tester_shutdown_chain(id);
+   ::testerShutdownChain(id);
 }
 
-std::string psibase::test_chain::get_path()
+std::string psibase::TestChain::getPath()
 {
-   size_t      len = tester_get_chain_path(id, nullptr, 0);
+   size_t      len = testerGetChainPath(id, nullptr, 0);
    std::string result(len, 0);
-   tester_get_chain_path(id, result.data(), len);
+   testerGetChainPath(id, result.data(), len);
    return result;
 }
 
-void psibase::test_chain::start_block(int64_t skip_miliseconds)
+void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 {
-   head_block_info.reset();
+   headBlockInfo.reset();
    if (skip_miliseconds >= 500)
    {
-      // Guarantee that there is a recent block for fill_tapos to use.
-      ::tester_start_block(id, skip_miliseconds - 500);
-      ::tester_start_block(id, 0);
+      // Guarantee that there is a recent block for fillTapos to use.
+      ::testerStartBlock(id, skip_miliseconds - 500);
+      ::testerStartBlock(id, 0);
    }
    else
    {
-      ::tester_start_block(id, skip_miliseconds);
+      ::testerStartBlock(id, skip_miliseconds);
    }
 }
 
-void psibase::test_chain::start_block(std::string_view time)
+void psibase::TestChain::startBlock(std::string_view time)
 {
    uint64_t value;
    auto     data = time.data();
-   check(string_to_utc_microseconds(value, data, data + time.size(), true), "bad time");
-   start_block(TimePointSec{.seconds = uint32_t(value / 1000)});
+   check(stringToUtcMicroseconds(value, data, data + time.size(), true), "bad time");
+   startBlock(TimePointSec{.seconds = uint32_t(value / 1000)});
 }
 
-void psibase::test_chain::start_block(TimePointSec tp)
+void psibase::TestChain::startBlock(TimePointSec tp)
 {
-   finish_block();
-   auto head_time = get_head_block_info().header.time;
+   finishBlock();
+   auto head_time = getHeadBlockInfo().header.time;
    // auto skip      = (tp - head_time).count() / 1000 - 500;
    auto skip = tp.seconds - head_time.seconds;
-   start_block(skip);
+   startBlock(skip);
 }
 
-void psibase::test_chain::finish_block()
+void psibase::TestChain::finishBlock()
 {
-   head_block_info.reset();
-   ::tester_finish_block(id);
+   headBlockInfo.reset();
+   ::testerFinishBlock(id);
 }
 
-const psibase::BlockInfo& psibase::test_chain::get_head_block_info()
+const psibase::BlockInfo& psibase::TestChain::getHeadBlockInfo()
 {
-   if (!head_block_info)
+   if (!headBlockInfo)
    {
-      std::vector<char> bin;
-      ::get_head_block_info(id,
-                            [&](size_t size)
-                            {
-                               bin.resize(size);
-                               return bin.data();
-                            });
-      head_block_info = psio::convert_from_frac<BlockInfo>(bin);
+      if (auto status = system_contract::getOptionalStatus())
+         headBlockInfo = status->head;
    }
-   return *head_block_info;
+   return *headBlockInfo;
 }
 
-void psibase::test_chain::fill_tapos(Transaction& t, uint32_t expire_sec)
+void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec)
 {
-   auto& info                 = get_head_block_info();
+   auto& info                 = getHeadBlockInfo();
    t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
    auto [index, suffix]       = system_contract::headTapos();
    t.tapos.refBlockIndex      = index;
    t.tapos.refBlockSuffix     = suffix;
 }
 
-psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&& actions)
+psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions)
 {
    Transaction t;
-   fill_tapos(t);
+   fillTapos(t);
    t.actions = std::move(actions);
    return t;
 }
 
-[[nodiscard]] psibase::TransactionTrace psibase::test_chain::pushTransaction(
-    const SignedTransaction& signed_trx)
+[[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(
+    const SignedTransaction& signedTrx)
 {
-   std::vector<char> packed_trx = psio::convert_to_frac(signed_trx);
+   std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
    std::vector<char> bin;
    ::pushTransaction(id, packed_trx.data(), packed_trx.size(),
                      [&](size_t size)
@@ -339,7 +317,7 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
    return psio::convert_from_frac<TransactionTrace>(bin);
 }
 
-[[nodiscard]] psibase::TransactionTrace psibase::test_chain::pushTransaction(
+[[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(
     Transaction                                          trx,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
@@ -348,26 +326,26 @@ psibase::Transaction psibase::test_chain::make_transaction(std::vector<Action>&&
           .contract = system_contract::VerifyEcSys::contract,
           .rawData  = psio::convert_to_frac(pub),
       });
-   SignedTransaction signed_trx;
-   signed_trx.transaction = trx;
-   auto hash              = sha256(signed_trx.transaction.data(), signed_trx.transaction.size());
+   SignedTransaction signedTrx;
+   signedTrx.transaction = trx;
+   auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
    for (auto& [pub, priv] : keys)
-      signed_trx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
-   return pushTransaction(signed_trx);
+      signedTrx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
+   return pushTransaction(signedTrx);
 }
 
-psibase::TransactionTrace psibase::test_chain::transact(
+psibase::TransactionTrace psibase::TestChain::transact(
     std::vector<Action>&&                                actions,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
-    const char*                                          expected_except)
+    const char*                                          expectedExcept)
 {
-   auto trace = pushTransaction(make_transaction(std::move(actions)), keys);
-   expect(trace, expected_except);
+   auto trace = pushTransaction(makeTransaction(std::move(actions)), keys);
+   expect(trace, expectedExcept);
    return trace;
 }
 
-psibase::TransactionTrace psibase::test_chain::transact(std::vector<Action>&& actions,
-                                                        const char*           expected_except)
+psibase::TransactionTrace psibase::TestChain::transact(std::vector<Action>&& actions,
+                                                       const char*           expectedExcept)
 {
-   return transact(std::move(actions), {{default_pub_key, default_priv_key}}, expected_except);
+   return transact(std::move(actions), {{defaultPubKey, defaultPrivKey}}, expectedExcept);
 }

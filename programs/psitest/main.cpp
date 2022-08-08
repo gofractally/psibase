@@ -134,9 +134,8 @@ struct test_chain
    std::unique_ptr<psibase::ActionContext>      nativeFunctionsActionContext;
    std::unique_ptr<psibase::NativeFunctions>    nativeFunctions;
 
-   test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
+   test_chain(::state& state) : state{state}
    {
-      psibase::check(snapshot.empty(), "snapshots not implemented");
       dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
       db     = {dir, true};
       writer = db.createWriter();
@@ -161,10 +160,10 @@ struct test_chain
       boost::filesystem::remove_all(dir);
    }
 
-   void start_block(int64_t skip_miliseconds = 0)
+   void startBlock(int64_t skip_miliseconds = 0)
    {
       // TODO: undo control
-      finish_block();
+      finishBlock();
       revisionAtBlockStart = db.getHead();
       blockContext =
           std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
@@ -187,10 +186,10 @@ struct test_chain
    void start_if_needed()
    {
       if (!blockContext)
-         start_block();
+         startBlock();
    }
 
-   void finish_block()
+   void finishBlock()
    {
       if (blockContext)
       {
@@ -589,7 +588,7 @@ struct callbacks
       return 0;
    }
 
-   bool tester_read_whole_file(span<const char> filename, uint32_t cb_alloc_data, uint32_t cb_alloc)
+   bool testerReadWholeFile(span<const char> filename, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
       file f = fopen(span_str(filename).c_str(), "r");
       if (!f.f)
@@ -612,7 +611,7 @@ struct callbacks
       return true;
    }
 
-   int32_t tester_execute(span<const char> command) { return system(span_str(command).c_str()); }
+   int32_t testerExecute(span<const char> command) { return system(span_str(command).c_str()); }
 
    test_chain& assert_chain(uint32_t chain, bool require_context = true)
    {
@@ -624,15 +623,15 @@ struct callbacks
       return result;
    }
 
-   uint32_t tester_create_chain(span<const char> snapshot, uint64_t state_size)
+   uint32_t testerCreateChain()
    {
-      state.chains.push_back(std::make_unique<test_chain>(state, span_str(snapshot), state_size));
+      state.chains.push_back(std::make_unique<test_chain>(state));
       if (state.chains.size() == 1)
          state.selected_chain_index = 0;
       return state.chains.size() - 1;
    }
 
-   void tester_destroy_chain(uint32_t chain)
+   void testerDestroyChain(uint32_t chain)
    {
       assert_chain(chain, false);
       if (state.selected_chain_index && *state.selected_chain_index == chain)
@@ -644,7 +643,7 @@ struct callbacks
       }
    }
 
-   void tester_shutdown_chain(uint32_t chain)
+   void testerShutdownChain(uint32_t chain)
    {
       auto& c = assert_chain(chain);
       c.blockContext.reset();
@@ -652,49 +651,28 @@ struct callbacks
       c.db = {};
    }
 
-   uint32_t tester_get_chain_path(uint32_t chain, span<char> dest)
+   uint32_t testerGetChainPath(uint32_t chain, span<char> dest)
    {
       auto& c = assert_chain(chain, false);
       memcpy(dest.data(), c.dir.c_str(), std::min(dest.size(), c.dir.size()));
       return c.dir.size();
    }
 
-   void tester_start_block(uint32_t chain_index, int64_t skip_miliseconds)
+   void testerStartBlock(uint32_t chain_index, int64_t skip_miliseconds)
    {
-      assert_chain(chain_index).start_block(skip_miliseconds);
+      assert_chain(chain_index).startBlock(skip_miliseconds);
    }
 
-   void tester_finish_block(uint32_t chain_index) { assert_chain(chain_index).finish_block(); }
+   void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
 
-   // TODO: drop this and add general kv access
-   void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
-   {
-      test_chain& chain = assert_chain(chain_index);
-
-      if (!chain.blockContext)
-      {
-         throw std::runtime_error("invalid block context");
-      }
-
-      auto status = chain.blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
-                                                                     psibase::statusKey());
-      psibase::BlockInfo bi;
-      if (status && status->head)
-      {
-         bi = *(status->head);
-      }
-
-      set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(bi));
-   }
-
-   void tester_push_transaction(uint32_t         chain_index,
-                                span<const char> args_packed,
-                                uint32_t         cb_alloc_data,
-                                uint32_t         cb_alloc)
+   void testerPushTransaction(uint32_t         chain_index,
+                              span<const char> args_packed,
+                              uint32_t         cb_alloc_data,
+                              uint32_t         cb_alloc)
    {
       auto&              chain = assert_chain(chain_index);
       psio::input_stream s     = {args_packed.data(), args_packed.size()};
-      auto               signed_trx =
+      auto               signedTrx =
           psio::convert_from_frac<psibase::SignedTransaction>(psio::input_stream{s.pos, s.end});
 
       chain.start_if_needed();
@@ -704,10 +682,10 @@ struct callbacks
       {
          psibase::BlockContext proofBC{*chain.sys, chain.revisionAtBlockStart};
          proofBC.start(chain.blockContext->current.header.time);
-         psibase::check(!proofBC.isGenesisBlock || signed_trx.proofs.empty(),
+         psibase::check(!proofBC.isGenesisBlock || signedTrx.proofs.empty(),
                         "Genesis block may not have proofs");
-         for (size_t i = 0; i < signed_trx.proofs.size(); ++i)
-            proofBC.verifyProof(signed_trx, trace, i, std::nullopt);
+         for (size_t i = 0; i < signedTrx.proofs.size(); ++i)
+            proofBC.verifyProof(signedTrx, trace, i, std::nullopt);
 
          if (!proofBC.needGenesisAction)
          {
@@ -719,11 +697,11 @@ struct callbacks
             // tests to chain transactions which modify auth. psinode
             // doesn't provide this luxury.
             auto saveTrace = trace;
-            chain.blockContext->checkFirstAuth(signed_trx, trace, std::nullopt);
+            chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt);
             trace = std::move(saveTrace);
          }
 
-         chain.blockContext->pushTransaction(signed_trx, trace, std::nullopt);
+         chain.blockContext->pushTransaction(signedTrx, trace, std::nullopt);
       }
       catch (const std::exception& e)
       {
@@ -741,7 +719,7 @@ struct callbacks
       set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(trace));
    }
 
-   void tester_select_chain_for_db(uint32_t chain_index)
+   void testerSelectChainForDb(uint32_t chain_index)
    {
       assert_chain(chain_index);
       state.selected_chain_index = chain_index;
@@ -817,17 +795,16 @@ void register_callbacks()
    rhf_t::add<&callbacks::tester_close_file>("env", "tester_close_file");
    rhf_t::add<&callbacks::tester_write_file>("env", "tester_write_file");
    rhf_t::add<&callbacks::tester_read_file>("env", "tester_read_file");
-   rhf_t::add<&callbacks::tester_read_whole_file>("env", "tester_read_whole_file");
-   rhf_t::add<&callbacks::tester_execute>("env", "tester_execute");
-   rhf_t::add<&callbacks::tester_create_chain>("env", "tester_create_chain");
-   rhf_t::add<&callbacks::tester_destroy_chain>("env", "tester_destroy_chain");
-   rhf_t::add<&callbacks::tester_shutdown_chain>("env", "tester_shutdown_chain");
-   rhf_t::add<&callbacks::tester_get_chain_path>("env", "tester_get_chain_path");
-   rhf_t::add<&callbacks::tester_start_block>("env", "tester_start_block");
-   rhf_t::add<&callbacks::tester_finish_block>("env", "tester_finish_block");
-   rhf_t::add<&callbacks::tester_get_head_block_info>("env", "tester_get_head_block_info");
-   rhf_t::add<&callbacks::tester_push_transaction>("env", "tester_push_transaction");
-   rhf_t::add<&callbacks::tester_select_chain_for_db>("env", "tester_select_chain_for_db");
+   rhf_t::add<&callbacks::testerReadWholeFile>("env", "testerReadWholeFile");
+   rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
+   rhf_t::add<&callbacks::testerCreateChain>("env", "testerCreateChain");
+   rhf_t::add<&callbacks::testerDestroyChain>("env", "testerDestroyChain");
+   rhf_t::add<&callbacks::testerShutdownChain>("env", "testerShutdownChain");
+   rhf_t::add<&callbacks::testerGetChainPath>("env", "testerGetChainPath");
+   rhf_t::add<&callbacks::testerStartBlock>("env", "testerStartBlock");
+   rhf_t::add<&callbacks::testerFinishBlock>("env", "testerFinishBlock");
+   rhf_t::add<&callbacks::testerPushTransaction>("env", "testerPushTransaction");
+   rhf_t::add<&callbacks::testerSelectChainForDb>("env", "testerSelectChainForDb");
    rhf_t::add<&callbacks::getResult>("env", "getResult");
    rhf_t::add<&callbacks::getKey>("env", "getKey");
    rhf_t::add<&callbacks::kvGet>("env", "kvGet");

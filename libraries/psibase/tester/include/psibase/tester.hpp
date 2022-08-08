@@ -1,5 +1,3 @@
-// TODO: clean up interface and naming convention
-
 #pragma once
 #include <catch2/catch.hpp>
 #include <iostream>
@@ -27,7 +25,7 @@ namespace psibase
       return {};
    }
 
-   inline const ActionTrace& get_top_action(TransactionTrace& t, size_t num)
+   inline const ActionTrace& getTopAction(TransactionTrace& t, size_t num)
    {
       // TODO: redesign TransactionTrace to make this easier
       // Current layout:
@@ -51,12 +49,12 @@ namespace psibase
       return *top_traces[2 * num + 1];
    }
 
-   std::vector<char> read_whole_file(std::string_view filename);
+   std::vector<char> readWholeFile(std::string_view filename);
 
    int32_t execute(std::string_view command);
 
    /**
-    * Validates the status of a transaction.  If expected_except is "", then the
+    * Validates the status of a transaction.  If expectedExcept is "", then the
     * transaction should succeed.  Otherwise it represents a string which should be
     * part of the error message.
     */
@@ -88,7 +86,7 @@ namespace psibase
       Result(TransactionTrace&& t)
           : TraceResult(std::forward<TransactionTrace>(t)), _return(std::nullopt)
       {
-         auto actionTrace = get_top_action(t, 0);
+         auto actionTrace = getTopAction(t, 0);
          if (actionTrace.rawRetval.size() != 0)
          {
             _return = psio::convert_from_frac<ReturnType>(actionTrace.rawRetval);
@@ -122,24 +120,24 @@ namespace psibase
 
    /**
     * Manages a chain.
-    * Only one test_chain can exist at a time.
-    * The test chain uses simulated time starting at 2020-01-01T00:00:00.000.
+    * Only one TestChain can exist at a time.
+    * The test chain uses simulated time.
     */
-   class test_chain
+   class TestChain
    {
      private:
       uint32_t                 id;
-      std::optional<BlockInfo> head_block_info;
+      std::optional<BlockInfo> headBlockInfo;
 
      public:
-      static const PublicKey  default_pub_key;
-      static const PrivateKey default_priv_key;
+      static const PublicKey  defaultPubKey;
+      static const PrivateKey defaultPrivKey;
 
-      test_chain(const char* snapshot = nullptr, uint64_t state_size = 1024 * 1024 * 1024);
-      test_chain(const test_chain&) = delete;
-      virtual ~test_chain();
+      TestChain();
+      TestChain(const TestChain&) = delete;
+      virtual ~TestChain();
 
-      test_chain& operator=(const test_chain&) = delete;
+      TestChain& operator=(const TestChain&) = delete;
 
       /**
        * Shuts down the chain to allow copying its state file. The chain's temporary path will
@@ -150,7 +148,7 @@ namespace psibase
       /**
        * Get the temporary path which contains the chain's blocks and states directories
        */
-      std::string get_path();
+      std::string getPath();
 
       /**
        * Start a new pending block.  If a block is currently pending, finishes it first.
@@ -159,33 +157,33 @@ namespace psibase
        * @param skip_milliseconds The amount of time to skip in addition to the 500 ms block time.
        * truncated to a multiple of 500 ms.
        */
-      void start_block(int64_t skip_miliseconds = 0);
+      void startBlock(int64_t skip_miliseconds = 0);
 
-      void start_block(std::string_view time);
+      void startBlock(std::string_view time);
 
-      void start_block(TimePointSec tp);
+      void startBlock(TimePointSec tp);
 
       /**
        * Finish the current pending block.  If no block is pending, creates an empty block.
        */
-      void finish_block();
+      void finishBlock();
 
-      const BlockInfo& get_head_block_info();
+      const BlockInfo& getHeadBlockInfo();
 
       /*
        * Set the reference block of the transaction to the head block.
        */
-      void fill_tapos(Transaction& t, uint32_t expire_sec = 2);
+      void fillTapos(Transaction& t, uint32_t expire_sec = 2);
 
       /*
        * Creates a transaction.
        */
-      Transaction make_transaction(std::vector<Action>&& actions = {});
+      Transaction makeTransaction(std::vector<Action>&& actions = {});
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] TransactionTrace pushTransaction(const SignedTransaction& signed_trx);
+      [[nodiscard]] TransactionTrace pushTransaction(const SignedTransaction& signedTrx);
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
@@ -193,7 +191,7 @@ namespace psibase
       [[nodiscard]] TransactionTrace pushTransaction(
           Transaction                                          trx,
           const std::vector<std::pair<PublicKey, PrivateKey>>& keys = {
-              {default_pub_key, default_priv_key}});
+              {defaultPubKey, defaultPrivKey}});
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
@@ -202,9 +200,9 @@ namespace psibase
        */
       TransactionTrace transact(std::vector<Action>&&                                actions,
                                 const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
-                                const char* expected_except = nullptr);
+                                const char* expectedExcept = nullptr);
       TransactionTrace transact(std::vector<Action>&& actions,
-                                const char*           expected_except = nullptr);
+                                const char*           expectedExcept = nullptr);
 
       template <typename Action, typename... Args>
       auto trace(const std::optional<std::vector<std::vector<char>>>& cfd,
@@ -213,35 +211,34 @@ namespace psibase
       {
          if (!cfd)
          {
-            return pushTransaction(
-                make_transaction({action.to_action(std::forward<Args>(args)...)}),
-                {default_priv_key});
+            return pushTransaction(makeTransaction({action.to_action(std::forward<Args>(args)...)}),
+                                   {defaultPrivKey});
          }
          else
          {
             return pushTransaction(
-                make_transaction({}, {action.to_action(std::forward<Args>(args)...)}),
-                {default_priv_key}, *cfd);
+                makeTransaction({}, {action.to_action(std::forward<Args>(args)...)}),
+                {defaultPrivKey}, *cfd);
          }
       }
 
       template <typename Action>
       auto trace(Action&& a)
       {
-         return pushTransaction(make_transaction({a}));
+         return pushTransaction(makeTransaction({a}));
       }
 
       /**
        *  This will push a transaction and return the trace and return value
        */
-      struct push_transaction_proxy
+      struct PushTransactionProxy
       {
-         push_transaction_proxy(test_chain& t, AccountNumber s, AccountNumber r)
+         PushTransactionProxy(TestChain& t, AccountNumber s, AccountNumber r)
              : chain(t), sender(s), receiver(r)
          {
          }
 
-         test_chain&   chain;
+         TestChain&    chain;
          AccountNumber sender;
          AccountNumber receiver;
 
@@ -258,9 +255,9 @@ namespace psibase
       };
 
       template <typename Contract>
-      struct ContractUser : public psio::reflect<Contract>::template proxy<push_transaction_proxy>
+      struct ContractUser : public psio::reflect<Contract>::template proxy<PushTransactionProxy>
       {
-         using base = typename psio::reflect<Contract>::template proxy<push_transaction_proxy>;
+         using base = typename psio::reflect<Contract>::template proxy<PushTransactionProxy>;
          using base::base;
 
          auto* operator->() const { return this; }
@@ -269,7 +266,7 @@ namespace psibase
 
       struct UserContext
       {
-         test_chain&   t;
+         TestChain&    t;
          AccountNumber id;
 
          template <typename Other>
@@ -282,6 +279,6 @@ namespace psibase
       };
 
       auto as(AccountNumber id) { return UserContext{*this, id}; }
-   };  // test_chain
+   };  // TestChain
 
 }  // namespace psibase
