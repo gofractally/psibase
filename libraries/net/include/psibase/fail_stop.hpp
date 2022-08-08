@@ -179,16 +179,6 @@ namespace psibase::net
          }
       };
 
-      struct append_entries_response2
-      {
-         producer_id node;
-         id_type missing_block;
-         std::string to_string() const
-         {
-            return "block request: missing=" + std::to_string(missing_block);
-         }
-      };
-
       using message_type = std::variant<hello_request, hello_response, append_entries_request, append_entries_response, request_vote_request, request_vote_response>;
 
       peer_connection& get_connection(peer_id id)
@@ -575,15 +565,6 @@ namespace psibase::net
          }
          // otherwise ignore out-dated response
       }
-#if 0
-      void recv(peer_id, const append_entries_response2& response)
-      {
-         if(auto* b = chain().get(response.missing_block))
-         {
-            network().sendto(response.node, append_entries_request{.term = b->term, .leader_id = b->producer, .leader_commit = chain().commit_index(), .block = *b});
-         }
-      }
-#endif
       void recv(peer_id, const request_vote_request& request)
       {
          update_term(request.term);
