@@ -3,6 +3,7 @@ target_link_libraries(psinode
     contracts_system
     psibase_http
     debug_eos_vm
+    psibase_net
 )
 target_include_directories(psinode PUBLIC
     ../../libraries/psibase/contract/include

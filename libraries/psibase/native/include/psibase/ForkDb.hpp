@@ -3,6 +3,7 @@
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 #include <psibase/BlockContext.hpp>
+#include <iostream>
 
 namespace psibase
 {
@@ -107,7 +108,8 @@ namespace psibase
       void async_switch_fork(F&& callback)
       {
          // Don't switch if we are currently building a block...
-         if(blockContext->active) return;
+         // FIXME: This means that we need to switch if a block is aborted
+         if(blockContext) return;
          auto pos = byOrderIndex.end();
          --pos;
          auto new_head = get_state(pos->second);
@@ -154,10 +156,10 @@ namespace psibase
                auto* next_state = get_state(iter->second);
                if(!next_state->revision)
                {
-                  blockContext->db.setRevision(state->revision);
-                  blockContext->start(Block{get(next_state->blockId())->block});
-                  blockContext->execAllInBlock();
-                  auto [newRevision,id] = blockContext->writeRevision();
+                  BlockContext ctx(*systemContext, state->revision, writer, true);
+                  ctx.start(Block{get(next_state->blockId())->block});
+                  ctx.execAllInBlock();
+                  auto [newRevision,id] = ctx.writeRevision();
                   // TODO: verify block id here?
                   // TODO: handle other errors and blacklist the block and its descendants
                   next_state->revision = newRevision;
@@ -185,7 +187,7 @@ namespace psibase
       void commit(BlockNum num)
       {
          commitIndex = std::max(std::min(num, head->blockNum()), commitIndex);
-         blockContext->systemContext.sharedDatabase.removeRevisions(*blockContext->writer, byBlocknumIndex.find(num)->second);
+         systemContext->sharedDatabase.removeRevisions(*writer, byBlocknumIndex.find(num)->second);
       }
 
       auto get_prev_id(const id_type& id)
@@ -257,17 +259,27 @@ namespace psibase
       template<typename... A>
       void start_block(A&&... a)
       {
+         //assert(!blockContext);
+         blockContext.emplace(*systemContext, head->revision, writer, true);
          blockContext->start(std::forward<A>(a)...);
+         blockContext->callStartBlock();
       }
       void abort_block()
       {
-         // Ignore the result
-         blockContext->writeRevision();
+         assert(!!blockContext);
+         blockContext.reset();
       }
       BlockHeaderState* finish_block()
       {
+         assert(!!blockContext);
+         if(blockContext->needGenesisAction)
+         {
+            abort_block();
+            return nullptr;
+         }
          auto block = blockContext->current;
          auto [revision, id] = blockContext->writeRevision();
+         systemContext->sharedDatabase.setHead(*writer, revision);
          assert(head->blockId() == block.header.previous);
          auto [iter, _] = blocks.try_emplace(id, SignedBlock{block});
          // TODO: don't recompute sha
@@ -276,11 +288,35 @@ namespace psibase
          byOrderIndex.insert({state_iter->second.order(), id});
          head = &state_iter->second;
          byBlocknumIndex.insert({head->blockNum(), head->blockId()});
+         std::cout << psio::convert_to_json(blockContext->current.header) << "\n";
          return head;
       }
 
+      bool isProducing() const { return !!blockContext; }
+
+      void setBlockContext(SystemContext* sc, WriterPtr writer)
+      {
+         systemContext = sc;
+         this->writer = std::move(writer);
+         head->revision = systemContext->sharedDatabase.getHead();
+         // TODO: set up initial state
+      }
+      BlockContext* getBlockContext()
+      {
+         if(blockContext)
+         {
+            return &*blockContext;
+         }
+         else
+         {
+            return nullptr;
+         }
+      }
+
    private:
-      BlockContext* blockContext = nullptr;
+      std::optional<BlockContext> blockContext;
+      SystemContext* systemContext = nullptr;
+      WriterPtr writer;
       BlockNum commitIndex = 1;
       BlockHeaderState* head = nullptr;
       std::map<Checksum256, SignedBlock> blocks;

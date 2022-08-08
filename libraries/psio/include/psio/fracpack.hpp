@@ -1315,7 +1315,15 @@ namespace psio
       }
       else if constexpr (is_shared_view_ptr<T>::value)
       {
-         return fracvalidate<typename is_shared_view_ptr<T>::value_type>(b, e);
+         if ((stream.valid = (stream.end - stream.begin >= 4)))
+         {
+            std::uint32_t size;
+            std::memcpy(&size, stream.begin, sizeof(size));
+            stream.pos += sizeof(size) + size;
+            stream.heap = stream.pos;
+            stream.valid = fracvalidate<typename is_shared_view_ptr<T>::value_type>(stream.begin + 4, stream.pos).valid;
+         }
+         return stream;
       }
       else if constexpr (not may_use_heap<T>())
       {

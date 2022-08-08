@@ -43,8 +43,8 @@ namespace psibase::net
       for(auto ch : c)
       {
          static const char xdigits[] = "0123456789ABCDEF";
-         result += xdigits[ch & 0xF];
          result += xdigits[(ch >> 4) & 0xF];
+         result += xdigits[ch & 0xF];
       }
       return result;
    }
@@ -272,16 +272,24 @@ namespace psibase::net
             // what happens if the peer lies, but at least this way we guarantee
             // that our local invariants hold.
             connection.last_received = {request.xid.id(), b->block.header.blockNum};
-            connection.last_sent = chain().get_common_ancestor(connection.last_received);
-            // async_send_fork will reset syncing if there is nothing to sync
-            connection.syncing = true;
-            connection.ready = true;
-            std::cout << "ready: received=" << to_string(connection.last_received.id()) << " common=" << to_string(connection.last_sent.id()) << std::endl;
-            // FIXME: blocks and hellos need to be sequenced correctly
-            network().async_send_block(connection.id, hello_response{}, [this, &connection](const std::error_code&){
-               async_send_fork(connection);
-            });
          }
+         else if(auto* b = chain().get_state(request.xid.id()))
+         {
+            connection.last_received = {request.xid.id(), b->blockNum()};
+         }
+         else
+         {
+            return;
+         }
+         connection.last_sent = chain().get_common_ancestor(connection.last_received);
+         // async_send_fork will reset syncing if there is nothing to sync
+         connection.syncing = true;
+         connection.ready = true;
+         std::cout << "ready: received=" << to_string(connection.last_received.id()) << " common=" << to_string(connection.last_sent.id()) << std::endl;
+         // FIXME: blocks and hellos need to be sequenced correctly
+         network().async_send_block(connection.id, hello_response{}, [this, &connection](const std::error_code&){
+            async_send_fork(connection);
+         });
       }
       void recv(peer_id origin, const hello_response&)
       {
@@ -343,10 +351,12 @@ namespace psibase::net
             }
             else if(_state == producer_state::leader)
             {
-               auto* b = chain().finish_block();
-               update_match_index(self, b->blockNum());
-               update_committed();
-               on_fork_switch(&b->info.header);
+               if(auto* b = chain().finish_block())
+               {
+                  update_match_index(self, b->blockNum());
+                  update_committed();
+                  on_fork_switch(&b->info.header);
+               }
                start_leader();
             }
          });
@@ -394,6 +404,7 @@ namespace psibase::net
             auto next_block_id = chain().get_block_id(peer.last_sent.num() + 1);
             peer.last_sent = {next_block_id, peer.last_sent.num() + 1};
             auto next_block = chain().get(next_block_id);
+
             network().async_send_block(
                 peer.id,
                 // TODO: This should probably use the current term/leader not the

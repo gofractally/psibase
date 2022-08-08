@@ -64,13 +64,14 @@ namespace psibase::net
       }
       void async_connect(std::string_view host, std::string_view service)
       {
+         std::cout << "Connecting to " << host << ":" << service << std::endl;
          _resolver.async_resolve(host, service, [this](const std::error_code& ec, const auto& endpoints){
             // TODO: report error
             if(!ec)
             {
                auto id = next_peer_id++;
                auto [iter,_] = _connections.try_emplace(id, std::make_shared<connection>(_ctx));
-               boost::asio::async_connect(iter->second._socket, endpoints, [this,id](const std::error_code& ec, const boost::asio::ip::tcp::endpoint& e){
+               boost::asio::async_connect(iter->second->_socket, endpoints, [this,id](const std::error_code& ec, const boost::asio::ip::tcp::endpoint& e){
                      if(ec)
                      {
                         std::cout << "Failed connecting" << std::endl;
@@ -82,6 +83,10 @@ namespace psibase::net
                         start_connection(id);
                      }
                   });
+            }
+            else
+            {
+               std::cout << "resolve failed: "  << ec.message() << std::endl;
             }
          });
       }
@@ -108,6 +113,7 @@ namespace psibase::net
             throw std::runtime_error("unknown peer");
          }
          using message_type = decltype(get_message_impl());
+         auto check_round_trip = psio::from_frac<message_type>(psio::to_frac(message_type{msg}));
          iter->second->async_write(psio::to_frac(message_type{msg}), std::forward<F>(f));
       }
       template<typename Msg>
