@@ -84,17 +84,10 @@ namespace system_contract
       //       also update contracts which use `head + 1`
       psibase::BlockNum     headBlockNum() const;
       psibase::TimePointSec headBlockTime() const;
-
-      // TODO: move to another contract
-      uint8_t setCode(psibase::AccountNumber contract,
-                      uint8_t                vmType,
-                      uint8_t                vmVersion,
-                      std::vector<char>      code);
    };
    PSIO_REFLECT(TransactionSys,
                 method(startBlock),
                 method(getTransaction),
-                method(setCode, contact, vmType, vmVersion, code),
                 method(headBlockNum),
                 method(headBlockTime))
 

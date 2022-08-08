@@ -12,6 +12,7 @@ function(add suffix)
         AuthEcSys/include
         AuthFakeSys/include
         ProxySys/include
+        SetCodeSys/include
         TransactionSys/include
         VerifyEcSys/include
     )
@@ -25,6 +26,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(AuthEcSys)
     add_subdirectory(AuthFakeSys)
     add_subdirectory(ProxySys)
+    add_subdirectory(SetCodeSys)
     add_subdirectory(TransactionSys)
     add_subdirectory(VerifyEcSys)
 endif()

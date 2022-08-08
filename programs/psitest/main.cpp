@@ -303,6 +303,7 @@ struct callbacks
 
    void backtrace()
    {
+      fprintf(stderr, "Generating backtrace...\n");
       void* data[max_backtrace_frames];
       int   count =
           state.backend.get_context().backtrace(data, sizeof(data) / sizeof(data[0]), nullptr);

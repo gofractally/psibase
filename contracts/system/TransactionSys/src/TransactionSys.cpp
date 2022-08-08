@@ -55,57 +55,6 @@ namespace system_contract
       return {};
    }
 
-   // TODO: move to another contract
-   uint8_t TransactionSys::setCode(AccountNumber     contract,
-                                   uint8_t           vmType,
-                                   uint8_t           vmVersion,
-                                   std::vector<char> code)
-   {
-      // TODO: validate code
-      check(getSender() == contract, "sender must match contract account");
-      auto account = kvGet<AccountRow>(AccountRow::db, accountKey(contract));
-      check(account.has_value(), "can not set code on a missing account");
-      auto codeHash = sha256(code.data(), code.size());
-      if (vmType == account->vmType && vmVersion == account->vmVersion &&
-          codeHash == account->codeHash)
-         return 0;
-      if (account->codeHash != Checksum256{})
-      {
-         // TODO: Refund RAM? A different resource?
-         auto code_obj = kvGet<codeRow>(
-             codeRow::db, codeKey(account->codeHash, account->vmType, account->vmVersion));
-         check(code_obj.has_value(), "missing code object");
-         if (--code_obj->numRefs)
-            kvPut(code_obj->db, code_obj->key(), *code_obj);
-         else
-         {
-            // TODO: erase code_obj
-         }
-      }
-
-      // TODO: Bill RAM? A different resource?
-      account->codeHash  = codeHash;
-      account->vmType    = vmType;
-      account->vmVersion = vmVersion;
-      kvPut(account->db, account->key(), *account);
-
-      auto code_obj = kvGet<codeRow>(
-          codeRow::db, codeKey(account->codeHash, account->vmType, account->vmVersion));
-      if (!code_obj)
-      {
-         code_obj.emplace(codeRow{
-             .codeHash  = account->codeHash,
-             .vmType    = account->vmType,
-             .vmVersion = account->vmVersion,
-         });
-         code_obj->code.assign(code.begin(), code.end());
-      }
-      ++code_obj->numRefs;
-      kvPut(code_obj->db, code_obj->key(), *code_obj);
-
-      return 0;
-   }  // setCode
-
    // Native code calls this on the transaction-sys account
    //
    // All transactions pass through this function, so it's critical

@@ -134,6 +134,7 @@ function(add_libs suffix)
         ${psidk_DIR}/contracts/system/ProxySys/include
         ${psidk_DIR}/contracts/system/RAccountSys/include
         ${psidk_DIR}/contracts/system/RAuthEcSys/include
+        ${psidk_DIR}/contracts/system/SetCodeSys/include
         ${psidk_DIR}/contracts/system/TransactionSys/include
         ${psidk_DIR}/contracts/system/VerifyEcSys/include
     )

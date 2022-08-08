@@ -8,6 +8,7 @@
 #include <contracts/system/RAccountSys.hpp>
 #include <contracts/system/RAuthEcSys.hpp>
 #include <contracts/system/RProxySys.hpp>
+#include <contracts/system/SetCodeSys.hpp>
 #include <contracts/system/TransactionSys.hpp>
 #include <contracts/system/VerifyEcSys.hpp>
 #include <contracts/user/ExploreSys.hpp>
@@ -50,6 +51,12 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                              .authContract = system_contract::AuthFakeSys::contract,
                              .flags        = system_contract::TransactionSys::contractFlags,
                              .code         = readWholeFile("TransactionSys.wasm"),
+                        },
+                         {
+                             .contract     = system_contract::SetCodeSys::contract,
+                             .authContract = system_contract::AuthFakeSys::contract,
+                             .flags        = system_contract::SetCodeSys::contractFlags,
+                             .code         = readWholeFile("SetCodeSys.wasm"),
                         },
                          {
                              .contract     = system_contract::AccountSys::contract,
@@ -184,10 +191,10 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
 {
    add_account(acc, AccountNumber("auth-fake-sys"), show);
 
-   transactor<system_contract::TransactionSys> tsys{acc, system_contract::TransactionSys::contract};
+   transactor<system_contract::SetCodeSys> scsys{acc, system_contract::SetCodeSys::contract};
 
    auto trace =
-       pushTransaction(makeTransaction({{tsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
+       pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
 
    check(psibase::show(show, trace) == "", "Failed to create contract");
 

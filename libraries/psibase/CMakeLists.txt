@@ -130,6 +130,7 @@ function(add suffix)
             ../../contracts/system/AuthEcSys/include
             ../../contracts/system/AuthFakeSys/include
             ../../contracts/system/ProxySys/include
+            ../../contracts/system/SetCodeSys/include
             ../../contracts/system/TransactionSys/include
             ../../contracts/system/VerifyEcSys/include
             ../../contracts/user/CommonSys/include

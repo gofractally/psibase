@@ -65,15 +65,23 @@ fn boot_trx() -> SignedTransaction {
         SharedGenesisContract {
             contract: account!("transact-sys"),
             auth_contract: account!("auth-fake-sys"),
-            flags: 3, // TODO: ?
+            flags: 3, // TODO
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../boot-image/TransactionSys.wasm"),
         },
         SharedGenesisContract {
+            contract: account!("setcode-sys"),
+            auth_contract: account!("auth-fake-sys"),
+            flags: 2, // TODO
+            vm_type: 0,
+            vm_version: 0,
+            code: include_bytes!("../boot-image/SetCodeSys.wasm"),
+        },
+        SharedGenesisContract {
             contract: account!("account-sys"),
             auth_contract: account!("auth-fake-sys"),
-            flags: 2, // TODO: ?
+            flags: 2, // TODO
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../boot-image/AccountSys.wasm"),
