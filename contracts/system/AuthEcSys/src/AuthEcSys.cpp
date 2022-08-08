@@ -45,7 +45,6 @@ namespace system_contract
 
    void AuthEcSys::setKey(psibase::PublicKey key)
    {
-      // TODO: charge resources? provide for free with all accounts?
       check(key.data.index() == 0, "only k1 currently supported");
 
       auto authTable = db.open<AuthTable_t>();

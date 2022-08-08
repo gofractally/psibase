@@ -138,9 +138,6 @@ function(add suffix)
         target_include_directories(psitestlib${suffix} PRIVATE
             ../../contracts/system/VerifyEcSys/include
         )
-        target_link_options(psitestlib${suffix} INTERFACE
-            -Wl,--export-table # TODO: remove
-        )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start
             -nostdlib

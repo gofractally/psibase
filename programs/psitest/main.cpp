@@ -939,19 +939,20 @@ int main(int argc, char* argv[])
       {
          additional_args[cl_flags::timing] = true;
       }
-      else if (!strcmp(argv[next_arg], "-s") || !strcmp(argv[next_arg], "--subst"))
-      {
-         next_arg += 2;
-         if (next_arg >= argc)
-         {
-            std::cerr << argv[next_arg - 2] << " needs 2 args\n";
-            error = true;
-         }
-         else
-         {
-            substitutions[argv[next_arg - 1]] = argv[next_arg];
-         }
-      }
+      // TODO
+      // else if (!strcmp(argv[next_arg], "-s") || !strcmp(argv[next_arg], "--subst"))
+      // {
+      //    next_arg += 2;
+      //    if (next_arg >= argc)
+      //    {
+      //       std::cerr << argv[next_arg - 2] << " needs 2 args\n";
+      //       error = true;
+      //    }
+      //    else
+      //    {
+      //       substitutions[argv[next_arg - 1]] = argv[next_arg];
+      //    }
+      // }
       else
       {
          std::cerr << "unknown option: " << argv[next_arg] << "\n";

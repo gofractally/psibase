@@ -138,7 +138,6 @@ function(add_libs suffix)
         ${psidk_DIR}/contracts/system/VerifyEcSys/include
     )
     target_link_options(psitestlib${suffix} INTERFACE
-        -Wl,--export-table # TODO: remove
         -Wl,--entry,_start
         -nostdlib
     )

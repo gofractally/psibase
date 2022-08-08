@@ -1,3 +1,5 @@
+// TODO: clean up interface and naming convention
+
 #pragma once
 #include <catch2/catch.hpp>
 #include <iostream>

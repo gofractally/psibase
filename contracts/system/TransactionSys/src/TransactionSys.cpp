@@ -112,6 +112,10 @@ namespace system_contract
    // for chain operations. A bug here can stop any new transactions
    // from entering the chain, including transactions which try to
    // fix the problem.
+   //
+   // TODO: move checkFirstAuthAndExit into getCurrentAction()
+   // TODO: reconsider which functions, if any, are direct exports
+   //       instead of going through dispatch
    extern "C" [[clang::export_name("processTransaction")]] void processTransaction(
        bool checkFirstAuthAndExit)
    {
@@ -122,6 +126,7 @@ namespace system_contract
       // TODO: resource billing
       // TODO: subjective mitigation hooks
       // TODO: limit execution time
+      // TODO: limit charged CPU & NET which can go into a block
       auto top_act = getCurrentAction();
       // TODO: avoid copying inner rawData during unpack
       // TODO: verify fracpack (no unknown, no extra data)

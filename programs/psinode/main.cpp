@@ -371,7 +371,6 @@ void run(const std::string& db_path,
 
 const char usage[] = "USAGE: psinode [OPTIONS] database";
 
-// TODO: use a command-line parser
 int main(int argc, char* argv[])
 {
    std::string db_path;

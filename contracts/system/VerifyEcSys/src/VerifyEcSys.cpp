@@ -6,6 +6,7 @@
 
 using namespace psibase;
 
+// TODO: move secp256k1 to another contract
 char               pre[1024];
 secp256k1_context* context = nullptr;
 

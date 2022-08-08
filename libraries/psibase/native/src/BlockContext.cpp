@@ -233,7 +233,6 @@ namespace psibase
             "block has unread subjective data");
    }
 
-   // TODO: limit charged CPU & NET which can go into a block
    void BlockContext::exec(const SignedTransaction&                 trx,
                            TransactionTrace&                        trace,
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,
