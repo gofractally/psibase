@@ -508,6 +508,16 @@ namespace psibase::net
             _state = producer_state::follower;
          }
       }
+      void check_votes()
+      {
+         if(votes_for_me.size() > active_producers.size()/2)
+         {
+            _state = producer_state::leader;
+            match_index.clear();
+            match_index.resize(active_producers.size());
+            start_leader();
+         }
+      }
       // -------------- The timer loop --------------------
       void randomize_timer()
       {
@@ -527,6 +537,7 @@ namespace psibase::net
          randomize_timer();
          _state = producer_state::candidate;
          network().multicast_producers(request_vote_request{current_term, self, chain().get_head()->blockNum, chain().get_head()->term});
+         check_votes();
       }
       // ----------- handling of incoming messages -------------
       void recv(peer_id origin, const append_entries_request& request)
@@ -596,18 +607,12 @@ namespace psibase::net
       void recv(peer_id, const request_vote_response& response)
       {
          update_term(response.term);
-         if(response.candidate_id == self && response.term == current_term && response.vote_granted)
+         if(response.candidate_id == self && response.term == current_term && response.vote_granted && _state == producer_state::candidate)
          {
             if(std::find(votes_for_me.begin(), votes_for_me.end(), response.voter_id) == votes_for_me.end())
             {
                votes_for_me.push_back(response.voter_id);
-               if(votes_for_me.size() > active_producers.size()/2)
-               {
-                  _state = producer_state::leader;
-                  match_index.clear();
-                  match_index.resize(active_producers.size());
-                  start_leader();
-               }
+               check_votes();
             }
          }
       }
