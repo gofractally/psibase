@@ -268,7 +268,7 @@ namespace psibase
          if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix ||
              memcmp(key.data() + 1, irreversible.data(), sizeof(BlockNum)) > 0)
             break;
-         if (!memcmp(key.data() + 1, irreversible.data(), irreversible.size()))
+         if (memcmp(key.data() + 1, irreversible.data(), irreversible.size()))
             writer.remove(topRoot, key);
          key.push_back(0);
       }
