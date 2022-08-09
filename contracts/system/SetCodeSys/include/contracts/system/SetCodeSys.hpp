@@ -8,12 +8,16 @@ namespace system_contract
    struct SetCodeSys : psibase::Contract<SetCodeSys>
    {
       static constexpr auto     contract      = psibase::AccountNumber("setcode-sys");
-      static constexpr uint64_t contractFlags = psibase::AccountRow::allowWriteNative;
+      static constexpr uint64_t contractFlags = psibase::CodeRow::allowWriteNative;
 
-      uint8_t setCode(psibase::AccountNumber contract,
-                      uint8_t                vmType,
-                      uint8_t                vmVersion,
-                      std::vector<char>      code);
+      void setCode(psibase::AccountNumber contract,
+                   uint8_t                vmType,
+                   uint8_t                vmVersion,
+                   std::vector<char>      code);
+
+      void setFlags(psibase::AccountNumber contract, uint64_t flags);
    };
-   PSIO_REFLECT(SetCodeSys, method(setCode, contact, vmType, vmVersion, code))
+   PSIO_REFLECT(SetCodeSys,
+                method(setCode, contact, vmType, vmVersion, code),
+                method(setFlags, contract, flags))
 }  // namespace system_contract

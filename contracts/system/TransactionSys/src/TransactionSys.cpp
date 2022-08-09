@@ -1,3 +1,4 @@
+#include <contracts/system/AccountSys.hpp>
 #include <contracts/system/AuthFakeSys.hpp>
 #include <contracts/system/TransactionSys.hpp>
 #include <psibase/dispatch.hpp>
@@ -14,6 +15,15 @@ static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
 
 namespace system_contract
 {
+   void TransactionSys::startup()
+   {
+      auto tables      = TransactionSys::Tables(TransactionSys::contract);
+      auto statusTable = tables.open<TransactionSysStatusTable>();
+      auto statusIdx   = statusTable.getIndex<0>();
+      check(!statusIdx.get(std::tuple{}), "already started");
+      statusTable.put({.enforceAuth = true});
+   }
+
    // CAUTION: startBlock() is critical to chain operations. If it fails, the chain stops.
    //          If the chain stops, it can only be fixed by forking out the misbehaving
    //          transact-sys.wasm and replacing it with a working one. That procedure
@@ -94,6 +104,8 @@ namespace system_contract
             "transaction was submitted too early");
 
       auto tables        = TransactionSys::Tables(TransactionSys::contract);
+      auto statusTable   = tables.open<TransactionSysStatusTable>();
+      auto statusIdx     = statusTable.getIndex<0>();
       auto includedTable = tables.open<IncludedTrxTable>();
       auto includedIdx   = includedTable.getIndex<0>();
       auto summaryTable  = tables.open<BlockSummaryTable>();
@@ -130,17 +142,25 @@ namespace system_contract
                "transaction references non-existing block");
       }
 
+      auto transactionSysStatus = statusIdx.get(std::tuple{});
+      auto accountSysTables     = AccountSys::Tables(AccountSys::contract);
+      auto accountTable         = accountSysTables.open<AccountTable>();
+      auto accountIndex         = accountTable.getIndex<0>();
+
       for (auto& act : trx.actions)
       {
-         auto account = kvGet<AccountRow>(AccountRow::db, accountKey(act.sender));
-         if (!account)
-            abortMessage("unknown sender \"" + act.sender.str() + "\"");
+         if (transactionSysStatus && transactionSysStatus->enforceAuth)
+         {
+            auto account = accountIndex.get(act.sender);
+            if (!account)
+               abortMessage("unknown sender \"" + act.sender.str() + "\"");
 
-         if constexpr (enable_print)
-            print("call checkAuthSys on ", account->authContract.str(), " for account ",
-                  act.sender.str(), "\n");
-         Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
-         auth.checkAuthSys(act, trx.claims, &act == &trx.actions[0], checkFirstAuthAndExit);
+            if constexpr (enable_print)
+               print("call checkAuthSys on ", account->authContract.str(), " for account ",
+                     act.sender.str(), "\n");
+            Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
+            auth.checkAuthSys(act, trx.claims, &act == &trx.actions[0], checkFirstAuthAndExit);
+         }
          if (checkFirstAuthAndExit)
             break;
          if constexpr (enable_print)

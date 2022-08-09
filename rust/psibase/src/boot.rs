@@ -64,7 +64,6 @@ fn boot_trx() -> SignedTransaction {
     let contracts = vec![
         SharedGenesisContract {
             contract: account!("transact-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 3, // TODO
             vm_type: 0,
             vm_version: 0,
@@ -72,7 +71,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("setcode-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 2, // TODO
             vm_type: 0,
             vm_version: 0,
@@ -80,15 +78,13 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("account-sys"),
-            auth_contract: account!("auth-fake-sys"),
-            flags: 2, // TODO
+            flags: 0,
             vm_type: 0,
             vm_version: 0,
             code: include_bytes!("../boot-image/AccountSys.wasm"),
         },
         SharedGenesisContract {
             contract: account!("proxy-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -96,7 +92,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("auth-fake-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -104,7 +99,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("auth-ec-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -112,7 +106,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("verifyec-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -120,7 +113,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("common-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -128,7 +120,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("r-account-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -136,7 +127,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("r-ath-ec-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -144,7 +134,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("r-proxy-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -152,7 +141,6 @@ fn boot_trx() -> SignedTransaction {
         },
         SharedGenesisContract {
             contract: account!("explore-sys"),
-            auth_contract: account!("auth-fake-sys"),
             flags: 0,
             vm_type: 0,
             vm_version: 0,
@@ -182,15 +170,22 @@ fn common_startup_trx() -> SignedTransaction {
     let startup_data = Startup {
         existing_accounts: vec![],
     };
-    let startup_action = Action {
+    let acc_startup_action = Action {
         sender: account!("account-sys"),
         contract: account!("account-sys"),
         method: method!("startup"),
         raw_data: startup_data.packed_bytes(),
     };
+    let trans_startup_action = Action {
+        sender: account!("transact-sys"),
+        contract: account!("transact-sys"),
+        method: method!("startup"),
+        raw_data: startup_data.packed_bytes(),
+    };
 
     let actions = vec![
-        startup_action,
+        acc_startup_action,
+        trans_startup_action,
         reg_server(account!("common-sys"), account!("common-sys")),
         store_sys(
             account!("common-sys"),

@@ -7,8 +7,6 @@
 
 namespace psibase
 {
-   struct AccountRow;
-
    struct NativeFunctions
    {
       Database&           database;
@@ -16,7 +14,7 @@ namespace psibase
       bool                allowDbRead           = false;
       bool                allowDbWrite          = false;
       bool                allowDbReadSubjective = false;
-      AccountRow          contractAccount       = {};
+      CodeRow             code                  = {};
       ActionContext*      currentActContext     = nullptr;  // Changes during recursion
 
       std::vector<char> result_key;

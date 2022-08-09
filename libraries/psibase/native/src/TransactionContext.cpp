@@ -106,14 +106,13 @@ namespace psibase
          for (auto& contract : data.contracts)
          {
             check(contract.contract.value, "account 0 is reserved");
-            check(!db.kvGet<AccountRow>(AccountRow::db, accountKey(contract.contract)),
+            check(!db.kvGet<CodeRow>(CodeRow::db, codeKey(contract.contract)),
                   "account already created");
-            AccountRow account{
-                .num          = contract.contract,
-                .authContract = contract.authContract,
-                .flags        = contract.flags,
+            CodeRow account{
+                .codeNum = contract.contract,
+                .flags   = contract.flags,
             };
-            db.kvPut(AccountRow::db, account.key(), account);
+            db.kvPut(CodeRow::db, account.key(), account);
             setCode(db, contract.contract, contract.vmType, contract.vmVersion,
                     {contract.code.data(), contract.code.size()});
          }

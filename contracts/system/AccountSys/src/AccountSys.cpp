@@ -1,5 +1,6 @@
 #include <contracts/system/AccountSys.hpp>
 
+#include <contracts/system/AuthFakeSys.hpp>
 #include <contracts/system/TransactionSys.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
@@ -11,29 +12,33 @@ using namespace psibase;
 
 namespace system_contract
 {
-   struct Status
-   {
-      uint32_t totalAccounts = 0;
-
-      std::tuple<> key() const { return {}; }
-   };
-   PSIO_REFLECT(Status, totalAccounts)
-   using StatusTable = Table<Status, &Status::key>;
-
-   using Tables = ContractTables<StatusTable>;
-
    void AccountSys::startup()
    {
       Tables tables{getReceiver()};
-      auto   statusTable = tables.open<StatusTable>();
-      auto   statusIndex = statusTable.getIndex<0>();
+      auto   statusTable  = tables.open<AccountSysStatusTable>();
+      auto   statusIndex  = statusTable.getIndex<0>();
+      auto   accountTable = tables.open<AccountTable>();
       check(!statusIndex.get(std::tuple{}), "already started");
 
       uint32_t totalAccounts = 0;
-      auto     accountIndex  = psibase::TableIndex<psibase::AccountRow, std::tuple<>>{
-               psibase::AccountRow::db, psio::convert_to_key(psibase::accountTable), false};
-      for (auto it = accountIndex.begin(); it != accountIndex.end(); ++it)
+      auto     codeIndex     = psibase::TableIndex<psibase::CodeRow, std::tuple<>>{
+                  psibase::CodeRow::db, psio::convert_to_key(codePrefix()), false};
+      if constexpr (enable_print)
+         writeConsole("initial accounts: ");
+      for (auto it = codeIndex.begin(); it != codeIndex.end(); ++it)
+      {
+         auto code = *it;
+         if constexpr (enable_print)
+         {
+            writeConsole(code.codeNum.str());
+            writeConsole(" ");
+         }
+         accountTable.put({
+             .accountNum   = code.codeNum,
+             .authContract = AuthFakeSys::contract,
+         });
          ++totalAccounts;
+      }
 
       statusTable.put({.totalAccounts = totalAccounts});
    }
@@ -44,9 +49,12 @@ namespace system_contract
    void AccountSys::newAccount(AccountNumber name, AccountNumber authContract, bool requireNew)
    {
       Tables tables{getReceiver()};
-      auto   statusTable = tables.open<StatusTable>();
-      auto   statusIndex = statusTable.getIndex<0>();
-      auto   status      = statusIndex.get(std::tuple{});
+      auto   statusTable  = tables.open<AccountSysStatusTable>();
+      auto   statusIndex  = statusTable.getIndex<0>();
+      auto   accountTable = tables.open<AccountTable>();
+      auto   accountIndex = accountTable.getIndex<0>();
+
+      auto status = statusIndex.get(std::tuple{});
       check(status.has_value(), "not started");
 
       if (enable_print)
@@ -58,35 +66,41 @@ namespace system_contract
       }
 
       check(name.value, "invalid account name");
-      if (exists(name))
+      if (accountIndex.get(name))
       {
          if (requireNew)
             abortMessage("account already exists");
          return;
       }
-      check(exists(authContract), "unknown auth contract");
+      check(accountIndex.get(authContract) != std::nullopt, "unknown auth contract");
+
+      Account account{
+          .accountNum   = name,
+          .authContract = authContract,
+      };
+      accountTable.put(account);
 
       ++status->totalAccounts;
-      AccountRow account{
-          .num          = name,
-          .authContract = authContract,
-          .flags        = 0,
-      };
       statusTable.put(*status);
-      kvPut(account.db, account.key(), account);
    }
 
    void AccountSys::setAuthCntr(psibase::AccountNumber authContract)
    {
-      auto account = kvGet<AccountRow>(AccountRow::db, accountKey(getSender()));
+      Tables tables{getReceiver()};
+      auto   accountTable = tables.open<AccountTable>();
+      auto   accountIndex = accountTable.getIndex<0>();
+      auto   account      = accountIndex.get((getSender()));
       check(account.has_value(), "account does not exist");
       account->authContract = authContract;
-      kvPut(AccountRow::db, account->key(), *account);
+      accountTable.put(*account);
    }
 
    bool AccountSys::exists(AccountNumber num)
    {
-      return !!kvGet<AccountRow>(AccountRow::db, accountKey(num));
+      Tables tables{getReceiver()};
+      auto   accountTable = tables.open<AccountTable>();
+      auto   accountIndex = accountTable.getIndex<0>();
+      return accountIndex.get(num) != std::nullopt;
    }
 
 }  // namespace system_contract

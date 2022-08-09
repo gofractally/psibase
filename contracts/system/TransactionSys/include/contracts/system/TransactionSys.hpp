@@ -45,6 +45,16 @@ namespace system_contract
    };
    PSIO_REFLECT(AuthInterface, method(checkAuthSys, action, claims))
 
+   struct TransactionSysStatus
+   {
+      bool enforceAuth = true;
+
+      std::tuple<> key() const { return {}; }
+   };
+   PSIO_REFLECT(TransactionSysStatus, enforceAuth)
+   using TransactionSysStatusTable =
+       psibase::Table<TransactionSysStatus, &TransactionSysStatus::key>;
+
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
    {
@@ -71,9 +81,12 @@ namespace system_contract
    {
       static constexpr auto     contract = psibase::AccountNumber("transact-sys");
       static constexpr uint64_t contractFlags =
-          psibase::AccountRow::allowSudo | psibase::AccountRow::allowWriteNative;
+          psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
 
-      using Tables = psibase::ContractTables<BlockSummaryTable, IncludedTrxTable>;
+      using Tables =
+          psibase::ContractTables<TransactionSysStatusTable, BlockSummaryTable, IncludedTrxTable>;
+
+      void startup();
 
       // Called by native code at the beginning of each block
       void startBlock();
@@ -86,6 +99,7 @@ namespace system_contract
       psibase::TimePointSec headBlockTime() const;
    };
    PSIO_REFLECT(TransactionSys,
+                method(startup),
                 method(startBlock),
                 method(getTransaction),
                 method(headBlockNum),
