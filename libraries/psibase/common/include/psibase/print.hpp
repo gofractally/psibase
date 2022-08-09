@@ -14,7 +14,7 @@ namespace psibase
       {
          [[clang::import_name("prints")]] void prints(const char*);
 
-         [[clang::import_name("prints_l")]] void prints_l(const char*, uint32_t);
+         [[clang::import_name("writeConsole")]] void writeConsole(const char*, uint32_t);
 
          [[clang::import_name("printi")]] void printi(int64_t);
 
@@ -79,7 +79,7 @@ namespace psibase
     */
    inline void printl(const char* ptr, size_t len)
    {
-      internal_use_do_not_use::prints_l(ptr, len);
+      internal_use_do_not_use::writeConsole(ptr, len);
    }
 
    /**
@@ -101,7 +101,7 @@ namespace psibase
     */
    inline void print(const std::string& str)
    {
-      internal_use_do_not_use::prints_l(str.c_str(), str.size());
+      internal_use_do_not_use::writeConsole(str.c_str(), str.size());
    }
 
    /**
@@ -112,7 +112,7 @@ namespace psibase
     */
    inline void print(std::string_view str)
    {
-      internal_use_do_not_use::prints_l(str.data(), str.size());
+      internal_use_do_not_use::writeConsole(str.data(), str.size());
    }
 
    /**
@@ -130,7 +130,7 @@ namespace psibase
          internal_use_do_not_use::printi128(&num);
       else*/
       if constexpr (std::is_same<T, char>::value)
-         internal_use_do_not_use::prints_l(&num, 1);
+         internal_use_do_not_use::writeConsole(&num, 1);
       else
          internal_use_do_not_use::printi(num);
    }
@@ -237,7 +237,7 @@ namespace psibase
             print_f(s + 1, rest...);
             return;
          }
-         internal_use_do_not_use::prints_l(s, 1);
+         internal_use_do_not_use::writeConsole(s, 1);
          s++;
       }
    }

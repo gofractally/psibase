@@ -3,11 +3,11 @@
 
 #include <psibase/check.hpp>
 
-[[clang::import_name("prints_l")]] extern "C" void prints_l(const char* cstr, uint32_t len);
+[[clang::import_name("writeConsole")]] extern "C" void writeConsole(const char* cstr, uint32_t len);
 
 extern "C" void prints(const char* cstr)
 {
-   prints_l(cstr, strlen(cstr));
+   writeConsole(cstr, strlen(cstr));
 }
 
 extern "C" void printui(uint64_t value)
@@ -20,7 +20,7 @@ extern "C" void printui(uint64_t value)
       value /= 10;
    } while (value);
    std::reverse(s, ch);
-   prints_l(s, ch - s);
+   writeConsole(s, ch - s);
 }
 
 extern "C" void printi(int64_t value)

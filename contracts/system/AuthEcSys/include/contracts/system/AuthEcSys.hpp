@@ -21,7 +21,10 @@ namespace system_contract
       using AuthTable_t              = psibase::Table<AuthRecord, &AuthRecord::account>;
       using Tables = psibase::ContractTables<AuthTable_t, psibase::WebContentTable>;
 
-      void checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims);
+      void checkAuthSys(psibase::Action             action,
+                        std::vector<psibase::Claim> claims,
+                        bool                        firstAuth,
+                        bool                        readOnly);
       void setKey(psibase::PublicKey key);
 
      private:

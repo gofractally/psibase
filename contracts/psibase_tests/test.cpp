@@ -10,10 +10,10 @@ TEST_CASE("recursion")
    DefaultTestChain t;
    t.add_contract(AccountNumber("test-cntr"), "test-cntr.wasm");
 
-   REQUIRE(                          //
-       show(false,                   //
-            t.pushTransaction(       //
-                t.make_transaction(  //
+   REQUIRE(                         //
+       show(false,                  //
+            t.pushTransaction(      //
+                t.makeTransaction(  //
                     {{
                         .sender   = AccountNumber("test-cntr"),
                         .contract = AccountNumber("test-cntr"),
@@ -29,10 +29,10 @@ TEST_CASE("kv")
    DefaultTestChain t;
 
    auto test_kv_contract = t.add_contract("test-kv", "test_kv.wasm");
-   REQUIRE(                          //
-       show(false,                   //
-            t.pushTransaction(       //
-                t.make_transaction(  //
+   REQUIRE(                         //
+       show(false,                  //
+            t.pushTransaction(      //
+                t.makeTransaction(  //
                     {{
                         .sender   = test_kv_contract,
                         .contract = test_kv_contract,
@@ -44,10 +44,10 @@ TEST_CASE("table")
    DefaultTestChain t;
 
    auto test_table_contract = t.add_contract("test-table", "test_table.wasm");
-   REQUIRE(                          //
-       show(false,                   //
+   REQUIRE(                         //
+       show(false,                  //
             t.pushTransaction(      //
-                t.make_transaction(  //
+                t.makeTransaction(  //
                     {{
                         .sender   = test_table_contract,
                         .contract = test_table_contract,

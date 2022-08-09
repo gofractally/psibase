@@ -155,7 +155,7 @@ SCENARIO("Creating a token")
 
          THEN("Alice may create a second token")
          {
-            t.start_block();
+            t.startBlock();
 
             auto create = a.create(8, 1'000'000'000e8);
             CHECK(create.succeeded());
@@ -691,7 +691,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
             THEN("Bob may uncredit 25 tokens")
             {
                CHECK(b.uncredit(tokenId, alice, 25e8, memo).succeeded());
-               t.start_block();
+               t.startBlock();
 
                AND_THEN("Bob may uncredit 25 tokens")
                {
@@ -777,7 +777,7 @@ SCENARIO("Mapping a symbol to a token")
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
-      t.start_block();
+      t.startBlock();
       auto newToken = a.create(8, userBalance).returnVal();
       a.mint(newToken, userBalance, memo);
 

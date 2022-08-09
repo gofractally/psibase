@@ -130,6 +130,7 @@ function(add suffix)
             ../../contracts/system/AuthEcSys/include
             ../../contracts/system/AuthFakeSys/include
             ../../contracts/system/ProxySys/include
+            ../../contracts/system/SetCodeSys/include
             ../../contracts/system/TransactionSys/include
             ../../contracts/system/VerifyEcSys/include
             ../../contracts/user/CommonSys/include
@@ -137,9 +138,6 @@ function(add suffix)
         )
         target_include_directories(psitestlib${suffix} PRIVATE
             ../../contracts/system/VerifyEcSys/include
-        )
-        target_link_options(psitestlib${suffix} INTERFACE
-            -Wl,--export-table # TODO: remove
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start

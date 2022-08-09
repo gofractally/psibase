@@ -5,12 +5,55 @@
 
 namespace system_contract
 {
+   // TransactionSys calls into auth contracts using this interface
+   // to authenticate senders of top-level actions. Any contract
+   // may become an auth contract by implementing it. Any account
+   // may select any contract to be its sole authenticator. Be
+   // careful; this allows that contract to act on the account's
+   // behalf. It can also can lock out that account. See AuthEcSys
+   // for a canonical example of implementing this interface.
+   //
+   // This interface can't authenticate non-top-level actions.
+   // Most contracts shouldn't call or implement AuthInterface;
+   // use getSender().
    struct AuthInterface
    {
+      // Authenticate a top-level action
+      //
+      // action:     Action to authenticate
+      // claims:     Claims in transaction (e.g. public keys)
+      // firstAuth:  Is this the transaction's first authorizer?
+      // readOnly:   Is the database in read-only mode?
+      //
+      // Auth contracts shouldn't try writing to the database if
+      // readOnly is set. If they do, the transaction will abort.
+      // Auth contracts shouldn't skip their check based on the
+      // value of the read-only flag. If they do, they'll hurt
+      // their users, either by allowing charging where it
+      // shouldn't be allowed, or by letting actions execute
+      // using the user's auth when they shouldn't.
+      //
       // TODO: return error message instead?
-      void checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims);
+      void checkAuthSys(psibase::Action             action,
+                        std::vector<psibase::Claim> claims,
+                        bool                        firstAuth,
+                        bool                        readOnly);
+
+      // TODO: add a method to allow the auth contract to verify
+      //       that it's OK with being the auth contract for a
+      //       particular account. AccountSys would call it.
    };
    PSIO_REFLECT(AuthInterface, method(checkAuthSys, action, claims))
+
+   struct TransactionSysStatus
+   {
+      bool enforceAuth = true;
+
+      std::tuple<> key() const { return {}; }
+   };
+   PSIO_REFLECT(TransactionSysStatus, enforceAuth)
+   using TransactionSysStatusTable =
+       psibase::Table<TransactionSysStatus, &TransactionSysStatus::key>;
 
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
@@ -38,27 +81,27 @@ namespace system_contract
    {
       static constexpr auto     contract = psibase::AccountNumber("transact-sys");
       static constexpr uint64_t contractFlags =
-          psibase::AccountRow::allowSudo | psibase::AccountRow::allowWriteNative;
+          psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
 
-      using Tables = psibase::ContractTables<BlockSummaryTable, IncludedTrxTable>;
+      using Tables =
+          psibase::ContractTables<TransactionSysStatusTable, BlockSummaryTable, IncludedTrxTable>;
+
+      void startup();
 
       // Called by native code at the beginning of each block
       void startBlock();
+
+      psibase::Transaction getTransaction() const;
 
       // TODO: currentBlockNum(), currentBlockTime(): fetch from new status fields
       //       also update contracts which use `head + 1`
       psibase::BlockNum     headBlockNum() const;
       psibase::TimePointSec headBlockTime() const;
-
-      // TODO: move to another contract
-      uint8_t setCode(psibase::AccountNumber contract,
-                      uint8_t                vmType,
-                      uint8_t                vmVersion,
-                      std::vector<char>      code);
    };
    PSIO_REFLECT(TransactionSys,
+                method(startup),
                 method(startBlock),
-                method(setCode, contact, vmType, vmVersion, code),
+                method(getTransaction),
                 method(headBlockNum),
                 method(headBlockTime))
 

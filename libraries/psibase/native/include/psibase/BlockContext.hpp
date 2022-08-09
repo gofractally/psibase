@@ -37,6 +37,15 @@ namespace psibase
       void                                     callStartBlock();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision();
 
+      void verifyProof(const SignedTransaction&                 trx,
+                       TransactionTrace&                        trace,
+                       size_t                                   i,
+                       std::optional<std::chrono::microseconds> watchdogLimit);
+
+      void checkFirstAuth(const SignedTransaction&                 trx,
+                          TransactionTrace&                        trace,
+                          std::optional<std::chrono::microseconds> watchdogLimit);
+
       void pushTransaction(const SignedTransaction&                 trx,
                            TransactionTrace&                        trace,
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,

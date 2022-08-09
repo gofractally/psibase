@@ -152,7 +152,7 @@ fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
     };
     Action {
         sender: account,
-        contract: account!("transact-sys"),
+        contract: account!("setcode-sys"),
         method: method!("setCode"),
         raw_data: set_code_action.packed_bytes(),
     }

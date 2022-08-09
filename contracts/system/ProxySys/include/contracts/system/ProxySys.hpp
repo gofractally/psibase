@@ -31,10 +31,6 @@ namespace psibase
    {
       static constexpr auto contract = psibase::proxyContractNum;
 
-      // TODO: allow contract to register multiple contracts to handle
-      //    * sub.dom.ains.contract (what's the use case?)
-      //    * contract/foo/bar/... (maybe not; there's a potential security issue with that)
-
       /// Register senders's subdomain
       ///
       /// `serverContract` will handle requests to this subdomain.

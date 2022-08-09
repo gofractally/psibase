@@ -104,13 +104,13 @@ namespace psibase
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace};
+      TransactionContext tc{*this, trx, trace, true, true, false};
       auto&              atrace = trace.actionTraces.emplace_back();
 
       // Failure here aborts the block since transaction-sys relies on startBlock
       // functioning correctly. Fixing this type of failure requires forking
       // the chain, just like fixing bugs which block transactions within
-      // transaction-sys's process_transaction may require forking the chain.
+      // transaction-sys's processTransaction may require forking the chain.
       //
       // TODO: log failure
       tc.execNonTrxAction(0, action, atrace);
@@ -149,6 +149,60 @@ namespace psibase
       return {session.writeRevision(status->head->blockId), status->head->blockId};
    }
 
+   void BlockContext::verifyProof(const SignedTransaction&                 trx,
+                                  TransactionTrace&                        trace,
+                                  size_t                                   i,
+                                  std::optional<std::chrono::microseconds> watchdogLimit)
+   {
+      try
+      {
+         checkActive();
+         TransactionContext t{*this, trx, trace, false, false, false};
+         if (watchdogLimit)
+            t.setWatchdog(*watchdogLimit);
+         t.execVerifyProof(i);
+         if (!current.subjectiveData.empty())
+            throw std::runtime_error("proof called a subjective contract");
+      }
+      catch (const std::exception& e)
+      {
+         current.subjectiveData.clear();
+         trace.error = e.what();
+         throw;
+      }
+      catch (...)
+      {
+         current.subjectiveData.clear();
+         throw;
+      }
+   }
+
+   void BlockContext::checkFirstAuth(const SignedTransaction&                 trx,
+                                     TransactionTrace&                        trace,
+                                     std::optional<std::chrono::microseconds> watchdogLimit)
+   {
+      try
+      {
+         checkActive();
+         TransactionContext t{*this, trx, trace, true, false, false};
+         if (watchdogLimit)
+            t.setWatchdog(*watchdogLimit);
+         t.checkFirstAuth();
+         current.subjectiveData.clear();
+      }
+      catch (const std::exception& e)
+      {
+         current.subjectiveData.clear();
+         trace.error = e.what();
+         throw;
+      }
+      catch (...)
+      {
+         current.subjectiveData.clear();
+         throw;
+      }
+   }
+
    void BlockContext::pushTransaction(const SignedTransaction&                 trx,
                                       TransactionTrace&                        trace,
                                       std::optional<std::chrono::microseconds> initialWatchdogLimit,
@@ -169,6 +223,7 @@ namespace psibase
    }
 
    // TODO: call callStartBlock() here? caller's responsibility?
+   // TODO: caller needs to verify proofs
    void BlockContext::execAllInBlock()
    {
       for (auto& trx : current.transactions)
@@ -180,7 +235,6 @@ namespace psibase
             "block has unread subjective data");
    }
 
-   // TODO: limit charged CPU & NET which can go into a block
    void BlockContext::exec(const SignedTransaction&                 trx,
                            TransactionTrace&                        trace,
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,
@@ -203,7 +257,7 @@ namespace psibase
          if (enableUndo)
             session = db.startWrite(writer);
 
-         TransactionContext t{*this, trx, trace};
+         TransactionContext t{*this, trx, trace, true, !isReadOnly, false};
          if (initialWatchdogLimit)
             t.setWatchdog(*initialWatchdogLimit);
          t.execTransaction();

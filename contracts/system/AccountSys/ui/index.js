@@ -41,10 +41,8 @@ function AccountList(addMsg, clearMsg) {
     const accounts = useAccounts(addMsg, clearMsg);
     return html`<table><tbody>${accounts.map(account =>
         html`<tr key=${account.num}>
-                <td style=${{ border: '2px solid' }}>${account.num}</td>
+                <td style=${{ border: '2px solid' }}>${account.accountNum}</td>
                 <td style=${{ border: '2px solid' }}>${account.authContract}</td>
-                <td style=${{ border: '2px solid' }}>${account.flags}</td>
-                <td style=${{ border: '2px solid' }}>${account.codeHash}</td>
             </tr>`
     )}</tbody></table>`
 }

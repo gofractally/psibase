@@ -27,6 +27,8 @@ namespace psibase
 
       DbId getDbRead(NativeFunctions& self, uint32_t db)
       {
+         check(self.allowDbRead,
+               "database access disabled during proof verification or first auth");
          if (db == uint32_t(DbId::contract))
             return (DbId)db;
          if (db == uint32_t(DbId::nativeConstrained))
@@ -39,19 +41,21 @@ namespace psibase
             //       However, there's a possibility this may make it easier on an active attacker.
             //       Make this capability a node configuration toggle? Allow node config to whitelist
             //       contracts for this?
-            if ((self.contractAccount.flags & AccountRow::isSubjective) || self.isReadOnly)
+            if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
                return (DbId)db;
          }
-         if (db == uint32_t(DbId::writeOnly) && self.isReadOnly)
+         if (db == uint32_t(DbId::writeOnly) && self.allowDbReadSubjective)
             return (DbId)db;
-         if (db == uint32_t(DbId::blockLog) && self.isReadOnly)
+         if (db == uint32_t(DbId::blockLog) && self.allowDbReadSubjective)
             return (DbId)db;
          throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
 
       DbId getDbReadSequential(NativeFunctions& self, uint32_t db)
       {
-         if (self.isReadOnly || (self.contractAccount.flags & AccountRow::isSubjective))
+         check(self.allowDbRead,
+               "database access disabled during proof verification or first auth");
+         if (self.allowDbReadSubjective || (self.code.flags & CodeRow::isSubjective))
          {
             if (db == uint32_t(DbId::historyEvent))
                return (DbId)db;
@@ -76,11 +80,13 @@ namespace psibase
 
       Writable getDbWrite(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
-         check(!self.isReadOnly, "writes disabled during query");
+         check(self.allowDbRead,
+               "database access disabled during proof verification or first auth");
+         check(self.allowDbWrite, "database writes disabled during query");
 
          if (keyHasContractPrefix(db))
          {
-            uint64_t prefix = self.contractAccount.num.value;
+            uint64_t prefix = self.code.codeNum.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
                   "key prefix must match contract during write");
@@ -100,13 +106,13 @@ namespace psibase
          //
          // TODO: reenable after subjective database support is working as intended
          if (false && db == uint32_t(DbId::subjective) &&
-             (self.contractAccount.flags & AccountRow::isSubjective) &&
-             (self.contractAccount.flags & AccountRow::allowWriteSubjective))
+             (self.code.flags & CodeRow::isSubjective) &&
+             (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective contracts are skipped during replay
             return {(DbId)db, false, false};
 
          // Prevent poison block; subjective contracts skip execution during replay
-         check(!(self.contractAccount.flags & AccountRow::isSubjective),
+         check(!(self.code.flags & CodeRow::isSubjective),
                "subjective contracts may only write to DbId::subjective");
 
          if (db == uint32_t(DbId::contract))
@@ -114,10 +120,10 @@ namespace psibase
          if (db == uint32_t(DbId::writeOnly))
             return {(DbId)db, true, false};
          if (db == uint32_t(DbId::nativeConstrained) &&
-             (self.contractAccount.flags & AccountRow::allowWriteNative))
+             (self.code.flags & CodeRow::allowWriteNative))
             return {(DbId)db, true, true};
          if (db == uint32_t(DbId::nativeUnconstrained) &&
-             (self.contractAccount.flags & AccountRow::allowWriteNative))
+             (self.code.flags & CodeRow::allowWriteNative))
             return {(DbId)db, true, true};
          throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
@@ -128,10 +134,12 @@ namespace psibase
       //          functions which call it need to adjust their logic.
       DbId getDbWriteSequential(NativeFunctions& self, uint32_t db)
       {
-         check(!self.isReadOnly, "writes disabled during query");
+         check(self.allowDbRead,
+               "database access disabled during proof verification or first auth");
+         check(self.allowDbWrite, "writes disabled during query");
 
          // Prevent poison block; subjective contracts skip execution during replay
-         check(!(self.contractAccount.flags & AccountRow::isSubjective),
+         check(!(self.code.flags & CodeRow::isSubjective),
                "contract may not write this db, or must use another intrinsic");
 
          if (db == uint32_t(DbId::historyEvent))
@@ -150,13 +158,14 @@ namespace psibase
          //
          // TODO: use a view here instead of unpacking to a rich object
          // TODO: verify fracpack; no unknown
-         auto code     = psio::convert_from_frac<codeRow>(psio::input_stream(value.pos, value.end));
+         auto code =
+             psio::convert_from_frac<CodeByHashRow>(psio::input_stream(value.pos, value.end));
          auto codeHash = sha256(code.code.data(), code.code.size());
-         check(code.codeHash == codeHash, "codeRow has incorrect codeHash");
+         check(code.codeHash == codeHash, "CodeByHashRow has incorrect codeHash");
          auto expected_key = psio::convert_to_key(code.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
-               "codeRow has incorrect key");
+               "CodeByHashRow has incorrect key");
       }
 
       uint32_t clearResult(NativeFunctions& self)
@@ -222,7 +231,7 @@ namespace psibase
 
    void NativeFunctions::abortMessage(eosio::vm::span<const char> str)
    {
-      throw std::runtime_error("contract '" + contractAccount.num.str() +
+      throw std::runtime_error("contract '" + code.codeNum.str() +
                                "' aborted with message: " + std::string(str.data(), str.size()));
    }
 
@@ -232,14 +241,14 @@ namespace psibase
       // call getBillableTime", but that may mislead contract developers
       // into thinking they should create a subjective contract;
       // they shouldn't.
-      check(contractAccount.flags & AccountRow::isSubjective,
+      check(code.flags & CodeRow::isSubjective,
             "unprivileged contracts may not call getBillableTime");
       return transactionContext.getBillableTime().count();
    }
 
    void NativeFunctions::setMaxTransactionTime(uint64_t nanoseconds)
    {
-      check(contractAccount.flags & AccountRow::canSetTimeLimit,
+      check(code.flags & CodeRow::canSetTimeLimit,
             "setMaxTransactionTime requires canSetTimeLimit privilege");
       if (transactionContext.blockContext.isProducing)
          transactionContext.setWatchdog(
@@ -290,15 +299,14 @@ namespace psibase
       check(psio::fracvalidate<Action>(data.data(), data.end()).valid_and_known(),
             "call: invalid data format");
       auto act = psio::convert_from_frac<Action>({data.data(), data.size()});
-      check(act.sender == contractAccount.num || (contractAccount.flags & AccountRow::allowSudo),
+      check(act.sender == code.codeNum || (code.flags & CodeRow::allowSudo),
             "contract is not authorized to call as another sender");
 
       currentActContext->actionTrace.innerTraces.push_back({ActionTrace{}});
       auto& inner_action_trace =
           std::get<ActionTrace>(currentActContext->actionTrace.innerTraces.back().inner);
       // TODO: avoid reserialization
-      currentActContext->transactionContext.execCalledAction(contractAccount.flags, act,
-                                                             inner_action_trace);
+      currentActContext->transactionContext.execCalledAction(code.flags, act, inner_action_trace);
       setResult(*this, inner_action_trace.rawRetval);
 
       --currentActContext->transactionContext.callDepth;
@@ -327,8 +335,7 @@ namespace psibase
              auto w = getDbWrite(*this, db, {key.data(), key.size()});
              if (w.chargeable)
              {
-                auto& delta =
-                    transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
+                auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{code.codeNum, db}];
                 delta.records += 1;
                 delta.keyBytes += key.size();
                 delta.valueBytes += value.size();
@@ -360,8 +367,7 @@ namespace psibase
              check(v.remaining() >= sizeof(AccountNumber::value),
                    "value prefix must match contract during write");
              auto contract = psio::from_bin<AccountNumber>(v);
-             check(contract == contractAccount.num,
-                   "value prefix must match contract during write");
+             check(contract == code.codeNum, "value prefix must match contract during write");
 
              auto&    dbStatus = transactionContext.blockContext.databaseStatus;
              uint64_t indexNumber;
@@ -380,25 +386,24 @@ namespace psibase
 
    void NativeFunctions::kvRemove(uint32_t db, eosio::vm::span<const char> key)
    {
-      timeDbVoid(
-          *this,
-          [&]
-          {
-             clearResult(*this);
-             auto w = getDbWrite(*this, db, {key.data(), key.size()});
-             if (w.refundable)
-             {
-                if (auto existing = database.kvGetRaw(w.db, {key.data(), key.size()}))
-                {
-                   auto& delta =
-                       transactionContext.kvResourceDeltas[KvResourceKey{contractAccount.num, db}];
-                   delta.records -= 1;
-                   delta.keyBytes -= key.size();
-                   delta.valueBytes -= existing->remaining();
-                }
-             }
-             database.kvRemoveRaw(w.db, {key.data(), key.size()});
-          });
+      timeDbVoid(*this,
+                 [&]
+                 {
+                    clearResult(*this);
+                    auto w = getDbWrite(*this, db, {key.data(), key.size()});
+                    if (w.refundable)
+                    {
+                       if (auto existing = database.kvGetRaw(w.db, {key.data(), key.size()}))
+                       {
+                          auto& delta =
+                              transactionContext.kvResourceDeltas[KvResourceKey{code.codeNum, db}];
+                          delta.records -= 1;
+                          delta.keyBytes -= key.size();
+                          delta.valueBytes -= existing->remaining();
+                       }
+                    }
+                    database.kvRemoveRaw(w.db, {key.data(), key.size()});
+                 });
    }
 
    uint32_t NativeFunctions::kvGet(uint32_t db, eosio::vm::span<const char> key)

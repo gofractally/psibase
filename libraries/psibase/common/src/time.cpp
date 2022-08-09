@@ -188,10 +188,10 @@ namespace psibase
       return s == end || !require_end;
    }
 
-   [[nodiscard]] bool string_to_utc_microseconds(uint64_t&    result,
-                                                 const char*& s,
-                                                 const char*  end,
-                                                 bool         require_end)
+   [[nodiscard]] bool stringToUtcMicroseconds(uint64_t&    result,
+                                              const char*& s,
+                                              const char*  end,
+                                              bool         require_end)
    {
       uint32_t sec;
       if (!string_to_utc_seconds(sec, s, end, false, false))

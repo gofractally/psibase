@@ -127,15 +127,15 @@ struct test_chain
    psibase::SharedDatabase                      db;
    psibase::WriterPtr                           writer;
    std::unique_ptr<psibase::SystemContext>      sys;
+   std::shared_ptr<const psibase::Revision>     revisionAtBlockStart;
    std::unique_ptr<psibase::BlockContext>       blockContext;
    std::unique_ptr<psibase::TransactionTrace>   nativeFunctionsTrace;
    std::unique_ptr<psibase::TransactionContext> nativeFunctionsTransactionContext;
    std::unique_ptr<psibase::ActionContext>      nativeFunctionsActionContext;
    std::unique_ptr<psibase::NativeFunctions>    nativeFunctions;
 
-   test_chain(::state& state, const std::string& snapshot, uint64_t state_size) : state{state}
+   test_chain(::state& state) : state{state}
    {
-      psibase::check(snapshot.empty(), "snapshots not implemented");
       dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
       db     = {dir, true};
       writer = db.createWriter();
@@ -153,17 +153,20 @@ struct test_chain
       nativeFunctionsActionContext.reset();
       nativeFunctionsTransactionContext.reset();
       blockContext.reset();
+      revisionAtBlockStart.reset();
       sys.reset();
       writer = {};
       db     = {};
       boost::filesystem::remove_all(dir);
    }
 
-   void start_block(int64_t skip_miliseconds = 0)
+   void startBlock(int64_t skip_miliseconds = 0)
    {
       // TODO: undo control
-      finish_block();
-      blockContext = std::make_unique<psibase::BlockContext>(*sys, db.getHead(), writer, true);
+      finishBlock();
+      revisionAtBlockStart = db.getHead();
+      blockContext =
+          std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
 
       uint32_t skipAdditional = 0;
       if (skip_miliseconds != 0)
@@ -183,10 +186,10 @@ struct test_chain
    void start_if_needed()
    {
       if (!blockContext)
-         start_block();
+         startBlock();
    }
 
-   void finish_block()
+   void finishBlock()
    {
       if (blockContext)
       {
@@ -197,6 +200,7 @@ struct test_chain
          db.setHead(*writer, revision);
          db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
          blockContext.reset();
+         revisionAtBlockStart.reset();
       }
    }
 
@@ -209,13 +213,15 @@ struct test_chain
          nativeFunctionsTrace = std::make_unique<psibase::TransactionTrace>();
          nativeFunctionsTrace->actionTraces.resize(1);
          nativeFunctionsTransactionContext = std::make_unique<psibase::TransactionContext>(
-             *blockContext, dummyTransaction, *nativeFunctionsTrace);
+             *blockContext, dummyTransaction, *nativeFunctionsTrace, true, false, true);
          nativeFunctionsActionContext = std::make_unique<psibase::ActionContext>(
              psibase::ActionContext{*nativeFunctionsTransactionContext, dummyAction,
                                     nativeFunctionsTrace->actionTraces[0]});
          nativeFunctions = std::make_unique<psibase::NativeFunctions>(
              psibase::NativeFunctions{blockContext->db,
                                       *nativeFunctionsTransactionContext,
+                                      true,
+                                      false,
                                       true,
                                       {},
                                       &*nativeFunctionsActionContext});
@@ -297,6 +303,7 @@ struct callbacks
 
    void backtrace()
    {
+      fprintf(stderr, "Generating backtrace...\n");
       void* data[max_backtrace_frames];
       int   count =
           state.backend.get_context().backtrace(data, sizeof(data) / sizeof(data[0]), nullptr);
@@ -362,16 +369,16 @@ struct callbacks
       memcpy(alloc(cb_alloc_data, cb_alloc, data.size()), data.data(), data.size());
    }
 
-   void tester_abort()
+   void testerAbort()
    {
       backtrace();
-      throw std::runtime_error("called tester_abort");
+      throw std::runtime_error("called testerAbort");
    }
 
-   void eosio_exit(int32_t)
+   void testerExit(int32_t)
    {
       backtrace();
-      throw std::runtime_error("called eosio_exit");
+      throw std::runtime_error("called testerExit");
    }
 
    void abortMessage(span<const char> msg)
@@ -380,9 +387,9 @@ struct callbacks
       throw ::assert_exception(span_str(msg));
    }
 
-   void prints_l(span<const char> str) { std::cout.write(str.data(), str.size()); }
+   void writeConsole(span<const char> str) { std::cout.write(str.data(), str.size()); }
 
-   void tester_get_arg_counts(wasm_ptr<uint32_t> argc, wasm_ptr<uint32_t> argv_buf_size)
+   void testerGetArgCounts(wasm_ptr<uint32_t> argc, wasm_ptr<uint32_t> argv_buf_size)
    {
       uint32_t size = 0;
       for (auto& a : state.args)
@@ -392,7 +399,7 @@ struct callbacks
    };
 
    // uint8_t** argv, uint8_t* argv_buf
-   void tester_get_args(uint32_t argv, uint32_t argv_buf)
+   void testerGetArgs(uint32_t argv, uint32_t argv_buf)
    {
       auto* memory   = state.backend.get_context().linear_memory();
       auto  get_argv = [&]() -> uint32_t& { return *reinterpret_cast<uint32_t*>(memory + argv); };
@@ -413,7 +420,7 @@ struct callbacks
       }
    };
 
-   int32_t tester_clock_time_get(uint32_t id, uint64_t precision, wasm_ptr<uint64_t> time)
+   int32_t testerClockTimeGet(uint32_t id, uint64_t precision, wasm_ptr<uint64_t> time)
    {
       std::chrono::nanoseconds result;
       if (id == 0)
@@ -440,11 +447,11 @@ struct callbacks
       return &state.files[file_index];
    }
 
-   uint32_t tester_fdstat_get(int32_t            fd,
-                              wasm_ptr<uint8_t>  fs_filetype,
-                              wasm_ptr<uint16_t> fs_flags,
-                              wasm_ptr<uint64_t> fs_rights_base,
-                              wasm_ptr<uint64_t> fs_rights_inheriting)
+   uint32_t testerFdstatGet(int32_t            fd,
+                            wasm_ptr<uint8_t>  fs_filetype,
+                            wasm_ptr<uint16_t> fs_flags,
+                            wasm_ptr<uint64_t> fs_rights_base,
+                            wasm_ptr<uint64_t> fs_rights_inheriting)
    {
       if (fd == STDIN_FILENO)
       {
@@ -481,11 +488,11 @@ struct callbacks
       return wasi_errno_badf;
    }
 
-   uint32_t tester_open_file(span<const char>  path,
-                             uint32_t          oflags,
-                             uint64_t          fs_rights_base,
-                             uint32_t          fdflags,
-                             wasm_ptr<int32_t> opened_fd)
+   uint32_t testerOpenFile(span<const char>  path,
+                           uint32_t          oflags,
+                           uint64_t          fs_rights_base,
+                           uint32_t          fdflags,
+                           wasm_ptr<int32_t> opened_fd)
    {
       if (oflags & wasi_oflags_directory)
          return wasi_errno_inval;
@@ -554,7 +561,7 @@ struct callbacks
       return 0;
    }
 
-   uint32_t tester_close_file(int32_t fd)
+   uint32_t testerCloseFile(int32_t fd)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -563,7 +570,7 @@ struct callbacks
       return 0;
    }
 
-   uint32_t tester_write_file(int32_t fd, span<const char> content)
+   uint32_t testerWriteFile(int32_t fd, span<const char> content)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -573,7 +580,7 @@ struct callbacks
       return wasi_errno_io;
    }
 
-   uint32_t tester_read_file(int32_t fd, span<char> content, wasm_ptr<int32_t> result)
+   uint32_t testerReadFile(int32_t fd, span<char> content, wasm_ptr<int32_t> result)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -582,7 +589,7 @@ struct callbacks
       return 0;
    }
 
-   bool tester_read_whole_file(span<const char> filename, uint32_t cb_alloc_data, uint32_t cb_alloc)
+   bool testerReadWholeFile(span<const char> filename, uint32_t cb_alloc_data, uint32_t cb_alloc)
    {
       file f = fopen(span_str(filename).c_str(), "r");
       if (!f.f)
@@ -605,7 +612,7 @@ struct callbacks
       return true;
    }
 
-   int32_t tester_execute(span<const char> command) { return system(span_str(command).c_str()); }
+   int32_t testerExecute(span<const char> command) { return system(span_str(command).c_str()); }
 
    test_chain& assert_chain(uint32_t chain, bool require_context = true)
    {
@@ -617,15 +624,15 @@ struct callbacks
       return result;
    }
 
-   uint32_t tester_create_chain(span<const char> snapshot, uint64_t state_size)
+   uint32_t testerCreateChain()
    {
-      state.chains.push_back(std::make_unique<test_chain>(state, span_str(snapshot), state_size));
+      state.chains.push_back(std::make_unique<test_chain>(state));
       if (state.chains.size() == 1)
          state.selected_chain_index = 0;
       return state.chains.size() - 1;
    }
 
-   void tester_destroy_chain(uint32_t chain)
+   void testerDestroyChain(uint32_t chain)
    {
       assert_chain(chain, false);
       if (state.selected_chain_index && *state.selected_chain_index == chain)
@@ -637,7 +644,7 @@ struct callbacks
       }
    }
 
-   void tester_shutdown_chain(uint32_t chain)
+   void testerShutdownChain(uint32_t chain)
    {
       auto& c = assert_chain(chain);
       c.blockContext.reset();
@@ -645,49 +652,28 @@ struct callbacks
       c.db = {};
    }
 
-   uint32_t tester_get_chain_path(uint32_t chain, span<char> dest)
+   uint32_t testerGetChainPath(uint32_t chain, span<char> dest)
    {
       auto& c = assert_chain(chain, false);
       memcpy(dest.data(), c.dir.c_str(), std::min(dest.size(), c.dir.size()));
       return c.dir.size();
    }
 
-   void tester_start_block(uint32_t chain_index, int64_t skip_miliseconds)
+   void testerStartBlock(uint32_t chain_index, int64_t skip_miliseconds)
    {
-      assert_chain(chain_index).start_block(skip_miliseconds);
+      assert_chain(chain_index).startBlock(skip_miliseconds);
    }
 
-   void tester_finish_block(uint32_t chain_index) { assert_chain(chain_index).finish_block(); }
+   void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
 
-   // TODO: drop this and add general kv access
-   void tester_get_head_block_info(uint32_t chain_index, uint32_t cb_alloc_data, uint32_t cb_alloc)
-   {
-      test_chain& chain = assert_chain(chain_index);
-
-      if (!chain.blockContext)
-      {
-         throw std::runtime_error("invalid block context");
-      }
-
-      auto status = chain.blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
-                                                                     psibase::statusKey());
-      psibase::BlockInfo bi;
-      if (status && status->head)
-      {
-         bi = *(status->head);
-      }
-
-      set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(bi));
-   }
-
-   void tester_push_transaction(uint32_t         chain_index,
-                                span<const char> args_packed,
-                                uint32_t         cb_alloc_data,
-                                uint32_t         cb_alloc)
+   void testerPushTransaction(uint32_t         chain_index,
+                              span<const char> args_packed,
+                              uint32_t         cb_alloc_data,
+                              uint32_t         cb_alloc)
    {
       auto&              chain = assert_chain(chain_index);
       psio::input_stream s     = {args_packed.data(), args_packed.size()};
-      auto               signed_trx =
+      auto               signedTrx =
           psio::convert_from_frac<psibase::SignedTransaction>(psio::input_stream{s.pos, s.end});
 
       chain.start_if_needed();
@@ -695,8 +681,28 @@ struct callbacks
       auto                      start_time = std::chrono::steady_clock::now();
       try
       {
-         // TODO: undo and commit control
-         chain.blockContext->pushTransaction(signed_trx, trace, std::nullopt);
+         psibase::BlockContext proofBC{*chain.sys, chain.revisionAtBlockStart};
+         proofBC.start(chain.blockContext->current.header.time);
+         psibase::check(!proofBC.isGenesisBlock || signedTrx.proofs.empty(),
+                        "Genesis block may not have proofs");
+         for (size_t i = 0; i < signedTrx.proofs.size(); ++i)
+            proofBC.verifyProof(signedTrx, trace, i, std::nullopt);
+
+         if (!proofBC.needGenesisAction)
+         {
+            // checkFirstAuth isn't necessary here, but including it catches
+            // the case where an auth contract modifies its tables while
+            // running in read-only mode.
+            //
+            // We run the check within blockContext to make it easier for
+            // tests to chain transactions which modify auth. psinode
+            // doesn't provide this luxury.
+            auto saveTrace = trace;
+            chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt);
+            trace = std::move(saveTrace);
+         }
+
+         chain.blockContext->pushTransaction(signedTrx, trace, std::nullopt);
       }
       catch (const std::exception& e)
       {
@@ -714,7 +720,7 @@ struct callbacks
       set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(trace));
    }
 
-   void tester_select_chain_for_db(uint32_t chain_index)
+   void testerSelectChainForDb(uint32_t chain_index)
    {
       assert_chain(chain_index);
       state.selected_chain_index = chain_index;
@@ -778,29 +784,28 @@ void backtrace()
 
 void register_callbacks()
 {
-   rhf_t::add<&callbacks::tester_abort>("env", "tester_abort");
-   rhf_t::add<&callbacks::eosio_exit>("env", "eosio_exit");  // TODO: rename
+   rhf_t::add<&callbacks::testerAbort>("env", "testerAbort");
+   rhf_t::add<&callbacks::testerExit>("env", "testerExit");
    rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
-   rhf_t::add<&callbacks::prints_l>("env", "prints_l");  // TODO: replace with writeConsole
-   rhf_t::add<&callbacks::tester_get_arg_counts>("env", "tester_get_arg_counts");
-   rhf_t::add<&callbacks::tester_get_args>("env", "tester_get_args");
-   rhf_t::add<&callbacks::tester_clock_time_get>("env", "tester_clock_time_get");
-   rhf_t::add<&callbacks::tester_fdstat_get>("env", "tester_fdstat_get");
-   rhf_t::add<&callbacks::tester_open_file>("env", "tester_open_file");
-   rhf_t::add<&callbacks::tester_close_file>("env", "tester_close_file");
-   rhf_t::add<&callbacks::tester_write_file>("env", "tester_write_file");
-   rhf_t::add<&callbacks::tester_read_file>("env", "tester_read_file");
-   rhf_t::add<&callbacks::tester_read_whole_file>("env", "tester_read_whole_file");
-   rhf_t::add<&callbacks::tester_execute>("env", "tester_execute");
-   rhf_t::add<&callbacks::tester_create_chain>("env", "tester_create_chain");
-   rhf_t::add<&callbacks::tester_destroy_chain>("env", "tester_destroy_chain");
-   rhf_t::add<&callbacks::tester_shutdown_chain>("env", "tester_shutdown_chain");
-   rhf_t::add<&callbacks::tester_get_chain_path>("env", "tester_get_chain_path");
-   rhf_t::add<&callbacks::tester_start_block>("env", "tester_start_block");
-   rhf_t::add<&callbacks::tester_finish_block>("env", "tester_finish_block");
-   rhf_t::add<&callbacks::tester_get_head_block_info>("env", "tester_get_head_block_info");
-   rhf_t::add<&callbacks::tester_push_transaction>("env", "tester_push_transaction");
-   rhf_t::add<&callbacks::tester_select_chain_for_db>("env", "tester_select_chain_for_db");
+   rhf_t::add<&callbacks::writeConsole>("env", "writeConsole");
+   rhf_t::add<&callbacks::testerGetArgCounts>("env", "testerGetArgCounts");
+   rhf_t::add<&callbacks::testerGetArgs>("env", "testerGetArgs");
+   rhf_t::add<&callbacks::testerClockTimeGet>("env", "testerClockTimeGet");
+   rhf_t::add<&callbacks::testerFdstatGet>("env", "testerFdstatGet");
+   rhf_t::add<&callbacks::testerOpenFile>("env", "testerOpenFile");
+   rhf_t::add<&callbacks::testerCloseFile>("env", "testerCloseFile");
+   rhf_t::add<&callbacks::testerWriteFile>("env", "testerWriteFile");
+   rhf_t::add<&callbacks::testerReadFile>("env", "testerReadFile");
+   rhf_t::add<&callbacks::testerReadWholeFile>("env", "testerReadWholeFile");
+   rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
+   rhf_t::add<&callbacks::testerCreateChain>("env", "testerCreateChain");
+   rhf_t::add<&callbacks::testerDestroyChain>("env", "testerDestroyChain");
+   rhf_t::add<&callbacks::testerShutdownChain>("env", "testerShutdownChain");
+   rhf_t::add<&callbacks::testerGetChainPath>("env", "testerGetChainPath");
+   rhf_t::add<&callbacks::testerStartBlock>("env", "testerStartBlock");
+   rhf_t::add<&callbacks::testerFinishBlock>("env", "testerFinishBlock");
+   rhf_t::add<&callbacks::testerPushTransaction>("env", "testerPushTransaction");
+   rhf_t::add<&callbacks::testerSelectChainForDb>("env", "testerSelectChainForDb");
    rhf_t::add<&callbacks::getResult>("env", "getResult");
    rhf_t::add<&callbacks::getKey>("env", "getKey");
    rhf_t::add<&callbacks::kvGet>("env", "kvGet");
@@ -912,19 +917,20 @@ int main(int argc, char* argv[])
       {
          additional_args[cl_flags::timing] = true;
       }
-      else if (!strcmp(argv[next_arg], "-s") || !strcmp(argv[next_arg], "--subst"))
-      {
-         next_arg += 2;
-         if (next_arg >= argc)
-         {
-            std::cerr << argv[next_arg - 2] << " needs 2 args\n";
-            error = true;
-         }
-         else
-         {
-            substitutions[argv[next_arg - 1]] = argv[next_arg];
-         }
-      }
+      // TODO
+      // else if (!strcmp(argv[next_arg], "-s") || !strcmp(argv[next_arg], "--subst"))
+      // {
+      //    next_arg += 2;
+      //    if (next_arg >= argc)
+      //    {
+      //       std::cerr << argv[next_arg - 2] << " needs 2 args\n";
+      //       error = true;
+      //    }
+      //    else
+      //    {
+      //       substitutions[argv[next_arg - 1]] = argv[next_arg];
+      //    }
+      // }
       else
       {
          std::cerr << "unknown option: " << argv[next_arg] << "\n";

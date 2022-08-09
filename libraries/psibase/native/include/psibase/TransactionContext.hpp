@@ -25,13 +25,25 @@ namespace psibase
       int                                         callDepth = 0;
       const std::chrono::steady_clock::time_point startTime;
       std::chrono::steady_clock::duration         databaseTime;
+      bool                                        allowDbRead;
+      bool                                        allowDbWrite;
+      bool                                        allowDbReadSubjective;
 
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,
-                         TransactionTrace&        transactionTrace);
+                         TransactionTrace&        transactionTrace,
+                         bool                     allowDbRead,
+                         bool                     allowDbWrite,
+                         bool                     allowDbReadSubjective);
       ~TransactionContext();
 
+      // Caution: each call to execVerifyProof(), checkFirstAuth(),
+      //          or execTransaction() must be in a fresh
+      //          TransactionContext instance.
+      void execVerifyProof(size_t i);
+      void checkFirstAuth();
       void execTransaction();
+
       void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execServe(const Action& act, ActionTrace& atrace);

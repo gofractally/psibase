@@ -8,7 +8,10 @@ namespace system_contract
    {
       static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-fake-sys");
 
-      void checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims);
+      void checkAuthSys(psibase::Action             action,
+                        std::vector<psibase::Claim> claims,
+                        bool                        firstAuth,
+                        bool                        readOnly);
    };
    PSIO_REFLECT(AuthFakeSys, method(checkAuthSys, action, claims))
 }  // namespace system_contract

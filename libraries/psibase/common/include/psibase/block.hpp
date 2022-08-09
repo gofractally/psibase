@@ -29,13 +29,12 @@ namespace psibase
    struct GenesisContract
    {
       AccountNumber     contract;
-      AccountNumber     authContract;
       uint64_t          flags     = 0;
       uint8_t           vmType    = 0;
       uint8_t           vmVersion = 0;
       std::vector<char> code      = {};
    };
-   PSIO_REFLECT(GenesisContract, contract, authContract, flags, vmType, vmVersion, code)
+   PSIO_REFLECT(GenesisContract, contract, flags, vmType, vmVersion, code)
 
    // The genesis action is the first action of the first transaction of
    // the first block. The action struct's fields are ignored, except
@@ -155,7 +154,7 @@ namespace psibase
       // TODO: don't repack to compute sha
       BlockInfo(const Block& b) : header{b.header}, blockId{sha256(b)}
       {
-         auto* src  = (const char*)&header.blockNum + sizeof(&header.blockNum);
+         auto* src  = (const char*)&header.blockNum + sizeof(header.blockNum);
          auto* dest = blockId.data();
          while (src != (const char*)&header.blockNum)
             *dest++ = *--src;

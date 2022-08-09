@@ -45,15 +45,16 @@ namespace psibase
       check(code.remaining(), "native setCode can't clear code");
       auto codeHash = sha256(code.pos, code.remaining());
 
-      auto account = database.kvGet<AccountRow>(AccountRow::db, accountKey(contract));
+      auto account = database.kvGet<CodeRow>(CodeRow::db, codeKey(contract));
       check(account.has_value(), "setCode: unknown contract account");
       check(account->codeHash == Checksum256{}, "native setCode can't replace code");
       account->codeHash  = codeHash;
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
-      database.kvPut(AccountRow::db, account->key(), *account);
+      database.kvPut(CodeRow::db, account->key(), *account);
 
-      auto codeObj = database.kvGet<codeRow>(codeRow::db, codeKey(codeHash, vmType, vmVersion));
+      auto codeObj = database.kvGet<CodeByHashRow>(CodeByHashRow::db,
+                                                   codeByHashKey(codeHash, vmType, vmVersion));
       if (!codeObj)
       {
          codeObj.emplace();
@@ -63,7 +64,7 @@ namespace psibase
          codeObj->code.assign(code.pos, code.end);
       }
       ++codeObj->numRefs;
-      database.kvPut(codeRow::db, codeObj->key(), *codeObj);
+      database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
    }  // setCode
 
    struct BackendEntry
@@ -149,33 +150,33 @@ namespace psibase
                            ExecutionMemory&    memory,
                            AccountNumber       contract)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
-                            transactionContext.blockContext.isReadOnly},
+                            transactionContext.allowDbRead, transactionContext.allowDbWrite,
+                            transactionContext.allowDbReadSubjective},
             wa{memory.impl->wa}
       {
-         auto ca = database.kvGet<AccountRow>(AccountRow::db, accountKey(contract));
+         auto ca = database.kvGet<CodeRow>(CodeRow::db, codeKey(contract));
          check(ca.has_value(), "unknown contract account");
          check(ca->codeHash != Checksum256{}, "account has no code");
-         contractAccount = std::move(*ca);
-         auto code       = database.kvGet<codeRow>(
-             codeRow::db,
-             codeKey(contractAccount.codeHash, contractAccount.vmType, contractAccount.vmVersion));
-         check(code.has_value(), "code record is missing");
-         check(code->vmType == 0, "vmType is not 0");
-         check(code->vmVersion == 0, "vmVersion is not 0");
+         code   = std::move(*ca);
+         auto c = database.kvGet<CodeByHashRow>(
+             CodeByHashRow::db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
+         check(c.has_value(), "code record is missing");
+         check(c->vmType == 0, "vmType is not 0");
+         check(c->vmVersion == 0, "vmVersion is not 0");
          rethrowVMExcept(
              [&]
              {
                 backend = transactionContext.blockContext.systemContext.wasmCache.impl->get(
-                    contractAccount.codeHash);
+                    code.codeHash);
                 if (!backend)
-                   backend = std::make_unique<backend_t>(code->code, nullptr);
+                   backend = std::make_unique<backend_t>(c->code, nullptr);
              });
       }
 
       ~ExecutionContextImpl()
       {
          transactionContext.blockContext.systemContext.wasmCache.impl->add(
-             {contractAccount.codeHash, std::move(backend)});
+             {code.codeHash, std::move(backend)});
       }
 
       // TODO: configurable wasm limits
@@ -252,22 +253,23 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
    }
 
-   void ExecutionContext::execProcessTransaction(ActionContext& actionContext)
+   void ExecutionContext::execProcessTransaction(ActionContext& actionContext,
+                                                 bool           checkFirstAuthAndExit)
    {
       impl->exec(actionContext, [&] {  //
-         (*impl->backend)(*impl, "env", "process_transaction");
+         (*impl->backend)(*impl, "env", "processTransaction", checkFirstAuthAndExit);
       });
    }
 
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       // Prevents a poison block
-      if (!(impl->contractAccount.flags & AccountRow::isSubjective))
-         check(!(callerFlags & AccountRow::isSubjective),
+      if (!(impl->code.flags & CodeRow::isSubjective))
+         check(!(callerFlags & CodeRow::isSubjective),
                "subjective contracts may not call non-subjective ones");
 
       auto& bc = impl->transactionContext.blockContext;
-      if ((impl->contractAccount.flags & AccountRow::isSubjective) && !bc.isProducing)
+      if ((impl->code.flags & CodeRow::isSubjective) && !bc.isProducing)
       {
          check(bc.nextSubjectiveRead < bc.current.subjectiveData.size(), "missing subjective data");
          impl->currentActContext->actionTrace.rawRetval =
@@ -280,8 +282,7 @@ namespace psibase
                           actionContext.action.sender.value);
       });
 
-      if ((impl->contractAccount.flags & AccountRow::isSubjective) &&
-          !(callerFlags & AccountRow::isSubjective))
+      if ((impl->code.flags & CodeRow::isSubjective) && !(callerFlags & CodeRow::isSubjective))
          bc.current.subjectiveData.push_back(impl->currentActContext->actionTrace.rawRetval);
    }
 
@@ -305,7 +306,7 @@ namespace psibase
 
    void ExecutionContext::asyncTimeout()
    {
-      if (impl->contractAccount.flags & AccountRow::canNotTimeOut)
+      if (impl->code.flags & CodeRow::canNotTimeOut)
          return;
       impl->timedOut = true;
       impl->backend->get_module().allocator.disable_code();

@@ -60,7 +60,7 @@ SCENARIO("Buying a symbol")
       sysIssuer.credit(sysToken, alice, 10'000e8, memo);
       sysIssuer.credit(sysToken, bob, 10'000e8, memo);
 
-      t.start_block();
+      t.startBlock();
 
       THEN("Alice cannot create a symbol with numbers")
       {
@@ -160,7 +160,7 @@ SCENARIO("Buying a symbol")
          }
          THEN("Alice cannot create the same symbol")
          {
-            t.start_block();
+            t.startBlock();
             auto create = a.create(SID{"abc"}, quantity);
             CHECK(create.failed(symbolAlreadyExists));
          }
@@ -196,7 +196,7 @@ SCENARIO("Measuring price increases")
       sysIssuer.mint(sysToken, aliceBalance, memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
-      t.start_block();
+      t.startBlock();
 
       std::vector<SID> tickers{
           // 25 tickers
@@ -243,7 +243,7 @@ SCENARIO("Measuring price increases")
       }
       THEN("The price remains stable if sold symbols per day is targetNrSymbolsPerDay")
       {
-         t.start_block(secondsInDay + 10'000);  // Start a new day (price will drop once)
+         t.startBlock(secondsInDay + 10'000);  // Start a new day (price will drop once)
          auto cost{decrementPrice(SymbolPricing::initialPrice)};
 
          auto symbolDetails = a.getSymbolType(3).returnVal();
@@ -260,7 +260,7 @@ SCENARIO("Measuring price increases")
          for (int i = 0; i < numSymbols && costConstant; ++i)
          {
             a.create(tickers[i], cost);
-            t.start_block();
+            t.startBlock();
 
             costConstant = (a.getPrice(3).returnVal() == cost);
          }
@@ -275,7 +275,7 @@ SCENARIO("Measuring price increases")
             CHECK(a.getSymbolType(3).returnVal().createCounter == 24);
             auto create = a.create(tickers[24], cost);
             CHECK(create.succeeded());
-            t.start_block();
+            t.startBlock();
 
             CHECK(a.getSymbolType(3).returnVal().createCounter == 0);
 
@@ -286,14 +286,14 @@ SCENARIO("Measuring price increases")
       THEN("The price decreases if less than x are sold over 24 hours")
       {
          CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
-         t.start_block(secondsInDay + 10'000);  // 10 seconds more than a full day has passed
+         t.startBlock(secondsInDay + 10'000);  // 10 seconds more than a full day has passed
 
          auto nextPrice = decrementPrice(SymbolPricing::initialPrice);
          CHECK(a.getPrice(3).returnVal() == nextPrice);
 
          AND_THEN("The price decreases even more if too few are sold over 48 hours")
          {
-            t.start_block(secondsInDay + 10'000);  // More than two full days has passed
+            t.startBlock(secondsInDay + 10'000);  // More than two full days has passed
 
             nextPrice = decrementPrice(nextPrice);
             CHECK(a.getPrice(3).returnVal() == nextPrice);
@@ -424,7 +424,7 @@ SCENARIO("Buying and selling symbols")
          }
          WHEN("The symbol is mapped to a token")
          {
-            t.start_block();
+            t.startBlock();
             auto newToken = alice.at<TokenSys>().create(8, userBalance).returnVal();
             alice.at<TokenSys>().mint(newToken, userBalance, memo);
             auto newTokenId = alice.at<TokenSys>().getToken(newToken).returnVal().id;

@@ -312,6 +312,10 @@ namespace psibase
             return nullptr;
          }
       }
+      ConstRevisionPtr getHeadRevision()
+      {
+         return head->revision;
+      }
 
    private:
       std::optional<BlockContext> blockContext;
