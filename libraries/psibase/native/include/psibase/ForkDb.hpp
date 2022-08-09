@@ -8,6 +8,7 @@
 namespace psibase
 {
 
+   // TODO: num is encoded in id now
    struct ExtendedBlockId
    {
       Checksum256 _id;
@@ -21,8 +22,10 @@ namespace psibase
    struct BlockHeaderState
    {
       BlockInfo info;
+      // May be null if the block has not been executed
       ConstRevisionPtr revision;
       BlockHeaderState() : info() { info.header.blockNum = 1; }
+      BlockHeaderState(const BlockInfo& info, ConstRevisionPtr revision = nullptr) : info(info), revision(revision) {}
       BlockHeaderState(const BlockHeaderState& prev, const BlockInfo& info, ConstRevisionPtr revision = nullptr) : info(info), revision(revision) {}
       auto order() const { return std::tuple(info.header.term, info.header.blockNum, info.blockId); }
       BlockNum blockNum() const { return info.header.blockNum; }
@@ -36,9 +39,6 @@ namespace psibase
       using id_type = Checksum256;
       ForkDb()
       {
-         states.emplace();
-         head = &states.begin()->second;
-         byBlocknumIndex.insert({head->blockNum(), head->blockId()});
       }
       bool insert(const SignedBlock& b)
       {
@@ -298,8 +298,46 @@ namespace psibase
       {
          systemContext = sc;
          this->writer = std::move(writer);
-         head->revision = systemContext->sharedDatabase.getHead();
-         // TODO: set up initial state
+
+         Database db{sc->sharedDatabase, sc->sharedDatabase.getHead()};
+         auto session = db.startRead();
+         auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         if(!status || !status->head)
+         {
+            // Initialize new chain state
+            states.emplace();
+            head = &states.begin()->second;
+            byBlocknumIndex.insert({head->blockNum(), head->blockId()});
+            head->revision = systemContext->sharedDatabase.getHead();
+         }
+         else
+         {
+            // Add blocks in [irreversible, head]
+            // for now ignore other forks
+            auto blockNum = status->head->header.blockNum;
+            do
+            {
+               auto block = db.kvGet<Block>(DbId::blockLog, blockNum);
+               if(!block)
+               {
+                  break;
+               }
+               BlockInfo info{*block};
+               auto revision = sc->sharedDatabase.getRevision(*this->writer, info.blockId);
+               if(!revision)
+               {
+                  break;
+               }
+               blocks.try_emplace(info.blockId, *block);
+               auto [state_iter,_] = states.try_emplace(info.blockId, info, revision);
+               byOrderIndex.try_emplace(state_iter->second.order(), info.blockId);
+               byBlocknumIndex.try_emplace(blockNum, info.blockId);
+               if(!head)
+               {
+                  head = &state_iter->second;
+               }
+            } while(blockNum--);
+         }
       }
       BlockContext* getBlockContext()
       {
