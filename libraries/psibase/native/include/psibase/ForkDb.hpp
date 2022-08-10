@@ -65,6 +65,15 @@ namespace psibase
       {
          return head;
       }
+      static BlockNum idToNum(const Checksum256& id)
+      {
+         BlockNum result;
+         auto* dest  = (char*)&result + sizeof(result);
+         auto* src = id.data();
+         while (dest != (const char*)&result)
+            *--dest = *src++;
+         return result;
+      }
       psio::shared_view_ptr<SignedBlock> get(const id_type& id) const
       {
          auto pos = blocks.find(id);
@@ -74,6 +83,16 @@ namespace psibase
          }
          else
          {
+            Database db{systemContext->sharedDatabase, head->revision};
+            auto session = db.startRead();
+            auto blockNum = idToNum(id);
+            if(auto block = db.kvGet<Block>(DbId::blockLog, blockNum))
+            {
+               if(BlockInfo{*block}.blockId == id)
+               {
+                  return psio::shared_view_ptr<SignedBlock>(SignedBlock{*block});
+               }
+            }
             return nullptr;
          }
       }
@@ -86,7 +105,17 @@ namespace psibase
          }
          else
          {
-            return {};
+            Database db{systemContext->sharedDatabase, head->revision};
+            auto session = db.startRead();
+            if(auto block = db.kvGet<Block>(DbId::blockLog, num))
+            {
+               // TODO: we can look up the next block and get prev instead of calculating the hash
+               return BlockInfo{*block}.blockId;
+            }
+            else
+            {
+               return {};
+            }
          }
       }
       psio::shared_view_ptr<SignedBlock> get_block_by_num(BlockNum num) const
@@ -98,7 +127,16 @@ namespace psibase
          }
          else
          {
-            return nullptr;
+            Database db{systemContext->sharedDatabase, head->revision};
+            auto session = db.startRead();
+            if(auto block = db.kvGet<Block>(DbId::blockLog, num))
+            {
+               return psio::shared_view_ptr<SignedBlock>(SignedBlock{*block});
+            }
+            else
+            {
+               return nullptr;
+            }
          }
       }
       template<typename F>
@@ -219,6 +257,10 @@ namespace psibase
             if(iter->first < t.num())
             {
                id = get_ancestor(id, t.num() - iter->first);
+            }
+            else if(get_block_id(t.num()) == t.id())
+            {
+               return t;
             }
             else
             {
