@@ -6,9 +6,9 @@ add_executable(test_mock_timer test_mock_timer.cpp mock_timer.cpp)
 target_include_directories(test_mock_timer PUBLIC ../include)
 target_link_libraries(test_mock_timer PUBLIC catch2)
 
-add_executable(test_fail_stop_consensus test_fail_stop_consensus.cpp mock_timer.cpp)
-target_include_directories(test_fail_stop_consensus PUBLIC ../include)
-target_link_libraries(test_fail_stop_consensus PUBLIC catch2)
+add_executable(test_cft_consensus test_cft_consensus.cpp mock_timer.cpp)
+target_include_directories(test_cft_consensus PUBLIC ../include)
+target_link_libraries(test_cft_consensus PUBLIC catch2)
 
 add_executable(test_direct_routing test_direct_routing.cpp mock_timer.cpp)
 target_include_directories(test_direct_routing PUBLIC ../include)

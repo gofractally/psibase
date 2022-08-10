@@ -1,6 +1,6 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/contractEntry.hpp>
-#include <psibase/fail_stop.hpp>
+#include <psibase/cft.hpp>
 #include <psibase/node.hpp>
 #include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
@@ -280,7 +280,7 @@ struct null_link {};
 using timer_type = boost::asio::system_timer;
 
 template<typename Derived>
-using fail_stop_consensus = basic_fail_stop_consensus<Derived, timer_type>;
+using cft_consensus = basic_cft_consensus<Derived, timer_type>;
 
 void run(const std::string& db_path,
          AccountNumber      producer,
@@ -344,7 +344,7 @@ void run(const std::string& db_path,
 
    boost::asio::io_context chainContext;
 
-   using node_type = node<null_link, direct_routing, fail_stop_consensus, ForkDb>;
+   using node_type = node<null_link, direct_routing, cft_consensus, ForkDb>;
    node_type node(chainContext);
    node.set_producer_id(producer);
    node.set_producers(producers);

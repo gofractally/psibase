@@ -1,4 +1,4 @@
-#include <psibase/fail_stop.hpp>
+#include <psibase/cft.hpp>
 #include <psibase/node.hpp>
 #include <psibase/direct_routing.hpp>
 #include <psibase/mock_timer.hpp>
@@ -23,7 +23,7 @@ struct null_link {};
 using timer_type = boost::asio::steady_timer;
 
 template<typename Derived>
-using fail_stop_consensus = basic_fail_stop_consensus<Derived, timer_type>;
+using cft_consensus = basic_cft_consensus<Derived, timer_type>;
 
 template<typename Timer, typename F>
 void loop(Timer& timer, F&& f)
@@ -42,7 +42,7 @@ void loop(Timer& timer, F&& f)
 TEST_CASE("")
 {
    using chain_type = ForkDb;
-   using node_type = node<null_link, direct_routing, fail_stop_consensus, chain_type>;
+   using node_type = node<null_link, direct_routing, cft_consensus, chain_type>;
    boost::asio::io_context ctx;
    node_type a(ctx), b(ctx), c(ctx);
    a.set_producer_id(psibase::AccountNumber{"a"});

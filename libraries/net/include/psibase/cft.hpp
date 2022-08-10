@@ -52,7 +52,7 @@ namespace psibase::net
    // This protocol is based on RAFT, with some simplifications.
    // i.e. the blockchain structure is sufficient to guarantee log matching.
    template<typename Derived, typename Timer>
-   struct basic_fail_stop_consensus
+   struct basic_cft_consensus
    {
       using term_id = std::uint64_t;
       using block_num = std::uint32_t;
@@ -109,7 +109,7 @@ namespace psibase::net
       };
 
       template<typename ExecutionContext>
-      explicit basic_fail_stop_consensus(ExecutionContext& ctx) : _election_timer(ctx), _block_timer(ctx) {}
+      explicit basic_cft_consensus(ExecutionContext& ctx) : _election_timer(ctx), _block_timer(ctx) {}
 
       producer_id self = null_producer;
       std::vector<producer_id> active_producers;
