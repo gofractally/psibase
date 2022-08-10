@@ -42,7 +42,21 @@ namespace system_contract
       // verify TAPoS on transactions.
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
-      // TODO: expire transaction IDs
+      // Remove expired transaction IDs
+      const auto& stat          = getStatus();
+      auto        includedTable = tables.open<IncludedTrxTable>();
+      auto        includedIndex = includedTable.getIndex<0>();
+      auto        includedEnd   = includedIndex.end();
+      while (true)
+      {
+         auto it = includedIndex.begin();
+         if (it == includedEnd)
+            break;
+         auto obj = *it;
+         if (obj.expiration > stat.current.time)
+            break;
+         includedTable.remove(obj);
+      }
    }
 
    struct RunAsKey
@@ -173,7 +187,7 @@ namespace system_contract
       //       " expiration: ", psio::convert_to_json(trx.tapos.expiration), "\n");
 
       check(!(trx.tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
-      check(stat.current.time <= trx.tapos.expiration, "transaction has expired");
+      check(stat.current.time < trx.tapos.expiration, "transaction has expired");
       check(trx.tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
             "transaction was submitted too early");
 
@@ -185,9 +199,9 @@ namespace system_contract
       auto summaryTable  = tables.open<BlockSummaryTable>();
       auto summaryIdx    = summaryTable.getIndex<0>();
 
-      check(!includedIdx.get(id), "duplicate transaction");
+      check(!includedIdx.get(std::tuple{trx.tapos.expiration, id}), "duplicate transaction");
       if (!checkFirstAuthAndExit)
-         includedTable.put({id, trx.tapos.expiration});
+         includedTable.put({trx.tapos.expiration, id});
 
       std::optional<BlockSummary> summary;
       if (checkFirstAuthAndExit)

@@ -157,14 +157,13 @@ namespace system_contract
    // This table tracks transaction IDs to detect duplicates.
    struct IncludedTrx
    {
-      psibase::Checksum256  id;
       psibase::TimePointSec expiration;
+      psibase::Checksum256  id;
 
-      auto by_expiration() const { return std::make_tuple(expiration, id); }
+      auto key() const { return std::make_tuple(expiration, id); }
    };
-   PSIO_REFLECT(IncludedTrx, id, expiration)
-   using IncludedTrxTable =
-       psibase::Table<IncludedTrx, &IncludedTrx::id, &IncludedTrx::by_expiration>;
+   PSIO_REFLECT(IncludedTrx, expiration, id)
+   using IncludedTrxTable = psibase::Table<IncludedTrx, &IncludedTrx::key>;
 
    /// All transactions enter the chain through this contract
    ///
