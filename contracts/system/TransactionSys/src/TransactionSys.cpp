@@ -3,6 +3,7 @@
 #include <contracts/system/TransactionSys.hpp>
 #include <psibase/dispatch.hpp>
 
+#include <boost/container/flat_map.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/print.hpp>
 
@@ -43,6 +44,79 @@ namespace system_contract
 
       // TODO: expire transaction IDs
    }
+
+   struct RunAsKey
+   {
+      AccountNumber sender;
+      AccountNumber authorizedSender;
+      AccountNumber receiver;
+      MethodNumber  method;
+
+      friend auto operator<=>(const RunAsKey&, const RunAsKey&) = default;
+   };
+   boost::container::flat_map<RunAsKey, uint32_t> runAsMap;
+
+   std::vector<char> TransactionSys::runAs(psibase::Action             action,
+                                           std::vector<ContractMethod> allowedActions)
+   {
+      auto requester = getSender();
+
+      auto tables               = TransactionSys::Tables(TransactionSys::contract);
+      auto statusTable          = tables.open<TransactionSysStatusTable>();
+      auto statusIdx            = statusTable.getIndex<0>();
+      auto transactionSysStatus = statusIdx.get(std::tuple{});
+
+      if (transactionSysStatus && transactionSysStatus->enforceAuth)
+      {
+         auto accountSysTables = AccountSys::Tables(AccountSys::contract);
+         auto accountTable     = accountSysTables.open<AccountTable>();
+         auto accountIndex     = accountTable.getIndex<0>();
+         auto account          = accountIndex.get(action.sender);
+         if (!account)
+            abortMessage("unknown sender \"" + action.sender.str() + "\"");
+
+         if (requester != account->authContract)
+         {
+            uint32_t flags = 0;
+            if (requester == action.sender)
+               flags = AuthInterface::runAsRequesterType;
+            else
+            {
+               auto it = runAsMap.lower_bound(RunAsKey{action.sender, requester, {}, {}});
+               while (it != runAsMap.end() &&  //
+                      it->first.sender == action.sender && it->first.authorizedSender == requester)
+               {
+                  if (it->second &&  //
+                      (!it->first.receiver.value || it->first.receiver == action.contract) &&
+                      (!it->first.method.value || it->first.method == action.method))
+                  {
+                     if (allowedActions.empty())
+                        flags = AuthInterface::runAsMatchedType;
+                     else
+                        flags = AuthInterface::runAsMatchedExpandedType;
+                     break;
+                  }
+                  ++it;
+               }
+               if (!flags)
+                  flags = AuthInterface::runAsOtherType;
+            }
+
+            Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
+            auth.checkAuthSys(flags, requester, action, allowedActions, std::vector<Claim>{});
+         }  // if (requester != account->authContract)
+      }     // if(enforceAuth)
+
+      for (auto& a : allowedActions)
+         ++runAsMap[{action.sender, action.contract, a.contract, a.method}];
+
+      auto result = call(action);
+
+      for (auto& a : allowedActions)
+         --runAsMap[{action.sender, action.contract, a.contract, a.method}];
+
+      return result;
+   }  // TransactionSys::runAs
 
    static Transaction trx;
    Transaction        TransactionSys::getTransaction() const
@@ -159,7 +233,13 @@ namespace system_contract
                print("call checkAuthSys on ", account->authContract.str(), " for account ",
                      act.sender.str(), "\n");
             Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
-            auth.checkAuthSys(act, trx.claims, &act == &trx.actions[0], checkFirstAuthAndExit);
+            uint32_t             flags = AuthInterface::topActionType;
+            if (&act == &trx.actions[0])
+               flags |= AuthInterface::firstAuthFlag;
+            if (checkFirstAuthAndExit)
+               flags |= AuthInterface::readOnlyFlag;
+            auth.checkAuthSys(flags, psibase::AccountNumber{}, act, std::vector<ContractMethod>{},
+                              trx.claims);
          }
          if (checkFirstAuthAndExit)
             break;

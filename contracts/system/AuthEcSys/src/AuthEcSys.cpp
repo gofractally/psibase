@@ -10,13 +10,26 @@ static constexpr bool enable_print = false;
 
 namespace system_contract
 {
-   void AuthEcSys::checkAuthSys(psibase::Action             action,
-                                std::vector<psibase::Claim> claims,
-                                bool                        firstAuth,
-                                bool                        readOnly)
+   void AuthEcSys::checkAuthSys(uint32_t                    flags,
+                                psibase::AccountNumber      requester,
+                                psibase::Action             action,
+                                std::vector<ContractMethod> allowedActions,
+                                std::vector<psibase::Claim> claims)
    {
       if (enable_print)
          print("auth_check\n");
+
+      auto type = flags & AuthInterface::typeMask;
+      if (type == AuthInterface::runAsRequesterType)
+         return;  // Request is valid
+      else if (type == AuthInterface::runAsMatchedType)
+         return;  // Request is valid
+      else if (type == AuthInterface::runAsMatchedExpandedType)
+         abortMessage("runAs: caller attempted to expand powers");
+      else if (type == AuthInterface::runAsOtherType)
+         abortMessage("runAs: caller is not authorized");
+      else if (type != AuthInterface::topActionType)
+         abortMessage("unsupported auth type");
 
       auto row = db.open<AuthTable_t>().getIndex<0>().get(action.sender);
 
@@ -35,7 +48,7 @@ namespace system_contract
             //
             // We do this check after passing the other checks so we can produce the
             // other errors when appropriate.
-            if (firstAuth && &claim != &claims[0])
+            if ((flags & AuthInterface::firstAuthFlag) && &claim != &claims[0])
                abortMessage("first sender is not verified by first signature");
             return;
          }

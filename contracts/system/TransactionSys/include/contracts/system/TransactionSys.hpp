@@ -5,45 +5,133 @@
 
 namespace system_contract
 {
-   // TransactionSys calls into auth contracts using this interface
-   // to authenticate senders of top-level actions. Any contract
-   // may become an auth contract by implementing it. Any account
-   // may select any contract to be its sole authenticator. Be
-   // careful; this allows that contract to act on the account's
-   // behalf. It can also can lock out that account. See AuthEcSys
-   // for a canonical example of implementing this interface.
-   //
-   // This interface can't authenticate non-top-level actions.
-   // Most contracts shouldn't call or implement AuthInterface;
-   // use getSender().
+   /// Identify a contract and method
+   ///
+   /// An empty `contract` or `method` indicates a wildcard.
+   struct ContractMethod
+   {
+      psibase::AccountNumber contract;
+      psibase::MethodNumber  method;
+   };
+   PSIO_REFLECT(ContractMethod, contract, method)
+
+   /// Authenticate actions
+   ///
+   /// [TransactionSys] calls into auth contracts using this interface
+   /// to authenticate senders of top-level actions and uses of
+   /// [TransactionSys::runAs]. Any contract may become an auth
+   /// contract by implementing `AuthInterface`. Any account may
+   /// select any contract to be its authenticator. Be careful;
+   /// this allows that contract to act on the account's behalf and
+   /// that contract to authorize other accounts and contracts to
+   /// act on the account's behalf. It can also can lock out that
+   /// account. See `AuthEcSys` for a canonical example of
+   /// implementing this interface.
+   ///
+   /// This interface can't authenticate non-top-level actions other
+   /// than [TransactionSys::runAs] actions. Most contracts shouldn't
+   /// call or implement `AuthInterface`; use `getSender()`.
+   ///
+   /// Auth contracts shouldn't inherit from this struct. Instead,
+   /// they should define methods with matching signatures.
    struct AuthInterface
    {
-      // Authenticate a top-level action
-      //
-      // action:     Action to authenticate
-      // claims:     Claims in transaction (e.g. public keys)
-      // firstAuth:  Is this the transaction's first authorizer?
-      // readOnly:   Is the database in read-only mode?
-      //
-      // Auth contracts shouldn't try writing to the database if
-      // readOnly is set. If they do, the transaction will abort.
-      // Auth contracts shouldn't skip their check based on the
-      // value of the read-only flag. If they do, they'll hurt
-      // their users, either by allowing charging where it
-      // shouldn't be allowed, or by letting actions execute
-      // using the user's auth when they shouldn't.
+      /// See header
+      ///
+      /// The database is in read-only mode. This flag is only
+      /// used for `topActionType`.
+      ///
+      /// Auth contracts shouldn't try writing to the database if
+      /// readOnly is set. If they do, the transaction will abort.
+      /// Auth contracts shouldn't skip their check based on the
+      /// value of the read-only flag. If they do, they'll hurt
+      /// their users, either by allowing charging where it
+      /// shouldn't be allowed, or by letting actions execute
+      /// using the user's auth when they shouldn't.
+      static constexpr uint32_t readOnlyFlag = 0x8000'0000;
+
+      /// See header
+      ///
+      /// Transaction's first authorizer. This flag is only
+      /// used for `topActionType`.
+      ///
+      /// Auth contracts should be aware that if this flag
+      /// is set, then only the first proof has been verified.
+      /// If they rely on other proofs when this flag is set,
+      /// they'll open up the accounts they're trying to
+      /// protect to resource billing attacks.
+      static constexpr uint32_t firstAuthFlag = 0x4000'0000;
+
+      /// Type bits
+      static constexpr uint32_t typeMask = 0x0000'00ff;
+
+      /// Top-level action
+      static constexpr uint32_t topActionType = 0x00;
+
+      /// See header
+      ///
+      /// `runAs` request. The requester matches the sender.
+      ///
+      /// Auth contracts should normally approve this unless
+      /// they enforce stronger rules, e.g. by restricting
+      /// `action` or `allowedActions`.
+      static constexpr uint32_t runAsRequesterType = 0x01;
+
+      /// See header
+      ///
+      /// `runAs` request. The request matches the criteria from
+      /// a `runAs` request currently in the call stack. `requester`
+      /// matches the earlier `action.contract`. `action` matches
+      /// one of the earlier `allowedActions` from the same request.
+      ///
+      /// Auth contracts should normally approve this unless
+      /// they enforce stronger rules.
+      static constexpr uint32_t runAsMatchedType = 0x02;
+
+      /// See header
+      ///
+      /// `runAs` request. Same as `runAsMatched`, except the
+      /// requestor provided a non-empty `allowedActions`. This
+      /// expands the authority beyond what was originally granted.
+      ///
+      /// Auth contracts should normally reject this unless
+      /// they have filtering criteria which allow it.
+      static constexpr uint32_t runAsMatchedExpandedType = 0x03;
+
+      /// See header
+      ///
+      /// `runAs` request. The other criteria don't match.
+      ///
+      /// Auth contracts should normally reject this unless
+      /// they have filtering criteria which allow it.
+      static constexpr uint32_t runAsOtherType = 0x04;
+
+      /// Authenticate a top-level action or a `runAs` action
+      ///
+      /// * `flags`:          One of the type constants, or'ed with
+      ///                     0 or more of the flag constants
+      /// * `requester`:      `""` if this is a top-level action, or
+      ///                     the sender of the `runAs` action.
+      ///                     This is often different than
+      ///                     `action.sender`.
+      /// * `action`:         Action to authenticate
+      /// * `allowedActions`: Argument from `runAs`
+      /// * `claims`:         Claims in transaction (e.g. public keys).
+      ///                     Empty if `runAs`
       //
       // TODO: return error message instead?
-      void checkAuthSys(psibase::Action             action,
-                        std::vector<psibase::Claim> claims,
-                        bool                        firstAuth,
-                        bool                        readOnly);
+      void checkAuthSys(uint32_t                    flags,
+                        psibase::AccountNumber      requester,
+                        psibase::Action             action,
+                        std::vector<ContractMethod> allowedActions,
+                        std::vector<psibase::Claim> claims);
 
       // TODO: add a method to allow the auth contract to verify
       //       that it's OK with being the auth contract for a
       //       particular account. AccountSys would call it.
    };
-   PSIO_REFLECT(AuthInterface, method(checkAuthSys, action, claims))
+   PSIO_REFLECT(AuthInterface,
+                method(checkAuthSys, flags, requester, action, allowedActions, claims))
 
    struct TransactionSysStatus
    {
@@ -77,30 +165,82 @@ namespace system_contract
    using IncludedTrxTable =
        psibase::Table<IncludedTrx, &IncludedTrx::id, &IncludedTrx::by_expiration>;
 
+   /// All transactions enter the chain through this contract
+   ///
+   /// This privileged contract dispatches top-level actions to other
+   /// contracts, checks TAPoS, detects duplicate transactions, and
+   /// checks authorizations using [system_contract::AuthInterface].
+   ///
+   /// Other contracts use it to get information about the chain,
+   /// current block, and head block. They also use it to call actions
+   /// using other accounts' authorities via [runAs].
    struct TransactionSys : psibase::Contract<TransactionSys>
    {
-      static constexpr auto     contract = psibase::AccountNumber("transact-sys");
+      /// "transact-sys"
+      static constexpr auto contract = psibase::AccountNumber("transact-sys");
+
+      /// Flags this contract must run with
       static constexpr uint64_t contractFlags =
           psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
 
       using Tables =
           psibase::ContractTables<TransactionSysStatusTable, BlockSummaryTable, IncludedTrxTable>;
 
+      /// Only called once during chain initialization
+      ///
+      /// This enables the auth checking system. Before this point, `TransactionSys`
+      /// allows all transactions to execute without auth checks. After this point,
+      /// `TransactionSys` uses [AuthInterface::checkAuthSys] to authenticate
+      /// top-level actions and uses of [runAs].
       void startup();
 
-      // Called by native code at the beginning of each block
+      /// Called by native code at the beginning of each block
       void startBlock();
 
+      /// Run `action` using `action.sender's` authority
+      ///
+      /// Also adds `allowedActions` to the list of actions that `action.contract`
+      /// may perform on `action.sender's` behalf, for as long as this call to
+      /// `runAs` is in the call stack. Use `""` for `contract` in
+      /// `allowedActions` to allow use of any contract (danger!). Use `""` for
+      /// `method` to allow any method.
+      ///
+      /// Returns the action's return value, if any.
+      ///
+      /// This will succeed if any of the following are true:
+      /// * `getSender() == action.sender's authContract`
+      /// * `getSender() == action.sender`. Requires `action.sender's authContract`
+      ///   to approve with flag `AuthInterface::runAsRequesterType` (normally succeeds).
+      /// * An existing `runAs` is currently on the call stack, `getSender()` matches
+      ///   `action.contract` on that earlier call, and `action` matches
+      ///   `allowedActions` from that same earlier call. Requires `action.sender's
+      ///   authContract` to approve with flag `AuthInterface::runAsMatchedType`
+      ///   if `allowedActions` is empty (normally succeeds), or
+      ///   `AuthInterface::runAsMatchedExpandedType` if not empty (normally fails).
+      /// * All other cases, requires `action.sender's authContract`
+      ///   to approve with flag `AuthInterface::runAsOtherType` (normally fails).
+      std::vector<char> runAs(psibase::Action action, std::vector<ContractMethod> allowedActions);
+
+      /// Get the currently executing transaction
       psibase::Transaction getTransaction() const;
 
       // TODO: currentBlockNum(), currentBlockTime(): fetch from new status fields
       //       also update contracts which use `head + 1`
-      psibase::BlockNum     headBlockNum() const;
+
+      /// Get the head block number
+      ///
+      /// This is *not* the currently executing block number.
+      psibase::BlockNum headBlockNum() const;
+
+      /// Get the head block time
+      ///
+      /// This is *not* the currently executing block time.
       psibase::TimePointSec headBlockTime() const;
    };
    PSIO_REFLECT(TransactionSys,
                 method(startup),
                 method(startBlock),
+                method(runAs, action, allowedActions),
                 method(getTransaction),
                 method(headBlockNum),
                 method(headBlockTime))
