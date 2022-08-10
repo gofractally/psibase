@@ -77,6 +77,7 @@ namespace psibase::net
 
       struct hello_request
       {
+         static constexpr unsigned type = 32;
          ExtendedBlockId xid;
          std::string to_string() const { return "hello: id=" + net::to_string(xid.id()) + " num=" + std::to_string(xid.num()); }
          PSIO_REFLECT_INLINE(hello_request, xid)
@@ -84,6 +85,7 @@ namespace psibase::net
 
       struct hello_response
       {
+         static constexpr unsigned type = 33;
          char dummy = 0;
          std::string to_string() const { return "hello response"; }
          PSIO_REFLECT_INLINE(hello_response, dummy)
@@ -130,6 +132,7 @@ namespace psibase::net
 
       struct append_entries_request
       {
+         static constexpr unsigned type = 34;
          term_id term;
          producer_id leader_id;
          BlockNum leader_commit;
@@ -144,6 +147,7 @@ namespace psibase::net
 
       struct append_entries_response
       {
+         static constexpr unsigned type = 35;
          term_id term;
          producer_id follower_id;
          BlockNum head_num;
@@ -156,6 +160,7 @@ namespace psibase::net
 
       struct request_vote_request
       {
+         static constexpr unsigned type = 36;
          term_id term;
          producer_id candidate_id;
          block_num last_log_index;
@@ -168,6 +173,7 @@ namespace psibase::net
       };
       struct request_vote_response
       {
+         static constexpr unsigned type = 37;
          term_id term;
          producer_id candidate_id;
          producer_id voter_id;
