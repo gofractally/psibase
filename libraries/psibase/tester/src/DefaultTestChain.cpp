@@ -274,6 +274,9 @@ void DefaultTestChain::registerSysRpc()
        // AccountSys
        rpcAccount.storeSys("/", html, read_whole_file(accDir + "/ui/index.html")),
        rpcAccount.storeSys("/ui/index.js", js, read_whole_file(accDir + "/ui/index.js")),
+       rpcAccount.storeSys("/legacy", html, read_whole_file(accDir + "/ui/legacy_index.html")),
+       rpcAccount.storeSys("/ui/legacy_index.js", js,
+                           read_whole_file(accDir + "/ui/legacy_index.js")),
 
        // AuthEcSys
        rpcAuthEc.storeSys("/", html, read_whole_file(authEcDir + "/ui/index.html")),

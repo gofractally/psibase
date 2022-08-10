@@ -1,170 +1,150 @@
-import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, initializeApplet, addRoute, push, action } from '/common/rpc.mjs';
-import { genKeyPair, KeyType } from '/common/keyConversions.mjs';
+import htm from "/common/htm.module.js";
+import { siblingUrl } from "/common/rootdomain.mjs";
+import { initializeApplet, 
+  getJson, action, addRoute, push, 
+  CommonResources } from "/common/rpc.mjs";
+import { keyPairStrings, privateStringToKeyPair } from "/common/keyConversions.mjs";
 
 const html = htm.bind(React.createElement);
+const { useEffect, useState, useCallback } = React;
+const { Segment, Header, Icon, Modal, Form, Table, Input, Button, Message, Tab, Container } = semanticUIReact;
 
 await initializeApplet();
+
 const thisApplet = await getJson('/common/thiscontract');
 
-let transactionTypes = {
-    newacc: 0,
-};
-
-function useAccounts(addMsg, clearMsg) {
-    const [accounts, setAccounts] = React.useState([]);
-
-    const refreshAccounts = React.useCallback((trace) => {
-        (async () => {
-            addMsg(JSON.stringify(trace, null, 4));
-            try {
-                setAccounts(await getJson('/accounts'));
-            }
-            catch (e) {
-                clearMsg();
-                addMsg(e);
-            }
-        })();
-    }, []);
-
-    React.useEffect(refreshAccounts, []);
-
-    React.useEffect(()=>{
-        addRoute("accCreated", transactionTypes.newacc, refreshAccounts);
-    }, [refreshAccounts]);
-    
-
-    return accounts;
-}
-
-function AccountList(addMsg, clearMsg) {
-    const accounts = useAccounts(addMsg, clearMsg);
-    return html`<table><tbody>${accounts.map(account =>
-        html`<tr key=${account.num}>
-                <td style=${{ border: '2px solid' }}>${account.num}</td>
-                <td style=${{ border: '2px solid' }}>${account.authContract}</td>
-                <td style=${{ border: '2px solid' }}>${account.flags}</td>
-                <td style=${{ border: '2px solid' }}>${account.codeHash}</td>
-            </tr>`
-    )}</tbody></table>`
-}
-
-async function newAccount(name, pubkey, addMsg, clearMsg) {
-    try {
-        clearMsg();
-        addMsg("Pushing transaction...");
-
-        var actions = [await action(
-            thisApplet, 
-            "newAccount", 
-            { 
-                name, 
-                authContract: 'auth-fake-sys', 
-                requireNew: true 
-            },
-            thisApplet,
-          )];
-
-        if (pubkey)
-            actions = actions.concat([
-                await action('auth-ec-sys', 'setKey', {key: pubkey}, name),
-                await action('account-sys', 'setAuthCntr', {authContract: 'auth-ec-sys'}, name), 
-            ]);
-
-        push(transactionTypes.newacc, actions);
-
-    } catch (e) {
-        console.error(e);
-        addMsg('');
-        addMsg(e.message);
-        if (e.trace) {
-            addMsg('');
-            addMsg('trace: ' + JSON.stringify(e.trace, null, 4));
-        }
+// Simple useLocalStorage hook taken from:
+//    https://usehooks.com/useLocalStorage/
+function useLocalStorage(key, initialValue) {
+  const [storedValue, setStoredValue] = useState(() => {
+    if (typeof window === "undefined") {
+      return initialValue;
     }
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.log(error);
+      return initialValue;
+    }
+  });
+
+  const setValue = (value) => {
+    try {
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+  return [storedValue, setValue];
 }
 
-function AccountForm(addMsg, clearMsg) {
-    const [name, setName] = React.useState('');
-    const [pubkey, setPubkey] = React.useState('');
-    return html`<div>
-        <table><tbody>
-            <tr>
-                <td>Name</td>
-                <td><input type="text" value=${name} onChange=${e => setName(e.target.value)}></input></td>
-            </tr>
-            <tr>
-                <td>Public Key</td>
-                <td><input type="text" value=${pubkey} onChange=${e => setPubkey(e.target.value)}></input></td>
-            </tr>
-            <tr>
-                <td></td>
-                <td><button onClick=${e => newAccount(name, pubkey, addMsg, clearMsg)}>Create Account</button></td>
-            </tr>
-        </tbody></table>
-    </div>`
-}
-
-function useMsg() {
-    const [msg, setMsg] = React.useState('');
-    const [nonSignallingState] = React.useState({ msg: '' });
-    const clearMsg = () => {
-        nonSignallingState.msg = '';
-        setMsg(nonSignallingState.msg);
-    };
-    const addMsg = (msg) => {
-        nonSignallingState.msg += msg + '\n';
-        setMsg(nonSignallingState.msg);
-    };
-    return { msg, addMsg, clearMsg };
-}
-
-function KeyPair() 
+function ErrorPane(props) 
 {
-    const [pub, setPub] = React.useState('');
-    const [priv, setPriv] = React.useState('');
-
-    let generateKeyPair = () => {
-        let kp = genKeyPair(KeyType.k1);
-        setPub(kp.pub);
-        setPriv(kp.priv);
-    };
-
+  if (props.show === true)
+  {
     return html`
-        <div>
-            <table><tbody>
-                <tr>
-                        <td></td>
-                        <td><button onClick=${generateKeyPair}>Generate</button></td>
-                </tr>    
-                <tr>
-                    <td>Public key</td>
-                    <td><input type="text" disabled value=${pub}></input></td>
-                </tr>
-                <tr>
-                    <td>Private key</td>
-                    <td><input type="text" disabled value=${priv}></input></td>
-                </tr>
-            </tbody></table>
-        </div>
+      <${Message} negative header='Import failure' content='Failed to import accounts for given private key.' />
     `;
+  }
+  else return html``;
 }
 
 function App() {
-    const [trx, setTrx] = React.useState('');
-    const { msg, addMsg, clearMsg } = useMsg();
-    return html`<div class="ui container">
-        <h1>account_sys</h1>
-        <h2>Accounts</h2>
-        ${AccountList(addMsg, clearMsg)}
-        <h2>Generate Key Pair</h2>
-        <${KeyPair} />
-        <h2>Create Account</h2>
-        ${AccountForm(addMsg, clearMsg)}
-        <h2>Messages</h2>
-        <pre style=${{ border: '1px solid' }}><code>${msg}</code></pre>
-    </div>`;
+
+  const [keys, setKeys] = useLocalStorage("keys", []);
+  const [accounts, setAccounts] = useLocalStorage("accounts", []);
+
+  const setManagedAccounts = useCallback( async (payload) =>{
+    console.log("managed accounts set.");
+    console.log(payload);
+  }, []);
+
+  useEffect(()=>{
+    try{
+        
+        callApplet("auth-ec-sys", "", "getAccounts", {}, setManagedAccounts);
+
+        let res = await getJson(siblingUrl(null, thisApplet, "accwithkey/" + keypair.pub));
+        setKeys(keys.concat([privateKey]));
+        setAccounts(accounts.concat(res));
+    } 
+    catch(e)
+    {
+        console.error(e);
+    }
+  }, []);
+
+  let Accounts = () => {
+    let accountRows = accounts.map((a)=>{
+      return html`
+        <${Table.Row}>
+          <${Table.Cell}>${a.account}</${Table.Cell}>
+          <${Table.Cell}>${a.authContract}</${Table.Cell}>
+          <${Table.Cell}><${Button} fluid>Login</${Button}></${Table.Cell}>
+        </${Table.Row}>
+      `;
+    });
+    console.log(accountRows);
+    if (accountRows) 
+    {
+        return accountRows;
+    }
+    else return html``;
+  };
+
+  return html`
+    <${Container}>
+      <${Header} as='h1'>Account Management</${Header}>
+      <${Segment}>
+      <${Header} as='h2'>Your accounts</${Header}>
+        <${Table} celled>
+          <${Table.Header}>
+            <${Table.Row}>
+              <${Table.HeaderCell} collapsing>Account</${Table.HeaderCell}>
+              <${Table.HeaderCell} collapsing>Authorization method</${Table.HeaderCell}>
+              <${Table.HeaderCell} collapsing />
+            </${Table.Row}>
+          </${Table.Header}>
+
+          <${Table.Body}>
+            <${Accounts} />
+          </${Table.Body}>
+        </${Table}>
+
+      </${Segment}>
+    </${Container}>
+  `;
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(html`<${App}/>`);
+/*
+        <${Modal}
+          trigger=${html`<${Button} primary><${Icon} name='add circle' /> Import account</${Button}>`}
+          header='Import by private key'
+          dimmer='blurring'
+          closeOnEscape=${false}
+          closeOnDimmerClick=${false}
+          content='${html`
+            <${Container}>
+              <${Input} fluid label='Private key:' placeholder='Enter private key...' onChange=${(e)=>{setPriv(e.target.value);}} value=${priv}>
+            </${Container}>
+          `}'
+          actions=${[
+            { key: 'cancel', content: 'Cancel', positive: false, onClick: ()=>{setPriv("");} }, 
+            { key: 'add', content: 'Add', positive: true, onClick: ()=>{
+              doImport(priv);
+              setPriv("");
+            } }
+          ]}
+        />
+        <${ErrorPane} show=${impErr}/>
+*/
+
+const container = document.getElementById("root");
+const root = ReactDOM.createRoot(container);
+root.render(html`<${App} />`);

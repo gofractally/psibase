@@ -1,7 +1,6 @@
 #include <contracts/system/AccountSys.hpp>
 
 #include <contracts/system/TransactionSys.hpp>
-#include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 
@@ -11,29 +10,6 @@ using namespace psibase;
 
 namespace system_contract
 {
-   struct Status
-   {
-      uint32_t totalAccounts = 0;
-
-      std::tuple<> key() const { return {}; }
-   };
-   PSIO_REFLECT(Status, totalAccounts)
-   using StatusTable = Table<Status, &Status::key>;
-
-   struct SingletonKey
-   {
-   };
-   PSIO_REFLECT(SingletonKey);
-   struct CreatorRecord
-   {
-      SingletonKey  key;
-      AccountNumber accountCreator;
-   };
-   PSIO_REFLECT(CreatorRecord, key, accountCreator);
-   using CreatorTable = Table<CreatorRecord, &CreatorRecord::key>;
-
-   using Tables = ContractTables<StatusTable, CreatorTable>;
-
    void AccountSys::startup()
    {
       Tables tables{getReceiver()};
