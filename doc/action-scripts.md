@@ -1,4 +1,4 @@
-# Transcripts
+# Action Scripts
 
 In most blockchains, every function called on an on-chain smart-contract is called a "transaction." In some other blockchains, calling a function on chain requires one "action," and a "transaction" may be comprised of one or many such actions. In this way, a transaction can be viewed as a kind of "script" with one very basic capability: execute an ordered list of actions.
 
