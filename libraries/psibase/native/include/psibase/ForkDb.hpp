@@ -37,9 +37,6 @@ namespace psibase
    {
    public:
       using id_type = Checksum256;
-      ForkDb()
-      {
-      }
       bool insert(const SignedBlock& b)
       {
          BlockInfo info(b.block);
@@ -296,10 +293,10 @@ namespace psibase
 
       bool isProducing() const { return !!blockContext; }
 
-      void setBlockContext(SystemContext* sc, WriterPtr writer)
+      explicit ForkDb(SystemContext* sc)
       {
          systemContext = sc;
-         this->writer = std::move(writer);
+         writer = sc->sharedDatabase.createWriter();
 
          Database db{sc->sharedDatabase, sc->sharedDatabase.getHead()};
          auto session = db.startRead();

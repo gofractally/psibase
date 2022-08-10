@@ -8,8 +8,8 @@ namespace psibase::net
       Routing<node<Link, Routing, Consensus, Chain>>,
       Consensus<node<Link, Routing, Consensus, Chain>>
    {
-      template<typename ExecutionContext>
-      explicit node(ExecutionContext& ctx) : Routing<node>(ctx), Consensus<node>(ctx) {}
+      template<typename ExecutionContext, typename ChainArg>
+      explicit node(ExecutionContext& ctx, ChainArg&& chainArg) : Routing<node>(ctx), Consensus<node>(ctx), _chain{std::forward<ChainArg>(chainArg)} {}
       Routing<node>& network() { return *this; }
       Consensus<node>& consensus() { return *this; }
       Chain& chain() { return _chain; }

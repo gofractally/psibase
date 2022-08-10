@@ -340,15 +340,12 @@ void run(const std::string& db_path,
 
    // TODO: temporary loop
    // TODO: replay
-   auto writer = system->sharedDatabase.createWriter();
-
    boost::asio::io_context chainContext;
 
    using node_type = node<null_link, direct_routing, cft_consensus, ForkDb>;
-   node_type node(chainContext);
+   node_type node(chainContext, system.get());
    node.set_producer_id(producer);
    node.set_producers(producers);
-   node.chain().setBlockContext(system.get(), writer);
 
    auto endpoint = node.listen({boost::asio::ip::tcp::v4(), 0});
    std::cout << "listening on " << endpoint << std::endl;
