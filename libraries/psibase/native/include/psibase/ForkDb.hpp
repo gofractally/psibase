@@ -264,7 +264,7 @@ namespace psibase
             }
             else
             {
-               throw std::runtime_error("unknown block number");
+               throw std::runtime_error("block number is irreversible but block id does not match");
             }
          }
          while(true)

@@ -2,6 +2,7 @@
 #include <psibase/contractEntry.hpp>
 #include <psibase/cft.hpp>
 #include <psibase/node.hpp>
+#include <psibase/tcp.hpp>
 #include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
 #include <psio/finally.hpp>
@@ -342,7 +343,7 @@ void run(const std::string& db_path,
    // TODO: replay
    boost::asio::io_context chainContext;
 
-   using node_type = node<null_link, direct_routing, cft_consensus, ForkDb>;
+   using node_type = node<tcp, direct_routing, cft_consensus, ForkDb>;
    node_type node(chainContext, system.get());
    node.set_producer_id(producer);
    node.set_producers(producers);
