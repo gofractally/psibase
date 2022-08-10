@@ -695,8 +695,9 @@ struct callbacks
             // running in read-only mode.
             //
             // We run the check within blockContext to make it easier for
-            // tests to chain transactions which modify auth. psinode
-            // doesn't provide this luxury.
+            // tests to chain transactions which modify auth. There's a
+            // cost to this since numExecutionMemories may bounce back
+            // and forth.
             auto saveTrace = trace;
             chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt);
             trace = std::move(saveTrace);

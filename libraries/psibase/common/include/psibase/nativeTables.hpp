@@ -7,10 +7,12 @@ namespace psibase
 {
    using NativeTableNum = uint16_t;
 
-   static constexpr NativeTableNum statusTable         = 1;
-   static constexpr NativeTableNum codeTable           = 2;
-   static constexpr NativeTableNum codeByHashTable     = 3;
-   static constexpr NativeTableNum databaseStatusTable = 4;
+   static constexpr NativeTableNum statusTable                = 1;
+   static constexpr NativeTableNum codeTable                  = 2;
+   static constexpr NativeTableNum codeByHashTable            = 3;
+   static constexpr NativeTableNum databaseStatusTable        = 4;
+   static constexpr NativeTableNum transactionWasmConfigTable = 5;
+   static constexpr NativeTableNum proofWasmConfigTable       = 6;  // Also for first auth
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -23,12 +25,45 @@ namespace psibase
       Checksum256              chainId;
       BlockHeader              current;
       std::optional<BlockInfo> head;
-      uint32_t                 numExecutionMemories = 32;  // TODO: move to a configuration table
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(StatusRow, chainId, current, head, numExecutionMemories)
+   PSIO_REFLECT(StatusRow, chainId, current, head)
+
+   // TODO: determine which eos-vm parameters need to
+   //       be constrained for safety and consensus.
+   //       Also decide on values.
+   struct VMOptions
+   {
+      std::uint32_t max_mutable_global_bytes = 1024;
+      std::uint32_t max_func_local_bytes     = 8192;
+      std::uint32_t max_pages                = 528;  // 33 MiB
+      std::uint32_t max_call_depth           = 251;
+      bool          enable_simd              = true;
+
+      friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
+   };
+   PSIO_REFLECT(VMOptions,
+                max_mutable_global_bytes,
+                max_func_local_bytes,
+                max_pages,
+                max_call_depth,
+                enable_simd)
+
+   struct WasmConfigRow
+   {
+      uint32_t  numExecutionMemories = 32;
+      VMOptions vmOptions;
+
+      static constexpr auto db = psibase::DbId::nativeConstrained;
+
+      static auto key(NativeTableNum TableNum)
+      {
+         return std::tuple{TableNum, nativeTablePrimaryIndex};
+      }
+   };
+   PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
 
    inline auto codePrefix()
    {

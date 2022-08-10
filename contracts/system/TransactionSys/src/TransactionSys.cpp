@@ -23,6 +23,14 @@ namespace system_contract
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
       statusTable.put({.enforceAuth = true});
+
+      // TODO: Move this to a config contract
+      // TODO: Reduce numExecutionMemories on proofWasmConfigTable. Waiting for
+      //       a fix to SystemContract caching, to prevent frequent allocating
+      //       and freeing of ExecutionMemory instances.
+      WasmConfigRow wasmConfig;
+      kvPut(wasmConfig.db, wasmConfig.key(transactionWasmConfigTable), wasmConfig);
+      kvPut(wasmConfig.db, wasmConfig.key(proofWasmConfigTable), wasmConfig);
    }
 
    // CAUTION: startBlock() is critical to chain operations. If it fails, the chain stops.

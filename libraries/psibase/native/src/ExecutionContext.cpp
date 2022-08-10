@@ -19,7 +19,7 @@ namespace psibase
 {
    struct ExecutionContextImpl;
    using rhf_t     = eosio::vm::registered_host_functions<ExecutionContextImpl>;
-   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit>;
+   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit, VMOptions>;
 
    // Rethrow with detailed info
    template <typename F>
@@ -70,7 +70,10 @@ namespace psibase
    struct BackendEntry
    {
       Checksum256                hash;
+      VMOptions                  vmOptions;
       std::unique_ptr<backend_t> backend;
+
+      auto byHash() const { return std::tie(hash, vmOptions); }
    };
 
    struct ByAge;
@@ -79,7 +82,7 @@ namespace psibase
    using BackendContainer = bmi::multi_index_container<
        BackendEntry,
        bmi::indexed_by<bmi::sequenced<bmi::tag<ByAge>>,
-                       bmi::ordered_non_unique<bmi::tag<ByHash>, bmi::key<&BackendEntry::hash>>>>;
+                       bmi::ordered_non_unique<bmi::tag<ByHash>, bmi::key<&BackendEntry::byHash>>>>;
 
    struct WasmCacheImpl
    {
@@ -98,12 +101,12 @@ namespace psibase
             ind.pop_front();
       }
 
-      std::unique_ptr<backend_t> get(const Checksum256& hash)
+      std::unique_ptr<backend_t> get(const Checksum256& hash, const VMOptions& vmOptions)
       {
          std::unique_ptr<backend_t>  result;
          std::lock_guard<std::mutex> lock{mutex};
          auto&                       ind = backends.get<ByHash>();
-         auto                        it  = ind.find(hash);
+         auto                        it  = ind.find(std::tie(hash, vmOptions));
          if (it == ind.end())
             return result;
          ind.modify(it, [&](auto& x) { result = std::move(x.backend); });
@@ -141,17 +144,20 @@ namespace psibase
    // TODO: debugger
    struct ExecutionContextImpl : NativeFunctions
    {
+      VMOptions                  vmOptions;
       eosio::vm::wasm_allocator& wa;
       std::unique_ptr<backend_t> backend;
       std::atomic<bool>          timedOut    = false;
       bool                       initialized = false;
 
       ExecutionContextImpl(TransactionContext& transactionContext,
+                           const VMOptions&    vmOptions,
                            ExecutionMemory&    memory,
                            AccountNumber       contract)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
                             transactionContext.allowDbRead, transactionContext.allowDbWrite,
                             transactionContext.allowDbReadSubjective},
+            vmOptions{vmOptions},
             wa{memory.impl->wa}
       {
          auto ca = database.kvGet<CodeRow>(CodeRow::db, codeKey(contract));
@@ -167,19 +173,18 @@ namespace psibase
              [&]
              {
                 backend = transactionContext.blockContext.systemContext.wasmCache.impl->get(
-                    code.codeHash);
+                    code.codeHash, vmOptions);
                 if (!backend)
-                   backend = std::make_unique<backend_t>(c->code, nullptr);
+                   backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
              });
       }
 
       ~ExecutionContextImpl()
       {
          transactionContext.blockContext.systemContext.wasmCache.impl->add(
-             {code.codeHash, std::move(backend)});
+             {code.codeHash, vmOptions, std::move(backend)});
       }
 
-      // TODO: configurable wasm limits
       void init()
       {
          rethrowVMExcept(
@@ -219,10 +224,12 @@ namespace psibase
    };  // ExecutionContextImpl
 
    ExecutionContext::ExecutionContext(TransactionContext& transactionContext,
+                                      const VMOptions&    vmOptions,
                                       ExecutionMemory&    memory,
                                       AccountNumber       contract)
    {
-      impl = std::make_unique<ExecutionContextImpl>(transactionContext, memory, contract);
+      impl =
+          std::make_unique<ExecutionContextImpl>(transactionContext, vmOptions, memory, contract);
    }
 
    ExecutionContext::ExecutionContext(ExecutionContext&& src)
