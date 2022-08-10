@@ -39,7 +39,7 @@ namespace system_contract
       /// See header
       ///
       /// The database is in read-only mode. This flag is only
-      /// used for `topActionType`.
+      /// used for `topActionReq`.
       ///
       /// Auth contracts shouldn't try writing to the database if
       /// readOnly is set. If they do, the transaction will abort.
@@ -53,7 +53,7 @@ namespace system_contract
       /// See header
       ///
       /// Transaction's first authorizer. This flag is only
-      /// used for `topActionType`.
+      /// used for `topActionReq`.
       ///
       /// Auth contracts should be aware that if this flag
       /// is set, then only the first proof has been verified.
@@ -62,20 +62,21 @@ namespace system_contract
       /// protect to resource billing attacks.
       static constexpr uint32_t firstAuthFlag = 0x4000'0000;
 
-      /// Type bits
-      static constexpr uint32_t typeMask = 0x0000'00ff;
+      /// Bits which identify kind of request
+      static constexpr uint32_t requestMask = 0x0000'00ff;
 
       /// Top-level action
-      static constexpr uint32_t topActionType = 0x00;
+      static constexpr uint32_t topActionReq = 0x01;
 
       /// See header
       ///
-      /// `runAs` request. The requester matches the sender.
+      /// `runAs` request. The requester matches the action's
+      /// sender.
       ///
       /// Auth contracts should normally approve this unless
       /// they enforce stronger rules, e.g. by restricting
       /// `action` or `allowedActions`.
-      static constexpr uint32_t runAsRequesterType = 0x01;
+      static constexpr uint32_t runAsRequesterReq = 0x02;
 
       /// See header
       ///
@@ -86,7 +87,7 @@ namespace system_contract
       ///
       /// Auth contracts should normally approve this unless
       /// they enforce stronger rules.
-      static constexpr uint32_t runAsMatchedType = 0x02;
+      static constexpr uint32_t runAsMatchedReq = 0x03;
 
       /// See header
       ///
@@ -96,7 +97,7 @@ namespace system_contract
       ///
       /// Auth contracts should normally reject this unless
       /// they have filtering criteria which allow it.
-      static constexpr uint32_t runAsMatchedExpandedType = 0x03;
+      static constexpr uint32_t runAsMatchedExpandedReq = 0x04;
 
       /// See header
       ///
@@ -104,7 +105,7 @@ namespace system_contract
       ///
       /// Auth contracts should normally reject this unless
       /// they have filtering criteria which allow it.
-      static constexpr uint32_t runAsOtherType = 0x04;
+      static constexpr uint32_t runAsOtherReq = 0x05;
 
       /// Authenticate a top-level action or a `runAs` action
       ///
@@ -210,15 +211,15 @@ namespace system_contract
       /// This will succeed if any of the following are true:
       /// * `getSender() == action.sender's authContract`
       /// * `getSender() == action.sender`. Requires `action.sender's authContract`
-      ///   to approve with flag `AuthInterface::runAsRequesterType` (normally succeeds).
+      ///   to approve with flag `AuthInterface::runAsRequesterReq` (normally succeeds).
       /// * An existing `runAs` is currently on the call stack, `getSender()` matches
       ///   `action.contract` on that earlier call, and `action` matches
       ///   `allowedActions` from that same earlier call. Requires `action.sender's
-      ///   authContract` to approve with flag `AuthInterface::runAsMatchedType`
+      ///   authContract` to approve with flag `AuthInterface::runAsMatchedReq`
       ///   if `allowedActions` is empty (normally succeeds), or
-      ///   `AuthInterface::runAsMatchedExpandedType` if not empty (normally fails).
+      ///   `AuthInterface::runAsMatchedExpandedReq` if not empty (normally fails).
       /// * All other cases, requires `action.sender's authContract`
-      ///   to approve with flag `AuthInterface::runAsOtherType` (normally fails).
+      ///   to approve with flag `AuthInterface::runAsOtherReq` (normally fails).
       std::vector<char> runAs(psibase::Action action, std::vector<ContractMethod> allowedActions);
 
       /// Get the currently executing transaction

@@ -19,16 +19,16 @@ namespace system_contract
       if (enable_print)
          print("auth_check\n");
 
-      auto type = flags & AuthInterface::typeMask;
-      if (type == AuthInterface::runAsRequesterType)
+      auto type = flags & AuthInterface::requestMask;
+      if (type == AuthInterface::runAsRequesterReq)
          return;  // Request is valid
-      else if (type == AuthInterface::runAsMatchedType)
+      else if (type == AuthInterface::runAsMatchedReq)
          return;  // Request is valid
-      else if (type == AuthInterface::runAsMatchedExpandedType)
+      else if (type == AuthInterface::runAsMatchedExpandedReq)
          abortMessage("runAs: caller attempted to expand powers");
-      else if (type == AuthInterface::runAsOtherType)
+      else if (type == AuthInterface::runAsOtherReq)
          abortMessage("runAs: caller is not authorized");
-      else if (type != AuthInterface::topActionType)
+      else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
       auto row = db.open<AuthTable_t>().getIndex<0>().get(action.sender);

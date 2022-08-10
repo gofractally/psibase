@@ -79,7 +79,7 @@ namespace system_contract
          {
             uint32_t flags = 0;
             if (requester == action.sender)
-               flags = AuthInterface::runAsRequesterType;
+               flags = AuthInterface::runAsRequesterReq;
             else
             {
                auto it = runAsMap.lower_bound(RunAsKey{action.sender, requester, {}, {}});
@@ -91,15 +91,15 @@ namespace system_contract
                       (!it->first.method.value || it->first.method == action.method))
                   {
                      if (allowedActions.empty())
-                        flags = AuthInterface::runAsMatchedType;
+                        flags = AuthInterface::runAsMatchedReq;
                      else
-                        flags = AuthInterface::runAsMatchedExpandedType;
+                        flags = AuthInterface::runAsMatchedExpandedReq;
                      break;
                   }
                   ++it;
                }
                if (!flags)
-                  flags = AuthInterface::runAsOtherType;
+                  flags = AuthInterface::runAsOtherReq;
             }
 
             Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
@@ -233,7 +233,7 @@ namespace system_contract
                print("call checkAuthSys on ", account->authContract.str(), " for account ",
                      act.sender.str(), "\n");
             Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
-            uint32_t             flags = AuthInterface::topActionType;
+            uint32_t             flags = AuthInterface::topActionReq;
             if (&act == &trx.actions[0])
                flags |= AuthInterface::firstAuthFlag;
             if (checkFirstAuthAndExit)
