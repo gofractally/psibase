@@ -2466,7 +2466,9 @@ namespace psio
       }
 
       shared_view_ptr(){};
-      bool operator!() const { return _data == nullptr; }
+      shared_view_ptr(std::nullptr_t){};
+      //bool operator!() const { return _data == nullptr; }
+      explicit operator bool() const { return _data != nullptr; }
 
       const auto operator->() const { return const_view<T>(data()); }
       auto       operator->() { return view<T>(data()); }

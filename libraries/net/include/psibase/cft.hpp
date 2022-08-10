@@ -133,12 +133,12 @@ namespace psibase::net
          term_id term;
          producer_id leader_id;
          BlockNum leader_commit;
-         SignedBlock block;
+         psio::shared_view_ptr<SignedBlock> block;
          PSIO_REFLECT_INLINE(append_entries_request, term, leader_id, leader_commit, block)
          std::string to_string() const
          {
-            BlockInfo info{block.block};
-            return "append_entries: term=" + std::to_string(term) + " leader=" + leader_id.str() + " id=" + net::to_string(info.blockId) + " blocknum=" + std::to_string(block.block.header.blockNum) + " irreversible=" + std::to_string(leader_commit);
+            BlockInfo info{*block->block()};
+            return "append_entries: term=" + std::to_string(term) + " leader=" + leader_id.str() + " id=" + net::to_string(info.blockId) + " blocknum=" + std::to_string(BlockNum{block->block()->header()->blockNum()}) + " irreversible=" + std::to_string(leader_commit);
          }
       };
 
@@ -219,15 +219,15 @@ namespace psibase::net
       {
          if(connection.hello_sent)
          {
-            auto* b = chain().get(connection.hello.xid.id());
+            auto b = chain().get(connection.hello.xid.id());
             if(!b)
             {
                return;
             }
-            auto prev = chain().get(b->block.header.previous);
+            auto prev = chain().get(Checksum256(b->block()->header()->previous()));
             if(prev)
             {
-               connection.hello = {b->block.header.previous, b->block.header.blockNum - 1};
+               connection.hello = {Checksum256(b->block()->header()->previous()), BlockNum(b->block()->header()->blockNum()) - 1};
             }
             else
             {
@@ -260,12 +260,12 @@ namespace psibase::net
             connection.hello.xid = {chain().get_block_id(request.xid.num()), request.xid.num()};
             connection.hello_sent = false;
          }
-         if(auto* b = chain().get(request.xid.id()))
+         if(auto b = chain().get(request.xid.id()))
          {
             // Ensure that the block number is accurate.  I have not worked out
             // what happens if the peer lies, but at least this way we guarantee
             // that our local invariants hold.
-            connection.last_received = {request.xid.id(), b->block.header.blockNum};
+            connection.last_received = {request.xid.id(), BlockNum(b->block()->header()->blockNum())};
          }
          else if(auto* b = chain().get_state(request.xid.id()))
          {
@@ -368,19 +368,6 @@ namespace psibase::net
       // The primary potential variation is whether a block is forwarded
       // before or after validation.
 
-      // These methods should be called by the producer
-      template<typename Block>
-      void broadcast_block(const Block& b)
-      {
-         append_entries_request args;
-         args.term = current_term;
-         args.leader_id = self;
-         args.leader_commit = chain().commit_index();
-         args.block = b;
-         update_match_index(self, b.num);
-         update_committed();
-         network().broadcast(args);
-      }
       // This should probably NOT be part of the consensus class, because
       // it's mostly invariant across consensus algorithms.
       // invariants: if the head block is not the last sent block, then
@@ -403,7 +390,7 @@ namespace psibase::net
                 peer.id,
                 // TODO: This should probably use the current term/leader not the
                 // term leader associated with the block.
-                append_entries_request{next_block->block.header.term, next_block->block.header.producer, chain().commit_index(), *next_block},
+                append_entries_request{next_block->block()->header()->term(), next_block->block()->header()->producer(), chain().commit_index(), next_block},
                 [this, &peer](const std::error_code& e){
                    async_send_fork(peer);
                 });
@@ -538,11 +525,11 @@ namespace psibase::net
          {
             _election_timer.restart();
          }
-         auto max_commit = std::min(request.leader_commit, request.block.block.header.blockNum);
+         auto max_commit = std::min(request.leader_commit, BlockNum(request.block->block()->header()->blockNum()));
          // TODO: should the leader ever accept a block from another source?
          if(chain().insert(request.block))
          {
-            BlockInfo info{request.block.block};
+            BlockInfo info{*request.block->block()};
             ExtendedBlockId xid = {info.blockId, info.header.blockNum};
             on_recv_block(connection, xid);
             std::cout << "recv node=" << self.str() << " id=" << to_string(xid.id()) << std::endl;

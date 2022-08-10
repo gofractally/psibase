@@ -37,10 +37,10 @@ namespace psibase
    {
    public:
       using id_type = Checksum256;
-      bool insert(const SignedBlock& b)
+      bool insert(const psio::shared_view_ptr<SignedBlock>& b)
       {
-         BlockInfo info(b.block);
-         if(b.block.header.blockNum <= commitIndex)
+         BlockInfo info(*b->block());
+         if(info.header.blockNum <= commitIndex)
          {
             return false;
          }
@@ -48,7 +48,7 @@ namespace psibase
          {
             return false;
          }
-         if(auto* prev = get_state(b.block.header.previous))
+         if(auto* prev = get_state(info.header.previous))
          {
             auto [pos, inserted] = states.try_emplace(info.blockId, *prev, info);
             assert(inserted);
@@ -65,12 +65,12 @@ namespace psibase
       {
          return head;
       }
-      const SignedBlock* get(const id_type& id) const
+      psio::shared_view_ptr<SignedBlock> get(const id_type& id) const
       {
          auto pos = blocks.find(id);
          if(pos != blocks.end())
          {
-            return &pos->second;
+            return pos->second;
          }
          else
          {
@@ -89,7 +89,7 @@ namespace psibase
             return {};
          }
       }
-      const SignedBlock* get_block_by_num(BlockNum num) const
+      psio::shared_view_ptr<SignedBlock> get_block_by_num(BlockNum num) const
       {
          auto iter = byBlocknumIndex.find(num);
          if(iter != byBlocknumIndex.end())
@@ -149,12 +149,11 @@ namespace psibase
             ++iter;
             for(; iter != end; ++iter)
             {
-               auto* block = get(iter->second);
                auto* next_state = get_state(iter->second);
                if(!next_state->revision)
                {
                   BlockContext ctx(*systemContext, state->revision, writer, true);
-                  ctx.start(Block{get(next_state->blockId())->block});
+                  ctx.start(Block(get(next_state->blockId())->block()));
                   ctx.execAllInBlock();
                   auto [newRevision,id] = ctx.writeRevision();
                   // TODO: verify block id here?
@@ -190,7 +189,7 @@ namespace psibase
 
       auto get_prev_id(const id_type& id)
       {
-         return get(id)->block.header.previous;
+         return Checksum256(*get(id)->block()->header()->previous());
       }
       template<typename T>
       T get_prev_id(const T& t)
@@ -281,7 +280,7 @@ namespace psibase
          assert(head->blockId() == block.header.previous);
          auto [iter, _] = blocks.try_emplace(id, SignedBlock{block});
          // TODO: don't recompute sha
-         BlockInfo info{iter->second.block};
+         BlockInfo info{*iter->second->block()};
          auto [state_iter, ins2] = states.try_emplace(iter->first, *head, info, revision);
          byOrderIndex.insert({state_iter->second.order(), id});
          head = &state_iter->second;
@@ -327,7 +326,7 @@ namespace psibase
                {
                   break;
                }
-               blocks.try_emplace(info.blockId, *block);
+               blocks.try_emplace(info.blockId, SignedBlock{*block});
                auto [state_iter,_] = states.try_emplace(info.blockId, info, revision);
                byOrderIndex.try_emplace(state_iter->second.order(), info.blockId);
                byBlocknumIndex.try_emplace(blockNum, info.blockId);
@@ -360,7 +359,7 @@ namespace psibase
       WriterPtr writer;
       BlockNum commitIndex = 1;
       BlockHeaderState* head = nullptr;
-      std::map<Checksum256, SignedBlock> blocks;
+      std::map<Checksum256, psio::shared_view_ptr<SignedBlock>> blocks;
       std::map<Checksum256, BlockHeaderState> states;
 
       std::map<decltype(std::declval<BlockHeaderState>().order()), Checksum256> byOrderIndex;
