@@ -164,6 +164,7 @@ namespace psibase
                   // TODO: handle other errors and blacklist the block and its descendants
                   next_state->revision = newRevision;
                }
+               systemContext->sharedDatabase.setHead(*writer, next_state->revision);
                state = next_state;
             }
          }
@@ -259,7 +260,7 @@ namespace psibase
       template<typename... A>
       void start_block(A&&... a)
       {
-         //assert(!blockContext);
+         assert(!blockContext);
          blockContext.emplace(*systemContext, head->revision, writer, true);
          blockContext->start(std::forward<A>(a)...);
          blockContext->callStartBlock();
@@ -289,6 +290,7 @@ namespace psibase
          head = &state_iter->second;
          byBlocknumIndex.insert({head->blockNum(), head->blockId()});
          std::cout << psio::convert_to_json(blockContext->current.header) << "\n";
+         blockContext.reset();
          return head;
       }
 
