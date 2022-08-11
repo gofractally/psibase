@@ -150,7 +150,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
         WORKING_DIRECTORY ${DEP_PREFIX}
         COMMAND bash -c "\
                rm -rf ${GMP_EXTRACTED}                                                      \
-            && tar xf ${GMP_ARCHIVE}                                                        \
+            && tar xf ${GMP_ARCHIVE} -I zstd                                                \
             && cd ${GMP_EXTRACTED}                                                          \
             && ./configure                                                                  \
                 CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"                     \
@@ -164,6 +164,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
         "
     )
 endif()
+
 if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
     download(${DEP_URL}/${OPENSSL_ARCHIVE} ${DEP_PREFIX}/${OPENSSL_ARCHIVE})
     message("building openssl")

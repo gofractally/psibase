@@ -148,7 +148,7 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm mdbx-static triedent ${Boost_LIBRARIES})
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent ${Boost_LIBRARIES})
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include
