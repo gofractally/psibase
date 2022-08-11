@@ -1,6 +1,4 @@
 #include <contracts/system/AuthEcSys.hpp>
-#include <contracts/system/InviteSys.hpp>
-
 #include <contracts/system/VerifyEcSys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/print.hpp>
@@ -29,7 +27,8 @@ namespace system_contract
 
    void AuthEcSys::newAccount(psibase::AccountNumber account, psibase::PublicKey payload)
    {
-      check(getSender() == InviteSys::contract, "Only invite-sys can create a new account");
+      check(false, "Not supported yet");
+      //check(getSender() == InviteSys::contract, "Only invite-sys can create a new account");
       check(payload.data.index() == 0, "only k1 currently supported");
       auto authTable = db.open<AuthTable>();
       check(!authTable.getIndex<0>().get(account).has_value(), "account already exists");
