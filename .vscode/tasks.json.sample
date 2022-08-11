@@ -42,7 +42,7 @@
         {
             "label": "testspecific",
             "type": "shell",
-            "command": "cd build && ./psitest token_sys-test-debug.wasm -s -r compact",
+            "command": "cd build && ./psitest TokenSys-test-debug.wasm -s -r compact",
             "args": [],
             "group": {
                 "kind": "build",
