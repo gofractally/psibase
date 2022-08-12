@@ -30,7 +30,7 @@ make -j $(nproc)
 ctest -j $(nproc)
 ```
 
-The built product lives in `build/clsdk`.
+The built product lives in `build/psidk`.
 
 To speed up builds, use `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache`
 
