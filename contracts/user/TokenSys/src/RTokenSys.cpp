@@ -13,6 +13,8 @@ using namespace UserContract;
 using namespace std;
 using namespace psibase;
 
+using Tables = psibase::ContractTables<psibase::WebContentTable>;
+
 namespace
 {
    auto simplePage = [](std::string str)
@@ -43,7 +45,7 @@ optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
    if (auto result = servePackAction<TokenSys>(request))
       return result;
 
-   if (auto result = serveContent(request, TokenSys::Tables{getReceiver()}))
+   if (auto result = serveContent(request, Tables{getReceiver()}))
       return result;
 
    if (auto result = _serveRestEndpoints(request))
@@ -57,7 +59,7 @@ optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
 void RTokenSys::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content), TokenSys::Tables{getReceiver()});
+   storeContent(move(path), move(contentType), move(content), Tables{getReceiver()});
 }
 
 struct AccountBalance
@@ -91,6 +93,25 @@ std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& reque
          }
          if (auto result = serveSimpleUI<TokenSys, true>(request))
             return result;
+      }
+      if (request.target.starts_with("/getTokenId/"))
+      {
+         auto symbol = request.target.substr(string("/getTokenId/").size());
+         check(symbol.find('/') == string::npos, "invalid symbol " + symbol);
+
+         // Todo: After symbol mapping moved to symbol contract, everything below here
+         //   should be changed to:
+         //   return to_json(at<SymbolSys>().getTokenId(symbol));
+         TokenSys::Tables db{TokenSys::contract};
+         auto             idx = db.open<TokenTable>().getIndex<0>();
+         check(idx.begin() != idx.end(), "No tokens");
+         for (auto itr = idx.begin(); itr != idx.end(); ++itr)
+         {
+            if ((*itr).symbolId == SID(symbol))
+               return to_json((*itr).id);
+         }
+
+         return to_json("-1");
       }
       if (request.target.starts_with("/balances/"))
       {

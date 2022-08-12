@@ -1,8 +1,7 @@
 import htm from "/common/htm.module.js";
 import { siblingUrl } from "/common/rootdomain.mjs";
 import { initializeApplet, 
-  getJson, action, addRoute, push, 
-  getLocalResource, CommonResources } from "/common/rpc.mjs";
+  getJson, action, addRoute, push} from "/common/rpc.mjs";
 import { keyPairStrings, privateStringToKeyPair } from "/common/keyConversions.mjs";
 
 const html = htm.bind(React.createElement);

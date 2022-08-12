@@ -18,12 +18,8 @@ namespace UserContract
    class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
-      using Tables                   = psibase::ContractTables<TokenTable,
-                                             BalanceTable,
-                                             SharedBalanceTable,
-                                             TokenHolderTable,
-                                             InitTable,
-                                             psibase::WebContentTable>;
+      using Tables = psibase::
+          ContractTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
       static constexpr auto contract = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken = TID{1};
 

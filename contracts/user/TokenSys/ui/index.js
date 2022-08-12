@@ -1,8 +1,7 @@
 import htm from "/common/htm.module.js";
 import { siblingUrl } from "/common/rootdomain.mjs";
-import { initializeApplet, 
-  getJson, action, addRoute, push, 
-  getLocalResource, CommonResources } from "/common/rpc.mjs";
+import { initializeApplet, getJson, action, 
+  query, setOperations, operation } from "/common/rpc.mjs";
 
 const html = htm.bind(React.createElement);
 const { useEffect, useState, useCallback } = React;
@@ -12,9 +11,27 @@ await initializeApplet();
 
 const thisApplet = await getJson('/common/thiscontract');
 
-const transactionTypes = {
-  credit: 0,
-};
+let operations = [
+  {
+      id: "credit",
+      exec: ({symbol, receiver, amount, memo}) => {
+
+        //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
+        let tokenId = await getJson(siblingUrl(null, thisApplet, "getTokenId/" + symbol));
+        console.log("TokenID for symbol " + symbol + " == " + tokenId);
+
+        action(thisApplet, "credit", 
+          { 
+            tokenId, 
+            receiver, 
+            amount: {value: amount }, 
+            memo: {contents: memo},
+        });
+      },
+  }
+];
+
+setOperations(operations);
 
 function Rows(balances) {
   return balances.map(b => {
@@ -58,10 +75,6 @@ function BalanceTable({loggedInUser}) {
   useEffect(()=>{
     refreshBalances();
   }, [refreshBalances])
-
-  useEffect(()=>{
-    addRoute("refreshbalances", transactionTypes.credit, refreshBalances);
-  }, [refreshBalances]);
 
   return html`
 
@@ -129,25 +142,9 @@ function SendPanel() {
     setTimeout(()=>{setShowSuccess(false);}, 5000);
   }, []);
 
-  useEffect(()=>{
-    addRoute("credited", transactionTypes.credit, credited);
-  }, [credited]);
-
   const onSendSubmit = (e) => {
     e.preventDefault();
-    const credit = async () => {
-
-      push(transactionTypes.credit, [await action(
-        thisApplet, "credit", 
-        {
-          tokenId: 1, 
-          receiver: receiver, 
-          amount: {value: amount },
-          memo: {contents: "Test"},
-        }
-      )]);
-    }
-    credit().catch(console.error);
+    operation(thisApplet, "credit", {symbol: "PSI", receiver, amount, memo: "Test"});
   };
 
   return html`
@@ -192,7 +189,7 @@ function App() {
     // Todo - Timeout is used because sometimes the window.parentIFrame isn't loaded yet when 
     //  this runs. Should use a better fix for the race condition than a delay.
     setTimeout(()=>{ 
-      getLocalResource(CommonResources.loggedInUser, setUser);
+      query("account-sys", "", "getLoggedInUser", setUser);
     }, 50);
   }, []);
 
