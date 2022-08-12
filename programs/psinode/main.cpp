@@ -289,6 +289,7 @@ void run(const std::string& db_path,
          const std::vector<AccountNumber>& producers,
          const std::vector<std::string>& peers,
          const std::string& host,
+         unsigned short     port,
          bool               host_perf,
          uint32_t           leeway_us,
          bool               allow_slow)
@@ -317,7 +318,7 @@ void run(const std::string& db_path,
           .idle_timeout_ms  = std::chrono::milliseconds{4000},
           .allow_origin     = "*",
           .address          = "0.0.0.0",
-          .port             = 8080,
+          .port             = port,
           .host             = host,
           .host_perf        = host_perf,
       });
@@ -428,6 +429,7 @@ int main(int argc, char* argv[])
    std::string producer   = {};
    std::vector<std::string> prods;
    std::string host       = {};
+   unsigned short port = 8080;
    bool        host_perf  = false;
    uint32_t    leeway_us  = 30000;  // TODO: find a good default
    bool        allow_slow = false;
@@ -443,6 +445,7 @@ int main(int argc, char* argv[])
    opt("prods", po::value(&prods), "Names of all producers");
    opt("peer", po::value(&peers), "Peer endpoint");
    opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
+   opt("port", po::value(&port), "http server port");
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
        "Transaction leeway, in us. Defaults to 30000.");
@@ -483,7 +486,7 @@ int main(int argc, char* argv[])
       {
          producers.push_back(AccountNumber{pname});
       }
-      run(db_path, AccountNumber{producer}, producers, peers, host, host_perf, leeway_us, allow_slow);
+      run(db_path, AccountNumber{producer}, producers, peers, host, port, host_perf, leeway_us, allow_slow);
       return 0;
    }
    catch (std::exception& e)
