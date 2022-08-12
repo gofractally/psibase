@@ -16,6 +16,7 @@
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/beast/websocket.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/make_unique.hpp>
 #include <boost/optional.hpp>
@@ -33,6 +34,7 @@
 #include <vector>
 
 namespace beast = boost::beast;                     // from <boost/beast.hpp>
+namespace websocket = beast::websocket;
 namespace bhttp = beast::http;                      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;                      // from <boost/asio.hpp>
 using tcp       = boost::asio::ip::tcp;             // from <boost/asio/ip/tcp.hpp>
@@ -43,6 +45,8 @@ using std::chrono::steady_clock;  // To create explicit timer
 
 namespace psibase::http
 {
+   struct websocket_upgrade {};
+
    // Report a failure
    static void fail(beast::error_code ec, const char* what)
    {
@@ -331,6 +335,14 @@ namespace psibase::http
             send.pause_read = true;
             return;
          }  // push_transaction
+         else if(req.target() == "/native/p2p" && websocket::is_upgrade(req) &&
+                  server.http_config->accept_p2p_websocket)
+         {
+            // Stop reading HTTP requests
+            send.pause_read = true;
+            send(websocket_upgrade{}, std::move(req));
+            return;
+         }
          else
          {
             return send(error(bhttp::status::not_found,
@@ -421,6 +433,48 @@ namespace psibase::http
                       beast::bind_front_handler(&http_session::on_write,
                                                 self.derived_session().shared_from_this(),
                                                 msg.need_eof()));
+               }
+            };
+
+            // Allocate and store the work
+            items.push_back(boost::make_unique<work_impl>(self, std::move(msg)));
+
+            // If there was no previous work, start this one
+            if (items.size() == 1)
+               (*items.front())();
+         }
+         template <class Msg>
+         void operator()(websocket_upgrade, Msg&& msg)
+         {
+            struct work_impl : work
+            {
+               http_session& self;
+               Msg request;
+
+               work_impl(http_session& self, Msg&& msg)
+                   : self(self), request(std::move(msg))
+               {
+               }
+               void operator()()
+               {
+                  struct op {
+                     Msg request;
+                     websocket::stream<decltype(self.derived_session().stream)> stream;
+                  };
+                  auto ptr = std::make_shared<op>(std::move(request), websocket::stream<decltype(self.derived_session().stream)>{std::move(self.derived_session().stream)});
+                  auto p = ptr.get();
+                  // Capture server, not self, because after returning, there is
+                  // no longer anything keeping the session alive
+                  p->stream.async_accept(p->request, [ptr=std::move(ptr), &server=self.server](const std::error_code& ec){
+                        if(!ec)
+                        {
+                           // FIXME: handle local sockets
+                           if constexpr(std::is_same_v<decltype(self.derived_session().stream), beast::tcp_stream>)
+                           {
+                              server.http_config->accept_p2p_websocket(std::move(ptr->stream));
+                           }
+                        }
+                     });
                }
             };
 

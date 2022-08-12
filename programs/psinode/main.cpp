@@ -3,6 +3,7 @@
 #include <psibase/cft.hpp>
 #include <psibase/node.hpp>
 #include <psibase/tcp.hpp>
+#include <psibase/websocket.hpp>
 #include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
 #include <psio/finally.hpp>
@@ -300,6 +301,13 @@ void run(const std::string& db_path,
    auto system = sharedState->getSystemContext();
    auto queue  = std::make_shared<transaction_queue>();
 
+   boost::asio::io_context chainContext;
+
+   using node_type = node<tcp, direct_routing, cft_consensus, ForkDb>;
+   node_type node(chainContext, system.get());
+   node.set_producer_id(producer);
+   node.set_producers(producers);
+
    if (!host.empty())
    {
       // TODO: command-line options
@@ -334,6 +342,13 @@ void run(const std::string& db_path,
          };
       }
 
+      // TODO: The websocket uses the http server's io_context, but does not
+      // do anything to keep it alive. Stopping the server doesn't close the
+      // websocket either.
+      http_config->accept_p2p_websocket = [&node](auto&& stream){
+         node.add_connection(std::make_shared<websocket_connection>(std::move(stream)));
+      };
+
       auto server = http::server::create(http_config, sharedState);
    }
 
@@ -341,13 +356,6 @@ void run(const std::string& db_path,
 
    // TODO: temporary loop
    // TODO: replay
-   boost::asio::io_context chainContext;
-
-   using node_type = node<tcp, direct_routing, cft_consensus, ForkDb>;
-   node_type node(chainContext, system.get());
-   node.set_producer_id(producer);
-   node.set_producers(producers);
-
    auto endpoint = node.listen({boost::asio::ip::tcp::v4(), 0});
    std::cout << "listening on " << endpoint << std::endl;
    for(const std::string& peer : peers)
@@ -359,7 +367,10 @@ void run(const std::string& db_path,
          std::cout << "missing p2p port (there is not default yet): " << peer << std::endl;
          continue;
       }
-      node.async_connect(peer.substr(0, pos), peer.substr(pos + 1));
+      auto host = peer.substr(0, pos);
+      auto service = peer.substr(pos + 1);
+      //node.async_connect(peer.substr(0, pos), peer.substr(pos + 1));
+      async_connect(std::make_shared<websocket_connection>(chainContext), node._resolver, host, service, [&node](auto&& conn){ node.add_connection(std::move(conn)); });
    }
    
    timer_type timer(chainContext);

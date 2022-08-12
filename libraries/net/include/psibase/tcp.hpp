@@ -4,6 +4,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/read.hpp>
+#include <boost/asio/dispatch.hpp>
 #include <boost/mp11/algorithm.hpp>
 #include <psio/fracpack.hpp>
 #include <psibase/net_base.hpp>
@@ -157,7 +158,6 @@ namespace psibase::net
             if(ec)
             {
                std::cout << "Failed connecting" << std::endl;
-               _connections.erase(id);
             }
             else
             {
@@ -223,11 +223,15 @@ namespace psibase::net
          p->async_read([this, c=std::move(c), id](const std::error_code& ec, std::vector<char>&& buf) mutable {
             if(ec && ec != make_error_code(boost::asio::error::operation_aborted))
             {
-               disconnect(id);
+               boost::asio::dispatch(_ctx, [this,id]() mutable {
+                  disconnect(id);
+               });
             }
             else if(!ec && c->is_open())
             {
-               network().recv(id, buf);
+               boost::asio::dispatch(_ctx, [this,id,buf=std::move(buf)]() mutable {
+                  network().recv(id, buf);
+               });
                async_recv(id, std::move(c));
             }
          });
