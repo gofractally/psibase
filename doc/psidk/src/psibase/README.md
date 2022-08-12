@@ -22,6 +22,10 @@ If you don't give it any other options, psinode will just sit there with nothing
 - `-p` or `--produce` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below).
 - `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on port `8080` with address `0.0.0.0` (TODO).
 
+There is one more option which is useful for local development. Production deployments shouldn't use this:
+
+- `--slow` stops it from complaining when it is unable to lock memory for database. This will still attempt to lock memory, but if it fails it will continue to run, but more slowly. If you don't run with `--slow`, it will give suggestions on how to enable it to lock memory.
+
 psinode does not include https hosting; use a reverse proxy to add that when hosting a public node.
 
 ## psibase
@@ -39,7 +43,7 @@ A chain doesn't exist until it's booted. This procedure boots a chain suitable f
 ### Start psinode
 
 ```
-psinode -p -o psibase.127.0.0.1.sslip.io my_psinode_db
+psinode -p -o psibase.127.0.0.1.sslip.io my_psinode_db --slow
 ```
 
 This will:
@@ -49,6 +53,8 @@ This will:
 - Produce blocks once the chain is booted.
 
 ### Boot the chain
+
+In a separate terminal, while `psinode` is running, run the following:
 
 ```
 psibase boot
