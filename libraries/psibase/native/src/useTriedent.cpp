@@ -34,25 +34,19 @@ namespace psibase
 #ifdef SANITY_CHECK
       std::map<std::vector<char>, std::vector<char>, blob_less> _sanity[numDatabases];
 
-      auto& sanity()
-      {
-         return _sanity;
-      }
+      auto& sanity() { return _sanity; }
 
-      auto& sanity() const
-      {
-         return _sanity;
-      }
+      auto& sanity() const { return _sanity; }
 #else
       std::map<std::vector<char>, std::vector<char>, blob_less> (&sanity())[];
       const std::map<std::vector<char>, std::vector<char>, blob_less> (&sanity() const)[];
 #endif
 
-      Revision()                           = default;
-      Revision(const Revision&)            = delete;
-      Revision(Revision&&)                 = default;
+      Revision()                = default;
+      Revision(const Revision&) = delete;
+      Revision(Revision&&)      = default;
       Revision& operator=(const Revision&) = delete;
-      Revision& operator=(Revision&&)      = default;
+      Revision& operator=(Revision&&) = default;
 
       std::shared_ptr<Revision> clone() const
       {
@@ -236,15 +230,9 @@ namespace psibase
    {
    }
 
-   ConstRevisionPtr SharedDatabase::getHead()
-   {
-      return impl->getHead();
-   }
+   ConstRevisionPtr SharedDatabase::getHead() { return impl->getHead(); }
 
-   WriterPtr SharedDatabase::createWriter()
-   {
-      return impl->trie->start_write_session();
-   }
+   WriterPtr SharedDatabase::createWriter() { return impl->trie->start_write_session(); }
 
    void SharedDatabase::setHead(Writer& writer, ConstRevisionPtr revision)
    {
@@ -404,15 +392,9 @@ namespace psibase
 
    Database::~Database() {}
 
-   void Database::setRevision(ConstRevisionPtr revision)
-   {
-      impl->setRevision(std::move(revision));
-   }
+   void Database::setRevision(ConstRevisionPtr revision) { impl->setRevision(std::move(revision)); }
 
-   ConstRevisionPtr Database::getBaseRevision()
-   {
-      return impl->baseRevision;
-   }
+   ConstRevisionPtr Database::getBaseRevision() { return impl->baseRevision; }
 
    ConstRevisionPtr Database::getModifiedRevision()
    {
@@ -434,20 +416,14 @@ namespace psibase
       return {this};
    }
 
-   void Database::commit(Database::Session&)
-   {
-      impl->commit();
-   }
+   void Database::commit(Database::Session&) { impl->commit(); }
 
    ConstRevisionPtr Database::writeRevision(Database::Session& session, const Checksum256& blockId)
    {
       return impl->writeRevision(blockId);
    }
 
-   void Database::abort(Database::Session&)
-   {
-      impl->abort();
-   }
+   void Database::abort(Database::Session&) { impl->abort(); }
 
    void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
    {

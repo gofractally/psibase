@@ -1,11 +1,11 @@
 #include <psibase/TransactionContext.hpp>
-#include <psibase/contractEntry.hpp>
 #include <psibase/cft.hpp>
+#include <psibase/contractEntry.hpp>
+#include <psibase/direct_routing.hpp>
+#include <psibase/http.hpp>
 #include <psibase/node.hpp>
 #include <psibase/tcp.hpp>
 #include <psibase/websocket.hpp>
-#include <psibase/direct_routing.hpp>
-#include <psibase/http.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
 
@@ -57,11 +57,8 @@ struct transaction_queue
    std::vector<entry> entries;
 };
 
-#define RETHROW_BAD_ALLOC  \
-   catch (std::bad_alloc&) \
-   {                       \
-      throw;               \
-   }
+#define RETHROW_BAD_ALLOC \
+   catch (std::bad_alloc&) { throw; }
 
 #define CATCH_IGNORE \
    catch (...) {}
@@ -141,18 +138,20 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
    return false;
 }  // push_boot
 
-template<typename Timer, typename F>
+template <typename Timer, typename F>
 void loop(Timer& timer, F&& f)
 {
    using namespace std::literals::chrono_literals;
    timer.expires_after(100ms);
-   timer.async_wait([&timer, f](const std::error_code& e){
-      if(!e)
-      {
-         f();
-         loop(timer, f);
-      }
-   });
+   timer.async_wait(
+       [&timer, f](const std::error_code& e)
+       {
+          if (!e)
+          {
+             f();
+             loop(timer, f);
+          }
+       });
 }
 
 void pushTransaction(psibase::SharedState&                  sharedState,
@@ -276,23 +275,25 @@ void pushTransaction(psibase::SharedState&                  sharedState,
    }
 }  // pushTransaction
 
-template<typename Derived>
-struct null_link {};
+template <typename Derived>
+struct null_link
+{
+};
 
 using timer_type = boost::asio::system_timer;
 
-template<typename Derived>
+template <typename Derived>
 using cft_consensus = basic_cft_consensus<Derived, timer_type>;
 
-void run(const std::string& db_path,
-         AccountNumber      producer,
+void run(const std::string&                db_path,
+         AccountNumber                     producer,
          const std::vector<AccountNumber>& producers,
-         const std::vector<std::string>& peers,
-         const std::string& host,
-         unsigned short     port,
-         bool               host_perf,
-         uint32_t           leeway_us,
-         bool               allow_slow)
+         const std::vector<std::string>&   peers,
+         const std::string&                host,
+         unsigned short                    port,
+         bool                              host_perf,
+         uint32_t                          leeway_us,
+         bool                              allow_slow)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -346,9 +347,8 @@ void run(const std::string& db_path,
       // TODO: The websocket uses the http server's io_context, but does not
       // do anything to keep it alive. Stopping the server doesn't close the
       // websocket either.
-      http_config->accept_p2p_websocket = [&node](auto&& stream){
-         node.add_connection(std::make_shared<websocket_connection>(std::move(stream)));
-      };
+      http_config->accept_p2p_websocket = [&node](auto&& stream)
+      { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
 
       auto server = http::server::create(http_config, sharedState);
    }
@@ -359,31 +359,33 @@ void run(const std::string& db_path,
    // TODO: replay
    auto endpoint = node.listen({boost::asio::ip::tcp::v4(), 0});
    std::cout << "listening on " << endpoint << std::endl;
-   for(const std::string& peer : peers)
+   for (const std::string& peer : peers)
    {
       // TODO: handle ipv6 addresses [addr]:port
       auto pos = peer.find(':');
-      if(pos == std::string::npos)
+      if (pos == std::string::npos)
       {
          std::cout << "missing p2p port (there is not default yet): " << peer << std::endl;
          continue;
       }
-      auto host = peer.substr(0, pos);
+      auto host    = peer.substr(0, pos);
       auto service = peer.substr(pos + 1);
       //node.async_connect(peer.substr(0, pos), peer.substr(pos + 1));
-      async_connect(std::make_shared<websocket_connection>(chainContext), node._resolver, host, service, [&node](auto&& conn){ node.add_connection(std::move(conn)); });
+      async_connect(std::make_shared<websocket_connection>(chainContext), node._resolver, host,
+                    service, [&node](auto&& conn) { node.add_connection(std::move(conn)); });
    }
-   
+
    timer_type timer(chainContext);
 
    // TODO: post the transactions to chainContext rather than batching them at fixed intervals.
-   auto process_transactions = [&](){
+   auto process_transactions = [&]()
+   {
       std::vector<transaction_queue::entry> entries;
       {
          std::scoped_lock lock{queue->mutex};
          std::swap(entries, queue->entries);
       }
-      if(auto bc = node.chain().getBlockContext())
+      if (auto bc = node.chain().getBlockContext())
       {
          auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
@@ -425,14 +427,14 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 
 int main(int argc, char* argv[])
 {
-   std::string db_path;
-   std::string producer   = {};
+   std::string              db_path;
+   std::string              producer = {};
    std::vector<std::string> prods;
-   std::string host       = {};
-   unsigned short port = 8080;
-   bool        host_perf  = false;
-   uint32_t    leeway_us  = 30000;  // TODO: find a good default
-   bool        allow_slow = false;
+   std::string              host       = {};
+   unsigned short           port       = 8080;
+   bool                     host_perf  = false;
+   uint32_t                 leeway_us  = 30000;  // TODO: find a good default
+   bool                     allow_slow = false;
    std::vector<std::string> peers;
 
    namespace po = boost::program_options;
@@ -482,11 +484,12 @@ int main(int argc, char* argv[])
    try
    {
       std::vector<AccountNumber> producers;
-      for(const auto& pname : prods)
+      for (const auto& pname : prods)
       {
          producers.push_back(AccountNumber{pname});
       }
-      run(db_path, AccountNumber{producer}, producers, peers, host, port, host_perf, leeway_us, allow_slow);
+      run(db_path, AccountNumber{producer}, producers, peers, host, port, host_perf, leeway_us,
+          allow_slow);
       return 0;
    }
    catch (std::exception& e)

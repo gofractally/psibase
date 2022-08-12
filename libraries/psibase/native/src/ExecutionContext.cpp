@@ -128,14 +128,8 @@ namespace psibase
 
    std::unique_ptr<ExecutionMemoryImpl> impl;
 
-   ExecutionMemory::ExecutionMemory()
-   {
-      impl = std::make_unique<ExecutionMemoryImpl>();
-   }
-   ExecutionMemory::ExecutionMemory(ExecutionMemory&& src)
-   {
-      impl = std::move(src.impl);
-   }
+   ExecutionMemory::ExecutionMemory() { impl = std::make_unique<ExecutionMemoryImpl>(); }
+   ExecutionMemory::ExecutionMemory(ExecutionMemory&& src) { impl = std::move(src.impl); }
    ExecutionMemory::~ExecutionMemory() {}
 
    // TODO: debugger
@@ -225,10 +219,7 @@ namespace psibase
       impl = std::make_unique<ExecutionContextImpl>(transactionContext, memory, contract);
    }
 
-   ExecutionContext::ExecutionContext(ExecutionContext&& src)
-   {
-      impl = std::move(src.impl);
-   }
+   ExecutionContext::ExecutionContext(ExecutionContext&& src) { impl = std::move(src.impl); }
    ExecutionContext::~ExecutionContext() {}
 
    void ExecutionContext::registerHostFunctions()

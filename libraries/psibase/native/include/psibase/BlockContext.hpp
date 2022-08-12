@@ -32,7 +32,9 @@ namespace psibase
 
       void checkActive() { check(active, "block is not active"); }
 
-      StatusRow                                start(std::optional<TimePointSec> time = {}, AccountNumber producer = {}, TermNum term = {});
+      StatusRow                                start(std::optional<TimePointSec> time     = {},
+                                                     AccountNumber               producer = {},
+                                                     TermNum                     term     = {});
       void                                     start(Block&& src);
       void                                     callStartBlock();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision();

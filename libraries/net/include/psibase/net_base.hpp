@@ -5,5 +5,5 @@
 namespace psibase::net
 {
    using producer_id = AccountNumber;
-   using peer_id = int;
-}
+   using peer_id     = int;
+}  // namespace psibase::net

@@ -1,10 +1,10 @@
 #pragma once
 
+#include <boost/beast/core/tcp_stream.hpp>
+#include <boost/beast/websocket/stream_fwd.hpp>
 #include <chrono>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
-#include <boost/beast/core/tcp_stream.hpp>
-#include <boost/beast/websocket/stream_fwd.hpp>
 
 namespace psibase::http
 {
@@ -19,7 +19,7 @@ namespace psibase::http
        std::function<void(std::vector<char> packed_signed_trx, push_transaction_callback)>;
 
    using accept_p2p_websocket_result = boost::beast::websocket::stream<boost::beast::tcp_stream>;
-   using accept_p2p_websocket_t = std::function<void(accept_p2p_websocket_result&&)>;
+   using accept_p2p_websocket_t      = std::function<void(accept_p2p_websocket_result&&)>;
 
    struct http_config
    {

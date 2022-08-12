@@ -34,7 +34,7 @@ namespace psibase
       SharedDatabase(SharedDatabase&&)      = default;
 
       SharedDatabase& operator=(const SharedDatabase&) = default;
-      SharedDatabase& operator=(SharedDatabase&&)      = default;
+      SharedDatabase& operator=(SharedDatabase&&) = default;
 
       ConstRevisionPtr getHead();
       WriterPtr        createWriter();
