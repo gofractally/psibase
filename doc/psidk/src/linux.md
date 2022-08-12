@@ -41,3 +41,11 @@ wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | 
 apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
 DEBIAN_FRONTEND=noninteractive apt-get install -yq cmake
 ```
+
+## Fedora 36
+
+Run these as root:
+
+```sh
+dnf install cmake wget
+```
