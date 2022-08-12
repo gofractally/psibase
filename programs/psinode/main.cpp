@@ -4,7 +4,7 @@
 #include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
 #include <psibase/node.hpp>
-#include <psibase/tcp.hpp>
+#include <psibase/peer_manager.hpp>
 #include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
@@ -305,7 +305,7 @@ void run(const std::string&                db_path,
 
    boost::asio::io_context chainContext;
 
-   using node_type = node<tcp, direct_routing, cft_consensus, ForkDb>;
+   using node_type = node<peer_manager, direct_routing, cft_consensus, ForkDb>;
    node_type node(chainContext, system.get());
    node.set_producer_id(producer);
    node.set_producers(producers);
@@ -355,13 +355,13 @@ void run(const std::string&                db_path,
 
    bool showedBootMsg = false;
 
-   // TODO: temporary loop
    // TODO: replay
-   auto endpoint = node.listen({boost::asio::ip::tcp::v4(), 0});
-   std::cout << "listening on " << endpoint << std::endl;
+
+   boost::asio::ip::tcp::resolver resolver(chainContext);
    for (const std::string& peer : peers)
    {
       // TODO: handle ipv6 addresses [addr]:port
+      // TODO: use a websocket URI
       auto pos = peer.find(':');
       if (pos == std::string::npos)
       {
@@ -371,8 +371,8 @@ void run(const std::string&                db_path,
       auto host    = peer.substr(0, pos);
       auto service = peer.substr(pos + 1);
       //node.async_connect(peer.substr(0, pos), peer.substr(pos + 1));
-      async_connect(std::make_shared<websocket_connection>(chainContext), node._resolver, host,
-                    service, [&node](auto&& conn) { node.add_connection(std::move(conn)); });
+      async_connect(std::make_shared<websocket_connection>(chainContext), resolver, host, service,
+                    [&node](auto&& conn) { node.add_connection(std::move(conn)); });
    }
 
    timer_type timer(chainContext);

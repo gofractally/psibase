@@ -9,7 +9,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <deque>
-#include <psibase/tcp.hpp>
+#include <psibase/peer_manager.hpp>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -104,7 +104,7 @@ namespace psibase::net
                 auto& sock = get_lowest_layer(conn->stream);
                 sock.async_connect(
                     endpoints,
-                    [conn = std::move(conn), f = std::forward<F>(f)](
+                    [conn = std::move(conn), f = std::move(f)](
                         const std::error_code& ec, const boost::asio::ip::tcp::endpoint& e) mutable
                     {
                        if (ec)
@@ -115,20 +115,20 @@ namespace psibase::net
                        {
                           std::cout << "Connected to: " << e << std::endl;
                           auto* p = conn.get();
-                          p->stream.async_handshake(
-                              p->host, "/native/p2p",
-                              [conn = std::move(conn),
-                               f    = std::forward<F>(f)](const std::error_code& ec) mutable
-                              {
-                                 if (ec)
-                                 {
-                                    std::cout << "Websocket handshake failed" << std::endl;
-                                 }
-                                 else
-                                 {
-                                    f(std::move(conn));
-                                 }
-                              });
+                          p->stream.async_handshake(p->host, "/native/p2p",
+                                                    [conn = std::move(conn), f = std::move(f)](
+                                                        const std::error_code& ec) mutable
+                                                    {
+                                                       if (ec)
+                                                       {
+                                                          std::cout << "Websocket handshake failed"
+                                                                    << std::endl;
+                                                       }
+                                                       else
+                                                       {
+                                                          f(std::move(conn));
+                                                       }
+                                                    });
                        }
                     });
              }

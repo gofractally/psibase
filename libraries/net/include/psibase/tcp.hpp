@@ -16,16 +16,6 @@
 namespace psibase::net
 {
 
-   struct connection_base
-   {
-      using read_handler  = std::function<void(const std::error_code&, std::vector<char>&&)>;
-      using write_handler = std::function<void(const std::error_code&)>;
-      virtual void async_write(std::vector<char>&&, write_handler) = 0;
-      virtual void async_read(read_handler)                        = 0;
-      virtual bool is_open() const                                 = 0;
-      virtual void close()                                         = 0;
-   };
-
    struct tcp_connection : connection_base
    {
       explicit tcp_connection(boost::asio::ip::tcp::socket&& socket) : _socket(std::move(socket)) {}
@@ -130,153 +120,75 @@ namespace psibase::net
       std::vector<char> _read_buf;
    };
 
-   template <typename Derived>
-   struct tcp
+   template <typename F>
+   void async_connect(std::shared_ptr<tcp_connection>&& conn,
+                      boost::asio::ip::tcp::resolver&   resolver,
+                      std::string_view                  host,
+                      std::string_view                  service,
+                      F&&                               f)
    {
-      auto& network() { return static_cast<Derived*>(this)->network(); }
-      explicit tcp(boost::asio::io_context& ctx) : _ctx(ctx), _resolver(_ctx) {}
-      boost::asio::ip::tcp::endpoint listen(const boost::asio::ip::tcp::endpoint& endpoint)
+      std::cout << "Connecting to " << host << ":" << service << std::endl;
+      resolver.async_resolve(
+          host, service,
+          [conn = std::move(conn), f = std::foward<F>(f)](const std::error_code& ec,
+                                                          const auto&            endpoints) mutable
+          {
+             // TODO: report error
+             if (!ec)
+             {
+                auto  conn = std::make_shared<tcp_connection>(_ctx);
+                auto& sock = conn->_socket;
+                boost::asio::async_connect(
+                    sock, endpoints,
+                    [this, conn = std::move(conn), f = std::move(f)](
+                        const std::error_code& ec, const boost::asio::ip::tcp::endpoint& e) mutable
+                    {
+                       if (ec)
+                       {
+                          std::cout << "Failed connecting" << std::endl;
+                       }
+                       else
+                       {
+                          std::cout << "Connected to: " << e << std::endl;
+                          f(std::move(conn));
+                       }
+                    });
+             }
+             else
+             {
+                std::cout << "resolve failed: " << ec.message() << std::endl;
+             }
+          });
+   }
+
+   struct tcp_listener
+   {
+      explicit tcp_listener(boost::asio::io_context& ctx) : _ctx(ctx) {}
+      template <typename F>
+      boost::asio::ip::tcp::endpoint listen(const boost::asio::ip::tcp::endpoint& endpoint, F&& f)
       {
          _acceptors.emplace_back(std::make_shared<boost::asio::ip::tcp::acceptor>(_ctx, endpoint));
-         async_accept(_acceptors.back());
+         async_accept(_acceptors.back(), std::forward<F>(f));
          return _acceptors.back()->local_endpoint();
       }
-      void async_accept(std::shared_ptr<boost::asio::ip::tcp::acceptor> a)
+      template <typename F>
+      static void async_accept(std::shared_ptr<boost::asio::ip::tcp::acceptor> a, F&& f)
       {
          auto p = a.get();
          p->async_accept(
-             [this, a = std::move(a)](const std::error_code&         ec,
-                                      boost::asio::ip::tcp::socket&& sock) mutable
+             [a = std::move(a), f = std::forward<F>(f)](const std::error_code&         ec,
+                                                        boost::asio::ip::tcp::socket&& sock) mutable
              {
-                if (!ec && a->is_open())
-                {
-                   std::cout << "Accepted connection from: " << sock.remote_endpoint() << std::endl;
-                   add_connection(std::make_shared<tcp_connection>(std::move(sock)));
-                   async_accept(std::move(a));
-                }
-             });
-      }
-      void async_connect(const boost::asio::ip::tcp::endpoint& endpoint)
-      {
-         auto  id   = next_peer_id++;
-         auto  conn = std::make_shared<tcp_connection>(_ctx);
-         auto& sock = conn->_socket;
-         sock.async_connect(endpoint,
-                            [this, conn = std::move(conn), id, endpoint](const std::error_code& ec)
-                            {
-                               if (ec)
-                               {
-                                  std::cout << "Failed connecting" << std::endl;
-                               }
-                               else
-                               {
-                                  std::cout << "Connected to: " << endpoint << std::endl;
-                                  add_connection(std::move(conn));
-                               }
-                            });
-      }
-      void async_connect(std::string_view host, std::string_view service)
-      {
-         std::cout << "Connecting to " << host << ":" << service << std::endl;
-         _resolver.async_resolve(
-             host, service,
-             [this](const std::error_code& ec, const auto& endpoints)
-             {
-                // TODO: report error
                 if (!ec)
                 {
-                   auto  conn = std::make_shared<tcp_connection>(_ctx);
-                   auto& sock = conn->_socket;
-                   boost::asio::async_connect(
-                       sock, endpoints,
-                       [this, conn = std::move(conn)](const std::error_code&                ec,
-                                                      const boost::asio::ip::tcp::endpoint& e)
-                       {
-                          if (ec)
-                          {
-                             std::cout << "Failed connecting" << std::endl;
-                          }
-                          else
-                          {
-                             std::cout << "Connected to: " << e << std::endl;
-                             add_connection(std::move(conn));
-                          }
-                       });
+                   std::cout << "Accepted connection from: " << sock.remote_endpoint() << std::endl;
+                   f(std::make_shared<tcp_connection>(std::move(sock)));
                 }
-                else
-                {
-                   std::cout << "resolve failed: " << ec.message() << std::endl;
-                }
+                async_accept(std::move(a), std::move(f));
              });
       }
-      template <typename F>
-      void async_send(peer_id id, const std::vector<char>& msg, F&& f)
-      {
-         auto iter = _connections.find(id);
-         if (iter == _connections.end())
-         {
-            throw std::runtime_error("unknown peer");
-         }
-         iter->second->async_write(std::vector<char>(msg), std::forward<F>(f));
-      }
-      void add_connection(std::shared_ptr<connection_base> conn)
-      {
-         auto id        = next_peer_id++;
-         auto [iter, _] = _connections.try_emplace(id, std::move(conn));
-         start_connection(id);
-      }
-      void start_connection(peer_id id)
-      {
-         auto iter = _connections.find(id);
-         assert(iter != _connections.end());
-         auto copy = iter->second;
-         async_recv(id, std::move(copy));
-         static_cast<Derived*>(this)->network().connect(id);
-      }
-      void async_recv(peer_id id, std::shared_ptr<connection_base>&& c)
-      {
-         auto p = c.get();
-         p->async_read(
-             [this, c = std::move(c), id](const std::error_code& ec,
-                                          std::vector<char>&&    buf) mutable
-             {
-                if (ec && ec != make_error_code(boost::asio::error::operation_aborted))
-                {
-                   boost::asio::dispatch(_ctx, [this, id]() mutable { disconnect(id); });
-                }
-                else if (!ec && c->is_open())
-                {
-                   boost::asio::dispatch(_ctx, [this, id, buf = std::move(buf)]() mutable
-                                         { network().recv(id, buf); });
-                   async_recv(id, std::move(c));
-                }
-             });
-      }
-      void disconnect_all()
-      {
-         for (auto& [id, conn] : _connections)
-         {
-            static_cast<Derived*>(this)->network().disconnect(id);
-            conn->close();
-         }
-         _connections.clear();
-      }
-      void disconnect(peer_id id)
-      {
-         auto iter = _connections.find(id);
-         if (iter != _connections.end())
-         {
-            static_cast<Derived*>(this)->network().disconnect(id);
-            iter->second->close();
-            _connections.erase(iter);
-         }
-      }
-
-      peer_id                                                      next_peer_id = 0;
       boost::asio::io_context&                                     _ctx;
-      boost::asio::ip::tcp::resolver                               _resolver;
       std::vector<std::shared_ptr<boost::asio::ip::tcp::acceptor>> _acceptors;
-      std::map<peer_id, std::shared_ptr<connection_base>>          _connections;
    };
 
 }  // namespace psibase::net
