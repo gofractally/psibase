@@ -1,4 +1,4 @@
-name: Ubuntu 20.04
+name: Ubuntu 18.04
 on:
   workflow_dispatch:
   push:
@@ -9,12 +9,12 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:3382926c582eb5edebd4cf19b449cf46d32ab421"
+  UBUNTU_1804_IMAGE: "ghcr.io/gofractally/internal-ubuntu-1804-builder:manual"
   LIBMDBX_MIRROR_PRIVATE_KEY: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
 
 jobs:
-  ubuntu-2004-build:
-    name: Ubuntu 20.04 | Build
+  ubuntu-1804-build:
+    name: Ubuntu 18.04 | Build
     runs-on: ubuntu-latest
     steps:
       - name: Timestamp
@@ -32,9 +32,9 @@ jobs:
         uses: actions/cache@v1.1.0
         with:
           path: .caches
-          key: $ubuntu-20.04-caches-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
+          key: $ubuntu-18.04-caches-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            $ubuntu-20.04-caches-
+            $ubuntu-18.04-caches-
       - name: Build
         run: |
           set -e
@@ -56,9 +56,9 @@ jobs:
           export RUSTC_WRAPPER=sccache
           export LLVM_CONFIG_PATH=/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/llvm-config
           export LD_LIBRARY_PATH=/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/lib/
-          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER -e LLVM_CONFIG_PATH -e LD_LIBRARY_PATH --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
-          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER -e LLVM_CONFIG_PATH -e LD_LIBRARY_PATH ${UBUNTU_2004_IMAGE}"
-          docker pull ${UBUNTU_2004_IMAGE}
+          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER -e LLVM_CONFIG_PATH -e LD_LIBRARY_PATH --user $(id -u):$(id -g) ${UBUNTU_1804_IMAGE}"
+          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER -e LLVM_CONFIG_PATH -e LD_LIBRARY_PATH ${UBUNTU_1804_IMAGE}"
+          docker pull ${UBUNTU_1804_IMAGE}
           echo =====
           ${DOCKER} ccache -s
           echo =====
@@ -77,14 +77,14 @@ jobs:
           echo =====
           ${DOCKER} sccache -s
           echo =====
-          bash -c "cd build && tar czf ../psidk-ubuntu-2004.tar.gz psidk"
+          bash -c "cd build && tar czf ../psidk-linux.tar.gz psidk"
           echo =====
           ${DOCKER} bash -c "cd doc/psidk && mdbook build && mv book psidk-book && tar czf ../../psidk-book.tar.gz psidk-book"
-      - name: Upload psidk-ubuntu-2004
+      - name: Upload psidk-linux
         uses: actions/upload-artifact@v1
         with:
-          name: psidk-ubuntu-2004
-          path: psidk-ubuntu-2004.tar.gz
+          name: psidk-linux
+          path: psidk-linux.tar.gz
       - name: Upload psidk-book
         uses: actions/upload-artifact@v1
         with:
