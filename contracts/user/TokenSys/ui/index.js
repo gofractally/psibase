@@ -7,31 +7,29 @@ const html = htm.bind(React.createElement);
 const { useEffect, useState, useCallback } = React;
 const { Segment, Header, Form, Table, Input, Button, Message, Tab, Container } = semanticUIReact;
 
-await initializeApplet();
-
 const thisApplet = await getJson('/common/thiscontract');
 
-let operations = [
-  {
-      id: "credit",
-      exec: ({symbol, receiver, amount, memo}) => {
-
-        //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
-        let tokenId = await getJson(siblingUrl(null, thisApplet, "getTokenId/" + symbol));
-        console.log("TokenID for symbol " + symbol + " == " + tokenId);
-
-        action(thisApplet, "credit", 
-          { 
-            tokenId, 
-            receiver, 
-            amount: {value: amount }, 
-            memo: {contents: memo},
-        });
-      },
-  }
-];
-
-setOperations(operations);
+initializeApplet(async ()=>{
+  setOperations([
+    {
+        id: "credit",
+        exec: async ({symbol, receiver, amount, memo}) => {
+  
+          //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
+          let tokenId = await getJson(siblingUrl(null, thisApplet, "getTokenId/" + symbol));
+          console.log("TokenID for symbol " + symbol + " == " + tokenId);
+  
+          action(thisApplet, "credit", 
+            { 
+              tokenId, 
+              receiver, 
+              amount: {value: amount }, 
+              memo: {contents: memo},
+          });
+        },
+    }
+  ]);
+});
 
 function Rows(balances) {
   return balances.map(b => {
@@ -189,7 +187,7 @@ function App() {
     // Todo - Timeout is used because sometimes the window.parentIFrame isn't loaded yet when 
     //  this runs. Should use a better fix for the race condition than a delay.
     setTimeout(()=>{ 
-      query("account-sys", "", "getLoggedInUser", setUser);
+      query("account-sys", "", "getLoggedInUser", {}, setUser);
     }, 50);
   }, []);
 

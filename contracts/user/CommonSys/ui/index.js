@@ -1,5 +1,5 @@
 import { siblingUrl } from "/common/rootdomain.mjs";
-import { signAndPushTransaction, getTaposForHeadBlock, MessageTypes, verifyFields, addQueryCallback } from "/common/rpc.mjs";
+import { signAndPushTransaction, getTaposForHeadBlock, MessageTypes, verifyFields, addQueryCallback, executeCallback } from "/common/rpc.mjs";
 import htm from "/common/htm.module.js";
 await import("/common/react-router-dom.min.js");
 
@@ -16,7 +16,7 @@ const AppletStates = {
     modal: 2,
 };
 
-let appletStyles;
+let appletStyles = {};
 appletStyles[AppletStates.primary] = {
     margin: 0,
     padding: 0
@@ -93,11 +93,15 @@ const constructTransaction = async (actions) => {
 let getIframeId = (appletStr, subPath) => {
     // TODO - To support multiple of the same type of applet being opened simultaneously, 
     //     the IDs need to be unique.
+    console.log("Trying to find iframe for " + appletStr + "/" + subPath);
     return "applet_" + appletStr + "_" + subPath;
 };
 
 function Applet(appletParams, handleMessage) {
-    let {appletStr, subPath, state} = appletParams;
+    let {appletStr, subPath, state, onInit} = appletParams;
+
+    if (onInit === undefined) 
+        onInit = ()=>{};
 
     const [applet, setApplet] = useState(appletStr);
     const [appletSrc, setAppletSrc] = useState(siblingUrl(null, appletStr, subPath));
@@ -117,19 +121,25 @@ function Applet(appletParams, handleMessage) {
     useEffect(() => { // Configure iFrameResizer
         if (appletSrc)
         {
-            iFrameResize(
-                {
-                    // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
-                    //log: true,
-                    checkOrigin: false,
-                    heightCalculationMethod: "lowestElement",
-                    onMessage: doHandleMessage,
-                    minHeight:
-                        document.documentElement.scrollHeight -
-                        document.getElementById(getIframeId(appletStr, subPath)).getBoundingClientRect().top,
-                },
-                "#" + getIframeId(appletStr, subPath)
-            )[0].iFrameResizer;
+            let iFrameId = getIframeId(appletStr, subPath);
+            let iFrame = document.getElementById(iFrameId);
+            if (iFrame)
+            {   // Todo - why isn't this running after the render is complete?
+                iFrameResize(
+                    {
+                        // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
+                        //log: true,
+                        checkOrigin: false,
+                        heightCalculationMethod: "lowestElement",
+                        onMessage: doHandleMessage,
+                        onInit,
+                        minHeight:
+                            document.documentElement.scrollHeight -
+                            iFrame.getBoundingClientRect().top,
+                    },
+                    "#" + iFrameId
+                )[0].iFrameResizer;
+            }
         }
     }, [appletSrc]);
 
@@ -144,7 +154,7 @@ function Applet(appletParams, handleMessage) {
             frameborder="0"
         ></iframe>
     `;
-    }
+    } else return html``;
 
 }
 
@@ -227,13 +237,6 @@ function getAppletInURL() {
     return {appletStr, subPath};
 }
 
-function Applets(applets, handleMessage)
-{
-    return applets.map((a)=>{
-        return Applet(a, handleMessage);
-    });
-}
-
 let currentOps = [];
 
 function makeAction(application, actionName, params)
@@ -241,9 +244,20 @@ function makeAction(application, actionName, params)
     return {contract: application, method: actionName, data: params};
 }
 
-function App() {
+function OtherApplets({applets, handleMessage})
+{
+    let nonPrimaryApplets = applets.filter(a=>a.state !== AppletStates.primary);
+    
+    return nonPrimaryApplets.map((a)=>{
+                return Applet(a, handleMessage);
+            });
 
-    let [applets, setApplets] = useState([]);
+    //return Applet({appletStr: "account-sys", subPath: "", state: AppletStates.headless}, handleMessage);
+}
+
+function App() {
+    let {appletStr, subPath} = getAppletInURL();
+    let [applets, setApplets] = useState([{appletStr, subPath, state: AppletStates.primary, onInit: ()=>{}}]);
     let [transaction, setTransaction] = useState([]);
 
     let getIndex = useCallback((appletStr, subPath)=>{
@@ -260,57 +274,61 @@ function App() {
         return index;
     }, []);
 
-    useEffect(()=>{ // Add the primary applet (Derived from URL)
-        let {appletStr, subPath} = getAppletInURL();
-        setApplets(applets.concat([{appletStr, subPath, state: AppletStates.primary}]));
-    }, []);
-
-    let open = useCallback((appletStr, subPath, state) => {
+    let open = useCallback(({appletStr, subPath, state}, callAfterOpen) => {
         // Opens an applet if it's not already open
         let index = getIndex(appletStr, subPath);
         if (index === -1)
         {
-            setApplets(applets.concat([{appletStr, subPath, state}]));
+            setApplets([...applets, {appletStr, subPath, state, onInit: callAfterOpen}]);
         }
+        else
+        {   // Applet is already open, invoke callback immediately
+            callAfterOpen();
+        }
+        
     }, []);
+
+    let urlApplet = useCallback(() => {
+        return Applet({appletStr, subPath, state: AppletStates.primary}, handleMessage);
+    }, [appletStr, subPath]);
 
     // TODO: Extract method between sendOp, sendQuery, sendQueryResponse - lots of duplicate code
     let sendOp = useCallback((sender, receiver, identifier, params)=>{
         let {rApplet, rSubPath} = receiver;
-        open(rApplet, rSubPath, AppletStates.headless);
-
-        var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
-        if (iframe == null)
-        {
-            console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
-            return;
-        }
-
-        // TODO: Could check that sender isn't on rApplet's blacklist before
-        //       making the IPC call.
-
-        // TODO: For security, this ought to restrict the origin of the target iframe
-        let restrictedTargetOrigin = "*"; 
-        iframe.iFrameResizer.sendMessage({type: MessageTypes.Operation, payload: {identifier, params}}, restrictedTargetOrigin);
+        open({appletStr: rApplet, subPath: rSubPath, state: AppletStates.headless}, ()=>{
+            var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
+            if (iframe == null)
+            {
+                console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
+                return;
+            }
+    
+            // TODO: Could check that sender isn't on rApplet's blacklist before
+            //       making the IPC call.
+    
+            // TODO: For security, this ought to restrict the origin of the target iframe
+            let restrictedTargetOrigin = "*"; 
+            iframe.iFrameResizer.sendMessage({type: MessageTypes.Operation, payload: {identifier, params}}, restrictedTargetOrigin);
+        });
     }, [open]);
 
     let sendQuery = useCallback((sender, receiver, identifier, params, callbackId)=>{
         let {rApplet, rSubPath} = receiver;
-        open(rApplet, rSubPath, AppletStates.headless);
+        open({appletStr: rApplet, subPath: rSubPath, state: AppletStates.headless}, ()=>{
+            var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
+            if (iframe == null)
+            {
+                console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
+                return;
+            }
 
-        var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
-        if (iframe == null)
-        {
-            console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
-            return;
-        }
+            // TODO: Could check that sender isn't on rApplet's blacklist before
+            //       making the IPC call.
 
-        // TODO: Could check that sender isn't on rApplet's blacklist before
-        //       making the IPC call.
-
-        // TODO: For security, this ought to restrict the origin of the target iframe
-        let restrictedTargetOrigin = "*"; 
-        iframe.iFrameResizer.sendMessage({type: MessageTypes.Query, payload: {identifier, params, callbackId}}, restrictedTargetOrigin);
+            // TODO: For security, this ought to restrict the origin of the target iframe
+            let restrictedTargetOrigin = "*"; 
+            iframe.iFrameResizer.sendMessage({type: MessageTypes.Query, payload: {identifier, params, callbackId}}, restrictedTargetOrigin);
+        });
     }, [open]);
 
     let sendQueryResponse = useCallback((sender, receiver, payload)=>{
@@ -350,7 +368,7 @@ function App() {
         return actions;
     }, []);
 
-    let executeTransaction = useCallback(() => {
+    let executeTransaction = useCallback(async () => {
         try 
         {
             let trans = await constructTransaction(injectSender(transaction));
@@ -463,11 +481,12 @@ function App() {
             },
             handle: (senderApplet, payload) => {
                 let {callbackId, qApplet, qSubPath, qName, qParams} = payload;
-                let coreCallbackId = addQueryCallback((responderApplet, response)=>{
+                let coreCallbackId = addQueryCallback((response)=>{
+                    let res = response.response;
                     sendQueryResponse(
-                        {sApplet: responderApplet.applet, sSubPath: responderApplet.subPath}, 
+                        {sApplet: response.senderApplet.applet, sSubPath: response.senderApplet.subPath}, 
                         {rApplet: senderApplet.applet, rSubPath: senderApplet.subPath}, 
-                        {callbackId, response}
+                        {callbackId, response: res}
                     );
                 });
                 sendQuery(senderApplet, {rApplet: qApplet, rSubPath: qSubPath}, qName, qParams, coreCallbackId);
@@ -485,24 +504,24 @@ function App() {
             },
         },
 
-
-        // {
-        //     type: MessageTypes.QueryResponse,
-        //     payload: { callbackId, response: val },
-        // }
-
-    ], [open, send]);
+    ], [open, sendOp, sendQuery, sendQueryResponse]);
 
     let handleMessage = useCallback(async ({applet, subPath, state}, request)=>{
         // TODO - Should there be any additional security here, such that we only 
         //   accept requests from same origin, etc.?
         let {type, payload} = request.message;
-        if (type === undefined || typeof type !== "number" || payload === undefined)
+        if (type === undefined || payload === undefined)
         {
-            console.error("Received malformed resource request from applet");
+            console.error("Received malformed message from applet");
             return;
         }
-        if (!messageRouting[type].validate(payload)) 
+        let route = messageRouting.find(m => m.type === type);
+        if (route === undefined)
+        {
+            console.error("Message from applet specifies unknown route.");
+            return;
+        }
+        if (!route.validate(payload)) 
         {
             let t = type === MessageTypes.Operation ? 'Operation' : 
                 type === MessageTypes.Action ? 'Action' : 
@@ -511,9 +530,9 @@ function App() {
             console.error(payload);
             return;
         }
-        messageRouting[type].handle({applet, subPath, state}, payload);
+        route.handle({applet, subPath, state}, payload);
 
-    }, [appletStr, subPath, messageRouting]);
+    }, [messageRouting]);
 
     return html`
         <div class="ui container">
@@ -525,7 +544,9 @@ function App() {
                 <${Route} path="${appletPrefix}" component=${urlApplet} />
             </div>
         </${BrowserRouter}>
-        <${()=>{Applets(applets, handleMessage);}} />
+        <div>
+            <${OtherApplets} applets=${applets} handleMessage=${handleMessage} />
+        </div>
     `;
 }
 

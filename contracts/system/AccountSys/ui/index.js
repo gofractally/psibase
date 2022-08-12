@@ -1,41 +1,38 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
 import { getJson, initializeApplet, action, operation, setOperations, setQueries } from '/common/rpc.mjs';
-import { genKeyPair, KeyType, setOperations } from '/common/keyConversions.mjs';
+import { genKeyPair, KeyType } from '/common/keyConversions.mjs';
 
 const html = htm.bind(React.createElement);
 
-await initializeApplet();
 const thisApplet = await getJson('/common/thiscontract');
-
-let operations = [
-    {
-        id: "newAcc",
-        exec: ({name, pubKey})=>{
-            action(thisApplet, "newAccount", { 
-                name, 
-                authContract: 'auth-fake-sys', 
-                requireNew: true,
-            });
-
-            if (pubKey !== "")
-            {
-                action('auth-ec-sys', 'setKey', {key: pubkey});
-                action(thisApplet, 'setAuthCntr', {authContract: 'auth-ec-sys'});
-            }
+initializeApplet(async ()=>{
+    setOperations([
+        {
+            id: "newAcc",
+            exec: ({name, pubKey})=>{
+                action(thisApplet, "newAccount", { 
+                    name, 
+                    authContract: 'auth-fake-sys', 
+                    requireNew: true,
+                });
+    
+                if (pubKey !== "")
+                {
+                    action('auth-ec-sys', 'setKey', {key: pubkey});
+                    action(thisApplet, 'setAuthCntr', {authContract: 'auth-ec-sys'});
+                }
+            },
         },
-    },
-];
-setOperations(operations);
-
-let queries = [
-    {
-        id: "getLoggedInUser",
-        exec: (params, reply) => {
-            reply("alice");
+    ]);
+    setQueries([
+        {
+            id: "getLoggedInUser",
+            exec: (params, reply) => {
+                reply("alice");
+            },
         },
-    },
-];
-setQueries(queries);
+    ]);
+});
 
 function useAccounts(addMsg, clearMsg) {
     const [accounts, setAccounts] = React.useState([]);

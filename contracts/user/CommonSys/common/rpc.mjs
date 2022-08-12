@@ -210,11 +210,11 @@ export const ErrorMessages = [
 ]
 
 export const MessageTypes = {
-    Core: 0, // A message to the core layer itself
-    Action: 1, // An action send to an on-chain application
-    Query: 2,  // A query to another client-side applet, expect a response
-    Operation: 3, // A procedure which can include multiple other queries, actions, and operations
-    QueryResponse: 4, // A response to a prior query
+    Core: "Core", // A message to the core layer itself
+    Action: "Action", // An action send to an on-chain application
+    Query: "Query",  // A query to another client-side applet, expect a response
+    Operation: "Operation", // A procedure which can include multiple other queries, actions, and operations
+    QueryResponse: "QueryResponse", // A response to a prior query
 };
 
 var ops = []; // Operations defined by an applet
@@ -244,18 +244,19 @@ export function executeCallback(callbackId, response)
     if (!found)
     {
         console.error("Callback with ID " + callbackId + " not found.");
-        return;
+        return false;
     }
+
     try{
-        queryCallbacks(idx).callback(response);
+        queryCallbacks[idx].callback(response);
     }
     catch (e)
     {
         console.error("Error calling callback with ID " + callbackId);
     }
-
     // Remove the callback now that it's been handled
     queryCallbacks.splice(idx, 1);
+    return true;
 }
 
 function sendToParent(message)
@@ -316,6 +317,9 @@ let handleErrorCode = (code) => {
     return true;
 };
 
+let fullyInitialized = false;
+let ipcBuffer = [];
+
 let messageRouting = [
     {
         type: MessageTypes.Operation,
@@ -324,26 +328,38 @@ let messageRouting = [
         },
         route: (payload) => {
             let {operation, params} = payload;
-            
-            let op = ops.find(o => o.id === operation);
-            if (op !== undefined)
-            {
-                try {
-                    op.exec(params);
-                }
-                catch (e)
+
+            let doRouteMessage = ()=>{
+                let op = ops.find(o => o.id === operation);
+                if (op !== undefined)
                 {
-                    console.error("Error running operation " + operation);
-                    console.error(e);
-                    stopOperation();
-                    throw e;
+                    try {
+                        op.exec(params);
+                        return true;
+                    }
+                    catch (e)
+                    {
+                        console.error("Error running operation " + operation);
+                        console.error(e);
+                        stopOperation();
+                        throw e;
+                    }
                 }
-            }
-            else
+                else
+                {
+                    console.error("Operation not found: " + operation);
+                }
+                stopOperation();
+
+                return false;
+            };
+
+            if (!fullyInitialized)
             {
-                console.error("Operation not found: " + operation);
+                ipcBuffer.push(doRouteMessage);
+                return true;
             }
-            stopOperation();
+            else return doRouteMessage();
         },
     },
     {
@@ -354,29 +370,41 @@ let messageRouting = [
         route: (payload) => {
             let {identifier, params, callbackId} = payload;
 
-            let qu = qrs.find(q => q.id === identifier);
-            if (qu !== undefined)
-            {
-                try {
-                    let reply = (val) => {
-                        sendToParent({
-                            type: MessageTypes.QueryResponse,
-                            payload: { callbackId, response: val },
-                        });
-                    };
-                    qu.exec(params, reply);
-                }
-                catch (e)
+            let doRouteMessage = ()=>{
+                let qu = qrs.find(q => q.id === identifier);
+                if (qu !== undefined)
                 {
-                    console.error("Error running query " + identifier);
-                    console.error(e);
-                    throw e;
+                    try {
+                        let reply = (val) => {
+                            sendToParent({
+                                type: MessageTypes.QueryResponse,
+                                payload: { callbackId, response: val },
+                            });
+                        };
+                        qu.exec(params, reply);
+                        return true;
+                    }
+                    catch (e)
+                    {
+                        console.error("Error running query " + identifier);
+                        console.error(e);
+                        throw e;
+                    }
                 }
-            }
-            else
+                else
+                {
+                    console.error("Query not found: " + identifier);
+                }
+
+                return false;
+            };
+
+            if (!fullyInitialized) 
             {
-                console.error("Query not found: " + identifier);
+                ipcBuffer.push(doRouteMessage);
+                return true;
             }
+            else return doRouteMessage();
         },
     },
     {
@@ -386,12 +414,12 @@ let messageRouting = [
         },
         route: (payload) => {
             let {callbackId, response} = payload;
-            executeCallback(callbackId, response);
+            return executeCallback(callbackId, response);
         },
     }
 ];
 
-export async function initializeApplet()
+export async function initializeApplet(initializer = ()=>{})
 {
     redirectIfAccessedDirectly();
 
@@ -401,13 +429,20 @@ export async function initializeApplet()
         //  targetOrigin: siblingUrl(null, "common-sys", null),
         onMessage: (msg)=>{
             let {type, payload} = msg;
-            if (type === undefined || typeof type !== "number" || payload === undefined)
+            if (type === undefined || payload === undefined)
             {
                 console.error("Malformed message received from core");
                 return;
             }
 
-            if (!messageRouting[type].validate(payload))
+            let route = messageRouting.find(m => m.type === type);
+            if (route === undefined)
+            {
+                console.error("Message from core specifies unknown route.");
+                return;
+            }
+
+            if (!route.validate(payload))
             {
                 console.error("Message from core failed validation checks");
                 return;
@@ -416,19 +451,33 @@ export async function initializeApplet()
             if (handleErrorCode(payload.error))
                 return;
 
-            if (!messageRouting[type].route(payload))
+            if (!route.route(payload))
             {
-                console.error("Child has no handler for message: " + msg);
+                console.error("Child failed to route message: " + msg);
                 return;
             }
         },
       };
 
     await import("/common/iframeResizer.contentWindow.js");
+
+    await initializer();
+
+    fullyInitialized = true;
+
+    try
+    {
+        ipcBuffer.forEach(buffered => {buffered();});
+    }
+    catch (e)
+    {
+        console.error("Buffered message failure");
+        console.error(e);
+    }
 }
 
 
-function set(targetArray, newElements, caller)
+function set({targetArray, newElements}, caller)
 {
     let valid = newElements.every(e => {
         if (!verifyFields(e, ["id", "exec"]))
@@ -445,7 +494,7 @@ function set(targetArray, newElements, caller)
     }
 
     if (targetArray.length === 0)
-        targetArray = newElements;
+        targetArray.push(...newElements);
     else 
     {
         valid = newElements.every(e => {
@@ -458,18 +507,18 @@ function set(targetArray, newElements, caller)
             console.error(caller + ": Same element defined twice.");
             return;
         }
-        targetArray = targetArray.concat(newElements);
+        targetArray.push(...newElements);
     }
 }
 
 export function setOperations(operations)
 {
-    set(ops, operations, "setOperations");
+    set({targetArray: ops, newElements: operations}, "setOperations");
 }
 
 export function setQueries(queries)
 {
-    set(qrs, queries, "setQueries");
+    set({targetArray: qrs, newElements: queries}, "setQueries");
 }
 
 function startOperation()
@@ -520,7 +569,3 @@ export function query(applet, subPath, queryName, params, callback)
     });
 }
 
-export function query(applet, subPath, queryName, callback)
-{
-    query(applet, subPath, queryName, {}, callback);
-}
