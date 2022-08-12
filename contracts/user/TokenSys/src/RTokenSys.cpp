@@ -94,24 +94,20 @@ std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& reque
          if (auto result = serveSimpleUI<TokenSys, true>(request))
             return result;
       }
-      if (request.target.starts_with("/getTokenId/"))
+      if (request.target.starts_with("/getTokenTypes"))
       {
-         auto symbol = request.target.substr(string("/getTokenId/").size());
-         check(symbol.find('/') == string::npos, "invalid symbol " + symbol);
+         auto parameters = request.target.substr(string("/getTokenTypes").size());
+         check(parameters.find('/') == string::npos, "invalid request");
 
-         // Todo: After symbol mapping moved to symbol contract, everything below here
-         //   should be changed to:
-         //   return to_json(at<SymbolSys>().getTokenId(symbol));
          TokenSys::Tables db{TokenSys::contract};
          auto             idx = db.open<TokenTable>().getIndex<0>();
-         check(idx.begin() != idx.end(), "No tokens");
+
+         std::vector<UserContract::TokenRecord> allTokens;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)
          {
-            if ((*itr).symbolId == SID(symbol))
-               return to_json((*itr).id);
+            allTokens.push_back(*itr);
          }
-
-         return to_json("-1");
+         return to_json(allTokens);
       }
       if (request.target.starts_with("/balances/"))
       {

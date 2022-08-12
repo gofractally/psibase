@@ -16,10 +16,16 @@ initializeApplet(async ()=>{
         exec: async ({symbol, receiver, amount, memo}) => {
   
           //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
-          let tokenId = await getJson(siblingUrl(null, thisApplet, "getTokenId/" + symbol));
-          console.log("TokenID for symbol " + symbol + " == " + tokenId);
-  
-          action(thisApplet, "credit", 
+          let tokens = await getJson(siblingUrl(null, thisApplet, "getTokenTypes"));
+          let token = tokens.find(t=>t.symbolId === symbol.toLowerCase());
+          if (!token)
+          {
+            console.error("No token with symbol " + symbol);
+            return;
+          }
+          let tokenId = token.id;
+
+          await action(thisApplet, "credit", 
             { 
               tokenId, 
               receiver, 
@@ -142,7 +148,7 @@ function SendPanel() {
 
   const onSendSubmit = (e) => {
     e.preventDefault();
-    operation(thisApplet, "credit", {symbol: "PSI", receiver, amount, memo: "Test"});
+    operation(thisApplet, "", "credit", {symbol: "PSI", receiver, amount, memo: "Test"});
   };
 
   return html`

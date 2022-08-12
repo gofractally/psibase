@@ -324,22 +324,21 @@ let messageRouting = [
     {
         type: MessageTypes.Operation,
         validate: (payload)=>{
-            return verifyFields(payload, ["action", "params"]);
+            return verifyFields(payload, ["identifier", "params"]);
         },
         route: (payload) => {
-            let {operation, params} = payload;
+            let {identifier, params} = payload;
 
-            let doRouteMessage = ()=>{
-                let op = ops.find(o => o.id === operation);
+            let doRouteMessage = async ()=>{
+                let op = ops.find(o => o.id === identifier);
                 if (op !== undefined)
                 {
                     try {
-                        op.exec(params);
-                        return true;
+                         await op.exec(params);
                     }
                     catch (e)
                     {
-                        console.error("Error running operation " + operation);
+                        console.error("Error running operation " + identifier);
                         console.error(e);
                         stopOperation();
                         throw e;
@@ -347,11 +346,11 @@ let messageRouting = [
                 }
                 else
                 {
-                    console.error("Operation not found: " + operation);
+                    console.error("Operation not found: " + identifier);
                 }
-                stopOperation();
 
-                return false;
+                stopOperation();
+                return true;
             };
 
             if (!fullyInitialized)
@@ -382,7 +381,6 @@ let messageRouting = [
                             });
                         };
                         qu.exec(params, reply);
-                        return true;
                     }
                     catch (e)
                     {
@@ -396,7 +394,7 @@ let messageRouting = [
                     console.error("Query not found: " + identifier);
                 }
 
-                return false;
+                return true;
             };
 
             if (!fullyInitialized) 
@@ -468,6 +466,7 @@ export async function initializeApplet(initializer = ()=>{})
     try
     {
         ipcBuffer.forEach(buffered => {buffered();});
+        ipcBuffer = [];
     }
     catch (e)
     {
@@ -531,16 +530,17 @@ function startOperation()
 
 function stopOperation()
 {
-    sendToParent({
-        type: MessageTypes.Core,
-        payload: {command: "stopOp"},
-    });
+    let tempDelay = 100; // TODO: remove this, add message buffering to core
+    setTimeout(()=>{
+        sendToParent({
+            type: MessageTypes.Core,
+            payload: {command: "stopOp"},
+        });
+    }, tempDelay);
 }
 
 export function operation(applet, subPath, operationName, params)
 {
-    startOperation();
-
     // Todo - There may be a way to short-circuit calling common-sys when 
     //    opApplet == await getJson('/common/thiscontract');
 

@@ -79,7 +79,7 @@ function Nav() {
 
 const constructTransaction = async (actions) => {
     let tenMinutes = 10 * 60 * 1000;
-    var transaction = JSON.parse(JSON.stringify({
+    var trans = JSON.parse(JSON.stringify({
             tapos: {
                     ...await getTaposForHeadBlock(),
                     expiration: new Date(Date.now() + tenMinutes),
@@ -87,13 +87,12 @@ const constructTransaction = async (actions) => {
             actions,
     }, null, 4));
 
-    return transaction;
+    return trans;
 };
 
 let getIframeId = (appletStr, subPath) => {
     // TODO - To support multiple of the same type of applet being opened simultaneously, 
     //     the IDs need to be unique.
-    console.log("Trying to find iframe for " + appletStr + "/" + subPath);
     return "applet_" + appletStr + "_" + subPath;
 };
 
@@ -255,10 +254,11 @@ function OtherApplets({applets, handleMessage})
     //return Applet({appletStr: "account-sys", subPath: "", state: AppletStates.headless}, handleMessage);
 }
 
+let transaction = [];
+
 function App() {
     let {appletStr, subPath} = getAppletInURL();
     let [applets, setApplets] = useState([{appletStr, subPath, state: AppletStates.primary, onInit: ()=>{}}]);
-    let [transaction, setTransaction] = useState([]);
 
     let getIndex = useCallback((appletStr, subPath)=>{
         // Finds the index of the specified applet in state: "applets"
@@ -381,7 +381,7 @@ function App() {
             console.error(trace);
         }
 
-        setTransaction([]);
+        transaction = [];
     }, []);
 
     let messageRouting = useMemo(() => [
@@ -390,7 +390,7 @@ function App() {
             validate: (payload) => {
                 if (verifyFields(payload, ["command"]))
                 {
-                    return payload.command === "startOp" || payload,command === "stopOp";
+                    return payload.command === "stopOp";
                 }
                 return false;
             },
@@ -436,13 +436,6 @@ function App() {
                         }
                     }
                 }
-                if (command === "startOp")
-                {
-                    // A minor implication here of ALWAYS allowing startOp is 
-                    //   that an applet could inject spurious startOps to 
-                    //   prevent any IPC operations from completing.
-                    currentOps = currentOps.concat([senderApplet]);
-                }
             },
         },
         {
@@ -452,6 +445,9 @@ function App() {
             },
             handle: (senderApplet, payload) => {
                 let { opApplet, opSubPath, opName, opParams } = payload;
+
+                // Todo - remove "startOp" - I replaced it with the following implicit startOp
+                currentOps = currentOps.concat([senderApplet]);
                 try{
                     sendOp(senderApplet, {rApplet: opApplet, rSubPath: opSubPath}, opName, opParams);
                 }
@@ -471,7 +467,7 @@ function App() {
             },
             handle: async (senderApplet, payload) => {
                 let {application, actionName, params} = payload;
-                setTransaction(transaction.concat([makeAction(application, actionName, params)]))
+                transaction.push(makeAction(application, actionName, params));
             }
         },
         {
