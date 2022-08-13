@@ -68,7 +68,7 @@ SCENARIO("Minting & burning nfts")
          auto mint = a.mint();
          auto nft1 = a.getNft(mint.returnVal()).returnVal();
 
-         t.start_block();
+         t.startBlock();
          THEN("Alice consumes storage space as expected")
          {
             CHECK(mint.diskConsumed({{alice.id, DiskUsage_NftRecord::firstEmplace}}));
@@ -98,7 +98,7 @@ SCENARIO("Minting & burning nfts")
          AND_WHEN("Alice mints a second NFT")
          {
             auto mint2 = a.mint();
-            t.start_block();
+            t.startBlock();
 
             THEN("The NFT is identical in every way, except the ID is incremented")
             {
@@ -111,7 +111,7 @@ SCENARIO("Minting & burning nfts")
          AND_WHEN("Bob mints an NFT")
          {
             auto mint = b.mint();
-            t.start_block();
+            t.startBlock();
 
             THEN("Bob's pays for an expected amount of storage space")
             {

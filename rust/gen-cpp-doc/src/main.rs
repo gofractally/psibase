@@ -472,7 +472,7 @@ fn document_struct(items: &[Item], index: usize, path: &str, result: &mut String
     def.push_str(" {\n");
 
     let fields = filter_children(&item.entity, |c| {
-        c.get_kind() == EntityKind::FieldDecl
+        (c.get_kind() == EntityKind::FieldDecl || c.get_kind() == EntityKind::VarDecl)
             && c.get_accessibility().unwrap() == Accessibility::Public
     });
     let mut type_size = 0;
@@ -705,6 +705,7 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/build/wasm/boost"),
         &("-I".to_owned() + repo_path + "/build/wasm/deps/include"),
         &("-I".to_owned() + repo_path + "/contracts/system/ProxySys/include"),
+        &("-I".to_owned() + repo_path + "/contracts/system/TransactionSys/include"),
         &("-I".to_owned() + repo_path + "/contracts/user/CommonSys/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/external/simdjson/include"),

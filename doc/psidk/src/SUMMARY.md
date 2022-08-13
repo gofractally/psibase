@@ -19,6 +19,7 @@
 - [Rust Contracts]()
 - [HTTP and Javascript](http.md)
 - [System Contracts]()
+  - [transact-sys](system-contract/transact-sys.md)
   - [common-sys](system-contract/common-sys.md)
   - [proxy-sys](system-contract/proxy-sys.md)
 - [Standard Actions](standards/actions.md)

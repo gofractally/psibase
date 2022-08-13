@@ -7,10 +7,12 @@ namespace psibase
 {
    using NativeTableNum = uint16_t;
 
-   static constexpr NativeTableNum statusTable         = 1;
-   static constexpr NativeTableNum accountTable        = 2;
-   static constexpr NativeTableNum codeTable           = 3;
-   static constexpr NativeTableNum databaseStatusTable = 4;
+   static constexpr NativeTableNum statusTable                = 1;
+   static constexpr NativeTableNum codeTable                  = 2;
+   static constexpr NativeTableNum codeByHashTable            = 3;
+   static constexpr NativeTableNum databaseStatusTable        = 4;
+   static constexpr NativeTableNum transactionWasmConfigTable = 5;
+   static constexpr NativeTableNum proofWasmConfigTable       = 6;  // Also for first auth
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -23,20 +25,55 @@ namespace psibase
       Checksum256              chainId;
       BlockHeader              current;
       std::optional<BlockInfo> head;
-      uint32_t                 numExecutionMemories = 32;  // TODO: move to a configuration table
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(StatusRow, chainId, current, head, numExecutionMemories)
+   PSIO_REFLECT(StatusRow, chainId, current, head)
 
-   // TODO: Rename account to contract?
-   inline auto accountKey(AccountNumber num)
+   // TODO: determine which eos-vm parameters need to
+   //       be constrained for safety and consensus.
+   //       Also decide on values.
+   struct VMOptions
    {
-      // TODO: leave space for secondary index?
-      return std::tuple{accountTable, nativeTablePrimaryIndex, num};
+      std::uint32_t max_mutable_global_bytes = 1024;
+      std::uint32_t max_func_local_bytes     = 8192;
+      std::uint32_t max_pages                = 528;  // 33 MiB
+      std::uint32_t max_call_depth           = 251;
+      bool          enable_simd              = true;
+
+      friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
+   };
+   PSIO_REFLECT(VMOptions,
+                max_mutable_global_bytes,
+                max_func_local_bytes,
+                max_pages,
+                max_call_depth,
+                enable_simd)
+
+   struct WasmConfigRow
+   {
+      uint32_t  numExecutionMemories = 32;
+      VMOptions vmOptions;
+
+      static constexpr auto db = psibase::DbId::nativeConstrained;
+
+      static auto key(NativeTableNum TableNum)
+      {
+         return std::tuple{TableNum, nativeTablePrimaryIndex};
+      }
+   };
+   PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
+
+   inline auto codePrefix()
+   {
+      return std::tuple{codeTable, nativeTablePrimaryIndex};
    }
-   struct AccountRow
+   inline auto codeKey(AccountNumber codeNum)
+   {
+      return std::tuple{codeTable, nativeTablePrimaryIndex, codeNum};
+   }
+   struct CodeRow
    {
       // Constants for flags
       static constexpr uint64_t allowSudo            = uint64_t(1) << 0;
@@ -46,35 +83,29 @@ namespace psibase
       static constexpr uint64_t canNotTimeOut        = uint64_t(1) << 4;
       static constexpr uint64_t canSetTimeLimit      = uint64_t(1) << 5;
 
-      AccountNumber num;           // TODO: rename
-      AccountNumber authContract;  // TODO: move out of native
-      uint64_t      flags = 0;     // Constants above
+      AccountNumber codeNum;
+      uint64_t      flags = 0;  // Constants above
 
-      // TODO?  1 account with contract per 1000+ without - faster perf on dispatch because don't need to lookup new account
       Checksum256 codeHash  = {};
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
-      //==================================^^
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
-      auto                  key() const { return accountKey(num); }
+      auto                  key() const { return codeKey(codeNum); }
    };
-   PSIO_REFLECT(AccountRow, num, authContract, flags, codeHash, vmType, vmVersion)
+   PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
 
-   inline auto codeKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
+   inline auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
    {
-      // TODO: leave space for secondary index?
-      return std::tuple{codeTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
+      return std::tuple{codeByHashTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
    }
 
    /// where code is actually stored, duplicate contracts are reused
-   struct codeRow
+   struct CodeByHashRow
    {
-      // primary key
       Checksum256 codeHash  = {};
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
-      //==================
 
       uint32_t             numRefs = 0;   // number accounts that ref this
       std::vector<uint8_t> code    = {};  // actual code, TODO: compressed
@@ -84,9 +115,9 @@ namespace psibase
       // that could happen if the key->code map doesn't match the
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto db = psibase::DbId::nativeConstrained;
-      auto                  key() const { return codeKey(codeHash, vmType, vmVersion); }
+      auto                  key() const { return codeByHashKey(codeHash, vmType, vmVersion); }
    };
-   PSIO_REFLECT(codeRow, codeHash, vmType, vmVersion, numRefs, code)
+   PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
 
    inline auto databaseStatusKey()
    {

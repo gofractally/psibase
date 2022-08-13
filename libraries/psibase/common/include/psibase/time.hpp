@@ -11,10 +11,10 @@ namespace psibase
                                             const char*  end,
                                             bool         eat_fractional,
                                             bool         require_end);
-   [[nodiscard]] bool string_to_utc_microseconds(uint64_t&    result,
-                                                 const char*& s,
-                                                 const char*  end,
-                                                 bool         require_end);
+   [[nodiscard]] bool stringToUtcMicroseconds(uint64_t&    result,
+                                              const char*& s,
+                                              const char*  end,
+                                              bool         require_end);
 
    struct TimePointSec
    {

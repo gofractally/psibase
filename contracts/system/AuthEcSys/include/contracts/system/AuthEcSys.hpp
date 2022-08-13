@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/Contract.hpp>
+#include <contracts/system/TransactionSys.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/serveContent.hpp>
@@ -21,7 +21,11 @@ namespace system_contract
       using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::pubkey>;
       using Tables    = psibase::ContractTables<AuthTable>;
 
-      void checkAuthSys(psibase::Action action, std::vector<psibase::Claim> claims);
+      void checkAuthSys(uint32_t                    flags,
+                        psibase::AccountNumber      requester,
+                        psibase::Action             action,
+                        std::vector<ContractMethod> allowedActions,
+                        std::vector<psibase::Claim> claims);
       void newAccount(psibase::AccountNumber account, psibase::PublicKey payload);
       void setKey(psibase::PublicKey key);
 
@@ -29,7 +33,9 @@ namespace system_contract
       Tables db{contract};
    };
    PSIO_REFLECT(AuthEcSys,  //
-                method(checkAuthSys, action, claims),
+                method(checkAuthSys, flags, requester, action, allowedActions, claims),
                 method(setKey, key),
-                method(newAccount, account, payload))
+                method(newAccount, account, payload)
+                //
+   )
 }  // namespace system_contract

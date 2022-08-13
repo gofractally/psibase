@@ -10,20 +10,37 @@
 
 #include <boost/filesystem/path.hpp>
 
+namespace triedent
+{
+   class write_session;
+}
+
 namespace psibase
 {
+   struct Revision;
+   using ConstRevisionPtr = std::shared_ptr<const Revision>;
+
+   using Writer    = triedent::write_session;
+   using WriterPtr = std::shared_ptr<Writer>;
+
    struct SharedDatabaseImpl;
    struct SharedDatabase
    {
       std::shared_ptr<SharedDatabaseImpl> impl;
 
       SharedDatabase() = default;
-      SharedDatabase(const boost::filesystem::path& dir);
+      SharedDatabase(const boost::filesystem::path& dir, bool allowSlow);
       SharedDatabase(const SharedDatabase&) = default;
       SharedDatabase(SharedDatabase&&)      = default;
 
       SharedDatabase& operator=(const SharedDatabase&) = default;
       SharedDatabase& operator=(SharedDatabase&&)      = default;
+
+      ConstRevisionPtr getHead();
+      WriterPtr        createWriter();
+      void             setHead(Writer& writer, ConstRevisionPtr revision);
+      ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
+      void             removeRevisions(Writer& writer, const Checksum256& irreversible);
    };
 
    struct DatabaseImpl;
@@ -70,16 +87,33 @@ namespace psibase
                db->commit(*this);
             db = nullptr;
          }
+
+         ConstRevisionPtr writeRevision(const Checksum256& blockId)
+         {
+            if (!db)
+               throw std::runtime_error("Session ended; can not create revision");
+            ConstRevisionPtr result;
+            result = db->writeRevision(*this, blockId);
+            db     = nullptr;
+            return result;
+         }
       };  // Session
 
-      Database(SharedDatabase shared);
+      Database(SharedDatabase shared, ConstRevisionPtr revision);
       Database(const Database&) = delete;
       ~Database();
 
-      Session startRead();
-      Session startWrite();
-      void    commit(Session&);
-      void    abort(Session&);
+      void             setRevision(ConstRevisionPtr revision);
+      ConstRevisionPtr getBaseRevision();
+      ConstRevisionPtr getModifiedRevision();
+      Session          startRead();
+      Session          startWrite(WriterPtr writer);
+      void             commit(Session& session);
+      ConstRevisionPtr writeRevision(Session& session, const Checksum256& blockId);
+      void             abort(Session&);
+
+      // TODO: kvPutRaw, kvRemoveRaw: return deltas
+      // TODO: getters: pass in input buffers instead of returning KVResult
 
       void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
       void kvRemoveRaw(DbId db, psio::input_stream key);

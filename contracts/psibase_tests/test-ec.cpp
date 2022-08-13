@@ -32,18 +32,18 @@ TEST_CASE("ec")
    auto bob   = t.as(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
    auto sue   = t.add_ec_account("sue", pub_key1);
 
-   expect(t.pushTransaction(t.make_transaction({{
+   expect(t.pushTransaction(t.makeTransaction({{
               .sender   = bob,
               .contract = test_contract,
           }})),
           "sender does not have a public key");
-   expect(t.pushTransaction(t.make_transaction({{
+   expect(t.pushTransaction(t.makeTransaction({{
               .sender   = sue,
               .contract = test_contract,
           }})),
           "transaction is not signed with key");
 
-   auto ec_trx = t.make_transaction({{
+   auto ec_trx = t.makeTransaction({{
        .sender   = sue,
        .contract = test_contract,
        .rawData  = psio::convert_to_frac(test_cntr::payload{}),
@@ -67,15 +67,15 @@ TEST_CASE("ec")
        psio::convert_to_frac(sign(priv_key1, sha256(packed_ec_trx.data(), packed_ec_trx.size())))};
    expect(t.pushTransaction(ec_signed));
 
-   t.start_block();
-   expect(t.pushTransaction(t.make_transaction({{
+   t.startBlock();
+   expect(t.pushTransaction(t.makeTransaction({{
                                 .sender   = sue,
                                 .contract = test_contract,
                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key1, priv_key1}}));
 
-   expect(t.pushTransaction(t.make_transaction({{
+   expect(t.pushTransaction(t.makeTransaction({{
                                 .sender   = sue,
                                 .contract = test_contract,
                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
@@ -83,7 +83,7 @@ TEST_CASE("ec")
                             {{pub_key2, priv_key2}}),
           "transaction is not signed with key");
 
-   expect(t.pushTransaction(t.make_transaction({{
+   expect(t.pushTransaction(t.makeTransaction({{
                                 .sender   = sue,
                                 .contract = test_contract,
                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),
@@ -91,10 +91,10 @@ TEST_CASE("ec")
                             {{pub_key1, priv_key2}}),
           "incorrect signature");
 
-   expect(t.pushTransaction(t.make_transaction({ecsys.as(sue).setKey(pub_key2)}),
+   expect(t.pushTransaction(t.makeTransaction({ecsys.as(sue).setKey(pub_key2)}),
                             {{pub_key1, priv_key1}}));
 
-   expect(t.pushTransaction(t.make_transaction({{
+   expect(t.pushTransaction(t.makeTransaction({{
                                 .sender   = sue,
                                 .contract = test_contract,
                                 .rawData  = psio::convert_to_frac(test_cntr::payload{}),

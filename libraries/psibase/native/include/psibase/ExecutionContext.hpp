@@ -5,6 +5,7 @@
 namespace psibase
 {
    struct Database;
+   struct VMOptions;
 
    // Only useful for genesis
    void setCode(Database&          db,
@@ -48,6 +49,7 @@ namespace psibase
       std::unique_ptr<ExecutionContextImpl> impl;
 
       ExecutionContext(TransactionContext& transactionContext,
+                       const VMOptions&    vmOptions,
                        ExecutionMemory&    memory,
                        AccountNumber       contract);
       ExecutionContext(ExecutionContext&&);
@@ -55,7 +57,7 @@ namespace psibase
 
       static void registerHostFunctions();
 
-      void execProcessTransaction(ActionContext& actionContext);
+      void execProcessTransaction(ActionContext& actionContext, bool checkFirstAuthAndExit);
       void execCalled(uint64_t callerFlags, ActionContext& actionContext);
       void execVerify(ActionContext& actionContext);
       void execServe(ActionContext& actionContext);

@@ -204,7 +204,7 @@ namespace psibase::http
             // TODO: time limit
             auto          system = server.sharedState->getSystemContext();
             psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
-            BlockContext  bc{*system, ReadOnly{}};
+            BlockContext  bc{*system, system->sharedDatabase.getHead()};
             bc.start();
             if (bc.needGenesisAction)
                return send(error(bhttp::status::internal_server_error,
@@ -216,7 +216,7 @@ namespace psibase::http
                            .rawData  = psio::convert_to_frac(data),
             };
             TransactionTrace   trace;
-            TransactionContext tc{bc, trx, trace, false};
+            TransactionContext tc{bc, trx, trace, true, false, true};
             ActionTrace        atrace;
             auto               startExecTime = steady_clock::now();
             tc.execServe(action, atrace);

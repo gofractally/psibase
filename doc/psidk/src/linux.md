@@ -1,15 +1,12 @@
 # Linux Installation
 
-This installs several dependencies then downloads and extracts both wasi-sdk and psidk. wasi-sdk provides clang and other tools and provides the C and C++ runtime libraries built for WASM. psidk provides libraries and tools for working with psibase. The `apt-get` portions are for `Ubuntu 20.04`; the set of packages you need to install varies with Linux distribution.
+This downloads and extracts both `wasi-sdk` and `psidk`. wasi-sdk provides clang and other tools and provides the C and C++ runtime libraries built for WASM. psidk provides libraries and tools for working with psibase. The set of additional packages you need varies with Linux distribution; see the sections below.
 
 For convenience, consider adding the environment variables below to `~/.bashrc` or whatever is appropriate for the shell you use.
 
 If you're using docker, use the `-p8080:8080` option to expose psibase's http port.
 
 ```sh
-apt-get update
-apt-get install -yq cmake wget
-
 export WASI_SDK_PREFIX=~/work/wasi-sdk-14.0
 export PSIDK_PREFIX=~/work/psidk
 export PATH=$PSIDK_PREFIX/bin:$PATH
@@ -20,6 +17,35 @@ wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-
 tar xf wasi-sdk-14.0-linux.tar.gz
 
 cd ~/work
-wget ...../path/to/psidk-linux.tar.gz    # TODO
+wget https://github.com/gofractally/psibase/releases/download/testrel/psidk-linux.tar.gz    # TODO: update
 tar xf psidk-linux.tar.gz
+```
+
+## Ubuntu 20.04 and 22.04
+
+Run these as root:
+
+```sh
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -yq cmake wget
+```
+
+## Ubuntu 18.04
+
+Run these as root:
+
+```sh
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -yq apt-transport-https ca-certificates gnupg software-properties-common wget
+wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
+apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
+DEBIAN_FRONTEND=noninteractive apt-get install -yq cmake
+```
+
+## Fedora 36
+
+Run these as root:
+
+```sh
+dnf install cmake wget
 ```

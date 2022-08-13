@@ -6,8 +6,8 @@ extern "C" __wasi_errno_t POLYFILL_NAME(environ_sizes_get)(__wasi_size_t* enviro
     __attribute__((__import_module__("wasi_snapshot_preview1"),
                    __import_name__("environ_sizes_get")))
 {
-   [[clang::import_name("prints")]] void                 prints(const char*);
-   [[clang::import_name("tester_abort"), noreturn]] void tester_abort();
+   [[clang::import_name("prints")]] void                prints(const char*);
+   [[clang::import_name("testerAbort"), noreturn]] void testerAbort();
    prints("__wasi_environ_sizes_get not implemented");
-   tester_abort();
+   testerAbort();
 }

@@ -10,6 +10,7 @@ function(add_user_contract suffix name)
         ../../system/AccountSys/include
         ../../system/AuthEcSys/include
         ../../system/AuthFakeSys/include
+        ../../system/SetCodeSys/include
         ../../system/TransactionSys/include
         ../../system/VerifyEcSys/include
     )
@@ -30,6 +31,7 @@ function(add_user_test suffix name)
       ../../../system/AccountSys/include
       ../../../system/AuthEcSys/include
       ../../../system/AuthFakeSys/include
+      ../../../system/SetCodeSys/include
       ../../../system/TransactionSys/include
       ../../../system/VerifyEcSys/include
      ${CMAKE_CURRENT_LIST_DIR})

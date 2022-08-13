@@ -130,6 +130,7 @@ function(add suffix)
             ../../contracts/system/AuthEcSys/include
             ../../contracts/system/AuthFakeSys/include
             ../../contracts/system/ProxySys/include
+            ../../contracts/system/SetCodeSys/include
             ../../contracts/system/TransactionSys/include
             ../../contracts/system/VerifyEcSys/include
             ../../contracts/user/CommonSys/include
@@ -137,9 +138,6 @@ function(add suffix)
         )
         target_include_directories(psitestlib${suffix} PRIVATE
             ../../contracts/system/VerifyEcSys/include
-        )
-        target_link_options(psitestlib${suffix} INTERFACE
-            -Wl,--export-table # TODO: remove
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start
@@ -150,18 +148,18 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm mdbx-static ${Boost_LIBRARIES})
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent ${Boost_LIBRARIES})
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include
             ../../external/libmdbx)
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
-            native/src/db.cpp
             native/src/ExecutionContext.cpp
             native/src/NativeFunctions.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
+            native/src/useTriedent.cpp
         )
 
         add_subdirectory(common/tests)

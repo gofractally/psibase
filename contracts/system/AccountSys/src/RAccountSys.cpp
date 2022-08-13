@@ -32,19 +32,13 @@ namespace system_contract
          // TODO: replace with GraphQL
          if (request.target == "/accounts")
          {
-            std::vector<AccountRow> rows;
-            auto                    key     = psio::convert_to_key(accountKey({}));
-            auto                    keySize = sizeof(accountTable);
-            while (true)
-            {
-               auto raw = kvGreaterEqualRaw(AccountRow::db, key, keySize);
-               if (!raw)
-                  break;
-               auto acc = psio::convert_from_frac<AccountRow>(*raw);
-               key      = getKey();
-               key.push_back(0);
-               rows.push_back(std::move(acc));
-            }
+            auto accountSysTables = AccountSys::Tables(AccountSys::contract);
+            auto accountTable     = accountSysTables.open<AccountTable>();
+            auto accountIndex     = accountTable.getIndex<0>();
+
+            std::vector<Account> rows;
+            for (auto it = accountIndex.begin(); it != accountIndex.end(); ++it)
+               rows.push_back(*it);
             return to_json(rows);
          }
       }

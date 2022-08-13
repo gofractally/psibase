@@ -32,7 +32,7 @@ SCENARIO("Testing default psibase chain")
 
    auto        tokenSysRpc = t.as(RTokenSys::contract).at<RTokenSys>();
    std::string rpcUiDir    = "../contracts/user/TokenSys/ui/";
-   tokenSysRpc.storeSys("/ui/index.js", "text/javascript", read_whole_file(rpcUiDir + "index.js"));
+   tokenSysRpc.storeSys("/ui/index.js", "text/javascript", readWholeFile(rpcUiDir + "index.js"));
 
    auto alice = t.as(t.add_account("alice"_a));
    auto bob   = t.as(t.add_account("bob"_a));
@@ -57,9 +57,9 @@ SCENARIO("Testing default psibase chain")
    auto create = alice.at<TokenSys>().create(4, 1'000'000e4);
    alice.at<TokenSys>().mint(create.returnVal(), 100e4, memo);
 
-   t.start_block();
+   t.startBlock();
 
-   /****** At t.get_path(): 
+   /****** At t.getPath(): 
       drwxr-xr-x block_log
       drwxr-xr-x state
       drwxr-xr-x subjective
@@ -67,12 +67,12 @@ SCENARIO("Testing default psibase chain")
       ******/
 
    // Make a couple block
-   t.finish_block();
-   t.start_block();
-   t.finish_block();
+   t.finishBlock();
+   t.startBlock();
+   t.finishBlock();
    // Run the chain
    psibase::execute("rm -rf tester_psinode_db");
    psibase::execute("mkdir tester_psinode_db");
-   psibase::execute("cp -a " + t.get_path() + "/. tester_psinode_db/");
-   psibase::execute("psinode -p -o psibase.127.0.0.1.sslip.io tester_psinode_db");
+   psibase::execute("cp -a " + t.getPath() + "/. tester_psinode_db/");
+   psibase::execute("psinode --slow -p -o psibase.127.0.0.1.sslip.io tester_psinode_db");
 }

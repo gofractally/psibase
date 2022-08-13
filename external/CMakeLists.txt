@@ -29,9 +29,9 @@ if(IS_NATIVE)
         option(ENABLE_TOOLS "enable building of tools" OFF)
         add_subdirectory(eos-vm)
 
-        set(MDBX_OUTPUT_DIR ${ROOT_BINARY_DIR}/mdbx)
-        set(MDBX_BUILD_TIMESTAMP unknown)
-        add_subdirectory(libmdbx)
+        # set(MDBX_OUTPUT_DIR ${ROOT_BINARY_DIR}/mdbx)
+        # set(MDBX_BUILD_TIMESTAMP unknown)
+        # add_subdirectory(libmdbx)
     endif()
 endif()
 

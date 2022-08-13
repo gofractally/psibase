@@ -79,7 +79,12 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
             for (auto& trx : transactions)
             {
                trace = {};
-               bc.pushTransaction(trx, trace, std::nullopt);
+               if (!trx.proofs.empty())
+                  // Proofs execute as of the state at the beginning of a block.
+                  // That state is empty, so there are no proof contracts installed.
+                  trace.error = "Transactions in boot block may not have proofs";
+               else
+                  bc.pushTransaction(trx, trace, std::nullopt);
             }
          }
       }
@@ -128,9 +133,13 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
    return false;
 }  // push_boot
 
-void pushTransaction(BlockContext&             bc,
-                     transaction_queue::entry& entry,
-                     std::chrono::microseconds initialWatchdogLimit)
+void pushTransaction(psibase::SharedState&                  sharedState,
+                     const std::shared_ptr<const Revision>& revisionAtBlockStart,
+                     BlockContext&                          bc,
+                     transaction_queue::entry&              entry,
+                     std::chrono::microseconds              firstAuthWatchdogLimit,
+                     std::chrono::microseconds              proofWatchdogLimit,
+                     std::chrono::microseconds              initialWatchdogLimit)
 {
    try
    {
@@ -144,7 +153,70 @@ void pushTransaction(BlockContext&             bc,
          if (bc.needGenesisAction)
             trace.error = "Need genesis block; use 'psibase boot' to boot chain";
          else
+         {
+            // All proofs execute as of the state at block begin. This will allow
+            // consistent parallel execution of all proofs within a block during
+            // replay. Proofs don't have direct database access, but they do rely
+            // on the set of contracts stored within the database. They may call
+            // other contracts; e.g. to call crypto functions.
+            //
+            // TODO: move proof execution to background threads
+            // TODO: track CPU usage of proofs and pass it somehow to the main
+            //       execution for charging
+            // TODO: If by the time the transaction executes it's on a different
+            //       block than the proofs were verified on, then either the proofs
+            //       need to be rerun, or the hashes of the contracts which ran
+            //       during the proofs need to be compared against the current
+            //       contract hashes. This will prevent a poison block.
+            // TODO: If the first proof and the first auth pass, but the transaction
+            //       fails (including other proof failures), then charge the first
+            //       authorizer
+            auto         proofSystem = sharedState.getSystemContext();
+            BlockContext proofBC{*proofSystem, revisionAtBlockStart};
+            proofBC.start(bc.current.header.time);
+            for (size_t i = 0; i < trx.proofs.size(); ++i)
+            {
+               proofBC.verifyProof(trx, trace, i, proofWatchdogLimit);
+               trace = {};
+            }
+
+            // TODO: in another thread: check first auth and first proof. After
+            //       they pass, schedule the remaining proofs. After they pass,
+            //       schedule the transaction for execution in the main thread.
+            //
+            // The first auth check is a prefiltering measure and is mostly redundant
+            // with main execution. Unlike the proofs, the first auth check is allowed
+            // to run with any state on any fork. This is OK since the main execution
+            // checks all auths including the first; the worst that could happen is
+            // the transaction being rejected because it passes on one fork but not
+            // another, potentially charging the user for the failed transaction. The
+            // first auth check, when not part of the main execution, runs in read-only
+            // mode. TransactionSys lets the account's auth contract know it's in a
+            // read-only mode so it doesn't fail the transaction trying to update its
+            // tables.
+            //
+            // Replay doesn't run the first auth check separately. This separate
+            // execution is a subjective measure; it's possible, but not advisable,
+            // for a modified node to skip it during production. This won't hurt
+            // consensus since replay never uses read-only mode for auth checks.
+            auto saveTrace = trace;
+            proofBC.checkFirstAuth(trx, trace, firstAuthWatchdogLimit);
+            trace = std::move(saveTrace);
+
+            // TODO: RPC: don't forward failed transactions to P2P; this gives users
+            //       feedback.
+            // TODO: P2P: do forward failed transactions; this enables producers to
+            //       bill failed transactions which have tied up P2P nodes.
+            // TODO: If the first authorizer doesn't have enough to bill for failure,
+            //       then drop before running any other checks. Don't propagate.
+            // TODO: Don't propagate failed transactions which have
+            //       do_not_broadcast_flag.
+            // TODO: Revisit all of this. It doesn't appear to eliminate the need to
+            //       shadow bill, and once shadow billing is in place, failed
+            //       transaction billing seems unnecessary.
+
             bc.pushTransaction(trx, trace, initialWatchdogLimit);
+         }
       }
       RETHROW_BAD_ALLOC
       catch (...)
@@ -186,13 +258,14 @@ void run(const std::string& db_path,
          bool               produce,
          const std::string& host,
          bool               host_perf,
-         uint32_t           leeway_us)
+         uint32_t           leeway_us,
+         bool               allow_slow)
 {
    ExecutionContext::registerHostFunctions();
 
    // TODO: configurable WasmCache size
    auto sharedState =
-       std::make_shared<psibase::SharedState>(SharedDatabase{db_path}, WasmCache{128});
+       std::make_shared<psibase::SharedState>(SharedDatabase{db_path, allow_slow}, WasmCache{128});
    auto system = sharedState->getSystemContext();
    auto queue  = std::make_shared<transaction_queue>();
 
@@ -237,6 +310,7 @@ void run(const std::string& db_path,
 
    // TODO: temporary loop
    // TODO: replay
+   auto writer = system->sharedDatabase.createWriter();
    while (true)
    {
       std::this_thread::sleep_for(std::chrono::milliseconds{100});
@@ -244,7 +318,7 @@ void run(const std::string& db_path,
       {
          TimePointSec t{(uint32_t)time(nullptr)};
          {
-            Database db{system->sharedDatabase};
+            Database db{system->sharedDatabase, system->sharedDatabase.getHead()};
             auto     session = db.startRead();
             auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
             if (status && status->head && status->head->header.time >= t)
@@ -257,7 +331,8 @@ void run(const std::string& db_path,
             std::swap(entries, queue->entries);
          }
 
-         BlockContext bc{*system, true, true};
+         auto         revisionAtBlockStart = system->sharedDatabase.getHead();
+         BlockContext bc{*system, revisionAtBlockStart, writer, true};
          bc.start(t);
          bc.callStartBlock();
 
@@ -267,7 +342,10 @@ void run(const std::string& db_path,
             if (entry.is_boot)
                abort_boot = !push_boot(bc, entry);
             else
-               pushTransaction(bc, entry, std::chrono::microseconds(leeway_us));
+               pushTransaction(*sharedState, revisionAtBlockStart, bc, entry,
+                               std::chrono::microseconds(100'000),  // TODO
+                               std::chrono::microseconds(100'000),  // TODO
+                               std::chrono::microseconds(leeway_us));
          }
          if (abort_boot)
             continue;
@@ -281,7 +359,11 @@ void run(const std::string& db_path,
             }
             continue;
          }
-         bc.commit();
+         auto [revision, blockId] = bc.writeRevision();
+         system->sharedDatabase.setHead(*writer, revision);
+         system->sharedDatabase.removeRevisions(*writer,
+                                                blockId);  // temp rule: head is now irreversible
+
          std::cout << psio::convert_to_json(bc.current.header) << "\n";
       }
    }
@@ -289,14 +371,14 @@ void run(const std::string& db_path,
 
 const char usage[] = "USAGE: psinode [OPTIONS] database";
 
-// TODO: use a command-line parser
 int main(int argc, char* argv[])
 {
    std::string db_path;
-   bool        produce   = false;
-   std::string host      = {};
-   bool        host_perf = false;
-   uint32_t    leeway_us = 30000;  // TODO: find a good default
+   bool        produce    = false;
+   std::string host       = {};
+   bool        host_perf  = false;
+   uint32_t    leeway_us  = 30000;  // TODO: find a good default
+   bool        allow_slow = false;
 
    namespace po = boost::program_options;
 
@@ -309,6 +391,9 @@ int main(int argc, char* argv[])
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
        "Transaction leeway, in us. Defaults to 30000.");
+   opt("slow", po::bool_switch(&allow_slow),
+       "Don't complain if unable to lock memory for database. This will still attempt to lock "
+       "memory, but if it fails it will continue to run, but more slowly.");
    opt("help,h", "Show this message");
 
    po::positional_options_description p;
@@ -324,31 +409,26 @@ int main(int argc, char* argv[])
    {
       if (!vm.count("help"))
       {
-         std::cerr << e.what() << "\n";
+         std::cout << e.what() << "\n";
          return 1;
       }
-   }
-   catch (...)
-   {
-      std::cerr << "\n\nx3\n\n";
-      return 1;
    }
 
    if (vm.count("help"))
    {
-      std::cerr << usage << "\n\n";
-      std::cerr << desc << "\n";
+      std::cout << usage << "\n\n";
+      std::cout << desc << "\n";
       return 1;
    }
 
    try
    {
-      run(db_path, produce, host, host_perf, leeway_us);
+      run(db_path, produce, host, host_perf, leeway_us, allow_slow);
       return 0;
    }
    catch (std::exception& e)
    {
-      std::cerr << "std::exception: " << e.what() << "\n";
+      std::cout << "std::exception: " << e.what() << "\n";
    }
    return 1;
 }

@@ -6,6 +6,7 @@ namespace psibase
 {
    struct SharedStateImpl
    {
+      // TODO: need to redo cache since numExecutionMemories varies
       std::mutex                                  mutex;
       SharedDatabase                              db;
       WasmCache                                   wasmCache;

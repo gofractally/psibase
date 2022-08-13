@@ -226,7 +226,7 @@ namespace triedent
       object_header* get_object(uint64_t offset)
       {
          // TODO: UB since this isn't atomic and there are multiple reader threads
-         ++_head->cache_hits;  // TODO: remove from release
+         // ++_head->cache_hits;  // TODO: remove from release
          return reinterpret_cast<object_header*>(begin_pos() + offset);
       }
 

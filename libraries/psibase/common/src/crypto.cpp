@@ -152,11 +152,11 @@ namespace psibase
    {
       PublicKey result;
       // TODO: remove this case
-      if (s.substr(0, 3) == "EOS")
-      {
-         return stringToKey<PublicKey>(s.substr(3), KeyType::k1, "");
-      }
-      else if (s.substr(0, 7) == "PUB_K1_")
+      // if (s.substr(0, 3) == "EOS")
+      // {
+      //    return stringToKey<PublicKey>(s.substr(3), KeyType::k1, "");
+      // }
+      if (s.substr(0, 7) == "PUB_K1_")
       {
          return stringToKey<PublicKey>(s.substr(7), KeyType::k1, "K1");
       }

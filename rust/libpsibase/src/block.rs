@@ -50,7 +50,6 @@ pub struct GenesisContract {
 #[derive(Debug, Fracpack, Serialize, Deserialize)]
 pub struct SharedGenesisContract<'a> {
     pub contract: AccountNumber,
-    pub auth_contract: AccountNumber,
     pub flags: u64,
     pub vm_type: u8,
     pub vm_version: u8,

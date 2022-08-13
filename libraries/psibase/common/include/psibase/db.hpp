@@ -21,6 +21,8 @@ namespace psibase
       /// Write-only during transactions, and read-only during RPC.
       /// Individual nodes may modify this database, expire data from this
       /// database, or wipe it entirely at will.
+      ///
+      /// The first 64 bits of the key match the contract.
       writeOnly,
 
       /// Data that is not part of consensus
@@ -30,6 +32,8 @@ namespace psibase
       /// from aborting transactions, aborting blocks, or forking
       /// blocks. Individual nodes may modify this database or wipe
       //  it entirely at will.
+      ///
+      /// The first 64 bits of the key match the contract.
       subjective,
 
       /// Tables used by native code
@@ -37,6 +41,14 @@ namespace psibase
       /// This database enforces constraints during write. Only
       /// writable by priviledged contracts, but readable by all
       /// contracts.
+      ///
+      /// Some writes to this database indicate chain upgrades. If a
+      /// priviledged contract writes to a table that an older
+      /// node version doesn't know about, or writes new fields
+      /// to an existing table that an older node doesn't know about,
+      /// then that node will reject the write. If the producers
+      /// accepted the write into a block, then the node will stop
+      /// following the chain until it's upgraded to a newer version.
       nativeConstrained,
 
       /// Tables used by native code
@@ -109,7 +121,11 @@ namespace psibase
       /// * [kvPutSequential]
       /// * [kvGetSequential]
       merkleEvent,
+
+      numDatabases,
    };
+
+   inline constexpr uint32_t numDatabases = (uint32_t)DbId::numDatabases;
 
    struct KvResourceKey
    {

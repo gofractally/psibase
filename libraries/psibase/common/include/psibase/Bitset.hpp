@@ -35,8 +35,7 @@ namespace psibase
    {
       static_assert(validNrBits<nrBits>, "Unsupported Bitset size. Supported sizes: 8, 16, 32, 64");
 
-      using Bitset_t = typename BitsetTypeMap<nrBits>::inner_t;
-      // TODO: rename; UPPERCASE_IS_FOR_MACROS_ONLY
+      using Bitset_t                  = typename BitsetTypeMap<nrBits>::inner_t;
       static constexpr size_t maxBits = std::numeric_limits<Bitset_t>::digits;
       static constexpr auto   one     = static_cast<Bitset_t>(1);
       Bitset_t                bits    = 0;

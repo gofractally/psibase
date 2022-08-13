@@ -3,20 +3,22 @@
 
 namespace psibase
 {
-   BlockContext::BlockContext(psibase::SystemContext& systemContext,
-                              bool                    isProducing,
-                              bool                    enableUndo)
+   BlockContext::BlockContext(psibase::SystemContext&         systemContext,
+                              std::shared_ptr<const Revision> revision,
+                              WriterPtr                       writer,
+                              bool                            isProducing)
        : systemContext{systemContext},
-         db{systemContext.sharedDatabase},
-         session{db.startWrite()},
+         db{systemContext.sharedDatabase, std::move(revision)},
+         writer{std::move(writer)},
+         session{db.startWrite(this->writer)},
          isProducing{isProducing}
    {
-      check(enableUndo, "TODO: revisit enableUndo option");
    }
 
-   BlockContext::BlockContext(psibase::SystemContext& systemContext, ReadOnly)
+   BlockContext::BlockContext(psibase::SystemContext&         systemContext,
+                              std::shared_ptr<const Revision> revision)
        : systemContext{systemContext},
-         db{systemContext.sharedDatabase},
+         db{systemContext.sharedDatabase, std::move(revision)},
          session{db.startRead()},
          isProducing{true},  // a read_only block is never replayed
          isReadOnly{true}
@@ -100,23 +102,22 @@ namespace psibase
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, false};
+      TransactionContext tc{*this, trx, trace, true, true, false};
       auto&              atrace = trace.actionTraces.emplace_back();
 
       // Failure here aborts the block since transaction-sys relies on startBlock
       // functioning correctly. Fixing this type of failure requires forking
       // the chain, just like fixing bugs which block transactions within
-      // transaction-sys's process_transaction may require forking the chain.
+      // transaction-sys's processTransaction may require forking the chain.
       //
       // TODO: log failure
       tc.execNonTrxAction(0, action, atrace);
       // printf("%s\n", prettyTrace(atrace).c_str());
 
-      tc.session.commit();
       active = true;
    }
 
-   void BlockContext::commit()
+   std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision()
    {
       checkActive();
       check(!needGenesisAction, "missing genesis action in block");
@@ -139,12 +140,65 @@ namespace psibase
 
       db.kvPut(StatusRow::db, status->key(), *status);
 
-      // TODO: store block IDs somewhere?
       // TODO: store block proofs somewhere
       // TODO: avoid repacking
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
 
-      session.commit();
+      return {session.writeRevision(status->head->blockId), status->head->blockId};
+   }
+
+   void BlockContext::verifyProof(const SignedTransaction&                 trx,
+                                  TransactionTrace&                        trace,
+                                  size_t                                   i,
+                                  std::optional<std::chrono::microseconds> watchdogLimit)
+   {
+      try
+      {
+         checkActive();
+         TransactionContext t{*this, trx, trace, false, false, false};
+         if (watchdogLimit)
+            t.setWatchdog(*watchdogLimit);
+         t.execVerifyProof(i);
+         if (!current.subjectiveData.empty())
+            throw std::runtime_error("proof called a subjective contract");
+      }
+      catch (const std::exception& e)
+      {
+         current.subjectiveData.clear();
+         trace.error = e.what();
+         throw;
+      }
+      catch (...)
+      {
+         current.subjectiveData.clear();
+         throw;
+      }
+   }
+
+   void BlockContext::checkFirstAuth(const SignedTransaction&                 trx,
+                                     TransactionTrace&                        trace,
+                                     std::optional<std::chrono::microseconds> watchdogLimit)
+   {
+      try
+      {
+         checkActive();
+         TransactionContext t{*this, trx, trace, true, false, false};
+         if (watchdogLimit)
+            t.setWatchdog(*watchdogLimit);
+         t.checkFirstAuth();
+         current.subjectiveData.clear();
+      }
+      catch (const std::exception& e)
+      {
+         current.subjectiveData.clear();
+         trace.error = e.what();
+         throw;
+      }
+      catch (...)
+      {
+         current.subjectiveData.clear();
+         throw;
+      }
    }
 
    void BlockContext::pushTransaction(const SignedTransaction&                 trx,
@@ -167,6 +221,7 @@ namespace psibase
    }
 
    // TODO: call callStartBlock() here? caller's responsibility?
+   // TODO: caller needs to verify proofs
    void BlockContext::execAllInBlock()
    {
       for (auto& trx : current.transactions)
@@ -178,8 +233,6 @@ namespace psibase
             "block has unread subjective data");
    }
 
-   // TODO: limit charged CPU & NET which can go into a block
-   // TODO: duplicate detection
    void BlockContext::exec(const SignedTransaction&                 trx,
                            TransactionTrace&                        trace,
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,
@@ -191,23 +244,25 @@ namespace psibase
          checkActive();
          check(enableUndo || commit, "neither enableUndo or commit is set");
 
-         // if !enableUndo then BlockContext becomes unusable if transaction
-         // fails. This will cascade to a busy lock (database corruption) if
-         // BlockContext::enableUndo is also false.
+         // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
+         check(!commit || !(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast_flag),
+               "cannot commit a do_not_broadcast transaction");
+
+         // if !enableUndo then BlockContext becomes unusable if transaction fails.
          active = enableUndo;
 
-         TransactionContext t{*this, trx, trace, enableUndo};
+         Database::Session session;
+         if (enableUndo)
+            session = db.startWrite(writer);
+
+         TransactionContext t{*this, trx, trace, true, !isReadOnly, false};
          if (initialWatchdogLimit)
             t.setWatchdog(*initialWatchdogLimit);
          t.execTransaction();
 
          if (commit)
          {
-            // TODO: limit billed time in block
-            // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
-            check(!(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast_flag),
-                  "cannot commit a do_not_broadcast transaction");
-            t.session.commit();
+            session.commit();
             active = true;
          }
       }

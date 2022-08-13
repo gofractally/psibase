@@ -7,13 +7,11 @@ namespace psibase
    /**
     * Manages a chain that uses the default system contracts.
     */
-   class DefaultTestChain : public test_chain
+   class DefaultTestChain : public TestChain
    {
      public:
       DefaultTestChain(
-          const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts = {},
-          const char*                                               snapshot            = nullptr,
-          uint64_t state_size = 1024 * 1024 * 1024);
+          const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts = {});
 
       void deploySystemContracts(bool show = false);
 
