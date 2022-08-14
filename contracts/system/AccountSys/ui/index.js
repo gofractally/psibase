@@ -1,15 +1,38 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, initializeApplet, addRoute, push, action } from '/common/rpc.mjs';
+import { getJson, initializeApplet, action, operation, setOperations, setQueries } from '/common/rpc.mjs';
 import { genKeyPair, KeyType } from '/common/keyConversions.mjs';
 
 const html = htm.bind(React.createElement);
 
-await initializeApplet();
 const thisApplet = await getJson('/common/thiscontract');
-
-let transactionTypes = {
-    newacc: 0,
-};
+initializeApplet(async ()=>{
+    setOperations([
+        {
+            id: "newAcc",
+            exec: ({name, pubKey})=>{
+                action(thisApplet, "newAccount", { 
+                    name, 
+                    authContract: 'auth-fake-sys', 
+                    requireNew: true,
+                });
+    
+                if (pubKey !== "")
+                {
+                    action('auth-ec-sys', 'setKey', {key: pubkey});
+                    action(thisApplet, 'setAuthCntr', {authContract: 'auth-ec-sys'});
+                }
+            },
+        },
+    ]);
+    setQueries([
+        {
+            id: "getLoggedInUser",
+            exec: (params, reply) => {
+                reply("alice");
+            },
+        },
+    ]);
+});
 
 function useAccounts(addMsg, clearMsg) {
     const [accounts, setAccounts] = React.useState([]);
@@ -29,11 +52,6 @@ function useAccounts(addMsg, clearMsg) {
 
     React.useEffect(refreshAccounts, []);
 
-    React.useEffect(()=>{
-        addRoute("accCreated", transactionTypes.newacc, refreshAccounts);
-    }, [refreshAccounts]);
-    
-
     return accounts;
 }
 
@@ -47,29 +65,12 @@ function AccountList(addMsg, clearMsg) {
     )}</tbody></table>`
 }
 
-async function newAccount(name, pubkey, addMsg, clearMsg) {
+async function newAccount(name, pubKey, addMsg, clearMsg) {
     try {
         clearMsg();
         addMsg("Pushing transaction...");
 
-        var actions = [await action(
-            thisApplet, 
-            "newAccount", 
-            { 
-                name, 
-                authContract: 'auth-fake-sys', 
-                requireNew: true 
-            },
-            thisApplet,
-          )];
-
-        if (pubkey)
-            actions = actions.concat([
-                await action('auth-ec-sys', 'setKey', {key: pubkey}, name),
-                await action('account-sys', 'setAuthCntr', {authContract: 'auth-ec-sys'}, name), 
-            ]);
-
-        push(transactionTypes.newacc, actions);
+        operation(thisApplet, "newAcc", {name, pubKey});
 
     } catch (e) {
         console.error(e);

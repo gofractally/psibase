@@ -10,8 +10,7 @@ namespace UserContract
    class NftSys : public psibase::Contract<NftSys>
    {
      public:
-      using tables =
-          psibase::ContractTables<NftTable_t, NftHolderTable_t, CreditTable_t, InitTable_t>;
+      using tables = psibase::ContractTables<NftTable, NftHolderTable, CreditTable, InitTable>;
 
       static constexpr auto contract = psibase::AccountNumber("nft-sys");
 
@@ -25,14 +24,14 @@ namespace UserContract
                   psio::const_view<psibase::String> memo);
       void uncredit(NID nftId, psio::const_view<psibase::String> memo);
       void debit(NID nftId, psio::const_view<psibase::String> memo);
-      void setUserConf(psibase::NamedBit_t flag, bool enable);
+      void setUserConf(psibase::NamedBit flag, bool enable);
 
       // Read-only:
       NftRecord       getNft(NID nftId);
       NftHolderRecord getNftHolder(psibase::AccountNumber account);
       CreditRecord    getCredRecord(NID nftId);
       bool            exists(NID nftId);
-      bool            getUserConf(psibase::AccountNumber account, psibase::NamedBit_t flag);
+      bool            getUserConf(psibase::AccountNumber account, psibase::NamedBit flag);
 
      private:
       tables db{contract};
@@ -48,7 +47,7 @@ namespace UserContract
             void initialized() {}
             void minted(NID nftId, Account issuer) {}
             void burned(NID nftId) {}
-            void userConfSet(Account account, psibase::NamedBit_t flag, bool enable) {}
+            void userConfSet(Account account, psibase::NamedBit flag, bool enable) {}
             //};
 
             //struct Ui

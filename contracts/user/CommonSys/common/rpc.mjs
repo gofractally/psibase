@@ -193,20 +193,6 @@ export function hexToUint8Array(hex) {
     return result;
 };
 
-let redirectIfAccessedDirectly = () => {
-    try {
-        if (window.self === window.top)
-        {
-            // We are the top window. Redirect needed.
-            const applet = window.location.hostname.substring(0, window.location.hostname.indexOf("."));
-            window.location.replace(siblingUrl(null, "", "/applet/" + applet));
-        }
-    } catch (e) {
-        // The browser blocked access to window.top due to the same origin policy, 
-        //   therefore we are in an iframe, all is well.
-    }
-};
-
 export const ErrorCodes = {
     invalidResource: 404,
     serverError: 500,
@@ -224,17 +210,89 @@ export const ErrorMessages = [
 ]
 
 export const MessageTypes = {
-    getResource: 0,
-    transaction: 1,
+    Core: "Core", // A message to the core layer itself
+    Action: "Action", // An action send to an on-chain application
+    Query: "Query",  // A query to another client-side applet, expect a response
+    Operation: "Operation", // A procedure which can include multiple other queries, actions, and operations
+    QueryResponse: "QueryResponse", // A response to a prior query
 };
 
-let verifyFields = (obj, fieldNames) => {
+var ops = []; // Operations defined by an applet
+
+var qrs = []; // Queries defined by an applet
+
+var queryCallbacks = []; // Callbacks automatically generated for responding to queries
+
+export function addQueryCallback(callback)
+{
+    let callbackId = queryCallbacks.length;
+    queryCallbacks.push({callbackId, callback});
+    return callbackId;
+}
+
+export function executeCallback(callbackId, response)
+{
+    let idx = -1;
+    let found = queryCallbacks.some((q, i) => {
+        if (q.callbackId === callbackId)
+        {
+            idx = i;
+            return true;
+        }
+        return false;
+    });
+    if (!found)
+    {
+        console.error("Callback with ID " + callbackId + " not found.");
+        return false;
+    }
+
+    try{
+        queryCallbacks[idx].callback(response);
+    }
+    catch (e)
+    {
+        console.error("Error calling callback with ID " + callbackId);
+    }
+    // Remove the callback now that it's been handled
+    queryCallbacks.splice(idx, 1);
+    return true;
+}
+
+function sendToParent(message)
+{
+    if ('parentIFrame' in window) {
+        // Todo - Restrict that messages should be sent to 
+        //   the expected origin
+        parentIFrame.sendMessage(message, "*");
+    }
+    else
+    {
+        // This can sometimes happen if the page hasn't fully loaded
+        console.log("No parent iframe");
+    }
+}
+
+let redirectIfAccessedDirectly = () => {
+    try {
+        if (window.self === window.top)
+        {
+            // We are the top window. Redirect needed.
+            const applet = window.location.hostname.substring(0, window.location.hostname.indexOf("."));
+            window.location.replace(siblingUrl(null, "", "/applet/" + applet));
+        }
+    } catch (e) {
+        // The browser blocked access to window.top due to the same origin policy, 
+        //   therefore we are in an iframe, all is well.
+    }
+};
+
+export function verifyFields (obj, fieldNames) {
     var missingField = false;
 
     fieldNames.forEach((fieldName)=>{
         if (!obj.hasOwnProperty(fieldName))
         {
-            console.error("Message from core missing \"" + fieldName + "\" field");
             missingField = true;
         }
     });
@@ -259,189 +317,255 @@ let handleErrorCode = (code) => {
     return true;
 };
 
+let fullyInitialized = false;
+let ipcBuffer = [];
+
 let messageRouting = [
     {
-        type: MessageTypes.getResource,
+        type: MessageTypes.Operation,
         validate: (payload)=>{
-            if (!verifyFields(payload, ["id", "resource"])) 
-                return false;
-
-            return true;
+            return verifyFields(payload, ["identifier", "params"]);
         },
         route: (payload) => {
-            let {id, resource} = payload;
-            var idx = -1;
-            let handled = singleUseHandlers.some((handler, index)=>{
-                if (handler.id === id)
-                {
-                    idx = index;
-                    handler.callback(resource);
-                    return true;
-                }
-                return false;
-            });
+            let {identifier, params} = payload;
 
-            if (handled)
-            {   // Remove the handler from singleUseHandlers.
-                singleUseHandlers.splice(idx, 1);
+            let doRouteMessage = async ()=>{
+                let op = ops.find(o => o.id === identifier);
+                if (op !== undefined)
+                {
+                    try {
+                         await op.exec(params);
+                    }
+                    catch (e)
+                    {
+                        console.error("Error running operation " + identifier);
+                        console.error(e);
+                        stopOperation();
+                        throw e;
+                    }
+                }
+                else
+                {
+                    console.error("Operation not found: " + identifier);
+                }
+
+                stopOperation();
+                return true;
+            };
+
+            if (!fullyInitialized)
+            {
+                ipcBuffer.push(doRouteMessage);
                 return true;
             }
-            return false;
+            else return doRouteMessage();
         },
     },
     {
-        type: MessageTypes.transaction,
+        type: MessageTypes.Query,
         validate: (payload)=>{
-            if (!verifyFields(payload, ["type", "trace"])) 
-                return false;
-
-            return true;
+            return verifyFields(payload, ["identifier", "params", "callbackId"]);
         },
         route: (payload) => {
-            let {type, trace} = payload;
-            
-            var handled = false;
-            handlers.filter((h)=>{return h.type == type;}).forEach((h)=>{
-                handled = true;
-                h.callback(trace);
-            });
-            return handled;
+            let {identifier, params, callbackId} = payload;
+
+            let doRouteMessage = ()=>{
+                let qu = qrs.find(q => q.id === identifier);
+                if (qu !== undefined)
+                {
+                    try {
+                        let reply = (val) => {
+                            sendToParent({
+                                type: MessageTypes.QueryResponse,
+                                payload: { callbackId, response: val },
+                            });
+                        };
+                        qu.exec(params, reply);
+                    }
+                    catch (e)
+                    {
+                        console.error("Error running query " + identifier);
+                        console.error(e);
+                        throw e;
+                    }
+                }
+                else
+                {
+                    console.error("Query not found: " + identifier);
+                }
+
+                return true;
+            };
+
+            if (!fullyInitialized) 
+            {
+                ipcBuffer.push(doRouteMessage);
+                return true;
+            }
+            else return doRouteMessage();
         },
     },
+    {
+        type: MessageTypes.QueryResponse,
+        validate: (payload) => {
+            return verifyFields(payload, ["callbackId", "response"]);
+        },
+        route: (payload) => {
+            let {callbackId, response} = payload;
+            return executeCallback(callbackId, response);
+        },
+    }
 ];
 
-// Handlers that are constructed when an applet starts and persist
-var handlers = [];
-
-// Handlers that are destroyed after routing a message
-var singleUseHandlers = [];
-
-export async function initializeApplet()
+export async function initializeApplet(initializer = ()=>{})
 {
     redirectIfAccessedDirectly();
 
     window.iFrameResizer = {
+        // TODO: [Security] Need to include targetOrigin, otherwise malicious applets could embed other
+        //  applets inside them and pretend to be core
+        //  targetOrigin: siblingUrl(null, "common-sys", null),
         onMessage: (msg)=>{
             let {type, payload} = msg;
-            if (type === undefined || typeof type !== "number" || payload === undefined)
+            if (type === undefined || payload === undefined)
             {
                 console.error("Malformed message received from core");
                 return;
             }
 
-            if (!messageRouting[type].validate(payload))
+            let route = messageRouting.find(m => m.type === type);
+            if (route === undefined)
+            {
+                console.error("Message from core specifies unknown route.");
                 return;
+            }
+
+            if (!route.validate(payload))
+            {
+                console.error("Message from core failed validation checks");
+                return;
+            }
 
             if (handleErrorCode(payload.error))
                 return;
 
-            if (!messageRouting[type].route(payload))
+            if (!route.route(payload))
             {
-                console.error("Child has no handler for message: " + msg);
+                console.error("Child failed to route message: " + msg);
                 return;
             }
         },
       };
 
     await import("/common/iframeResizer.contentWindow.js");
+
+    await initializer();
+
+    fullyInitialized = true;
+
+    try
+    {
+        ipcBuffer.forEach(buffered => {buffered();});
+        ipcBuffer = [];
+    }
+    catch (e)
+    {
+        console.error("Buffered message failure");
+        console.error(e);
+    }
 }
 
-/**
- * Description: Append a route handler to map a transaction types to a callback function.
- * Multiple routes can be configured for the same transaction type.
- * 
- * @param {String} id - An arbitrary but unique name mapped to this specific route.
- * @param {Number} type - An arbitrary number mapped to this type of transaction.
- * @param {Function} callback - A callback function that should be called when a return message is received with the corresponding ID.
- */
-export function addRoute(id, type, callback)
+
+function set({targetArray, newElements}, caller)
 {
-    // Find and remove the old route mapped to this id
-    var idx = -1;
-    handlers.some((h, index)=>{
-        if (h.id == id) 
+    let valid = newElements.every(e => {
+        if (!verifyFields(e, ["id", "exec"]))
         {
-            idx = index;
-            return true;
+            return false;
         }
-        return false;
+        return true;
     });
-    if (idx !== -1)
+
+    if (!valid) 
     {
-        handlers.splice(idx, 1);
+        console.error(caller + ": All elements must have \"id\" and \"exec\" properties");
+        return;
     }
 
-    // Add the new route
-    handlers.push({id, type, callback});
-}
-
-/**
- * Description: Constructs an action that can be pushed to chain with push().
- * 
- * Example usage: action("token-sys", "credit", {tokenId: 1, receiver: "alice", amount: 100, memo: "Test"});
- * @param {String} contract - The name of the contract
- * @param {String} actionName - The name of the action to be called
- * @param {Object} params - The name and value of each of the action parameters
- * @param {String} sender [0] - The name of the sender. Will default to the logged in user, unless explicitly specified.
- */
-export async function action(contract, actionName, params, sender = 0)
-{
-    if (sender !== 0)
-        return {sender, contract, method: actionName, data: params};
-    else
-        return {contract, method: actionName, data: params};
-}
-
-/**
- * Description: Pushes a collection of actions to the chain.
- * 
- * Example usage: push("swap-transaction", Array(myCreditAction, myDebitAction));
- * @param {Number} transactionType - An arbitrary name for this type of transaction that has a corresponding route configuration
- * @param {Array} actions - An array of Objects constructed via the action() function
- */
-export async function push(transactionType, actions)
-{
-    if ('parentIFrame' in window) {
-        parentIFrame.sendMessage({
-            type: MessageTypes.transaction,
-            payload: {
-                type: transactionType,
-                actions
-            },
-        }, "*");
-    }
-    else
+    if (targetArray.length === 0)
+        targetArray.push(...newElements);
+    else 
     {
-        // This can sometimes happen if the window hasn't fully loaded
-        console.log("No parent iframe");
+        valid = newElements.every(e => {
+            if (targetArray.find(t => t.id === e.id)) 
+                return false;
+            else 
+                return true;
+        });
+        if (!valid) {
+            console.error(caller + ": Same element defined twice.");
+            return;
+        }
+        targetArray.push(...newElements);
     }
 }
 
-export const CommonResources = {
-    loggedInUser: 0,
-};
-
-/**
- * Description: Gets a client-side resource.
- * 
- * @param {Number} resource - The ID of the requested resource
- * @param {Array} callback - The function to call with the requested resource
- */
-export async function getLocalResource(resource, callback)
+export function setOperations(operations)
 {
-    if ('parentIFrame' in window) {
-        let id = singleUseHandlers.length;
-        singleUseHandlers.push({id, callback});
+    set({targetArray: ops, newElements: operations}, "setOperations");
+}
 
-        parentIFrame.sendMessage({
-            type: MessageTypes.getResource,
-            payload: { id, resource },
-        }, "*");
-    }
-    else
-    {
-        // This can sometimes happen if the window hasn't fully loaded
-        console.log("No parent iframe");
-    }
+export function setQueries(queries)
+{
+    set({targetArray: qrs, newElements: queries}, "setQueries");
+}
+
+function startOperation()
+{
+    sendToParent({
+        type: MessageTypes.Core,
+        payload: {command: "startOp"},
+    });
+}
+
+function stopOperation()
+{
+    let tempDelay = 100; // TODO: remove this, add message buffering to core
+    setTimeout(()=>{
+        sendToParent({
+            type: MessageTypes.Core,
+            payload: {command: "stopOp"},
+        });
+    }, tempDelay);
+}
+
+export function operation(applet, subPath, operationName, params)
+{
+    // Todo - There may be a way to short-circuit calling common-sys when 
+    //    opApplet == await getJson('/common/thiscontract');
+
+    sendToParent({
+        type: MessageTypes.Operation,
+        payload: { opApplet: applet, opSubPath: subPath, opName: operationName, opParams: params },
+    });
+}
+
+export function action(application, actionName, params)
+{
+    sendToParent({
+        type: MessageTypes.Action,
+        payload: { application, actionName, params },
+    });
+}
+
+export function query(applet, subPath, queryName, params, callback)
+{
+    // Will leave memory hanging if we don't get a response as expected
+    let callbackId = addQueryCallback(callback);
+
+    sendToParent({
+        type: MessageTypes.Query,
+        payload: { callbackId, qApplet: applet, qSubPath: subPath, qName: queryName, qParams: params },
+    });
 }
 

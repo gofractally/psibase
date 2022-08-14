@@ -50,8 +50,8 @@ namespace UserContract
       Quantity           maxSupply;
       SID                symbolId;
 
-      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"unrecallable"},
-                                                psibase::NamedBit_t{"untradeable"}>;
+      using Configurations =
+          psibase::NamedBits<psibase::NamedBit{"unrecallable"}, psibase::NamedBit{"untradeable"}>;
 
       static bool isValidKey(TID tokenId)
       {
@@ -75,47 +75,47 @@ namespace UserContract
                 currentSupply,
                 maxSupply,
                 symbolId);
-   using TokenTable_t = psibase::Table<TokenRecord, &TokenRecord::id>;
+   using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
    // Todo - add symbolId as secondary index when possible
 
-   struct BalanceKey_t
+   struct BalanceKey
    {
       psibase::AccountNumber account;
       TID                    tokenId;
 
-      auto operator<=>(const BalanceKey_t&) const = default;
+      auto operator<=>(const BalanceKey&) const = default;
    };
-   PSIO_REFLECT(BalanceKey_t, account, tokenId);
+   PSIO_REFLECT(BalanceKey, account, tokenId);
 
    struct BalanceRecord
    {
-      BalanceKey_t key;
-      uint64_t     balance;
+      BalanceKey key;
+      uint64_t   balance;
 
       auto operator<=>(const BalanceRecord&) const = default;
    };
    PSIO_REFLECT(BalanceRecord, key, balance);
-   using BalanceTable_t = psibase::Table<BalanceRecord, &BalanceRecord::key>;
+   using BalanceTable = psibase::Table<BalanceRecord, &BalanceRecord::key>;
 
-   struct SharedBalanceKey_t
+   struct SharedBalanceKey
    {
       psibase::AccountNumber creditor;
       psibase::AccountNumber debitor;
       TID                    tokenId;
 
-      auto operator<=>(const SharedBalanceKey_t&) const = default;
+      auto operator<=>(const SharedBalanceKey&) const = default;
    };
-   PSIO_REFLECT(SharedBalanceKey_t, creditor, debitor, tokenId);
+   PSIO_REFLECT(SharedBalanceKey, creditor, debitor, tokenId);
 
    struct SharedBalanceRecord
    {
-      SharedBalanceKey_t key;
-      uint64_t           balance;
+      SharedBalanceKey key;
+      uint64_t         balance;
 
       auto operator<=>(const SharedBalanceRecord&) const = default;
    };
    PSIO_REFLECT(SharedBalanceRecord, key, balance);
-   using SharedBalanceTable_t = psibase::Table<SharedBalanceRecord, &SharedBalanceRecord::key>;
+   using SharedBalanceTable = psibase::Table<SharedBalanceRecord, &SharedBalanceRecord::key>;
    // Todo - How can I add a secondary index for debitor? I imagine people will want to search for shared balances by debitor.
 
    struct TokenHolderRecord
@@ -123,11 +123,11 @@ namespace UserContract
       psibase::AccountNumber account;
       psibase::Bitset<8>     config;
 
-      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"manualDebit"}>;
+      using Configurations = psibase::NamedBits<psibase::NamedBit{"manualDebit"}>;
 
       auto operator<=>(const TokenHolderRecord&) const = default;
    };
    PSIO_REFLECT(TokenHolderRecord, account, config);
-   using TokenHolderTable_t = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
+   using TokenHolderTable = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
 
 }  // namespace UserContract

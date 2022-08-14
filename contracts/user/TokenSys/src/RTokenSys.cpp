@@ -13,6 +13,8 @@ using namespace UserContract;
 using namespace std;
 using namespace psibase;
 
+using Tables = psibase::ContractTables<psibase::WebContentTable>;
+
 namespace
 {
    auto simplePage = [](std::string str)
@@ -43,7 +45,7 @@ optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
    if (auto result = servePackAction<TokenSys>(request))
       return result;
 
-   if (auto result = serveContent(request, TokenSys::Tables{getReceiver()}))
+   if (auto result = serveContent(request, Tables{getReceiver()}))
       return result;
 
    if (auto result = _serveRestEndpoints(request))
@@ -57,7 +59,7 @@ optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
 void RTokenSys::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content), TokenSys::Tables{getReceiver()});
+   storeContent(move(path), move(contentType), move(content), Tables{getReceiver()});
 }
 
 struct AccountBalance
@@ -92,6 +94,21 @@ std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& reque
          if (auto result = serveSimpleUI<TokenSys, true>(request))
             return result;
       }
+      if (request.target.starts_with("/getTokenTypes"))
+      {
+         auto parameters = request.target.substr(string("/getTokenTypes").size());
+         check(parameters.find('/') == string::npos, "invalid request");
+
+         TokenSys::Tables db{TokenSys::contract};
+         auto             idx = db.open<TokenTable>().getIndex<0>();
+
+         std::vector<UserContract::TokenRecord> allTokens;
+         for (auto itr = idx.begin(); itr != idx.end(); ++itr)
+         {
+            allTokens.push_back(*itr);
+         }
+         return to_json(allTokens);
+      }
       if (request.target.starts_with("/balances/"))
       {
          auto user = request.target.substr(string("/balances/").size());
@@ -99,10 +116,10 @@ std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& reque
          psibase::AccountNumber acc(string_view{user});
 
          TokenSys::Tables db{TokenSys::contract};
-         auto             idx = db.open<TokenTable_t>().getIndex<0>();
+         auto             idx = db.open<TokenTable>().getIndex<0>();
          check(idx.begin() != idx.end(), "No tokens");
 
-         auto                        balIdx = db.open<BalanceTable_t>().getIndex<0>();
+         auto                        balIdx = db.open<BalanceTable>().getIndex<0>();
          std::vector<AccountBalance> balances;
          TID                         tokenId = 1;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)

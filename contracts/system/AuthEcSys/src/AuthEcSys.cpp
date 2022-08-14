@@ -1,5 +1,4 @@
 #include <contracts/system/AuthEcSys.hpp>
-
 #include <contracts/system/VerifyEcSys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/print.hpp>
@@ -31,7 +30,7 @@ namespace system_contract
       else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
-      auto row = db.open<AuthTable_t>().getIndex<0>().get(action.sender);
+      auto row = db.open<AuthTable>().getIndex<0>().get(action.sender);
 
       check(row.has_value(), "sender does not have a public key");
 
@@ -56,13 +55,25 @@ namespace system_contract
       abortMessage("transaction is not signed with key " + publicKeyToString(row->pubkey));
    }
 
+   void AuthEcSys::newAccount(psibase::AccountNumber account, psibase::PublicKey payload)
+   {
+      check(false, "Not supported yet");
+      //check(getSender() == InviteSys::contract, "Only invite-sys can create a new account");
+      check(payload.data.index() == 0, "only k1 currently supported");
+      auto authTable = db.open<AuthTable>();
+      check(!authTable.getIndex<0>().get(account).has_value(), "account already exists");
+
+      authTable.put(AuthRecord{.account = account, .pubkey = payload});
+   }
+
    void AuthEcSys::setKey(psibase::PublicKey key)
    {
       check(key.data.index() == 0, "only k1 currently supported");
 
-      auto authTable = db.open<AuthTable_t>();
+      auto authTable = db.open<AuthTable>();
       authTable.put(AuthRecord{.account = getSender(), .pubkey = key});
    }
+
 }  // namespace system_contract
 
 PSIBASE_DISPATCH(system_contract::AuthEcSys)
