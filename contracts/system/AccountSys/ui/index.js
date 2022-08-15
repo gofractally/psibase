@@ -70,7 +70,7 @@ async function newAccount(name, pubKey, addMsg, clearMsg) {
         clearMsg();
         addMsg("Pushing transaction...");
 
-        operation(thisApplet, "newAcc", {name, pubKey});
+        operation(thisApplet, "", "newAcc", {name, pubKey});
 
     } catch (e) {
         console.error(e);
