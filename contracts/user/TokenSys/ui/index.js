@@ -9,7 +9,7 @@ const { Segment, Header, Form, Table, Input, Button, Message, Tab, Container } =
 
 const thisApplet = await getJson('/common/thiscontract');
 
-initializeApplet(async ()=>{
+initializeApplet(async () => {
   setOperations([
     {
         id: "credit",
@@ -76,7 +76,7 @@ function BalanceTable({loggedInUser}) {
     getBalances().catch(console.error);
   }, [getBalances]);
 
-  useEffect(()=>{
+  useEffect(() => {
     refreshBalances();
   }, [refreshBalances])
 
@@ -146,9 +146,11 @@ function SendPanel() {
     setTimeout(()=>{setShowSuccess(false);}, 5000);
   }, []);
 
+  const amountToSend = String(Number(amount) * Math.pow(10, 8))
+
   const onSendSubmit = (e) => {
     e.preventDefault();
-    operation(thisApplet, "", "credit", {symbol: "PSI", receiver, amount, memo: "Test"});
+    operation(thisApplet, "", "credit", {symbol: "PSI", receiver, amount: amountToSend, memo: "Test"});
   };
 
   return html`

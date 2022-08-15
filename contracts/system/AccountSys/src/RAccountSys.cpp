@@ -16,12 +16,12 @@ using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
 namespace system_contract
 {
-   std::optional<RpcReplyData> RAccountSys::serveSys(RpcRequestData request)
+   std::optional<HttpReply> RAccountSys::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
       {
          auto json = psio::convert_to_json(obj);
-         return RpcReplyData{
+         return HttpReply{
              .contentType = "application/json",
              .body        = {json.begin(), json.end()},
          };

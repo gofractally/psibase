@@ -21,8 +21,7 @@ namespace
    {
       auto d = string("<html><div>" + str + "</div></html>");
 
-      return RpcReplyData{.contentType = "text/html",
-                          .body        = std::vector<char>{d.begin(), d.end()}};
+      return HttpReply{.contentType = "text/html", .body = std::vector<char>{d.begin(), d.end()}};
    };
 
 }
@@ -37,7 +36,7 @@ namespace
 // };
 // PSIO_REFLECT(TokenQuery, method(balances))
 
-optional<RpcReplyData> RTokenSys::serveSys(RpcRequestData request)
+optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {
    if (auto result = at<system_contract::CommonSys>().serveCommon(request).unpack())
       return result;
@@ -72,12 +71,12 @@ struct AccountBalance
 };
 PSIO_REFLECT(AccountBalance, account, token, symbol, precision, balance);
 
-std::optional<RpcReplyData> RTokenSys::_serveRestEndpoints(RpcRequestData& request)
+std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
 {
    auto to_json = [](const auto& obj)
    {
       auto json = psio::convert_to_json(obj);
-      return RpcReplyData{
+      return HttpReply{
           .contentType = "application/json",
           .body        = {json.begin(), json.end()},
       };

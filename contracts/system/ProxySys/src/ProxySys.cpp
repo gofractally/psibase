@@ -11,7 +11,7 @@ namespace psibase
 {
    namespace
    {
-      bool isSubdomain(const psibase::RpcRequestData& req)
+      bool isSubdomain(const psibase::HttpRequest& req)
       {
          return req.host.size() > req.rootHost.size() + 1  //
                 && req.host.ends_with(req.rootHost)        //
@@ -54,7 +54,7 @@ namespace psibase
    {
       auto act = getCurrentAction();
       // TODO: use a view
-      auto req = psio::convert_from_frac<RpcRequestData>(act.rawData);
+      auto req = psio::convert_from_frac<HttpRequest>(act.rawData);
 
       std::string contractName;
 

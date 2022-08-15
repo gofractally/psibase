@@ -12,11 +12,11 @@ namespace system_contract
       static constexpr auto contract = psibase::AccountNumber("r-ath-ec-sys");
       using Tables                   = psibase::ContractTables<psibase::WebContentTable>;
 
-      auto serveSys(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
+      auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
      private:
-      std::optional<psibase::RpcReplyData> serveRestEndpoints(psibase::RpcRequestData& request);
+      std::optional<psibase::HttpReply> serveRestEndpoints(psibase::HttpRequest& request);
    };
    PSIO_REFLECT(RAuthEcSys,  //
                 method(serveSys, request),
