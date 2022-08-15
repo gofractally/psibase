@@ -14,7 +14,7 @@ using std::string_view;
 
 namespace system_contract
 {
-   std::optional<RpcReplyData> RAuthEcSys::serveSys(RpcRequestData request)
+   std::optional<HttpReply> RAuthEcSys::serveSys(HttpRequest request)
    {
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
          return result;
@@ -39,12 +39,12 @@ namespace system_contract
                             Tables{getReceiver()});
    }
 
-   std::optional<RpcReplyData> RAuthEcSys::serveRestEndpoints(RpcRequestData& request)
+   std::optional<HttpReply> RAuthEcSys::serveRestEndpoints(HttpRequest& request)
    {
       auto to_json = [](const auto& obj)
       {
          auto json = psio::convert_to_json(obj);
-         return RpcReplyData{
+         return HttpReply{
              .contentType = "application/json",
              .body        = {json.begin(), json.end()},
          };

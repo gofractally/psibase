@@ -67,6 +67,8 @@ endif()
 option(BUILD_RUST "Build rust" OFF)
 if(BUILD_RUST)
     set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
+    set(THIRD_SRC ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common/thirdParty/src)
+    set(THIRD_DEST ${BOOT_IMAGE}/CommonSys/common/thirdParty)
     ExternalProject_Add(
         rust
         DEPENDS wasm
@@ -74,22 +76,44 @@ if(BUILD_RUST)
         CONFIGURE_COMMAND ""
         BUILD_COMMAND   rm -rf ${BOOT_IMAGE}
         COMMAND         mkdir -p ${BOOT_IMAGE}/AccountSys ${BOOT_IMAGE}/CommonSys ${BOOT_IMAGE}/ExploreSys
+        COMMAND         mkdir -p ${BOOT_IMAGE}/AuthEcSys ${BOOT_IMAGE}/TokenSys
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthFakeSys.wasm                  ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm                       ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm                     ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm                  ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm                    ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm                    ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm                     ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm               ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm                  ${BOOT_IMAGE}
+
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/system/AccountSys/ui    ${BOOT_IMAGE}/AccountSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/system/AuthEcSys/ui     ${BOOT_IMAGE}/AuthEcSys/ui
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common   ${BOOT_IMAGE}/CommonSys/common
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/ui       ${BOOT_IMAGE}/CommonSys/ui
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/TokenSys/ui        ${BOOT_IMAGE}/TokenSys/ui
+
+        COMMAND         rm -rf ${THIRD_DEST}
+        COMMAND         mkdir -p ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/htm.module.js                                    ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/iframeResizer.contentWindow.js                   ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/iframeResizer.js                                 ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/react-dom.development.js                         ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/react-dom.production.min.js                      ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/react-router-dom.min.js                          ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/react.development.js                             ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/react.production.min.js                          ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/semantic-ui-react.min.js                         ${THIRD_DEST}
+        COMMAND         cp -a ${THIRD_SRC}/useLocalStorageState.js                          ${THIRD_DEST}
+
         COMMAND         cargo build -r --bin psibase --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
         INSTALL_COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
         COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin

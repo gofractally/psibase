@@ -67,8 +67,8 @@ namespace psibase
    /// // Don't forget to include your contract's other tables in this!
    /// using Tables = psibase::ContractTables<psibase::WebContentTable>;
    ///
-   /// std::optional<psibase::RpcReplyData> MyContract::serveSys(
-   ///    psibase::RpcRequestData request)
+   /// std::optional<psibase::HttpReply> MyContract::serveSys(
+   ///    psibase::HttpRequest request)
    /// {
    ///    if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
    ///       return result;
@@ -76,15 +76,15 @@ namespace psibase
    /// }
    /// ```
    template <typename... Tables>
-   std::optional<RpcReplyData> serveContent(const RpcRequestData&            request,
-                                            const ContractTables<Tables...>& tables)
+   std::optional<HttpReply> serveContent(const HttpRequest&               request,
+                                         const ContractTables<Tables...>& tables)
    {
       if (request.method == "GET")
       {
          auto index = tables.template open<WebContentTable>().template getIndex<0>();
          if (auto content = index.get(request.target))
          {
-            return RpcReplyData{
+            return HttpReply{
                 .contentType = content->contentType,
                 .body        = content->content,
             };

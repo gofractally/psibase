@@ -26,7 +26,7 @@ namespace psibase
    /// &lt;/html&gt;
    /// ```
    template <typename Contract, bool IncludeRoot>
-   std::optional<RpcReplyData> serveSimpleUI(const RpcRequestData& request)
+   std::optional<HttpReply> serveSimpleUI(const HttpRequest& request)
    {
       if (auto result = serveActionTemplates<Contract>(request))
          return result;
@@ -34,7 +34,7 @@ namespace psibase
          return result;
       if (IncludeRoot && request.method == "GET" && request.target == "/")
       {
-         return RpcReplyData{
+         return HttpReply{
              .contentType = "text/html",
              .body        = {simpleUIMainPage, simpleUIMainPage + strlen(simpleUIMainPage)},
          };
