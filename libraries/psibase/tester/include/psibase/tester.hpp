@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 #include <iostream>
 #include <psibase/Actor.hpp>
+#include <psibase/print.hpp>
 #include <psibase/trace.hpp>
 
 namespace psibase
@@ -71,7 +72,7 @@ namespace psibase
       TraceResult(TransactionTrace&& t);
       bool succeeded();
       bool failed(std::string_view expected);
-      bool diskConsumed(const std::vector<std::pair<AccountNumber, int64_t>>& consumption);
+      //bool diskConsumed(const std::vector<std::pair<AccountNumber, int64_t>>& consumption);
 
       const TransactionTrace& trace() { return _t; }
 
@@ -95,13 +96,17 @@ namespace psibase
 
       ReturnType returnVal()
       {
+         if (_t.error.has_value())
+         {
+            psibase::print(prettyTrace(trimRawData(_t)).c_str());
+         }
+
          if (_return.has_value())
          {
             return (*_return);
          }
          else
          {
-            show(true, _t);
             check(false, "Action aborted, no return value");
             return ReturnType();  // Silence compiler warning
          }

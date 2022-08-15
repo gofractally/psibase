@@ -128,7 +128,7 @@ function Applet(appletParams, handleMessage) {
                     {
                         // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
                         //log: true,
-                        checkOrigin: false,
+                        checkOrigin: false, // TODO - Should set to true to restrict incoming messages from the origin specified in iframe src
                         heightCalculationMethod: "lowestElement",
                         onMessage: doHandleMessage,
                         onInit,
