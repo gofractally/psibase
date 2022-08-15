@@ -5,7 +5,7 @@ namespace UserContract
    class RTokenSys : public psibase::Contract<RTokenSys>
    {
      public:
-      static constexpr auto contract = psibase::AccountNumber("rpc-tok-sys");
+      static constexpr auto contract = psibase::AccountNumber("r-tok-sys");
 
       auto serveSys(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);

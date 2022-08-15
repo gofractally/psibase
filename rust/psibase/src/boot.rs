@@ -1,4 +1,4 @@
-use crate::{reg_server, store_sys, without_tapos, Args, Error};
+use crate::{new_account_action, reg_server, store_sys, without_tapos, Args, Error};
 use anyhow::Context;
 use fracpack::Packable;
 use libpsibase::{
@@ -7,10 +7,10 @@ use libpsibase::{
 };
 use serde_json::Value;
 
+// TODO: support ().packed_bytes(). It should pack the same as
+// a struct with no fields.
 #[derive(Fracpack)]
-struct Startup {
-    existing_accounts: Vec<AccountNumber>,
-}
+struct Empty {}
 
 pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), anyhow::Error> {
     let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx()];
@@ -60,92 +60,69 @@ async fn push_boot(
     Ok(())
 }
 
+macro_rules! sgc {
+    ($acc:literal, $flags:expr, $wasm:literal) => {
+        SharedGenesisContract {
+            contract: account!($acc),
+            flags: $flags,
+            vm_type: 0,
+            vm_version: 0,
+            code: include_bytes!(concat!("../boot-image/", $wasm)),
+        }
+    };
+}
+
+macro_rules! store {
+    ($acc:literal, $dest:expr, $ty:expr, $src:expr) => {
+        store_sys(
+            account!($acc),
+            $dest,
+            $ty,
+            include_bytes!(concat!("../boot-image/", $src)),
+        )
+    };
+}
+
+macro_rules! store_common {
+    ($name:literal, $ty:expr) => {
+        store!(
+            "common-sys",
+            concat!("/common/", $name),
+            $ty,
+            concat!("CommonSys/common/", $name)
+        )
+    };
+}
+
+macro_rules! store_third_party {
+    ($name:literal, $ty:expr) => {
+        store!(
+            "common-sys",
+            concat!("/common/", $name),
+            $ty,
+            concat!("CommonSys/common/thirdParty/", $name)
+        )
+    };
+}
+
 fn boot_trx() -> SignedTransaction {
     let contracts = vec![
-        SharedGenesisContract {
-            contract: account!("transact-sys"),
-            flags: 3, // TODO
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/TransactionSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("setcode-sys"),
-            flags: 2, // TODO
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/SetCodeSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("account-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/AccountSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("proxy-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/ProxySys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("auth-fake-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/AuthFakeSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("auth-ec-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/AuthEcSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("verifyec-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/VerifyEcSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("common-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/CommonSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("r-account-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/RAccountSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("r-ath-ec-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/RAuthEcSys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("r-proxy-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/RProxySys.wasm"),
-        },
-        SharedGenesisContract {
-            contract: account!("explore-sys"),
-            flags: 0,
-            vm_type: 0,
-            vm_version: 0,
-            code: include_bytes!("../boot-image/ExploreSys.wasm"),
-        },
+        sgc!("account-sys", 0, "AccountSys.wasm"),
+        sgc!("auth-ec-sys", 0, "AuthEcSys.wasm"),
+        sgc!("auth-fake-sys", 0, "AuthFakeSys.wasm"),
+        sgc!("common-sys", 0, "CommonSys.wasm"),
+        sgc!("explore-sys", 0, "ExploreSys.wasm"),
+        sgc!("nft-sys", 0, "NftSys.wasm"),
+        sgc!("proxy-sys", 0, "ProxySys.wasm"),
+        sgc!("r-account-sys", 0, "RAccountSys.wasm"),
+        sgc!("r-ath-ec-sys", 0, "RAuthEcSys.wasm"),
+        sgc!("r-proxy-sys", 0, "RProxySys.wasm"),
+        sgc!("r-tok-sys", 0, "RTokenSys.wasm"),
+        sgc!("setcode-sys", 2, "SetCodeSys.wasm"), // TODO: flags
+        sgc!("symbol-sys", 0, "SymbolSys.wasm"),
+        sgc!("token-sys", 0, "TokenSys.wasm"),
+        sgc!("transact-sys", 3, "TransactionSys.wasm"), // TODO: flags
+        sgc!("verifyec-sys", 0, "VerifyEcSys.wasm"),
     ];
 
     let genesis_action_data = SharedGenesisActionData {
@@ -167,85 +144,149 @@ fn boot_trx() -> SignedTransaction {
 }
 
 fn common_startup_trx() -> SignedTransaction {
-    let startup_data = Startup {
-        existing_accounts: vec![],
-    };
-    let acc_startup_action = Action {
-        sender: account!("account-sys"),
-        contract: account!("account-sys"),
-        method: method!("startup"),
-        raw_data: startup_data.packed_bytes(),
-    };
-    let trans_startup_action = Action {
-        sender: account!("transact-sys"),
-        contract: account!("transact-sys"),
-        method: method!("startup"),
-        raw_data: startup_data.packed_bytes(),
-    };
+    let mut init_actions = vec![
+        Action {
+            sender: account!("account-sys"),
+            contract: account!("account-sys"),
+            method: method!("startup"),
+            raw_data: Empty {}.packed_bytes(),
+        },
+        Action {
+            sender: account!("transact-sys"),
+            contract: account!("transact-sys"),
+            method: method!("startup"),
+            raw_data: Empty {}.packed_bytes(),
+        },
+        Action {
+            sender: account!("nft-sys"),
+            contract: account!("nft-sys"),
+            method: method!("init"),
+            raw_data: Empty {}.packed_bytes(),
+        },
+        Action {
+            sender: account!("token-sys"),
+            contract: account!("token-sys"),
+            method: method!("init"),
+            raw_data: Empty {}.packed_bytes(),
+        },
+        Action {
+            sender: account!("symbol-sys"),
+            contract: account!("symbol-sys"),
+            method: method!("init"),
+            raw_data: Empty {}.packed_bytes(),
+        },
+    ];
 
-    let actions = vec![
-        acc_startup_action,
-        trans_startup_action,
-        reg_server(account!("common-sys"), account!("common-sys")),
-        store_sys(
-            account!("common-sys"),
-            "/",
-            "text/html",
-            include_bytes!("../boot-image/CommonSys/ui/index.html"),
-        ),
-        store_sys(
-            account!("common-sys"),
-            "/common/rpc.mjs",
-            "text/javascript",
-            include_bytes!("../boot-image/CommonSys/common/rpc.mjs"),
-        ),
-        store_sys(
-            account!("common-sys"),
-            "/common/useGraphQLQuery.mjs",
-            "text/javascript",
-            include_bytes!("../boot-image/CommonSys/common/useGraphQLQuery.mjs"),
-        ),
-        store_sys(
-            account!("common-sys"),
-            "/common/SimpleUI.mjs",
-            "text/javascript",
-            include_bytes!("../boot-image/CommonSys/common/SimpleUI.mjs"),
-        ),
-        store_sys(
-            account!("common-sys"),
-            "/common/keyConversions.mjs",
-            "text/javascript",
-            include_bytes!("../boot-image/CommonSys/common/keyConversions.mjs"),
-        ),
-        store_sys(
-            account!("common-sys"),
-            "/ui/index.js",
-            "text/javascript",
-            include_bytes!("../boot-image/CommonSys/ui/index.js"),
-        ),
+    let html = "text/html";
+    let js = "text/javascript";
+
+    let mut reg_actions = vec![
         reg_server(account!("account-sys"), account!("r-account-sys")),
-        store_sys(
-            account!("r-account-sys"),
-            "/",
-            "text/html",
-            include_bytes!("../boot-image/AccountSys/ui/index.html"),
-        ),
-        store_sys(
-            account!("r-account-sys"),
-            "/ui/index.js",
-            "text/javascript",
-            include_bytes!("../boot-image/AccountSys/ui/index.js"),
-        ),
         reg_server(account!("auth-ec-sys"), account!("r-ath-ec-sys")),
-        reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
+        reg_server(account!("common-sys"), account!("common-sys")),
         reg_server(account!("explore-sys"), account!("explore-sys")),
-        store_sys(
-            account!("explore-sys"),
+        reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
+    ];
+
+    let mut common_sys_files = vec![
+        store!("common-sys", "/", html, "CommonSys/ui/index.html"),
+        store!(
+            "common-sys",
+            "/ui/common.index.html",
+            html,
+            "CommonSys/ui/common.index.html"
+        ),
+        store!("common-sys", "/ui/index.js", js, "CommonSys/ui/index.js"),
+        store_common!("keyConversions.mjs", js),
+        store_common!("rpc.mjs", js),
+        store_common!("SimpleUI.mjs", js),
+        store_common!("useGraphQLQuery.mjs", js),
+        store_common!("widgets.mjs", js),
+    ];
+
+    let mut common_sys_3rd_party_files = vec![
+        store_third_party!("htm.module.js", js),
+        store_third_party!("iframeResizer.contentWindow.js", js),
+        store_third_party!("iframeResizer.js", js),
+        store_third_party!("react-dom.development.js", js),
+        store_third_party!("react-dom.production.min.js", js),
+        store_third_party!("react-router-dom.min.js", js),
+        store_third_party!("react.development.js", js),
+        store_third_party!("react.production.min.js", js),
+        store_third_party!("semantic-ui-react.min.js", js),
+        store_third_party!("useLocalStorageState.js", js),
+    ];
+
+    let mut account_sys_files = vec![
+        store!("r-account-sys", "/", html, "AccountSys/ui/index.html"),
+        store!(
+            "r-account-sys",
             "/ui/index.js",
-            "text/javascript",
-            include_bytes!("../boot-image/ExploreSys/ui/index.js"),
+            js,
+            "AccountSys/ui/index.js"
         ),
     ];
+
+    let mut auth_ec_sys_files = vec![
+        store!("r-ath-ec-sys", "/", html, "AuthEcSys/ui/index.html"),
+        store!("r-ath-ec-sys", "/ui/index.js", js, "AuthEcSys/ui/index.js"),
+    ];
+
+    let mut explore_sys_files = vec![store!(
+        "explore-sys",
+        "/ui/index.js",
+        js,
+        "ExploreSys/ui/index.js"
+    )];
+
+    let mut token_sys_files = vec![store!(
+        "r-tok-sys",
+        "/ui/index.js",
+        js,
+        "TokenSys/ui/index.js"
+    )];
+
+    // TODO: make this optional
+    #[allow(clippy::inconsistent_digit_grouping)]
+    let mut create_and_fund_example_users = vec![
+        new_account_action(account!("alice")),
+        new_account_action(account!("bob")),
+        Action {
+            sender: account!("symbol-sys"),
+            contract: account!("token-sys"),
+            method: method!("setTokenConf"),
+            raw_data: (1u32, method!("untradeable"), true).packed_bytes(),
+        },
+        Action {
+            sender: account!("symbol-sys"),
+            contract: account!("token-sys"),
+            method: method!("mint"),
+            raw_data: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed_bytes(),
+        },
+        Action {
+            sender: account!("symbol-sys"),
+            contract: account!("token-sys"),
+            method: method!("credit"),
+            raw_data: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed_bytes(),
+        },
+        Action {
+            sender: account!("symbol-sys"),
+            contract: account!("token-sys"),
+            method: method!("credit"),
+            raw_data: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed_bytes(),
+        },
+    ];
+
+    let mut actions = Vec::new();
+    actions.append(&mut init_actions);
+    actions.append(&mut reg_actions);
+    actions.append(&mut common_sys_files);
+    actions.append(&mut common_sys_3rd_party_files);
+    actions.append(&mut account_sys_files);
+    actions.append(&mut auth_ec_sys_files);
+    actions.append(&mut explore_sys_files);
+    actions.append(&mut token_sys_files);
+    actions.append(&mut create_and_fund_example_users);
 
     SignedTransaction {
         transaction: without_tapos(actions).packed_bytes(),
