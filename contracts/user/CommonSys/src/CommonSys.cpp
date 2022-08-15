@@ -17,12 +17,12 @@ namespace system_contract
    static constexpr std::pair<const char*, const char*> commonResMap[]{
        {"/", "/ui/common.index.html"}};
 
-   std::optional<RpcReplyData> CommonSys::serveSys(RpcRequestData request)
+   std::optional<HttpReply> CommonSys::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
       {
          auto json = psio::convert_to_json(obj);
-         return RpcReplyData{
+         return HttpReply{
              .contentType = "application/json",
              .body        = {json.begin(), json.end()},
          };
@@ -64,7 +64,7 @@ namespace system_contract
                 "    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootdomain +\n"
                 "           ':' + loc.port + '/' + (path || '').replace(/^\\/+/, '');\n"
                 "}\n";
-            return RpcReplyData{
+            return HttpReply{
                 .contentType = "text/javascript",
                 .body        = {js.begin(), js.end()},
             };
@@ -82,7 +82,7 @@ namespace system_contract
                 "    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootdomain +\n"
                 "           ':' + loc.port + '/' + (path || '').replace(/^\\/+/, '');\n"
                 "}\n";
-            return RpcReplyData{
+            return HttpReply{
                 .contentType = "text/javascript",
                 .body        = {js.begin(), js.end()},
             };
@@ -92,7 +92,7 @@ namespace system_contract
             auto [index, suffix] = headTapos();
             auto json            = "{\"refBlockIndex\":" + std::to_string(index) +
                         ",\"refBlockSuffix\":" + std::to_string(suffix) + "}";
-            return RpcReplyData{
+            return HttpReply{
                 .contentType = "application/json",
                 .body        = {json.begin(), json.end()},
             };
@@ -107,7 +107,7 @@ namespace system_contract
             psio::json_token_stream jstream{request.body.data()};
             Transaction             trx;
             psio::from_json(trx, jstream);
-            return RpcReplyData{
+            return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(trx),
             };
@@ -118,7 +118,7 @@ namespace system_contract
             psio::json_token_stream jstream{request.body.data()};
             SignedTransaction       trx;
             psio::from_json(trx, jstream);
-            return RpcReplyData{
+            return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(trx),
             };
@@ -142,7 +142,7 @@ namespace system_contract
                             Tables{getReceiver()});
    }
 
-   std::optional<RpcReplyData> CommonSys::serveCommon(RpcRequestData request)
+   std::optional<HttpReply> CommonSys::serveCommon(HttpRequest request)
    {
       if (request.method == "GET")
       {
@@ -154,7 +154,7 @@ namespace system_contract
                    ContractTables<WebContentTable>{contract}.open<WebContentTable>().getIndex<0>();
                if (auto content = index.get(std::string(replacement)))
                {
-                  return RpcReplyData{
+                  return HttpReply{
                       .contentType = content->contentType,
                       .body        = content->content,
                   };

@@ -21,7 +21,7 @@ PSIO_REFLECT(  //
 
 namespace system_contract
 {
-   std::optional<psibase::RpcReplyData> ExploreSys::serveSys(psibase::RpcRequestData request)
+   std::optional<psibase::HttpReply> ExploreSys::serveSys(psibase::HttpRequest request)
    {
       if (auto result = at<CommonSys>().serveCommon(request).unpack())
          return result;

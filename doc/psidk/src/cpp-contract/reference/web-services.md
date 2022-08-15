@@ -4,8 +4,8 @@
 - [Registration](#registration)
 - [Interfaces](#interfaces)
   - [psibase::ServerInterface]
-  - [psibase::RpcRequestData]
-  - [psibase::RpcReplyData]
+  - [psibase::HttpRequest]
+  - [psibase::HttpReply]
   - [psibase::StorageInterface]
 - [Helpers](#helpers)
   - [psibase::serveSimpleUI]
@@ -70,13 +70,13 @@ A contract doesn't have to serve HTTP requests itself; it may delegate this to a
 Contracts which serve HTML implement these interfaces:
 
 - [psibase::ServerInterface] (required)
-  - [psibase::RpcRequestData]
-  - [psibase::RpcReplyData]
+  - [psibase::HttpRequest]
+  - [psibase::HttpReply]
 - [psibase::StorageInterface] (optional)
 
 {{#cpp-doc ::psibase::ServerInterface}}
-{{#cpp-doc ::psibase::RpcRequestData}}
-{{#cpp-doc ::psibase::RpcReplyData}}
+{{#cpp-doc ::psibase::HttpRequest}}
+{{#cpp-doc ::psibase::HttpReply}}
 {{#cpp-doc ::psibase::StorageInterface}}
 
 ## Helpers
@@ -98,7 +98,7 @@ These help implement basic functionality:
 Here's a common pattern for using these functions:
 
 ```c++
-std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
+std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {
    if (auto result = psibase::serveActionTemplates<ExampleContract>(request))
       return result;
@@ -109,7 +109,7 @@ std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
    if (request.method == "GET" && request.target == "/")
    {
       static const char helloWorld[] = "Hello World";
-      return psibase::RpcReplyData{
+      return psibase::HttpReply{
             .contentType = "text/plain",
             .body        = {helloWorld, helloWorld + strlen(helloWorld)},
       };
