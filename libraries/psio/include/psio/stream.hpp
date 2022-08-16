@@ -3,6 +3,7 @@
 #include <string.h>
 #include <algorithm>
 #include <psio/check.hpp>
+#include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -278,6 +279,7 @@ namespace psio
       }
       input_stream(const std::vector<char>& v) : pos{v.data()}, end{v.data() + v.size()} {}
       constexpr input_stream(std::string_view v) : pos{v.data()}, end{v.data() + v.size()} {}
+      constexpr input_stream(std::span<const char> v) : pos{v.data()}, end{v.data() + v.size()} {}
       constexpr input_stream(const input_stream&) = default;
 
       input_stream& operator=(const input_stream&) = default;

@@ -4,6 +4,7 @@
 #include <psibase/dispatch.hpp>
 
 #include <boost/container/flat_map.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/print.hpp>
 
@@ -168,11 +169,9 @@ namespace system_contract
    // from entering the chain, including transactions which try to
    // fix the problem.
    //
-   // TODO: move checkFirstAuthAndExit into getCurrentAction()
    // TODO: reconsider which functions, if any, are direct exports
    //       instead of going through dispatch
-   extern "C" [[clang::export_name("processTransaction")]] void processTransaction(
-       bool checkFirstAuthAndExit)
+   extern "C" [[clang::export_name("processTransaction")]] void processTransaction()
    {
       if constexpr (enable_print)
          print("processTransaction\n");
@@ -183,9 +182,11 @@ namespace system_contract
       // TODO: limit execution time
       // TODO: limit charged CPU & NET which can go into a block
       auto top_act = getCurrentAction();
+      auto args    = psio::convert_from_frac<ProcessTransactionArgs>(top_act.rawData);
       // TODO: avoid copying inner rawData during unpack
-      // TODO: verify fracpack (no unknown, no extra data)
-      trx     = psio::convert_from_frac<Transaction>(top_act.rawData);
+      auto t = args.transaction.data_without_size_prefix();
+      check(psio::fracvalidate<Transaction>(t).valid_and_known(), "transaction has invalid format");
+      trx     = psio::convert_from_frac<Transaction>(t);
       auto id = sha256(top_act.rawData.data(), top_act.rawData.size());
 
       check(trx.actions.size() > 0, "transaction has no actions");
@@ -208,11 +209,11 @@ namespace system_contract
       auto summaryIdx    = summaryTable.getIndex<0>();
 
       check(!includedIdx.get(std::tuple{trx.tapos.expiration, id}), "duplicate transaction");
-      if (!checkFirstAuthAndExit)
+      if (!args.checkFirstAuthAndExit)
          includedTable.put({trx.tapos.expiration, id});
 
       std::optional<BlockSummary> summary;
-      if (checkFirstAuthAndExit)
+      if (args.checkFirstAuthAndExit)
          summary = getBlockSummary();  // startBlock() might not have run
       else
          summary = summaryIdx.get(std::tuple<>{});
@@ -258,12 +259,12 @@ namespace system_contract
             uint32_t             flags = AuthInterface::topActionReq;
             if (&act == &trx.actions[0])
                flags |= AuthInterface::firstAuthFlag;
-            if (checkFirstAuthAndExit)
+            if (args.checkFirstAuthAndExit)
                flags |= AuthInterface::readOnlyFlag;
             auth.checkAuthSys(flags, psibase::AccountNumber{}, act, std::vector<ContractMethod>{},
                               trx.claims);
          }
-         if (checkFirstAuthAndExit)
+         if (args.checkFirstAuthAndExit)
             break;
          if constexpr (enable_print)
             print("call action\n");

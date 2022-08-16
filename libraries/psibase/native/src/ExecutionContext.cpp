@@ -263,11 +263,10 @@ namespace psibase
       // rhf_t::add<&ExecutionContextImpl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
    }
 
-   void ExecutionContext::execProcessTransaction(ActionContext& actionContext,
-                                                 bool           checkFirstAuthAndExit)
+   void ExecutionContext::execProcessTransaction(ActionContext& actionContext)
    {
       impl->exec(actionContext, [&] {  //
-         (*impl->backend)(*impl, "env", "processTransaction", checkFirstAuthAndExit);
+         (*impl->backend)(*impl, "env", "processTransaction");
       });
    }
 

@@ -2476,6 +2476,11 @@ namespace psio
          return std::string_view(_data.get(), size() + sizeof(uint32_t));
       }
 
+      std::span<const char> data_without_size_prefix() const
+      {
+         return std::string_view(data(), size());
+      }
+
       /** @return the number of bytes of packed data after the size prefix */
       size_t size() const
       {
