@@ -23,6 +23,7 @@ const App = () => {
             }
         }
     }`;
+    const [autoUpdateMode, setAutoUpdateMode] = React.useState(true);
     const pagedResult = useGraphQLPagedQuery('/graphql', query, {
         pageSize: 10,
         getPageInfo: (result) => result.data?.blocks.pageInfo,
@@ -31,35 +32,37 @@ const App = () => {
     const tdStyle = { border: "1px solid" };
     
     React.useEffect(()=>{
-        console.info(`Explorer.useEffect() called; pagedResult.data exists...`);
-        const interval=setInterval(()=>{
-            console.info("\n========= BEGIN ============")
-            console.info("Interval: refreshing data...");
-            pagedResult.last();
-        },1000)
-             
-        // return ()=> { // figure out why this is running when it's running
-        //     console.info('Explorer.useEffect().dismount');
-        //     clearInterval(interval);
-        // }
-    }, []);
+        let interval
+        if (autoUpdateMode) {
+            interval=setInterval(()=>{
+                pagedResult.last();
+            },1000)
+        } else {
+            clearInterval(interval);
+        }
+        return ()=> {
+            clearInterval(interval);
+        }
+    }, [autoUpdateMode]);
 
-    console.info('rendering...');
+    const processPagingRequests = (pagingFn) => {
+        setAutoUpdateMode(false);
+        pagingFn();
+    }
+
     if (!pagedResult.result.data) {
-        console.info('no data yet...');
         return html`<div>Loading data...</div>`;
     }
-    // console.info('pagedResult:');
-    // console.info(pagedResult);
     return html`
         <div class="ui container">
             <a href=${siblingUrl()}>chain</a>
             <h1>explore-sys</h1>
         
-            <button onClick=${pagedResult.first}>First</button>
-            <button disabled=${!pagedResult.hasPreviousPage} onClick=${pagedResult.previous}>Previous</button>
-            <button disabled=${!pagedResult.hasNextPage} onClick=${pagedResult.next}>Next</button>
-            <button onClick=${pagedResult.last}>Last</button>
+            <button onClick=${()=>processPagingRequests(pagedResult.first)}>First</button>
+            <button disabled=${!pagedResult.hasPreviousPage} onClick=${()=>processPagingRequests(pagedResult.previous)}>Previous</button>
+            <button disabled=${!pagedResult.hasNextPage} onClick=${()=>processPagingRequests(pagedResult.next)}>Next</button>
+            <button onClick=${()=>processPagingRequests(pagedResult.last)}>Last</button>
+            <button disabled=${autoUpdateMode} onClick=${()=>setAutoUpdateMode(true)}>${autoUpdateMode ? "(auto-updating)" : "Auto-Update Mode"}</button>
             <table>
                 <tbody>
                     <tr>
