@@ -8,12 +8,7 @@ import { postGraphQLGetJson } from './rpc.mjs';
 // }
 export function useGraphQLQuery(url, query, opts) {
     // non-signalling state
-    // const [state, setState] = React.useState({
-    //     url: null,
-    //     query: null,
-    //     refreshRequested: false,
-    // });
-    const [refetch, setRefetch] = React.useState(false);
+    const [refetch, setRefetch] = React.useState(true);
     const [cachedQueryResult, setCachedQueryResult] = React.useState({
         isLoading: true,
         isError: false,
@@ -23,11 +18,9 @@ export function useGraphQLQuery(url, query, opts) {
         setRefetch(true);
     }
     const queryAndPackageResponse = async (url, query) => {
-        console.info('queryAndPackageResponse.fetching...');
         let queryResult = await postGraphQLGetJson(url, query);
-        setRefetch(false);
-        console.info('useGraphQLQuery.queryResult:');
-        console.info(queryResult);
+        console.info('fetched new results...      (useGraphQLQuery)');
+        // console.info(queryResult);
         setCachedQueryResult({
             ...queryResult,
             isLoading: false,
@@ -44,7 +37,7 @@ export function useGraphQLQuery(url, query, opts) {
     React.useEffect(() => {
         (async () => {
             console.info('considering a query url&&query[', !!(url&&query), '], refetch[', refetch, ']')
-            if (url && query || refetch) {
+            if (url && query && refetch) {
                 try {
                     await queryAndPackageResponse(url, query);
                 } catch (e) {
@@ -54,6 +47,7 @@ export function useGraphQLQuery(url, query, opts) {
                         errors: [{ message: e + "" }],
                     });
                 }
+                setRefetch(false);
                 console.info("========= END ============\n")
             }
             // setState((prevState) => ({

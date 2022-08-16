@@ -31,39 +31,26 @@ const App = () => {
     const tdStyle = { border: "1px solid" };
     
     React.useEffect(()=>{
-        if(!pagedResult.result.data) {
-            console.info('Explorer.useEffect().returning because !pagedResult.result.data');
-            return;
-        }
         console.info(`Explorer.useEffect() called; pagedResult.data exists...`);
         const interval=setInterval(()=>{
             console.info("\n========= BEGIN ============")
             console.info("Interval: refreshing data...");
             pagedResult.last();
-        },2000)
+        },1000)
              
         // return ()=> { // figure out why this is running when it's running
         //     console.info('Explorer.useEffect().dismount');
         //     clearInterval(interval);
         // }
-    }, [pagedResult.result]);
-
-    // React.useEffect(()=>{
-    //     if(pagedResult.hasNextPage) {
-    //         console.info('next page; so navigate last');
-    //         pagedResult.last();
-    //     } else {
-    //         console.info('no next page');
-    //     }
-    // }, [])
+    }, []);
 
     console.info('rendering...');
     if (!pagedResult.result.data) {
         console.info('no data yet...');
         return html`<div>Loading data...</div>`;
     }
-    console.info('pagedResult:');
-    console.info(pagedResult);
+    // console.info('pagedResult:');
+    // console.info(pagedResult);
     return html`
         <div class="ui container">
             <a href=${siblingUrl()}>chain</a>
