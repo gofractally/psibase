@@ -99,62 +99,60 @@ let getIframeId = (appletStr, subPath) => {
 function Applet(appletParams, handleMessage) {
     let {appletStr, subPath, state, onInit} = appletParams;
 
+    if (!appletStr)
+    {
+        console.error("No applet specified");
+        return;
+    }
+
     if (onInit === undefined) 
         onInit = ()=>{};
 
-    const [applet, setApplet] = useState(appletStr);
-    const [appletSrc, setAppletSrc] = useState(siblingUrl(null, appletStr, subPath));
+    let appletSrc = siblingUrl(null, appletStr, subPath);
 
     useEffect(()=>{ // Set document title
         if (appletStr && state === AppletStates.primary)
         {
-            window.document.title = applet;
+            window.document.title = appletStr;
         }
-    }, [applet]);
+    }, []);
 
     let doHandleMessage = useCallback((request)=>{
-        // Todo - pass source applet
-        handleMessage({applet, subPath, state}, request);
-    }, [handleMessage, applet, subPath, state]);
+        handleMessage({appletStr, subPath, state}, request);
+    }, []);
 
     useEffect(() => { // Configure iFrameResizer
-        if (appletSrc)
-        {
-            let iFrameId = getIframeId(appletStr, subPath);
-            let iFrame = document.getElementById(iFrameId);
-            if (iFrame)
-            {   // Todo - why isn't this running after the render is complete?
-                iFrameResize(
-                    {
-                        // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
-                        //log: true,
-                        checkOrigin: false, // TODO - Should set to true to restrict incoming messages from the origin specified in iframe src
-                        heightCalculationMethod: "lowestElement",
-                        onMessage: doHandleMessage,
-                        onInit,
-                        minHeight:
-                            document.documentElement.scrollHeight -
-                            iFrame.getBoundingClientRect().top,
-                    },
-                    "#" + iFrameId
-                )[0].iFrameResizer;
-            }
+        
+        let iFrameId = getIframeId(appletStr, subPath);
+        let iFrame = document.getElementById(iFrameId);
+        if (iFrame)
+        {   // Todo - why isn't this running only after the render is complete?
+            iFrameResize(
+                {
+                    // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
+                    //log: true,
+                    checkOrigin: true,
+                    heightCalculationMethod: "lowestElement",
+                    onMessage: doHandleMessage,
+                    onInit,
+                    minHeight:
+                        document.documentElement.scrollHeight -
+                        iFrame.getBoundingClientRect().top,
+                },
+                "#" + iFrameId
+            )[0].iFrameResizer;
         }
-    }, [appletSrc]);
+    }, []);
 
-    if (appletSrc)
-    {
-        return html`
+    return html`
         <iframe
             id=${getIframeId(appletStr, subPath)}
             style=${appletStyles[state]}
             src="${appletSrc}"
-            title="${applet}"
+            title="${appletStr}"
             frameborder="0"
         ></iframe>
     `;
-    } else return html``;
-
 }
 
 function Dashboard() {
@@ -241,6 +239,11 @@ let currentOps = [];
 function makeAction(application, actionName, params)
 {
     return {contract: application, method: actionName, data: params};
+}
+
+function makeActionAs(application, actionName, params, sender)
+{
+    return {contract: application, method: actionName, data: params, sender};
 }
 
 function OtherApplets({applets, handleMessage})
@@ -378,7 +381,7 @@ function App() {
         }
         catch (e)
         {
-            console.error(trace);
+            console.error(e);
         }
 
         transaction = [];
@@ -467,7 +470,10 @@ function App() {
             },
             handle: async (senderApplet, payload) => {
                 let {application, actionName, params} = payload;
-                transaction.push(makeAction(application, actionName, params));
+                if (typeof payload.sender === 'undefined')
+                    transaction.push(makeAction(application, actionName, params));
+                else
+                    transaction.push(makeActionAs(application, actionName, params, payload.sender));
             }
         },
         {
@@ -503,8 +509,6 @@ function App() {
     ], [open, sendOp, sendQuery, sendQueryResponse]);
 
     let handleMessage = useCallback(async ({applet, subPath, state}, request)=>{
-        // TODO - Should there be any additional security here, such that we only 
-        //   accept requests from same origin, etc.?
         let {type, payload} = request.message;
         if (type === undefined || payload === undefined)
         {

@@ -1,5 +1,5 @@
 import htm from 'https://unpkg.com/htm@3.1.0?module';
-import { getJson, initializeApplet, action, operation, setOperations, setQueries } from '/common/rpc.mjs';
+import { getJson, initializeApplet, action, operation, setOperations, setQueries, actionAs } from '/common/rpc.mjs';
 import { genKeyPair, KeyType } from '/common/keyConversions.mjs';
 
 const html = htm.bind(React.createElement);
@@ -18,8 +18,8 @@ initializeApplet(async ()=>{
     
                 if (pubKey !== "")
                 {
-                    action('auth-ec-sys', 'setKey', {key: pubkey});
-                    action(thisApplet, 'setAuthCntr', {authContract: 'auth-ec-sys'});
+                    actionAs('auth-ec-sys', 'setKey', {key: pubKey}, name);
+                    actionAs(thisApplet, 'setAuthCntr', {authContract: 'auth-ec-sys'}, name);
                 }
             },
         },

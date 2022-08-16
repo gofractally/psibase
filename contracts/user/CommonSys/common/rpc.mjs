@@ -424,7 +424,7 @@ export async function initializeApplet(initializer = ()=>{})
     window.iFrameResizer = {
         // TODO: [Security] Need to include targetOrigin, otherwise malicious applets could embed other
         //  applets inside them and pretend to be core
-        //  targetOrigin: siblingUrl(null, "common-sys", null),
+        targetOrigin: siblingUrl(null, null, null),
         onMessage: (msg)=>{
             let {type, payload} = msg;
             if (type === undefined || payload === undefined)
@@ -555,6 +555,14 @@ export function action(application, actionName, params)
     sendToParent({
         type: MessageTypes.Action,
         payload: { application, actionName, params },
+    });
+}
+
+export function actionAs(application, actionName, params, sender)
+{
+    sendToParent({
+        type: MessageTypes.Action,
+        payload: { application, actionName, params, sender },
     });
 }
 
