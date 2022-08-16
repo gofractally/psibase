@@ -70,7 +70,7 @@ const App = () => {
                         <th style=${tdStyle}>Previous</th>
                         <th style=${tdStyle}>Time</th>
                     </tr>
-                    ${pagedResult.result.data?.blocks.edges.map?.(e => html`<tr>
+                    ${pagedResult.result.data?.blocks.edges.reverse().map?.(e => html`<tr>
                         <td style=${tdStyle}>${e.node.header.blockNum}</td>
                         <td style=${tdStyle}>
                             <pre>${e.node.header.previous}</pre>
