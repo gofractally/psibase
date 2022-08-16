@@ -1,5 +1,5 @@
 import { siblingUrl } from "/common/rootdomain.mjs";
-import { signAndPushTransaction, getTaposForHeadBlock, MessageTypes, verifyFields, addQueryCallback, executeCallback } from "/common/rpc.mjs";
+import { signAndPushTransaction, getTaposForHeadBlock, MessageTypes, verifyFields, storeCallback, executeCallback } from "/common/rpc.mjs";
 import htm from "/common/htm.module.js";
 await import("/common/react-router-dom.min.js");
 
@@ -253,8 +253,6 @@ function OtherApplets({applets, handleMessage})
     return nonPrimaryApplets.map((a)=>{
                 return Applet(a, handleMessage);
             });
-
-    //return Applet({appletStr: "account-sys", subPath: "", state: AppletStates.headless}, handleMessage);
 }
 
 let transaction = [];
@@ -332,34 +330,59 @@ function App() {
         }
     }, [open, getIndex]);
 
-    let injectSender = useCallback((actions) => {
+    let runQuery = useCallback((senderApplet, qApplet, qSubPath, qName, params, callback)=>{
+        let coreCallbackId = storeCallback(({responseApplet, response})=>{
+            if (responseApplet.applet !== qApplet || responseApplet.subPath !== qSubPath)
+            {
+                return;
+            }
+            callback({responseApplet, response});
+        });
+
+        sendMessage(MessageTypes.Query, 
+            senderApplet,
+            {rApplet: qApplet, rSubPath: qSubPath}, 
+            {identifier: qName, params, callbackId: coreCallbackId}, 
+            true
+        );
+    }, [sendMessage]);
+
+    let injectSender = useCallback((actions, sender) => {
         actions.forEach(action => {
             if (typeof action.sender === 'undefined')
             {
-                //action.sender = messageRouting[MessageTypes.Query].handle("common-sys", { id: 0, applet: "account-sys", subPath: "", actionName: "getLoggedInUser" }).resource;
-                // TODO
-                action.sender = "alice";
+                action.sender = sender;
             }
         });
-    
         return actions;
     }, []);
 
-    let executeTransaction = useCallback(async () => {
-        try 
-        {
-            let trans = await constructTransaction(injectSender(transaction));
-            let baseUrl = ''; // default
-            let trace = await signAndPushTransaction(baseUrl, trans);
-            console.log(trace);
-        }
-        catch (e)
-        {
-            console.error(e);
-        }
+    let withSender = useCallback((callback)=>{
+        let senderApplet = {applet: "common-sys", subPath: ""};
+        runQuery(senderApplet, 
+            "account-sys", "", "getLoggedInUser", {}, 
+            ({responseApplet, response})=>{
+                callback(response);
+            }
+        );
+    }, [runQuery]);
 
-        transaction = [];
-    }, []);
+    let executeTransaction = useCallback(() => {
+        withSender(async (sender)=>{
+            try
+            {
+                let trans = await constructTransaction(injectSender(transaction, sender));
+                let baseUrl = ''; // default
+                let trace = await signAndPushTransaction(baseUrl, trans);
+                console.log(trace);
+            }
+            catch (e)
+            {
+                console.error(e);
+            }
+            transaction = [];
+        });
+    }, [withSender]);
 
     let messageRouting = useMemo(() => [
         {
@@ -461,21 +484,19 @@ function App() {
             },
             handle: (senderApplet, payload) => {
                 let {callbackId, qApplet, qSubPath, qName, qParams} = payload;
-                let coreCallbackId = addQueryCallback((response)=>{
-                    let res = response.response;
+
+                let queryCallback = ({responseApplet, response})=>{
+                    let {applet : rApplet, subPath : rSubPath} = senderApplet;
+                    let {applet : sApplet, subPath : sSubPath} = responseApplet;
                     sendMessage(MessageTypes.QueryResponse, 
-                        {sApplet: response.senderApplet.applet, sSubPath: response.senderApplet.subPath}, 
-                        {rApplet: senderApplet.applet, rSubPath: senderApplet.subPath}, 
-                        {callbackId, response: res}, 
+                        {sApplet, sSubPath},
+                        {rApplet, rSubPath},
+                        {callbackId, response},
                         false
                     );
-                });
-                sendMessage(MessageTypes.Query, 
-                    senderApplet, 
-                    {rApplet: qApplet, rSubPath: qSubPath}, 
-                    {identifier: qName, params: qParams, callbackId: coreCallbackId}, 
-                    true
-                );
+                };
+
+                runQuery(senderApplet, qApplet, qSubPath, qName, qParams, queryCallback);
             },
         },
         {
@@ -486,7 +507,7 @@ function App() {
             handle: (senderApplet, payload) =>
             {
                 let {callbackId, response} = payload;
-                executeCallback(callbackId, {senderApplet, response});
+                executeCallback(callbackId, {responseApplet: senderApplet, response});
             },
         },
 

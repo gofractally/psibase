@@ -223,7 +223,7 @@ var qrs = []; // Queries defined by an applet
 
 var queryCallbacks = []; // Callbacks automatically generated for responding to queries
 
-export function addQueryCallback(callback)
+export function storeCallback(callback)
 {
     let callbackId = queryCallbacks.length;
     queryCallbacks.push({callbackId, callback});
@@ -528,14 +528,14 @@ function stopOperation()
     }, tempDelay);
 }
 
-export function operation(applet, subPath, operationName, params)
+export function operation(applet, subPath, name, params)
 {
     // Todo - There may be a way to short-circuit calling common-sys when 
     //    opApplet == await getJson('/common/thiscontract');
 
     sendToParent({
         type: MessageTypes.Operation,
-        payload: { opApplet: applet, opSubPath: subPath, opName: operationName, opParams: params },
+        payload: { opApplet: applet, opSubPath: subPath, opName: name, opParams: params },
     });
 }
 
@@ -558,7 +558,7 @@ export function actionAs(application, actionName, params, sender)
 export function query(applet, subPath, queryName, params, callback)
 {
     // Will leave memory hanging if we don't get a response as expected
-    let callbackId = addQueryCallback(callback);
+    let callbackId = storeCallback(callback);
 
     sendToParent({
         type: MessageTypes.Query,
