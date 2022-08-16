@@ -8,57 +8,66 @@ import { postGraphQLGetJson } from './rpc.mjs';
 // }
 export function useGraphQLQuery(url, query, extraDependency) {
     // non-signalling state
-    const [state] = React.useState({
+    const [state, setState] = React.useState({
         mounted: true,
         url: null,
         query: null,
         fetchId: 0,
         extraDependency: null,
-        refreshRequested: true,
+        // refreshRequested: true,
     });
     const [cachedQueryResult, setCachedQueryResult] = React.useState({
         isLoading: true,
         isError: false,
-        refresh: () => { state.refreshRequested = true; },
+        // refresh: () => {
+        //     setState((prevState) => ({
+        //         ...prevState,
+        //         refreshRequested: true,
+        //     }))
+        // },
     });
-    const queryAndPackageResponse = async (url, query, fetchId) => {
+    const queryAndPackageResponse = async (url, query) => {
         console.info('queryAndPackageResponse.fetching...');
         let queryResult = await postGraphQLGetJson(url, query);
         console.info('useGraphQLQuery.queryResult:');
         console.info(queryResult);
-        if (state.mounted && fetchId == state.fetchId) {
+        if (state.mounted) {
             setCachedQueryResult({
                 ...queryResult,
                 isLoading: false,
                 isError: Boolean(queryResult.errors),
-                refresh: () => { state.refreshRequested = true; },
+                // refresh: () => { setState.refreshRequested = true; },
             });
-            state.refreshRequested = false;
+            // state.refreshRequested = false;
         }
     };
     React.useEffect(() => {
         return () => {
-            state.mounted = false;
+            setState((prev) => ({
+                ...prevState,
+                mounted: false,
+            }));
         };
     }, []);
     React.useEffect(() => {
         console.info('useGraphQLQuery().useEffect() to fetch');
         (async () => {
             if (state.url !== url || state.query !== query || state.extraDependency !== extraDependency ) { // || state.refreshRequested) {
-                state.url = url;
-                state.query = query;
-                state.extraDependency = extraDependency;
-                state.fetchId += 1;
-                let fetchId = state.fetchId;
+                setState((prevState) => ({
+                    url,
+                    query,
+                    extraDependency,
+                    fetchId: prevState.fetchId + 1,
+                }));
                 if (url && query) {
                     try {
-                        await queryAndPackageResponse(url, query, fetchId);
+                        await queryAndPackageResponse(url, query);
                     } catch (e) {
-                        if (state.mounted && fetchId == state.fetchId) {
+                        if (state.mounted) {
                             setCachedQueryResult({
                                 isLoading: false,
                                 isError: true,
-                                refresh: () => { console.error("refresh() called in catch..."); },
+                                // refresh: () => { console.error("refresh() called in catch..."); },
                                 errors: [{ message: e + "" }],
                             });
                         }

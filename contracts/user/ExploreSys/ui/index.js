@@ -32,17 +32,17 @@ const App = () => {
             return;
         }
         console.info(`Explorer.useEffect() called; pagedResult.data exists...`);
-        const interval=setInterval(()=>{
-            console.info("Interval: refreshing data...");
-            console.info('pagedResult:');
-            console.info(pagedResult);
-            pagedResult.last();
-        },10000)
+        // const interval=setInterval(()=>{
+        //     console.info("Interval: refreshing data...");
+        //     console.info('pagedResult:');
+        //     console.info(pagedResult);
+        //     pagedResult.last();
+        // },10000)
              
-        return ()=> {
-            console.info('Explorer.useEffect().dismount');
-            clearInterval(interval);
-        }
+        // return ()=> {
+        //     console.info('Explorer.useEffect().dismount');
+        //     clearInterval(interval);
+        // }
     }, [pagedResult.result]);
 
     // React.useEffect(()=>{
