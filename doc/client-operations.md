@@ -40,6 +40,10 @@ But, for an applet to execute actions and operations on another applet would req
 
 The core infrastructure provided for applet development handles these permission requests automatically so that applets can simply focus on writing the logic that performs the necessary operations. All permissions management and authentication will be automatically facilitated for all applets that are served from a psibase chain.
 
+From the perspective of each applet, the origin of the window on whom postMessage is called during all inter-applet communication is restricted to be the common-sys applet. That means it is not possible for an attacker applet to embed your applet within their own and mimic common-sys.
+
+In common-sys, each time an applet is opened in an iFrame, all incoming messages from it are restricted to the domain listed in the initial src property of the iFrame. Therefore, if the iFrame navigates away to a different origin, common-sys will reject all messages from it. Furthermore, all messages sent from core to a particular iFrame are explicitly restricted such that they will only be processed if the origin of the iFrame matches the origin when the iFrame was first opened. 
+
 ## Execution
 
 It is possible that the user may be using an applet to construct a transaction, rather than wanting to construct it and immediately push it to chain (for example if trying to propose a multisignature transaction).

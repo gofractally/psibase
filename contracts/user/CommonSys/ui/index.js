@@ -118,7 +118,7 @@ function Applet(appletParams, handleMessage) {
     }, []);
 
     let doHandleMessage = useCallback((request)=>{
-        handleMessage({appletStr, subPath, state}, request);
+        handleMessage({applet: appletStr, subPath, state}, request);
     }, []);
 
     useEffect(() => { // Configure iFrameResizer
@@ -309,8 +309,7 @@ function App() {
             // TODO: Could check that sender isn't on rApplet's blacklist before
             //       making the IPC call.
     
-            // TODO: For security, this ought to restrict the origin of the target iframe
-            let restrictedTargetOrigin = "*"; 
+            let restrictedTargetOrigin = siblingUrl(null, rApplet, rSubPath);
             iframe.iFrameResizer.sendMessage({type: MessageTypes.Operation, payload: {identifier, params}}, restrictedTargetOrigin);
         });
     }, [open]);
@@ -328,8 +327,7 @@ function App() {
             // TODO: Could check that sender isn't on rApplet's blacklist before
             //       making the IPC call.
 
-            // TODO: For security, this ought to restrict the origin of the target iframe
-            let restrictedTargetOrigin = "*"; 
+            let restrictedTargetOrigin = siblingUrl(null, rApplet, rSubPath);
             iframe.iFrameResizer.sendMessage({type: MessageTypes.Query, payload: {identifier, params, callbackId}}, restrictedTargetOrigin);
         });
     }, [open]);
@@ -353,8 +351,7 @@ function App() {
         // TODO: Could check that sender isn't on rApplet's blacklist before
         //       making the IPC call.        
 
-        // TODO: For security, this ought to restrict the origin of the target iframe
-        let restrictedTargetOrigin = "*"; 
+        let restrictedTargetOrigin = siblingUrl(null, rApplet, rSubPath);
         iframe.iFrameResizer.sendMessage({type: MessageTypes.QueryResponse, payload}, restrictedTargetOrigin);
     }, []);
 

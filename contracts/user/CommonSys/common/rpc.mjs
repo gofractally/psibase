@@ -262,9 +262,8 @@ export function executeCallback(callbackId, response)
 function sendToParent(message)
 {
     if ('parentIFrame' in window) {
-        // Todo - Restrict that messages should be sent to 
-        //   the expected origin
-        parentIFrame.sendMessage(message, "*");
+        // Specify siblingUrl to prevent any malicious site from mimicking common-sys.
+        parentIFrame.sendMessage(message, siblingUrl(null,null,null));
     }
     else
     {
@@ -422,9 +421,7 @@ export async function initializeApplet(initializer = ()=>{})
     redirectIfAccessedDirectly();
 
     window.iFrameResizer = {
-        // TODO: [Security] Need to include targetOrigin, otherwise malicious applets could embed other
-        //  applets inside them and pretend to be core
-        targetOrigin: siblingUrl(null, null, null),
+        targetOrigin: siblingUrl(null, null, null), // Prevents any malicious site from mimicking common-sys.
         onMessage: (msg)=>{
             let {type, payload} = msg;
             if (type === undefined || payload === undefined)
