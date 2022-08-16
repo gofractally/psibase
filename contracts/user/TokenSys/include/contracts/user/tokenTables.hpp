@@ -13,22 +13,22 @@ namespace UserContract
 {
    struct InfSettingsRecord
    {
-      uint64_t daily_limit_pct;
-      uint64_t daily_limit_qty;
-      uint64_t yearly_limit_pct;
+      uint64_t dailyLimitPct;
+      uint64_t dailyLimitQty;
+      uint64_t yearlyLimitPct;
 
       auto operator<=>(const InfSettingsRecord&) const = default;
    };
-   PSIO_REFLECT(InfSettingsRecord, daily_limit_pct, daily_limit_qty, yearly_limit_pct);
+   PSIO_REFLECT(InfSettingsRecord, dailyLimitPct, dailyLimitQty, yearlyLimitPct);
 
    struct InfStatsRecord
    {
-      int64_t avg_daily;
-      int64_t avg_yearly;
+      int64_t avgDaily;
+      int64_t avgYearly;
 
       auto operator<=>(const InfStatsRecord&) const = default;
    };
-   PSIO_REFLECT(InfStatsRecord, avg_daily, avg_yearly);
+   PSIO_REFLECT(InfStatsRecord, avgDaily, avgYearly);
 
    struct InflationRecord
    {

@@ -12,9 +12,9 @@ namespace UserContract
 
    struct Precision
    {
-      static constexpr uint8_t          PRECISION_MIN = 0;
-      static constexpr uint8_t          PRECISION_MAX = 16;
-      static constexpr std::string_view error_invalid = "Value exceeds allowed Precision range";
+      static constexpr uint8_t          precisionMin = 0;
+      static constexpr uint8_t          precisionMax = 16;
+      static constexpr std::string_view errorInvalid = "Value exceeds allowed Precision range";
 
       uint8_t value;
 
@@ -25,7 +25,7 @@ namespace UserContract
       // TODO: from_json doesn't enforce yet
       static void fracpack_validate(Precision p)
       {
-         psibase::check(PRECISION_MIN <= p.value && p.value <= PRECISION_MAX, error_invalid);
+         psibase::check(precisionMin <= p.value && p.value <= precisionMax, errorInvalid);
       }
 
       friend std::strong_ordering operator<=>(const Precision&, const Precision&) = default;

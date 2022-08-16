@@ -101,38 +101,6 @@ bool psibase::TraceResult::failed(std::string_view expected)
    return false;
 }
 
-// TODO
-bool psibase::TraceResult::diskConsumed(
-    const std::vector<std::pair<AccountNumber, int64_t>>& consumption)
-{
-   //const vector<ActionTrace>& actions = trace.actionTraces;
-   //const auto& ram_deltas = actions.at(0).account_ram_deltas;
-
-   {
-       //INFO("Check for equality in the total number of RAM changes");
-       //CHECK(ram_deltas.size() == consumption.size());
-   }
-
-   {
-      //INFO("Check that each actual RAM delta was in the set of expected deltas");
-      // for (const auto& delta : ram_deltas)
-      // {
-      //    bool foundMatch =
-      //        std::any_of(consumption.begin(), consumption.end(), [&](const auto& cPair) {
-      //           return cPair.first == delta.account && cPair.second == delta.delta;
-      //        });
-      //    if (!foundMatch)
-      //    {
-      //       INFO("Real RAM Delta: [" << delta.account.to_string() << "]["
-      //                                << std::to_string(delta.delta) << "]");
-      //       CHECK(false);
-      //    }
-      // }
-   }
-
-   return true;
-}
-
 std::vector<char> psibase::readWholeFile(std::string_view filename)
 {
    std::vector<char> result;

@@ -69,11 +69,6 @@ SCENARIO("Minting & burning nfts")
          auto nft1 = a.getNft(mint.returnVal()).returnVal();
 
          t.startBlock();
-         THEN("Alice consumes storage space as expected")
-         {
-            CHECK(mint.diskConsumed({{alice.id, DiskUsage_NftRecord::firstEmplace}}));
-            CHECK(storageBillingImplemented);
-         }
          THEN("Alice can burn the NFT")
          {  //
             CHECK(a.burn(nft1.id).succeeded());
@@ -106,17 +101,6 @@ SCENARIO("Minting & burning nfts")
                NftRecord expectedNft = nft1;
                expectedNft.id++;
                CHECK(nft2 == expectedNft);
-            }
-         }
-         AND_WHEN("Bob mints an NFT")
-         {
-            auto mint = b.mint();
-            t.startBlock();
-
-            THEN("Bob's pays for an expected amount of storage space")
-            {
-               CHECK(mint.diskConsumed({{bob.id, DiskUsage_NftRecord::subsequentEmplace}}));
-               CHECK(storageBillingImplemented);
             }
          }
       }
@@ -222,12 +206,6 @@ SCENARIO("Transferring NFTs")
                auto newNft = b.getNft(nft.id).returnVal();
                CHECK(newNft.owner == bob.id);
             }
-            THEN("The payer for storage costs of the NFT are updated accordingly")
-            {
-               CHECK(credit.diskConsumed({{alice.id, -1 * DiskUsage_NftRecord::update},
-                                          {bob.id, DiskUsage_NftRecord::update}}));
-               CHECK(storageBillingImplemented);
-            }
             THEN("Alice has no chance to uncredit the NFT")
             {
                CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
@@ -263,11 +241,6 @@ SCENARIO("Transferring NFTs")
                {
                   auto debit = b.debit(nft.id, "memo");
                   CHECK(debit.succeeded());
-                  AND_THEN("The payer for storage costs of the NFT are updated accordingly")
-                  {
-                     debit.diskConsumed({{alice.id, -1 * DiskUsage_NftRecord::update},
-                                         {bob.id, DiskUsage_NftRecord::update}});
-                  }
                }
                THEN("Alice may uncredit the NFT")
                {
