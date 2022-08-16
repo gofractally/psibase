@@ -1,8 +1,11 @@
-use crate::{new_account_action, reg_server, store_sys, without_tapos, Args, Error};
+use crate::{
+    new_account_action, reg_server, set_auth_contract_action, set_key_action, store_sys,
+    without_tapos, Args, Error,
+};
 use anyhow::Context;
 use fracpack::Packable;
 use libpsibase::{
-    account, method, AccountNumber, Action, Fracpack, SharedGenesisActionData,
+    account, method, AccountNumber, Action, Fracpack, PublicKey, SharedGenesisActionData,
     SharedGenesisContract, SignedTransaction,
 };
 use serde_json::Value;
@@ -12,8 +15,33 @@ use serde_json::Value;
 #[derive(Fracpack)]
 struct Empty {}
 
-pub(super) async fn boot(args: &Args, client: reqwest::Client) -> Result<(), anyhow::Error> {
-    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx()];
+const ACCOUNTS: [AccountNumber; 18] = [
+    account!("account-sys"),
+    account!("alice"),
+    account!("auth-ec-sys"),
+    account!("auth-fake-sys"),
+    account!("bob"),
+    account!("common-sys"),
+    account!("explore-sys"),
+    account!("nft-sys"),
+    account!("proxy-sys"),
+    account!("r-account-sys"),
+    account!("r-ath-ec-sys"),
+    account!("r-proxy-sys"),
+    account!("r-tok-sys"),
+    account!("setcode-sys"),
+    account!("symbol-sys"),
+    account!("token-sys"),
+    account!("transact-sys"),
+    account!("verifyec-sys"),
+];
+
+pub(super) async fn boot(
+    args: &Args,
+    client: reqwest::Client,
+    key: &Option<PublicKey>,
+) -> Result<(), anyhow::Error> {
+    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx(key)];
     push_boot(args, client, new_signed_transactions.packed_bytes()).await?;
     println!("Ok");
     Ok(())
@@ -143,7 +171,7 @@ fn boot_trx() -> SignedTransaction {
     }
 }
 
-fn common_startup_trx() -> SignedTransaction {
+fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     let mut init_actions = vec![
         Action {
             sender: account!("account-sys"),
@@ -287,6 +315,13 @@ fn common_startup_trx() -> SignedTransaction {
     actions.append(&mut explore_sys_files);
     actions.append(&mut token_sys_files);
     actions.append(&mut create_and_fund_example_users);
+
+    if let Some(k) = key {
+        for account in ACCOUNTS {
+            actions.push(set_key_action(account, k));
+            actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+        }
+    }
 
     SignedTransaction {
         transaction: without_tapos(actions).packed_bytes(),

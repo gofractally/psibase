@@ -52,7 +52,9 @@ namespace system_contract
             return;
          }
       }
-      abortMessage("transaction is not signed with key " + publicKeyToString(row->pubkey));
+      abortMessage("transaction is not signed with key " + publicKeyToString(row->pubkey) +
+                   " needed to authenticate sender " + action.sender.str() + " for action " +
+                   action.contract.str() + "::" + action.method.str());
    }
 
    void AuthEcSys::newAccount(psibase::AccountNumber account, psibase::PublicKey payload)

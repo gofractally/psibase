@@ -65,6 +65,8 @@ This will create a new chain which has:
 - A set of system contracts suitable for development
 - A set of web-based user interfaces suitable for development
 
+`psibase boot` creates system accounts with no authentication, making it easy to manage them. If you intend to make the chain public, use boot's `-k` or `--key` option to set the public key for those accounts.
+
 You may now interact with the chain using:
 
 - The web UI at [http://psibase.127.0.0.1.sslip.io:8080/](http://psibase.127.0.0.1.sslip.io:8080/)

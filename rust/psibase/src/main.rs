@@ -32,7 +32,7 @@ struct Args {
     api: Url,
 
     /// Sign with this key (repeatable)
-    #[clap(short = 'k', long, value_name = "KEY")]
+    #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<PrivateKey>,
 
     #[clap(subcommand)]
@@ -42,7 +42,11 @@ struct Args {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Boot a development chain
-    Boot {},
+    Boot {
+        /// Set all accounts to authenticate using this key
+        #[clap(short = 'k', long, value_name = "KEY")]
+        key: Option<PublicKey>,
+    },
 
     /// Deploy a contract
     Deploy {
@@ -299,7 +303,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Commands::Boot {} => boot::boot(&args, client).await?,
+        Commands::Boot { key } => boot::boot(&args, client, key).await?,
         Commands::Deploy {
             account,
             filename,
