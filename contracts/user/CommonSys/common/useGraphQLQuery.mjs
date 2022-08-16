@@ -7,10 +7,6 @@ import { postGraphQLGetJson } from './rpc.mjs';
 //     errors?,     // GraphQL errors, if any
 // }
 export function useGraphQLQuery(url, query, extraDependency) {
-    const [cachedQueryResult, setCachedQueryResult] = React.useState({
-        isLoading: true,
-        isError: false,
-    });
     // non-signalling state
     const [state] = React.useState({
         mounted: true,
@@ -18,15 +14,37 @@ export function useGraphQLQuery(url, query, extraDependency) {
         query: null,
         fetchId: 0,
         extraDependency: null,
+        refreshRequested: true,
     });
+    const [cachedQueryResult, setCachedQueryResult] = React.useState({
+        isLoading: true,
+        isError: false,
+        refresh: () => { state.refreshRequested = true; },
+    });
+    const queryAndPackageResponse = async (url, query, fetchId) => {
+        console.info('queryAndPackageResponse.fetching...');
+        let queryResult = await postGraphQLGetJson(url, query);
+        console.info('useGraphQLQuery.queryResult:');
+        console.info(queryResult);
+        if (state.mounted && fetchId == state.fetchId) {
+            setCachedQueryResult({
+                ...queryResult,
+                isLoading: false,
+                isError: Boolean(queryResult.errors),
+                refresh: () => { state.refreshRequested = true; },
+            });
+            state.refreshRequested = false;
+        }
+    };
     React.useEffect(() => {
         return () => {
             state.mounted = false;
         };
     }, []);
     React.useEffect(() => {
+        console.info('useGraphQLQuery().useEffect() to fetch');
         (async () => {
-            if (state.url !== url || state.query !== query || state.extraDependency !== extraDependency) {
+            if (state.url !== url || state.query !== query || state.extraDependency !== extraDependency ) { // || state.refreshRequested) {
                 state.url = url;
                 state.query = query;
                 state.extraDependency = extraDependency;
@@ -34,19 +52,13 @@ export function useGraphQLQuery(url, query, extraDependency) {
                 let fetchId = state.fetchId;
                 if (url && query) {
                     try {
-                        let queryResult = await postGraphQLGetJson(url, query);
-                        if (state.mounted && fetchId == state.fetchId) {
-                            setCachedQueryResult({
-                                ...queryResult,
-                                isLoading: false,
-                                isError: Boolean(queryResult.errors),
-                            });
-                        }
+                        await queryAndPackageResponse(url, query, fetchId);
                     } catch (e) {
                         if (state.mounted && fetchId == state.fetchId) {
                             setCachedQueryResult({
                                 isLoading: false,
                                 isError: true,
+                                refresh: () => { console.error("refresh() called in catch..."); },
                                 errors: [{ message: e + "" }],
                             });
                         }
@@ -85,6 +97,8 @@ export function useGraphQLPagedQuery(
     const [extraDependency, setExtraDependency] = React.useState(0);
     const [args, setArgs] = React.useState(`first:${pageSize}`);
     const result = useGraphQLQuery(url, query.replace("@page@", args), extraDependency);
+    // console.info("useGraphQLPagedQuery().result:");
+    // console.info(result);
     const pageInfo = getPageInfo(result) || {
         hasPreviousPage: false,
         hasNextPage: false,
