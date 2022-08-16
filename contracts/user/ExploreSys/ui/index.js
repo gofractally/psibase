@@ -32,6 +32,10 @@ const App = () => {
             return;
         }
         console.info(`Explorer.useEffect() called; pagedResult.data exists...`);
+        const timeout = setTimeout(() => {
+            console.info('calling last()')
+            pagedResult.last();
+        }, 5000);
         // const interval=setInterval(()=>{
         //     console.info("Interval: refreshing data...");
         //     console.info('pagedResult:');
@@ -55,6 +59,10 @@ const App = () => {
     // }, [])
 
     console.info('rendering...');
+    // if (!pagedResult.result.data) {
+    //     console.info('no data yet...');
+    //     return html`<div>Loading data...</div>`;
+    // }
     console.info('pagedResult:');
     console.info(pagedResult);
     return html`
