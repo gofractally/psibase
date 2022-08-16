@@ -71,6 +71,15 @@ enum Commands {
         /// website, serve RPC requests, and serve GraphQL requests.
         #[clap(short = 'p', long)]
         register_proxy: bool,
+
+        /// Sender to use when creating the account.
+        #[clap(
+            short = 'S',
+            long,
+            value_name = "SENDER",
+            default_value = "account-sys"
+        )]
+        sender: AccountNumber,
     },
 
     /// Upload a file to a contract
@@ -107,14 +116,14 @@ pub struct NewAccountAction {
     pub require_new: bool,
 }
 
-fn new_account_action(account: AccountNumber) -> Action {
+fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
     let new_account_action = NewAccountAction {
         account,
         auth_contract: account!("auth-fake-sys"),
         require_new: false,
     };
     Action {
-        sender: account!("account-sys"),
+        sender,
         contract: account!("account-sys"),
         method: method!("newAccount"),
         raw_data: new_account_action.packed_bytes(),
@@ -223,9 +232,11 @@ pub async fn with_tapos(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn deploy(
     args: &Args,
     client: reqwest::Client,
+    sender: AccountNumber,
     account: AccountNumber,
     filename: &str,
     create_account: &Option<PublicKey>,
@@ -241,7 +252,7 @@ async fn deploy(
     }
 
     if create_account.is_some() || create_insecure_account {
-        actions.push(new_account_action(account));
+        actions.push(new_account_action(sender, account));
     }
 
     // This happens before the set_code as a safety measure.
@@ -310,10 +321,12 @@ async fn main() -> Result<(), anyhow::Error> {
             create_account,
             create_insecure_account,
             register_proxy,
+            sender,
         } => {
             deploy(
                 &args,
                 client,
+                *sender,
                 (*account).into(),
                 filename,
                 create_account,

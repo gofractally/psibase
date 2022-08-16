@@ -277,8 +277,8 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     // TODO: make this optional
     #[allow(clippy::inconsistent_digit_grouping)]
     let mut create_and_fund_example_users = vec![
-        new_account_action(account!("alice")),
-        new_account_action(account!("bob")),
+        new_account_action(account!("account-sys"), account!("alice")),
+        new_account_action(account!("account-sys"), account!("bob")),
         Action {
             sender: account!("symbol-sys"),
             contract: account!("token-sys"),
