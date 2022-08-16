@@ -517,14 +517,6 @@ export function setQueries(queries)
     set({targetArray: qrs, newElements: queries}, "setQueries");
 }
 
-function startOperation()
-{
-    sendToParent({
-        type: MessageTypes.Core,
-        payload: {command: "startOp"},
-    });
-}
-
 function stopOperation()
 {
     let tempDelay = 100; // TODO: remove this, add message buffering to core

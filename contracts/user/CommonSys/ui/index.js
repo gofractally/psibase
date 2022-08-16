@@ -295,28 +295,11 @@ function App() {
         return Applet({appletStr, subPath, state: AppletStates.primary}, handleMessage);
     }, [appletStr, subPath]);
 
-    // TODO: Extract method between sendOp, sendQuery, sendQueryResponse - lots of duplicate code
-    let sendOp = useCallback((sender, receiver, identifier, params)=>{
+    
+    let sendMessage = useCallback((messageType, sender, receiver, payload, shouldOpenReceiver)=>{
         let {rApplet, rSubPath} = receiver;
-        open({appletStr: rApplet, subPath: rSubPath, state: AppletStates.headless}, ()=>{
-            var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
-            if (iframe == null)
-            {
-                console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
-                return;
-            }
-    
-            // TODO: Could check that sender isn't on rApplet's blacklist before
-            //       making the IPC call.
-    
-            let restrictedTargetOrigin = siblingUrl(null, rApplet, rSubPath);
-            iframe.iFrameResizer.sendMessage({type: MessageTypes.Operation, payload: {identifier, params}}, restrictedTargetOrigin);
-        });
-    }, [open]);
 
-    let sendQuery = useCallback((sender, receiver, identifier, params, callbackId)=>{
-        let {rApplet, rSubPath} = receiver;
-        open({appletStr: rApplet, subPath: rSubPath, state: AppletStates.headless}, ()=>{
+        let callOnApplet = ()=>{
             var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
             if (iframe == null)
             {
@@ -328,32 +311,26 @@ function App() {
             //       making the IPC call.
 
             let restrictedTargetOrigin = siblingUrl(null, rApplet, rSubPath);
-            iframe.iFrameResizer.sendMessage({type: MessageTypes.Query, payload: {identifier, params, callbackId}}, restrictedTargetOrigin);
-        });
-    }, [open]);
-
-    let sendQueryResponse = useCallback((sender, receiver, payload)=>{
-        let {rApplet, rSubPath} = receiver;
-
-        if (getIndex(rApplet, rSubPath) === -1)
-        {
-            console.error("Querying applet closed before response.");
-            return;
+            iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
         }
 
-        var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
-        if (iframe == null)
+        if (!shouldOpenReceiver)
         {
-            console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
-            return;
+            if (getIndex(rApplet, rSubPath) === -1)
+            {
+                console.error("Cannot find applet target for sendMessage");
+                return;
+            }
+            callOnApplet();
         }
-
-        // TODO: Could check that sender isn't on rApplet's blacklist before
-        //       making the IPC call.        
-
-        let restrictedTargetOrigin = siblingUrl(null, rApplet, rSubPath);
-        iframe.iFrameResizer.sendMessage({type: MessageTypes.QueryResponse, payload}, restrictedTargetOrigin);
-    }, []);
+        else
+        {
+            open({appletStr: rApplet, 
+                subPath: rSubPath, 
+                state: AppletStates.headless
+            }, callOnApplet);
+        }
+    }, [open, getIndex]);
 
     let injectSender = useCallback((actions) => {
         actions.forEach(action => {
@@ -446,10 +423,14 @@ function App() {
             handle: (senderApplet, payload) => {
                 let { opApplet, opSubPath, opName, opParams } = payload;
 
-                // Todo - remove "startOp" - I replaced it with the following implicit startOp
                 currentOps = currentOps.concat([senderApplet]);
                 try{
-                    sendOp(senderApplet, {rApplet: opApplet, rSubPath: opSubPath}, opName, opParams);
+                    sendMessage(MessageTypes.Operation, 
+                        senderApplet, 
+                        {rApplet: opApplet, rSubPath: opSubPath}, 
+                        {identifier: opName, params: opParams}, 
+                        true
+                    );
                 }
                 catch (e)
                 {
@@ -482,13 +463,19 @@ function App() {
                 let {callbackId, qApplet, qSubPath, qName, qParams} = payload;
                 let coreCallbackId = addQueryCallback((response)=>{
                     let res = response.response;
-                    sendQueryResponse(
+                    sendMessage(MessageTypes.QueryResponse, 
                         {sApplet: response.senderApplet.applet, sSubPath: response.senderApplet.subPath}, 
                         {rApplet: senderApplet.applet, rSubPath: senderApplet.subPath}, 
-                        {callbackId, response: res}
+                        {callbackId, response: res}, 
+                        false
                     );
                 });
-                sendQuery(senderApplet, {rApplet: qApplet, rSubPath: qSubPath}, qName, qParams, coreCallbackId);
+                sendMessage(MessageTypes.Query, 
+                    senderApplet, 
+                    {rApplet: qApplet, rSubPath: qSubPath}, 
+                    {identifier: qName, params: qParams, callbackId: coreCallbackId}, 
+                    true
+                );
             },
         },
         {
@@ -503,7 +490,7 @@ function App() {
             },
         },
 
-    ], [open, sendOp, sendQuery, sendQueryResponse]);
+    ], [open]);
 
     let handleMessage = useCallback(async ({applet, subPath, state}, request)=>{
         let {type, payload} = request.message;
