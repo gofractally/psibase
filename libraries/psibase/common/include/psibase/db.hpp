@@ -79,8 +79,8 @@ namespace psibase
       /// * 64 bit: contract
       ///
       /// Only usable with these native functions:
-      /// * [kvPutSequential]
-      /// * [kvGetSequential]
+      /// * [putSequential]
+      /// * [getSequential]
       historyEvent,
 
       /// Short-term history event storage
@@ -99,8 +99,8 @@ namespace psibase
       /// * 64 bit: contract
       ///
       /// Only usable with these native functions:
-      /// * [kvPutSequential]
-      /// * [kvGetSequential]
+      /// * [putSequential]
+      /// * [getSequential]
       uiEvent,
 
       /// Events which go into the merkle tree
@@ -118,8 +118,8 @@ namespace psibase
       /// * 64 bit: contract
       ///
       /// Only usable with these native functions:
-      /// * [kvPutSequential]
-      /// * [kvGetSequential]
+      /// * [putSequential]
+      /// * [getSequential]
       merkleEvent,
 
       numDatabases,

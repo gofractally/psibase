@@ -240,24 +240,27 @@ namespace psibase
 
    void ExecutionContext::registerHostFunctions()
    {
+      // TODO: enable linking to disabled functions below after we finalize
+      //       their interfaces. Disabling now simplifies future upgrades.
+
       rhf_t::add<&ExecutionContextImpl::getResult>("env", "getResult");
       rhf_t::add<&ExecutionContextImpl::getKey>("env", "getKey");
       rhf_t::add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
       rhf_t::add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
-      rhf_t::add<&ExecutionContextImpl::getBillableTime>("env", "getBillableTime");
-      rhf_t::add<&ExecutionContextImpl::setMaxTransactionTime>("env", "setMaxTransactionTime");
+      // rhf_t::add<&ExecutionContextImpl::getBillableTime>("env", "getBillableTime");
+      // rhf_t::add<&ExecutionContextImpl::setMaxTransactionTime>("env", "setMaxTransactionTime");
       rhf_t::add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&ExecutionContextImpl::call>("env", "call");
       rhf_t::add<&ExecutionContextImpl::setRetval>("env", "setRetval");
       rhf_t::add<&ExecutionContextImpl::kvPut>("env", "kvPut");
-      rhf_t::add<&ExecutionContextImpl::kvPutSequential>("env", "kvPutSequential");
+      rhf_t::add<&ExecutionContextImpl::putSequential>("env", "putSequential");
       rhf_t::add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
       rhf_t::add<&ExecutionContextImpl::kvGet>("env", "kvGet");
-      rhf_t::add<&ExecutionContextImpl::kvGetSequential>("env", "kvGetSequential");
+      rhf_t::add<&ExecutionContextImpl::getSequential>("env", "getSequential");
       rhf_t::add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
       rhf_t::add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
       rhf_t::add<&ExecutionContextImpl::kvMax>("env", "kvMax");
-      rhf_t::add<&ExecutionContextImpl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
+      // rhf_t::add<&ExecutionContextImpl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
    }
 
    void ExecutionContext::execProcessTransaction(ActionContext& actionContext,

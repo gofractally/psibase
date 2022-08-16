@@ -15,7 +15,7 @@ namespace psibase
    PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
 
    // TODO: consider adding headers to this
-   /// An RPC Request
+   /// An HTTP Request
    ///
    /// Most contracts receive this via their `serveSys` action.
    /// [psibase::ProxySys] receives it via its `serve` exported function.
@@ -30,7 +30,7 @@ namespace psibase
    };
    PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, body)
 
-   /// An RPC reply
+   /// An HTTP reply
    ///
    /// Contracts return this from their `serveSys` action.
    struct HttpReply

@@ -249,7 +249,6 @@ namespace psibase
       auto& console =
           std::get<ConsoleTrace>(currentActContext->actionTrace.innerTraces.back().inner).console;
       console.append(str.begin(), str.end());
-      clearResult(*this);
    }
 
    void NativeFunctions::abortMessage(eosio::vm::span<const char> str)
@@ -266,6 +265,7 @@ namespace psibase
       // they shouldn't.
       check(code.flags & CodeRow::isSubjective,
             "unprivileged contracts may not call getBillableTime");
+      clearResult(*this);
       return transactionContext.getBillableTime().count();
    }
 
@@ -273,6 +273,7 @@ namespace psibase
    {
       check(code.flags & CodeRow::canSetTimeLimit,
             "setMaxTransactionTime requires canSetTimeLimit privilege");
+      clearResult(*this);
       if (transactionContext.blockContext.isProducing)
          transactionContext.setWatchdog(
              std::chrono::duration_cast<std::chrono::steady_clock::duration>(
@@ -377,7 +378,7 @@ namespace psibase
    }
 
    // TODO: restrict value size
-   uint64_t NativeFunctions::kvPutSequential(uint32_t db, eosio::vm::span<const char> value)
+   uint64_t NativeFunctions::putSequential(uint32_t db, eosio::vm::span<const char> value)
    {
       return timeDb(  //
           *this,
@@ -399,13 +400,13 @@ namespace psibase
              else if (db == uint32_t(DbId::uiEvent))
                 indexNumber = dbStatus.nextUIEventNumber++;
              else
-                check(false, "kvPutSequential: unsupported db");
+                check(false, "putSequential: unsupported db");
              database.kvPut(DatabaseStatusRow::db, dbStatus.key(), dbStatus);
 
              database.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
              return indexNumber;
           });
-   }  // kvPutSequential()
+   }  // putSequential()
 
    void NativeFunctions::kvRemove(uint32_t db, eosio::vm::span<const char> key)
    {
@@ -439,7 +440,7 @@ namespace psibase
           });
    }
 
-   uint32_t NativeFunctions::kvGetSequential(uint32_t db, uint64_t indexNumber)
+   uint32_t NativeFunctions::getSequential(uint32_t db, uint64_t indexNumber)
    {
       return timeDb(  //
           *this,
