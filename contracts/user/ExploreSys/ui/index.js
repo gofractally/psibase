@@ -23,27 +23,26 @@ const App = () => {
             }
         }
     }`;
-    const pagedResult = useGraphQLPagedQuery('/graphql', query, 10, (result) => result.data?.blocks.pageInfo);
+    const pagedResult = useGraphQLPagedQuery('/graphql', query, {
+        pageSize: 10,
+        getPageInfo: (result) => result.data?.blocks.pageInfo,
+        defaultArgs: `last: 10`
+    });
     const tdStyle = { border: "1px solid" };
     
     React.useEffect(()=>{
         if(!pagedResult.result.data) {
-            console.info('Explorer.useEffect().returning because !pagedResult.data');
+            console.info('Explorer.useEffect().returning because !pagedResult.result.data');
             return;
         }
         console.info(`Explorer.useEffect() called; pagedResult.data exists...`);
-        const timeout = setTimeout(() => {
-            console.info('calling last()')
+        const interval=setInterval(()=>{
+            console.info("\n========= BEGIN ============")
+            console.info("Interval: refreshing data...");
             pagedResult.last();
-        }, 5000);
-        // const interval=setInterval(()=>{
-        //     console.info("Interval: refreshing data...");
-        //     console.info('pagedResult:');
-        //     console.info(pagedResult);
-        //     pagedResult.last();
-        // },10000)
+        },2000)
              
-        // return ()=> {
+        // return ()=> { // figure out why this is running when it's running
         //     console.info('Explorer.useEffect().dismount');
         //     clearInterval(interval);
         // }
@@ -59,15 +58,15 @@ const App = () => {
     // }, [])
 
     console.info('rendering...');
-    // if (!pagedResult.result.data) {
-    //     console.info('no data yet...');
-    //     return html`<div>Loading data...</div>`;
-    // }
+    if (!pagedResult.result.data) {
+        console.info('no data yet...');
+        return html`<div>Loading data...</div>`;
+    }
     console.info('pagedResult:');
     console.info(pagedResult);
     return html`
         <div class="ui container">
-            <a href=${siblingUrl()}>psibase</a>
+            <a href=${siblingUrl()}>chain</a>
             <h1>explore-sys</h1>
         
             <button onClick=${pagedResult.first}>First</button>
