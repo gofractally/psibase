@@ -16,6 +16,10 @@ export function useGraphQLQuery(url, query) {
         setRefetch(true);
     }
     const queryAndPackageResponse = async (url, query) => {
+        setCachedQueryResult((prevState) => ({
+            ...prevState,
+            isLoading: true,
+        }));
         let queryResult = await postGraphQLGetJson(url, query);
         setCachedQueryResult({
             ...queryResult,
