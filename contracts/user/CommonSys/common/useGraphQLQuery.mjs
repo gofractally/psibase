@@ -6,8 +6,7 @@ import { postGraphQLGetJson } from './rpc.mjs';
 //     data?,       // GraphQL query result
 //     errors?,     // GraphQL errors, if any
 // }
-export function useGraphQLQuery(url, query, opts) {
-    // non-signalling state
+export function useGraphQLQuery(url, query) {
     const [refetch, setRefetch] = React.useState(true);
     const [cachedQueryResult, setCachedQueryResult] = React.useState({
         isLoading: true,
@@ -71,7 +70,7 @@ export function useGraphQLPagedQuery(
     // }
 ) {
     const [args, setArgs] = React.useState(opts.defaultArgs || `first:${opts.pageSize}`);
-    const [result, invalidateQuery] = useGraphQLQuery(url, query.replace("@page@", args), opts);
+    const [result, invalidateQuery] = useGraphQLQuery(url, query.replace("@page@", args));
 
     const pageInfo = opts.getPageInfo(result) || {
         hasPreviousPage: false,
