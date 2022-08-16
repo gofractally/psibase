@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 mod boot;
 
 custom_error! { Error
-    OneCreateOnly       = "--create-account and --create-insecure-account cannot be used together",
-    Msg{s:String}       = "{s}",
+    Msg{s:String}               = "{s}",
+    StaticMsg{s:&'static str}   = "{s}",
 }
 
 /// Interact with a running psinode
@@ -32,7 +32,7 @@ struct Args {
     api: Url,
 
     /// Sign with this key (repeatable)
-    #[clap(short = 'k', long, value_name = "KEY")]
+    #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<PrivateKey>,
 
     #[clap(subcommand)]
@@ -42,7 +42,55 @@ struct Args {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Boot a development chain
-    Boot {},
+    Boot {
+        /// Set all accounts to authenticate using this key
+        #[clap(short = 'k', long, value_name = "KEY")]
+        key: Option<PublicKey>,
+    },
+
+    /// Create or modify an account
+    Create {
+        /// Account to create
+        account: ExactAccountNumber,
+
+        /// Set the account to authenticate using this key. Also works
+        /// if the account already exists.
+        #[clap(short = 'k', long, value_name = "KEY")]
+        key: Option<PublicKey>,
+
+        /// The account won't be secured; anyone can authorize as this
+        /// account without signing. This option does nothing if the
+        /// account already exists. Caution: this option should not
+        /// be used on production or public chains.
+        #[clap(short = 'i', long)]
+        insecure: bool,
+
+        /// Sender to use when creating the account.
+        #[clap(
+            short = 'S',
+            long,
+            value_name = "SENDER",
+            default_value = "account-sys"
+        )]
+        sender: ExactAccountNumber,
+    },
+
+    /// Modify an account
+    Modify {
+        /// Account to modify
+        account: ExactAccountNumber,
+
+        /// Set the account to authenticate using this key
+        #[clap(short = 'k', long, value_name = "KEY")]
+        key: Option<PublicKey>,
+
+        /// Make the account insecure, even if it has been previously
+        /// secured. Anyone will be able to authorize as this account
+        /// without signing. Caution: this option should not be used
+        /// on production or public chains.
+        #[clap(short = 'i', long)]
+        insecure: bool,
+    },
 
     /// Deploy a contract
     Deploy {
@@ -67,6 +115,15 @@ enum Commands {
         /// website, serve RPC requests, and serve GraphQL requests.
         #[clap(short = 'p', long)]
         register_proxy: bool,
+
+        /// Sender to use when creating the account.
+        #[clap(
+            short = 'S',
+            long,
+            value_name = "SENDER",
+            default_value = "account-sys"
+        )]
+        sender: ExactAccountNumber,
     },
 
     /// Upload a file to a contract
@@ -103,14 +160,14 @@ pub struct NewAccountAction {
     pub require_new: bool,
 }
 
-fn new_account_action(account: AccountNumber) -> Action {
+fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
     let new_account_action = NewAccountAction {
         account,
         auth_contract: account!("auth-fake-sys"),
         require_new: false,
     };
     Action {
-        sender: account!("account-sys"),
+        sender,
         contract: account!("account-sys"),
         method: method!("newAccount"),
         raw_data: new_account_action.packed_bytes(),
@@ -219,9 +276,94 @@ pub async fn with_tapos(
     })
 }
 
+async fn create(
+    args: &Args,
+    client: reqwest::Client,
+    sender: AccountNumber,
+    account: AccountNumber,
+    key: &Option<PublicKey>,
+    insecure: bool,
+) -> Result<(), anyhow::Error> {
+    let mut actions: Vec<Action> = Vec::new();
+
+    if key.is_some() && insecure {
+        return Err(Error::StaticMsg {
+            s: "--key and --insecure cannot be used together",
+        }
+        .into());
+    }
+    if key.is_none() && !insecure {
+        return Err(Error::StaticMsg {
+            s: "either --key or --insecure must be used",
+        }
+        .into());
+    }
+
+    actions.push(new_account_action(sender, account));
+
+    if let Some(key) = key {
+        actions.push(set_key_action(account, key));
+        actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+    }
+
+    let trx = with_tapos(&args.api, client.clone(), actions).await?;
+    push_transaction(
+        &args.api,
+        client,
+        sign_transaction(trx, &args.sign)?.packed_bytes(),
+    )
+    .await?;
+    println!("Ok");
+    Ok(())
+}
+
+async fn modify(
+    args: &Args,
+    client: reqwest::Client,
+    account: AccountNumber,
+    key: &Option<PublicKey>,
+    insecure: bool,
+) -> Result<(), anyhow::Error> {
+    let mut actions: Vec<Action> = Vec::new();
+
+    if key.is_some() && insecure {
+        return Err(Error::StaticMsg {
+            s: "--key and --insecure cannot be used together",
+        }
+        .into());
+    }
+    if key.is_none() && !insecure {
+        return Err(Error::StaticMsg {
+            s: "either --key or --insecure must be used",
+        }
+        .into());
+    }
+
+    if let Some(key) = key {
+        actions.push(set_key_action(account, key));
+        actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+    }
+
+    if insecure {
+        actions.push(set_auth_contract_action(account, account!("auth-fake-sys")));
+    }
+
+    let trx = with_tapos(&args.api, client.clone(), actions).await?;
+    push_transaction(
+        &args.api,
+        client,
+        sign_transaction(trx, &args.sign)?.packed_bytes(),
+    )
+    .await?;
+    println!("Ok");
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn deploy(
     args: &Args,
     client: reqwest::Client,
+    sender: AccountNumber,
     account: AccountNumber,
     filename: &str,
     create_account: &Option<PublicKey>,
@@ -233,11 +375,14 @@ async fn deploy(
     let mut actions: Vec<Action> = Vec::new();
 
     if create_account.is_some() && create_insecure_account {
-        return Err(Error::OneCreateOnly.into());
+        return Err(Error::StaticMsg {
+            s: "--create-account and --create-insecure-account cannot be used together",
+        }
+        .into());
     }
 
     if create_account.is_some() || create_insecure_account {
-        actions.push(new_account_action(account));
+        actions.push(new_account_action(sender, account));
     }
 
     // This happens before the set_code as a safety measure.
@@ -299,17 +444,40 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Commands::Boot {} => boot::boot(&args, client).await?,
+        Commands::Boot { key } => boot::boot(&args, client, key).await?,
+        Commands::Create {
+            account,
+            key,
+            insecure,
+            sender,
+        } => {
+            create(
+                &args,
+                client,
+                (*sender).into(),
+                (*account).into(),
+                key,
+                *insecure,
+            )
+            .await?
+        }
+        Commands::Modify {
+            account,
+            key,
+            insecure,
+        } => modify(&args, client, (*account).into(), key, *insecure).await?,
         Commands::Deploy {
             account,
             filename,
             create_account,
             create_insecure_account,
             register_proxy,
+            sender,
         } => {
             deploy(
                 &args,
                 client,
+                (*sender).into(),
                 (*account).into(),
                 filename,
                 create_account,

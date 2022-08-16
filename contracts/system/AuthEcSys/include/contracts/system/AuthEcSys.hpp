@@ -11,6 +11,8 @@ namespace system_contract
    {
       psibase::AccountNumber account;
       psibase::PublicKey     pubkey;
+
+      auto byPubkey() const { return std::tuple{pubkey, account}; }
    };
    PSIO_REFLECT(AuthRecord, account, pubkey)
 
@@ -18,7 +20,7 @@ namespace system_contract
    {
      public:
       static constexpr auto contract = psibase::AccountNumber("auth-ec-sys");
-      using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::pubkey>;
+      using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::byPubkey>;
       using Tables    = psibase::ContractTables<AuthTable>;
 
       void checkAuthSys(uint32_t                    flags,

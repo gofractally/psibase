@@ -128,20 +128,22 @@ namespace psibase
       }
    }
 
+   // TODO: eliminate extra copies
    static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit)
    {
+      ProcessTransactionArgs args{.transaction           = self.signedTransaction.transaction,
+                                  .checkFirstAuthAndExit = checkFirstAuthAndExit};
+
       Action action{
           .sender   = AccountNumber(),
           .contract = transactionContractNum,
-          .rawData  = {self.signedTransaction.transaction.data(),
-                       self.signedTransaction.transaction.data() +
-                           self.signedTransaction.transaction.size()},
+          .rawData  = psio::convert_to_frac(args),
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
       ActionContext ac = {self, action, self.transactionTrace.actionTraces.back()};
       auto&         ec = self.getExecutionContext(transactionContractNum);
-      ec.execProcessTransaction(ac, checkFirstAuthAndExit);
+      ec.execProcessTransaction(ac);
    }
 
    void TransactionContext::execVerifyProof(size_t i)
@@ -158,7 +160,7 @@ namespace psibase
             "proofs and claims must have same size");
       auto  id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());
       auto& proof = signedTransaction.proofs[i];
-      VerifyData data{
+      VerifyArgs data{
           .transactionHash = id,
           .claim           = claimsView[i],
           .proof           = proof,

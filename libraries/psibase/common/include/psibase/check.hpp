@@ -4,10 +4,10 @@
 #include <string_view>
 
 #ifdef COMPILING_WASM
-#define PSIBASE_INTRINSIC(x) [[clang::import_name(#x)]]
+#define PSIBASE_NATIVE(x) [[clang::import_name(#x)]]
 #else
 #include <stdexcept>
-#define PSIBASE_INTRINSIC(x)
+#define PSIBASE_NATIVE(x)
 #endif
 
 namespace psibase
@@ -19,7 +19,7 @@ namespace psibase
       /// Abort with `message`
       ///
       /// Message should be UTF8.
-      PSIBASE_INTRINSIC(abortMessage)
+      PSIBASE_NATIVE(abortMessage)
       [[noreturn]] void abortMessage(const char* message, uint32_t len);
    }  // namespace raw
 
@@ -45,4 +45,4 @@ namespace psibase
    }
 }  // namespace psibase
 
-#undef PSIBASE_INTRINSIC
+#undef PSIBASE_NATIVE

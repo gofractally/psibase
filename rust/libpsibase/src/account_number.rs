@@ -29,7 +29,7 @@ pub struct AccountNumber {
 }
 
 impl AccountNumber {
-    pub fn new(value: u64) -> Self {
+    pub const fn new(value: u64) -> Self {
         AccountNumber { value }
     }
 
