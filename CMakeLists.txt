@@ -115,6 +115,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${THIRD_SRC}/useLocalStorageState.js                          ${THIRD_DEST}
 
         COMMAND         cargo build -r --bin psibase --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+
         INSTALL_COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
         COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
     )

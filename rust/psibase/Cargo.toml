@@ -11,6 +11,7 @@ clap = {version = "3.1", features = ["derive"]}
 custom_error = "1.9"
 fracpack = { version = "0.1.0", path = "../fracpack" }
 libpsibase = { version = "0.1.0", path = "../libpsibase" }
+mime_guess = "2.0"
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
 secp256k1 = "0.22"
 serde = { version = "1.0", features = ["derive"] }
