@@ -39,7 +39,7 @@ async fn get_tapos_for_head_impl(
     base_url: &Url,
     client: reqwest::Client,
 ) -> Result<TaposRefBlock, anyhow::Error> {
-    Ok(as_json(client.get(base_url.join("common/tapos/head")?)).await?)
+    as_json(client.get(base_url.join("common/tapos/head")?)).await
 }
 
 pub async fn get_tapos_for_head(

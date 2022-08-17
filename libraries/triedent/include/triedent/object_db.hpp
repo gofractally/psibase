@@ -330,7 +330,11 @@ namespace triedent
 
       if (mlock(_region->get_address(), existing_size) < 0)
          if (!allow_slow)
-            throw std::runtime_error("unable to lock memory for " + idfile.generic_string());
+            throw std::runtime_error(
+                "unable to lock memory for " + idfile.generic_string() +
+                ". Try upgrading your shell's limits using \"sudo prlimit --memlock=-1 --pid $$\". "
+                "If that doesn't work, try running psinode with \"sudo\". If that doesn't work, "
+                "then try using psinode's \"--slow\" option.");
 
       _header = reinterpret_cast<object_db_header*>(_region->get_address());
 

@@ -2,6 +2,7 @@
 #include <psibase/Contract.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/contractEntry.hpp>
+#include <psibase/serveContent.hpp>
 
 namespace system_contract
 {
@@ -9,11 +10,13 @@ namespace system_contract
    {
      public:
       static constexpr auto contract = psibase::AccountNumber("r-ath-ec-sys");
-      auto serveSys(psibase::RpcRequestData request) -> std::optional<psibase::RpcReplyData>;
+      using Tables                   = psibase::ContractTables<psibase::WebContentTable>;
+
+      auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
      private:
-      std::optional<psibase::RpcReplyData> _serveRestEndpoints(psibase::RpcRequestData& request);
+      std::optional<psibase::HttpReply> serveRestEndpoints(psibase::HttpRequest& request);
    };
    PSIO_REFLECT(RAuthEcSys,  //
                 method(serveSys, request),

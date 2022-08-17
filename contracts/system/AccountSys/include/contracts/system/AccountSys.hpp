@@ -26,6 +26,18 @@ namespace system_contract
    PSIO_REFLECT(Account, accountNum, authContract)
    using AccountTable = psibase::Table<Account, &Account::key>;
 
+   struct SingletonKey
+   {
+   };
+   PSIO_REFLECT(SingletonKey);
+   struct CreatorRecord
+   {
+      SingletonKey           key;
+      psibase::AccountNumber accountCreator;
+   };
+   PSIO_REFLECT(CreatorRecord, key, accountCreator);
+   using CreatorTable = psibase::Table<CreatorRecord, &CreatorRecord::key>;
+
    // TODO: account deletion, with an index to prevent reusing IDs
    // TODO: a mode which restricts which account may use newAccount.
    //       also let the UI know.
@@ -35,7 +47,7 @@ namespace system_contract
       static constexpr auto                   contract    = psibase::AccountNumber("account-sys");
       static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
 
-      using Tables = psibase::ContractTables<AccountSysStatusTable, AccountTable>;
+      using Tables = psibase::ContractTables<AccountSysStatusTable, AccountTable, CreatorTable>;
 
       void startup();
       void newAccount(psibase::AccountNumber name,
@@ -43,6 +55,8 @@ namespace system_contract
                       bool                   requireNew);
       void setAuthCntr(psibase::AccountNumber authContract);
       bool exists(psibase::AccountNumber num);
+
+      void setCreator(psibase::AccountNumber creator);
 
       struct Events
       {
@@ -62,5 +76,8 @@ namespace system_contract
                 method(startup, existing_accounts),
                 method(newAccount, name, authContract, requireNew),
                 method(setAuthCntr, authContract),
-                method(exists, num))
+                method(exists, num),
+                method(setCreator, creator)
+                //
+   )
 }  // namespace system_contract

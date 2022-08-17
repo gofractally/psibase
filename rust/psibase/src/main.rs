@@ -9,12 +9,13 @@ use libpsibase::{
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::fs::{metadata, read_dir};
 
 mod boot;
 
 custom_error! { Error
-    OneCreateOnly       = "--create-account and --create-insecure-account cannot be used together",
-    Msg{s:String}       = "{s}",
+    Msg{s:String}               = "{s}",
+    StaticMsg{s:&'static str}   = "{s}",
 }
 
 /// Interact with a running psinode
@@ -32,7 +33,7 @@ struct Args {
     api: Url,
 
     /// Sign with this key (repeatable)
-    #[clap(short = 'k', long, value_name = "KEY")]
+    #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<PrivateKey>,
 
     #[clap(subcommand)]
@@ -42,7 +43,55 @@ struct Args {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Boot a development chain
-    Boot {},
+    Boot {
+        /// Set all accounts to authenticate using this key
+        #[clap(short = 'k', long, value_name = "KEY")]
+        key: Option<PublicKey>,
+    },
+
+    /// Create or modify an account
+    Create {
+        /// Account to create
+        account: ExactAccountNumber,
+
+        /// Set the account to authenticate using this key. Also works
+        /// if the account already exists.
+        #[clap(short = 'k', long, value_name = "KEY")]
+        key: Option<PublicKey>,
+
+        /// The account won't be secured; anyone can authorize as this
+        /// account without signing. This option does nothing if the
+        /// account already exists. Caution: this option should not
+        /// be used on production or public chains.
+        #[clap(short = 'i', long)]
+        insecure: bool,
+
+        /// Sender to use when creating the account.
+        #[clap(
+            short = 'S',
+            long,
+            value_name = "SENDER",
+            default_value = "account-sys"
+        )]
+        sender: ExactAccountNumber,
+    },
+
+    /// Modify an account
+    Modify {
+        /// Account to modify
+        account: ExactAccountNumber,
+
+        /// Set the account to authenticate using this key
+        #[clap(short = 'k', long, value_name = "KEY")]
+        key: Option<PublicKey>,
+
+        /// Make the account insecure, even if it has been previously
+        /// secured. Anyone will be able to authorize as this account
+        /// without signing. Caution: this option should not be used
+        /// on production or public chains.
+        #[clap(short = 'i', long)]
+        insecure: bool,
+    },
 
     /// Deploy a contract
     Deploy {
@@ -67,6 +116,15 @@ enum Commands {
         /// website, serve RPC requests, and serve GraphQL requests.
         #[clap(short = 'p', long)]
         register_proxy: bool,
+
+        /// Sender to use when creating the account.
+        #[clap(
+            short = 'S',
+            long,
+            value_name = "SENDER",
+            default_value = "account-sys"
+        )]
+        sender: ExactAccountNumber,
     },
 
     /// Upload a file to a contract
@@ -74,14 +132,34 @@ enum Commands {
         /// Contract to upload to
         contract: ExactAccountNumber,
 
-        /// Path to store within contract
-        path: String,
+        /// Destination file within contract
+        dest: String,
 
         /// MIME content type of file
         content_type: String,
 
-        /// Filename to upload
-        filename: String,
+        /// Source filename to upload
+        source: String,
+
+        /// Sender to use; defaults to <CONTRACT>
+        #[clap(short = 'S', long, value_name = "SENDER")]
+        sender: Option<ExactAccountNumber>,
+    },
+
+    /// Upload a directory tree to a contract
+    UploadTree {
+        /// Contract to upload to
+        contract: ExactAccountNumber,
+
+        /// Destination directory within contract
+        dest: String,
+
+        /// Source directory to upload
+        source: String,
+
+        /// Sender to use; defaults to <CONTRACT>
+        #[clap(short = 'S', long, value_name = "SENDER")]
+        sender: Option<ExactAccountNumber>,
     },
 }
 
@@ -103,14 +181,14 @@ pub struct NewAccountAction {
     pub require_new: bool,
 }
 
-fn new_account_action(account: AccountNumber) -> Action {
+fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
     let new_account_action = NewAccountAction {
         account,
         auth_contract: account!("auth-fake-sys"),
         require_new: false,
     };
     Action {
-        sender: account!("account-sys"),
+        sender,
         contract: account!("account-sys"),
         method: method!("newAccount"),
         raw_data: new_account_action.packed_bytes(),
@@ -170,10 +248,16 @@ fn reg_server(contract: AccountNumber, server_contract: AccountNumber) -> Action
     }
 }
 
-fn store_sys(contract: AccountNumber, path: &str, content_type: &str, content: &[u8]) -> Action {
+fn store_sys(
+    contract: AccountNumber,
+    sender: AccountNumber,
+    path: &str,
+    content_type: &str,
+    content: &[u8],
+) -> Action {
     let data = (path.to_string(), content_type.to_string(), content.to_vec());
     Action {
-        sender: contract,
+        sender,
         contract,
         method: method!("storeSys"),
         raw_data: data.packed_bytes(),
@@ -219,9 +303,94 @@ pub async fn with_tapos(
     })
 }
 
+async fn create(
+    args: &Args,
+    client: reqwest::Client,
+    sender: AccountNumber,
+    account: AccountNumber,
+    key: &Option<PublicKey>,
+    insecure: bool,
+) -> Result<(), anyhow::Error> {
+    let mut actions: Vec<Action> = Vec::new();
+
+    if key.is_some() && insecure {
+        return Err(Error::StaticMsg {
+            s: "--key and --insecure cannot be used together",
+        }
+        .into());
+    }
+    if key.is_none() && !insecure {
+        return Err(Error::StaticMsg {
+            s: "either --key or --insecure must be used",
+        }
+        .into());
+    }
+
+    actions.push(new_account_action(sender, account));
+
+    if let Some(key) = key {
+        actions.push(set_key_action(account, key));
+        actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+    }
+
+    let trx = with_tapos(&args.api, client.clone(), actions).await?;
+    push_transaction(
+        &args.api,
+        client,
+        sign_transaction(trx, &args.sign)?.packed_bytes(),
+    )
+    .await?;
+    println!("Ok");
+    Ok(())
+}
+
+async fn modify(
+    args: &Args,
+    client: reqwest::Client,
+    account: AccountNumber,
+    key: &Option<PublicKey>,
+    insecure: bool,
+) -> Result<(), anyhow::Error> {
+    let mut actions: Vec<Action> = Vec::new();
+
+    if key.is_some() && insecure {
+        return Err(Error::StaticMsg {
+            s: "--key and --insecure cannot be used together",
+        }
+        .into());
+    }
+    if key.is_none() && !insecure {
+        return Err(Error::StaticMsg {
+            s: "either --key or --insecure must be used",
+        }
+        .into());
+    }
+
+    if let Some(key) = key {
+        actions.push(set_key_action(account, key));
+        actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+    }
+
+    if insecure {
+        actions.push(set_auth_contract_action(account, account!("auth-fake-sys")));
+    }
+
+    let trx = with_tapos(&args.api, client.clone(), actions).await?;
+    push_transaction(
+        &args.api,
+        client,
+        sign_transaction(trx, &args.sign)?.packed_bytes(),
+    )
+    .await?;
+    println!("Ok");
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn deploy(
     args: &Args,
     client: reqwest::Client,
+    sender: AccountNumber,
     account: AccountNumber,
     filename: &str,
     create_account: &Option<PublicKey>,
@@ -233,11 +402,14 @@ async fn deploy(
     let mut actions: Vec<Action> = Vec::new();
 
     if create_account.is_some() && create_insecure_account {
-        return Err(Error::OneCreateOnly.into());
+        return Err(Error::StaticMsg {
+            s: "--create-account and --create-insecure-account cannot be used together",
+        }
+        .into());
     }
 
     if create_account.is_some() || create_insecure_account {
-        actions.push(new_account_action(account));
+        actions.push(new_account_action(sender, account));
     }
 
     // This happens before the set_code as a safety measure.
@@ -272,18 +444,94 @@ async fn upload(
     args: &Args,
     client: reqwest::Client,
     contract: AccountNumber,
-    path: &str,
+    sender: Option<ExactAccountNumber>,
+    dest: &str,
     content_type: &str,
-    filename: &str,
+    source: &str,
 ) -> Result<(), anyhow::Error> {
+    let sender = if let Some(s) = sender {
+        s.into()
+    } else {
+        contract
+    };
+
     let actions = vec![store_sys(
         contract,
-        path,
+        sender,
+        dest,
         content_type,
-        &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
+        &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
     )];
     let trx = with_tapos(&args.api, client.clone(), actions).await?;
 
+    push_transaction(
+        &args.api,
+        client,
+        sign_transaction(trx, &args.sign)?.packed_bytes(),
+    )
+    .await?;
+    println!("Ok");
+    Ok(())
+}
+
+fn fill_tree(
+    contract: AccountNumber,
+    sender: AccountNumber,
+    actions: &mut Vec<Action>,
+    dest: &str,
+    source: &str,
+) -> Result<(), anyhow::Error> {
+    let md = metadata(source)?;
+    if md.is_file() {
+        let guess = mime_guess::from_path(source);
+        if let Some(t) = guess.first() {
+            println!("{} <=== {}   {}", dest, source, t.essence_str());
+            actions.push(store_sys(
+                contract,
+                sender,
+                dest,
+                t.essence_str(),
+                &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
+            ));
+        } else {
+            println!("Skip unknown mime type: {}", source);
+        }
+    } else if md.is_dir() {
+        for path in read_dir(source)? {
+            let path = path?;
+            let d = if path.file_name() == "index.html" {
+                dest.to_owned() + "/"
+            } else {
+                dest.to_owned() + "/" + path.file_name().to_str().unwrap()
+            };
+            fill_tree(contract, sender, actions, &d, path.path().to_str().unwrap())?;
+        }
+    }
+    Ok(())
+}
+
+async fn upload_tree(
+    args: &Args,
+    client: reqwest::Client,
+    contract: AccountNumber,
+    sender: Option<ExactAccountNumber>,
+    mut dest: &str,
+    source: &str,
+) -> Result<(), anyhow::Error> {
+    let sender = if let Some(s) = sender {
+        s.into()
+    } else {
+        contract
+    };
+
+    while !dest.is_empty() && dest.ends_with('/') {
+        dest = &dest[0..dest.len() - 1];
+    }
+
+    let mut actions = Vec::new();
+    fill_tree(contract, sender, &mut actions, dest, source)?;
+
+    let trx = with_tapos(&args.api, client.clone(), actions).await?;
     push_transaction(
         &args.api,
         client,
@@ -299,17 +547,40 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Commands::Boot {} => boot::boot(&args, client).await?,
+        Commands::Boot { key } => boot::boot(&args, client, key).await?,
+        Commands::Create {
+            account,
+            key,
+            insecure,
+            sender,
+        } => {
+            create(
+                &args,
+                client,
+                (*sender).into(),
+                (*account).into(),
+                key,
+                *insecure,
+            )
+            .await?
+        }
+        Commands::Modify {
+            account,
+            key,
+            insecure,
+        } => modify(&args, client, (*account).into(), key, *insecure).await?,
         Commands::Deploy {
             account,
             filename,
             create_account,
             create_insecure_account,
             register_proxy,
+            sender,
         } => {
             deploy(
                 &args,
                 client,
+                (*sender).into(),
                 (*account).into(),
                 filename,
                 create_account,
@@ -320,20 +591,28 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Upload {
             contract,
-            path,
+            dest,
             content_type,
-            filename,
+            source,
+            sender,
         } => {
             upload(
                 &args,
                 client,
                 (*contract).into(),
-                path,
+                *sender,
+                dest,
                 content_type,
-                filename,
+                source,
             )
             .await?
         }
+        Commands::UploadTree {
+            contract,
+            dest,
+            source,
+            sender,
+        } => upload_tree(&args, client, (*contract).into(), *sender, dest, source).await?,
     }
 
     Ok(())

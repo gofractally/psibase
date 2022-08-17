@@ -6,56 +6,44 @@ import { postGraphQLGetJson } from './rpc.mjs';
 //     data?,       // GraphQL query result
 //     errors?,     // GraphQL errors, if any
 // }
-export function useGraphQLQuery(url, query, extraDependency) {
+export function useGraphQLQuery(url, query) {
+    const [refetch, setRefetch] = React.useState(true);
     const [cachedQueryResult, setCachedQueryResult] = React.useState({
         isLoading: true,
         isError: false,
     });
-    // non-signalling state
-    const [state] = React.useState({
-        mounted: true,
-        url: null,
-        query: null,
-        fetchId: 0,
-        extraDependency: null,
-    });
-    React.useEffect(() => {
-        return () => {
-            state.mounted = false;
-        };
-    }, []);
+    const invalidateQuery = () => {
+        setRefetch(true);
+    }
+    const queryAndPackageResponse = async (url, query) => {
+        setCachedQueryResult((prevState) => ({
+            ...prevState,
+            isLoading: true,
+        }));
+        let queryResult = await postGraphQLGetJson(url, query);
+        setCachedQueryResult({
+            ...queryResult,
+            isLoading: false,
+            isError: Boolean(queryResult.errors),
+        });
+    };
     React.useEffect(() => {
         (async () => {
-            if (state.url !== url || state.query !== query || state.extraDependency !== extraDependency) {
-                state.url = url;
-                state.query = query;
-                state.extraDependency = extraDependency;
-                state.fetchId += 1;
-                let fetchId = state.fetchId;
-                if (url && query) {
-                    try {
-                        let queryResult = await postGraphQLGetJson(url, query);
-                        if (state.mounted && fetchId == state.fetchId) {
-                            setCachedQueryResult({
-                                ...queryResult,
-                                isLoading: false,
-                                isError: Boolean(queryResult.errors),
-                            });
-                        }
-                    } catch (e) {
-                        if (state.mounted && fetchId == state.fetchId) {
-                            setCachedQueryResult({
-                                isLoading: false,
-                                isError: true,
-                                errors: [{ message: e + "" }],
-                            });
-                        }
-                    }
+            if (url && query && refetch) {
+                try {
+                    await queryAndPackageResponse(url, query);
+                } catch (e) {
+                    setCachedQueryResult({
+                        isLoading: false,
+                        isError: true,
+                        errors: [{ message: e + "" }],
+                    });
                 }
+                setRefetch(false);
             }
         })();
-    });
-    return cachedQueryResult;
+    }, [url, query, refetch]);
+    return [cachedQueryResult, invalidateQuery];
 } // useGraphQLQuery
 
 /*
@@ -79,13 +67,16 @@ interface PageInfo {
 export function useGraphQLPagedQuery(
     url,
     query,
-    pageSize,
-    getPageInfo, // useGraphQLQuery's result => PageInfo or null
+    opts, // opts = {
+    // pageSize,
+    // getPageInfo, // useGraphQLQuery's result => PageInfo or null
+    // defaultArgs,
+    // }
 ) {
-    const [extraDependency, setExtraDependency] = React.useState(0);
-    const [args, setArgs] = React.useState(`first:${pageSize}`);
-    const result = useGraphQLQuery(url, query.replace("@page@", args), extraDependency);
-    const pageInfo = getPageInfo(result) || {
+    const [args, setArgs] = React.useState(opts.defaultArgs || `first:${opts.pageSize}`);
+    const [result, invalidateQuery] = useGraphQLQuery(url, query.replace("@page@", args));
+
+    const pageInfo = opts.getPageInfo(result) || {
         hasPreviousPage: false,
         hasNextPage: false,
         startCursor: "",
@@ -96,20 +87,20 @@ export function useGraphQLPagedQuery(
         hasPreviousPage: pageInfo.hasPreviousPage,
         hasNextPage: pageInfo.hasNextPage,
         next() {
-            setExtraDependency(extraDependency + 1);
-            setArgs(`first:${pageSize} after:"${pageInfo.endCursor}"`);
+            setArgs(`first:${opts.pageSize} after:"${pageInfo.endCursor}"`);
+            invalidateQuery();
         },
         previous() {
-            setExtraDependency(extraDependency + 1);
-            setArgs(`last:${pageSize} before:"${pageInfo.startCursor}"`);
+            setArgs(`last:${opts.pageSize} before:"${pageInfo.startCursor}"`);
+            invalidateQuery();
         },
         first() {
-            setExtraDependency(extraDependency + 1);
-            setArgs(`first:${pageSize}`);
+            setArgs(`first:${opts.pageSize}`);
+            invalidateQuery();
         },
         last() {
-            setExtraDependency(extraDependency + 1);
-            setArgs(`last:${pageSize}`);
+            setArgs(`last:${opts.pageSize}`);
+            invalidateQuery();
         },
     };
 }

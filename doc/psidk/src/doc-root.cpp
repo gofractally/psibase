@@ -2,6 +2,7 @@
 
 #include <contracts/system/CommonSys.hpp>
 #include <contracts/system/ProxySys.hpp>
+#include <contracts/system/TransactionSys.hpp>
 #include <psibase/Contract.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>

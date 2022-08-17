@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/Contract.hpp>
+#include <contracts/system/TransactionSys.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/serveContent.hpp>
@@ -11,6 +11,8 @@ namespace system_contract
    {
       psibase::AccountNumber account;
       psibase::PublicKey     pubkey;
+
+      auto byPubkey() const { return std::tuple{pubkey, account}; }
    };
    PSIO_REFLECT(AuthRecord, account, pubkey)
 
@@ -18,19 +20,24 @@ namespace system_contract
    {
      public:
       static constexpr auto contract = psibase::AccountNumber("auth-ec-sys");
-      using AuthTable_t              = psibase::Table<AuthRecord, &AuthRecord::account>;
-      using Tables = psibase::ContractTables<AuthTable_t, psibase::WebContentTable>;
+      using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::byPubkey>;
+      using Tables    = psibase::ContractTables<AuthTable>;
 
-      void checkAuthSys(psibase::Action             action,
-                        std::vector<psibase::Claim> claims,
-                        bool                        firstAuth,
-                        bool                        readOnly);
+      void checkAuthSys(uint32_t                    flags,
+                        psibase::AccountNumber      requester,
+                        psibase::Action             action,
+                        std::vector<ContractMethod> allowedActions,
+                        std::vector<psibase::Claim> claims);
+      void newAccount(psibase::AccountNumber account, psibase::PublicKey payload);
       void setKey(psibase::PublicKey key);
 
      private:
       Tables db{contract};
    };
    PSIO_REFLECT(AuthEcSys,  //
-                method(checkAuthSys, action, claims),
-                method(setKey, key))
+                method(checkAuthSys, flags, requester, action, allowedActions, claims),
+                method(setKey, key),
+                method(newAccount, account, payload)
+                //
+   )
 }  // namespace system_contract

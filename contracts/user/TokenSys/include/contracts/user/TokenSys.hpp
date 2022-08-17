@@ -18,15 +18,10 @@ namespace UserContract
    class TokenSys : public psibase::Contract<TokenSys>
    {
      public:
-      using Tables                      = psibase::ContractTables<TokenTable_t,
-                                             BalanceTable_t,
-                                             SharedBalanceTable_t,
-                                             TokenHolderTable_t,
-                                             InitTable_t,
-                                             psibase::WebContentTable>;
-      static constexpr auto contract    = psibase::AccountNumber("token-sys");
-      static constexpr auto sysToken    = TID{1};
-      static constexpr auto sysTokenSym = SID{"PSI"};
+      using Tables = psibase::
+          ContractTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
+      static constexpr auto contract = psibase::AccountNumber("token-sys");
+      static constexpr auto sysToken = TID{1};
 
       TokenSys(psio::shared_view_ptr<psibase::Action> action);
 
@@ -41,8 +36,8 @@ namespace UserContract
 
       void burn(TID tokenId, Quantity amount);
 
-      void setUserConf(psibase::NamedBit_t flag, bool enable);
-      void setTokenConf(TID tokenId, psibase::NamedBit_t flag, bool enable);
+      void setUserConf(psibase::NamedBit flag, bool enable);
+      void setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable);
 
       void credit(TID                               tokenId,
                   psibase::AccountNumber            receiver,
@@ -75,14 +70,14 @@ namespace UserContract
                                        psibase::AccountNumber creditor,
                                        psibase::AccountNumber debitor);
       TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
-      bool                getUserConf(psibase::AccountNumber account, psibase::NamedBit_t flag);
-      bool                getTokenConf(TID tokenId, psibase::NamedBit_t flag);
+      bool                getUserConf(psibase::AccountNumber account, psibase::NamedBit flag);
+      bool                getTokenConf(TID tokenId, psibase::NamedBit flag);
 
      private:
       Tables db{contract};
 
-      void _checkAccountValid(psibase::AccountNumber account);
-      bool _isSenderIssuer(TID tokenId);
+      void checkAccountValid(psibase::AccountNumber account);
+      bool isSenderIssuer(TID tokenId);
 
      public:
       struct Events
@@ -97,8 +92,8 @@ namespace UserContract
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
             void minted(TID tokenId, Account minter, Quantity amount, StringView memo) {}
             void burned(TID tokenId, Account burner, Quantity amount) {}
-            void userConfSet(Account account, psibase::NamedBit_t flag, bool enable) {}
-            void tokenConfSet(TID tokenId, Account setter, psibase::NamedBit_t flag, bool enable) {}
+            void userConfSet(Account account, psibase::NamedBit flag, bool enable) {}
+            void tokenConfSet(TID tokenId, Account setter, psibase::NamedBit flag, bool enable) {}
             void symbolMapped(TID tokenId, Account account, SID symbolId) {}
             //};
 

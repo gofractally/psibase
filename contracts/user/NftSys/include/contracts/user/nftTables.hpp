@@ -19,19 +19,19 @@ namespace UserContract
       SingletonKey key;
    };
    PSIO_REFLECT(InitializedRecord, key);
-   using InitTable_t = psibase::Table<InitializedRecord, &InitializedRecord::key>;
+   using InitTable = psibase::Table<InitializedRecord, &InitializedRecord::key>;
 
    struct NftHolderRecord
    {
       psibase::AccountNumber account;
       psibase::Bitset<8>     config;
 
-      using Configurations = psibase::NamedBits<psibase::NamedBit_t{"manualDebit"}>;
+      using Configurations = psibase::NamedBits<psibase::NamedBit{"manualDebit"}>;
 
       auto operator<=>(const NftHolderRecord&) const = default;
    };
    PSIO_REFLECT(NftHolderRecord, account, config);
-   using NftHolderTable_t = psibase::Table<NftHolderRecord, &NftHolderRecord::account>;
+   using NftHolderTable = psibase::Table<NftHolderRecord, &NftHolderRecord::account>;
 
    struct NftRecord
    {
@@ -44,7 +44,7 @@ namespace UserContract
       auto operator<=>(const NftRecord&) const = default;
    };
    PSIO_REFLECT(NftRecord, id, issuer, owner);
-   using NftTable_t = psibase::Table<NftRecord, &NftRecord::id>;
+   using NftTable = psibase::Table<NftRecord, &NftRecord::id>;
 
    struct CreditRecord
    {
@@ -54,6 +54,6 @@ namespace UserContract
       auto operator<=>(const CreditRecord&) const = default;
    };
    PSIO_REFLECT(CreditRecord, nftId, debitor);
-   using CreditTable_t = psibase::Table<CreditRecord, &CreditRecord::nftId>;
+   using CreditTable = psibase::Table<CreditRecord, &CreditRecord::nftId>;
 
 }  // namespace UserContract

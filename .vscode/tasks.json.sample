@@ -1,0 +1,59 @@
+{
+    "inputs": [
+        {
+            "id": "testsuite",
+            "type": "promptString",
+            "default": "[mytestsuite]",
+            "description": "Enter test suite key (Example: \"[MyTestSuite]\""
+        }
+    ],
+    "tasks": [
+        // Compilation
+        {
+            "label": "make",
+            "type": "shell",
+            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes .. && make -j $(nproc)",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "statusbar": {
+                    "label": "$(diff-insert) Build",
+                    "tooltip": "Build with cmake"
+                }
+            }
+        },
+        {
+            "label": "testnet",
+            "type": "shell",
+            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes .. && make -j $(nproc) && ./psitest launchTestChain-test-debug.wasm -s -r compact",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "statusbar": {
+                    "label": "$(diff-insert) Build & Launch local testnet",
+                    "tooltip": "Build with cmake & invoke psitest on the testchain wasm"
+                }
+            }
+        },
+        {
+            "label": "testspecific",
+            "type": "shell",
+            "command": "cd build && ./psitest TokenSys-test-debug.wasm -s -r compact",
+            "args": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "statusbar": {
+                    "label": "$(diff-insert) Test Token App",
+                    "tooltip": "Invoke psitest on the system token application"
+                }
+            }
+        }
+    ]
+}

@@ -3,6 +3,8 @@
 #include <contracts/system/TransactionSys.hpp>
 #include <psibase/dispatch.hpp>
 
+#include <boost/container/flat_map.hpp>
+#include <psibase/contractEntry.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/print.hpp>
 
@@ -22,6 +24,14 @@ namespace system_contract
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
       statusTable.put({.enforceAuth = true});
+
+      // TODO: Move this to a config contract
+      // TODO: Reduce numExecutionMemories on proofWasmConfigTable. Waiting for
+      //       a fix to SystemContract caching, to prevent frequent allocating
+      //       and freeing of ExecutionMemory instances.
+      WasmConfigRow wasmConfig;
+      kvPut(wasmConfig.db, wasmConfig.key(transactionWasmConfigTable), wasmConfig);
+      kvPut(wasmConfig.db, wasmConfig.key(proofWasmConfigTable), wasmConfig);
    }
 
    // CAUTION: startBlock() is critical to chain operations. If it fails, the chain stops.
@@ -41,8 +51,95 @@ namespace system_contract
       // verify TAPoS on transactions.
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
-      // TODO: expire transaction IDs
+      // Remove expired transaction IDs
+      const auto& stat          = getStatus();
+      auto        includedTable = tables.open<IncludedTrxTable>();
+      auto        includedIndex = includedTable.getIndex<0>();
+      auto        includedEnd   = includedIndex.end();
+      while (true)
+      {
+         auto it = includedIndex.begin();
+         if (it == includedEnd)
+            break;
+         auto obj = *it;
+         if (obj.expiration > stat.current.time)
+            break;
+         includedTable.remove(obj);
+      }
    }
+
+   struct RunAsKey
+   {
+      AccountNumber sender;
+      AccountNumber authorizedSender;
+      AccountNumber receiver;
+      MethodNumber  method;
+
+      friend auto operator<=>(const RunAsKey&, const RunAsKey&) = default;
+   };
+   boost::container::flat_map<RunAsKey, uint32_t> runAsMap;
+
+   std::vector<char> TransactionSys::runAs(psibase::Action             action,
+                                           std::vector<ContractMethod> allowedActions)
+   {
+      auto requester = getSender();
+
+      auto tables               = TransactionSys::Tables(TransactionSys::contract);
+      auto statusTable          = tables.open<TransactionSysStatusTable>();
+      auto statusIdx            = statusTable.getIndex<0>();
+      auto transactionSysStatus = statusIdx.get(std::tuple{});
+
+      if (transactionSysStatus && transactionSysStatus->enforceAuth)
+      {
+         auto accountSysTables = AccountSys::Tables(AccountSys::contract);
+         auto accountTable     = accountSysTables.open<AccountTable>();
+         auto accountIndex     = accountTable.getIndex<0>();
+         auto account          = accountIndex.get(action.sender);
+         if (!account)
+            abortMessage("unknown sender \"" + action.sender.str() + "\"");
+
+         if (requester != account->authContract)
+         {
+            uint32_t flags = 0;
+            if (requester == action.sender)
+               flags = AuthInterface::runAsRequesterReq;
+            else
+            {
+               auto it = runAsMap.lower_bound(RunAsKey{action.sender, requester, {}, {}});
+               while (it != runAsMap.end() &&  //
+                      it->first.sender == action.sender && it->first.authorizedSender == requester)
+               {
+                  if (it->second &&  //
+                      (!it->first.receiver.value || it->first.receiver == action.contract) &&
+                      (!it->first.method.value || it->first.method == action.method))
+                  {
+                     if (allowedActions.empty())
+                        flags = AuthInterface::runAsMatchedReq;
+                     else
+                        flags = AuthInterface::runAsMatchedExpandedReq;
+                     break;
+                  }
+                  ++it;
+               }
+               if (!flags)
+                  flags = AuthInterface::runAsOtherReq;
+            }
+
+            Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
+            auth.checkAuthSys(flags, requester, action, allowedActions, std::vector<Claim>{});
+         }  // if (requester != account->authContract)
+      }     // if(enforceAuth)
+
+      for (auto& a : allowedActions)
+         ++runAsMap[{action.sender, action.contract, a.contract, a.method}];
+
+      auto result = call(action);
+
+      for (auto& a : allowedActions)
+         --runAsMap[{action.sender, action.contract, a.contract, a.method}];
+
+      return result;
+   }  // TransactionSys::runAs
 
    static Transaction trx;
    Transaction        TransactionSys::getTransaction() const
@@ -72,11 +169,9 @@ namespace system_contract
    // from entering the chain, including transactions which try to
    // fix the problem.
    //
-   // TODO: move checkFirstAuthAndExit into getCurrentAction()
    // TODO: reconsider which functions, if any, are direct exports
    //       instead of going through dispatch
-   extern "C" [[clang::export_name("processTransaction")]] void processTransaction(
-       bool checkFirstAuthAndExit)
+   extern "C" [[clang::export_name("processTransaction")]] void processTransaction()
    {
       if constexpr (enable_print)
          print("processTransaction\n");
@@ -87,9 +182,11 @@ namespace system_contract
       // TODO: limit execution time
       // TODO: limit charged CPU & NET which can go into a block
       auto top_act = getCurrentAction();
+      auto args    = psio::convert_from_frac<ProcessTransactionArgs>(top_act.rawData);
       // TODO: avoid copying inner rawData during unpack
-      // TODO: verify fracpack (no unknown, no extra data)
-      trx     = psio::convert_from_frac<Transaction>(top_act.rawData);
+      auto t = args.transaction.data_without_size_prefix();
+      check(psio::fracvalidate<Transaction>(t).valid_and_known(), "transaction has invalid format");
+      trx     = psio::convert_from_frac<Transaction>(t);
       auto id = sha256(top_act.rawData.data(), top_act.rawData.size());
 
       check(trx.actions.size() > 0, "transaction has no actions");
@@ -99,7 +196,7 @@ namespace system_contract
       //       " expiration: ", psio::convert_to_json(trx.tapos.expiration), "\n");
 
       check(!(trx.tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
-      check(stat.current.time <= trx.tapos.expiration, "transaction has expired");
+      check(stat.current.time < trx.tapos.expiration, "transaction has expired");
       check(trx.tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
             "transaction was submitted too early");
 
@@ -111,12 +208,12 @@ namespace system_contract
       auto summaryTable  = tables.open<BlockSummaryTable>();
       auto summaryIdx    = summaryTable.getIndex<0>();
 
-      check(!includedIdx.get(id), "duplicate transaction");
-      if (!checkFirstAuthAndExit)
-         includedTable.put({id, trx.tapos.expiration});
+      check(!includedIdx.get(std::tuple{trx.tapos.expiration, id}), "duplicate transaction");
+      if (!args.checkFirstAuthAndExit)
+         includedTable.put({trx.tapos.expiration, id});
 
       std::optional<BlockSummary> summary;
-      if (checkFirstAuthAndExit)
+      if (args.checkFirstAuthAndExit)
          summary = getBlockSummary();  // startBlock() might not have run
       else
          summary = summaryIdx.get(std::tuple<>{});
@@ -159,9 +256,15 @@ namespace system_contract
                print("call checkAuthSys on ", account->authContract.str(), " for account ",
                      act.sender.str(), "\n");
             Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
-            auth.checkAuthSys(act, trx.claims, &act == &trx.actions[0], checkFirstAuthAndExit);
+            uint32_t             flags = AuthInterface::topActionReq;
+            if (&act == &trx.actions[0])
+               flags |= AuthInterface::firstAuthFlag;
+            if (args.checkFirstAuthAndExit)
+               flags |= AuthInterface::readOnlyFlag;
+            auth.checkAuthSys(flags, psibase::AccountNumber{}, act, std::vector<ContractMethod>{},
+                              trx.claims);
          }
-         if (checkFirstAuthAndExit)
+         if (args.checkFirstAuthAndExit)
             break;
          if constexpr (enable_print)
             print("call action\n");

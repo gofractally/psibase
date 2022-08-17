@@ -10,7 +10,7 @@ using Tables = psibase::ContractTables<psibase::WebContentTable>;
 
 namespace system_contract
 {
-   std::optional<RpcReplyData> RProxySys::serveSys(RpcRequestData request)
+   std::optional<HttpReply> RProxySys::serveSys(HttpRequest request)
    {
       if (auto result = psibase::serveSimpleUI<ProxySys, true>(request))
          return result;

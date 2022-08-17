@@ -11,7 +11,7 @@ namespace psibase
 {
    namespace
    {
-      bool isSubdomain(const psibase::RpcRequestData& req)
+      bool isSubdomain(const psibase::HttpRequest& req)
       {
          return req.host.size() > req.rootHost.size() + 1  //
                 && req.host.ends_with(req.rootHost)        //
@@ -54,7 +54,7 @@ namespace psibase
    {
       auto act = getCurrentAction();
       // TODO: use a view
-      auto req = psio::convert_from_frac<RpcRequestData>(act.rawData);
+      auto req = psio::convert_from_frac<HttpRequest>(act.rawData);
 
       std::string contractName;
 
@@ -72,11 +72,13 @@ namespace psibase
 
       auto contract = AccountNumber(contractName);
       auto reg      = kvGet<RegisteredContractRow>(registeredContractKey(act.contract, contract));
-      if (!reg)
-         abortMessage("contract not registered: " + contract.str());
+      if (reg)
+         contract = reg->serverContract;
+      else
+         contract = "psispace-sys"_a;
 
       // TODO: avoid repacking (both directions)
-      psibase::Actor<ServerInterface> iface(act.contract, reg->serverContract);
+      psibase::Actor<ServerInterface> iface(act.contract, contract);
 
       auto result = iface.serveSys(std::move(req)).unpack();
       if (result && !result->headers.empty() && contractName != "common-sys")

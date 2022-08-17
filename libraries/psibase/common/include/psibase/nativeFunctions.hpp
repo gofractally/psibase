@@ -9,9 +9,9 @@
 #include <span>
 
 #ifdef COMPILING_WASM
-#define PSIBASE_INTRINSIC(x) [[clang::import_name(#x)]]
+#define PSIBASE_NATIVE(x) [[clang::import_name(#x)]]
 #else
-#define PSIBASE_INTRINSIC(x)
+#define PSIBASE_NATIVE(x)
 #endif
 
 namespace psibase
@@ -30,20 +30,24 @@ namespace psibase
       ///
       /// If `offset >= resultSize`, then skip the copy.
       ///
-      /// Other functions set result.
-      PSIBASE_INTRINSIC(getResult)
+      /// Other functions set or clear result. `getResult`, [getKey], and
+      /// [writeConsole] are the only raw functions which leave the current
+      /// result and key intact.
+      PSIBASE_NATIVE(getResult)
       uint32_t getResult(const char* dest, uint32_t destSize, uint32_t offset);
 
       /// Copy `min(destSize, key_size)` bytes of the most-recent key into
       /// dest and return `key_size`
       ///
-      /// Other functions set the key.
-      PSIBASE_INTRINSIC(getKey) uint32_t getKey(const char* dest, uint32_t destSize);
+      /// Other functions set or clear the key. [getResult], `getKey`, and
+      /// [writeConsole] are the only raw functions which leave the current
+      /// result and key intact.
+      PSIBASE_NATIVE(getKey) uint32_t getKey(const char* dest, uint32_t destSize);
 
       /// Write `message` to console
       ///
       /// Message should be UTF8.
-      PSIBASE_INTRINSIC(writeConsole) void writeConsole(const char* message, uint32_t len);
+      PSIBASE_NATIVE(writeConsole) void writeConsole(const char* message, uint32_t len);
 
       /// Store the currently-executing action into result and return the result size
       ///
@@ -55,44 +59,44 @@ namespace psibase
       /// * After B returns, `getCurrentAction()` returns A.
       ///
       /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
-      PSIBASE_INTRINSIC(getCurrentAction) uint32_t getCurrentAction();
+      PSIBASE_NATIVE(getCurrentAction) uint32_t getCurrentAction();
 
       /// Call a contract, store the return value into result, and return the result size
       ///
       /// `action` must contain a fracpacked [Action].
       ///
       /// Use [getResult] to get result.
-      PSIBASE_INTRINSIC(call) uint32_t call(const char* action, uint32_t len);
+      PSIBASE_NATIVE(call) uint32_t call(const char* action, uint32_t len);
 
       /// Set the return value of the currently-executing action
-      PSIBASE_INTRINSIC(setRetval) void setRetval(const char* retval, uint32_t len);
+      PSIBASE_NATIVE(setRetval) void setRetval(const char* retval, uint32_t len);
 
       /// Set a key-value pair
       ///
       /// If key already exists, then replace the existing value.
-      PSIBASE_INTRINSIC(kvPut)
+      PSIBASE_NATIVE(kvPut)
       void kvPut(DbId db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen);
 
       /// Add a sequentially-numbered record
       ///
       /// Returns the id.
-      PSIBASE_INTRINSIC(kvPutSequential)
-      uint64_t kvPutSequential(DbId db, const char* value, uint32_t valueLen);
+      PSIBASE_NATIVE(putSequential)
+      uint64_t putSequential(DbId db, const char* value, uint32_t valueLen);
 
       /// Remove a key-value pair if it exists
-      PSIBASE_INTRINSIC(kvRemove) void kvRemove(DbId db, const char* key, uint32_t keyLen);
+      PSIBASE_NATIVE(kvRemove) void kvRemove(DbId db, const char* key, uint32_t keyLen);
 
       /// Get a key-value pair, if any
       ///
       /// If key exists, then sets result to value and returns size. If key does not
       /// exist, returns `-1` and clears result. Use [getResult] to get result.
-      PSIBASE_INTRINSIC(kvGet) uint32_t kvGet(DbId db, const char* key, uint32_t keyLen);
+      PSIBASE_NATIVE(kvGet) uint32_t kvGet(DbId db, const char* key, uint32_t keyLen);
 
       /// Get a sequentially-numbered record
       ///
       /// If `id` is available, then sets result to value and returns size. If id does
       /// not exist, returns -1 and clears result.
-      PSIBASE_INTRINSIC(kvGetSequential) uint32_t kvGetSequential(DbId db, uint64_t id);
+      PSIBASE_NATIVE(getSequential) uint32_t getSequential(DbId db, uint64_t id);
 
       /// Get the first key-value pair which is greater than or equal to the provided
       /// key
@@ -101,7 +105,7 @@ namespace psibase
       /// matches the provided key, then sets result to value and returns size. Also
       /// sets key. Otherwise returns `-1` and clears result. Use [getResult] to get
       /// result and [getKey] to get found key.
-      PSIBASE_INTRINSIC(kvGreaterEqual)
+      PSIBASE_NATIVE(kvGreaterEqual)
       uint32_t kvGreaterEqual(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
       /// Get the key-value pair immediately-before provided key
@@ -110,7 +114,7 @@ namespace psibase
       /// matches the provided key, then sets result to value and returns size.
       /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult]
       /// to get result and [getKey] to get found key.
-      PSIBASE_INTRINSIC(kvLessThan)
+      PSIBASE_NATIVE(kvLessThan)
       uint32_t kvLessThan(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
       /// Get the maximum key-value pair which has key as a prefix
@@ -118,7 +122,7 @@ namespace psibase
       /// If one is found, then sets result to value and returns size. Also sets key.
       /// Otherwise returns `-1` and clears result. Use [getResult] to get result
       /// and [getKey] to get found key.
-      PSIBASE_INTRINSIC(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
+      PSIBASE_NATIVE(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
    }  // namespace raw
 
    /// Get result
@@ -222,14 +226,14 @@ namespace psibase
    /// Returns the id.
    inline uint64_t kvPutSequentialRaw(DbId db, psio::input_stream value)
    {
-      return raw::kvPutSequential(db, value.pos, value.remaining());
+      return raw::putSequential(db, value.pos, value.remaining());
    }
 
    /// Add a sequentially-numbered record
    ///
    /// Returns the id.
    template <typename Type, NotOptional V>
-   uint64_t kvPutSequential(DbId db, AccountNumber contract, Type type, const V& value)
+   uint64_t putSequential(DbId db, AccountNumber contract, Type type, const V& value)
    {
       std::vector<char>     packed(psio::fracpack_size(contract) + psio::fracpack_size(type) +
                                    psio::fracpack_size(value));
@@ -330,7 +334,7 @@ namespace psibase
    /// Get a sequentially-numbered record, if available
    inline std::optional<std::vector<char>> kvGetSequentialRaw(DbId db, uint64_t id)
    {
-      auto size = raw::kvGetSequential(db, id);
+      auto size = raw::getSequential(db, id);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -347,12 +351,12 @@ namespace psibase
    /// * If `type` is non-null, then it receives the record type. It is left untouched if either the record
    ///   is not available or if `matchContract` is not null but doesn't match.
    template <typename V, typename Type>
-   inline std::optional<V> kvGetSequential(DbId                 db,
-                                           uint64_t             id,
-                                           const AccountNumber* matchContract = nullptr,
-                                           const Type*          matchType     = nullptr,
-                                           AccountNumber*       contract      = nullptr,
-                                           Type*                type          = nullptr)
+   inline std::optional<V> getSequential(DbId                 db,
+                                         uint64_t             id,
+                                         const AccountNumber* matchContract = nullptr,
+                                         const Type*          matchType     = nullptr,
+                                         AccountNumber*       contract      = nullptr,
+                                         Type*                type          = nullptr)
    {
       std::optional<V> result;
       auto             v = kvGetSequentialRaw(db, id);
@@ -508,4 +512,4 @@ namespace psibase
 
 }  // namespace psibase
 
-#undef PSIBASE_INTRINSIC
+#undef PSIBASE_NATIVE

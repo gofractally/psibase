@@ -1,20 +1,41 @@
 import htm from "/common/htm.module.js";
 import { siblingUrl } from "/common/rootdomain.mjs";
-import { initializeApplet, 
-  getJson, action, addRoute, push, 
-  getLocalResource, CommonResources } from "/common/rpc.mjs";
+import { initializeApplet, getJson, action, 
+  query, setOperations, operation } from "/common/rpc.mjs";
 
 const html = htm.bind(React.createElement);
 const { useEffect, useState, useCallback } = React;
 const { Segment, Header, Form, Table, Input, Button, Message, Tab, Container } = semanticUIReact;
 
-await initializeApplet();
+const thisApplet = await getJson('/common/thiscontract');
 
-export const thisApplet = await getJson('/common/thiscontract');
+initializeApplet(async () => {
+  setOperations([
+    {
+        id: "credit",
+        exec: async ({symbol, receiver, amount, memo}) => {
+  
+          //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
+          let tokens = await getJson(siblingUrl(null, thisApplet, "getTokenTypes"));
+          let token = tokens.find(t=>t.symbolId === symbol.toLowerCase());
+          if (!token)
+          {
+            console.error("No token with symbol " + symbol);
+            return;
+          }
+          let tokenId = token.id;
 
-const transactionTypes = {
-  credit: 0,
-};
+          await action(thisApplet, "credit", 
+            { 
+              tokenId, 
+              receiver, 
+              amount: {value: amount }, 
+              memo: {contents: memo},
+          });
+        },
+    }
+  ]);
+});
 
 function Rows(balances) {
   return balances.map(b => {
@@ -55,13 +76,9 @@ function BalanceTable({loggedInUser}) {
     getBalances().catch(console.error);
   }, [getBalances]);
 
-  useEffect(()=>{
+  useEffect(() => {
     refreshBalances();
   }, [refreshBalances])
-
-  useEffect(()=>{
-    addRoute("refreshbalances", transactionTypes.credit, refreshBalances);
-  }, [refreshBalances]);
 
   return html`
 
@@ -129,25 +146,11 @@ function SendPanel() {
     setTimeout(()=>{setShowSuccess(false);}, 5000);
   }, []);
 
-  useEffect(()=>{
-    addRoute("credited", transactionTypes.credit, credited);
-  }, [credited]);
+  const amountToSend = String(Number(amount) * Math.pow(10, 8))
 
   const onSendSubmit = (e) => {
     e.preventDefault();
-    const credit = async () => {
-
-      push(transactionTypes.credit, [await action(
-        thisApplet, "credit", 
-        {
-          tokenId: 1, 
-          receiver: receiver, 
-          amount: {value: amount },
-          memo: {contents: "Test"},
-        }
-      )]);
-    }
-    credit().catch(console.error);
+    operation(thisApplet, "", "credit", {symbol: "PSI", receiver, amount: amountToSend, memo: "Test"});
   };
 
   return html`
@@ -192,7 +195,7 @@ function App() {
     // Todo - Timeout is used because sometimes the window.parentIFrame isn't loaded yet when 
     //  this runs. Should use a better fix for the race condition than a delay.
     setTimeout(()=>{ 
-      getLocalResource(CommonResources.loggedInUser, setUser);
+      query("account-sys", "", "getLoggedInUser", {}, setUser);
     }, 50);
   }, []);
 

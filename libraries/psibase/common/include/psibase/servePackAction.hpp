@@ -73,7 +73,7 @@ namespace psibase
    /// If `request` doesn't match the above, or the action name is not found,
    /// then this returns `std::nullopt`.
    template <typename Contract>
-   std::optional<RpcReplyData> servePackAction(const RpcRequestData& request)
+   std::optional<HttpReply> servePackAction(const HttpRequest& request)
    {
       if (request.method == "POST")
       {
@@ -83,7 +83,7 @@ namespace psibase
                     std::string_view{request.target}.substr(13),
                     std::string_view{request.body.data(), request.body.size()}))
             {
-               return RpcReplyData{
+               return HttpReply{
                    .contentType = "application/octet-stream",
                    .body        = std::move(*result),
                };

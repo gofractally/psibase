@@ -1,6 +1,5 @@
 #include <contracts/system/AccountSys.hpp>
 #include <contracts/system/commonErrors.hpp>
-#include <contracts/user/NameSys.hpp>
 #include <contracts/user/NftSys.hpp>
 #include <psibase/Bitset.hpp>
 #include <psibase/dispatch.hpp>
@@ -18,14 +17,14 @@ NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable_t>().getIndex<0>().get(SingletonKey{});
+      auto initRecord = db.open<InitTable>().getIndex<0>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
 
 void NftSys::init()
 {
-   auto initTable = db.open<InitTable_t>();
+   auto initTable = db.open<InitTable>();
    auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
@@ -39,7 +38,7 @@ void NftSys::init()
 NID NftSys::mint()
 {
    auto issuer   = getSender();
-   auto nftTable = db.open<NftTable_t>();
+   auto nftTable = db.open<NftTable>();
    auto nftIdx   = nftTable.getIndex<0>();
 
    // Todo - replace with auto incrementing when available
@@ -64,7 +63,7 @@ void NftSys::burn(NID nftId)
 
    check(record.owner == getSender(), missingRequiredAuth);
 
-   db.open<NftTable_t>().erase(nftId);
+   db.open<NftTable>().erase(nftId);
 
    emit().ui().burned(nftId);
 }
@@ -84,12 +83,12 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
    if (isTransfer)
    {
       record.owner = receiver;
-      db.open<NftTable_t>().put(record);
+      db.open<NftTable>().put(record);
    }
    else
    {
       creditRecord.debitor = receiver;
-      db.open<CreditTable_t>().put(creditRecord);
+      db.open<CreditTable>().put(creditRecord);
    }
 
    emit().ui().credited(nftId, sender, receiver, memo);
@@ -109,7 +108,7 @@ void NftSys::uncredit(NID nftId, const_view<String> memo)
    check(creditRecord.debitor != AccountSys::nullAccount, uncreditRequiresCredit);
    check(record.owner == sender, creditorAction);
 
-   db.open<CreditTable_t>().erase(nftId);
+   db.open<CreditTable>().erase(nftId);
 
    emit().ui().uncredited(nftId, sender, creditRecord.debitor, memo);
 }
@@ -126,13 +125,13 @@ void NftSys::debit(NID nftId, const_view<String> memo)
 
    record.owner = debiter;
 
-   db.open<NftTable_t>().put(record);
-   db.open<CreditTable_t>().erase(nftId);
+   db.open<NftTable>().put(record);
+   db.open<CreditTable>().erase(nftId);
 
    emit().ui().transferred(nftId, creditor, debiter, memo);
 }
 
-void NftSys::setUserConf(psibase::NamedBit_t flag, bool enable)
+void NftSys::setUserConf(psibase::NamedBit flag, bool enable)
 {
    auto sender  = getSender();
    auto record  = getNftHolder(sender);
@@ -143,14 +142,14 @@ void NftSys::setUserConf(psibase::NamedBit_t flag, bool enable)
 
    record.config.set(bit, enable);
 
-   db.open<NftHolderTable_t>().put(record);
+   db.open<NftHolderTable>().put(record);
 
    emit().ui().userConfSet(sender, flag, enable);
 }
 
 NftRecord NftSys::getNft(NID nftId)
 {
-   auto nftRecord = db.open<NftTable_t>().getIndex<0>().get(nftId);
+   auto nftRecord = db.open<NftTable>().getIndex<0>().get(nftId);
    bool exists    = nftRecord.has_value();
 
    // Todo
@@ -168,7 +167,7 @@ NftRecord NftSys::getNft(NID nftId)
 
 NftHolderRecord NftSys::getNftHolder(AccountNumber account)
 {
-   auto nftHodler = db.open<NftHolderTable_t>().getIndex<0>().get(account);
+   auto nftHodler = db.open<NftHolderTable>().getIndex<0>().get(account);
 
    if (nftHodler.has_value())
    {
@@ -185,7 +184,7 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
 
 CreditRecord NftSys::getCredRecord(NID nftId)
 {
-   auto creditRecord = db.open<CreditTable_t>().getIndex<0>().get(nftId);
+   auto creditRecord = db.open<CreditTable>().getIndex<0>().get(nftId);
 
    if (creditRecord.has_value())
    {
@@ -201,12 +200,12 @@ CreditRecord NftSys::getCredRecord(NID nftId)
 
 bool NftSys::exists(NID nftId)
 {
-   return db.open<NftTable_t>().getIndex<0>().get(nftId).has_value();
+   return db.open<NftTable>().getIndex<0>().get(nftId).has_value();
 }
 
-bool NftSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit_t flag)
+bool NftSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
 {
-   auto hodler = db.open<NftHolderTable_t>().getIndex<0>().get(account);
+   auto hodler = db.open<NftHolderTable>().getIndex<0>().get(account);
    if (hodler.has_value() == false)
    {
       return false;

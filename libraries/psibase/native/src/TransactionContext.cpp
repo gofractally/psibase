@@ -11,6 +11,9 @@ namespace psibase
    // TODO: spawn timeout thread once per block instead of once per trx
    struct TransactionContextImpl
    {
+      WasmConfigRow wasmConfig;
+
+      // mutex protects everything below
       std::mutex                                mutex             = {};
       std::condition_variable                   cond              = {};
       std::thread                               thread            = {};
@@ -56,9 +59,10 @@ namespace psibase
    void TransactionContext::execTransaction()
    {
       // Prepare for execution
-      auto& db     = blockContext.db;
-      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+      auto& db         = blockContext.db;
+      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
+          WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
+      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
 
       if (blockContext.needGenesisAction)
       {
@@ -77,17 +81,17 @@ namespace psibase
 
       // If the transaction adjusted numExecutionMemories too big for this node, then attempt
       // to reject the transaction. It is possible for the node to go down in flames instead.
-      status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
+          WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
+      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
    }
 
    void TransactionContext::checkFirstAuth()
    {
-      auto& db     = blockContext.db;
-      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-
-      // TODO: different limit since this will execute in background threads
-      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+      auto& db         = blockContext.db;
+      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
+                                                          WasmConfigRow::key(proofWasmConfigTable));
+      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
 
       check(!blockContext.needGenesisAction, "checkFirstAuth does not handle genesis");
       execProcessTransaction(*this, true);
@@ -124,29 +128,30 @@ namespace psibase
       }
    }
 
+   // TODO: eliminate extra copies
    static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit)
    {
+      ProcessTransactionArgs args{.transaction           = self.signedTransaction.transaction,
+                                  .checkFirstAuthAndExit = checkFirstAuthAndExit};
+
       Action action{
           .sender   = AccountNumber(),
           .contract = transactionContractNum,
-          .rawData  = {self.signedTransaction.transaction.data(),
-                      self.signedTransaction.transaction.data() +
-                          self.signedTransaction.transaction.size()},
+          .rawData  = psio::convert_to_frac(args),
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
       ActionContext ac = {self, action, self.transactionTrace.actionTraces.back()};
       auto&         ec = self.getExecutionContext(transactionContractNum);
-      ec.execProcessTransaction(ac, checkFirstAuthAndExit);
+      ec.execProcessTransaction(ac);
    }
 
    void TransactionContext::execVerifyProof(size_t i)
    {
-      auto& db     = blockContext.db;
-      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-
-      // TODO: separate config for proof execution
-      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+      auto& db         = blockContext.db;
+      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
+                                                          WasmConfigRow::key(proofWasmConfigTable));
+      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
 
       // TODO: fracpack validation, allowing new fields in inner transaction. Might be redundant elsewhere?
       auto trxView    = *signedTransaction.transaction;
@@ -155,7 +160,7 @@ namespace psibase
             "proofs and claims must have same size");
       auto  id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());
       auto& proof = signedTransaction.proofs[i];
-      VerifyData data{
+      VerifyArgs data{
           .transactionHash = id,
           .claim           = claimsView[i],
           .proof           = proof,
@@ -176,9 +181,10 @@ namespace psibase
                                              const Action& action,
                                              ActionTrace&  atrace)
    {
-      auto& db     = blockContext.db;
-      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+      auto& db         = blockContext.db;
+      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
+          WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
+      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
@@ -196,11 +202,13 @@ namespace psibase
       ec.execCalled(callerFlags, ac);
    }
 
+   // TODO: different wasmConfig, controlled by config file
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
    {
-      auto& db     = blockContext.db;
-      auto  status = db.kvGetOrDefault<StatusRow>(StatusRow::db, statusKey());
-      blockContext.systemContext.setNumMemories(status.numExecutionMemories);
+      auto& db         = blockContext.db;
+      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
+          WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
+      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
@@ -220,9 +228,10 @@ namespace psibase
       check(impl->executionContexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running contracts");
       auto& memory = blockContext.systemContext.executionMemories[impl->executionContexts.size()];
-      auto& result =
-          impl->executionContexts.insert({contract, ExecutionContext{*this, memory, contract}})
-              .first->second;
+      auto& result = impl->executionContexts
+                         .insert({contract, ExecutionContext{*this, impl->wasmConfig.vmOptions,
+                                                             memory, contract}})
+                         .first->second;
       impl->contractLoadTime += std::chrono::steady_clock::now() - loadStart;
       return result;
    }

@@ -5,6 +5,8 @@ target_link_libraries(psitest
     psibase
     debug_eos_vm
     ${Boost_LIBRARIES}
+    -static-libgcc
+    -static-libstdc++
 )
 set_target_properties(psitest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 add_custom_command(TARGET psitest POST_BUILD

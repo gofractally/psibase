@@ -31,13 +31,12 @@ namespace psibase
    ///
    /// See [makeConnection example](#makeconnection-example).
    template <typename QueryRoot>
-   std::optional<RpcReplyData> serveGraphQL(const RpcRequestData& request,
-                                            const QueryRoot&      queryRoot)
+   std::optional<HttpReply> serveGraphQL(const HttpRequest& request, const QueryRoot& queryRoot)
    {
       auto doit = [&](std::string_view query, std::string_view variables)
       {
          auto result = psio::gql_query(queryRoot, query, {});
-         return RpcReplyData{
+         return HttpReply{
              .contentType = "application/json",
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
          };
@@ -52,7 +51,7 @@ namespace psibase
       else if (request.method == "GET")
       {
          auto result = psio::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
-         return RpcReplyData{
+         return HttpReply{
              .contentType = "text",                                          // TODO
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
          };
@@ -289,7 +288,7 @@ namespace psibase
    ///
    /// struct ExampleContract : psibase::Contract<ExampleContract>
    /// {
-   ///    std::optional<psibase::RpcReplyData> serveSys(psibase::RpcRequestData request)
+   ///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
    ///    {
    ///       if (auto result = psibase::serveSimpleUI<ExampleContract, true>(request))
    ///          return result;

@@ -15,12 +15,11 @@ namespace psibase
    PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
 
    // TODO: consider adding headers to this
-   // TODO: rename to HttpRequestData; adjust docs
-   /// An RPC Request
+   /// An HTTP Request
    ///
    /// Most contracts receive this via their `serveSys` action.
    /// [psibase::ProxySys] receives it via its `serve` exported function.
-   struct RpcRequestData
+   struct HttpRequest
    {
       std::string       host;         ///< Fully-qualified domain name
       std::string       rootHost;     ///< host, but without contract subdomain
@@ -29,18 +28,17 @@ namespace psibase
       std::string       contentType;  ///< "application/json", "text/html", ...
       std::vector<char> body;         ///< Request body, e.g. POST data
    };
-   PSIO_REFLECT(RpcRequestData, host, rootHost, method, target, contentType, body)
+   PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, body)
 
-   // TODO: rename to HttpReplyData; adjust docs
-   /// An RPC reply
+   /// An HTTP reply
    ///
    /// Contracts return this from their `serveSys` action.
-   struct RpcReplyData
+   struct HttpReply
    {
       std::string             contentType;  ///< "application/json", "text/html", ...
       std::vector<char>       body;         ///< Response body
       std::vector<HttpHeader> headers;      ///< HTTP Headers
    };
-   PSIO_REFLECT(RpcReplyData, contentType, body, headers)
+   PSIO_REFLECT(HttpReply, contentType, body, headers)
 
 }  // namespace psibase

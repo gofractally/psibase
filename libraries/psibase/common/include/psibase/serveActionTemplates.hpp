@@ -73,11 +73,11 @@ namespace psibase
    ///
    /// If `request` doesn't match the above, then this returns `std::nullopt`.
    template <typename Contract>
-   std::optional<RpcReplyData> serveActionTemplates(const RpcRequestData& request)
+   std::optional<HttpReply> serveActionTemplates(const HttpRequest& request)
    {
       if (request.method == "GET" && request.target == "/action_templates")
       {
-         return RpcReplyData{
+         return HttpReply{
              .contentType = "application/json",
              .body        = generateActionJsonTemplate<Contract>(),
          };

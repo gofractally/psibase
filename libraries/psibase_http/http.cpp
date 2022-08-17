@@ -192,8 +192,8 @@ namespace psibase::http
 
          else if (!req.target().starts_with("/native"))
          {
-            auto           startTime = steady_clock::now();
-            RpcRequestData data;
+            auto        startTime = steady_clock::now();
+            HttpRequest data;
             if (req.method() == bhttp::verb::get)
                data.method = "GET";
             else if (req.method() == bhttp::verb::post)
@@ -229,7 +229,7 @@ namespace psibase::http
             auto endExecTime = steady_clock::now();
             // TODO: option to print this
             // printf("%s\n", prettyTrace(atrace).c_str());
-            auto result  = psio::convert_from_frac<std::optional<RpcReplyData>>(atrace.rawRetval);
+            auto result  = psio::convert_from_frac<std::optional<HttpReply>>(atrace.rawRetval);
             auto endTime = steady_clock::now();
             if (server.http_config->host_perf)
             {

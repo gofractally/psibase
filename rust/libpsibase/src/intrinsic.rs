@@ -62,7 +62,7 @@ pub mod raw {
         /// Add a sequentially-numbered record
         ///
         /// Returns the id.
-        pub fn kvPutSequential(db: crate::DbId, value: *const u8, value_len: u32) -> u64;
+        pub fn putSequential(db: crate::DbId, value: *const u8, value_len: u32) -> u64;
 
         /// Remove a key-value pair if it exists
         pub fn kvRemove(db: crate::DbId, key: *const u8, key_len: u32);
@@ -77,7 +77,7 @@ pub mod raw {
         ///
         /// If `id` is available, then sets result to value and returns size. If id does
         /// not exist, returns -1 and clears result.
-        pub fn kvGetSequential(db: crate::DbId, id: u64) -> u32;
+        pub fn getSequential(db: crate::DbId, id: u64) -> u32;
 
         /// Get the first key-value pair which is greater than or equal to the provided
         /// key

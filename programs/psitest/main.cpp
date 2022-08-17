@@ -695,8 +695,9 @@ struct callbacks
             // running in read-only mode.
             //
             // We run the check within blockContext to make it easier for
-            // tests to chain transactions which modify auth. psinode
-            // doesn't provide this luxury.
+            // tests to chain transactions which modify auth. There's a
+            // cost to this since numExecutionMemories may bounce back
+            // and forth.
             auto saveTrace = trace;
             chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt);
             trace = std::move(saveTrace);
@@ -748,9 +749,9 @@ struct callbacks
       return native().kvGet(db, key);
    }
 
-   uint32_t kvGetSequential(uint32_t db, uint64_t indexNumber)
+   uint32_t getSequential(uint32_t db, uint64_t indexNumber)
    {
-      return native().kvGetSequential(db, indexNumber);
+      return native().getSequential(db, indexNumber);
    }
 
    uint32_t kvGreaterEqual(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
@@ -809,7 +810,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::getResult>("env", "getResult");
    rhf_t::add<&callbacks::getKey>("env", "getKey");
    rhf_t::add<&callbacks::kvGet>("env", "kvGet");
-   rhf_t::add<&callbacks::kvGetSequential>("env", "kvGetSequential");
+   rhf_t::add<&callbacks::getSequential>("env", "getSequential");
    rhf_t::add<&callbacks::kvGreaterEqual>("env", "kvGreaterEqual");
    rhf_t::add<&callbacks::kvLessThan>("env", "kvLessThan");
    rhf_t::add<&callbacks::kvMax>("env", "kvMax");
