@@ -140,6 +140,10 @@ enum Commands {
 
         /// Source filename to upload
         source: String,
+
+        /// Sender to use; defaults to <CONTRACT>
+        #[clap(short = 'S', long, value_name = "SENDER")]
+        sender: Option<ExactAccountNumber>,
     },
 
     /// Upload a directory tree to a contract
@@ -152,6 +156,10 @@ enum Commands {
 
         /// Source directory to upload
         source: String,
+
+        /// Sender to use; defaults to <CONTRACT>
+        #[clap(short = 'S', long, value_name = "SENDER")]
+        sender: Option<ExactAccountNumber>,
     },
 }
 
@@ -240,10 +248,16 @@ fn reg_server(contract: AccountNumber, server_contract: AccountNumber) -> Action
     }
 }
 
-fn store_sys(contract: AccountNumber, path: &str, content_type: &str, content: &[u8]) -> Action {
+fn store_sys(
+    contract: AccountNumber,
+    sender: AccountNumber,
+    path: &str,
+    content_type: &str,
+    content: &[u8],
+) -> Action {
     let data = (path.to_string(), content_type.to_string(), content.to_vec());
     Action {
-        sender: contract,
+        sender,
         contract,
         method: method!("storeSys"),
         raw_data: data.packed_bytes(),
@@ -430,12 +444,20 @@ async fn upload(
     args: &Args,
     client: reqwest::Client,
     contract: AccountNumber,
+    sender: Option<ExactAccountNumber>,
     dest: &str,
     content_type: &str,
     source: &str,
 ) -> Result<(), anyhow::Error> {
+    let sender = if let Some(s) = sender {
+        s.into()
+    } else {
+        contract
+    };
+
     let actions = vec![store_sys(
         contract,
+        sender,
         dest,
         content_type,
         &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
@@ -454,6 +476,7 @@ async fn upload(
 
 fn fill_tree(
     contract: AccountNumber,
+    sender: AccountNumber,
     actions: &mut Vec<Action>,
     dest: &str,
     source: &str,
@@ -465,6 +488,7 @@ fn fill_tree(
             println!("{} <=== {}   {}", dest, source, t.essence_str());
             actions.push(store_sys(
                 contract,
+                sender,
                 dest,
                 t.essence_str(),
                 &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
@@ -480,7 +504,7 @@ fn fill_tree(
             } else {
                 dest.to_owned() + "/" + path.file_name().to_str().unwrap()
             };
-            fill_tree(contract, actions, &d, path.path().to_str().unwrap())?;
+            fill_tree(contract, sender, actions, &d, path.path().to_str().unwrap())?;
         }
     }
     Ok(())
@@ -490,15 +514,22 @@ async fn upload_tree(
     args: &Args,
     client: reqwest::Client,
     contract: AccountNumber,
+    sender: Option<ExactAccountNumber>,
     mut dest: &str,
     source: &str,
 ) -> Result<(), anyhow::Error> {
+    let sender = if let Some(s) = sender {
+        s.into()
+    } else {
+        contract
+    };
+
     while !dest.is_empty() && dest.ends_with('/') {
         dest = &dest[0..dest.len() - 1];
     }
 
     let mut actions = Vec::new();
-    fill_tree(contract, &mut actions, dest, source)?;
+    fill_tree(contract, sender, &mut actions, dest, source)?;
 
     let trx = with_tapos(&args.api, client.clone(), actions).await?;
     push_transaction(
@@ -563,11 +594,13 @@ async fn main() -> Result<(), anyhow::Error> {
             dest,
             content_type,
             source,
+            sender,
         } => {
             upload(
                 &args,
                 client,
                 (*contract).into(),
+                *sender,
                 dest,
                 content_type,
                 source,
@@ -578,7 +611,8 @@ async fn main() -> Result<(), anyhow::Error> {
             contract,
             dest,
             source,
-        } => upload_tree(&args, client, (*contract).into(), dest, source).await?,
+            sender,
+        } => upload_tree(&args, client, (*contract).into(), *sender, dest, source).await?,
     }
 
     Ok(())

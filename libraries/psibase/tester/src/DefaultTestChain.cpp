@@ -5,6 +5,7 @@
 #include <contracts/system/AuthFakeSys.hpp>
 #include <contracts/system/CommonSys.hpp>
 #include <contracts/system/ProxySys.hpp>
+#include <contracts/system/PsiSpaceSys.hpp>
 #include <contracts/system/RAccountSys.hpp>
 #include <contracts/system/RAuthEcSys.hpp>
 #include <contracts/system/RProxySys.hpp>
@@ -105,6 +106,11 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                              .contract = RProxySys::contract,
                              .flags    = 0,
                              .code     = readWholeFile("RProxySys.wasm"),
+                        },
+                         {
+                             .contract = PsiSpaceSys::contract,
+                             .flags    = 0,
+                             .code     = readWholeFile("PsiSpaceSys.wasm"),
                         },
                     },
                 }),
@@ -208,7 +214,9 @@ void DefaultTestChain::registerSysRpc()
        transactor<ProxySys>{AccountSys::contract, r}.registerServer(RAccountSys::contract),
        transactor<ProxySys>{ExploreSys::contract, r}.registerServer(ExploreSys::contract),
        transactor<ProxySys>{AuthEcSys::contract, r}.registerServer(RAuthEcSys::contract),
-       transactor<ProxySys>{ProxySys::contract, r}.registerServer(RProxySys::contract)};
+       transactor<ProxySys>{ProxySys::contract, r}.registerServer(RProxySys::contract),
+       transactor<ProxySys>{PsiSpaceSys::contract, r}.registerServer(PsiSpaceSys::contract),
+   };
 
    auto trace = pushTransaction(makeTransaction(std::move(a)));
    check(psibase::show(false, trace) == "", "Failed to register system rpc contracts");

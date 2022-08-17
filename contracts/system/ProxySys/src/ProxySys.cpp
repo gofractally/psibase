@@ -72,11 +72,13 @@ namespace psibase
 
       auto contract = AccountNumber(contractName);
       auto reg      = kvGet<RegisteredContractRow>(registeredContractKey(act.contract, contract));
-      if (!reg)
-         abortMessage("contract not registered: " + contract.str());
+      if (reg)
+         contract = reg->serverContract;
+      else
+         contract = "psispace-sys"_a;
 
       // TODO: avoid repacking (both directions)
-      psibase::Actor<ServerInterface> iface(act.contract, reg->serverContract);
+      psibase::Actor<ServerInterface> iface(act.contract, contract);
 
       auto result = iface.serveSys(std::move(req)).unpack();
       if (result && !result->headers.empty() && contractName != "common-sys")
