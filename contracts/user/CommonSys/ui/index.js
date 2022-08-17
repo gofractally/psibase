@@ -5,7 +5,7 @@ await import("/common/react-router-dom.min.js");
 
 const html = htm.bind(React.createElement);
 
-const { useEffect, useState, useCallback, useMemo } = React;
+const { useEffect, useState, useCallback, useMemo, useRef } = React;
 const { BrowserRouter, Route } = ReactRouterDOM;
 
 const appletPrefix = "/applet/";
@@ -256,10 +256,13 @@ function App() {
     let {appletStr, subPath} = getAppletInURL();
     let [applets, setApplets] = useState([{appletStr, subPath, state: AppletStates.primary, onInit: ()=>{}}]);
 
+    const appletsRef = useRef();
+    appletsRef.current = applets;
+
     let getIndex = useCallback((appletStr, subPath)=>{
         // Finds the index of the specified applet in state: "applets"
         var index = -1;
-        applets.some((a, i) => {
+        appletsRef.current.some((a, i) => {
             if (a.appletStr == appletStr && a.subPath == subPath)
             {
                 index = i;
@@ -275,18 +278,18 @@ function App() {
         let index = getIndex(appletStr, subPath);
         if (index === -1)
         {
-            setApplets([...applets, {appletStr, subPath, state, onInit: callAfterOpen}]);
+            setApplets([...appletsRef.current, {appletStr, subPath, state, onInit: callAfterOpen}]);
         }
         else
         {   // Applet is already open, invoke callback immediately
             callAfterOpen();
         }
         
-    }, []);
+    }, [getIndex]);
 
     let urlApplet = useCallback(() => {
         return Applet({appletStr, subPath, state: AppletStates.primary}, handleMessage);
-    }, [appletStr, subPath]);
+    }, []);
 
     
     let sendMessage = useCallback((messageType, sender, receiver, payload, shouldOpenReceiver)=>{
@@ -353,14 +356,13 @@ function App() {
     }, []);
 
     let withSender = useCallback((callback)=>{
-        // let senderApplet = {applet: "common-sys", subPath: ""};
-        // runQuery(senderApplet, 
-        //     "account-sys", "", "getLoggedInUser", {}, 
-        //     ({responseApplet, response})=>{
-        //         callback(response);
-        //     }
-        // );
-        callback("alice");
+        let senderApplet = {applet: "common-sys", subPath: ""};
+        runQuery(senderApplet, 
+            "account-sys", "", "getLoggedInUser", {}, 
+            ({responseApplet, response})=>{
+                callback(response);
+            }
+        );
     }, [runQuery]);
 
     let executeTransaction = useCallback(() => {
@@ -504,7 +506,7 @@ function App() {
             },
         },
 
-    ], [open]);
+    ], [open, executeTransaction, sendMessage, runQuery]);
 
     let handleMessage = useCallback(async ({applet, subPath, state}, request)=>{
         let {type, payload} = request.message;
