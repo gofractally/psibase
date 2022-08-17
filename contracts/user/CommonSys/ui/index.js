@@ -353,13 +353,14 @@ function App() {
     }, []);
 
     let withSender = useCallback((callback)=>{
-        let senderApplet = {applet: "common-sys", subPath: ""};
-        runQuery(senderApplet, 
-            "account-sys", "", "getLoggedInUser", {}, 
-            ({responseApplet, response})=>{
-                callback(response);
-            }
-        );
+        // let senderApplet = {applet: "common-sys", subPath: ""};
+        // runQuery(senderApplet, 
+        //     "account-sys", "", "getLoggedInUser", {}, 
+        //     ({responseApplet, response})=>{
+        //         callback(response);
+        //     }
+        // );
+        callback("alice");
     }, [runQuery]);
 
     let executeTransaction = useCallback(() => {
