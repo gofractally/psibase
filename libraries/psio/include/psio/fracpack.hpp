@@ -2505,8 +2505,6 @@ namespace psio
          memcpy(_data.get(), &size, sizeof(size));
       }
 
-      operator T() const { return unpack(); }
-
       bool validate(bool& unknown) const
       {
          if (_data)

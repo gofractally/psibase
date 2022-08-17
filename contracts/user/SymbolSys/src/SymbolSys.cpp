@@ -114,7 +114,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    }
 
    // Mint and offer ownership NFT
-   newSym.ownerNft    = at<NftSys>().mint();
+   newSym.ownerNft    = *at<NftSys>().mint();
    auto nftCreditMemo = "This NFT conveys ownership of symbol: " + symString;
    if (sender != contract)
    {
@@ -123,7 +123,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
 
    // Update symbol type statistics
    symType.createCounter++;
-   symType.lastPriceUpdateTime = at<TransactionSys>().headBlockTime();
+   symType.lastPriceUpdateTime = *at<TransactionSys>().headBlockTime();
 
    db.open<SymbolTable_t>().put(newSym);
    db.open<SymbolLengthTable_t>().put(symType);
