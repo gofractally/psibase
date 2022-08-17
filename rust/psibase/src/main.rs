@@ -9,6 +9,7 @@ use libpsibase::{
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::fs::{metadata, read_dir};
 
 mod boot;
 
@@ -131,14 +132,26 @@ enum Commands {
         /// Contract to upload to
         contract: ExactAccountNumber,
 
-        /// Path to store within contract
-        path: String,
+        /// Destination file within contract
+        dest: String,
 
         /// MIME content type of file
         content_type: String,
 
-        /// Filename to upload
-        filename: String,
+        /// Source filename to upload
+        source: String,
+    },
+
+    /// Upload a directory tree to a contract
+    UploadTree {
+        /// Contract to upload to
+        contract: ExactAccountNumber,
+
+        /// Destination directory within contract
+        dest: String,
+
+        /// Source directory to upload
+        source: String,
     },
 }
 
@@ -417,18 +430,77 @@ async fn upload(
     args: &Args,
     client: reqwest::Client,
     contract: AccountNumber,
-    path: &str,
+    dest: &str,
     content_type: &str,
-    filename: &str,
+    source: &str,
 ) -> Result<(), anyhow::Error> {
     let actions = vec![store_sys(
         contract,
-        path,
+        dest,
         content_type,
-        &std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?,
+        &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
     )];
     let trx = with_tapos(&args.api, client.clone(), actions).await?;
 
+    push_transaction(
+        &args.api,
+        client,
+        sign_transaction(trx, &args.sign)?.packed_bytes(),
+    )
+    .await?;
+    println!("Ok");
+    Ok(())
+}
+
+fn fill_tree(
+    contract: AccountNumber,
+    actions: &mut Vec<Action>,
+    dest: &str,
+    source: &str,
+) -> Result<(), anyhow::Error> {
+    let md = metadata(source)?;
+    if md.is_file() {
+        let guess = mime_guess::from_path(source);
+        if let Some(t) = guess.first() {
+            println!("{} <=== {}   {}", dest, source, t.essence_str());
+            actions.push(store_sys(
+                contract,
+                dest,
+                t.essence_str(),
+                &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
+            ));
+        } else {
+            println!("Skip unknown mime type: {}", source);
+        }
+    } else if md.is_dir() {
+        for path in read_dir(source)? {
+            let path = path?;
+            let d = if path.file_name() == "index.html" {
+                dest.to_owned() + "/"
+            } else {
+                dest.to_owned() + "/" + path.file_name().to_str().unwrap()
+            };
+            fill_tree(contract, actions, &d, path.path().to_str().unwrap())?;
+        }
+    }
+    Ok(())
+}
+
+async fn upload_tree(
+    args: &Args,
+    client: reqwest::Client,
+    contract: AccountNumber,
+    mut dest: &str,
+    source: &str,
+) -> Result<(), anyhow::Error> {
+    while !dest.is_empty() && dest.ends_with('/') {
+        dest = &dest[0..dest.len() - 1];
+    }
+
+    let mut actions = Vec::new();
+    fill_tree(contract, &mut actions, dest, source)?;
+
+    let trx = with_tapos(&args.api, client.clone(), actions).await?;
     push_transaction(
         &args.api,
         client,
@@ -488,20 +560,25 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Upload {
             contract,
-            path,
+            dest,
             content_type,
-            filename,
+            source,
         } => {
             upload(
                 &args,
                 client,
                 (*contract).into(),
-                path,
+                dest,
                 content_type,
-                filename,
+                source,
             )
             .await?
         }
+        Commands::UploadTree {
+            contract,
+            dest,
+            source,
+        } => upload_tree(&args, client, (*contract).into(), dest, source).await?,
     }
 
     Ok(())

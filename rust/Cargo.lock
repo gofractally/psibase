@@ -1651,6 +1651,7 @@ dependencies = [
  "cxx-build",
  "fracpack",
  "libpsibase",
+ "mime_guess",
  "reqwest",
  "secp256k1",
  "serde",
