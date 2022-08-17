@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import './App.css'
+import { Person } from './person';
 // @ts-ignore
 import { siblingUrl } from '/common/rootdomain.mjs'
+// import { siblingUrl } from '/common'
 
 console.log(siblingUrl, 'is the sibling url')
 // const siblingUrl = window.siblingUrl;
@@ -22,6 +24,7 @@ function App() {
       </div>
       <h1  className='derp' style={{ backgroundColor: 'red' }}>Vite + React</h1>
       <div className="card">
+        {['john', 'brandon', 'mike'].map(name => <Person name={name} />)}
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
         </button>

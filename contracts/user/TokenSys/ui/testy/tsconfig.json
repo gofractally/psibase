@@ -2,6 +2,9 @@
   "compilerOptions": {
     "target": "ESNext",
     "baseUrl": "./src",
+    "typeRoots": [
+      "types"
+    ],
     "useDefineForClassFields": true,
     "lib": [
       "DOM",

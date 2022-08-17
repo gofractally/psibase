@@ -1,5 +1,3 @@
-declare module "/common" {
-
-
-        export function derp(): string;
+declare namespace common {
+    export function siblingUrl(): string;
 }
