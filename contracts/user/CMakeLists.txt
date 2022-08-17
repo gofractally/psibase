@@ -5,6 +5,7 @@ function(add_user_contract suffix name)
         ../CommonSys/include
         ../ExchangeSys/include
         ../NftSys/include
+        ../PsiSpaceSys/include
         ../SymbolSys/include
         ../TokenSys/include
         ../../system/AccountSys/include
@@ -26,6 +27,7 @@ function(add_user_test suffix name)
       ../../CommonSys/include
       ../../ExchangeSys/include
       ../../NftSys/include
+      ../../PsiSpaceSys/include
       ../../SymbolSys/include
       ../../TokenSys/include
       ../../../system/AccountSys/include
@@ -65,11 +67,12 @@ if(DEFINED IS_WASM)
     add_subdirectory(CommonSys)
     add_subdirectory(ExchangeSys)
     add_subdirectory(ExploreSys)
+    add_subdirectory(launchTestChain)
     add_subdirectory(mincon)
     add_subdirectory(NftSys)
+    add_subdirectory(PsiSpaceSys)
     add_subdirectory(SymbolSys)
     add_subdirectory(TokenSys)
-    add_subdirectory(launchTestChain)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
