@@ -34,9 +34,9 @@ const App = () => {
     React.useEffect(()=>{
         let interval
         if (autoUpdateMode) {
-            interval=setInterval(()=>{
+            interval = setInterval(()=>{
                 pagedResult.last();
-            },1000)
+            }, 1000)
         } else {
             clearInterval(interval);
         }
