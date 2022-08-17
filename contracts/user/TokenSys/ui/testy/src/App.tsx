@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import './App.css'
+// @ts-ignore
+import { siblingUrl } from '/common/rootdomain.mjs'
 
+console.log(siblingUrl, 'is the sibling url')
 // const siblingUrl = window.siblingUrl;
 
 function App() {
