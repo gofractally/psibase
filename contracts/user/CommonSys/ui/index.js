@@ -236,12 +236,7 @@ function getAppletInURL() {
 
 let currentOps = [];
 
-function makeAction(application, actionName, params)
-{
-    return {contract: application, method: actionName, data: params};
-}
-
-function makeActionAs(application, actionName, params, sender)
+function makeAction(application, actionName, params, sender)
 {
     return {contract: application, method: actionName, data: params, sender};
 }
@@ -349,7 +344,7 @@ function App() {
 
     let injectSender = useCallback((actions, sender) => {
         actions.forEach(action => {
-            if (typeof action.sender === 'undefined')
+            if (action.sender === null)
             {
                 action.sender = sender;
             }
@@ -467,14 +462,11 @@ function App() {
         {
             type: MessageTypes.Action,
             validate: (payload) => {
-                return verifyFields(payload, ["application", "actionName", "params"]);
+                return verifyFields(payload, ["application", "actionName", "params", "sender"]);
             },
             handle: async (senderApplet, payload) => {
-                let {application, actionName, params} = payload;
-                if (typeof payload.sender === 'undefined')
-                    transaction.push(makeAction(application, actionName, params));
-                else
-                    transaction.push(makeActionAs(application, actionName, params, payload.sender));
+                let {application, actionName, params, sender} = payload;
+                transaction.push(makeAction(application, actionName, params, sender));
             }
         },
         {

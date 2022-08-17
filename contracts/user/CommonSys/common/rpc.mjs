@@ -507,11 +507,19 @@ function set({targetArray, newElements}, caller)
     }
 }
 
+/**
+ * Description: Sets the operations supported by this applet.
+ * Call this from within the initialization function provided to initializeApplet.
+ */
 export function setOperations(operations)
 {
     set({targetArray: ops, newElements: operations}, "setOperations");
 }
 
+/**
+ * Description: Sets the queries supported by this applet.
+ * Call this from within the initialization function provided to initializeApplet.
+ */
 export function setQueries(queries)
 {
     set({targetArray: qrs, newElements: queries}, "setQueries");
@@ -528,6 +536,14 @@ function stopOperation()
     }, tempDelay);
 }
 
+/**
+ * Description: Runs the specified operation
+ * 
+ * @param {String} applet - The name of the applet that handles the specified operation.
+ * @param {String} subPath - The page of the applet that handles the specified operation.
+ * @param {String} name - The name of the operation to run.
+ * @param {Object} params - The object containing all parameters expected by the operation handler.
+ */
 export function operation(applet, subPath, name, params)
 {
     // Todo - There may be a way to short-circuit calling common-sys when 
@@ -539,15 +555,16 @@ export function operation(applet, subPath, name, params)
     });
 }
 
-export function action(application, actionName, params)
-{
-    sendToParent({
-        type: MessageTypes.Action,
-        payload: { application, actionName, params },
-    });
-}
-
-export function actionAs(application, actionName, params, sender)
+/**
+ * Description: Calls the specified action on the blockchain
+ * 
+ * @param {String} application - The name of the application that defines the action.
+ * @param {String} actionName - The name of the action being called.
+ * @param {Object} params - The object containing all parameters expected by the action.
+ * @param {String} sender - Optional parameter to explicitly specify a sender. If no sender is provided, 
+ *  the currently logged in user is assumed to be the sender.
+ */
+export function action(application, actionName, params, sender = null)
 {
     sendToParent({
         type: MessageTypes.Action,
@@ -555,6 +572,16 @@ export function actionAs(application, actionName, params, sender)
     });
 }
 
+
+/**
+ * Description: Calls the specified query on another applet. The callback will be executed with the return value.
+ * 
+ * @param {String} applet - The name of the applet being queried.
+ * @param {String} subPath - The page of the applet that handles the specified query.
+ * @param {String} queryName - The name of the query being executed.
+ * @param {Object} params - The object containing all parameters expected by the query handler.
+ * @param {Function} callback - The function called with the return value.
+ */
 export function query(applet, subPath, queryName, params, callback)
 {
     // Will leave memory hanging if we don't get a response as expected
