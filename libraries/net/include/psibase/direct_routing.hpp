@@ -136,11 +136,24 @@ namespace psibase::net
          psio::fracpack(msg, s);
          return result;
       }
+      template <typename T>
+      void try_recv_impl(peer_id peer, psio::input_stream& s)
+      {
+         try
+         {
+            return recv(peer, psio::convert_from_frac<T>(s));
+         }
+         catch (...)
+         {
+            std::cout << "invalid message from peer " << peer << std::endl;
+            peers().disconnect(peer);
+         }
+      }
       template <template <typename...> class L, typename... T>
       void recv_impl(peer_id peer, int key, const std::vector<char>& msg, L<T...>*)
       {
          psio::input_stream s(msg.data() + 1, msg.size() - 1);
-         ((key == T::type ? recv(peer, psio::convert_from_frac<T>(s)) : (void)0), ...);
+         ((key == T::type ? try_recv_impl<T>(peer, s) : (void)0), ...);
       }
       void recv(peer_id peer, const std::vector<char>& msg)
       {
