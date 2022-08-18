@@ -1,9 +1,28 @@
-import { siblingUrl } from '/common/rootdomain.mjs';
 import { privateStringToKeyPair, publicKeyPairToFracpack, signatureToFracpack } from '/common/keyConversions.mjs';
 import hashJs from 'https://cdn.skypack.dev/hash.js';
 
-export { siblingUrl };
+let rootDomain = '';
 
+export async function getRootDomain() {
+    if (rootDomain) {
+        return rootDomain;
+    } else {
+        rootDomain = await getJson('/common/rootdomain');
+        return rootDomain;
+    }
+}
+
+export async function siblingUrl(baseUrl, contract, path) {
+
+    const rootDomain = await getRootDomain();
+
+    let loc;
+    if (!baseUrl)
+        loc = location;
+    else
+        loc = new URL(baseUrl);
+    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootDomain + ':' + loc.port + '/' + (path || '').replace(/^\/+/, '');
+}
 export class RPCError extends Error {
     constructor(message, trace) {
         super(message)
@@ -101,7 +120,7 @@ export async function packAction(baseUrl, action) {
     let { sender, contract, method, data, rawData } = action;
     if (!rawData) {
         rawData = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
-            siblingUrl(baseUrl, contract, '/pack_action/' + method),
+            await siblingUrl(baseUrl, contract, '/pack_action/' + method),
             data)));
     }
     return { sender, contract, method, rawData };
@@ -254,10 +273,10 @@ export function executeCallback(callbackId, response) {
     return true;
 }
 
-function sendToParent(message) {
+async function sendToParent(message) {
     if ('parentIFrame' in window) {
         // Specify siblingUrl to prevent any malicious site from mimicking common-sys.
-        parentIFrame.sendMessage(message, siblingUrl(null, null, null));
+        parentIFrame.sendMessage(message, await siblingUrl(null, null, null));
     }
     else {
         // This can sometimes happen if the page hasn't fully loaded
@@ -265,12 +284,12 @@ function sendToParent(message) {
     }
 }
 
-let redirectIfAccessedDirectly = () => {
+let redirectIfAccessedDirectly = async () => {
     try {
         if (window.self === window.top) {
             // We are the top window. Redirect needed.
             const applet = window.location.hostname.substring(0, window.location.hostname.indexOf("."));
-            window.location.replace(siblingUrl(null, "", "/applet/" + applet));
+            window.location.replace(await siblingUrl(null, "", "/applet/" + applet));
         }
     } catch (e) {
         // The browser blocked access to window.top due to the same origin policy, 
@@ -306,16 +325,13 @@ let handleErrorCode = (code) => {
     return true;
 };
 
-let fullyInitialized = false;
-let ipcBuffer = [];
-
 let messageRouting = [
     {
         type: MessageTypes.Operation,
         validate: (payload) => {
             return verifyFields(payload, ["identifier", "params"]);
         },
-        route: (payload) => {
+        route: async (payload) => {
             let { identifier, params } = payload;
 
             let doRouteMessage = async () => {
@@ -339,11 +355,7 @@ let messageRouting = [
                 return true;
             };
 
-            if (!fullyInitialized) {
-                ipcBuffer.push(doRouteMessage);
-                return true;
-            }
-            else return doRouteMessage();
+            return await doRouteMessage();
         },
     },
     {
@@ -351,10 +363,10 @@ let messageRouting = [
         validate: (payload) => {
             return verifyFields(payload, ["identifier", "params", "callbackId"]);
         },
-        route: (payload) => {
+        route: async (payload) => {
             let { identifier, params, callbackId } = payload;
 
-            let doRouteMessage = () => {
+            let doRouteMessage = async () => {
                 let qu = qrs.find(q => q.id === identifier);
                 if (qu !== undefined) {
                     try {
@@ -379,11 +391,7 @@ let messageRouting = [
                 return true;
             };
 
-            if (!fullyInitialized) {
-                ipcBuffer.push(doRouteMessage);
-                return true;
-            }
-            else return doRouteMessage();
+            return await doRouteMessage();
         },
     },
     {
@@ -399,11 +407,11 @@ let messageRouting = [
 ];
 
 export async function initializeApplet(initializer = () => { }) {
-    redirectIfAccessedDirectly();
+    await redirectIfAccessedDirectly();
 
     window.iFrameResizer = {
-        targetOrigin: siblingUrl(null, null, null), // Prevents any malicious site from mimicking common-sys.
-        onMessage: (msg) => {
+        targetOrigin: await siblingUrl(null, null, null), // Prevents any malicious site from mimicking common-sys.
+        onMessage: async (msg) => {
             let { type, payload } = msg;
             if (type === undefined || payload === undefined) {
                 console.error("Malformed message received from core");
@@ -424,7 +432,8 @@ export async function initializeApplet(initializer = () => { }) {
             if (handleErrorCode(payload.error))
                 return;
 
-            if (!route.route(payload)) {
+            let routed = await route.route(payload);
+            if (!routed) {
                 console.error("Child failed to route message: " + msg);
                 return;
             }
@@ -434,17 +443,6 @@ export async function initializeApplet(initializer = () => { }) {
     // await import("/common/iframeResizer.contentWindow.js");
 
     await initializer();
-
-    fullyInitialized = true;
-
-    try {
-        ipcBuffer.forEach(buffered => { buffered(); });
-        ipcBuffer = [];
-    }
-    catch (e) {
-        console.error("Buffered message failure");
-        console.error(e);
-    }
 }
 
 

@@ -1,12 +1,29 @@
 #include "contracts/system/PsiSpaceSys.hpp"
 
 #include <psibase/dispatch.hpp>
+#include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
 
 using namespace psibase;
 
 namespace system_contract
 {
+   namespace
+   {
+      struct Query
+      {
+         AccountNumber contract;
+
+         auto content() const
+         {
+            return PsiSpaceSys::Tables{contract}.open<PsiSpaceContentTable>().getIndex<0>();
+         }
+      };
+      PSIO_REFLECT(  //
+          Query,
+          method(content))
+   }  // namespace
+
    std::optional<HttpReply> PsiSpaceSys::serveSys(HttpRequest request)
    {
       check(request.host.size() > request.rootHost.size(), "oops");
@@ -18,14 +35,16 @@ namespace system_contract
 
       if (account == PsiSpaceSys::contract)
       {
+         if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
+            return result;
          if (auto result = serveSimpleUI<PsiSpaceSys, true>(request))
             return result;
       }
 
       if (request.method == "GET")
       {
-         auto index = tables.template open<PsiSpaceContentTable>().template getIndex<0>();
-         if (auto content = index.get(std::tie(account, request.target)))
+         auto index = tables.open<PsiSpaceContentTable>().getIndex<0>();
+         if (auto content = index.get(PsiSpaceContentKey{account, request.target}))
          {
             return HttpReply{
                 .contentType = content->contentType,

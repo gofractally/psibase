@@ -25,10 +25,12 @@ namespace system_contract
       check(!statusIdx.get(std::tuple{}), "already started");
       statusTable.put({.enforceAuth = true});
 
-      // TODO: Move this to a config contract
+      // TODO: Move these to a config contract
       // TODO: Reduce numExecutionMemories on proofWasmConfigTable. Waiting for
       //       a fix to SystemContract caching, to prevent frequent allocating
       //       and freeing of ExecutionMemory instances.
+      ConfigRow config;
+      kvPut(config.db, config.key(), config);
       WasmConfigRow wasmConfig;
       kvPut(wasmConfig.db, wasmConfig.key(transactionWasmConfigTable), wasmConfig);
       kvPut(wasmConfig.db, wasmConfig.key(proofWasmConfigTable), wasmConfig);

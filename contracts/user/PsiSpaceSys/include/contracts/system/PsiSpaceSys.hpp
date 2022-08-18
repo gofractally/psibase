@@ -5,6 +5,19 @@
 
 namespace system_contract
 {
+   struct PsiSpaceContentKey
+   {
+      psibase::AccountNumber account = {};
+      std::string            path    = {};
+
+      // TODO: upgrade wasi-sdk; <=> for string is missing
+      friend bool operator<(const PsiSpaceContentKey& a, const PsiSpaceContentKey& b)
+      {
+         return std::tie(a.account, a.path) < std::tie(b.account, b.path);
+      }
+   };
+   PSIO_REFLECT(PsiSpaceContentKey, account, path)
+
    struct PsiSpaceContentRow
    {
       psibase::AccountNumber account     = {};
@@ -12,7 +25,7 @@ namespace system_contract
       std::string            contentType = {};
       std::vector<char>      content     = {};
 
-      auto key() const { return std::tie(account, path); }
+      PsiSpaceContentKey key() const { return {account, path}; }
    };
    PSIO_REFLECT(PsiSpaceContentRow, account, path, contentType, content)
    using PsiSpaceContentTable = psibase::Table<PsiSpaceContentRow, &PsiSpaceContentRow::key>;

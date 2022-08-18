@@ -13,7 +13,7 @@ namespace
       // TODO: fix naming
 
       // clang-format off
-      [[clang::import_name("testerCreateChain")]]        uint32_t testerCreateChain();
+      [[clang::import_name("testerCreateChain")]]        uint32_t testerCreateChain(uint64_t max_objects, uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
       [[clang::import_name("testerDestroyChain")]]       void     testerDestroyChain(uint32_t chain);
       [[clang::import_name("testerExecute")]]            int32_t  testerExecute(const char* command, uint32_t command_size);
       [[clang::import_name("testerFinishBlock")]]        void     testerFinishBlock(uint32_t chain_index);
@@ -182,7 +182,16 @@ const psibase::PrivateKey psibase::TestChain::defaultPrivKey =
 // need to be kept in sync with whatever updates the native layer.
 static psibase::TestChain* currentChain = nullptr;
 
-psibase::TestChain::TestChain() : id{::testerCreateChain()}
+psibase::TestChain::TestChain(uint64_t max_objects,
+                              uint64_t hot_addr_bits,
+                              uint64_t warm_addr_bits,
+                              uint64_t cool_addr_bits,
+                              uint64_t cold_addr_bits)
+    : id{::testerCreateChain(max_objects,
+                             hot_addr_bits,
+                             warm_addr_bits,
+                             cool_addr_bits,
+                             cold_addr_bits)}
 {
    currentChain = this;
 }

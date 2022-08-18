@@ -13,6 +13,7 @@ namespace psibase
    static constexpr NativeTableNum databaseStatusTable        = 4;
    static constexpr NativeTableNum transactionWasmConfigTable = 5;
    static constexpr NativeTableNum proofWasmConfigTable       = 6;  // Also for first auth
+   static constexpr NativeTableNum configTable                = 7;
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -30,6 +31,17 @@ namespace psibase
       static auto           key() { return statusKey(); }
    };
    PSIO_REFLECT(StatusRow, chainId, current, head)
+
+   struct ConfigRow
+   {
+      uint32_t maxKeySize   = 128;
+      uint32_t maxValueSize = 8 << 20;
+
+      static constexpr auto db = psibase::DbId::nativeConstrained;
+
+      static auto key() { return std::tuple{configTable, nativeTablePrimaryIndex}; }
+   };
+   PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
 
    // TODO: determine which eos-vm parameters need to
    //       be constrained for safety and consensus.

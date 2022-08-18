@@ -164,6 +164,22 @@ namespace psibase
                "CodeByHashRow has incorrect key");
       }
 
+      void verifyConfigRow(psio::input_stream key, psio::input_stream value)
+      {
+         check(psio::fracvalidate<ConfigRow>(value.pos, value.end).valid_and_known(),
+               "ConfigRow has invalid format");
+         auto row          = psio::convert_from_frac<ConfigRow>(value);
+         auto expected_key = psio::convert_to_key(row.key());
+         check(key.remaining() == expected_key.size() &&
+                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+               "ConfigRow has incorrect key");
+
+         // Both of these are on the conservative side for triedent. The actual
+         // max values are odd.
+         check(row.maxKeySize <= 128, "maxKeySize too big for triedent");
+         check(row.maxValueSize <= (15 << 20), "maxValueSize too big for triedent");
+      }
+
       void verifyWasmConfigRow(NativeTableNum     table,
                                psio::input_stream key,
                                psio::input_stream value)
@@ -185,6 +201,8 @@ namespace psibase
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == codeByHashTable)
             verifyCodeByHashRow(key, value);
+         else if (table == configTable)
+            verifyConfigRow(key, value);
          else if (table == transactionWasmConfigTable || table == proofWasmConfigTable)
             verifyWasmConfigRow(table, key, value);
          else
@@ -343,8 +361,6 @@ namespace psibase
       clearResult(*this);
    }
 
-   // TODO: restrict key size
-   // TODO: restrict value size
    void NativeFunctions::kvPut(uint32_t                    db,
                                eosio::vm::span<const char> key,
                                eosio::vm::span<const char> value)
@@ -353,6 +369,8 @@ namespace psibase
           *this,
           [&]
           {
+             check(key.size() <= transactionContext.config.maxKeySize, "key is too big");
+             check(value.size() <= transactionContext.config.maxValueSize, "value is too big");
              if (db == uint32_t(DbId::nativeConstrained))
                 verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
              clearResult(*this);
@@ -377,13 +395,13 @@ namespace psibase
           });
    }
 
-   // TODO: restrict value size
    uint64_t NativeFunctions::putSequential(uint32_t db, eosio::vm::span<const char> value)
    {
       return timeDb(  //
           *this,
           [&]
           {
+             check(value.size() <= transactionContext.config.maxValueSize, "value is too big");
              clearResult(*this);
              auto m = getDbWriteSequential(*this, db);
 

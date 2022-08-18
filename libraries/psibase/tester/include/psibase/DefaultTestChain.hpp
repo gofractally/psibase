@@ -11,7 +11,12 @@ namespace psibase
    {
      public:
       DefaultTestChain(
-          const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts = {});
+          const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts = {},
+          uint64_t                                                  max_objects         = 1'000'000,
+          uint64_t                                                  hot_addr_bits       = 27,
+          uint64_t                                                  warm_addr_bits      = 27,
+          uint64_t                                                  cool_addr_bits      = 27,
+          uint64_t                                                  cold_addr_bits      = 27);
 
       void deploySystemContracts(bool show = false);
 

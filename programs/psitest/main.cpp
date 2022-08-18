@@ -134,10 +134,16 @@ struct test_chain
    std::unique_ptr<psibase::ActionContext>      nativeFunctionsActionContext;
    std::unique_ptr<psibase::NativeFunctions>    nativeFunctions;
 
-   test_chain(::state& state) : state{state}
+   test_chain(::state& state,
+              uint64_t max_objects,
+              uint64_t hot_addr_bits,
+              uint64_t warm_addr_bits,
+              uint64_t cool_addr_bits,
+              uint64_t cold_addr_bits)
+       : state{state}
    {
-      dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-      db     = {dir, true};
+      dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
+      db  = {dir, true, max_objects, hot_addr_bits, warm_addr_bits, cool_addr_bits, cold_addr_bits};
       writer = db.createWriter();
       sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
@@ -624,9 +630,14 @@ struct callbacks
       return result;
    }
 
-   uint32_t testerCreateChain()
+   uint32_t testerCreateChain(uint64_t max_objects,
+                              uint64_t hot_addr_bits,
+                              uint64_t warm_addr_bits,
+                              uint64_t cool_addr_bits,
+                              uint64_t cold_addr_bits)
    {
-      state.chains.push_back(std::make_unique<test_chain>(state));
+      state.chains.push_back(std::make_unique<test_chain>(
+          state, max_objects, hot_addr_bits, warm_addr_bits, cool_addr_bits, cold_addr_bits));
       if (state.chains.size() == 1)
          state.selected_chain_index = 0;
       return state.chains.size() - 1;
