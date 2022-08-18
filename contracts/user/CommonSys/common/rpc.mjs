@@ -223,35 +223,30 @@ var qrs = []; // Queries defined by an applet
 
 var queryCallbacks = []; // Callbacks automatically generated for responding to queries
 
-export function storeCallback(callback)
-{
+export function storeCallback(callback) {
     let callbackId = queryCallbacks.length;
-    queryCallbacks.push({callbackId, callback});
+    queryCallbacks.push({ callbackId, callback });
     return callbackId;
 }
 
-export function executeCallback(callbackId, response)
-{
+export function executeCallback(callbackId, response) {
     let idx = -1;
     let found = queryCallbacks.some((q, i) => {
-        if (q.callbackId === callbackId)
-        {
+        if (q.callbackId === callbackId) {
             idx = i;
             return true;
         }
         return false;
     });
-    if (!found)
-    {
+    if (!found) {
         console.error("Callback with ID " + callbackId + " not found.");
         return false;
     }
 
-    try{
+    try {
         queryCallbacks[idx].callback(response);
     }
-    catch (e)
-    {
+    catch (e) {
         console.error("Error calling callback with ID " + callbackId);
     }
     // Remove the callback now that it's been handled
@@ -259,14 +254,12 @@ export function executeCallback(callbackId, response)
     return true;
 }
 
-function sendToParent(message)
-{
+function sendToParent(message) {
     if ('parentIFrame' in window) {
         // Specify siblingUrl to prevent any malicious site from mimicking common-sys.
-        parentIFrame.sendMessage(message, siblingUrl(null,null,null));
+        parentIFrame.sendMessage(message, siblingUrl(null, null, null));
     }
-    else
-    {
+    else {
         // This can sometimes happen if the page hasn't fully loaded
         console.log("No parent iframe");
     }
@@ -274,8 +267,7 @@ function sendToParent(message)
 
 let redirectIfAccessedDirectly = () => {
     try {
-        if (window.self === window.top)
-        {
+        if (window.self === window.top) {
             // We are the top window. Redirect needed.
             const applet = window.location.hostname.substring(0, window.location.hostname.indexOf("."));
             window.location.replace(siblingUrl(null, "", "/applet/" + applet));
@@ -286,12 +278,11 @@ let redirectIfAccessedDirectly = () => {
     }
 };
 
-export function verifyFields (obj, fieldNames) {
+export function verifyFields(obj, fieldNames) {
     var missingField = false;
 
-    fieldNames.forEach((fieldName)=>{
-        if (!obj.hasOwnProperty(fieldName))
-        {
+    fieldNames.forEach((fieldName) => {
+        if (!obj.hasOwnProperty(fieldName)) {
             missingField = true;
         }
     });
@@ -302,9 +293,8 @@ export function verifyFields (obj, fieldNames) {
 let handleErrorCode = (code) => {
     if (code === undefined) return false;
 
-    let recognizedError = ErrorMessages.some((err)=>{
-        if (err.code === code)
-        {
+    let recognizedError = ErrorMessages.some((err) => {
+        if (err.code === code) {
             console.error(err.message);
             return true;
         }
@@ -322,29 +312,26 @@ let ipcBuffer = [];
 let messageRouting = [
     {
         type: MessageTypes.Operation,
-        validate: (payload)=>{
+        validate: (payload) => {
             return verifyFields(payload, ["identifier", "params"]);
         },
         route: (payload) => {
-            let {identifier, params} = payload;
+            let { identifier, params } = payload;
 
-            let doRouteMessage = async ()=>{
+            let doRouteMessage = async () => {
                 let op = ops.find(o => o.id === identifier);
-                if (op !== undefined)
-                {
+                if (op !== undefined) {
                     try {
-                         await op.exec(params);
+                        await op.exec(params);
                     }
-                    catch (e)
-                    {
+                    catch (e) {
                         console.error("Error running operation " + identifier);
                         console.error(e);
                         stopOperation();
                         throw e;
                     }
                 }
-                else
-                {
+                else {
                     console.error("Operation not found: " + identifier);
                 }
 
@@ -352,8 +339,7 @@ let messageRouting = [
                 return true;
             };
 
-            if (!fullyInitialized)
-            {
+            if (!fullyInitialized) {
                 ipcBuffer.push(doRouteMessage);
                 return true;
             }
@@ -362,16 +348,15 @@ let messageRouting = [
     },
     {
         type: MessageTypes.Query,
-        validate: (payload)=>{
+        validate: (payload) => {
             return verifyFields(payload, ["identifier", "params", "callbackId"]);
         },
         route: (payload) => {
-            let {identifier, params, callbackId} = payload;
+            let { identifier, params, callbackId } = payload;
 
-            let doRouteMessage = ()=>{
+            let doRouteMessage = () => {
                 let qu = qrs.find(q => q.id === identifier);
-                if (qu !== undefined)
-                {
+                if (qu !== undefined) {
                     try {
                         let reply = (val) => {
                             sendToParent({
@@ -381,23 +366,20 @@ let messageRouting = [
                         };
                         qu.exec(params, reply);
                     }
-                    catch (e)
-                    {
+                    catch (e) {
                         console.error("Error running query " + identifier);
                         console.error(e);
                         throw e;
                     }
                 }
-                else
-                {
+                else {
                     console.error("Query not found: " + identifier);
                 }
 
                 return true;
             };
 
-            if (!fullyInitialized) 
-            {
+            if (!fullyInitialized) {
                 ipcBuffer.push(doRouteMessage);
                 return true;
             }
@@ -410,35 +392,31 @@ let messageRouting = [
             return verifyFields(payload, ["callbackId", "response"]);
         },
         route: (payload) => {
-            let {callbackId, response} = payload;
+            let { callbackId, response } = payload;
             return executeCallback(callbackId, response);
         },
     }
 ];
 
-export async function initializeApplet(initializer = ()=>{})
-{
+export async function initializeApplet(initializer = () => { }) {
     redirectIfAccessedDirectly();
 
     window.iFrameResizer = {
         targetOrigin: siblingUrl(null, null, null), // Prevents any malicious site from mimicking common-sys.
-        onMessage: (msg)=>{
-            let {type, payload} = msg;
-            if (type === undefined || payload === undefined)
-            {
+        onMessage: (msg) => {
+            let { type, payload } = msg;
+            if (type === undefined || payload === undefined) {
                 console.error("Malformed message received from core");
                 return;
             }
 
             let route = messageRouting.find(m => m.type === type);
-            if (route === undefined)
-            {
+            if (route === undefined) {
                 console.error("Message from core specifies unknown route.");
                 return;
             }
 
-            if (!route.validate(payload))
-            {
+            if (!route.validate(payload)) {
                 console.error("Message from core failed validation checks");
                 return;
             }
@@ -446,57 +424,50 @@ export async function initializeApplet(initializer = ()=>{})
             if (handleErrorCode(payload.error))
                 return;
 
-            if (!route.route(payload))
-            {
+            if (!route.route(payload)) {
                 console.error("Child failed to route message: " + msg);
                 return;
             }
         },
-      };
+    };
 
-    await import("/common/iframeResizer.contentWindow.js");
+    // await import("/common/iframeResizer.contentWindow.js");
 
     await initializer();
 
     fullyInitialized = true;
 
-    try
-    {
-        ipcBuffer.forEach(buffered => {buffered();});
+    try {
+        ipcBuffer.forEach(buffered => { buffered(); });
         ipcBuffer = [];
     }
-    catch (e)
-    {
+    catch (e) {
         console.error("Buffered message failure");
         console.error(e);
     }
 }
 
 
-function set({targetArray, newElements}, caller)
-{
+function set({ targetArray, newElements }, caller) {
     let valid = newElements.every(e => {
-        if (!verifyFields(e, ["id", "exec"]))
-        {
+        if (!verifyFields(e, ["id", "exec"])) {
             return false;
         }
         return true;
     });
 
-    if (!valid) 
-    {
+    if (!valid) {
         console.error(caller + ": All elements must have \"id\" and \"exec\" properties");
         return;
     }
 
     if (targetArray.length === 0)
         targetArray.push(...newElements);
-    else 
-    {
+    else {
         valid = newElements.every(e => {
-            if (targetArray.find(t => t.id === e.id)) 
+            if (targetArray.find(t => t.id === e.id))
                 return false;
-            else 
+            else
                 return true;
         });
         if (!valid) {
@@ -511,27 +482,24 @@ function set({targetArray, newElements}, caller)
  * Description: Sets the operations supported by this applet.
  * Call this from within the initialization function provided to initializeApplet.
  */
-export function setOperations(operations)
-{
-    set({targetArray: ops, newElements: operations}, "setOperations");
+export function setOperations(operations) {
+    set({ targetArray: ops, newElements: operations }, "setOperations");
 }
 
 /**
  * Description: Sets the queries supported by this applet.
  * Call this from within the initialization function provided to initializeApplet.
  */
-export function setQueries(queries)
-{
-    set({targetArray: qrs, newElements: queries}, "setQueries");
+export function setQueries(queries) {
+    set({ targetArray: qrs, newElements: queries }, "setQueries");
 }
 
-function stopOperation()
-{
+function stopOperation() {
     let tempDelay = 100; // TODO: remove this, add message buffering to core
-    setTimeout(()=>{
+    setTimeout(() => {
         sendToParent({
             type: MessageTypes.Core,
-            payload: {command: "stopOp"},
+            payload: { command: "stopOp" },
         });
     }, tempDelay);
 }
@@ -544,8 +512,7 @@ function stopOperation()
  * @param {String} name - The name of the operation to run.
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
-export function operation(applet, subPath, name, params)
-{
+export function operation(applet, subPath, name, params) {
     // Todo - There may be a way to short-circuit calling common-sys when 
     //    opApplet == await getJson('/common/thiscontract');
 
@@ -564,8 +531,7 @@ export function operation(applet, subPath, name, params)
  * @param {String} sender - Optional parameter to explicitly specify a sender. If no sender is provided, 
  *  the currently logged in user is assumed to be the sender.
  */
-export function action(application, actionName, params, sender = null)
-{
+export function action(application, actionName, params, sender = null) {
     sendToParent({
         type: MessageTypes.Action,
         payload: { application, actionName, params, sender },
@@ -582,8 +548,7 @@ export function action(application, actionName, params, sender = null)
  * @param {Object} params - The object containing all parameters expected by the query handler.
  * @param {Function} callback - The function called with the return value.
  */
-export function query(applet, subPath, queryName, params, callback)
-{
+export function query(applet, subPath, queryName, params, callback) {
     // Will leave memory hanging if we don't get a response as expected
     let callbackId = storeCallback(callback);
 

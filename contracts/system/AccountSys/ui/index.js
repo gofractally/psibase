@@ -5,21 +5,20 @@ import { genKeyPair, KeyType } from '/common/keyConversions.mjs';
 const html = htm.bind(React.createElement);
 
 const thisApplet = await getJson('/common/thiscontract');
-initializeApplet(async ()=>{
+initializeApplet(async () => {
     setOperations([
         {
             id: "newAcc",
-            exec: ({name, pubKey})=>{
-                action(thisApplet, "newAccount", { 
-                    name, 
-                    authContract: 'auth-fake-sys', 
+            exec: ({ name, pubKey }) => {
+                action(thisApplet, "newAccount", {
+                    name,
+                    authContract: 'auth-fake-sys',
                     requireNew: true,
                 });
-    
-                if (pubKey !== "")
-                {
-                    action('auth-ec-sys', 'setKey', {key: pubKey}, name);
-                    action(thisApplet, 'setAuthCntr', {authContract: 'auth-ec-sys'}, name);
+
+                if (pubKey !== "") {
+                    action('auth-ec-sys', 'setKey', { key: pubKey }, name);
+                    action(thisApplet, 'setAuthCntr', { authContract: 'auth-ec-sys' }, name);
                 }
             },
         },
@@ -70,9 +69,10 @@ async function newAccount(name, pubKey, addMsg, clearMsg) {
         clearMsg();
         addMsg("Pushing transaction...");
 
-        operation(thisApplet, "", "newAcc", {name, pubKey});
+        operation(thisApplet, "", "newAcc", { name, pubKey });
 
     } catch (e) {
+        console.log('caught')
         console.error(e);
         addMsg('');
         addMsg(e.message);
@@ -118,8 +118,7 @@ function useMsg() {
     return { msg, addMsg, clearMsg };
 }
 
-function KeyPair() 
-{
+function KeyPair() {
     const [pub, setPub] = React.useState('');
     const [priv, setPriv] = React.useState('');
 

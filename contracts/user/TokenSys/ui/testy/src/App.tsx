@@ -1,16 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import './App.css'
 import { Person } from './person';
 // @ts-ignore
-import { siblingUrl } from '/common/rootdomain.mjs'
-// import { siblingUrl } from '/common'
+import { initializeApplet } from '/common/rpc.mjs'
 
-console.log(siblingUrl, 'is the sibling url')
+console.log(initializeApplet, 'was initializeApplet')
 // const siblingUrl = window.siblingUrl;
 
 function App() {
   const [count, setCount] = useState(0)
+
+  useEffect(() => {
+
+    initializeApplet()
+
+  }, [])
 
   return (
     <div className="App">
@@ -22,9 +27,9 @@ function App() {
           <img src={reactLogo} className="logo react" alt="React logo" />
         </a>
       </div>
-      <h1  className='derp' style={{ backgroundColor: 'red' }}>Vite + React</h1>
+      <h1 className='derp' style={{ backgroundColor: 'red' }}>Vite + React</h1>
       <div className="card">
-        {['john', 'brandon', 'mike'].map(name => <Person name={name} />)}
+        {['john', 'brandon', 'mike'].map(name => <Person key={name} name={name} />)}
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
         </button>
