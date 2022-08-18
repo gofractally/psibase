@@ -206,6 +206,7 @@ namespace psibase
                   // TODO: verify block id here?
                   // TODO: handle other errors and blacklist the block and its descendants
                   next_state->revision = newRevision;
+                  std::cout << psio::convert_to_json(ctx.current.header) << "\n";
                }
                systemContext->sharedDatabase.setHead(*writer, next_state->revision);
                state = next_state;

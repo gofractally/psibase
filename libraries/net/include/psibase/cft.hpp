@@ -307,8 +307,8 @@ namespace psibase::net
          // async_send_fork will reset syncing if there is nothing to sync
          connection.syncing = true;
          connection.ready   = true;
-         std::cout << "ready: received=" << to_string(connection.last_received.id())
-                   << " common=" << to_string(connection.last_sent.id()) << std::endl;
+         //std::cout << "ready: received=" << to_string(connection.last_received.id())
+         //          << " common=" << to_string(connection.last_sent.id()) << std::endl;
          // FIXME: blocks and hellos need to be sequenced correctly
          network().async_send_block(connection.id, hello_response{},
                                     [this, &connection](const std::error_code&)
@@ -573,7 +573,7 @@ namespace psibase::net
             BlockInfo       info{*request.block->block()};
             ExtendedBlockId xid = {info.blockId, info.header.blockNum};
             on_recv_block(connection, xid);
-            std::cout << "recv node=" << self.str() << " id=" << to_string(xid.id()) << std::endl;
+            //std::cout << "recv node=" << self.str() << " id=" << to_string(xid.id()) << std::endl;
             chain().async_switch_fork(
                 [this, max_commit](BlockHeader* h)
                 {

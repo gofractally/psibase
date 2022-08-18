@@ -174,7 +174,7 @@ namespace psibase::net
       }
       void recv(peer_id peer, const auto& msg)
       {
-         std::cout << "recv " << msg.to_string() << std::endl;
+         //std::cout << "recv " << msg.to_string() << std::endl;
          static_cast<Derived*>(this)->consensus().recv(peer, msg);
       }
       std::multimap<producer_id, peer_id> producers;
