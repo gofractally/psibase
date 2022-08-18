@@ -108,6 +108,8 @@ namespace psibase
    };
    PSIO_REFLECT(SignedTransaction, transaction, proofs)
 
+   using TermNum = uint32_t;
+
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Producer & Rotation
    // TODO: Consensus fields
@@ -116,11 +118,13 @@ namespace psibase
    // TODO: Consider placing consensus alg in a contract; might affect how header is laid out.
    struct BlockHeader
    {
-      Checksum256  previous = {};
-      BlockNum     blockNum = 0;  // TODO: pack into previous instead?
-      TimePointSec time;          // TODO: switch to microseconds
+      Checksum256   previous = {};
+      BlockNum      blockNum = 0;  // TODO: pack into previous instead?
+      TimePointSec  time;          // TODO: switch to microseconds
+      AccountNumber producer;
+      TermNum       term;
    };
-   PSIO_REFLECT(BlockHeader, previous, blockNum, time)
+   PSIO_REFLECT(BlockHeader, previous, blockNum, time, producer, term)
 
    // TODO: switch fields to shared_view_ptr?
    struct Block

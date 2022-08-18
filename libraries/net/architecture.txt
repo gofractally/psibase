@@ -1,0 +1,235 @@
+
+
+The link layer is a simple wrapper around peer connections.
+It is abstracted as a message oriented send/receive protocol.
+
+The transport layer provides multi-hop routing.  It provides the
+following routing strategies:
+- producer-to-producer unicast
+- multicast to producers
+- full network broadcast
+The transport layer may pass messages to the consensus layer for validation
+before forwarding.  The transport layer is only required to implement
+broadcast.  Messages may be sent to a superset of the recipients.
+
+The consensus layer is responsible for
+- Deciding when a node should produce a block
+- Deciding when a block is committed: a block can be committed based on headers
+  or based on messaging at the consensus layer.
+- It also may provide some block header components
+
+The chain layer contains the block log, fork database, and state.
+It is a pure data structure and never calls into other components.
+- add_block: adds a block to the fork database and possibly switches to it
+- produce_block: split into multiple steps: start/transaction*/end
+
+
+
+
+
+Block broadcast algorithm:
+
+on recv block, add to fork database
+
+each outgoing connection has several possible states:
+- off: never send blocks over this connection.  Manualy set only.
+- backup: only send block ids (or maybe block headers?) over this connection
+- active: send blocks over this connections
+
+An active or backup connection tracks the last block sent to the peer.
+When switching forks, send all blocks from the new fork in order
+
+- If we receive a block over a backup connection, and it is part of the best fork
+
+- If we have multiple incoming connections for a given producer, prune all but one.
+
+
+- Goal, create a spanning tree per producer (?).  If the active producer
+  rotates, then a per-producer spanning tree is probably needed.
+  For RAFT the active producer should rarely change, so we can
+  probably maintain only a single spanning tree and update it
+  on demand...  but that will result in increased delays after
+  a new leader is elected, which in turn increases the likelyhood
+  of leader thrashing.  To compensate, we would need a higher
+  timeout, which will cause the network to take longer to
+  detect leader failure.
+
+
+- If
+
+
+- When two nodes establish a new connection, they find the nearest common ancestor of their best chains
+
+
+- A node will only send blocks that are in its best chain
+- If we receive a block from a peer than that peer knows all ancestors of that block
+
+
+- GOAL: If N1 and N2 are peers, and N1 has an irreversible block that N2 does not,
+  and messages between N1 and N2 are delivered in bounded time, then N2 will advance
+  its last irreversible block in bounded time.  (synchronous liveness)
+
+Desired invariant:
+- If two nodes are both correct, then a block that is sent by either will never be rejected by the other.
+
+- Each node tracks the peer's head block
+  - The peer's head block can be changed to an ancestor at any time
+  - Only an immediate child of the peer's head can be sent
+  - After sending a block, the peer's head is changed to the newly sent block
+  - After receiving a block, the peer's head is changed to the newly received block
+
+- Each connection tracks 2 blocks, the last sent block, and the last received block,
+  when switching forks, we back up to the nearest block.
+
+
+Performance goals/ordering constraints on messages:
+- Blocks sent MUST be received in the order sent
+- A response to a block SHOULD NOT be required before
+  sending the next block, because waiting for a response
+  limits throughput.
+- Routing and consensus messages SHOULD NOT wait for
+  a block which is being sent on the same channel.
+  Blocks can take significant time to send and
+  delaying finality and consensus messages can
+  cause user visible delays in the time to reach
+  finality and the time for the routing tables
+  to converge after any network reconfiguration.
+
+
+
+
+
+
+
+
+
+Connection states:
+
+Node states
+start, initlow, inithigh, syncing, idle
+
+Compound states (both nodes + in flight messages)
+(start, start): hello, hello
+  -> (idle, idle): identical hello
+  -> (initlow, inithigh): different forks
+  -> (initlow, syncing): one node ahead, either same or different forks
+  Other combinations are not possible:
+  -> (syncing, syncing): possible if nodes receive blocks after sending hello
+  -> (inithigh, inithigh): high vs low is determined by the relative hello messages
+  -> (initlow, initlow): " " "
+
+
+start, hello -> init lower, init higher, syncing, idle
+
+init lower, append_entires -> idle
+init higher, init_sync -> syncing
+
+- On connection start each node sends its head block info
+- If a node knows the others head block, then it can immediately transition to an appropriate state
+- If a node does not know the other's head AND its hello is worse than the other's hello,
+  then it streams hellos backing up one block each time.
+  - If the node sending hellos switches forks
+    - If the new head is a descendant of the last hello, do nothing
+    - Otherwise, if the new head is better than the other nodes hello,
+      send a single hello.
+    - Otherwise, start streaming hello at the new head
+- If the better head receives a hello for a block that it recognizes,
+  then it transitions to syncing.
+
+
+- A node needs to know:
+  - A block which is in its best chain and which is known to the other node
+  - The best block info of the other node
+
+
+What if?
+ - Send hello and then fork away before receiving response?
+  - if blocks are not orphaned, we're okay, because we can find the common ancestor
+  - if blocks are orphaned, then discarding incoming blocks is safe
+    - but... we don't know what to send and the peer has already transitioned out of start state
+  - maybe allow a sync->start transition when receiving a hello?
+    - If hello is better than current head, then transition to start
+    - If hello is worse than current head, then it is safe to ignore because... why?
+      - If current head is irreversibly forked, then trying to sync is pointless (is it really?)
+      - If current head is NOT irreversibly forked, then the peer has not discarded
+
+
+Possible node states:
+- start, init, sync, idle
+
+Transitions:
+- fork switch
+- recv message
+
+Messages:
+- hello
+- block
+
+
+
+- A node is in the init state iff the last sent hello is worse
+  than the last received hello and the last received hello refers to an unknown block.
+
+
+
+
+
+
+There are three possible communication models: synchronous, partially synchronous, and asynchronous.  Synchronous communication can be ignored, because it doesn't exist in the real world.  Asynchronous communication can also be ignored, because although real world systems do fall within an asynchronous communication model, it is too weak to provide the guarantees that we need.  In particular, asynchronous consensus cannot guarantee both safety and liveness.  Thus, for practical purposes, we only need to consider partially synchronous communication.
+
+The second variable is the failure model, which can be either fail-stop or byzantine.
+
+The final variable is the guarantees provided.  The two primary guarantees of a consensus algorithm are safety and liveness.
+
+
+In addition to this, any analysis of the real world use of an algorithm must take into account the effects of manual intervention.  In general, a failure of liveness will result in manual intervention, which can result in arbitrary changes to the protocol.  Even if the protocol as coded does not guarantee liveness, it could be considered live if there is an obvious form of manual intervention that is guaranteed to preserve safety.  For example, a block with an infinite loop can be blacklisted safely.
+
+
+
+
+
+BFT
+---
+
+Goals:
+- Crashed producers shall only reduce network capacity by a bounded
+  number of blocks per crash.  i.e. if a producer simply becomes
+  non-responsive, its workload will be distributed among the remaining
+  producers.
+- <1/3 malicious producers cannot reduce network capacity more
+  than the fraction of the network that they control
+
+
+
+
+- Each producer has a time slot
+- There is a timeout after which the block producers consider the current producer failed and send a message to the next producer.
+- A producer can produce a block if either
+  - the previous block header indicates a cooperative view change
+  - at least f+1 producers have sent a timeout for the previous producer
+
+
+struct view_change_message {
+  block_id last_commit;
+  view_id view;
+}
+
+Every block that a producer commits in a given view must not be after
+the block id in the view change message.
+
+
+
+
+Abstract Chain interface
+---------------
+
+Types:
+Block, BlockHeader, BlockState, BlockHeaderState, BlockBuilder
+
+Functions:
+next(BlockHeaderState, BlockHeader) -> BlockHeaderState
+start_block(BlockState, ...) -> BlockBuilder
+finish_block(BlockBuilder) -> BlockState,Block
+execute(BlockHeaderState prev_header, BlockState prev_state, BlockHeaderState current_state, Block) -> BlockState
+get_header(Block) -> BlockHeader
+

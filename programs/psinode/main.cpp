@@ -1,6 +1,11 @@
 #include <psibase/TransactionContext.hpp>
+#include <psibase/cft.hpp>
 #include <psibase/contractEntry.hpp>
+#include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
+#include <psibase/node.hpp>
+#include <psibase/peer_manager.hpp>
+#include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
 
@@ -9,11 +14,14 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 
+#include <boost/asio/system_timer.hpp>
+
 #include <iostream>
 #include <mutex>
 #include <thread>
 
 using namespace psibase;
+using namespace psibase::net;
 
 std::vector<char> read_whole_file(const char* filename)
 {
@@ -49,11 +57,8 @@ struct transaction_queue
    std::vector<entry> entries;
 };
 
-#define RETHROW_BAD_ALLOC  \
-   catch (std::bad_alloc&) \
-   {                       \
-      throw;               \
-   }
+#define RETHROW_BAD_ALLOC \
+   catch (std::bad_alloc&) { throw; }
 
 #define CATCH_IGNORE \
    catch (...) {}
@@ -132,6 +137,22 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
    }
    return false;
 }  // push_boot
+
+template <typename Timer, typename F>
+void loop(Timer& timer, F&& f)
+{
+   using namespace std::literals::chrono_literals;
+   timer.expires_after(100ms);
+   timer.async_wait(
+       [&timer, f](const std::error_code& e)
+       {
+          if (!e)
+          {
+             f();
+             loop(timer, f);
+          }
+       });
+}
 
 void pushTransaction(psibase::SharedState&                  sharedState,
                      const std::shared_ptr<const Revision>& revisionAtBlockStart,
@@ -254,12 +275,25 @@ void pushTransaction(psibase::SharedState&                  sharedState,
    }
 }  // pushTransaction
 
-void run(const std::string& db_path,
-         bool               produce,
-         const std::string& host,
-         bool               host_perf,
-         uint32_t           leeway_us,
-         bool               allow_slow)
+template <typename Derived>
+struct null_link
+{
+};
+
+using timer_type = boost::asio::system_timer;
+
+template <typename Derived>
+using cft_consensus = basic_cft_consensus<Derived, timer_type>;
+
+void run(const std::string&                db_path,
+         AccountNumber                     producer,
+         const std::vector<AccountNumber>& producers,
+         const std::vector<std::string>&   peers,
+         const std::string&                host,
+         unsigned short                    port,
+         bool                              host_perf,
+         uint32_t                          leeway_us,
+         bool                              allow_slow)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -268,6 +302,13 @@ void run(const std::string& db_path,
        std::make_shared<psibase::SharedState>(SharedDatabase{db_path, allow_slow}, WasmCache{128});
    auto system = sharedState->getSystemContext();
    auto queue  = std::make_shared<transaction_queue>();
+
+   boost::asio::io_context chainContext;
+
+   using node_type = node<peer_manager, direct_routing, cft_consensus, ForkDb>;
+   node_type node(chainContext, system.get());
+   node.set_producer_id(producer);
+   node.set_producers(producers);
 
    if (!host.empty())
    {
@@ -278,13 +319,13 @@ void run(const std::string& db_path,
           .idle_timeout_ms  = std::chrono::milliseconds{4000},
           .allow_origin     = "*",
           .address          = "0.0.0.0",
-          .port             = 8080,
+          .port             = port,
           .host             = host,
           .host_perf        = host_perf,
       });
 
       // TODO: speculative execution on non-producers
-      if (produce)
+      if (producer != AccountNumber{})
       {
          http_config->push_boot_async = [queue](std::vector<char>        packed_signed_transactions,
                                                 http::push_boot_callback callback)
@@ -303,82 +344,98 @@ void run(const std::string& db_path,
          };
       }
 
+      // TODO: The websocket uses the http server's io_context, but does not
+      // do anything to keep it alive. Stopping the server doesn't close the
+      // websocket either.
+      http_config->accept_p2p_websocket = [&node](auto&& stream)
+      { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
+
       auto server = http::server::create(http_config, sharedState);
    }
 
    bool showedBootMsg = false;
 
-   // TODO: temporary loop
    // TODO: replay
-   auto writer = system->sharedDatabase.createWriter();
-   while (true)
+
+   boost::asio::ip::tcp::resolver resolver(chainContext);
+   for (const std::string& peer : peers)
    {
-      std::this_thread::sleep_for(std::chrono::milliseconds{100});
-      if (produce)
+      // TODO: handle ipv6 addresses [addr]:port
+      // TODO: use a websocket URI
+      auto pos = peer.find(':');
+      if (pos == std::string::npos)
       {
-         TimePointSec t{(uint32_t)time(nullptr)};
-         {
-            Database db{system->sharedDatabase, system->sharedDatabase.getHead()};
-            auto     session = db.startRead();
-            auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
-            if (status && status->head && status->head->header.time >= t)
-               continue;
-         }
+         std::cout << "missing p2p port (there is not default yet): " << peer << std::endl;
+         continue;
+      }
+      auto host    = peer.substr(0, pos);
+      auto service = peer.substr(pos + 1);
+      //node.async_connect(peer.substr(0, pos), peer.substr(pos + 1));
+      async_connect(std::make_shared<websocket_connection>(chainContext), resolver, host, service,
+                    [&node](auto&& conn) { node.add_connection(std::move(conn)); });
+   }
 
-         std::vector<transaction_queue::entry> entries;
-         {
-            std::scoped_lock lock{queue->mutex};
-            std::swap(entries, queue->entries);
-         }
+   timer_type timer(chainContext);
 
-         auto         revisionAtBlockStart = system->sharedDatabase.getHead();
-         BlockContext bc{*system, revisionAtBlockStart, writer, true};
-         bc.start(t);
-         bc.callStartBlock();
-
-         bool abort_boot = false;
+   // TODO: post the transactions to chainContext rather than batching them at fixed intervals.
+   auto process_transactions = [&]()
+   {
+      std::vector<transaction_queue::entry> entries;
+      {
+         std::scoped_lock lock{queue->mutex};
+         std::swap(entries, queue->entries);
+      }
+      if (auto bc = node.chain().getBlockContext())
+      {
+         auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
          {
             if (entry.is_boot)
-               abort_boot = !push_boot(bc, entry);
+               push_boot(*bc, entry);
             else
-               pushTransaction(*sharedState, revisionAtBlockStart, bc, entry,
+               pushTransaction(*sharedState, revisionAtBlockStart, *bc, entry,
                                std::chrono::microseconds(100'000),  // TODO
                                std::chrono::microseconds(100'000),  // TODO
                                std::chrono::microseconds(leeway_us));
          }
-         if (abort_boot)
-            continue;
 
-         if (bc.needGenesisAction)
+         // TODO: this should go in the leader's production loop
+         if (bc->needGenesisAction)
          {
             if (!showedBootMsg)
             {
                std::cout << "Need genesis block; use 'psibase boot' to boot chain\n";
                showedBootMsg = true;
             }
-            continue;
+            //continue;
          }
-         auto [revision, blockId] = bc.writeRevision();
-         system->sharedDatabase.setHead(*writer, revision);
-         system->sharedDatabase.removeRevisions(*writer,
-                                                blockId);  // temp rule: head is now irreversible
-
-         std::cout << psio::convert_to_json(bc.current.header) << "\n";
       }
-   }
+      else
+      {
+         for (auto& entry : entries)
+         {
+            entry.callback("redirect to leader");
+         }
+      }
+   };
+   loop(timer, process_transactions);
+
+   chainContext.run();
 }
 
 const char usage[] = "USAGE: psinode [OPTIONS] database";
 
 int main(int argc, char* argv[])
 {
-   std::string db_path;
-   bool        produce    = false;
-   std::string host       = {};
-   bool        host_perf  = false;
-   uint32_t    leeway_us  = 30000;  // TODO: find a good default
-   bool        allow_slow = false;
+   std::string              db_path;
+   std::string              producer = {};
+   std::vector<std::string> prods;
+   std::string              host       = {};
+   unsigned short           port       = 8080;
+   bool                     host_perf  = false;
+   uint32_t                 leeway_us  = 30000;  // TODO: find a good default
+   bool                     allow_slow = false;
+   std::vector<std::string> peers;
 
    namespace po = boost::program_options;
 
@@ -386,8 +443,11 @@ int main(int argc, char* argv[])
    auto                    opt = desc.add_options();
    opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
        "Path to database");
-   opt("produce,p", po::bool_switch(&produce), "Produce blocks");
+   opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
+   opt("prods", po::value(&prods), "Names of all producers");
+   opt("peer", po::value(&peers), "Peer endpoint");
    opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
+   opt("port", po::value(&port), "http server port");
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
        "Transaction leeway, in us. Defaults to 30000.");
@@ -423,7 +483,13 @@ int main(int argc, char* argv[])
 
    try
    {
-      run(db_path, produce, host, host_perf, leeway_us, allow_slow);
+      std::vector<AccountNumber> producers;
+      for (const auto& pname : prods)
+      {
+         producers.push_back(AccountNumber{pname});
+      }
+      run(db_path, AccountNumber{producer}, producers, peers, host, port, host_perf, leeway_us,
+          allow_slow);
       return 0;
    }
    catch (std::exception& e)
