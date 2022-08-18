@@ -149,6 +149,7 @@ function Applet(appletParams, handleMessage) {
             id=${getIframeId(appletStr, subPath)}
             style=${appletStyles[state]}
             src="${appletSrc}"
+            allow="camera;microphone"
             title="${appletStr}"
             frameborder="0"
         ></iframe>
