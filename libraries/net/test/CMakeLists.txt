@@ -1,12 +1,13 @@
 find_package(Threads REQUIRED)
+find_package(Boost REQUIRED)
 
 add_executable(test_random_timer test_random_timer.cpp)
 target_include_directories(test_random_timer PUBLIC ../include)
-target_link_libraries(test_random_timer PUBLIC catch2 Threads::Threads)
+target_link_libraries(test_random_timer PUBLIC catch2 Threads::Threads Boost::headers)
 
 add_executable(test_mock_timer test_mock_timer.cpp mock_timer.cpp)
 target_include_directories(test_mock_timer PUBLIC ../include)
-target_link_libraries(test_mock_timer PUBLIC catch2 Threads::Threads)
+target_link_libraries(test_mock_timer PUBLIC catch2 Threads::Threads Boost::headers)
 
 #add_executable(test_cft_consensus test_cft_consensus.cpp mock_timer.cpp)
 #target_include_directories(test_cft_consensus PUBLIC ../include)
