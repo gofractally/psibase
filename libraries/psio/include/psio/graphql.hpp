@@ -3,6 +3,7 @@
 #include <cctype>
 #include <charconv>
 #include <psio/fracpack.hpp>
+#include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
 #include <psio/to_json.hpp>
@@ -83,10 +84,10 @@ namespace psio
    };
 
    template <typename Raw>
-   std::string generate_gql_whole_name(Raw*, bool is_optional = false);
+   std::string generate_gql_whole_name(Raw*, bool is_input, bool is_optional = false);
 
    template <typename Raw>
-   std::string generate_gql_partial_name(Raw*)
+   std::string generate_gql_partial_name(Raw*, bool is_input)
    {
       using T = remove_cvref_t<Raw>;
       if constexpr (std::is_same_v<T, bool>)
@@ -107,36 +108,43 @@ namespace psio
       else if constexpr (std::is_same_v<T, std::string>)
          return "String";
       else if constexpr (is_std_vector<T>::value)
-         return "[" + generate_gql_whole_name((typename T::value_type*)nullptr) + "]";
+         return "[" + generate_gql_whole_name((typename T::value_type*)nullptr, is_input) + "]";
       else if constexpr (is_shared_view_ptr<T>::value)
-         return generate_gql_partial_name((T*)nullptr);
+         return generate_gql_partial_name((T*)nullptr, is_input);
       else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
-         return get_type_name((T*)nullptr);
+         if (is_input)
+            return std::string{get_type_name((T*)nullptr)} + "_Input";
+         else
+            return get_type_name((T*)nullptr);
       else
          return get_gql_name((T*)nullptr);
    }
 
    template <typename Raw>
-   std::string generate_gql_whole_name(Raw*, bool is_optional)
+   std::string generate_gql_whole_name(Raw*, bool is_input, bool is_optional)
    {
       using T = remove_cvref_t<Raw>;
       if constexpr (is_std_optional<T>())
-         return generate_gql_whole_name((typename T::value_type*)nullptr, true);
+         return generate_gql_whole_name((typename T::value_type*)nullptr, is_input, true);
       else if constexpr (std::is_pointer<T>())
          return generate_gql_whole_name((std::remove_const_t<std::remove_pointer_t<T>>*)nullptr,
-                                        true);
+                                        is_input, true);
       else if constexpr (is_std_unique_ptr<T>::value)
-         return generate_gql_whole_name((typename T::element_type*)nullptr, true);
+         return generate_gql_whole_name((typename T::element_type*)nullptr, is_input, true);
       else if constexpr (is_std_reference_wrapper<T>::value)
-         return generate_gql_whole_name((typename T::type*)nullptr, false);
+         return generate_gql_whole_name((typename T::type*)nullptr, is_input, false);
+      else if constexpr (is_shared_view_ptr<T>::value)
+         return generate_gql_whole_name((typename T::value_type*)nullptr, is_input, false);
       else if (is_optional)
-         return generate_gql_partial_name((Raw*)nullptr);
+         return generate_gql_partial_name((Raw*)nullptr, is_input);
       else
-         return generate_gql_partial_name((Raw*)nullptr) + "!";
+         return generate_gql_partial_name((Raw*)nullptr, is_input) + "!";
    }
 
    template <typename MemPtr, typename S>
-   void fill_gql_schema_fn_types(MemPtr*, S& stream, std::set<std::type_index>& defined_types)
+   void fill_gql_schema_fn_types(MemPtr*,
+                                 S&                                          stream,
+                                 std::set<std::pair<std::type_index, bool>>& defined_types)
    {
       if constexpr (MemPtr::numArgs == 0 &&
                     gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
@@ -148,9 +156,9 @@ namespace psio
       else
       {
          forEachType(typename MemPtr::ArgTypes{},
-                     [&](auto* p) { fill_gql_schema(p, stream, defined_types); });
+                     [&](auto* p) { fill_gql_schema(p, stream, defined_types, true); });
          fill_gql_schema((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr, stream,
-                         defined_types);
+                         defined_types, false);
       }
    }
 
@@ -188,40 +196,43 @@ namespace psio
                       write_str(" ", stream);
                    write_str(name, stream);
                    write_str(": ", stream);
-                   write_str(generate_gql_whole_name(p), stream);
+                   write_str(generate_gql_whole_name(p, true), stream);
                    first = false;
                 });
             write_str(")", stream);
          }
          write_str(": ", stream);
-         write_str(
-             generate_gql_whole_name((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr),
-             stream);
+         write_str(generate_gql_whole_name(
+                       (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr, false),
+                   stream);
          write_str("\n", stream);
       }
    }
 
    template <typename Raw, typename S>
    void fill_gql_schema(Raw*,
-                        S&                         stream,
-                        std::set<std::type_index>& defined_types,
-                        bool                       is_query_root = false)
+                        S&                                          stream,
+                        std::set<std::pair<std::type_index, bool>>& defined_types,
+                        bool                                        is_input,
+                        bool                                        is_query_root = false)
    {
       using T = std::remove_cvref_t<Raw>;
       if constexpr (is_std_optional<T>())
-         fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types);
+         fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
       else if constexpr (std::is_pointer<T>())
          fill_gql_schema((std::remove_const_t<std::remove_pointer_t<T>>*)nullptr, stream,
-                         defined_types);
+                         defined_types, is_input);
       else if constexpr (is_std_unique_ptr_v<T>)
-         fill_gql_schema((typename T::element_type*)nullptr, stream, defined_types);
+         fill_gql_schema((typename T::element_type*)nullptr, stream, defined_types, is_input);
       else if constexpr (is_std_reference_wrapper_v<T>)
-         fill_gql_schema((typename T::type*)nullptr, stream, defined_types);
+         fill_gql_schema((typename T::type*)nullptr, stream, defined_types, is_input);
       else if constexpr (is_std_vector_v<T>)
-         fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types);
+         fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
+      else if constexpr (is_shared_view_ptr<T>())
+         fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
       else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
       {
-         if (defined_types.insert(typeid(T)).second)
+         if (defined_types.insert({typeid(T), is_input}).second)
          {
             reflect<T>::for_each(
                 [&](const psio::meta& meta, auto member)
@@ -230,21 +241,25 @@ namespace psio
                    if constexpr (!MemPtr::isFunction)
                    {
                       fill_gql_schema((remove_cvref_t<typename MemPtr::ValueType>*)nullptr, stream,
-                                      defined_types);
+                                      defined_types, is_input);
                    }
                 });
-            reflect<T>::for_each(
-                [&](const psio::meta& meta, auto member)
-                {
-                   using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
-                   if constexpr (MemPtr::isConstFunction)
-                      fill_gql_schema_fn_types((MemPtr*)nullptr, stream, defined_types);
-                });
-            write_str("type ", stream);
+            if (!is_input)
+               reflect<T>::for_each(
+                   [&](const psio::meta& meta, auto member)
+                   {
+                      using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                      if constexpr (MemPtr::isConstFunction)
+                         fill_gql_schema_fn_types((MemPtr*)nullptr, stream, defined_types);
+                   });
+            if (is_input)
+               write_str("input ", stream);
+            else
+               write_str("type ", stream);
             if (is_query_root)
                write_str("Query", stream);
             else
-               write_str(generate_gql_partial_name((Raw*)nullptr), stream);
+               write_str(generate_gql_partial_name((Raw*)nullptr, is_input), stream);
             write_str(" {\n", stream);
             reflect<T>::for_each(
                 [&](const psio::meta& meta, auto member)
@@ -255,9 +270,10 @@ namespace psio
                       write_str("    ", stream);
                       write_str(meta.name, stream);
                       write_str(": ", stream);
-                      write_str(generate_gql_whole_name(
-                                    (std::remove_cvref_t<typename MemPtr::ValueType>*)nullptr),
-                                stream);
+                      write_str(
+                          generate_gql_whole_name(
+                              (std::remove_cvref_t<typename MemPtr::ValueType>*)nullptr, is_input),
+                          stream);
                       write_str("\n", stream);
                    }
                 });
@@ -277,8 +293,8 @@ namespace psio
    template <typename Raw, typename S>
    void fill_gql_schema(Raw*, S& stream)
    {
-      std::set<std::type_index> defined_types;
-      fill_gql_schema((Raw*)nullptr, stream, defined_types, true);
+      std::set<std::pair<std::type_index, bool>> defined_types;
+      fill_gql_schema((Raw*)nullptr, stream, defined_types, false, true);
    }
 
    template <typename T>
@@ -989,9 +1005,9 @@ namespace psio
    {
       if (input_stream.current_type == gql_stream::string)
       {
-         from_string(arg, input_stream.current_value);
          // TODO: prevent abort
-         //arg = psio::convert_from_string<T>(input_stream.current_value);
+         // TODO: remove double conversion
+         arg = psio::convert_from_json<T>(psio::convert_to_json(input_stream.current_value));
          input_stream.skip();
          return true;
       }

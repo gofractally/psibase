@@ -15,7 +15,7 @@ use serde_json::Value;
 #[derive(Fracpack)]
 struct Empty {}
 
-const ACCOUNTS: [AccountNumber; 18] = [
+const ACCOUNTS: [AccountNumber; 19] = [
     account!("account-sys"),
     account!("alice"),
     account!("auth-ec-sys"),
@@ -25,6 +25,7 @@ const ACCOUNTS: [AccountNumber; 18] = [
     account!("explore-sys"),
     account!("nft-sys"),
     account!("proxy-sys"),
+    account!("psispace-sys"),
     account!("r-account-sys"),
     account!("r-ath-ec-sys"),
     account!("r-proxy-sys"),
@@ -104,6 +105,7 @@ macro_rules! store {
     ($acc:literal, $dest:expr, $ty:expr, $src:expr) => {
         store_sys(
             account!($acc),
+            account!($acc),
             $dest,
             $ty,
             include_bytes!(concat!("../boot-image/", $src)),
@@ -142,6 +144,7 @@ fn boot_trx() -> SignedTransaction {
         sgc!("explore-sys", 0, "ExploreSys.wasm"),
         sgc!("nft-sys", 0, "NftSys.wasm"),
         sgc!("proxy-sys", 0, "ProxySys.wasm"),
+        sgc!("psispace-sys", 0, "PsiSpaceSys.wasm"),
         sgc!("r-account-sys", 0, "RAccountSys.wasm"),
         sgc!("r-ath-ec-sys", 0, "RAuthEcSys.wasm"),
         sgc!("r-proxy-sys", 0, "RProxySys.wasm"),
@@ -214,6 +217,7 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
         reg_server(account!("common-sys"), account!("common-sys")),
         reg_server(account!("explore-sys"), account!("explore-sys")),
         reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
+        reg_server(account!("psispace-sys"), account!("psispace-sys")),
     ];
 
     let mut common_sys_files = vec![
