@@ -21,6 +21,7 @@ namespace psibase
       BlockContext&                               blockContext;
       const SignedTransaction&                    signedTransaction;
       TransactionTrace&                           transactionTrace;
+      ConfigRow                                   config;
       KvResourceMap                               kvResourceDeltas;
       int                                         callDepth = 0;
       const std::chrono::steady_clock::time_point startTime;
@@ -37,9 +38,8 @@ namespace psibase
                          bool                     allowDbReadSubjective);
       ~TransactionContext();
 
-      // Caution: each call to execVerifyProof(), checkFirstAuth(),
-      //          or execTransaction() must be in a fresh
-      //          TransactionContext instance.
+      // Caution: each call to exec*(), except execCalledAction(),
+      //          must be in a fresh TransactionContext instance.
       void execVerifyProof(size_t i);
       void checkFirstAuth();
       void execTransaction();
