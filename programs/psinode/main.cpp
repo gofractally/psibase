@@ -414,7 +414,15 @@ void run(const std::string&                db_path,
       {
          for (auto& entry : entries)
          {
-            entry.callback("redirect to leader");
+            std::string message = "Only the current leader accepts transactions";
+            if (entry.callback)
+            {
+               entry.callback(message);
+            }
+            else if (entry.boot_callback)
+            {
+               entry.boot_callback(message);
+            }
          }
       }
    };
