@@ -93,5 +93,8 @@ namespace psibase
       psibase::dispatch<CONTRACT>(sender, receiver);                                      \
    }                                                                                      \
    extern "C" void __wasm_call_ctors();                                                   \
-   extern "C" void start(psibase::AccountNumber this_contract) { __wasm_call_ctors(); }
+   extern "C" void start(psibase::AccountNumber this_contract)                            \
+   {                                                                                      \
+      __wasm_call_ctors();                                                                \
+   }
 \
