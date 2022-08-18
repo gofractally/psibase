@@ -182,18 +182,26 @@ namespace psibase
       std::mutex                      headMutex;
       std::shared_ptr<const Revision> head;
 
-      SharedDatabaseImpl(const std::filesystem::path& dir, bool allowSlow)
+      SharedDatabaseImpl(const std::filesystem::path& dir,
+                         bool                         allowSlow,
+                         uint64_t                     max_objects,
+                         uint64_t                     hot_addr_bits,
+                         uint64_t                     warm_addr_bits,
+                         uint64_t                     cool_addr_bits,
+                         uint64_t                     cold_addr_bits)
       {
          if (!std::filesystem::exists(dir))
          {
             std::cout << "Creating " << dir << "\n";
             triedent::database::create(  //
                 dir,                     //
-                triedent::database::config{.max_objects = 1'000'000'000,
-                                           .hot_pages   = 32,
-                                           .warm_pages  = 32,
-                                           .cool_pages  = 32,
-                                           .cold_pages  = 38});
+                triedent::database::config{
+                    .max_objects = max_objects,
+                    .hot_pages   = hot_addr_bits,
+                    .warm_pages  = warm_addr_bits,
+                    .cool_pages  = cool_addr_bits,
+                    .cold_pages  = cold_addr_bits,
+                });
          }
          else
          {
@@ -231,8 +239,20 @@ namespace psibase
       }
    };  // SharedDatabaseImpl
 
-   SharedDatabase::SharedDatabase(const boost::filesystem::path& dir, bool allowSlow)
-       : impl{std::make_shared<SharedDatabaseImpl>(dir.c_str(), allowSlow)}
+   SharedDatabase::SharedDatabase(const boost::filesystem::path& dir,
+                                  bool                           allowSlow,
+                                  uint64_t                       max_objects,
+                                  uint64_t                       hot_addr_bits,
+                                  uint64_t                       warm_addr_bits,
+                                  uint64_t                       cool_addr_bits,
+                                  uint64_t                       cold_addr_bits)
+       : impl{std::make_shared<SharedDatabaseImpl>(dir.c_str(),
+                                                   allowSlow,
+                                                   max_objects,
+                                                   hot_addr_bits,
+                                                   warm_addr_bits,
+                                                   cool_addr_bits,
+                                                   cold_addr_bits)}
    {
    }
 

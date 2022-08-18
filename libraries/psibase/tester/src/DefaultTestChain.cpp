@@ -21,7 +21,13 @@ using namespace psibase;
 using namespace system_contract;
 
 DefaultTestChain::DefaultTestChain(
-    const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts /* = {{}} */)
+    const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts,
+    uint64_t                                                  max_objects,
+    uint64_t                                                  hot_addr_bits,
+    uint64_t                                                  warm_addr_bits,
+    uint64_t                                                  cool_addr_bits,
+    uint64_t                                                  cold_addr_bits)
+    : TestChain{max_objects, hot_addr_bits, warm_addr_bits, cool_addr_bits, cold_addr_bits}
 {
    startBlock();
    deploySystemContracts();
