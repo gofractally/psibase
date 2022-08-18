@@ -659,6 +659,24 @@ TEST_CASE("optstr")
    }
 }
 
+struct nested_view
+{
+   psio::shared_view_ptr<ext_simple_with_string> inner;
+};
+PSIO_REFLECT(nested_view, inner)
+
+TEST_CASE("nestview")
+{
+   nested_view v{{ext_simple_with_string{42,43,44,"test"}}};
+   psio::shared_view_ptr<nested_view> p(v);
+   CHECK(p.validate());
+   auto u = p.unpack();
+   CHECK(u.inner.unpack().a == 42);
+   CHECK(u.inner.unpack().b == 43);
+   CHECK(u.inner.unpack().c == 44);
+   CHECK(u.inner.unpack().s == "test");
+}
+
 struct ext_v1
 {
    std::string                a;

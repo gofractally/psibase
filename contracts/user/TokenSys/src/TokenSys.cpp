@@ -75,13 +75,13 @@ void TokenSys::init()
 
    // Create system token
    auto tid = tokContract.create(Precision{8}, Quantity{1'000'000'000e8});
-   check(tid == TID{1}, wrongSysTokenId);
+   check(*tid == TID{1}, wrongSysTokenId);
 
    // Make system token default untradeable
-   tokContract.setTokenConf(tid, tokenConfig::untradeable, true);
+   tokContract.setTokenConf(*tid, tokenConfig::untradeable, true);
 
    // Pass system token ownership to symbol contract
-   auto tNft = getToken(tid).ownerNft;
+   auto tNft = getToken(*tid).ownerNft;
    nftContract.credit(tNft, SymbolSys::contract, "Passing system token ownership");
 
    // Register proxy
@@ -105,12 +105,12 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    auto nftId = nftContract.mint();
    if (creator != TokenSys::contract)
    {
-      nftContract.credit(nftId, creator, "Nft for new token ID: " + std::to_string(newId));
+      nftContract.credit(*nftId, creator, "Nft for new token ID: " + std::to_string(newId));
    }
 
    tokenTable.put(TokenRecord{
        .id        = newId,      //
-       .ownerNft  = nftId,      //
+       .ownerNft  = *nftId,     //
        .precision = precision,  //
        .maxSupply = maxSupply   //
    });
@@ -311,7 +311,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
    auto nftContract = at<NftSys>();
 
    check(symbol.ownerNft != NID{0}, symbolDNE);
-   check(nftContract.exists(symbol.ownerNft), missingRequiredAuth);
+   check(*nftContract.exists(symbol.ownerNft), missingRequiredAuth);
    check(token.symbolId == SID{0}, tokenHasSymbol);
    check(isSenderIssuer(tokenId), missingRequiredAuth);
 
@@ -366,7 +366,7 @@ BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
    }
    else
    {
-      check(at<AccountSys>().exists(account), invalidAccount);
+      check(*at<AccountSys>().exists(account), invalidAccount);
       check(exists(tokenId), tokenDNE);
 
       record = {.key = {account, tokenId}, .balance = 0};
@@ -445,7 +445,7 @@ bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit flag)
 
 void TokenSys::checkAccountValid(psibase::AccountNumber account)
 {
-   check(at<AccountSys>().exists(account), invalidAccount);
+   check(*at<AccountSys>().exists(account), invalidAccount);
    check(account != AccountSys::nullAccount, invalidAccount);
 }
 

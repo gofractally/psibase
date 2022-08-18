@@ -28,7 +28,7 @@ namespace
 
 SCENARIO("Testing default psibase chain")
 {
-   DefaultTestChain t(neededContracts);
+   DefaultTestChain t(neededContracts, 1'000'000'000ul, 32, 32, 32, 38);
 
    auto        tokenSysRpc = t.as(RTokenSys::contract).at<RTokenSys>();
    std::string rpcUiDir    = "../contracts/user/TokenSys/ui/";
