@@ -57,8 +57,11 @@ struct transaction_queue
    std::vector<entry> entries;
 };
 
-#define RETHROW_BAD_ALLOC \
-   catch (std::bad_alloc&) { throw; }
+#define RETHROW_BAD_ALLOC  \
+   catch (std::bad_alloc&) \
+   {                       \
+      throw;               \
+   }
 
 #define CATCH_IGNORE \
    catch (...) {}

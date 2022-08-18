@@ -123,5 +123,8 @@ namespace table_test
    }
 
    extern "C" void __wasm_call_ctors();
-   extern "C" void start(AccountNumber this_contract) { __wasm_call_ctors(); }
+   extern "C" void start(AccountNumber this_contract)
+   {
+      __wasm_call_ctors();
+   }
 }  // namespace table_test
