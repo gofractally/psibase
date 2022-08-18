@@ -1,5 +1,4 @@
 import { useGraphQLPagedQuery } from '/common/useGraphQLQuery.mjs';
-import { siblingUrl } from '/common/rootdomain.mjs';
 import htm from 'https://unpkg.com/htm@3.1.0?module';
 const html = htm.bind(React.createElement);
 
@@ -55,7 +54,7 @@ const App = () => {
     }
     return html`
         <div class="ui container">
-            <a href=${siblingUrl()}>chain</a>
+            <a>chain</a>
             <h1>explore-sys</h1>
         
             <button onClick=${()=>processPagingRequests(pagedResult.first)}>First</button>

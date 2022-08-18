@@ -51,42 +51,6 @@ namespace system_contract
          }
          if (request.target == "/common/rootdomain")
             return to_json(request.rootHost);
-         if (request.target == "/common/rootdomain.js")
-         {
-            auto js = "const rootdomain = '" + request.rootHost + "';\n";
-            js +=
-                "function siblingUrl(baseUrl, contract, path) {\n"
-                "    let loc;\n"
-                "    if (!baseUrl)\n"
-                "        loc = location;\n"
-                "    else\n"
-                "        loc = new URL(baseUrl);\n"
-                "    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootdomain +\n"
-                "           ':' + loc.port + '/' + (path || '').replace(/^\\/+/, '');\n"
-                "}\n";
-            return HttpReply{
-                .contentType = "text/javascript",
-                .body        = {js.begin(), js.end()},
-            };
-         }
-         if (request.target == "/common/rootdomain.mjs")
-         {
-            auto js = "export const rootdomain = '" + request.rootHost + "';\n";
-            js +=
-                "export function siblingUrl(baseUrl, contract, path) {\n"
-                "    let loc;\n"
-                "    if (!baseUrl)\n"
-                "        loc = location;\n"
-                "    else\n"
-                "        loc = new URL(baseUrl);\n"
-                "    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootdomain +\n"
-                "           ':' + loc.port + '/' + (path || '').replace(/^\\/+/, '');\n"
-                "}\n";
-            return HttpReply{
-                .contentType = "text/javascript",
-                .body        = {js.begin(), js.end()},
-            };
-         }
          if (request.target == "/common/tapos/head")
          {
             auto [index, suffix] = headTapos();

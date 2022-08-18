@@ -1,6 +1,5 @@
 import htm from "/common/htm.module.js";
-import { siblingUrl } from "/common/rootdomain.mjs";
-import { initializeApplet, getJson, action, 
+import { initializeApplet, getJson, action, siblingUrl,
   query, setOperations, operation } from "/common/rpc.mjs";
 
 const html = htm.bind(React.createElement);
@@ -16,7 +15,7 @@ initializeApplet(async () => {
         exec: async ({symbol, receiver, amount, memo}) => {
   
           //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
-          let tokens = await getJson(siblingUrl(null, thisApplet, "getTokenTypes"));
+          let tokens = await getJson(await siblingUrl(null, thisApplet, "getTokenTypes"));
           let token = tokens.find(t=>t.symbolId === symbol.toLowerCase());
           if (!token)
           {
@@ -67,7 +66,7 @@ function BalanceTable({loggedInUser}) {
   const getBalances = useCallback(async () => {
     if (user)
     {
-      let res = await getJson(siblingUrl(null, thisApplet, "balances/" + user));
+      let res = await getJson(await siblingUrl(null, thisApplet, "balances/" + user));
       setBalances(res);
     }
   }, [user]);
