@@ -242,12 +242,30 @@ void DefaultTestChain::registerSysRpc()
 
    const std::string html = "text/html";
    const std::string js   = "text/javascript";
+   const std::string css   = "text/css";
+   const std::string svg   = "image/svg+xml";
 
    std::vector<psibase::Action> b{
-       // CommonSys
-       rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/index.html")),
+       // CommonSys Fancy UI
+       rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/dist/index.html")),
+       rpcCommon.storeSys("/index.js", js, readWholeFile(comDir + "/ui/dist/index.js")),
+       rpcCommon.storeSys("/style.css", css, readWholeFile(comDir + "/ui/dist/style.css")),
+       rpcCommon.storeSys("/ninebox.svg", svg, readWholeFile(comDir + "/ui/dist/ninebox.svg")),
+       rpcCommon.storeSys("/psibase.svg", svg, readWholeFile(comDir + "/ui/dist/psibase.svg")),
+       rpcCommon.storeSys("/app-account-desktop.svg", svg, readWholeFile(comDir + "/ui/dist/app-account-desktop.svg")),
+       rpcCommon.storeSys("/app-account-mobile.svg", svg, readWholeFile(comDir + "/ui/dist/app-account-mobile.svg")),
+       rpcCommon.storeSys("/app-explore-desktop.svg", svg, readWholeFile(comDir + "/ui/dist/app-explore-desktop.svg")),
+       rpcCommon.storeSys("/app-explore-mobile.svg", svg, readWholeFile(comDir + "/ui/dist/app-explore-mobile.svg")),
+       rpcCommon.storeSys("/app-wallet-desktop.svg", svg, readWholeFile(comDir + "/ui/dist/app-wallet-desktop.svg")),
+       rpcCommon.storeSys("/app-wallet-mobile.svg", svg, readWholeFile(comDir + "/ui/dist/app-wallet-mobile.svg")),
+
+       // CommonSys Basic UI
+    //    rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/vanilla/index.html")),
+    //    rpcCommon.storeSys("/ui/index.js", js, readWholeFile(comDir + "/ui/vanilla/index.js")),
+
+       // CommonSys Other
        rpcCommon.storeSys("/ui/common.index.html", html,
-                          readWholeFile(comDir + "/ui/common.index.html")),
+                          readWholeFile(comDir + "/ui/vanilla/common.index.html")),
 
        rpcCommon.storeSys("/common/rpc.mjs", js, readWholeFile(comDir + "/common/rpc.mjs")),
        rpcCommon.storeSys("/common/useGraphQLQuery.mjs", js,
@@ -257,7 +275,6 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/common/keyConversions.mjs", js,
                           readWholeFile(comDir + "/common/keyConversions.mjs")),
        rpcCommon.storeSys("/common/widgets.mjs", js, readWholeFile(comDir + "/common/widgets.mjs")),
-       rpcCommon.storeSys("/ui/index.js", js, readWholeFile(comDir + "/ui/index.js")),
 
        // CommonSys - 3rd party
        rpcCommon.storeSys("/common/iframeResizer.js", js,

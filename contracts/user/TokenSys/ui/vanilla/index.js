@@ -187,11 +187,16 @@ const panes = [
   },
 ];
 
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function App() {
 
   const [user, setUser] = useState("");
 
   useEffect(async ()=>{
+      await delay(1000);
       let user = await query(accountSys, "getLoggedInUser").catch(console.error);
       setUser(user);
   }, []);

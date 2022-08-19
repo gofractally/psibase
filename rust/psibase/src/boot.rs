@@ -233,6 +233,8 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
 
     let html = "text/html";
     let js = "text/javascript";
+    // let css = "text/css";
+    // let svg = "image/svg+xml";
 
     let mut reg_actions = vec![
         reg_server(account!("account-sys"), account!("r-account-sys")),
@@ -244,14 +246,14 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     ];
 
     let mut common_sys_files = vec![
-        store!("common-sys", "/index.html", html, "CommonSys/ui/index.html"),
+        store!("common-sys", "/index.html", html, "CommonSys/ui/vanilla/index.html"),
         store!(
             "common-sys",
             "/ui/common.index.html",
             html,
-            "CommonSys/ui/common.index.html"
+            "CommonSys/ui/vanilla/common.index.html"
         ),
-        store!("common-sys", "/ui/index.js", js, "CommonSys/ui/index.js"),
+        store!("common-sys", "/ui/index.js", js, "CommonSys/ui/vanilla/index.js"),
         store_common!("keyConversions.mjs", js),
         store_common!("rpc.mjs", js),
         store_common!("SimpleUI.mjs", js),
@@ -299,12 +301,14 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
         "ExploreSys/ui/index.js"
     )];
 
-    let mut token_sys_files = vec![store!(
-        "r-tok-sys",
-        "/ui/index.js",
-        js,
-        "TokenSys/ui/index.js"
-    )];
+    let mut token_sys_files = vec![
+        store!("r-tok-sys", "/index.html", html, "CommonSys/ui/vanilla/common.index.html"),
+        store!("r-tok-sys", "/ui/index.js", js, "TokenSys/ui/vanilla/index.js"),
+        // store!("r-tok-sys", "/index.html", html, "TokenSys/ui/dist/index.html"),
+        // store!("r-tok-sys", "/index.js", js, "TokenSys/ui/dist/index.js"),
+        // store!("r-tok-sys", "/style.css", css, "TokenSys/ui/dist/style.css"),
+        // store!("r-tok-sys", "/vite.svg", svg, "TokenSys/ui/dist/vite.svg"),
+    ];
 
     let mut doc_actions = vec![
         new_account_action(account!("account-sys"), account!("doc-sys")), //

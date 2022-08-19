@@ -31,8 +31,19 @@ SCENARIO("Testing default psibase chain")
    DefaultTestChain t(neededContracts, 1'000'000'000ul, 32, 32, 32, 38);
 
    auto        tokenSysRpc = t.as(RTokenSys::contract).at<RTokenSys>();
-   std::string rpcUiDir    = "../contracts/user/TokenSys/ui/";
+
+   // Old UI
+   std::string comUiDir    = "../contracts/user/CommonSys/ui/vanilla/";
+   tokenSysRpc.storeSys("/index.html", "text/html", readWholeFile(comUiDir + "common.index.html"));
+   std::string rpcUiDir    = "../contracts/user/TokenSys/ui/vanilla/";
    tokenSysRpc.storeSys("/ui/index.js", "text/javascript", readWholeFile(rpcUiDir + "index.js"));
+
+   // New UI
+   // std::string rpcUiDir    = "../contracts/user/TokenSys/ui/dist/";
+   // tokenSysRpc.storeSys("/index.html", "text/html", readWholeFile(rpcUiDir + "index.html"));
+   // tokenSysRpc.storeSys("/index.js", "text/javascript", readWholeFile(rpcUiDir + "index.js"));
+   // tokenSysRpc.storeSys("/style.css", "text/css", readWholeFile(rpcUiDir + "style.css"));
+   // tokenSysRpc.storeSys("/vite.svg", "image/svg+xml", readWholeFile(rpcUiDir + "vite.svg"));
 
    auto alice = t.as(t.add_account("alice"_a));
    auto bob   = t.as(t.add_account("bob"_a));
