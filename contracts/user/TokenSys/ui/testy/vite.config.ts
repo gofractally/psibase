@@ -21,7 +21,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '/common/rpc.mjs': path.resolve('/root/psibase/contracts/user/CommonSys/common/rpc.mjs'),
+      '/common': path.resolve('/root/psibase/contracts/user/CommonSys/common'),
     },
   },
   server: {
