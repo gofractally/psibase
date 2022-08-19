@@ -1,22 +1,23 @@
 find_package(Boost 1.75 REQUIRED COMPONENTS filesystem)
 
-
 add_executable(psitest main.cpp)
+
 if(APPLE)
-target_link_libraries(psitest
-    psibase
-    debug_eos_vm
-    ${Boost_LIBRARIES}
-)
+    target_link_libraries(psitest
+        psibase
+        debug_eos_vm
+        ${Boost_LIBRARIES}
+    )
 elseif(UNIX)
-target_link_libraries(psitest
-    psibase
-    debug_eos_vm
-    ${Boost_LIBRARIES}
-    -static-libgcc
-    -static-libstdc++
-)
+    target_link_libraries(psitest
+        psibase
+        debug_eos_vm
+        ${Boost_LIBRARIES}
+        -static-libgcc
+        -static-libstdc++
+    )
 endif()
+
 set_target_properties(psitest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 add_custom_command(TARGET psitest POST_BUILD
     COMMAND mkdir -p ${ROOT_BINARY_DIR}/psidk/bin

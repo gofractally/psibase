@@ -126,7 +126,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/TokenSys/ui        ${BOOT_IMAGE}/TokenSys/ui
 
-        COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc | true"
+        COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc || mkdir -p ${BOOT_IMAGE}/doc"
 
         COMMAND         rm -rf ${THIRD_DEST}
         COMMAND         mkdir -p ${THIRD_DEST}
