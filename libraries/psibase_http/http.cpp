@@ -461,10 +461,9 @@ namespace psibase::http
                      Msg                                                        request;
                      websocket::stream<decltype(self.derived_session().stream)> stream;
                   };
-                  auto ptr = std::make_shared<op>(
-                      std::move(request),
-                      websocket::stream<decltype(self.derived_session().stream)>{
-                          std::move(self.derived_session().stream)});
+
+                  auto ptr =  std::make_shared<op>( op{std::move(request), websocket::stream<decltype(self.derived_session().stream)>{ std::move(self.derived_session().stream)}}); 
+                  
                   auto p = ptr.get();
                   // Capture server, not self, because after returning, there is
                   // no longer anything keeping the session alive

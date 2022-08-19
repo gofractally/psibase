@@ -9,7 +9,7 @@
 	url = https://github.com/catchorg/Catch2.git
 [submodule "external/libmdbx"]
 	path = external/libmdbx
-	url = https://github.com/gofractally/libmdbx-mirror.git
+	url = git@github.com:gofractally/libmdbx-mirror.git
 [submodule "external/secp256k1"]
 	path = external/secp256k1
 	url = https://github.com/bitcoin-core/secp256k1.git

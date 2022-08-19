@@ -1,6 +1,7 @@
 #include <psibase/TransactionContext.hpp>
 
 #include <condition_variable>
+#include <thread>   
 #include <mutex>
 #include <psibase/ActionContext.hpp>
 #include <psibase/contractEntry.hpp>

@@ -14,9 +14,9 @@ namespace psibase::net
    class basic_random_timer
    {
      public:
-      using duration   = Timer::duration;
-      using time_point = Timer::time_point;
-      using clock_type = Timer::clock_type;
+      using duration   = typename Timer::duration;
+      using time_point = typename Timer::time_point;
+      using clock_type = typename Timer::clock_type;
       template <typename ExecutionContext>
       explicit basic_random_timer(ExecutionContext& ctx) : _timer(ctx)
       {
