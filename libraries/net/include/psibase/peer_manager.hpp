@@ -20,6 +20,8 @@ namespace psibase::net
       virtual void async_read(read_handler)                        = 0;
       virtual bool is_open() const                                 = 0;
       virtual void close()                                         = 0;
+      // Information for display
+      virtual std::string endpoint() const { return ""; }
    };
 
    template <typename Derived>
@@ -73,7 +75,7 @@ namespace psibase::net
          }
          _connections.clear();
       }
-      void disconnect(peer_id id)
+      bool disconnect(peer_id id)
       {
          auto iter = _connections.find(id);
          if (iter != _connections.end())
@@ -81,8 +83,12 @@ namespace psibase::net
             static_cast<Derived*>(this)->network().disconnect(id);
             iter->second->close();
             _connections.erase(iter);
+            return true;
          }
+         return false;
       }
+
+      const auto& connections() const { return _connections; }
 
       peer_id                                             next_peer_id = 0;
       boost::asio::io_context&                            _ctx;

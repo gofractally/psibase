@@ -16,6 +16,7 @@
 
 #include <boost/asio/system_timer.hpp>
 
+#include <charconv>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -57,11 +58,8 @@ struct transaction_queue
    std::vector<entry> entries;
 };
 
-#define RETHROW_BAD_ALLOC  \
-   catch (std::bad_alloc&) \
-   {                       \
-      throw;               \
-   }
+#define RETHROW_BAD_ALLOC \
+   catch (std::bad_alloc&) { throw; }
 
 #define CATCH_IGNORE \
    catch (...) {}
@@ -278,10 +276,20 @@ void pushTransaction(psibase::SharedState&                  sharedState,
    }
 }  // pushTransaction
 
-template <typename Derived>
-struct null_link
+std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view peer)
 {
-};
+   // TODO: handle ipv6 addresses [addr]:port
+   // TODO: use a websocket URI
+   auto pos = peer.find(':');
+   if (pos == std::string_view::npos)
+   {
+      return {peer, "8080"};
+   }
+   else
+   {
+      return {peer.substr(0, pos), peer.substr(pos + 1)};
+   }
+}
 
 using timer_type = boost::asio::system_timer;
 
@@ -312,6 +320,9 @@ void run(const std::string&                db_path,
    node_type node(chainContext, system.get());
    node.set_producer_id(producer);
    node.set_producers(producers);
+
+   // Used for outgoing connections
+   boost::asio::ip::tcp::resolver resolver(chainContext);
 
    if (!host.empty())
    {
@@ -353,6 +364,65 @@ void run(const std::string&                db_path,
       http_config->accept_p2p_websocket = [&node](auto&& stream)
       { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
 
+      http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
+      {
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, callback = std::move(callback)]
+                           {
+                              http::get_peers_result result;
+                              for (const auto& [id, conn] : node.peers().connections())
+                              {
+                                 result.push_back({id, conn->endpoint()});
+                              }
+                              callback(std::move(result));
+                           });
+      };
+
+      http_config->connect =
+          [&chainContext, &node, &resolver](std::vector<char> peer, http::connect_callback callback)
+      {
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, &resolver, peer = std::move(peer),
+                            callback = std::move(callback)]() mutable
+                           {
+                              auto [host, service] = parse_endpoint({peer.data(), peer.size()});
+                              async_connect(std::make_shared<websocket_connection>(chainContext),
+                                            resolver, host, service,
+                                            [&node](auto&& conn)
+                                            { node.add_connection(std::move(conn)); });
+                              callback(std::nullopt);
+                           });
+      };
+
+      http_config->disconnect =
+          [&chainContext, &node, &resolver](std::vector<char> peer, http::connect_callback callback)
+      {
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, &resolver, peer = std::move(peer),
+              callback = std::move(callback)]() mutable
+             {
+                int  id;
+                auto result  = std::from_chars(peer.data(), peer.data() + peer.size(), id);
+                auto message = "Unknown peer";
+                if (result.ec != std::errc() || result.ptr != peer.data() + peer.size())
+                {
+                   callback(message);
+                }
+                else
+                {
+                   if (!node.peers().disconnect(id))
+                   {
+                      callback(message);
+                   }
+                   else
+                   {
+                      callback(std::nullopt);
+                   }
+                }
+             });
+      };
+
       auto server = http::server::create(http_config, sharedState);
    }
 
@@ -360,19 +430,9 @@ void run(const std::string&                db_path,
 
    // TODO: replay
 
-   boost::asio::ip::tcp::resolver resolver(chainContext);
    for (const std::string& peer : peers)
    {
-      // TODO: handle ipv6 addresses [addr]:port
-      // TODO: use a websocket URI
-      auto pos = peer.find(':');
-      if (pos == std::string::npos)
-      {
-         std::cout << "missing p2p port (there is not default yet): " << peer << std::endl;
-         continue;
-      }
-      auto host    = peer.substr(0, pos);
-      auto service = peer.substr(pos + 1);
+      auto [host, service] = parse_endpoint(peer);
       //node.async_connect(peer.substr(0, pos), peer.substr(pos + 1));
       async_connect(std::make_shared<websocket_connection>(chainContext), resolver, host, service,
                     [&node](auto&& conn) { node.add_connection(std::move(conn)); });

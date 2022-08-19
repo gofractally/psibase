@@ -21,6 +21,20 @@ namespace psibase::http
    using accept_p2p_websocket_result = boost::beast::websocket::stream<boost::beast::tcp_stream>;
    using accept_p2p_websocket_t      = std::function<void(accept_p2p_websocket_result&&)>;
 
+   struct peer_info
+   {
+      int         id;
+      std::string endpoint;
+   };
+   PSIO_REFLECT(peer_info, id, endpoint);
+   using get_peers_result   = std::vector<peer_info>;
+   using get_peers_callback = std::function<void(get_peers_result)>;
+   using get_peers_t        = std::function<void(get_peers_callback)>;
+
+   using connect_result   = std::optional<std::string>;
+   using connect_callback = std::function<void(connect_result)>;
+   using connect_t        = std::function<void(std::vector<char>, connect_callback)>;
+
    struct http_config
    {
       uint32_t                  num_threads            = {};
@@ -34,6 +48,9 @@ namespace psibase::http
       push_boot_t               push_boot_async        = {};
       push_transaction_t        push_transaction_async = {};
       accept_p2p_websocket_t    accept_p2p_websocket   = {};
+      get_peers_t               get_peers              = {};
+      connect_t                 connect                = {};
+      connect_t                 disconnect             = {};
       bool                      host_perf              = false;
    };
 

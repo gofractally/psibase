@@ -345,6 +345,89 @@ namespace psibase::http
             send(websocket_upgrade{}, std::move(req));
             return;
          }
+         else if (req.target() == "/native/admin/peers" && req.method() == bhttp::verb::get &&
+                  server.http_config->get_peers)
+         {
+            // returns json list of {id:int,endpoint:string}
+            send.pause_read = true;
+            server.http_config->get_peers(
+                [ok, session = send.self.derived_session().shared_from_this(),
+                 server = send.self.server.shared_from_this()](get_peers_result result)
+                {
+                   net::post(session->stream.socket().get_executor(),
+                             [ok, session = std::move(session), result = std::move(result)]()
+                             {
+                                session->queue_.pause_read = false;
+                                std::vector<char>   data;
+                                psio::vector_stream stream{data};
+                                psio::to_json(result, stream);
+                                session->queue_(ok(std::move(data), "application/json"));
+                                if (session->queue_.can_read())
+                                   session->do_read();
+                             });
+                });
+            return;
+         }
+         else if (req.target() == "/native/admin/connect" && req.method() == bhttp::verb::post &&
+                  server.http_config->connect)
+         {
+            // takes a string endpoint
+            send.pause_read = true;
+            server.http_config->connect(
+                req.body(),
+                [ok_no_content, error, session = send.self.derived_session().shared_from_this(),
+                 server = send.self.server.shared_from_this()](connect_result result)
+                {
+                   net::post(
+                       session->stream.socket().get_executor(),
+                       [ok_no_content, error, session = std::move(session),
+                        result = std::move(result)]()
+                       {
+                          session->queue_.pause_read = false;
+                          if (result)
+                          {
+                             session->queue_(error(bhttp::status::internal_server_error, *result));
+                          }
+                          else
+                          {
+                             session->queue_(ok_no_content());
+                          }
+                          if (session->queue_.can_read())
+                             session->do_read();
+                       });
+                });
+            return;
+         }
+         else if (req.target() == "/native/admin/disconnect" && req.method() == bhttp::verb::post &&
+                  server.http_config->disconnect)
+         {
+            // takes an integer identifying the peer
+            send.pause_read = true;
+            server.http_config->disconnect(
+                req.body(),
+                [ok_no_content, error, session = send.self.derived_session().shared_from_this(),
+                 server = send.self.server.shared_from_this()](connect_result result)
+                {
+                   net::post(
+                       session->stream.socket().get_executor(),
+                       [ok_no_content, error, session = std::move(session),
+                        result = std::move(result)]()
+                       {
+                          session->queue_.pause_read = false;
+                          if (result)
+                          {
+                             session->queue_(error(bhttp::status::internal_server_error, *result));
+                          }
+                          else
+                          {
+                             session->queue_(ok_no_content());
+                          }
+                          if (session->queue_.can_read())
+                             session->do_read();
+                       });
+                });
+            return;
+         }
          else
          {
             return send(error(bhttp::status::not_found,

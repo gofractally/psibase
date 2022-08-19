@@ -10,6 +10,7 @@
 #include <boost/beast/websocket.hpp>
 #include <deque>
 #include <psibase/peer_manager.hpp>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -72,6 +73,13 @@ namespace psibase::net
          {
             stream.close(boost::beast::websocket::close_code::none);
          }
+      }
+      std::string endpoint() const
+      {
+         auto               result = get_lowest_layer(stream).socket().remote_endpoint();
+         std::ostringstream ss;
+         ss << result;
+         return ss.str();
       }
       struct message
       {
