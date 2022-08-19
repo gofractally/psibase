@@ -14,14 +14,16 @@ export default defineConfig({
     cssCodeSplit: false,
     rollupOptions: {
       external: ['/common/rootdomain.mjs', '/common/rpc.mjs', '/common/iframeResizer.js'],
+      makeAbsoluteExternalsRelative: false,
       output: {
-        entryFileNames: 'index.js'
+        entryFileNames: 'index.js',
+        assetFileNames: '[name][extname]'
       }
     }
   },
   resolve: {
     alias: {
-      '/common': path.resolve('/root/psibase/contracts/user/CommonSys/common'),
+      '/common': path.resolve('../../../CommonSys/common'),
     },
   },
   server: {
