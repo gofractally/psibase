@@ -3,7 +3,7 @@ import reactLogo from './assets/react.svg'
 import './App.css'
 import { Person } from './person';
 // @ts-ignore
-import { initializeApplet } from '/common/rpc.mjs'
+import { initializeApplet, query } from '/common/rpc.mjs'
 
 console.log(initializeApplet, 'was initializeApplet')
 // const siblingUrl = window.siblingUrl;
@@ -15,7 +15,19 @@ function App() {
 
     initializeApplet()
 
+    
   }, [])
+
+  const setUser = console.log;
+
+  useEffect(() => {
+    // Todo - Timeout is used because sometimes the window.parentIFrame isn't loaded yet when 
+    //  this runs. Should use a better fix for the race condition than a delay.
+    setTimeout(() => {
+      console.log(window, 'is window')
+        query("account-sys", "", "getLoggedInUser", {}, setUser);
+    }, 5000);
+}, []);
 
   return (
     <div className="App">
