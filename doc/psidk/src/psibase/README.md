@@ -19,7 +19,7 @@ psinode [OPTIONS] <DATABASE>
 
 If you don't give it any other options, psinode will just sit there with nothing to do. There are two important options for creating and running a local test chain:
 
-- `-p` or `--produce` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below).
+- `-p` or `--producer` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below). It's argument is a name for the producer and must match the name provided as the `--prods` arg (while that arg exists).
 - `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on port `8080` with address `0.0.0.0` (TODO).
 
 There is one more option which is useful for local development. Production deployments shouldn't use this:
