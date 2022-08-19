@@ -38,8 +38,8 @@ namespace
 
 optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {
-   if (auto result = at<system_contract::CommonSys>().serveCommon(request).unpack())
-      return result;
+   // if (auto result = at<system_contract::CommonSys>().serveCommon(request).unpack())
+   //    return result;
 
    if (auto result = servePackAction<TokenSys>(request))
       return result;
