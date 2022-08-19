@@ -1,10 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import './App.css'
+
+// @ts-ignore
+// import { initializeApplet, setOperations, } from "/common/rpc.mjs";
 
 function App() {
   const [count, setCount] = useState(0)
 
+  // useEffect(() => {
+  //   initializeApplet(async () => {
+  //     setOperations([
+  //       {
+  //           id: "credit",
+  //           exec: async () => {
+  //             console.log('hello world!')
+  //           },
+  //       }
+  //     ]);
+  //   });
+  // })
+  
   return (
     <div className="App">
       <div>
