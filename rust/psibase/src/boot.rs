@@ -221,7 +221,7 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     ];
 
     let mut common_sys_files = vec![
-        store!("common-sys", "/", html, "CommonSys/ui/index.html"),
+        store!("common-sys", "/index.html", html, "CommonSys/ui/index.html"),
         store!(
             "common-sys",
             "/ui/common.index.html",
@@ -250,7 +250,12 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     ];
 
     let mut account_sys_files = vec![
-        store!("r-account-sys", "/", html, "AccountSys/ui/index.html"),
+        store!(
+            "r-account-sys",
+            "/index.html",
+            html,
+            "AccountSys/ui/index.html"
+        ),
         store!(
             "r-account-sys",
             "/ui/index.js",
