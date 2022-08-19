@@ -23,6 +23,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '/common/iframeResizer.contentWindow.js': path.resolve('../../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js'),
       '/common': path.resolve('../../../CommonSys/common'),
     },
   },
@@ -30,12 +31,17 @@ export default defineConfig({
     host: "localhost",
     port: 8081,
     proxy: {
+      '/common/rootdomain': {
+        target: 'http://psibase.127.0.0.1.sslip.io:8080'
+      },
       '/': {
         target: 'http://psibase.127.0.0.1.sslip.io:8080/',
         bypass: (req, _res, _opt) => {
           const host = req.headers.host || ""
           const subdomain = host.split(".")[0]
+          console.log({ host, subdomain })
           if (subdomain === APPLET_CONTRACT) {
+            console.log({ returning: req.url })
             return req.url;
           }
         }

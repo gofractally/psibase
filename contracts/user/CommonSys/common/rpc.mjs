@@ -1,27 +1,36 @@
 import { privateStringToKeyPair, publicKeyPairToFracpack, signatureToFracpack } from '/common/keyConversions.mjs';
 import hashJs from 'https://cdn.skypack.dev/hash.js';
 
+console.log('i got at the top')
+
+
 let rootDomain = '';
 
 export async function getRootDomain() {
     if (rootDomain) {
         return rootDomain;
     } else {
-        rootDomain = await getJson('/common/rootdomain');
+        rootDomain = await getJson('/common/rootdomain').catch(e => console.error(e, 'on getrootdomain'))
         return rootDomain;
     }
 }
 
 export async function siblingUrl(baseUrl, contract, path) {
 
-    const rootDomain = await getRootDomain();
+    try {
 
-    let loc;
-    if (!baseUrl)
-        loc = location;
-    else
-        loc = new URL(baseUrl);
-    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootDomain + ':' + loc.port + '/' + (path || '').replace(/^\/+/, '');
+        const rootDomain = await getRootDomain();
+
+        let loc;
+        if (!baseUrl)
+            loc = location;
+        else
+            loc = new URL(baseUrl);
+        return loc.protocol + '//' + (contract ? contract + '.' : '') + rootDomain + ':' + loc.port + '/' + (path || '').replace(/^\/+/, '');
+    } catch (e) {
+        console.warn('sibling url failed', e)
+        throw new Error(e)
+    }
 }
 export class RPCError extends Error {
     constructor(message, trace) {
@@ -242,35 +251,30 @@ var qrs = []; // Queries defined by an applet
 
 var queryCallbacks = []; // Callbacks automatically generated for responding to queries
 
-export function storeCallback(callback)
-{
+export function storeCallback(callback) {
     let callbackId = queryCallbacks.length;
-    queryCallbacks.push({callbackId, callback});
+    queryCallbacks.push({ callbackId, callback });
     return callbackId;
 }
 
-export function executeCallback(callbackId, response)
-{
+export function executeCallback(callbackId, response) {
     let idx = -1;
     let found = queryCallbacks.some((q, i) => {
-        if (q.callbackId === callbackId)
-        {
+        if (q.callbackId === callbackId) {
             idx = i;
             return true;
         }
         return false;
     });
-    if (!found)
-    {
+    if (!found) {
         console.error("Callback with ID " + callbackId + " not found.");
         return false;
     }
 
-    try{
+    try {
         queryCallbacks[idx].callback(response);
     }
-    catch (e)
-    {
+    catch (e) {
         console.error("Error calling callback with ID " + callbackId);
     }
     // Remove the callback now that it's been handled
@@ -278,18 +282,16 @@ export function executeCallback(callbackId, response)
     return true;
 }
 
-async function sendToParent(message)
-{
+async function sendToParent(message) {
 
     let sendMessage = async () => {
-        parentIFrame.sendMessage(message, await siblingUrl(null,null,null));
+        parentIFrame.sendMessage(message, await siblingUrl(null, null, null));
     };
 
     if ('parentIFrame' in window) {
         sendMessage();
     }
-    else
-    {
+    else {
         console.log("Message queued");
         bufferedMessages.push(sendMessage);
     }
@@ -297,8 +299,7 @@ async function sendToParent(message)
 
 let redirectIfAccessedDirectly = async () => {
     try {
-        if (window.self === window.top)
-        {
+        if (window.self === window.top) {
             // We are the top window. Redirect needed.
             const applet = window.location.hostname.substring(0, window.location.hostname.indexOf("."));
             window.location.replace(await siblingUrl(null, "", "/applet/" + applet));
@@ -309,12 +310,11 @@ let redirectIfAccessedDirectly = async () => {
     }
 };
 
-export function verifyFields (obj, fieldNames) {
+export function verifyFields(obj, fieldNames) {
     var missingField = false;
 
-    fieldNames.forEach((fieldName)=>{
-        if (!obj.hasOwnProperty(fieldName))
-        {
+    fieldNames.forEach((fieldName) => {
+        if (!obj.hasOwnProperty(fieldName)) {
             missingField = true;
         }
     });
@@ -325,9 +325,8 @@ export function verifyFields (obj, fieldNames) {
 let handleErrorCode = (code) => {
     if (code === undefined) return false;
 
-    let recognizedError = ErrorMessages.some((err)=>{
-        if (err.code === code)
-        {
+    let recognizedError = ErrorMessages.some((err) => {
+        if (err.code === code) {
             console.error(err.message);
             return true;
         }
@@ -342,29 +341,26 @@ let handleErrorCode = (code) => {
 let messageRouting = [
     {
         type: MessageTypes.Operation,
-        validate: (payload)=>{
+        validate: (payload) => {
             return verifyFields(payload, ["identifier", "params"]);
         },
         route: async (payload) => {
-            let {identifier, params} = payload;
+            let { identifier, params } = payload;
 
-            let doRouteMessage = async ()=>{
+            let doRouteMessage = async () => {
                 let op = ops.find(o => o.id === identifier);
-                if (op !== undefined)
-                {
+                if (op !== undefined) {
                     try {
-                         await op.exec(params);
+                        await op.exec(params);
                     }
-                    catch (e)
-                    {
+                    catch (e) {
                         console.error("Error running operation " + identifier);
                         console.error(e);
                         stopOperation();
                         throw e;
                     }
                 }
-                else
-                {
+                else {
                     console.error("Operation not found: " + identifier);
                 }
 
@@ -377,16 +373,15 @@ let messageRouting = [
     },
     {
         type: MessageTypes.Query,
-        validate: (payload)=>{
+        validate: (payload) => {
             return verifyFields(payload, ["identifier", "params", "callbackId"]);
         },
         route: async (payload) => {
-            let {identifier, params, callbackId} = payload;
+            let { identifier, params, callbackId } = payload;
 
-            let doRouteMessage = async ()=>{
+            let doRouteMessage = async () => {
                 let qu = qrs.find(q => q.id === identifier);
-                if (qu !== undefined)
-                {
+                if (qu !== undefined) {
                     try {
                         let reply = (val) => {
                             sendToParent({
@@ -396,15 +391,13 @@ let messageRouting = [
                         };
                         qu.exec(params, reply);
                     }
-                    catch (e)
-                    {
+                    catch (e) {
                         console.error("Error running query " + identifier);
                         console.error(e);
                         throw e;
                     }
                 }
-                else
-                {
+                else {
                     console.error("Query not found: " + identifier);
                 }
 
@@ -420,7 +413,7 @@ let messageRouting = [
             return verifyFields(payload, ["callbackId", "response"]);
         },
         route: (payload) => {
-            let {callbackId, response} = payload;
+            let { callbackId, response } = payload;
             return executeCallback(callbackId, response);
         },
     }
@@ -428,34 +421,33 @@ let messageRouting = [
 
 let bufferedMessages = [];
 
-export async function initializeApplet(initializer = ()=>{})
-{
-    await redirectIfAccessedDirectly();
+export async function initializeApplet(initializer = () => { }) {
+    console.log('initialize applet called ****')
+    // await redirectIfAccessedDirectly();
 
-    let rootUrl = await siblingUrl(null, null, null);
+    console.log('redirect')
+    let rootUrl = await siblingUrl(null, null, null).catch(e => console.error(e, 'sibling url failed'))
+    console.log('sibling url successfull')
     window.iFrameResizer = {
         targetOrigin: rootUrl,
-        onReady: ()=>{
+        onReady: () => {
             bufferedMessages.forEach(m => m());
             bufferedMessages = [];
         },
-        onMessage: async (msg)=>{
-            let {type, payload} = msg;
-            if (type === undefined || payload === undefined)
-            {
+        onMessage: async (msg) => {
+            let { type, payload } = msg;
+            if (type === undefined || payload === undefined) {
                 console.error("Malformed message received from core");
                 return;
             }
 
             let route = messageRouting.find(m => m.type === type);
-            if (route === undefined)
-            {
+            if (route === undefined) {
                 console.error("Message from core specifies unknown route.");
                 return;
             }
 
-            if (!route.validate(payload))
-            {
+            if (!route.validate(payload)) {
                 console.error("Message from core failed validation checks");
                 return;
             }
@@ -464,44 +456,41 @@ export async function initializeApplet(initializer = ()=>{})
                 return;
 
             let routed = await route.route(payload);
-            if (!routed)
-            {
+            if (!routed) {
                 console.error("Child failed to route message: " + msg);
                 return;
             }
         },
-      };
+    };
 
+    console.log('i got here first')
     await import("/common/iframeResizer.contentWindow.js");
+    console.log('i got here safely')
 
     await initializer();
 }
 
 
-function set({targetArray, newElements}, caller)
-{
+function set({ targetArray, newElements }, caller) {
     let valid = newElements.every(e => {
-        if (!verifyFields(e, ["id", "exec"]))
-        {
+        if (!verifyFields(e, ["id", "exec"])) {
             return false;
         }
         return true;
     });
 
-    if (!valid) 
-    {
+    if (!valid) {
         console.error(caller + ": All elements must have \"id\" and \"exec\" properties");
         return;
     }
 
     if (targetArray.length === 0)
         targetArray.push(...newElements);
-    else 
-    {
+    else {
         valid = newElements.every(e => {
-            if (targetArray.find(t => t.id === e.id)) 
+            if (targetArray.find(t => t.id === e.id))
                 return false;
-            else 
+            else
                 return true;
         });
         if (!valid) {
@@ -516,27 +505,24 @@ function set({targetArray, newElements}, caller)
  * Description: Sets the operations supported by this applet.
  * Call this from within the initialization function provided to initializeApplet.
  */
-export function setOperations(operations)
-{
-    set({targetArray: ops, newElements: operations}, "setOperations");
+export function setOperations(operations) {
+    set({ targetArray: ops, newElements: operations }, "setOperations");
 }
 
 /**
  * Description: Sets the queries supported by this applet.
  * Call this from within the initialization function provided to initializeApplet.
  */
-export function setQueries(queries)
-{
-    set({targetArray: qrs, newElements: queries}, "setQueries");
+export function setQueries(queries) {
+    set({ targetArray: qrs, newElements: queries }, "setQueries");
 }
 
-function stopOperation()
-{
+function stopOperation() {
     let tempDelay = 100; // TODO: remove this, add message buffering to core
-    setTimeout(()=>{
+    setTimeout(() => {
         sendToParent({
             type: MessageTypes.Core,
-            payload: {command: "stopOp"},
+            payload: { command: "stopOp" },
         });
     }, tempDelay);
 }
@@ -549,8 +535,7 @@ function stopOperation()
  * @param {String} name - The name of the operation to run.
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
-export function operation(applet, subPath, name, params)
-{
+export function operation(applet, subPath, name, params) {
     // Todo - There may be a way to short-circuit calling common-sys when 
     //    opApplet == await getJson('/common/thiscontract');
 
@@ -569,8 +554,7 @@ export function operation(applet, subPath, name, params)
  * @param {String} sender - Optional parameter to explicitly specify a sender. If no sender is provided, 
  *  the currently logged in user is assumed to be the sender.
  */
-export function action(application, actionName, params, sender = null)
-{
+export function action(application, actionName, params, sender = null) {
     sendToParent({
         type: MessageTypes.Action,
         payload: { application, actionName, params, sender },
@@ -587,8 +571,7 @@ export function action(application, actionName, params, sender = null)
  * @param {Object} params - The object containing all parameters expected by the query handler.
  * @param {Function} callback - The function called with the return value.
  */
-export function query(applet, subPath, queryName, params, callback)
-{
+export function query(applet, subPath, queryName, params, callback) {
     // Will leave memory hanging if we don't get a response as expected
     let callbackId = storeCallback(callback);
 

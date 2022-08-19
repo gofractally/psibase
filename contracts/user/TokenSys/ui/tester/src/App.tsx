@@ -10,6 +10,7 @@ function App() {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
+    console.log('initilizing the applet..')
     initializeApplet(async() => {
       const thisApplet = await getJson('/common/thiscontract') as string;
 
