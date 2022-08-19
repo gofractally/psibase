@@ -66,12 +66,36 @@ endif()
 # TODO: switch default to on
 option(BUILD_RUST "Build rust" OFF)
 if(BUILD_RUST)
+    ExternalProject_Add(
+        gen-cpp-doc
+        DEPENDS             wasm
+        SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
+        CONFIGURE_COMMAND   ""
+        BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+        INSTALL_COMMAND     ""
+    )
+endif()
+
+option(BUILD_DOC "Build doc" OFF)
+if(BUILD_DOC)
+    set(DOC_DEP doc)
+    ExternalProject_Add(
+        ${DOC_DEP}
+        DEPENDS             gen-cpp-doc
+        SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk
+        CONFIGURE_COMMAND   ""
+        BUILD_COMMAND       cd ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk && rm -rf book && mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book
+        INSTALL_COMMAND     ""
+    )
+endif()
+
+if(BUILD_RUST)
     set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
     set(THIRD_SRC ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common/thirdParty/src)
     set(THIRD_DEST ${BOOT_IMAGE}/CommonSys/common/thirdParty)
     ExternalProject_Add(
         rust
-        DEPENDS wasm
+        DEPENDS wasm ${DOC_DEP}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
         CONFIGURE_COMMAND ""
         BUILD_COMMAND   rm -rf ${BOOT_IMAGE}
@@ -102,6 +126,8 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/TokenSys/ui        ${BOOT_IMAGE}/TokenSys/ui
 
+        COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc | true"
+
         COMMAND         rm -rf ${THIRD_DEST}
         COMMAND         mkdir -p ${THIRD_DEST}
         COMMAND         cp -a ${THIRD_SRC}/htm.module.js                                    ${THIRD_DEST}
@@ -115,7 +141,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${THIRD_SRC}/semantic-ui-react.min.js                         ${THIRD_DEST}
         COMMAND         cp -a ${THIRD_SRC}/useLocalStorageState.js                          ${THIRD_DEST}
 
-        COMMAND         cargo build -r --bin psibase --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+        COMMAND         cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
 
         INSTALL_COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
         COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin

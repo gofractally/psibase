@@ -23,26 +23,6 @@
 using namespace psibase;
 using namespace psibase::net;
 
-std::vector<char> read_whole_file(const char* filename)
-{
-   FILE* f = fopen(filename, "r");
-   if (!f)
-      throw std::runtime_error("error reading file " + std::string(filename));
-   psio::finally fin{[&] { fclose(f); }};
-
-   if (fseek(f, 0, SEEK_END))
-      throw std::runtime_error("error reading file " + std::string(filename));
-   auto size = ftell(f);
-   if (size < 0)
-      throw std::runtime_error("error reading file " + std::string(filename));
-   if (fseek(f, 0, SEEK_SET))
-      throw std::runtime_error("error reading file " + std::string(filename));
-   std::vector<char> buf(size);
-   if (fread(buf.data(), size, 1, f) != 1)
-      throw std::runtime_error("error reading file " + std::string(filename));
-   return buf;
-}
-
 struct transaction_queue
 {
    struct entry
@@ -397,8 +377,8 @@ void run(const std::string&                db_path,
                push_boot(*bc, entry);
             else
                pushTransaction(*sharedState, revisionAtBlockStart, *bc, entry,
-                               std::chrono::microseconds(100'000),  // TODO
-                               std::chrono::microseconds(100'000),  // TODO
+                               std::chrono::microseconds(leeway_us),  // TODO
+                               std::chrono::microseconds(leeway_us),  // TODO
                                std::chrono::microseconds(leeway_us));
          }
 
