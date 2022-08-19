@@ -655,4 +655,3 @@ export function query(appletId, name, params = {})
 
     return queryPromise;
 }
-
