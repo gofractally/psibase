@@ -61,6 +61,7 @@ namespace psibase
    {
       // Prepare for execution
       auto& db         = blockContext.db;
+      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
@@ -90,6 +91,7 @@ namespace psibase
    void TransactionContext::checkFirstAuth()
    {
       auto& db         = blockContext.db;
+      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
                                                           WasmConfigRow::key(proofWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
@@ -150,6 +152,7 @@ namespace psibase
    void TransactionContext::execVerifyProof(size_t i)
    {
       auto& db         = blockContext.db;
+      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
                                                           WasmConfigRow::key(proofWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
@@ -183,6 +186,7 @@ namespace psibase
                                              ActionTrace&  atrace)
    {
       auto& db         = blockContext.db;
+      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
@@ -207,6 +211,7 @@ namespace psibase
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
    {
       auto& db         = blockContext.db;
+      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);

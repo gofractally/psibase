@@ -534,24 +534,35 @@ namespace psibase::net
       // -------------- The timer loop --------------------
       void randomize_timer()
       {
-         _election_timer.expires_after(_timeout, _timeout * 2);
-         _election_timer.async_wait(
-             [this](const std::error_code& ec)
-             {
-                if (!ec &&
-                    (_state == producer_state::follower || _state == producer_state::candidate))
+         // Don't bother waiting if we're the only producer
+         if (active_producers.size() == 1 && active_producers[0] == self)
+         {
+            if (_state == producer_state::follower)
+            {
+               request_vote();
+            }
+         }
+         else
+         {
+            _election_timer.expires_after(_timeout, _timeout * 2);
+            _election_timer.async_wait(
+                [this](const std::error_code& ec)
                 {
-                   request_vote();
-                }
-             });
+                   if (!ec &&
+                       (_state == producer_state::follower || _state == producer_state::candidate))
+                   {
+                      request_vote();
+                   }
+                });
+         }
       }
       void request_vote()
       {
          ++current_term;
          voted_for = self;
          votes_for_me.push_back(self);
-         randomize_timer();
          _state = producer_state::candidate;
+         randomize_timer();
          network().multicast_producers(request_vote_request{
              current_term, self, chain().get_head()->blockNum, chain().get_head()->term});
          check_votes();

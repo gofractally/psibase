@@ -151,8 +151,6 @@ The [common-sys contract](system-contract/common-sys.md) provides services which
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/common/thiscontract`           | Returns a JSON string containing the contract associated with the domain. If it's the root domain, returns `"common-sys"` |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                     |
-| `GET`  | `/common/rootdomain.js`          | [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js)                                                           |
-| `GET`  | `/common/rootdomain.mjs`         | [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js)                                                           |
 | `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction-http)                                                                             |
 | `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction-http)                                                                      |
 | `GET`  | `/common/<other>`                | [Common files (http)](#common-files-http)                                                                                 |
@@ -170,23 +168,7 @@ The [common-sys contract](system-contract/common-sys.md) provides services which
 
 ### rootdomain and siblingUrl (js)
 
-`GET /common/rootdomain.mjs` returns a script like the following:
-
-```
-export const rootdomain = 'psibase.127.0.0.1.sslip.io';
-
-export function siblingUrl(baseUrl, contract, path) {
-    let loc;
-    if (!baseUrl)
-        loc = location;
-    else
-        loc = new URL(baseUrl);
-    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootdomain +
-           ':' + loc.port + '/' + (path || '').replace(/^\/+/, '');
-}
-```
-
-`GET /common/rootdomain.js` returns the same thing, but without the `export` keyword.
+`getRootDomain` calls the `/common/rootdomain/` endpoint, which returns the root domain for the queried node (e.g. `psibase.127.0.0.1.sslip.io`). The result is cached so subsequent calls will not make additional queries to the node.
 
 `siblingUrl` makes it easy for scripts to reference other contracts' domains. It automatically navigates through reverse proxies, which may change the protocol (e.g. to HTTPS) or port (e.g. to 443) from what psinode provides. `baseUrl` may point within either the root domain or one of the contract domains. It also may be empty, null, or undefined for scripts running on webpages served by psinode.
 

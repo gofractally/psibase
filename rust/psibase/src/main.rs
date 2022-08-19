@@ -3,9 +3,12 @@ use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
 use custom_error::custom_error;
 use fracpack::Packable;
+use futures::future::join_all;
+use indicatif::{ProgressBar, ProgressStyle};
 use libpsibase::{
     account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
-    ExactAccountNumber, Fracpack, PrivateKey, PublicKey, Tapos, TimePointSec, Transaction,
+    ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction, Tapos, TaposRefBlock,
+    TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -281,17 +284,12 @@ pub fn without_tapos(actions: Vec<Action>) -> Transaction {
     }
 }
 
-pub async fn with_tapos(
-    base_url: &Url,
-    client: reqwest::Client,
-    actions: Vec<Action>,
-) -> Result<Transaction, anyhow::Error> {
-    let tapos = get_tapos_for_head(base_url, client).await?;
+pub fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec {
         seconds: now_plus_10secs.timestamp() as u32,
     };
-    Ok(Transaction {
+    Transaction {
         tapos: Tapos {
             expiration,
             ref_block_suffix: tapos.ref_block_suffix,
@@ -300,7 +298,7 @@ pub async fn with_tapos(
         },
         actions,
         claims: vec![],
-    })
+    }
 }
 
 async fn create(
@@ -333,7 +331,10 @@ async fn create(
         actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
     }
 
-    let trx = with_tapos(&args.api, client.clone(), actions).await?;
+    let trx = with_tapos(
+        &get_tapos_for_head(&args.api, client.clone()).await?,
+        actions,
+    );
     push_transaction(
         &args.api,
         client,
@@ -375,7 +376,10 @@ async fn modify(
         actions.push(set_auth_contract_action(account, account!("auth-fake-sys")));
     }
 
-    let trx = with_tapos(&args.api, client.clone(), actions).await?;
+    let trx = with_tapos(
+        &get_tapos_for_head(&args.api, client.clone()).await?,
+        actions,
+    );
     push_transaction(
         &args.api,
         client,
@@ -429,7 +433,10 @@ async fn deploy(
         actions.push(reg_server(account, account));
     }
 
-    let trx = with_tapos(&args.api, client.clone(), actions).await?;
+    let trx = with_tapos(
+        &get_tapos_for_head(&args.api, client.clone()).await?,
+        actions,
+    );
     push_transaction(
         &args.api,
         client,
@@ -462,7 +469,10 @@ async fn upload(
         content_type,
         &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
     )];
-    let trx = with_tapos(&args.api, client.clone(), actions).await?;
+    let trx = with_tapos(
+        &get_tapos_for_head(&args.api, client.clone()).await?,
+        actions,
+    );
 
     push_transaction(
         &args.api,
@@ -477,7 +487,7 @@ async fn upload(
 fn fill_tree(
     contract: AccountNumber,
     sender: AccountNumber,
-    actions: &mut Vec<Action>,
+    actions: &mut Vec<(String, Action)>,
     dest: &str,
     source: &str,
 ) -> Result<(), anyhow::Error> {
@@ -486,12 +496,15 @@ fn fill_tree(
         let guess = mime_guess::from_path(source);
         if let Some(t) = guess.first() {
             println!("{} <=== {}   {}", dest, source, t.essence_str());
-            actions.push(store_sys(
-                contract,
-                sender,
-                dest,
-                t.essence_str(),
-                &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
+            actions.push((
+                dest.to_owned(),
+                store_sys(
+                    contract,
+                    sender,
+                    dest,
+                    t.essence_str(),
+                    &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
+                ),
             ));
         } else {
             println!("Skip unknown mime type: {}", source);
@@ -499,13 +512,33 @@ fn fill_tree(
     } else if md.is_dir() {
         for path in read_dir(source)? {
             let path = path?;
-            let d = if path.file_name() == "index.html" {
-                dest.to_owned() + "/"
-            } else {
-                dest.to_owned() + "/" + path.file_name().to_str().unwrap()
-            };
+            let d = dest.to_owned() + "/" + path.file_name().to_str().unwrap();
             fill_tree(contract, sender, actions, &d, path.path().to_str().unwrap())?;
         }
+    }
+    Ok(())
+}
+
+async fn monitor_trx(
+    args: &Args,
+    client: &reqwest::Client,
+    files: Vec<String>,
+    trx: SignedTransaction,
+    progress: ProgressBar,
+    n: u64,
+) -> Result<(), anyhow::Error> {
+    let result = push_transaction(&args.api, client.clone(), trx.packed_bytes()).await;
+    if let Err(err) = result {
+        progress.suspend(|| {
+            println!("=====\n{:?}", err);
+            println!("-----\nThese files were in this failed transaction:");
+            for f in files {
+                println!("    {}", f);
+            }
+        });
+        return Err(err);
+    } else {
+        progress.inc(n);
     }
     Ok(())
 }
@@ -531,13 +564,46 @@ async fn upload_tree(
     let mut actions = Vec::new();
     fill_tree(contract, sender, &mut actions, dest, source)?;
 
-    let trx = with_tapos(&args.api, client.clone(), actions).await?;
-    push_transaction(
-        &args.api,
-        client,
-        sign_transaction(trx, &args.sign)?.packed_bytes(),
-    )
-    .await?;
+    let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
+    let mut running = Vec::new();
+    let progress = ProgressBar::new(actions.len() as u64).with_style(ProgressStyle::with_template(
+        "{wide_bar} {pos}/{len} files",
+    )?);
+
+    while !actions.is_empty() {
+        let mut n = 0;
+        let mut size = 0;
+        while n < actions.len() && n < 10 && size < 64 * 1024 {
+            size += actions[n].1.raw_data.len();
+            n += 1;
+        }
+
+        let (selected_files, selected_actions) = actions.drain(..n).unzip();
+        let trx = with_tapos(&tapos, selected_actions);
+        running.push(monitor_trx(
+            args,
+            &client,
+            selected_files,
+            sign_transaction(trx, &args.sign)?,
+            progress.clone(),
+            n as u64,
+        ));
+    }
+
+    let num_trx = running.len();
+    let num_failed = join_all(running)
+        .await
+        .iter()
+        .filter(|x| x.is_err())
+        .count();
+    if num_failed > 0 {
+        progress.abandon();
+        return Err(Error::Msg {
+            s: format!("{}/{} failed transactions", num_failed, num_trx),
+        }
+        .into());
+    }
+
     println!("Ok");
     Ok(())
 }

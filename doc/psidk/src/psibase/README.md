@@ -17,10 +17,16 @@ psinode [OPTIONS] <DATABASE>
 
 `<DATABASE>`, which is required, is a path to the psibase database. psinode creates it if it does not already exist.
 
-If you don't give it any other options, psinode will just sit there with nothing to do. There are two important options for creating and running a local test chain:
+If you don't give it any other options, psinode will just sit there with nothing to do. There are three important options for creating and running a local test chain:
 
-- `-p` or `--produce` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below).
-- `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on port `8080` with address `0.0.0.0` (TODO).
+- `-p` or `--producer` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below).  It's argument is a name for the producer and must match one of the names provided by the `--prods` arg.  Multiple distinct nodes must not use the same producer name.
+- `--prods` tells psinode the set of producer nodes.  This argument may appear multiple times for a multi-producer network.  For a single producer network, it should appear once and should have the same argument as `-p`.  All nodes in the network must specify the same set of producers.  (TODO: This argument is temporary.  The set of producers will be configured on chain)
+- `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on address `0.0.0.0` (TODO).  The port defaults to 8080 but can be configured with `--port`.  The http interface also accepts p2p websocket connections from other nodes (see `--peer`).
+
+Two more options are important for connecting multiple nodes together in a network:
+
+- `--port` tells psinode the TCP port for the http interface.  The default port is 8080.  This option is only useful with `-o`.
+- `--peer` tells psinode a peer to sync with.  The argument should have the form `host:port`.  This argument can appear any number of times.
 
 There is one more option which is useful for local development. Production deployments shouldn't use this:
 
@@ -43,7 +49,7 @@ A chain doesn't exist until it's booted. This procedure boots a chain suitable f
 ### Start psinode
 
 ```
-psinode -p -o psibase.127.0.0.1.sslip.io my_psinode_db --slow
+psinode -p prod --prods prod -o psibase.127.0.0.1.sslip.io my_psinode_db --slow
 ```
 
 This will:

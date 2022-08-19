@@ -1,5 +1,4 @@
 import htm from "/common/htm.module.js";
-import { siblingUrl } from "/common/rootdomain.mjs";
 import { initializeApplet, 
   getJson} from "/common/rpc.mjs";
 import { keyPairStrings, privateStringToKeyPair } from "/common/keyConversions.mjs";
@@ -106,7 +105,7 @@ function App() {
 
     try {
       let keypair = keyPairStrings(privateStringToKeyPair(privateKey));
-      let res = await getJson(siblingUrl(null, thisApplet, "accwithkey/" + keypair.pub));
+      let res = await getJson(await siblingUrl(null, thisApplet, "accwithkey/" + keypair.pub));
       setKeys(keys.concat([privateKey]));
       setAccounts(accounts.concat(res));
     } catch(e)

@@ -245,7 +245,7 @@ void DefaultTestChain::registerSysRpc()
 
    std::vector<psibase::Action> b{
        // CommonSys
-       rpcCommon.storeSys("/", html, readWholeFile(comDir + "/ui/index.html")),
+       rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/index.html")),
        rpcCommon.storeSys("/ui/common.index.html", html,
                           readWholeFile(comDir + "/ui/common.index.html")),
 
@@ -281,11 +281,11 @@ void DefaultTestChain::registerSysRpc()
                           readWholeFile(thirdPty + "/useLocalStorageState.js")),
 
        // AccountSys
-       rpcAccount.storeSys("/", html, readWholeFile(accDir + "/ui/index.html")),
+       rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/index.html")),
        rpcAccount.storeSys("/ui/index.js", js, readWholeFile(accDir + "/ui/index.js")),
 
        // AuthEcSys
-       rpcAuthEc.storeSys("/", html, readWholeFile(authEcDir + "/ui/index.html")),
+       rpcAuthEc.storeSys("/index.html", html, readWholeFile(authEcDir + "/ui/index.html")),
        rpcAuthEc.storeSys("/ui/index.js", js, readWholeFile(authEcDir + "/ui/index.js")),
 
        // ExploreSys

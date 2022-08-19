@@ -64,9 +64,12 @@ namespace system_contract
             auto pubkey = publicKeyFromString(string_view{pubkeyParam});
 
             std::vector<AuthRecord> auths;
-            for (auto itr = authIdx.lower_bound(pubkey); itr != authIdx.upper_bound(pubkey); ++itr)
+            for (auto itr = authIdx.lower_bound(pubkey); itr != authIdx.end(); ++itr)
             {
-               auths.push_back((*itr));
+               auto obj = *itr;
+               if (obj.pubkey != pubkey)
+                  break;
+               auths.push_back(obj);
             }
 
             return to_json(auths);

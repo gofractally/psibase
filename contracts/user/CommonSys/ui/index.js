@@ -1,5 +1,5 @@
-import { siblingUrl } from "/common/rootdomain.mjs";
-import { signAndPushTransaction, getTaposForHeadBlock, MessageTypes, verifyFields, storeCallback, executeCallback } from "/common/rpc.mjs";
+import { siblingUrl, signAndPushTransaction, getTaposForHeadBlock,
+    MessageTypes, verifyFields, storeCallback, executeCallback } from "/common/rpc.mjs";
 import htm from "/common/htm.module.js";
 await import("/common/react-router-dom.min.js");
 
@@ -98,6 +98,7 @@ let getIframeId = (appletStr, subPath) => {
 
 function Applet(appletParams, handleMessage) {
     let {appletStr, subPath, state, onInit} = appletParams;
+    let [appletSrc, setAppletSrc] = useState('');
 
     if (!appletStr)
     {
@@ -108,8 +109,14 @@ function Applet(appletParams, handleMessage) {
     if (onInit === undefined) 
         onInit = ()=>{};
 
-    let appletSrc = siblingUrl(null, appletStr, subPath);
+    useEffect(()=>{
+        let doSetAppletSrc = async () => {
+            setAppletSrc(await siblingUrl(null, appletStr, subPath));
+        };
+        doSetAppletSrc();
+    },[]);
 
+    
     useEffect(()=>{ // Set document title
         if (appletStr && state === AppletStates.primary)
         {
@@ -142,17 +149,23 @@ function Applet(appletParams, handleMessage) {
                 "#" + iFrameId
             )[0].iFrameResizer;
         }
-    }, []);
+    }, [appletSrc]);
 
-    return html`
+    if (!appletSrc) 
+        return;
+    else
+    {
+        return html`
         <iframe
             id=${getIframeId(appletStr, subPath)}
             style=${appletStyles[state]}
             src="${appletSrc}"
+            allow="camera;microphone"
             title="${appletStr}"
             frameborder="0"
         ></iframe>
     `;
+    }
 }
 
 function Dashboard() {
@@ -295,7 +308,7 @@ function App() {
     let sendMessage = useCallback((messageType, sender, receiver, payload, shouldOpenReceiver)=>{
         let {rApplet, rSubPath} = receiver;
 
-        let callOnApplet = ()=>{
+        let callOnApplet = async ()=>{
             var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
             if (iframe == null)
             {
@@ -306,7 +319,7 @@ function App() {
             // TODO: Could check that sender isn't on rApplet's blacklist before
             //       making the IPC call.
 
-            let restrictedTargetOrigin = siblingUrl(null, rApplet, rSubPath);
+            let restrictedTargetOrigin = await siblingUrl(null, rApplet, rSubPath);
             iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
         }
 
