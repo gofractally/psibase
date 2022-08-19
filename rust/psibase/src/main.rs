@@ -512,11 +512,7 @@ fn fill_tree(
     } else if md.is_dir() {
         for path in read_dir(source)? {
             let path = path?;
-            let d = if path.file_name() == "index.html" {
-                dest.to_owned() + "/"
-            } else {
-                dest.to_owned() + "/" + path.file_name().to_str().unwrap()
-            };
+            let d = dest.to_owned() + "/" + path.file_name().to_str().unwrap();
             fill_tree(contract, sender, actions, &d, path.path().to_str().unwrap())?;
         }
     }
