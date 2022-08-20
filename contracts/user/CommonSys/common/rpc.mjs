@@ -419,7 +419,7 @@ let messageRouting = [
 let bufferedMessages = [];
 
 export async function initializeApplet(initializer = () => { }) {
-    // await redirectIfAccessedDirectly();
+    await redirectIfAccessedDirectly();
 
     let rootUrl = await siblingUrl(null, null, null)
 
@@ -532,6 +532,7 @@ export function operation(applet, subPath, name, params) {
     // Todo - There may be a way to short-circuit calling common-sys when 
     //    opApplet == await getJson('/common/thiscontract');
 
+    console.log({ applet, subPath, name, params })
     sendToParent({
         type: MessageTypes.Operation,
         payload: { opApplet: applet, opSubPath: subPath, opName: name, opParams: params },

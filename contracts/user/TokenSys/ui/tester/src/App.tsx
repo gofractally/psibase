@@ -26,13 +26,18 @@ function App() {
             }
             let tokenId = token.id;
 
-            await action(thisApplet, "credit",
-              {
-                tokenId,
-                receiver,
-                amount: { value: amount },
-                memo: { contents: memo },
-              });
+            try {
+
+              await action(thisApplet, "credit",
+                {
+                  tokenId,
+                  receiver,
+                  amount: { value: amount },
+                  memo: { contents: memo },
+                });
+            } catch (e) {
+              console.error('tx failed', e)
+            }
           },
         }
       ]);
@@ -41,6 +46,9 @@ function App() {
     query("account-sys", "", "getLoggedInUser", {}, (loggedInUser: any) => {
       console.log('getLoggedInUser:', loggedInUser)
     });
+    // wait(1000).then(() => {
+    //   getBalance()
+    // })
   }, [])
 
   const [userBalance, setUserBalance] = useState('');
@@ -49,12 +57,14 @@ function App() {
     let res = await getJson(await siblingUrl(null, 'token-sys', "balances/" + 'alice')) as { account: string; balance: string; precision: number, token: number, symbol: string }[]
     return res;
   }
-  const amountToSend = String(Number(5) * Math.pow(10, 8))
+  const amountToSend = String(Number(33) * Math.pow(10, 8))
 
   const triggerTx = async () => {
+    console.log(operation, 'is what is going to be hit...')
     operation('token-sys', '', 'credit', { symbol: 'PSI', receiver: 'bob', amount: amountToSend, memo: 'Working' })
     await wait(2000);
     const balances = await getBalance()
+    console.log('balances fetched', balances)
     setUserBalance(balances[0].balance)
   };
 
