@@ -1,9 +1,6 @@
 import { privateStringToKeyPair, publicKeyPairToFracpack, signatureToFracpack } from '/common/keyConversions.mjs';
 import hashJs from 'https://cdn.skypack.dev/hash.js';
 
-console.log('i got at the top')
-
-
 let rootDomain = '';
 
 export async function getRootDomain() {
@@ -422,12 +419,10 @@ let messageRouting = [
 let bufferedMessages = [];
 
 export async function initializeApplet(initializer = () => { }) {
-    console.log('initialize applet called ****')
     // await redirectIfAccessedDirectly();
 
-    console.log('redirect')
-    let rootUrl = await siblingUrl(null, null, null).catch(e => console.error(e, 'sibling url failed'))
-    console.log('sibling url successfull')
+    let rootUrl = await siblingUrl(null, null, null)
+
     window.iFrameResizer = {
         targetOrigin: rootUrl,
         onReady: () => {
@@ -463,9 +458,7 @@ export async function initializeApplet(initializer = () => { }) {
         },
     };
 
-    console.log('i got here first')
     await import("/common/iframeResizer.contentWindow.js");
-    console.log('i got here safely')
 
     await initializer();
 }
