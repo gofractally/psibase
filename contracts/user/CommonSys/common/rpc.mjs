@@ -7,7 +7,7 @@ export async function getRootDomain() {
     if (rootDomain) {
         return rootDomain;
     } else {
-        rootDomain = await getJson('/common/rootdomain').catch(e => console.error(e, 'on getrootdomain'))
+        rootDomain = await getJson('/common/rootdomain');
         return rootDomain;
     }
 }
