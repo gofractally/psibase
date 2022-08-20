@@ -39,9 +39,7 @@ export default defineConfig({
         bypass: (req, _res, _opt) => {
           const host = req.headers.host || ""
           const subdomain = host.split(".")[0]
-          console.log({ host, subdomain })
           if (subdomain === APPLET_CONTRACT) {
-            console.log({ returning: req.url })
             return req.url;
           }
         }
