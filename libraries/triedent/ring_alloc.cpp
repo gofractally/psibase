@@ -53,8 +53,12 @@ namespace triedent
       {
          if (mlock(_map_region->get_address(), file_size) < 0)
             if (!allow_slow)
-               throw std::runtime_error("Attempt to pin memory for " + filename.generic_string() +
-                                        " failed");
+               throw std::runtime_error(
+                   "unable to lock memory for " + filename.generic_string() +
+                   ". Try upgrading your shell's limits using \"sudo prlimit --memlock=-1 --pid "
+                   "$$\". "
+                   "If that doesn't work, try running psinode with \"sudo\". If that doesn't work, "
+                   "then try using psinode's \"--slow\" option.");
       }
       _begin = _head->begin.get();
       _end   = _head->end.get();
