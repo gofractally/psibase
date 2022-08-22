@@ -29,7 +29,7 @@ export default defineConfig({
     },
   },
   server: {
-    host: "localhost",
+    host: "psibase.127.0.0.1.sslip.io",
     port: 8081,
     proxy: {
       // '/common/rootdomain': {

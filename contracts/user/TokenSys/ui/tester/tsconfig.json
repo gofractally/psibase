@@ -8,7 +8,6 @@
       "ESNext"
     ],
     "allowJs": false,
-    "baseUrl": "./src",
     "paths": {
       "/common": [
         "../../../CommonSys/common"
@@ -27,7 +26,8 @@
     "jsx": "react-jsx"
   },
   "include": [
-    "src"
+    "src",
+    "../../../CommonSys/common/rpc.d.ts"
   ],
   "references": [
     {
