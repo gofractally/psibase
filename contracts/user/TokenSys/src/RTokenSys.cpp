@@ -93,9 +93,9 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          if (auto result = serveSimpleUI<TokenSys, true>(request))
             return result;
       }
-      if (request.target.starts_with("/getTokenTypes"))
+      if (request.target.starts_with("/api/getTokenTypes"))
       {
-         auto parameters = request.target.substr(string("/getTokenTypes").size());
+         auto parameters = request.target.substr(string("/api/getTokenTypes").size());
          check(parameters.find('/') == string::npos, "invalid request");
 
          TokenSys::Tables db{TokenSys::contract};
@@ -108,9 +108,9 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          }
          return to_json(allTokens);
       }
-      if (request.target.starts_with("/balances/"))
+      if (request.target.starts_with("/api/balances/"))
       {
-         auto user = request.target.substr(string("/balances/").size());
+         auto user = request.target.substr(string("/api/balances/").size());
          check(user.find('/') == string::npos, "invalid user " + user);
          psibase::AccountNumber acc(string_view{user});
 

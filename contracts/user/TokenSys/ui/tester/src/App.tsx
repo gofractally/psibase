@@ -2,23 +2,25 @@ import { useEffect, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import './App.css'
 import wait from 'waait'
-// @ts-ignore
-import { initializeApplet, action, query, operation, siblingUrl, getJson, setOperations } from "/common/rpc.mjs";
 
+import { initializeApplet, action, query, operation, siblingUrl, getJson, setOperations } from "common/rpc.mjs"
 
 function App() {
 
   useEffect(() => {
     initializeApplet(async () => {
+      console.log('init applet')
       const thisApplet = await getJson('/common/thiscontract') as string;
+      console.log('thisApplet', thisApplet)
 
       setOperations([
         {
           id: "credit",
           exec: async ({ symbol, receiver, amount, memo }: { symbol: string, receiver: string, amount: string, memo: string }) => {
 
+            console.log("credit hit!")
             //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
-            let tokens = await getJson(await siblingUrl(null, thisApplet, "getTokenTypes"));
+            let tokens = await getJson(await siblingUrl(null, thisApplet, "api/getTokenTypes"));
             let token = tokens.find((t: any) => t.symbolId === symbol.toLowerCase());
             if (!token) {
               console.error("No token with symbol " + symbol);
@@ -27,7 +29,7 @@ function App() {
             let tokenId = token.id;
 
             try {
-
+              console.log('got here')
               await action(thisApplet, "credit",
                 {
                   tokenId,
@@ -54,7 +56,7 @@ function App() {
   const [userBalance, setUserBalance] = useState('');
 
   const getBalance = async () => {
-    let res = await getJson(await siblingUrl(null, 'token-sys', "balances/" + 'alice')) as { account: string; balance: string; precision: number, token: number, symbol: string }[]
+    let res = await getJson(await siblingUrl(null, 'token-sys', "api/balances/" + 'alice')) as { account: string; balance: string; precision: number, token: number, symbol: string }[]
     return res;
   }
   const amountToSend = String(Number(33) * Math.pow(10, 8))

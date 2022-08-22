@@ -1,13 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import alias from '@rollup/plugin-alias';
 
 
 const APPLET_CONTRACT = "token-sys"
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), alias({ entries: [{ find: "common/rpc.mjs", replacement: '/common/rpc.mjs' }] })],
   build: {
     // outDir: '/root/psibase/contracts/user/TokenSys/ui',
     assetsDir: '',
@@ -31,18 +32,22 @@ export default defineConfig({
     host: "localhost",
     port: 8081,
     proxy: {
-      '/common/rootdomain': {
-        target: 'http://psibase.127.0.0.1.sslip.io:8080'
-      },
+      // '/common/rootdomain': {
+      //   target: 'http://psibase.127.0.0.1.sslip.io:8080'
+      // },
       '/': {
         target: 'http://psibase.127.0.0.1.sslip.io:8080/',
         bypass: (req, _res, _opt) => {
-          const host = req.headers.host || ""
-          const subdomain = host.split(".")[0]
-          if (subdomain === APPLET_CONTRACT) {
+          const host = req.headers.host || "";
+          const subdomain = host.split(".")[0];
+          if (
+            subdomain === APPLET_CONTRACT &&
+            req.method !== "POST" &&
+            !req.url.startsWith("/common") && !req.url.startsWith("/api")
+          ) {
             return req.url;
           }
-        }
+        },
       },
     }
   }
