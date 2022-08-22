@@ -152,8 +152,7 @@ function(add suffix)
         target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent ${Boost_LIBRARIES})
         target_include_directories(psibase${suffix} PUBLIC
             native/include
-            common/include
-            ../../external/libmdbx)
+            common/include)
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
             native/src/ExecutionContext.cpp
