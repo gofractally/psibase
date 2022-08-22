@@ -1,10 +1,77 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import './App.css'
 import wait from 'waait'
 
 import { initializeApplet, action, query, operation, siblingUrl, getJson, setOperations } from "common/rpc.mjs"
 import useEffectOnce from './hooks/useEffectOnce'
+
+interface Uint64 {
+  value: string;
+}
+interface FungibleToken {
+  id: number;
+  ownerNft: number;
+  inflation: {
+    settings: {
+      dailyLimitPct: string;
+      dailyLimitQty: string;
+      yearlyLimitPct: string;
+    },
+    stats: {
+      avgDaily: string;
+      avgYearly: string;
+    }
+  },
+  config: {
+    bits: number
+  },
+  precision: {
+    value: number;
+  },
+  currentSupply: Uint64,
+  maxSupply: Uint64;
+  symbolId: string;
+}
+
+interface TokenBalance {
+  account: string; balance: string; precision: number, token: number, symbol: string
+}
+
+class Contract {
+  protected cachedApplet?: string
+
+  protected async applet(): Promise<string> {
+    if (this.cachedApplet) return this.cachedApplet;
+    const appletName = await getJson('/common/thiscontract') as string;
+    this.cachedApplet = appletName;
+    return appletName;
+  }
+
+}
+
+class TokenContract extends Contract {
+
+  public async fetchTokenTypes() {
+    const url = await siblingUrl(undefined, await this.applet(), "api/getTokenTypes");
+    return getJson<FungibleToken[]>(url);
+  }
+
+  public async fetchBalances(user: string = 'alice') {
+    const url = await siblingUrl(undefined, 'token-sys', `api/balances/${user}`)
+    return getJson<TokenBalance[]>(url)
+  }
+
+  // idea:
+  // @Operation('credit')
+  // async credit ({ symbol, receiver, amount, memo }: { symbol: string, receiver: string, amount: string, memo: string }) => {
+
+  // })
+
+}
+
+const tokenContract = new TokenContract();
+
 
 function App() {
 
@@ -18,21 +85,21 @@ function App() {
           exec: async ({ symbol, receiver, amount, memo }: { symbol: string, receiver: string, amount: string, memo: string }) => {
 
             console.log("credit hit!")
+
             //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
-            let tokens = await getJson(await siblingUrl(undefined, thisApplet, "api/getTokenTypes"));
-            let token = tokens.find((t: any) => t.symbolId === symbol.toLowerCase());
+            const allTokens = await tokenContract.fetchTokenTypes();
+            const token = allTokens.find(t => t.symbolId === symbol.toLowerCase());
             if (!token) {
               console.error("No token with symbol " + symbol);
               return;
             }
-            let tokenId = token.id;
 
             const value = String(Number(amount) * Math.pow(10, 8));
 
             try {
               await action(thisApplet, "credit",
                 {
-                  tokenId,
+                  tokenId: token.id,
                   receiver,
                   amount: { value },
                   memo: { contents: memo },
@@ -55,13 +122,9 @@ function App() {
 
   const [userBalance, setUserBalance] = useState('');
 
-  const fetchBalance = async () => {
-    let res = await getJson(await siblingUrl(undefined, 'token-sys', "api/balances/" + 'alice')) as { account: string; balance: string; precision: number, token: number, symbol: string }[]
-    return res;
-  }
 
   const getBalance = async (current?: string, attempt = 1): Promise<string> => {
-    const res = await fetchBalance();
+    const res = await tokenContract.fetchBalances();
     const parsedBalance = Number(Number(res[0].balance) / Math.pow(10, 8)).toString();
 
     if (!current || parsedBalance !== current || attempt > 3) return parsedBalance;

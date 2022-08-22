@@ -7,7 +7,7 @@ declare module "common/rpc.mjs" {
 
     function getCurrentApplet(): Promise<string>;
     function initializeApplet(fn: (data: any) => Promise<void>): void;
-    function getJson(url: string): Promise<any>;
+    function getJson<T = any>(url: string): Promise<T>;
     function query<Params, Response>(
         applet: string,
         subPath: string,
