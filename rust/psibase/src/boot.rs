@@ -306,7 +306,9 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
         "TokenSys/ui/index.js"
     )];
 
-    let mut doc_actions = Vec::new();
+    let mut doc_actions = vec![
+        new_account_action(account!("account-sys"), account!("doc-sys")), //
+    ];
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
         &mut doc_actions,
