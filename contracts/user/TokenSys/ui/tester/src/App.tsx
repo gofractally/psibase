@@ -127,14 +127,20 @@ function App() {
     const res = await tokenContract.fetchBalances();
     const parsedBalance = Number(Number(res[0].balance) / Math.pow(10, 8)).toString();
 
-    if (!current || parsedBalance !== current || attempt > 3) return parsedBalance;
+    const maxAttempts = 5;
+    const tooManyAttempts = attempt > maxAttempts;
+    if (!current || parsedBalance !== current || tooManyAttempts) {
+      if (tooManyAttempts) {
+        console.warn(`getBalance failed to return a different balance than the previously given ${current} after ${maxAttempts}`);
+      }
+      return parsedBalance
+    };
     console.log(`awaiting before checking balance again... Attempt: ${attempt}`);
     await wait(500);
     return getBalance(current, attempt + 1);
   }
 
   const triggerTx = async () => {
-    console.log(operation, 'is what is going to be hit...');
     const beforeBalance = userBalance
     operation('token-sys', '', 'credit', { symbol: 'PSI', receiver: 'bob', amount: 3.5, memo: 'Working' })
     await wait(2000);
@@ -147,26 +153,14 @@ function App() {
 
   return (
     <div className="App">
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
+
       <h1>Alices balance is {userBalance}</h1>
       <div className="card">
         <button onClick={() => { triggerTx() }}>
-          send 4 tokens to bob
+          send 3.5 tokens to bob
         </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+
     </div>
   )
 }
