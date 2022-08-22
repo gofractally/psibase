@@ -424,7 +424,7 @@ int main(int argc, char* argv[])
    std::string              host       = {};
    unsigned short           port       = 8080;
    bool                     host_perf  = false;
-   uint32_t                 leeway_us  = 30000;  // TODO: find a good default
+   uint32_t                 leeway_us  = 200000;  // TODO: real value once resources are in place
    bool                     allow_slow = false;
    std::vector<std::string> peers;
 
@@ -441,7 +441,7 @@ int main(int argc, char* argv[])
    opt("port", po::value(&port), "http server port");
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
-       "Transaction leeway, in us. Defaults to 30000.");
+       "Transaction leeway, in us. Defaults to 200000.");
    opt("slow", po::bool_switch(&allow_slow),
        "Don't complain if unable to lock memory for database. This will still attempt to lock "
        "memory, but if it fails it will continue to run, but more slowly.");
