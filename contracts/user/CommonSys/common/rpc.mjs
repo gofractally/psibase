@@ -280,14 +280,18 @@ export function executeCallback(callbackId, response)
 
 async function sendToParent(message)
 {
-    if ('parentIFrame' in window) {
-        // Specify siblingUrl to prevent any malicious site from mimicking common-sys.
+
+    let sendMessage = async () => {
         parentIFrame.sendMessage(message, await siblingUrl(null,null,null));
+    };
+
+    if ('parentIFrame' in window) {
+        sendMessage();
     }
     else
     {
-        // This can sometimes happen if the page hasn't fully loaded
-        console.log("No parent iframe");
+        console.log("Message queued");
+        bufferedMessages.push(sendMessage);
     }
 }
 
@@ -422,12 +426,19 @@ let messageRouting = [
     }
 ];
 
+let bufferedMessages = [];
+
 export async function initializeApplet(initializer = ()=>{})
 {
     await redirectIfAccessedDirectly();
 
+    let rootUrl = await siblingUrl(null, null, null);
     window.iFrameResizer = {
-        targetOrigin: await siblingUrl(null, null, null), // Prevents any malicious site from mimicking common-sys.
+        targetOrigin: rootUrl,
+        onReady: ()=>{
+            bufferedMessages.forEach(m => m());
+            bufferedMessages = [];
+        },
         onMessage: async (msg)=>{
             let {type, payload} = msg;
             if (type === undefined || payload === undefined)

@@ -43,8 +43,20 @@ namespace system_contract
 
       if (request.method == "GET")
       {
-         auto index = tables.open<PsiSpaceContentTable>().getIndex<0>();
-         if (auto content = index.get(PsiSpaceContentKey{account, request.target}))
+         auto index  = tables.open<PsiSpaceContentTable>().getIndex<0>();
+         auto target = request.target;
+         auto pos    = target.find('?');
+         if (pos != target.npos)
+            target.resize(pos);
+         auto content = index.get(PsiSpaceContentKey{account, target});
+         if (!content)
+         {
+            if (target.ends_with('/'))
+               content = index.get(PsiSpaceContentKey{account, target + "index.html"});
+            else
+               content = index.get(PsiSpaceContentKey{account, target + "/index.html"});
+         }
+         if (content)
          {
             return HttpReply{
                 .contentType = content->contentType,

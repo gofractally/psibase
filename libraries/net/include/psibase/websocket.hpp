@@ -35,7 +35,7 @@ namespace psibase::net
       }
       void async_write(std::vector<char>&& data, write_handler f) override
       {
-         outbox.emplace_back(std::move(data), std::move(f));
+         outbox.emplace_back(psibase::net::websocket_connection::message{std::move(data), std::move(f)});
          if (outbox.size() == 1)
          {
             async_write_loop();

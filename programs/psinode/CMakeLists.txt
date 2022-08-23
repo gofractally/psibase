@@ -1,12 +1,23 @@
 add_executable(psinode main.cpp)
-target_link_libraries(psinode
-    contracts_system
-    psibase_http
-    debug_eos_vm
-    psibase_net
-    -static-libgcc
-    -static-libstdc++
-)
+
+if(APPLE)
+    target_link_libraries(psinode
+        contracts_system
+        psibase_http
+        debug_eos_vm
+        psibase_net
+    )
+elseif(UNIX)
+    target_link_libraries(psinode
+        contracts_system
+        psibase_http
+        debug_eos_vm
+        psibase_net
+        -static-libgcc
+        -static-libstdc++
+    )
+endif()
+
 target_include_directories(psinode PUBLIC
     ../../libraries/psibase/contract/include
     ../../contracts/psibase_tests)

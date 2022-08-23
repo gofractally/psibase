@@ -81,8 +81,20 @@ namespace psibase
    {
       if (request.method == "GET")
       {
-         auto index = tables.template open<WebContentTable>().template getIndex<0>();
-         if (auto content = index.get(request.target))
+         auto index  = tables.template open<WebContentTable>().template getIndex<0>();
+         auto target = request.target;
+         auto pos    = target.find('?');
+         if (pos != target.npos)
+            target.resize(pos);
+         auto content = index.get(target);
+         if (!content)
+         {
+            if (target.ends_with('/'))
+               content = index.get(target + "index.html");
+            else
+               content = index.get(target + "/index.html");
+         }
+         if (content)
          {
             return HttpReply{
                 .contentType = content->contentType,

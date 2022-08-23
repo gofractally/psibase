@@ -27,7 +27,7 @@ Run these as root:
 
 ```sh
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -yq cmake wget
+DEBIAN_FRONTEND=noninteractive apt-get install -yq cmake wget binaryen
 ```
 
 ## Ubuntu 18.04
@@ -40,12 +40,16 @@ DEBIAN_FRONTEND=noninteractive apt-get install -yq apt-transport-https ca-certif
 wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
 apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
 DEBIAN_FRONTEND=noninteractive apt-get install -yq cmake
+
+cd /usr/local
+wget https://github.com/WebAssembly/binaryen/releases/download/version_109/binaryen-version_109-x86_64-linux.tar.gz
+tar xf binaryen-version_109-x86_64-linux.tar.gz --strip-components=1
 ```
 
 ## Fedora 36
 
-Run these as root:
+Run this as root:
 
 ```sh
-dnf install cmake wget
+dnf -y install cmake wget binaryen
 ```

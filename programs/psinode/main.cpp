@@ -24,26 +24,6 @@
 using namespace psibase;
 using namespace psibase::net;
 
-std::vector<char> read_whole_file(const char* filename)
-{
-   FILE* f = fopen(filename, "r");
-   if (!f)
-      throw std::runtime_error("error reading file " + std::string(filename));
-   psio::finally fin{[&] { fclose(f); }};
-
-   if (fseek(f, 0, SEEK_END))
-      throw std::runtime_error("error reading file " + std::string(filename));
-   auto size = ftell(f);
-   if (size < 0)
-      throw std::runtime_error("error reading file " + std::string(filename));
-   if (fseek(f, 0, SEEK_SET))
-      throw std::runtime_error("error reading file " + std::string(filename));
-   std::vector<char> buf(size);
-   if (fread(buf.data(), size, 1, f) != 1)
-      throw std::runtime_error("error reading file " + std::string(filename));
-   return buf;
-}
-
 struct transaction_queue
 {
    struct entry
@@ -457,8 +437,8 @@ void run(const std::string&                db_path,
                push_boot(*bc, entry);
             else
                pushTransaction(*sharedState, revisionAtBlockStart, *bc, entry,
-                               std::chrono::microseconds(100'000),  // TODO
-                               std::chrono::microseconds(100'000),  // TODO
+                               std::chrono::microseconds(leeway_us),  // TODO
+                               std::chrono::microseconds(leeway_us),  // TODO
                                std::chrono::microseconds(leeway_us));
          }
 
@@ -504,7 +484,7 @@ int main(int argc, char* argv[])
    std::string              host       = {};
    unsigned short           port       = 8080;
    bool                     host_perf  = false;
-   uint32_t                 leeway_us  = 30000;  // TODO: find a good default
+   uint32_t                 leeway_us  = 200000;  // TODO: real value once resources are in place
    bool                     allow_slow = false;
    std::vector<std::string> peers;
 
@@ -521,7 +501,7 @@ int main(int argc, char* argv[])
    opt("port", po::value(&port), "http server port");
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
-       "Transaction leeway, in us. Defaults to 30000.");
+       "Transaction leeway, in us. Defaults to 200000.");
    opt("slow", po::bool_switch(&allow_slow),
        "Don't complain if unable to lock memory for database. This will still attempt to lock "
        "memory, but if it fails it will continue to run, but more slowly.");

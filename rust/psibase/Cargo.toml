@@ -11,6 +11,7 @@ clap = {version = "3.1", features = ["derive"]}
 custom_error = "1.9"
 fracpack = { version = "0.1.0", path = "../fracpack" }
 futures = "0.3"
+include_dir = "0.7"
 indicatif = "0.17"
 libpsibase = { version = "0.1.0", path = "../libpsibase" }
 mime_guess = "2.0"

@@ -10,7 +10,6 @@ on:
 
 env:
   UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:3382926c582eb5edebd4cf19b449cf46d32ab421"
-  LIBMDBX_MIRROR_PRIVATE_KEY: ${{ secrets.LIBMDBX_MIRROR_PRIVATE_KEY }}
 
 jobs:
   ubuntu-2004-build:
@@ -41,10 +40,6 @@ jobs:
           echo =====
           mkdir -p $HOME/.ssh
           chmod 700 $HOME/.ssh
-          echo "$LIBMDBX_MIRROR_PRIVATE_KEY" > $HOME/.ssh/libmdbx-mirror.key
-          chmod 600 $HOME/.ssh/libmdbx-mirror.key
-          git rm external/libmdbx
-          GIT_SSH_COMMAND="ssh -i $HOME/.ssh/libmdbx-mirror.key" git submodule add git@github.com:gofractally/libmdbx-mirror.git external/libmdbx/
           git submodule update --init --recursive
           echo =====
           export CCACHE_DIR=${GITHUB_WORKSPACE}/.caches/ccache
@@ -65,7 +60,7 @@ jobs:
           ${DOCKER} sccache -s
           echo =====
           mkdir build
-          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DBUILD_RUST=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
+          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
           echo =====
