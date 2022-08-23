@@ -43,7 +43,7 @@ class Contract {
 
   protected async applet(): Promise<string> {
     if (this.cachedApplet) return this.cachedApplet;
-    const appletName = await getJson('/common/thiscontract') as string;
+    const appletName = await getJson<string>('/common/thiscontract');
     this.cachedApplet = appletName;
     return appletName;
   }
