@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include <system_error>
 
 namespace psibase::test
 {

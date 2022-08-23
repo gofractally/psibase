@@ -144,6 +144,11 @@ namespace psibase
             }
          }
       }
+      auto get_prev_id(const id_type& id)
+      {
+         return Checksum256(*get(id)->block()->header()->previous());
+      }
+
       template <typename F>
       void async_switch_fork(F&& callback)
       {
@@ -232,10 +237,6 @@ namespace psibase
          systemContext->sharedDatabase.removeRevisions(*writer, byBlocknumIndex.find(num)->second);
       }
 
-      auto get_prev_id(const id_type& id)
-      {
-         return Checksum256(*get(id)->block()->header()->previous());
-      }
       template <typename T>
       T get_prev_id(const T& t)
       {

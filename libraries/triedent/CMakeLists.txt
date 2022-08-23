@@ -7,8 +7,13 @@ target_include_directories(triedent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include $
 target_link_libraries(triedent PUBLIC Threads::Threads)
 
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(X86_64)|(amd64)|(AMD64)")
+   if( NOT APPLE )
     target_compile_options(triedent PUBLIC -march=haswell -flto)
     target_link_options(triedent PUBLIC -march=haswell -flto)
+   else()
+    target_compile_options(triedent PUBLIC -flto)
+    target_link_options(triedent PUBLIC -flto)
+   endif()
 endif()
 
 add_executable(triedent-tests triedent-tests.cpp)

@@ -4,6 +4,7 @@ use crate::{
 };
 use anyhow::Context;
 use fracpack::Packable;
+use include_dir::{include_dir, Dir};
 use libpsibase::{
     account, method, AccountNumber, Action, Fracpack, PublicKey, SharedGenesisActionData,
     SharedGenesisContract, SignedTransaction,
@@ -15,13 +16,14 @@ use serde_json::Value;
 #[derive(Fracpack)]
 struct Empty {}
 
-const ACCOUNTS: [AccountNumber; 19] = [
+const ACCOUNTS: [AccountNumber; 20] = [
     account!("account-sys"),
     account!("alice"),
     account!("auth-ec-sys"),
     account!("auth-fake-sys"),
     account!("bob"),
     account!("common-sys"),
+    account!("doc-sys"),
     account!("explore-sys"),
     account!("nft-sys"),
     account!("proxy-sys"),
@@ -174,6 +176,27 @@ fn boot_trx() -> SignedTransaction {
     }
 }
 
+fn fill_dir(dir: &Dir, actions: &mut Vec<Action>) {
+    for e in dir.entries() {
+        match e {
+            include_dir::DirEntry::Dir(d) => fill_dir(d, actions),
+            include_dir::DirEntry::File(e) => {
+                let path = e.path().to_str().unwrap();
+                if let Some(t) = mime_guess::from_path(path).first() {
+                    // println!("{} {}", &("/".to_owned() + path), t.essence_str());
+                    actions.push(store_sys(
+                        account!("psispace-sys"),
+                        account!("doc-sys"),
+                        &("/".to_owned() + path),
+                        t.essence_str(),
+                        e.contents(),
+                    ));
+                }
+            }
+        }
+    }
+}
+
 fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     let mut init_actions = vec![
         Action {
@@ -221,7 +244,7 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     ];
 
     let mut common_sys_files = vec![
-        store!("common-sys", "/", html, "CommonSys/ui/index.html"),
+        store!("common-sys", "/index.html", html, "CommonSys/ui/index.html"),
         store!(
             "common-sys",
             "/ui/common.index.html",
@@ -250,7 +273,12 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     ];
 
     let mut account_sys_files = vec![
-        store!("r-account-sys", "/", html, "AccountSys/ui/index.html"),
+        store!(
+            "r-account-sys",
+            "/index.html",
+            html,
+            "AccountSys/ui/index.html"
+        ),
         store!(
             "r-account-sys",
             "/ui/index.js",
@@ -277,6 +305,14 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
         js,
         "TokenSys/ui/index.js"
     )];
+
+    let mut doc_actions = vec![
+        new_account_action(account!("account-sys"), account!("doc-sys")), //
+    ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
+        &mut doc_actions,
+    );
 
     // TODO: make this optional
     #[allow(clippy::inconsistent_digit_grouping)]
@@ -318,6 +354,7 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     actions.append(&mut auth_ec_sys_files);
     actions.append(&mut explore_sys_files);
     actions.append(&mut token_sys_files);
+    actions.append(&mut doc_actions);
     actions.append(&mut create_and_fund_example_users);
 
     if let Some(k) = key {
