@@ -287,23 +287,32 @@ namespace psibase::net
             connection.hello.xid  = {chain().get_block_id(request.xid.num()), request.xid.num()};
             connection.hello_sent = false;
          }
-         if (auto b = chain().get(request.xid.id()))
+         if (request.xid.id() == Checksum256{})
          {
-            // Ensure that the block number is accurate.  I have not worked out
-            // what happens if the peer lies, but at least this way we guarantee
-            // that our local invariants hold.
-            connection.last_received = {request.xid.id(),
-                                        BlockNum(b->block()->header()->blockNum())};
-         }
-         else if (auto* b = chain().get_state(request.xid.id()))
-         {
-            connection.last_received = {request.xid.id(), b->blockNum()};
+            // sync from genesis
+            connection.last_received = {Checksum256{}, 1};
+            connection.last_sent     = connection.last_received;
          }
          else
          {
-            return;
+            if (auto b = chain().get(request.xid.id()))
+            {
+               // Ensure that the block number is accurate.  I have not worked out
+               // what happens if the peer lies, but at least this way we guarantee
+               // that our local invariants hold.
+               connection.last_received = {request.xid.id(),
+                                           BlockNum(b->block()->header()->blockNum())};
+            }
+            else if (auto* b = chain().get_state(request.xid.id()))
+            {
+               connection.last_received = {request.xid.id(), b->blockNum()};
+            }
+            else
+            {
+               return;
+            }
+            connection.last_sent = chain().get_common_ancestor(connection.last_received);
          }
-         connection.last_sent = chain().get_common_ancestor(connection.last_received);
          // async_send_fork will reset syncing if there is nothing to sync
          connection.syncing = true;
          connection.ready   = true;
