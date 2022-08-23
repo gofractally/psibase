@@ -25,14 +25,14 @@ Set the `WASI_SDK_PREFIX` environment variable before building. Alternatively, u
 git submodule update --init --recursive
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RUST=yes ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache ..
 make -j $(nproc)
 ctest -j $(nproc)
 ```
 
 The built product lives in `build/psidk`.
 
-To speed up builds, use `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache`
+To build documentation, use `-DBUILD_DOC=yes`
 
 ### Ubuntu 22.04
 

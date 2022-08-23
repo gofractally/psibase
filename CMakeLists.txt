@@ -63,9 +63,9 @@ else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
 
-# TODO: switch default to on
-option(BUILD_RUST "Build rust" OFF)
-if(BUILD_RUST)
+option(BUILD_DOC "Build doc" OFF)
+if(BUILD_DOC)
+    set(DOC_DEP doc)
     ExternalProject_Add(
         gen-cpp-doc
         DEPENDS             wasm
@@ -74,11 +74,6 @@ if(BUILD_RUST)
         BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
         INSTALL_COMMAND     ""
     )
-endif()
-
-option(BUILD_DOC "Build doc" OFF)
-if(BUILD_DOC)
-    set(DOC_DEP doc)
     ExternalProject_Add(
         ${DOC_DEP}
         DEPENDS             gen-cpp-doc
@@ -89,6 +84,7 @@ if(BUILD_DOC)
     )
 endif()
 
+option(BUILD_RUST "Build rust" ON)
 if(BUILD_RUST)
     set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
     set(THIRD_SRC ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common/thirdParty/src)
