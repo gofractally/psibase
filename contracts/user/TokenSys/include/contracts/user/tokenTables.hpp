@@ -49,6 +49,7 @@ namespace UserContract
       Quantity           currentSupply;
       Quantity           maxSupply;
       SID                symbolId;
+      uint64_t           lastEvent;
 
       using Configurations =
           psibase::NamedBits<psibase::NamedBit{"unrecallable"}, psibase::NamedBit{"untradeable"}>;
@@ -74,7 +75,8 @@ namespace UserContract
                 precision,
                 currentSupply,
                 maxSupply,
-                symbolId);
+                symbolId,
+                lastEvent);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
    // Todo - add symbolId as secondary index when possible
 

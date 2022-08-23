@@ -90,11 +90,11 @@ namespace UserContract
          {
             void initialized() {}
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
-            void minted(TID tokenId, Account minter, Quantity amount, StringView memo) {}
-            void burned(TID tokenId, Account burner, Quantity amount) {}
+            void minted(TID tokenId, uint64_t prevEvent, Account minter, Quantity amount, StringView memo) {}
+            void burned(TID tokenId, uint64_t prevEvent, Account burner, Quantity amount) {}
             void userConfSet(Account account, psibase::NamedBit flag, bool enable) {}
-            void tokenConfSet(TID tokenId, Account setter, psibase::NamedBit flag, bool enable) {}
-            void symbolMapped(TID tokenId, Account account, SID symbolId) {}
+            void tokenConfSet(TID tokenId, uint64_t prevEvent, Account setter, psibase::NamedBit flag, bool enable) {}
+            void symbolMapped(TID tokenId, uint64_t prevEvent, Account account, SID symbolId) {}
             //};
 
             //struct Ui
@@ -117,7 +117,7 @@ namespace UserContract
       method(init),
       method(create, precision, maxSupply),
       method(mint, tokenId, amount, memo),
-      
+
       method(burn, tokenId, amount),
       method(setUserConf, flag, enable),
       method(setTokenConf, tokenId, flag, enable),
@@ -137,17 +137,17 @@ namespace UserContract
    PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
       method(initialized),
       method(created, tokenId, creator, precision, maxSupply),
-      method(minted, tokenId, minter, amount, memo),
-      method(burned, tokenId, burner, amount),
+      method(minted, prevEvent, tokenId, minter, amount, memo),
+      method(burned, prevEvent, tokenId, burner, amount),
       method(userConfSet, account, flag, enable),
-      method(tokenConfSet, tokenId, setter, flag, enable),
-      method(symbolMapped, tokenId, account, symbolId),
+      method(tokenConfSet, prevEvent, tokenId, setter, flag, enable),
+      method(symbolMapped, prevEvent, tokenId, account, symbolId),
    //);
-   //PSIBASE_REFLECT_UI_EVENTS(TokenSys, 
+   //PSIBASE_REFLECT_UI_EVENTS(TokenSys,
       method(credited, tokenId, sender, receiver, amount, memo),
       method(uncredited, tokenId, sender, receiver, amount, memo),
    //);
-   //PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys, 
+   //PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys,
       method(transferred, tokenId, sender, receiver, amount, memo),
       method(recalled, tokenId, from, amount, memo)
    );

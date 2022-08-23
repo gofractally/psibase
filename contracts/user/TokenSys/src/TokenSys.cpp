@@ -108,14 +108,15 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
       nftContract.credit(*nftId, creator, "Nft for new token ID: " + std::to_string(newId));
    }
 
+   auto lastEvent = emit().ui().created(newId, creator, precision, maxSupply);
+
    tokenTable.put(TokenRecord{
        .id        = newId,      //
        .ownerNft  = *nftId,     //
        .precision = precision,  //
-       .maxSupply = maxSupply   //
+       .maxSupply = maxSupply,  //
+       .lastEvent = lastEvent,  //
    });
-
-   emit().ui().created(newId, creator, precision, maxSupply);
 
    return newId;
 }
@@ -131,12 +132,12 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
    check(not sumExceeds(token.currentSupply.value, amount.value, token.maxSupply.value),
          maxSupplyExceeded);
 
+   token.lastEvent = emit().ui().minted(tokenId, token.lastEvent, sender, amount, memo);
+
    token.currentSupply += amount;
    balance.balance += amount.value;
    db.open<TokenTable>().put(token);
    db.open<BalanceTable>().put(balance);
-
-   emit().ui().minted(tokenId, sender, amount, memo);
 }
 
 void TokenSys::burn(TID tokenId, Quantity amount)
@@ -159,7 +160,9 @@ void TokenSys::burn(TID tokenId, Quantity amount)
       db.open<BalanceTable>().put(balance);
    }
 
-   emit().ui().burned(tokenId, sender, amount);
+   token.lastEvent = emit().ui().burned(tokenId, token.lastEvent, sender, amount);
+
+   db.open<TokenTable>().put(token);
 }
 
 void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
@@ -187,10 +190,10 @@ void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
    auto token     = getToken(tokenId);
    auto flagIndex = TokenRecord::Configurations::getIndex(flag);
 
+   token.lastEvent = emit().ui().tokenConfSet(tokenId, token.lastEvent, getSender(), flag, enable);
+
    token.config.set(flagIndex, enable);
    db.open<TokenTable>().put(token);
-
-   emit().ui().tokenConfSet(tokenId, getSender(), flag, enable);
 }
 
 void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
@@ -319,15 +322,15 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
    auto debitMemo = "Mapping symbol " + symbolId.str() + " to token " + std::to_string(tokenId);
    nftContract.debit(symbol.ownerNft, debitMemo);
 
+   // Emit mapped event
+   token.lastEvent = emit().ui().symbolMapped(tokenId, token.lastEvent, sender, symbolId);
+
    // Store mapping
    token.symbolId = symbolId;
    db.open<TokenTable>().put(token);
 
    // Destroy symbol owner NFT, it can never be used or traded again
    nftContract.burn(symbol.ownerNft);
-
-   // Emit mapped event
-   emit().ui().symbolMapped(tokenId, sender, symbolId);
 }
 
 TokenRecord TokenSys::getToken(TID tokenId)
