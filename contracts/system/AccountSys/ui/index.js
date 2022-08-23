@@ -1,6 +1,7 @@
 import htm from "https://unpkg.com/htm@3.1.0?module";
-import { getJson, initializeApplet, action, operation, setOperations, setQueries } from "/common/rpc.mjs";
+import { getJson, initializeApplet, action, operation, query, setOperations, setQueries, signTransaction } from "/common/rpc.mjs";
 import { genKeyPair, KeyType } from "/common/keyConversions.mjs";
+
 
 const html = htm.bind(React.createElement);
 
@@ -17,6 +18,14 @@ initializeApplet(async () => {
                 });
     
                 if (pubKey !== "") {
+                    operation(thisApplet, "", "setKey", { name, pubKey });
+                }
+            },
+        },
+        {
+            id: "setKey",
+            exec: ({ name, pubKey }) => {
+                if (pubKey !== "") {
                     action("auth-ec-sys", "setKey", { key: pubKey }, name);
                     action(thisApplet, "setAuthCntr", { authContract: "auth-ec-sys" }, name);
                 }
@@ -28,6 +37,23 @@ initializeApplet(async () => {
             id: "getLoggedInUser",
             exec: (params, reply) => {
                 reply("alice");
+            },
+        },
+        {
+            id: "getAuthedTransaction",
+            exec: ({transaction}, reply) => {
+                query(thisApplet, "", "getLoggedInUser", {}, async (user) => {
+                    let accounts = await getJson("/accounts");
+                    let u = accounts.find(a => a.accountNum === user);
+                    if (u.authContract === "auth-ec-sys")
+                    {
+                        // Todo: Should sign with the private key mapped to the logged-in 
+                        //        user stored in localstorage
+                        reply(await signTransaction('', transaction, ['PVT_K1_22vrGgActn3X4H1wwvy2KH4hxGke7cGy6ypy2njMjnyZBZyU7h']));
+                    }
+                    else
+                        reply(await signTransaction('', transaction));
+                });
             },
         },
     ]);
@@ -171,6 +197,16 @@ const useMsg = () => {
 const App = () => {
     const { msg, addMsg, clearMsg } = useMsg();
     console.log("msg:", msg);
+
+
+    // For this test, I'm hardcoding the keypair used by setauth
+    // Public: PUB_K1_53cz2oXcYTqy76vfCTsknKHS2NauiRyUwe8pAgDe2j9YHsmZqg
+    // Private: PVT_K1_22vrGgActn3X4H1wwvy2KH4hxGke7cGy6ypy2njMjnyZBZyU7h
+
+    let setAuth = () => {
+        operation(thisApplet, "", "setKey", { name: "alice", pubKey: "PUB_K1_53cz2oXcYTqy76vfCTsknKHS2NauiRyUwe8pAgDe2j9YHsmZqg" });
+    }
+
     return html`
         <div class="ui container">
             <h1>account_sys</h1>
@@ -180,6 +216,8 @@ const App = () => {
             <${KeyPair} />
             <h2>Create Account</h2>
             <${AccountForm} addMsg=${addMsg} clearMsg=${clearMsg} />
+            <h2>Set Alice Auth Cntr</h2>
+            <button onClick=${e => setAuth()}>Set Auth</button>
             <h2>Messages</h2>
             <pre style=${{ border: "1px solid" }}>
                 <code>${msg}</code>

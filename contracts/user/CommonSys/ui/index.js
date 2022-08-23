@@ -1,4 +1,4 @@
-import { siblingUrl, signAndPushTransaction, getTaposForHeadBlock,
+import { siblingUrl, packAndPushSignedTransaction, getTaposForHeadBlock,
     MessageTypes, verifyFields, storeCallback, executeCallback } from "/common/rpc.mjs";
 import htm from "/common/htm.module.js";
 await import("/common/react-router-dom.min.js");
@@ -378,14 +378,26 @@ function App() {
         );
     }, [runQuery]);
 
+    let withAuthedTransaction = useCallback((trans, callback)=>{
+        let senderApplet = {applet: "common-sys", subPath: ""};
+        runQuery(senderApplet, 
+            "account-sys", "", "getAuthedTransaction", {transaction: trans}, 
+            ({responseApplet, response})=>{
+                callback(response);
+            }
+        );
+    }, [runQuery]);
+
     let executeTransaction = useCallback(() => {
         withSender(async (sender)=>{
             try
             {
                 let trans = await constructTransaction(injectSender(transaction, sender));
                 let baseUrl = ''; // default
-                let trace = await signAndPushTransaction(baseUrl, trans);
-                console.log(trace);
+                withAuthedTransaction(trans, async (signedTransaction)=>{
+                    let trace = await packAndPushSignedTransaction(baseUrl, signedTransaction);
+                    console.log(trace);
+                });
             }
             catch (e)
             {
