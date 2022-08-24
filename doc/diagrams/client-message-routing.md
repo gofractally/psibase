@@ -1,11 +1,3 @@
-Whenever we call operation(), action(), or query() inside an applet, `Window.postMessage` is used to send a specific message to the common-sys window.
-
-According to the [Window.postMessage documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage):
-
-> After postMessage() is called, the MessageEvent will be dispatched only after all pending execution contexts have finished.
-
-Therefore postMessage in the below diagrams does not immediately post to the other window. Instead it schedules a payload to be dispatched after the completion of all remaining execution contexts.
-
 ```mermaid
 sequenceDiagram
 
@@ -21,13 +13,12 @@ participant chain
 
 activate applet_1
 applet_1->>applet_1_rpc: operation1
-note over applet_1_rpc: After-EC: postMessage(operation1)
+note over applet_1_rpc: postMessage(operation1)
 applet_1_rpc-->>applet_1: 
-Note over applet_1,applet_1_rpc: Waiting on IO<br>(Execution Contexts finished)
 
-break
+note over applet_1_rpc,applet_1: Waiting on IO<br>(Execution Contexts finished)
 applet_1_rpc->>core: operation1
-end
+
 deactivate applet_1
 
 
@@ -41,11 +32,9 @@ note over core: waits for applet_2 to load
 core->>core_rpc: operation1
 note over core_rpc: After-EC: postMessage(operation1)
 core_rpc-->>core: 
-note over core,core_rpc: Waiting on messages
 
-break
+note over core,core_rpc: Waiting on messages
 core_rpc->>applet_2_rpc: operation1
-end
 deactivate core
 
 
@@ -60,11 +49,9 @@ note over applet_2_rpc: In 100ms: After-EC: postMessage(operationEnded)
 applet_2->>applet_2_rpc: action1
 note over applet_2_rpc: After-EC: postMessage(action1)
 applet_2_rpc-->>applet_2: 
-note over applet_2_rpc,applet_2: Waiting on IO<br>(Execution Contexts finished)
 
-break
+note over applet_2_rpc,applet_2: Waiting on IO<br>(Execution Contexts finished)
 applet_2_rpc->>core: action1
-end
 
 
 note over applet_1,chain: 
@@ -80,11 +67,9 @@ note over applet_1,chain:
 
 note over applet_2_rpc: 100ms passed
 note over applet_2_rpc: After-EC: postMessage(operationEnded)
-note over applet_2_rpc,applet_2: Waiting on IO<br>(Execution Contexts finished)
 
-break
+note over applet_2_rpc,applet_2: Waiting on IO<br>(Execution Contexts finished)
 applet_2_rpc->>core: postMessage(operationEnded)
-end
 deactivate applet_2
 
 
@@ -127,11 +112,9 @@ activate applet_1
 applet_1->>applet_1_rpc: query1(callback)
 note over applet_1_rpc: After-EC: postMessage(query1)
 applet_1_rpc-->>applet_1: 
-Note over applet_1, applet_1_rpc: Waiting on IO<br>(Execution Contexts finished)
 
-break
+Note over applet_1, applet_1_rpc: Waiting on IO<br>(Execution Contexts finished)
 applet_1_rpc->>core: query1
-end
 deactivate applet_1
 
 
@@ -144,11 +127,9 @@ note over core: waits for applet_2 to load
 core->>core_rpc: query1
 note over core_rpc: After-EC: postMessage(query1)
 core_rpc-->>core: 
-note over core, core_rpc: Waiting on messages
 
-break
+note over core, core_rpc: Waiting on messages
 core_rpc->>applet_2_rpc: query1
-end
 deactivate core
 
 
@@ -159,11 +140,9 @@ activate applet_2
 applet_2_rpc->>applet_2: query1(params, callback)
 note over applet_2: calls callback(queryResult)
 note over applet_2_rpc: After-EC: postMessage(query1Result)
-note over applet_2_rpc,applet_2: Waiting for IO<br>(Execution Contexts finished)
 
-break
+note over applet_2_rpc,applet_2: Waiting for IO<br>(Execution Contexts finished)
 applet_2_rpc->>core: query1Result
-end
 deactivate applet_2
 
 
@@ -174,11 +153,9 @@ activate core
 core->>core_rpc: query1Result
 note over core_rpc: After-EC: postMessage(query1Result)
 core_rpc-->>core: 
-note over core, core_rpc: Waiting for messages<br>(Execution Contexts finished)
 
-break
+note over core, core_rpc: Waiting for messages<br>(Execution Contexts finished)
 core_rpc->>applet_1_rpc: query1Result
-end
 deactivate core
 
 
