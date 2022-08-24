@@ -21,10 +21,10 @@ let appletStyles = {
         margin: 0,
         padding: 0
     },
-    appletStyles[AppletStates.headless]: {
+    [AppletStates.headless]: {
         display: "none"
     },
-    appletStyles[AppletStates.modal]: {
+    [AppletStates.modal]: {
         padding: 0,
         position: "absolute",
         width: 400,
@@ -38,6 +38,16 @@ let appletStyles = {
 ("use strict");
 
 function Nav() {
+
+    const [commonSysUrl, setCommonSysUrl] = useState('');
+    const [tokenSysUrl, setTokenSysUrl] = useState('');
+    
+    useEffect(()=>{
+        (async () => {
+            setCommonSysUrl(await getSiblingUrl());
+            setTokenSysUrl(await getSiblingUrl(null, "", "applet/token-sys"));
+        })();
+    },[]);
 
     let activeIf = (cName) => {
         if (cName === "common-sys")
@@ -269,8 +279,6 @@ function App() {
     let {appletStr, subPath} = getAppletInURL();
     let [applets, setApplets] = useState([{appletStr, subPath, state: AppletStates.primary, onInit: ()=>{}}]);
 
-    const [commonSysUrl, setCommonSysUrl] = useState('');
-    const [tokenSysUrl, setTokenSysUrl] = useState('');
     const appletsRef = useRef();
     appletsRef.current = applets;
 
@@ -560,12 +568,6 @@ function App() {
 
     }, [messageRouting]);
 
-    useEffect(()=>{
-        (async () => {
-            setCommonSysUrl(await getSiblingUrl());
-            setTokenSysUrl(await getSiblingUrl(null, "", "applet/token-sys"));
-        })();
-    },[]);
     return html`
         <div class="ui container">
             <${Nav} />
