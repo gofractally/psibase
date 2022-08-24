@@ -269,6 +269,7 @@ function App() {
     let {appletStr, subPath} = getAppletInURL();
     let [applets, setApplets] = useState([{appletStr, subPath, state: AppletStates.primary, onInit: ()=>{}}]);
 
+    const setSiblingUrl = useState('');
     const appletsRef = useRef();
     appletsRef.current = applets;
 
@@ -559,6 +560,11 @@ function App() {
 
     }, [messageRouting]);
 
+    useEffect(()=>{
+        (async () => {
+            setSiblingUrl(await siblingUrl(null, appletStr, subPath));
+        })();
+    },[]);
     return html`
         <div class="ui container">
             <${Nav} />
