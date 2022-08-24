@@ -26,10 +26,10 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 - [psibase::getKey]
 - [psibase::getResult]
 - [psibase::getSequential]
+- [psibase::getSequentialRaw]
 - [psibase::kvGet]
 - [psibase::kvGetOrDefault]
 - [psibase::kvGetRaw]
-- [psibase::kvGetSequentialRaw]
 - [psibase::kvGetSize]
 - [psibase::kvGetSizeRaw]
 - [psibase::kvGreaterEqual]
@@ -40,10 +40,10 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 - [psibase::kvMaxRaw]
 - [psibase::kvPut]
 - [psibase::kvPutRaw]
-- [psibase::kvPutSequentialRaw]
 - [psibase::kvRemove]
 - [psibase::kvRemoveRaw]
 - [psibase::putSequential]
+- [psibase::putSequentialRaw]
 - [psibase::setRetval]
 - [psibase::setRetvalBytes]
 - [psibase::writeConsole]
@@ -56,10 +56,10 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 {{#cpp-doc ::psibase::getKey}}
 {{#cpp-doc ::psibase::getResult}}
 {{#cpp-doc ::psibase::getSequential}}
+{{#cpp-doc ::psibase::getSequentialRaw}}
 {{#cpp-doc ::psibase::kvGet}}
 {{#cpp-doc ::psibase::kvGetOrDefault}}
 {{#cpp-doc ::psibase::kvGetRaw}}
-{{#cpp-doc ::psibase::kvGetSequentialRaw}}
 {{#cpp-doc ::psibase::kvGetSize}}
 {{#cpp-doc ::psibase::kvGetSizeRaw}}
 {{#cpp-doc ::psibase::kvGreaterEqual}}
@@ -70,10 +70,10 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 {{#cpp-doc ::psibase::kvMaxRaw}}
 {{#cpp-doc ::psibase::kvPut}}
 {{#cpp-doc ::psibase::kvPutRaw}}
-{{#cpp-doc ::psibase::kvPutSequentialRaw}}
 {{#cpp-doc ::psibase::kvRemove}}
 {{#cpp-doc ::psibase::kvRemoveRaw}}
 {{#cpp-doc ::psibase::putSequential}}
+{{#cpp-doc ::psibase::putSequentialRaw}}
 {{#cpp-doc ::psibase::setRetval}}
 {{#cpp-doc ::psibase::setRetvalBytes}}
 {{#cpp-doc ::psibase::writeConsole}}
