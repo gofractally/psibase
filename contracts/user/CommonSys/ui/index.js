@@ -91,8 +91,9 @@ const constructTransaction = async (actions) => {
 };
 
 let getIframeId = (appletStr, subPath) => {
-    // TODO - To support multiple of the same type of applet being opened simultaneously, 
-    //     the IDs need to be unique.
+    // Do more than one iFrame of the same appletStr/subPath ever need to be opened simultaneously?
+    //    If so, this method needs to change to add a refCount to the ID or something, to ensure the IDs
+    //    are unique.
     return "applet_" + appletStr + "_" + subPath;
 };
 
@@ -133,7 +134,9 @@ function Applet(appletParams, handleMessage) {
         let iFrameId = getIframeId(appletStr, subPath);
         let iFrame = document.getElementById(iFrameId);
         if (iFrame)
-        {   // Todo - why isn't this running only after the render is complete?
+        {
+            // TODO - Fix error: Failed to execute 'postMessage' on 'DOMWindow'
+            //        https://github.com/gofractally/psibase/issues/107
             iFrameResize(
                 {
                     // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
