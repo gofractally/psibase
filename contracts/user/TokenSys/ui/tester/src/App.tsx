@@ -3,8 +3,9 @@ import reactLogo from './assets/react.svg'
 import './App.css'
 import wait from 'waait'
 
-import { initializeApplet, action, query, operation, siblingUrl, getJson, setOperations } from "common/rpc.mjs"
+import { initializeApplet, action, operation, siblingUrl, getJson, setOperations } from "common/rpc.mjs"
 import useEffectOnce from './hooks/useEffectOnce'
+import { fetchQuery } from './helpers'
 
 interface Uint64 {
   value: string;
@@ -70,6 +71,11 @@ class TokenContract extends Contract {
 
 }
 
+
+
+const getLoggedInUser = () => fetchQuery<string>("getLoggedInUser", "account-sys")
+
+
 const tokenContract = new TokenContract();
 
 
@@ -112,7 +118,7 @@ function App() {
       ]);
     });
 
-    query("account-sys", "", "getLoggedInUser", {}, (loggedInUser: any) => {
+    getLoggedInUser().then((loggedInUser) => {
       console.log('getLoggedInUser:', loggedInUser)
     });
     wait(1000).then(() => {
