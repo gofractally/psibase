@@ -1,4 +1,4 @@
-import { siblingUrl, packAndPushSignedTransaction, getTaposForHeadBlock,
+import { siblingUrl as getSiblingUrl, packAndPushSignedTransaction, getTaposForHeadBlock,
     MessageTypes, verifyFields, storeCallback, executeCallback } from "/common/rpc.mjs";
 import htm from "/common/htm.module.js";
 await import("/common/react-router-dom.min.js");
@@ -16,22 +16,23 @@ const AppletStates = {
     modal: 2,
 };
 
-let appletStyles = {};
-appletStyles[AppletStates.primary] = {
-    margin: 0,
-    padding: 0
-};
-appletStyles[AppletStates.headless] = {
-    display: "none"
-};
-appletStyles[AppletStates.modal] = {
-    padding: 0,
-    position: "absolute",
-    width: 400,
-    height: 266,
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
+let appletStyles = {
+    [AppletStates.primary]: {
+        margin: 0,
+        padding: 0
+    },
+    appletStyles[AppletStates.headless]: {
+        display: "none"
+    },
+    appletStyles[AppletStates.modal]: {
+        padding: 0,
+        position: "absolute",
+        width: 400,
+        height: 266,
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+    },
 };
 
 ("use strict");
@@ -51,10 +52,10 @@ function Nav() {
 
     return html`
         <div class="ui secondary menu" style=${{ paddingBottom: "10px" }}>
-            <a class="${activeIf("common-sys")} item" href=${siblingUrl()}> Home </a>
+            <a class="${activeIf("common-sys")} item" href=${commonSysUrl}> Home </a>
             <a
                 class="${activeIf("token-sys")} item"
-                href=${siblingUrl(null, "", "applet/token-sys")}
+                href=${tokenSysUrl}
             >
                 Wallet
             </a>
@@ -111,11 +112,10 @@ function Applet(appletParams, handleMessage) {
 
     useEffect(()=>{
         let doSetAppletSrc = async () => {
-            setAppletSrc(await siblingUrl(null, appletStr, subPath));
+            setAppletSrc(await getSiblingUrl(null, appletStr, subPath));
         };
         doSetAppletSrc();
     },[]);
-
     
     useEffect(()=>{ // Set document title
         if (appletStr && state === AppletStates.primary)
@@ -269,7 +269,8 @@ function App() {
     let {appletStr, subPath} = getAppletInURL();
     let [applets, setApplets] = useState([{appletStr, subPath, state: AppletStates.primary, onInit: ()=>{}}]);
 
-    const setSiblingUrl = useState('');
+    const [commonSysUrl, setCommonSysUrl] = useState('');
+    const [tokenSysUrl, setTokenSysUrl] = useState('');
     const appletsRef = useRef();
     appletsRef.current = applets;
 
@@ -305,7 +306,6 @@ function App() {
         return Applet({appletStr, subPath, state: AppletStates.primary}, handleMessage);
     }, []);
 
-    
     let sendMessage = useCallback((messageType, sender, receiver, payload, shouldOpenReceiver)=>{
         let {rApplet, rSubPath} = receiver;
 
@@ -320,7 +320,7 @@ function App() {
             // TODO: Could check that sender isn't on rApplet's blacklist before
             //       making the IPC call.
 
-            let restrictedTargetOrigin = await siblingUrl(null, rApplet, rSubPath);
+            let restrictedTargetOrigin = await getSiblingUrl(null, rApplet, rSubPath);
             iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
         }
 
@@ -562,7 +562,8 @@ function App() {
 
     useEffect(()=>{
         (async () => {
-            setSiblingUrl(await siblingUrl(null, appletStr, subPath));
+            setCommonSysUrl(await getSiblingUrl());
+            setTokenSysUrl(await getSiblingUrl(null, "", "applet/token-sys"));
         })();
     },[]);
     return html`

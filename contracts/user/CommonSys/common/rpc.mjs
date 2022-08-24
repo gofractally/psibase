@@ -11,17 +11,26 @@ export async function getRootDomain() {
         return rootDomain;
     }
 }
-
-export async function siblingUrl(baseUrl, contract, path) {
-
-    const rootDomain = await getRootDomain();
-
+function constructSiblingUrl(baseUrl, contract, path) {
     let loc;
     if (!baseUrl)
         loc = location;
     else
         loc = new URL(baseUrl);
     return loc.protocol + '//' + (contract ? contract + '.' : '') + rootDomain + ':' + loc.port + '/' + (path || '').replace(/^\/+/, '');
+}
+export function siblingUrlSync(baseUrl, contract, path) {
+    if (rootDomain) {
+        return constructSiblingUrl(baseUrl, contract, path);
+    } else {
+        return "";
+    }
+}
+export async function siblingUrl(baseUrl, contract, path) {
+
+    const rootDomain = await getRootDomain();
+    return constructSiblingUrl(baseUrl, contract, path);
+
 }
 export class RPCError extends Error {
     constructor(message, trace) {
