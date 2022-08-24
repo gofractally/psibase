@@ -1,6 +1,6 @@
 #include <contracts/system/AccountSys.hpp>
 
-#include <contracts/system/AuthFakeSys.hpp>
+#include <contracts/system/AuthAnySys.hpp>
 #include <contracts/system/TransactionSys.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
@@ -35,7 +35,7 @@ namespace system_contract
          }
          accountTable.put({
              .accountNum   = code.codeNum,
-             .authContract = AuthFakeSys::contract,
+             .authContract = AuthAnySys::contract,
          });
          ++totalAccounts;
       }

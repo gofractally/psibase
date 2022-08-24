@@ -130,7 +130,7 @@ function(add_libs suffix)
         ${psidk_DIR}/psibase/tester/include
         ${psidk_DIR}/contracts/system/AccountSys/include
         ${psidk_DIR}/contracts/system/AuthEcSys/include
-        ${psidk_DIR}/contracts/system/AuthFakeSys/include
+        ${psidk_DIR}/contracts/system/AuthAnySys/include
         ${psidk_DIR}/contracts/system/ProxySys/include
         ${psidk_DIR}/contracts/system/RAccountSys/include
         ${psidk_DIR}/contracts/system/RAuthEcSys/include

@@ -13,7 +13,7 @@ initializeApplet(async () => {
             exec: ({ name, pubKey }) => {
                 action(thisApplet, "newAccount", { 
                     name, 
-                    authContract: "auth-fake-sys", 
+                    authContract: "auth-any-sys", 
                     requireNew: true,
                 });
     

@@ -1,8 +1,8 @@
 #include <psibase/DefaultTestChain.hpp>
 
 #include <contracts/system/AccountSys.hpp>
+#include <contracts/system/AuthAnySys.hpp>
 #include <contracts/system/AuthEcSys.hpp>
-#include <contracts/system/AuthFakeSys.hpp>
 #include <contracts/system/CommonSys.hpp>
 #include <contracts/system/ProxySys.hpp>
 #include <contracts/system/PsiSpaceSys.hpp>
@@ -74,9 +74,9 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                              .code     = readWholeFile("ProxySys.wasm"),
                         },
                          {
-                             .contract = system_contract::AuthFakeSys::contract,
+                             .contract = system_contract::AuthAnySys::contract,
                              .flags    = 0,
-                             .code     = readWholeFile("AuthFakeSys.wasm"),
+                             .code     = readWholeFile("AuthAnySys.wasm"),
                         },
                          {
                              .contract = system_contract::AuthEcSys::contract,
@@ -139,7 +139,7 @@ void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
 
 AccountNumber DefaultTestChain::add_account(
     AccountNumber acc,
-    AccountNumber authContract /* = AccountNumber("auth-fake-sys") */,
+    AccountNumber authContract /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
 {
    transactor<system_contract::AccountSys> asys(system_contract::TransactionSys::contract,
@@ -155,7 +155,7 @@ AccountNumber DefaultTestChain::add_account(
 
 AccountNumber DefaultTestChain::add_account(
     const char*   acc,
-    AccountNumber authContract /* = AccountNumber("auth-fake-sys")*/,
+    AccountNumber authContract /* = AccountNumber("auth-any-sys")*/,
     bool          show /* = false */)
 {
    return add_account(AccountNumber(acc), authContract, show);
@@ -171,7 +171,7 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                                                  system_contract::AuthEcSys::contract);
 
    auto trace = pushTransaction(makeTransaction({
-       asys.newAccount(name, "auth-fake-sys", true),
+       asys.newAccount(name, system_contract::AuthAnySys::contract, true),
        ecsys.as(name).setKey(public_key),
        asys.as(name).setAuthCntr(system_contract::AuthEcSys::contract),
    }));
@@ -191,7 +191,7 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
                                              const char*   filename,
                                              bool          show /* = false */)
 {
-   add_account(acc, AccountNumber("auth-fake-sys"), show);
+   add_account(acc, system_contract::AuthAnySys::contract, show);
 
    transactor<system_contract::SetCodeSys> scsys{acc, system_contract::SetCodeSys::contract};
 

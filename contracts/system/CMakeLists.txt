@@ -10,7 +10,7 @@ function(add suffix)
     target_include_directories(contracts_system${suffix} INTERFACE
         AccountSys/include
         AuthEcSys/include
-        AuthFakeSys/include
+        AuthAnySys/include
         ProxySys/include
         SetCodeSys/include
         TransactionSys/include
@@ -24,7 +24,7 @@ add("-debug")
 if(DEFINED IS_WASM)
     add_subdirectory(AccountSys)
     add_subdirectory(AuthEcSys)
-    add_subdirectory(AuthFakeSys)
+    add_subdirectory(AuthAnySys)
     add_subdirectory(ProxySys)
     add_subdirectory(SetCodeSys)
     add_subdirectory(TransactionSys)
