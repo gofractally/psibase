@@ -13,6 +13,7 @@ const psibase = (appletContract: string) => {
         return {
           build: {
             assetsDir: "",
+            outDir: "../",
             cssCodeSplit: false,
             rollupOptions: {
               external: ['/common/rootdomain.mjs', '/common/rpc.mjs', '/common/iframeResizer.js'],
