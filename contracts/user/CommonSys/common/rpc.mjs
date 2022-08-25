@@ -631,7 +631,7 @@ export function action(application, actionName, params, sender = null)
  * @param {String} queryName - The name of the query being executed.
  * @param {Object} params - The object containing all parameters expected by the query handler.
  */
-export function query(applet, subPath, queryName, params)
+export function query(applet, subPath, queryName, params = {})
 {
     const queryPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
