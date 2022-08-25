@@ -2,7 +2,6 @@
 
 #include <psibase/Table.hpp>
 #include <psibase/contractEntry.hpp>
-#include <psibase/nativeFunctions.hpp>
 #include <psio/graphql.hpp>
 #include <psio/to_hex.hpp>
 
@@ -447,5 +446,249 @@ namespace psibase
           T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
       return makeConnection<Connection, T, K>;
    }  // gql_callable_fn
+
+   // These fields are in snake_case and have the event_ prefix
+   // to avoid conflict with event argument names, which
+   // should be in mixedCase to match common GraphQL convention.
+   struct EventDecoderStatus
+   {
+      uint32_t      event_db;
+      uint64_t      event_id;
+      bool          event_found;
+      AccountNumber event_contract;
+      bool          event_supported_contract;
+      MethodNumber  event_type;
+      bool          event_unpack_ok;
+   };
+   PSIO_REFLECT(EventDecoderStatus,
+                event_db,
+                event_id,
+                event_found,
+                event_contract,
+                event_supported_contract,
+                event_type,
+                event_unpack_ok)
+
+   template <typename Events>
+   struct EventDecoder
+   {
+      DbId          db;
+      uint64_t      eventId;
+      AccountNumber contract;
+   };
+
+   template <typename Events>
+   auto get_gql_name(EventDecoder<Events>*)
+   {
+      return get_type_name((Events*)nullptr);
+   }
+
+   template <typename Events, typename S>
+   void fill_gql_schema(EventDecoder<Events>*,
+                        S&                                          stream,
+                        std::set<std::pair<std::type_index, bool>>& defined_types,
+                        bool                                        is_input,
+                        bool                                        is_query_root = false)
+   {
+      psio::fill_gql_schema_as((EventDecoder<Events>*)nullptr, (EventDecoderStatus*)nullptr, stream,
+                               defined_types, is_input, is_query_root);
+   }
+
+   template <int i, typename T, typename F>
+   void get_event_field(const T&                     value,
+                        std::string_view             name,
+                        std::span<const char* const> field_names,
+                        F&&                          f)
+   {
+      if constexpr (i < std::tuple_size_v<T>)
+         if (i < field_names.size())
+         {
+            if (name == field_names[i])
+               f(std::get<i>(value));
+            else
+               get_event_field<i + 1>(value, name, field_names, std::move(f));
+         }
+   }
+
+   template <typename Events, typename T, typename F>
+   void get_event_field(const EventDecoder<Events>&  decoder,
+                        MethodNumber                 type,
+                        const T&                     value,
+                        std::string_view             name,
+                        std::span<const char* const> field_names,
+                        F&&                          f)
+   {
+      if (name == "event_db")
+         f((uint32_t)decoder.db);
+      else if (name == "event_id")
+         f(decoder.eventId);
+      else if (name == "event_found")
+         f(true);
+      else if (name == "event_contract")
+         f(decoder.contract);
+      else if (name == "event_supported_contract")
+         f(true);
+      else if (name == "event_type")
+         f(type);
+      else if (name == "event_unpack_ok")
+         f(true);
+      else
+         get_event_field<0>(value, name, field_names, f);
+   }
+
+   template <typename Events, typename T, typename OS, typename E>
+   auto gql_query_decoder_value(const EventDecoder<Events>&  decoder,
+                                MethodNumber                 type,
+                                const T&                     value,
+                                psio::gql_stream&            input_stream,
+                                OS&                          output_stream,
+                                const E&                     error,
+                                std::span<const char* const> field_names)
+   {
+      if (input_stream.current_puncuator != '{')
+         return error("expected {");
+      input_stream.skip();
+      bool first = true;
+      output_stream.write('{');
+      while (input_stream.current_type == psio::gql_stream::name)
+      {
+         bool found      = false;
+         bool ok         = true;
+         auto alias      = input_stream.current_value;
+         auto field_name = alias;
+         input_stream.skip();
+         if (input_stream.current_puncuator == ':')
+         {
+            input_stream.skip();
+            if (input_stream.current_type != psio::gql_stream::name)
+               return error("expected name after :");
+            field_name = input_stream.current_value;
+            input_stream.skip();
+         }
+
+         get_event_field(
+             decoder, type, value, field_name, field_names,
+             [&](const auto& field_value)
+             {
+                found = true;
+                if (first)
+                {
+                   increase_indent(output_stream);
+                   first = false;
+                }
+                else
+                {
+                   output_stream.write(',');
+                }
+                write_newline(output_stream);
+                to_json(alias, output_stream);
+                write_colon(output_stream);
+
+                // Allow fields to be treated normally or as scalars
+                if (input_stream.current_puncuator == '(' || input_stream.current_puncuator == '{')
+                   ok &= gql_query(field_value, input_stream, output_stream, error);
+                else
+                   to_json(field_value, output_stream);
+             });
+
+         if (!ok)
+            return false;
+         if (!found)
+         {
+            if (!gql_skip_args(input_stream, error))
+               return false;
+            if (!gql_skip_selection_set(input_stream, error))
+               return false;
+         }
+      }
+      if (input_stream.current_puncuator != '}')
+         return error("expected }");
+      input_stream.skip();
+      if (!first)
+      {
+         decrease_indent(output_stream);
+         write_newline(output_stream);
+      }
+      output_stream.write('}');
+      return true;
+   }  // gql_query_decoder_value
+
+   template <typename Events, typename OS, typename E>
+   auto gql_query(const EventDecoder<Events>& decoder,
+                  psio::gql_stream&           input_stream,
+                  OS&                         output_stream,
+                  const E&                    error,
+                  bool                        allow_unknown_members = false)
+   {
+      auto v = getSequentialRaw(decoder.db, decoder.eventId);
+
+      if (!v)
+         return gql_query(
+             EventDecoderStatus{
+                 .event_db                 = (uint32_t)decoder.db,
+                 .event_id                 = decoder.eventId,
+                 .event_found              = false,
+                 .event_contract           = {},
+                 .event_supported_contract = false,
+                 .event_type               = {},
+                 .event_unpack_ok          = false,
+             },
+             input_stream, output_stream, error, true);
+
+      psio::input_stream stream(v->data(), v->size());
+
+      AccountNumber contract;
+      fracunpack(contract, stream);
+      if (contract != decoder.contract)
+         return gql_query(
+             EventDecoderStatus{
+                 .event_db                 = (uint32_t)decoder.db,
+                 .event_id                 = decoder.eventId,
+                 .event_found              = true,
+                 .event_contract           = contract,
+                 .event_supported_contract = false,
+                 .event_type               = {},
+                 .event_unpack_ok          = false,
+             },
+             input_stream, output_stream, error, true);
+
+      MethodNumber type;
+      fracunpack(type, stream);
+
+      bool ok    = true;
+      bool found = false;
+      psio::reflect<Events>::get_by_name(
+          type.value,
+          [&](auto meta, auto member)
+          {
+             using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+             static_assert(MT::isFunction);
+             using TT = decltype(psio::tuple_remove_view(
+                 std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+             if (psio::fracvalidate<TT>(stream.pos, stream.end).valid)
+             {
+                found      = true;
+                auto value = psio::convert_from_frac<TT>(stream);
+                ok = gql_query_decoder_value(decoder, type, value, input_stream, output_stream,
+                                             error,
+                                             {meta.param_names.begin(), meta.param_names.end()});
+             }
+          });
+
+      if (!found)
+         return gql_query(
+             EventDecoderStatus{
+                 .event_db                 = (uint32_t)decoder.db,
+                 .event_id                 = decoder.eventId,
+                 .event_found              = true,
+                 .event_contract           = contract,
+                 .event_supported_contract = true,
+                 .event_type               = type,
+                 .event_unpack_ok          = false,
+             },
+             input_stream, output_stream, error, true);
+
+      return ok;
+   }  // gql_query(EventDecoder)
 
 }  // namespace psibase

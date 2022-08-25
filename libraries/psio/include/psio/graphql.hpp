@@ -50,7 +50,11 @@ namespace psio
    }
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members = false)
        -> std::enable_if_t<use_json_string_for_gql((T*)nullptr), bool>
    {
       to_json(value, output_stream);
@@ -83,13 +87,12 @@ namespace psio
       static constexpr bool value = sizeof(test<T>((const char**)nullptr)) == sizeof(char);
    };
 
-   template <typename Raw>
-   std::string generate_gql_whole_name(Raw*, bool is_input, bool is_optional = false);
+   template <typename T>
+   std::string generate_gql_whole_name(const T*, bool is_input, bool is_optional = false);
 
-   template <typename Raw>
-   std::string generate_gql_partial_name(Raw*, bool is_input)
+   template <typename T>
+   std::string generate_gql_partial_name(const T*, bool is_input)
    {
-      using T = remove_cvref_t<Raw>;
       if constexpr (std::is_same_v<T, bool>)
          return "Boolean";
       else if constexpr (std::is_integral_v<T>)
@@ -120,10 +123,9 @@ namespace psio
          return get_gql_name((T*)nullptr);
    }
 
-   template <typename Raw>
-   std::string generate_gql_whole_name(Raw*, bool is_input, bool is_optional)
+   template <typename T>
+   std::string generate_gql_whole_name(const T*, bool is_input, bool is_optional)
    {
-      using T = remove_cvref_t<Raw>;
       if constexpr (is_std_optional<T>())
          return generate_gql_whole_name((typename T::value_type*)nullptr, is_input, true);
       else if constexpr (std::is_pointer<T>())
@@ -136,9 +138,9 @@ namespace psio
       else if constexpr (is_shared_view_ptr<T>::value)
          return generate_gql_whole_name((typename T::value_type*)nullptr, is_input, false);
       else if (is_optional)
-         return generate_gql_partial_name((Raw*)nullptr, is_input);
+         return generate_gql_partial_name((T*)nullptr, is_input);
       else
-         return generate_gql_partial_name((Raw*)nullptr, is_input) + "!";
+         return generate_gql_partial_name((T*)nullptr, is_input) + "!";
    }
 
    template <typename MemPtr, typename S>
@@ -162,8 +164,8 @@ namespace psio
       }
    }
 
-   template <typename Raw, typename MemPtr, typename S>
-   void fill_gql_schema_fn(Raw*,
+   template <typename T, typename MemPtr, typename S>
+   void fill_gql_schema_fn(const T*,
                            MemPtr*,
                            const char*                  name,
                            std::span<const char* const> argNames,
@@ -209,14 +211,92 @@ namespace psio
       }
    }
 
-   template <typename Raw, typename S>
-   void fill_gql_schema(Raw*,
-                        S&                                          stream,
-                        std::set<std::pair<std::type_index, bool>>& defined_types,
-                        bool                                        is_input,
-                        bool                                        is_query_root = false)
+   template <typename T, typename S>
+   void fill_gql_schema_dependencies(const T*,
+                                     S&                                          stream,
+                                     std::set<std::pair<std::type_index, bool>>& defined_types,
+                                     bool                                        is_input)
    {
-      using T = std::remove_cvref_t<Raw>;
+      reflect<T>::for_each(
+          [&](const psio::meta& meta, auto member)
+          {
+             using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+             if constexpr (!MemPtr::isFunction)
+             {
+                fill_gql_schema((remove_cvref_t<typename MemPtr::ValueType>*)nullptr, stream,
+                                defined_types, is_input);
+             }
+          });
+      if (!is_input)
+         reflect<T>::for_each(
+             [&](const psio::meta& meta, auto member)
+             {
+                using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                if constexpr (MemPtr::isConstFunction)
+                   fill_gql_schema_fn_types((MemPtr*)nullptr, stream, defined_types);
+             });
+   }
+
+   template <typename T, typename S>
+   void fill_gql_schema_members(const T*, S& stream, bool is_input)
+   {
+      reflect<T>::for_each(
+          [&](const psio::meta& meta, auto member)
+          {
+             using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+             if constexpr (!MemPtr::isFunction)
+             {
+                write_str("    ", stream);
+                write_str(meta.name, stream);
+                write_str(": ", stream);
+                write_str(generate_gql_whole_name(
+                              (std::remove_cvref_t<typename MemPtr::ValueType>*)nullptr, is_input),
+                          stream);
+                write_str("\n", stream);
+             }
+          });
+      reflect<T>::for_each(
+          [&](const psio::meta& meta, auto member)
+          {
+             using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
+             if constexpr (MemPtr::isConstFunction)
+                fill_gql_schema_fn((const T*)nullptr, (MemPtr*)nullptr, meta.name, meta.param_names,
+                                   stream);
+          });
+   }
+
+   template <typename T, typename Source, typename S>
+   void fill_gql_schema_as(const T*,
+                           const Source*,
+                           S&                                          stream,
+                           std::set<std::pair<std::type_index, bool>>& defined_types,
+                           bool                                        is_input,
+                           bool                                        is_query_root)
+   {
+      if (defined_types.insert({typeid(T), is_input}).second)
+      {
+         fill_gql_schema_dependencies((Source*)nullptr, stream, defined_types, is_input);
+         if (is_input)
+            write_str("input ", stream);
+         else
+            write_str("type ", stream);
+         if (is_query_root)
+            write_str("Query", stream);
+         else
+            write_str(generate_gql_partial_name((const T*)nullptr, is_input), stream);
+         write_str(" {\n", stream);
+         fill_gql_schema_members((Source*)nullptr, stream, is_input);
+         write_str("}\n", stream);
+      }
+   }
+
+   template <typename T, typename S>
+   void fill_gql_schema_impl(const T*,
+                             S&                                          stream,
+                             std::set<std::pair<std::type_index, bool>>& defined_types,
+                             bool                                        is_input,
+                             bool                                        is_query_root)
+   {
       if constexpr (is_std_optional<T>())
          fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
       else if constexpr (std::is_pointer<T>())
@@ -231,70 +311,16 @@ namespace psio
       else if constexpr (is_shared_view_ptr<T>())
          fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
       else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
-      {
-         if (defined_types.insert({typeid(T), is_input}).second)
-         {
-            reflect<T>::for_each(
-                [&](const psio::meta& meta, auto member)
-                {
-                   using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
-                   if constexpr (!MemPtr::isFunction)
-                   {
-                      fill_gql_schema((remove_cvref_t<typename MemPtr::ValueType>*)nullptr, stream,
-                                      defined_types, is_input);
-                   }
-                });
-            if (!is_input)
-               reflect<T>::for_each(
-                   [&](const psio::meta& meta, auto member)
-                   {
-                      using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
-                      if constexpr (MemPtr::isConstFunction)
-                         fill_gql_schema_fn_types((MemPtr*)nullptr, stream, defined_types);
-                   });
-            if (is_input)
-               write_str("input ", stream);
-            else
-               write_str("type ", stream);
-            if (is_query_root)
-               write_str("Query", stream);
-            else
-               write_str(generate_gql_partial_name((Raw*)nullptr, is_input), stream);
-            write_str(" {\n", stream);
-            reflect<T>::for_each(
-                [&](const psio::meta& meta, auto member)
-                {
-                   using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
-                   if constexpr (!MemPtr::isFunction)
-                   {
-                      write_str("    ", stream);
-                      write_str(meta.name, stream);
-                      write_str(": ", stream);
-                      write_str(
-                          generate_gql_whole_name(
-                              (std::remove_cvref_t<typename MemPtr::ValueType>*)nullptr, is_input),
-                          stream);
-                      write_str("\n", stream);
-                   }
-                });
-            reflect<T>::for_each(
-                [&](const psio::meta& meta, auto member)
-                {
-                   using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
-                   if constexpr (MemPtr::isConstFunction)
-                      fill_gql_schema_fn((Raw*)nullptr, (MemPtr*)nullptr, meta.name,
-                                         meta.param_names, stream);
-                });
-            write_str("}\n", stream);
-         }
-      }
+         fill_gql_schema_as((T*)nullptr, (T*)nullptr, stream, defined_types, is_input,
+                            is_query_root);
+
    }  // fill_gql_schema
 
-   template <typename Raw, typename S>
-   void fill_gql_schema(Raw*, S& stream)
+   template <typename T, typename S>
+   void fill_gql_schema(const T*, S& stream)
    {
       std::set<std::pair<std::type_index, bool>> defined_types;
-      fill_gql_schema((Raw*)nullptr, stream, defined_types, false, true);
+      fill_gql_schema((T*)nullptr, stream, defined_types, false, true);
    }
 
    template <typename T>
@@ -307,6 +333,16 @@ namespace psio
       fill_gql_schema((T*)nullptr, fbs);
       check(fbs.pos == fbs.end, error_to_str(stream_error::underrun));
       return result;
+   }
+
+   template <typename T, typename S>
+   void fill_gql_schema(const T*,
+                        S&                                          stream,
+                        std::set<std::pair<std::type_index, bool>>& defined_types,
+                        bool                                        is_input,
+                        bool                                        is_query_root = false)
+   {
+      fill_gql_schema_impl((T*)nullptr, stream, defined_types, is_input, is_query_root);
    }
 
    struct gql_stream
@@ -678,40 +714,100 @@ namespace psio
             input_stream.skip();
             return true;
          }
+         else if (input_stream.current_puncuator == '(')
+         {
+            if (!gql_skip_args(input_stream, error))
+               return false;
+         }
          else
             input_stream.skip();
       }
-   }
+   }  // gql_skip_selection_set
+
+   template <typename E>
+   bool gql_skip_args(gql_stream& input_stream, const E& error)
+   {
+      if (input_stream.current_puncuator != '(')
+         return true;
+      input_stream.skip();
+      while (true)
+      {
+         if (input_stream.current_type == gql_stream::eof)
+            return error("expected )");
+         else if (input_stream.current_puncuator == '(')
+         {
+            if (!gql_skip_args(input_stream, error))
+               return false;
+         }
+         else if (input_stream.current_puncuator == ')')
+         {
+            input_stream.skip();
+            return true;
+         }
+         else if (input_stream.current_puncuator == '{')
+         {
+            if (!gql_skip_selection_set(input_stream, error))
+               return false;
+         }
+         else
+            input_stream.skip();
+      }
+   }  // gql_skip_args
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members = false)
        -> std::enable_if_t<std::is_arithmetic_v<T> || std::is_same_v<T, std::string>, bool>;
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members = false)
        -> std::enable_if_t<is_std_optional<T>() || std::is_pointer<T>() || is_std_unique_ptr<T>(),
                            bool>;
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members = false)
        -> std::enable_if_t<is_std_reference_wrapper_v<T>, bool>;
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members = false)
        -> std::enable_if_t<is_std_vector<T>::value && !use_json_string_for_gql((T*)nullptr), bool>;
 
    template <typename T, typename OS, typename E>
    auto gql_query(const shared_view_ptr<T>& value,
                   gql_stream&               input_stream,
                   OS&                       output_stream,
-                  const E&                  error);
-
-   template <typename Raw, typename OS, typename E>
-   auto gql_query(const Raw& value, gql_stream& input_stream, OS& output_stream, const E& error)
-       -> std::enable_if_t<reflect<Raw>::is_struct and not has_get_gql_name<Raw>::value, bool>;
+                  const E&                  error,
+                  bool                      allow_unknown_members = false);
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members = false)
+       -> std::enable_if_t<reflect<T>::is_struct and not has_get_gql_name<T>::value, bool>;
+
+   template <typename T, typename OS, typename E>
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members)
        -> std::enable_if_t<std::is_arithmetic_v<T> || std::is_same_v<T, std::string>, bool>
    {
       to_json(value, output_stream);
@@ -719,25 +815,37 @@ namespace psio
    }
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members)
        -> std::enable_if_t<is_std_optional<T>() || std::is_pointer<T>() || is_std_unique_ptr<T>(),
                            bool>
    {
       if (value)
-         return gql_query(*value, input_stream, output_stream, error);
+         return gql_query(*value, input_stream, output_stream, error, allow_unknown_members);
       write_str("null", output_stream);
       return gql_skip_selection_set(input_stream, error);
    }
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members)
        -> std::enable_if_t<is_std_reference_wrapper_v<T>, bool>
    {
-      return gql_query(value.get(), input_stream, output_stream, error);
+      return gql_query(value.get(), input_stream, output_stream, error, allow_unknown_members);
    }
 
    template <typename T, typename OS, typename E>
-   auto gql_query(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members)
        -> std::enable_if_t<is_std_vector<T>::value && !use_json_string_for_gql((T*)nullptr), bool>
    {
       output_stream.write('[');
@@ -751,7 +859,7 @@ namespace psio
          write_newline(output_stream);
          first     = false;
          auto copy = input_stream;
-         if (!gql_query(v, copy, output_stream, error))
+         if (!gql_query(v, copy, output_stream, error, allow_unknown_members))
             return false;
       }
       if (!gql_skip_selection_set(input_stream, error))
@@ -769,19 +877,21 @@ namespace psio
    auto gql_query(const shared_view_ptr<T>& value,
                   gql_stream&               input_stream,
                   OS&                       output_stream,
-                  const E&                  error)
+                  const E&                  error,
+                  bool                      allow_unknown_members)
    {
       // TODO: validate fracpack
-      return gql_query(value.unpack(), input_stream, output_stream, error);
+      return gql_query(value.unpack(), input_stream, output_stream, error, allow_unknown_members);
    }
 
-   template <typename Raw, typename MPtr, typename OS, typename E>
-   bool gql_query_fn(const Raw&                   value,
+   template <typename T, typename MPtr, typename OS, typename E>
+   bool gql_query_fn(const T&                     value,
                      std::span<const char* const> argNames,
                      MPtr                         mptr,
                      gql_stream&                  input_stream,
                      OS&                          output_stream,
-                     const E&                     error)
+                     const E&                     error,
+                     bool                         allow_unknown_members)
    {
       using args_tuple = TupleFromTypeList<typename MemberPtrType<MPtr>::SimplifiedArgTypes>;
       static constexpr int num_args = std::tuple_size_v<args_tuple>;
@@ -790,7 +900,7 @@ namespace psio
       {
          return gql_query_fn((value.*mptr)(), *gql_callable_args((ReturnType*)nullptr),
                              gql_callable_fn((ReturnType*)nullptr), input_stream, output_stream,
-                             error);
+                             error, allow_unknown_members);
       }
       else
       {
@@ -821,17 +931,20 @@ namespace psio
                                std::string(std::data(argNames)[i]) + "'");
          auto result = std::apply(
              [&](auto&&... args) { return std::invoke(mptr, value, std::move(args)...); }, args);
-         if (!gql_query(result, input_stream, output_stream, error))
+         if (!gql_query(result, input_stream, output_stream, error, allow_unknown_members))
             return false;
          return true;
       }
    }  // gql_query_fn
 
-   template <typename Raw, typename OS, typename E>
-   auto gql_query(const Raw& value, gql_stream& input_stream, OS& output_stream, const E& error)
-       -> std::enable_if_t<reflect<Raw>::is_struct and not has_get_gql_name<Raw>::value, bool>
+   template <typename T, typename OS, typename E>
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members)
+       -> std::enable_if_t<reflect<T>::is_struct and not has_get_gql_name<T>::value, bool>
    {
-      using T = remove_cvref_t<Raw>;
       if (input_stream.current_puncuator != '{')
          return error("expected {");
       input_stream.skip();
@@ -874,20 +987,28 @@ namespace psio
                 if constexpr (!MemPtr::isFunction)
                 {
                    found = true;
-                   ok &= gql_query(value.*member(&value), input_stream, output_stream, error);
+                   ok &= gql_query(value.*member(&value), input_stream, output_stream, error,
+                                   allow_unknown_members);
                 }
                 else if constexpr (MemPtr::isConstFunction)
                 {
                    found = true;
                    ok &= gql_query_fn(value, m.param_names, member(&value), input_stream,
-                                      output_stream, error);
+                                      output_stream, error, allow_unknown_members);
                 }
              });
 
          if (!ok)
             return false;
          if (!found)
-            return error((std::string)field_name + " not found");
+         {
+            if (!allow_unknown_members)
+               return error((std::string)field_name + " not found");
+            if (!gql_skip_args(input_stream, error))
+               return false;
+            if (!gql_skip_selection_set(input_stream, error))
+               return false;
+         }
       }
       if (input_stream.current_puncuator != '}')
          return error("expected }");
@@ -902,7 +1023,11 @@ namespace psio
    }
 
    template <typename T, typename OS, typename E>
-   bool gql_query_root(const T& value, gql_stream& input_stream, OS& output_stream, const E& error)
+   bool gql_query_root(const T&    value,
+                       gql_stream& input_stream,
+                       OS&         output_stream,
+                       const E&    error,
+                       bool        allow_unknown_members)
    {
       if (input_stream.current_type == gql_stream::name)
       {
@@ -925,7 +1050,7 @@ namespace psio
          else
             return error("expected query");
       }
-      if (!gql_query(value, input_stream, output_stream, error))
+      if (!gql_query(value, input_stream, output_stream, error, allow_unknown_members))
          return false;
       if (input_stream.current_type == gql_stream::eof)
          return true;
@@ -944,7 +1069,10 @@ namespace psio
    }
 
    template <typename Stream = string_stream, typename T>
-   std::string gql_query(const T& value, std::string_view query, std::string_view variables)
+   std::string gql_query(const T&         value,
+                         std::string_view query,
+                         std::string_view variables,
+                         bool             allow_unknown_members = false)
    {
       gql_stream  input_stream{query};
       std::string result;
@@ -961,12 +1089,14 @@ namespace psio
          ok    = false;
       }
       else
-         ok = gql_query_root(value, input_stream, output_stream,
-                             [&](const auto& e)
-                             {
-                                error = e;
-                                return false;
-                             });
+         ok = gql_query_root(
+             value, input_stream, output_stream,
+             [&](const auto& e)
+             {
+                error = e;
+                return false;
+             },
+             allow_unknown_members);
       if (!ok)
       {
          result.clear();
@@ -994,9 +1124,11 @@ namespace psio
    }
 
    template <typename T>
-   std::string format_gql_query(const T& value, std::string_view query)
+   std::string format_gql_query(const T&         value,
+                                std::string_view query,
+                                bool             allow_unknown_members = false)
    {
-      return gql_query<pretty_stream<string_stream>>(value, query);
+      return gql_query<pretty_stream<string_stream>>(value, query, allow_unknown_members);
    }
 
    template <typename T, typename E>
