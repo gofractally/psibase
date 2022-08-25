@@ -20,7 +20,7 @@ const ACCOUNTS: [AccountNumber; 20] = [
     account!("account-sys"),
     account!("alice"),
     account!("auth-ec-sys"),
-    account!("auth-fake-sys"),
+    account!("auth-any-sys"),
     account!("bob"),
     account!("common-sys"),
     account!("doc-sys"),
@@ -141,7 +141,7 @@ fn boot_trx() -> SignedTransaction {
     let contracts = vec![
         sgc!("account-sys", 0, "AccountSys.wasm"),
         sgc!("auth-ec-sys", 0, "AuthEcSys.wasm"),
-        sgc!("auth-fake-sys", 0, "AuthAnySys.wasm"),
+        sgc!("auth-any-sys", 0, "AuthAnySys.wasm"),
         sgc!("common-sys", 0, "CommonSys.wasm"),
         sgc!("explore-sys", 0, "ExploreSys.wasm"),
         sgc!("nft-sys", 0, "NftSys.wasm"),

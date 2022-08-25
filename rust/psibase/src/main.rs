@@ -187,7 +187,7 @@ pub struct NewAccountAction {
 fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
     let new_account_action = NewAccountAction {
         account,
-        auth_contract: account!("auth-fake-sys"),
+        auth_contract: account!("auth-any-sys"),
         require_new: false,
     };
     Action {
@@ -373,7 +373,7 @@ async fn modify(
     }
 
     if insecure {
-        actions.push(set_auth_contract_action(account, account!("auth-fake-sys")));
+        actions.push(set_auth_contract_action(account, account!("auth-any-sys")));
     }
 
     let trx = with_tapos(
