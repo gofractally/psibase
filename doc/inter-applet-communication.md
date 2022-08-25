@@ -32,7 +32,32 @@ In the above sample implementation of the symbol-sys:create operation, there is 
 
 Hopefully this starts to elucidate how the concept of client-side operations can be used to improve abstraction and composability in psibase applications & applets beyond what is possible in other blockchain development environments.
 
-## Security
+# Queries
+
+Queries allow applets to query each other for information on the client side. In order to return the result that the caller is looking for, it may be necessary for an applet to reference chain state or local (client-side) storage. The applet being queried always knows which applet was the sender of the request, and can therefore may want to prompt the user to explicitly allow the sharing of data if the data is potentially sensitive.
+
+## Example implementation
+
+The account-sys applet defines a mechanism to allow other applets to ask for the name of the currently logged-in user, using something similar to the following definition:
+
+```javascript
+// applet/account-sys/index.js
+
+initializeApplet(async () => {
+    setQueries([
+        {
+            id: "getLoggedInUser",
+            exec: ({sender}) => {
+                return users.find(u=>u.loggedIn === true);
+            },
+        }
+    ]);
+});
+```
+
+In the above example implementation, the sender is not checked, and therefore any applet would be permitted to know the name of the currently logged-in user.
+
+# Security
 
 An applet is served by its own application, and it is therefore capable of executing actions on its own application on behalf of the user without asking for explicit permission. It's functionally an extension of the application itself.
 
@@ -44,9 +69,12 @@ From the perspective of each applet, the origin of the window on whom postMessag
 
 In common-sys, each time an applet is opened in an iFrame, all incoming messages from it are restricted to the domain listed in the initial src property of the iFrame. Therefore, if the iFrame navigates away to a different origin, common-sys will reject all messages from it. Furthermore, all messages sent from core to a particular iFrame are explicitly restricted such that they will only be processed if the origin of the iFrame matches the origin when the iFrame was first opened. 
 
-## Execution
+# Error handling
+
+If an operation or a query throws an exception during execution, the exception will be routed back to the caller applet. 
+
+# Execution
 
 It is possible that the user may be using an applet to construct a transaction, rather than wanting to construct it and immediately push it to chain (for example if trying to propose a multisignature transaction).
 
-This means that an applet should not be written to expect a callback when an operation is executed. Instead, an applet should design their application to poll the blockchain for state updates, or subscribe and handle particular events.
-
+This means that an applet should not be written to expect a callback when an operation is executed. Instead, Psibase blockchains use an event-sourcing model, where an applet should subscribe to the on-chain events that it cares about, and it will be automatically notified when those events are emitted. 
