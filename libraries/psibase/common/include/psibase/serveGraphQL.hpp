@@ -495,8 +495,20 @@ namespace psibase
    }
 
    template <int i, typename T, typename F>
+   void get_event_all_content(const T& value, std::span<const char* const> field_names, F&& f)
+   {
+      if constexpr (i < std::tuple_size_v<T>)
+         if (i < field_names.size())
+         {
+            f(field_names[i], std::get<i>(value));
+            get_event_all_content<i + 1>(value, field_names, std::move(f));
+         }
+   }
+
+   template <int i, typename T, typename F>
    void get_event_field(const T&                     value,
                         std::string_view             name,
+                        std::string_view             alias,
                         std::span<const char* const> field_names,
                         F&&                          f)
    {
@@ -504,9 +516,9 @@ namespace psibase
          if (i < field_names.size())
          {
             if (name == field_names[i])
-               f(std::get<i>(value));
+               f(alias, std::get<i>(value));
             else
-               get_event_field<i + 1>(value, name, field_names, std::move(f));
+               get_event_field<i + 1>(value, name, alias, field_names, std::move(f));
          }
    }
 
@@ -515,25 +527,28 @@ namespace psibase
                         MethodNumber                 type,
                         const T&                     value,
                         std::string_view             name,
+                        std::string_view             alias,
                         std::span<const char* const> field_names,
                         F&&                          f)
    {
       if (name == "event_db")
-         f((uint32_t)decoder.db);
+         f(alias, (uint32_t)decoder.db);
       else if (name == "event_id")
-         f(decoder.eventId);
+         f(alias, decoder.eventId);
       else if (name == "event_found")
-         f(true);
+         f(alias, true);
       else if (name == "event_contract")
-         f(decoder.contract);
+         f(alias, decoder.contract);
       else if (name == "event_supported_contract")
-         f(true);
+         f(alias, true);
       else if (name == "event_type")
-         f(type);
+         f(alias, type);
       else if (name == "event_unpack_ok")
-         f(true);
+         f(alias, true);
+      else if (name == "event_all_content")
+         get_event_all_content<0>(value, field_names, f);
       else
-         get_event_field<0>(value, name, field_names, f);
+         get_event_field<0>(value, name, alias, field_names, f);
    }
 
    template <typename Events, typename T, typename OS, typename E>
@@ -567,8 +582,8 @@ namespace psibase
          }
 
          get_event_field(
-             decoder, type, value, field_name, field_names,
-             [&](const auto& field_value)
+             decoder, type, value, field_name, alias, field_names,
+             [&](auto alias, const auto& field_value)
              {
                 found = true;
                 if (first)
