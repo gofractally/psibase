@@ -35,25 +35,25 @@ initializeApplet(async () => {
     setQueries([
         {
             id: "getLoggedInUser",
-            exec: (params, reply) => {
-                reply("alice");
+            exec: (params) => {
+                // TODO - Get the actual logged in user
+                return "alice";
             },
         },
         {
             id: "getAuthedTransaction",
-            exec: ({transaction}, reply) => {
-                query(thisApplet, "", "getLoggedInUser", {}, async (user) => {
-                    let accounts = await getJson("/accounts");
-                    let u = accounts.find(a => a.accountNum === user);
-                    if (u.authContract === "auth-ec-sys")
-                    {
-                        // Todo: Should sign with the private key mapped to the logged-in 
-                        //        user stored in localstorage
-                        reply(await signTransaction('', transaction, ['PVT_K1_22vrGgActn3X4H1wwvy2KH4hxGke7cGy6ypy2njMjnyZBZyU7h']));
-                    }
-                    else
-                        reply(await signTransaction('', transaction));
-                });
+            exec: async ({transaction}) => {
+                let user = await query(thisApplet, "", "getLoggedInUser", {}); 
+                let accounts = await getJson("/accounts");
+                let u = accounts.find(a => a.accountNum === user);
+                if (u.authContract === "auth-ec-sys")
+                {
+                    // Todo: Should sign with the private key mapped to the logged-in 
+                    //        user stored in localstorage
+                    return await signTransaction('', transaction, ['PVT_K1_22vrGgActn3X4H1wwvy2KH4hxGke7cGy6ypy2njMjnyZBZyU7h']);
+                }
+                else
+                    return await signTransaction('', transaction);
             },
         },
     ]);

@@ -190,8 +190,9 @@ function App() {
 
   const [user, setUser] = useState("");
 
-  useEffect(()=>{
-      query("account-sys", "", "getLoggedInUser", {}, setUser);
+  useEffect(async ()=>{
+      let user = await query("account-sys", "", "getLoggedInUser", {}).catch(console.error);
+      setUser(user);
   }, []);
 
   return html`

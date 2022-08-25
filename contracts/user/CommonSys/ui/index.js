@@ -289,77 +289,78 @@ function App() {
         return index;
     }, []);
 
-    let open = useCallback(({appletStr, subPath, state}, callAfterOpen) => {
-        // Opens an applet if it's not already open
-        let index = getIndex(appletStr, subPath);
-        if (index === -1)
-        {
-            setApplets([...appletsRef.current, {appletStr, subPath, state, onInit: callAfterOpen}]);
-        }
-        else
-        {   // Applet is already open, invoke callback immediately
-            callAfterOpen();
-        }
-        
+    let open = useCallback(({appletStr, subPath, state}) => {
+        return new Promise((resolve, reject) => {
+            
+            // Opens an applet if it's not already open
+            let index = getIndex(appletStr, subPath);
+            if (index === -1)
+            {
+                setApplets([...appletsRef.current, {appletStr, subPath, state, onInit: resolve}]);
+            }
+            else
+            {   // Applet is already open, invoke callback immediately
+                resolve();
+            }
+        });
     }, [getIndex]);
 
     let urlApplet = useCallback(() => {
         return Applet({appletStr, subPath, state: AppletStates.primary}, handleMessage);
     }, []);
 
-    
-    let sendMessage = useCallback((messageType, sender, receiver, payload, shouldOpenReceiver)=>{
+    let sendMessage = useCallback(async (messageType, sender, receiver, payload, shouldOpenReceiver)=>{
         let {rApplet, rSubPath} = receiver;
 
-        let callOnApplet = async ()=>{
-            var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
-            if (iframe == null)
-            {
-                console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
-                return;
-            }
-
-            // TODO: Could check that sender isn't on rApplet's blacklist before
-            //       making the IPC call.
-
-            let restrictedTargetOrigin = await siblingUrl(null, rApplet, rSubPath);
-            iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
-        }
-
-        if (!shouldOpenReceiver)
+        if (!shouldOpenReceiver && getIndex(rApplet, rSubPath) === -1)
         {
-            if (getIndex(rApplet, rSubPath) === -1)
-            {
-                console.error("Cannot find applet target for sendMessage");
-                return;
-            }
-            callOnApplet();
+            console.error("Cannot find applet target for sendMessage");
+            return;
         }
-        else
-        {
-            open({appletStr: rApplet, 
-                subPath: rSubPath, 
-                state: AppletStates.headless
-            }, callOnApplet);
-        }
-    }, [open, getIndex]);
 
-    let runQuery = useCallback((senderApplet, qApplet, qSubPath, qName, params, callback)=>{
-        let coreCallbackId = storeCallback(({responseApplet, response})=>{
-            if (responseApplet.applet !== qApplet || responseApplet.subPath !== qSubPath)
-            {
-                return;
-            }
-            callback({responseApplet, response});
+        await open({appletStr: rApplet, 
+            subPath: rSubPath, 
+            state: AppletStates.headless
         });
 
-        sendMessage(MessageTypes.Query, 
-            senderApplet,
-            {rApplet: qApplet, rSubPath: qSubPath}, 
-            {identifier: qName, params, callbackId: coreCallbackId}, 
-            true
-        );
+        var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
+        if (iframe == null)
+        {
+            console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
+            return;
+        }
+
+        // TODO: Could check that sender isn't on a blacklist before
+        //       making the IPC call.
+
+        let restrictedTargetOrigin = await siblingUrl(null, rApplet, rSubPath);
+        iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
+
+    }, [open, getIndex]);
+
+    let runQuery = useCallback((senderApplet, qApplet, qSubPath, qName, params)=>{
+        return new Promise((resolve, reject) => {
+            let coreCallbackId = storeCallback(({responseApplet, response, errors})=>{
+                if (responseApplet.applet !== qApplet || responseApplet.subPath !== qSubPath)
+                {
+                    return;
+                }
+                resolve({responseApplet, response, errors});
+            });
+    
+            sendMessage(MessageTypes.Query, 
+                senderApplet,
+                {rApplet: qApplet, rSubPath: qSubPath}, 
+                {identifier: qName, params, callbackId: coreCallbackId}, 
+                true
+            );
+        });
     }, [sendMessage]);
+
+    let coreQuery = useCallback(async (qApplet, qSubPath, qName, params) => {
+        let senderApplet = {applet: "common-sys", subPath: ""};
+        return await runQuery(senderApplet, qApplet, qSubPath, qName, params);
+    }, [runQuery]);
 
     let injectSender = useCallback((actions, sender) => {
         actions.forEach(action => {
@@ -371,44 +372,23 @@ function App() {
         return actions;
     }, []);
 
-    let withSender = useCallback((callback)=>{
-        let senderApplet = {applet: "common-sys", subPath: ""};
-        runQuery(senderApplet, 
-            "account-sys", "", "getLoggedInUser", {}, 
-            ({responseApplet, response})=>{
-                callback(response);
-            }
-        );
-    }, [runQuery]);
-
-    let withAuthedTransaction = useCallback((trans, callback)=>{
-        let senderApplet = {applet: "common-sys", subPath: ""};
-        runQuery(senderApplet, 
-            "account-sys", "", "getAuthedTransaction", {transaction: trans}, 
-            ({responseApplet, response})=>{
-                callback(response);
-            }
-        );
-    }, [runQuery]);
-
-    let executeTransaction = useCallback(() => {
-        withSender(async (sender)=>{
-            try
-            {
-                let trans = await constructTransaction(injectSender(transaction, sender));
-                let baseUrl = ''; // default
-                withAuthedTransaction(trans, async (signedTransaction)=>{
-                    let trace = await packAndPushSignedTransaction(baseUrl, signedTransaction);
-                    console.log(trace);
-                });
-            }
-            catch (e)
-            {
-                console.error(e);
-            }
-            transaction = [];
-        });
-    }, [withSender]);
+    let executeTransaction = useCallback(async () => {
+        try
+        {
+            let {response: sender} = await coreQuery("account-sys", "", "getLoggedInUser", {});
+            let trans = await constructTransaction(injectSender(transaction, sender));
+            let {response: signedTransaction,} = 
+                await coreQuery("account-sys", "", "getAuthedTransaction", {transaction: trans});
+            let baseUrl = ''; // default
+            let trace = await packAndPushSignedTransaction(baseUrl, signedTransaction);
+            console.log(trace);
+        }
+        catch (e)
+        {
+            console.error(e);
+        }
+        transaction = [];
+    }, [coreQuery, injectSender]);
 
     let messageRouting = useMemo(() => [
         {
@@ -505,32 +485,30 @@ function App() {
             validate: (payload) => {
                 return verifyFields(payload, ["callbackId", "qApplet", "qSubPath", "qName", "qParams"]);
             },
-            handle: (senderApplet, payload) => {
+            handle: async (senderApplet, payload) => {
                 let {callbackId, qApplet, qSubPath, qName, qParams} = payload;
 
-                let queryCallback = ({responseApplet, response})=>{
-                    let {applet : rApplet, subPath : rSubPath} = senderApplet;
-                    let {applet : sApplet, subPath : sSubPath} = responseApplet;
-                    sendMessage(MessageTypes.QueryResponse, 
-                        {sApplet, sSubPath},
-                        {rApplet, rSubPath},
-                        {callbackId, response},
-                        false
-                    );
-                };
-
-                runQuery(senderApplet, qApplet, qSubPath, qName, qParams, queryCallback);
+                let res = await runQuery(senderApplet, qApplet, qSubPath, qName, qParams);
+                let {responseApplet, response, errors} = res;
+                let {applet : rApplet, subPath : rSubPath} = senderApplet;
+                let {applet : sApplet, subPath : sSubPath} = responseApplet;
+                sendMessage(MessageTypes.QueryResponse, 
+                    {sApplet, sSubPath},
+                    {rApplet, rSubPath},
+                    {callbackId, response, errors},
+                    false
+                );
             },
         },
         {
             type: MessageTypes.QueryResponse,
             validate: (payload) => {
-                return verifyFields(payload, ["callbackId", "response"]);
+                return verifyFields(payload, ["callbackId", "response", "errors"]);
             },
             handle: (senderApplet, payload) =>
             {
-                let {callbackId, response} = payload;
-                executeCallback(callbackId, {responseApplet: senderApplet, response});
+                let {callbackId, response, errors} = payload;
+                executeCallback(callbackId, {responseApplet: senderApplet, response, errors});
             },
         },
 

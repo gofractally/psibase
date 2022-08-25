@@ -249,6 +249,14 @@ export function storeCallback(callback)
     return callbackId;
 }
 
+var promises = [];
+export function storePromise(resolve, reject)
+{
+    let callbackId = promises.length;
+    promises.push({callbackId, resolve, reject});
+    return callbackId;
+}
+
 export function executeCallback(callbackId, response)
 {
     let idx = -1;
@@ -275,6 +283,33 @@ export function executeCallback(callbackId, response)
     }
     // Remove the callback now that it's been handled
     queryCallbacks.splice(idx, 1);
+    return true;
+}
+
+export function executePromise(callbackId, response, errors)
+{
+    let idx = -1;
+    let found = promises.some((q, i) => {
+        if (q.callbackId === callbackId)
+        {
+            idx = i;
+            return true;
+        }
+        return false;
+    });
+    if (!found)
+    {
+        console.error("Promise with ID " + callbackId + " not found.");
+        return false;
+    }
+
+    if (errors.length > 0)
+        promises[idx].reject(errors);
+    else
+        promises[idx].resolve(response);
+    
+    // Remove the promise now that it's been handled
+    promises.splice(idx, 1);
     return true;
 }
 
@@ -388,13 +423,22 @@ let messageRouting = [
                 if (qu !== undefined)
                 {
                     try {
-                        let reply = (val) => {
-                            sendToParent({
-                                type: MessageTypes.QueryResponse,
-                                payload: { callbackId, response: val },
-                            });
-                        };
-                        qu.exec(params, reply);
+                        let reply = null;
+                        let errors = [];
+                        try
+                        {
+                            reply = await qu.exec(params, reply);
+                        } 
+                        catch (e)
+                        {
+                            errors.push(e);
+                        }
+
+                        sendToParent({
+                            type: MessageTypes.QueryResponse,
+                            payload: { callbackId, response: reply, errors },
+                        });
+                        
                     }
                     catch (e)
                     {
@@ -417,11 +461,11 @@ let messageRouting = [
     {
         type: MessageTypes.QueryResponse,
         validate: (payload) => {
-            return verifyFields(payload, ["callbackId", "response"]);
+            return verifyFields(payload, ["callbackId", "response", "errors"]);
         },
         route: (payload) => {
-            let {callbackId, response} = payload;
-            return executeCallback(callbackId, response);
+            let {callbackId, response, errors} = payload;
+            return executePromise(callbackId, response, errors);
         },
     }
 ];
@@ -579,22 +623,27 @@ export function action(application, actionName, params, sender = null)
 
 
 /**
- * Description: Calls the specified query on another applet. The callback will be executed with the return value.
+ * Description: Calls the specified query on another applet. 
+ * Returns a promise that resolves with the result of the query.
  * 
  * @param {String} applet - The name of the applet being queried.
  * @param {String} subPath - The page of the applet that handles the specified query.
  * @param {String} queryName - The name of the query being executed.
  * @param {Object} params - The object containing all parameters expected by the query handler.
- * @param {Function} callback - The function called with the return value.
  */
-export function query(applet, subPath, queryName, params, callback)
+export function query(applet, subPath, queryName, params)
 {
-    // Will leave memory hanging if we don't get a response as expected
-    let callbackId = storeCallback(callback);
+    const queryPromise = new Promise((resolve, reject) => {
+        // Will leave memory hanging if we don't get a response as expected
+        let callbackId = storePromise(resolve, reject);
 
-    sendToParent({
-        type: MessageTypes.Query,
-        payload: { callbackId, qApplet: applet, qSubPath: subPath, qName: queryName, qParams: params },
+        sendToParent({
+            type: MessageTypes.Query,
+            payload: { callbackId, qApplet: applet, qSubPath: subPath, qName: queryName, qParams: params },
+        });
+
     });
+
+    return queryPromise;
 }
 
