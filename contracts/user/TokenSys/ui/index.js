@@ -190,12 +190,9 @@ function App() {
 
   const [user, setUser] = useState("");
 
-  useEffect(()=>{
-    // Todo - Timeout is used because sometimes the window.parentIFrame isn't loaded yet when 
-    //  this runs. Should use a better fix for the race condition than a delay.
-    setTimeout(()=>{ 
-      query("account-sys", "", "getLoggedInUser", {}, setUser);
-    }, 50);
+  useEffect(async ()=>{
+      let user = await query("account-sys", "", "getLoggedInUser").catch(console.error);
+      setUser(user);
   }, []);
 
   return html`

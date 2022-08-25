@@ -4,9 +4,9 @@
 
 namespace system_contract
 {
-   struct AuthFakeSys : psibase::Contract<AuthFakeSys>
+   struct AuthAnySys : psibase::Contract<AuthAnySys>
    {
-      static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-fake-sys");
+      static constexpr psibase::AccountNumber contract = psibase::AccountNumber("auth-any-sys");
 
       void checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
@@ -14,5 +14,5 @@ namespace system_contract
                         std::vector<ContractMethod> allowedActions,
                         std::vector<psibase::Claim> claims);
    };
-   PSIO_REFLECT(AuthFakeSys, method(checkAuthSys, flags, requester, action, allowedActions, claims))
+   PSIO_REFLECT(AuthAnySys, method(checkAuthSys, flags, requester, action, allowedActions, claims))
 }  // namespace system_contract

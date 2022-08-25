@@ -1,5 +1,5 @@
 #include <contracts/system/AccountSys.hpp>
-#include <contracts/system/AuthFakeSys.hpp>
+#include <contracts/system/AuthAnySys.hpp>
 #include <contracts/system/TransactionSys.hpp>
 #include <psibase/dispatch.hpp>
 

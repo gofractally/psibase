@@ -35,11 +35,11 @@ namespace psibase
                                    bool             show = false);
 
       AccountNumber add_account(const char*   acc,
-                                AccountNumber authContract = AccountNumber("auth-fake-sys"),
+                                AccountNumber authContract = AccountNumber("auth-any-sys"),
                                 bool          show         = false);
 
       AccountNumber add_account(AccountNumber acc,
-                                AccountNumber authContract = AccountNumber("auth-fake-sys"),
+                                AccountNumber authContract = AccountNumber("auth-any-sys"),
                                 bool          show         = false);
       void          registerSysRpc();
    };

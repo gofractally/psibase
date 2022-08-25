@@ -128,7 +128,7 @@ function(add suffix)
             tester/include
             ../../contracts/system/AccountSys/include
             ../../contracts/system/AuthEcSys/include
-            ../../contracts/system/AuthFakeSys/include
+            ../../contracts/system/AuthAnySys/include
             ../../contracts/system/ProxySys/include
             ../../contracts/system/SetCodeSys/include
             ../../contracts/system/TransactionSys/include

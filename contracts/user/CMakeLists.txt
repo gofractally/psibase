@@ -10,7 +10,7 @@ function(add_user_contract suffix name)
         ../TokenSys/include
         ../../system/AccountSys/include
         ../../system/AuthEcSys/include
-        ../../system/AuthFakeSys/include
+        ../../system/AuthAnySys/include
         ../../system/SetCodeSys/include
         ../../system/TransactionSys/include
         ../../system/VerifyEcSys/include
@@ -32,7 +32,7 @@ function(add_user_test suffix name)
       ../../TokenSys/include
       ../../../system/AccountSys/include
       ../../../system/AuthEcSys/include
-      ../../../system/AuthFakeSys/include
+      ../../../system/AuthAnySys/include
       ../../../system/SetCodeSys/include
       ../../../system/TransactionSys/include
       ../../../system/VerifyEcSys/include
