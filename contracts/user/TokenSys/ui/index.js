@@ -15,7 +15,7 @@ initializeApplet(async () => {
         exec: async ({symbol, receiver, amount, memo}) => {
   
           //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
-          let tokens = await getJson(await siblingUrl(null, thisApplet, "getTokenTypes"));
+          let tokens = await getJson(await siblingUrl(null, thisApplet, "api/getTokenTypes"));
           let token = tokens.find(t=>t.symbolId === symbol.toLowerCase());
           if (!token)
           {
@@ -66,7 +66,7 @@ function BalanceTable({loggedInUser}) {
   const getBalances = useCallback(async () => {
     if (user)
     {
-      let res = await getJson(await siblingUrl(null, thisApplet, "balances/" + user));
+      let res = await getJson(await siblingUrl(null, thisApplet, "api/balances/" + user));
       setBalances(res);
     }
   }, [user]);

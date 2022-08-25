@@ -224,7 +224,7 @@ namespace psibase
    /// Add a sequentially-numbered record
    ///
    /// Returns the id.
-   inline uint64_t kvPutSequentialRaw(DbId db, psio::input_stream value)
+   inline uint64_t putSequentialRaw(DbId db, psio::input_stream value)
    {
       return raw::putSequential(db, value.pos, value.remaining());
    }
@@ -241,7 +241,7 @@ namespace psibase
       psio::fracpack(contract, stream);
       psio::fracpack(type, stream);
       psio::fracpack(value, stream);
-      return kvPutSequentialRaw(db, packed);
+      return putSequentialRaw(db, packed);
    }
 
    /// Remove a key-value pair if it exists
@@ -332,7 +332,7 @@ namespace psibase
    }
 
    /// Get a sequentially-numbered record, if available
-   inline std::optional<std::vector<char>> kvGetSequentialRaw(DbId db, uint64_t id)
+   inline std::optional<std::vector<char>> getSequentialRaw(DbId db, uint64_t id)
    {
       auto size = raw::getSequential(db, id);
       if (size == -1)
@@ -359,7 +359,7 @@ namespace psibase
                                          Type*                type          = nullptr)
    {
       std::optional<V> result;
-      auto             v = kvGetSequentialRaw(db, id);
+      auto             v = getSequentialRaw(db, id);
       if (!v)
          return result;
       psio::input_stream stream(v->data(), v->size());

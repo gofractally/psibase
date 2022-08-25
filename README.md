@@ -25,7 +25,7 @@ Set the `WASI_SDK_PREFIX` environment variable before building. Alternatively, u
 git submodule update --init --recursive
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache ..
+cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DOC=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache ..
 make -j $(nproc)
 ctest -j $(nproc)
 ```
