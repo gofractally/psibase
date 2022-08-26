@@ -549,7 +549,23 @@ namespace psio
       return error("expected String");
    }
 
-   // TODO: schema support for these types as inputs
+   template <typename T, typename E>
+   auto gql_parse_arg(std::vector<T>& arg, gql_stream& input_stream, const E& error)
+   {
+      if (input_stream.current_puncuator != '[')
+         return error("expected [");
+      input_stream.skip();
+      while (input_stream.current_puncuator != ']')
+      {
+         T v;
+         if (!gql_parse_arg(v, input_stream, error))
+            return false;
+         arg.push_back(std::move(v));
+      }
+      input_stream.skip();
+      return true;
+   }
+
    template <typename T, typename E>
    auto gql_parse_arg(T& arg, gql_stream& input_stream, const E& error)
        -> std::enable_if_t<reflect<T>::is_struct && !use_json_string_for_gql((T*)nullptr), bool>

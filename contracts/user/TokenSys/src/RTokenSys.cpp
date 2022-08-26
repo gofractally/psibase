@@ -1,3 +1,5 @@
+#include <psibase/serveGraphQL.hpp>
+
 #include <contracts/system/CommonSys.hpp>
 #include <contracts/user/RTokenSys.hpp>
 #include <contracts/user/SymbolSys.hpp>
@@ -26,15 +28,16 @@ namespace
 
 }
 
-// TODO: Replace queries with gql when it supports more than simple keys
-// struct TokenQuery
-// {
-//    auto balances() const
-//    {  //
-//       return TableIndex<BalanceRecord, decltype(BalanceRecord::key)>{DbId::contract, {}, false};
-//    }
-// };
-// PSIO_REFLECT(TokenQuery, method(balances))
+struct TokenQuery
+{
+   auto balances() const
+   {
+      return TokenSys::Tables{TokenSys::contract}.open<BalanceTable>().getIndex<0>();
+   }
+
+   auto events() const { return EventQuery<TokenSys::Events>{TokenSys::contract}; }
+};
+PSIO_REFLECT(TokenQuery, method(balances), method(events))
 
 optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {
@@ -50,8 +53,9 @@ optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
    if (auto result = _serveRestEndpoints(request))
       return result;
 
-   // if (auto result = serveGraphQL(request, TokenQuery{}))
-   //    return result;
+   if (auto result = serveGraphQL(request, TokenQuery{}))
+      return result;
+
    return nullopt;
 }
 

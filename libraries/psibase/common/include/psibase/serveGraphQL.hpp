@@ -706,4 +706,94 @@ namespace psibase
       return ok;
    }  // gql_query(EventDecoder)
 
+   template <typename Events>
+   struct EventQuery
+   {
+      AccountNumber contract;
+
+      auto history(const std::vector<uint64_t>& ids) const
+      {
+         std::vector<EventDecoder<typename Events::History>> result;
+         result.reserve(ids.size());
+         for (auto id : ids)
+            result.push_back({DbId::historyEvent, id, contract});
+         return result;
+      }
+
+      auto ui(const std::vector<uint64_t>& ids) const
+      {
+         std::vector<EventDecoder<typename Events::Ui>> result;
+         result.reserve(ids.size());
+         for (auto id : ids)
+            result.push_back({DbId::uiEvent, id, contract});
+         return result;
+      }
+
+      auto merkle(const std::vector<uint64_t>& ids) const
+      {
+         std::vector<EventDecoder<typename Events::Merkle>> result;
+         result.reserve(ids.size());
+         for (auto id : ids)
+            result.push_back({DbId::merkleEvent, id, contract});
+         return result;
+      }
+
+      struct Reflect
+      {
+         static constexpr bool is_defined = true;
+         static constexpr bool is_struct  = true;
+         template <typename L>
+         constexpr inline static void for_each(L&& lambda)
+         {
+            lambda(
+                psio::meta{
+                    .name        = "history",
+                    .param_names = {"ids"},
+                },
+                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::history)
+                { return &psio::remove_cvref_t<decltype(*p)>::history; });
+            lambda(
+                psio::meta{
+                    .name        = "ui",
+                    .param_names = {"ids"},
+                },
+                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::ui)
+                { return &psio::remove_cvref_t<decltype(*p)>::ui; });
+            lambda(
+                psio::meta{
+                    .name        = "merkle",
+                    .param_names = {"ids"},
+                },
+                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::merkle)
+                { return &psio::remove_cvref_t<decltype(*p)>::merkle; });
+         }
+         template <typename L>
+         inline static bool get_by_name(uint64_t n, L&& lambda)
+         {
+            switch (n)
+            {
+               case psio::hash_name(BOOST_PP_STRINGIZE(history)):
+                  (void)lambda(psio::meta{.name = "history", .param_names = {"ids"}},
+                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::history)
+                               { return &psio::remove_cvref_t<decltype(*p)>::history; });
+                  break;
+               case psio::hash_name(BOOST_PP_STRINGIZE(ui)):
+                  (void)lambda(psio::meta{.name = "ui", .param_names = {"ids"}},
+                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::ui)
+                               { return &psio::remove_cvref_t<decltype(*p)>::ui; });
+                  break;
+               case psio::hash_name(BOOST_PP_STRINGIZE(merkle)):
+                  (void)lambda(psio::meta{.name = "merkle", .param_names = {"ids"}},
+                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::merkle)
+                               { return &psio::remove_cvref_t<decltype(*p)>::merkle; });
+                  break;
+            }
+            return false;
+         }
+      };  // Reflect
+
+      friend Reflect get_reflect_impl(const EventQuery&);
+      friend auto    get_type_name(EventQuery*) { return get_type_name((Events*)nullptr); }
+   };  // EventQuery
+
 }  // namespace psibase

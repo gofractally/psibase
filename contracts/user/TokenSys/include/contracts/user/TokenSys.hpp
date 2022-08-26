@@ -86,7 +86,7 @@ namespace UserContract
          using StringView = psio::const_view<psibase::String>;
 
          // clang-format off
-         struct Ui  // History <-- Todo - Change back to History
+         struct History
          {
             void initialized() {}
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
@@ -95,16 +95,16 @@ namespace UserContract
             void userConfSet(Account account, psibase::NamedBit flag, bool enable) {}
             void tokenConfSet(TID tokenId, uint64_t prevEvent, Account setter, psibase::NamedBit flag, bool enable) {}
             void symbolMapped(TID tokenId, uint64_t prevEvent, Account account, SID symbolId) {}
-            //};
+         };
 
-            //struct Ui
-            //{
+         struct Ui
+         {
             void credited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
             void uncredited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-            //};
+         };
 
-            //struct Merkle
-            //{
+         struct Merkle
+         {
             void transferred(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
             void recalled(TID tokenId, Account from, Quantity amount, StringView memo) {}
          };
@@ -134,7 +134,8 @@ namespace UserContract
       method(getTokenConf, tokenId, flag),
       method(mapSymbol, symbolId, tokenId),
     );
-   PSIBASE_REFLECT_UI_EVENTS(TokenSys, // Change to history
+   PSIBASE_REFLECT_EVENTS(TokenSys)
+   PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys,
       method(initialized),
       method(created, tokenId, creator, precision, maxSupply),
       method(minted, prevEvent, tokenId, minter, amount, memo),
@@ -142,12 +143,12 @@ namespace UserContract
       method(userConfSet, account, flag, enable),
       method(tokenConfSet, prevEvent, tokenId, setter, flag, enable),
       method(symbolMapped, prevEvent, tokenId, account, symbolId),
-   //);
-   //PSIBASE_REFLECT_UI_EVENTS(TokenSys,
+   );
+   PSIBASE_REFLECT_UI_EVENTS(TokenSys,
       method(credited, tokenId, sender, receiver, amount, memo),
       method(uncredited, tokenId, sender, receiver, amount, memo),
-   //);
-   //PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys,
+   );
+   PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys,
       method(transferred, tokenId, sender, receiver, amount, memo),
       method(recalled, tokenId, from, amount, memo)
    );
