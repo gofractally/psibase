@@ -11,20 +11,20 @@ sequenceDiagram
 title Client message routing: Operation
 
 participant applet_1
-participant applet_1_rpc
+participant applet_1_iac
 participant core
-participant core_rpc
-participant applet_2_rpc
+participant core_iac
+participant applet_2_iac
 participant applet_2
 participant chain
 
 activate applet_1
-applet_1->>applet_1_rpc: operation1
-note over applet_1_rpc: postMessage(operation1)
-applet_1_rpc-->>applet_1: 
+applet_1->>applet_1_iac: operation1
+note over applet_1_iac: postMessage(operation1)
+applet_1_iac-->>applet_1: 
 
-note over applet_1_rpc,applet_1: Waiting on IO<br>(Execution Contexts finished)
-applet_1_rpc->>core: operation1
+note over applet_1_iac,applet_1: Waiting on IO<br>(Execution Contexts finished)
+applet_1_iac->>core: operation1
 
 deactivate applet_1
 
@@ -36,12 +36,12 @@ note over core: ops: [<br> applet_1<br>]
 core->>chain: request applet 2
 chain-->>core: 
 note over core: waits for applet_2 to load
-core->>core_rpc: operation1
-note over core_rpc: After-EC: postMessage(operation1)
-core_rpc-->>core: 
+core->>core_iac: operation1
+note over core_iac: After-EC: postMessage(operation1)
+core_iac-->>core: 
 
-note over core,core_rpc: Waiting on messages
-core_rpc->>applet_2_rpc: operation1
+note over core,core_iac: Waiting on messages
+core_iac->>applet_2_iac: operation1
 deactivate core
 
 
@@ -49,16 +49,16 @@ note over applet_1,chain:
 
 
 activate applet_2
-applet_2_rpc->>applet_2: operation1
-applet_2-->applet_2_rpc: 
-note over applet_2_rpc: In 100ms: After-EC: postMessage(operationEnded)
+applet_2_iac->>applet_2: operation1
+applet_2-->applet_2_iac: 
+note over applet_2_iac: In 100ms: After-EC: postMessage(operationEnded)
 
-applet_2->>applet_2_rpc: action1
-note over applet_2_rpc: After-EC: postMessage(action1)
-applet_2_rpc-->>applet_2: 
+applet_2->>applet_2_iac: action1
+note over applet_2_iac: After-EC: postMessage(action1)
+applet_2_iac-->>applet_2: 
 
-note over applet_2_rpc,applet_2: Waiting on IO<br>(Execution Contexts finished)
-applet_2_rpc->>core: action1
+note over applet_2_iac,applet_2: Waiting on IO<br>(Execution Contexts finished)
+applet_2_iac->>core: action1
 
 
 note over applet_1,chain: 
@@ -72,11 +72,11 @@ deactivate core
 note over applet_1,chain: 
 
 
-note over applet_2_rpc: 100ms passed
-note over applet_2_rpc: After-EC: postMessage(operationEnded)
+note over applet_2_iac: 100ms passed
+note over applet_2_iac: After-EC: postMessage(operationEnded)
 
-note over applet_2_rpc,applet_2: Waiting on IO<br>(Execution Contexts finished)
-applet_2_rpc->>core: postMessage(operationEnded)
+note over applet_2_iac,applet_2: Waiting on IO<br>(Execution Contexts finished)
+applet_2_iac->>core: postMessage(operationEnded)
 deactivate applet_2
 
 
@@ -108,20 +108,20 @@ sequenceDiagram
 title Client message routing: Query
 
 participant applet_1
-participant applet_1_rpc
+participant applet_1_iac
 participant core
-participant core_rpc
-participant applet_2_rpc
+participant core_iac
+participant applet_2_iac
 participant applet_2
 participant chain
 
 activate applet_1
-applet_1->>applet_1_rpc: query1(callback)
-note over applet_1_rpc: After-EC: postMessage(query1)
-applet_1_rpc-->>applet_1: 
+applet_1->>applet_1_iac: query1(callback)
+note over applet_1_iac: After-EC: postMessage(query1)
+applet_1_iac-->>applet_1: 
 
-Note over applet_1, applet_1_rpc: Waiting on IO<br>(Execution Contexts finished)
-applet_1_rpc->>core: query1
+Note over applet_1, applet_1_iac: Waiting on IO<br>(Execution Contexts finished)
+applet_1_iac->>core: query1
 deactivate applet_1
 
 
@@ -131,12 +131,12 @@ activate core
 core->>chain: request applet 2
 chain-->>core: 
 note over core: waits for applet_2 to load
-core->>core_rpc: query1
-note over core_rpc: After-EC: postMessage(query1)
-core_rpc-->>core: 
+core->>core_iac: query1
+note over core_iac: After-EC: postMessage(query1)
+core_iac-->>core: 
 
-note over core, core_rpc: Waiting on messages
-core_rpc->>applet_2_rpc: query1
+note over core, core_iac: Waiting on messages
+core_iac->>applet_2_iac: query1
 deactivate core
 
 
@@ -144,12 +144,12 @@ note over applet_1,chain:
 
 
 activate applet_2
-applet_2_rpc->>applet_2: query1(params, callback)
+applet_2_iac->>applet_2: query1(params, callback)
 note over applet_2: calls callback(queryResult)
-note over applet_2_rpc: After-EC: postMessage(query1Result)
+note over applet_2_iac: After-EC: postMessage(query1Result)
 
-note over applet_2_rpc,applet_2: Waiting for IO<br>(Execution Contexts finished)
-applet_2_rpc->>core: query1Result
+note over applet_2_iac,applet_2: Waiting for IO<br>(Execution Contexts finished)
+applet_2_iac->>core: query1Result
 deactivate applet_2
 
 
@@ -157,12 +157,12 @@ note over applet_1,chain:
 
 
 activate core
-core->>core_rpc: query1Result
-note over core_rpc: After-EC: postMessage(query1Result)
-core_rpc-->>core: 
+core->>core_iac: query1Result
+note over core_iac: After-EC: postMessage(query1Result)
+core_iac-->>core: 
 
-note over core, core_rpc: Waiting for messages<br>(Execution Contexts finished)
-core_rpc->>applet_1_rpc: query1Result
+note over core, core_iac: Waiting for messages<br>(Execution Contexts finished)
+core_iac->>applet_1_iac: query1Result
 deactivate core
 
 
@@ -170,8 +170,8 @@ note over applet_1,chain:
 
 
 activate applet_1
-applet_1_rpc->>applet_1: query1Callback()
-applet_1-->>applet_1_rpc: 
+applet_1_iac->>applet_1: query1Callback()
+applet_1-->>applet_1_iac: 
 deactivate applet_1
 
 ```
