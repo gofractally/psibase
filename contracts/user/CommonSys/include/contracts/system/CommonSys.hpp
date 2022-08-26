@@ -5,6 +5,9 @@
 
 namespace system_contract
 {
+   /// TODO: doc
+   ///
+   /// See [HTTP and Javascript](../http.md)
    struct CommonSys : psibase::Contract<CommonSys>
    {
       static constexpr auto contract = psibase::AccountNumber("common-sys");

@@ -110,10 +110,10 @@ namespace system_contract
       /// Authenticate a top-level action or a `runAs` action
       ///
       /// * `flags`:          One of the type constants, or'ed with
-      ///                     0 or more of the flag constants
+      ///                     0 or more of the Req (request) constants
       /// * `requester`:      `""` if this is a top-level action, or
       ///                     the sender of the `runAs` action.
-      ///                     This is often different than
+      ///                     This is often different from
       ///                     `action.sender`.
       /// * `action`:         Action to authenticate
       /// * `allowedActions`: Argument from `runAs`
