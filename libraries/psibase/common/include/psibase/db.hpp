@@ -122,6 +122,9 @@ namespace psibase
       /// * [getSequential]
       merkleEvent,
 
+      /// Number of defined databases
+      ///
+      /// This number may grow in the future
       numDatabases,
    };
 

@@ -469,6 +469,91 @@ namespace psibase
                 event_type,
                 event_unpack_ok)
 
+   /// GraphQL support for decoding an event
+   ///
+   /// If a GraphQL query function returns this type, then the system
+   /// fetches and decodes an event.
+   ///
+   /// The GraphQL result is an object with these fields, plus more:
+   ///
+   /// ```text
+   /// type MyContract_EventsUi {
+   ///     event_db: Float!                   # Database ID (uint32_t)
+   ///     event_id: String!                  # Event ID (uint64_t)
+   ///     event_found: Boolean!              # Was the event found in db?
+   ///     event_contract: String!            # Contract that created the event
+   ///     event_supported_contract: Boolean! # Is this contract the one
+   ///                                        #    that created it?
+   ///     event_type: String!                # Event type
+   ///     event_unpack_ok: Boolean!          # Did it decode OK?
+   /// }
+   /// ```
+   ///
+   /// `EventDecoder` will only attempt to decode an event which meets all of the following:
+   /// * It's found in the `EventDecoder::db` database (`event_found` will be true)
+   /// * Was written by the contract which matches the `EventDecoder::contract` field (`event_supported_contract` will be true)
+   /// * Has a type which matches one of the definitions in the `Events` template argument
+   ///
+   /// If decoding is successful, `EventDecoder` will set the GraphQL `event_unpack_ok`
+   /// field to true. It will include any event fields which were in the query request.
+   /// It will include all event fields if the query request includes the special field
+   /// `event_all_content`. `EventDecoder` silently ignores any requested fields which
+   /// don't match the fields of the decoded event.
+   ///
+   /// #### EventDecoder example
+   ///
+   /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
+   /// have [defined events](contracts-events.md#defining-events) for your contract.
+   /// It's rare to define a query method like this one; use [EventQuery] instead,
+   /// which handles history, ui, and merkle events.
+   ///
+   /// ```c++
+   /// struct Query
+   /// {
+   ///    psibase::AccountNumber contract;
+   ///
+   ///    auto getUiEvent(uint64_t eventId) const
+   ///    {
+   ///       return EventDecoder<MyContract::Events::Ui>{
+   ///          DbId::uiEvent, eventId, contract};
+   ///    }
+   /// };
+   /// PSIO_REFLECT(Query, method(getUiEvent, eventId))
+   /// ```
+   ///
+   /// Example query:
+   ///
+   /// ```text
+   /// {
+   ///   getUiEvent(eventId: "13") {
+   ///     event_id
+   ///     event_type
+   ///     event_all_content
+   ///   }
+   /// }
+   /// ```
+   ///
+   /// Example reply:
+   ///
+   /// ```text
+   /// {
+   ///   "data": {
+   ///     "getUiEvent": {
+   ///       "event_id": "13",
+   ///       "event_type": "credited",
+   ///       "tokenId": 1,
+   ///       "sender": "symbol-sys",
+   ///       "receiver": "alice",
+   ///       "amount": {
+   ///         "value": "100000000000"
+   ///       },
+   ///       "memo": {
+   ///         "contents": "memo"
+   ///       }
+   ///     }
+   ///   }
+   /// }
+   /// ```
    template <typename Events>
    struct EventDecoder
    {
@@ -706,11 +791,94 @@ namespace psibase
       return ok;
    }  // gql_query(EventDecoder)
 
+   /// GraphQL support for decoding multiple events
+   ///
+   /// If a GraphQL query function returns this type, then the system
+   /// returns a GraphQL object with the following query methods:
+   ///
+   /// ```text
+   /// type MyContract_Events {
+   ///     history(ids: [String!]!): [MyContract_EventsHistory!]!
+   ///     ui(ids: [String!]!):      [MyContract_EventsUi!]!
+   ///     merkle(ids: [String!]!):  [MyContract_EventsMerkle!]!
+   /// }
+   /// ```
+   ///
+   /// These methods take an array of event IDs. They return arrays
+   /// of objects containing the decoded (if possible) events.
+   /// See [EventDecoder] for how to interact with the return values;
+   /// `MyContract_EventsHistory`, `MyContract_EventsUi`, and
+   /// `MyContract_EventsMerkle` all behave the same.
+   ///
+   ///
+   /// #### EventQuery example
+   ///
+   /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
+   /// have [defined events](contracts-events.md#defining-events) for your contract.
+   ///
+   /// ```c++
+   /// struct Query
+   /// {
+   ///    psibase::AccountNumber contract;
+   ///
+   ///    auto events() const
+   ///    {
+   ///       return psibase::EventQuery<MyContract::Events>{contract};
+   ///    }
+   /// };
+   /// PSIO_REFLECT(Query, method(events))
+   /// ```
+   ///
+   /// Example query:
+   ///
+   /// ```text
+   /// {
+   ///   events {
+   ///     history(ids: ["3", "4"]) {
+   ///       event_id
+   ///       event_all_content
+   ///     }
+   ///   }
+   /// }
+   /// ```
+   ///
+   /// Example reply:
+   ///
+   /// ```text
+   /// {
+   ///   "data": {
+   ///     "events": {
+   ///       "history": [
+   ///         {
+   ///           "event_id": "3",
+   ///           "tokenId": 1,
+   ///           "creator": "token-sys",
+   ///           "precision": {
+   ///             "value": 8
+   ///           },
+   ///           "maxSupply": {
+   ///             "value": "100000000000000000"
+   ///           }
+   ///         },
+   ///         {
+   ///           "event_id": "4",
+   ///           "prevEvent": 1,
+   ///           "tokenId": "3",
+   ///           "setter": "token-sys",
+   ///           "flag": "untradeable",
+   ///           "enable": true
+   ///         }
+   ///       ]
+   ///     }
+   ///   }
+   /// }
+   /// ```
    template <typename Events>
    struct EventQuery
    {
       AccountNumber contract;
 
+      /// Decode history events
       auto history(const std::vector<uint64_t>& ids) const
       {
          std::vector<EventDecoder<typename Events::History>> result;
@@ -720,6 +888,7 @@ namespace psibase
          return result;
       }
 
+      /// Decode user interface events
       auto ui(const std::vector<uint64_t>& ids) const
       {
          std::vector<EventDecoder<typename Events::Ui>> result;
@@ -729,6 +898,7 @@ namespace psibase
          return result;
       }
 
+      /// Decode merkle events
       auto merkle(const std::vector<uint64_t>& ids) const
       {
          std::vector<EventDecoder<typename Events::Merkle>> result;
