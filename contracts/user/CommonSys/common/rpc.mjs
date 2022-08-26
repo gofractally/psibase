@@ -36,8 +36,8 @@ export async function throwIfError(response) {
     return response;
 }
 
-export async function get(url) {
-    return await throwIfError(await fetch(url, { method: 'GET' }));
+export async function get(url, options = {}) {
+    return await throwIfError(await fetch(url, { ...options, method: 'GET' }));
 }
 
 export async function getText(url) {
@@ -45,7 +45,7 @@ export async function getText(url) {
 }
 
 export async function getJson(url) {
-    return await (await get(url)).json();
+    return await (await get(url, { headers: { Accept: "application/json" }})).json();
 }
 
 export async function postText(url, text) {
