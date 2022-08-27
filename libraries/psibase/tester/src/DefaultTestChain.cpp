@@ -5,7 +5,6 @@
 #include <contracts/system/AuthEcSys.hpp>
 #include <contracts/system/CommonSys.hpp>
 #include <contracts/system/ProxySys.hpp>
-#include <contracts/system/PsiSpaceSys.hpp>
 #include <contracts/system/RAccountSys.hpp>
 #include <contracts/system/RAuthEcSys.hpp>
 #include <contracts/system/RProxySys.hpp>
@@ -13,6 +12,7 @@
 #include <contracts/system/TransactionSys.hpp>
 #include <contracts/system/VerifyEcSys.hpp>
 #include <contracts/user/ExploreSys.hpp>
+#include <contracts/user/PsiSpaceSys.hpp>
 #include <psibase/contractEntry.hpp>
 #include <utility>
 #include <vector>

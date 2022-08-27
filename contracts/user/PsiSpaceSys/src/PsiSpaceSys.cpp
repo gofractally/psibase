@@ -1,4 +1,4 @@
-#include "contracts/system/PsiSpaceSys.hpp"
+#include "contracts/user/PsiSpaceSys.hpp"
 
 #include <psibase/dispatch.hpp>
 #include <psibase/serveGraphQL.hpp>

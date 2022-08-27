@@ -707,6 +707,7 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/contracts/system/ProxySys/include"),
         &("-I".to_owned() + repo_path + "/contracts/system/TransactionSys/include"),
         &("-I".to_owned() + repo_path + "/contracts/user/CommonSys/include"),
+        &("-I".to_owned() + repo_path + "/contracts/user/PsiSpaceSys/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/external/simdjson/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/common/include"),

@@ -22,6 +22,7 @@
   - [transact-sys](system-contract/transact-sys.md)
   - [common-sys](system-contract/common-sys.md)
   - [proxy-sys](system-contract/proxy-sys.md)
+  - [psispace-sys](system-contract/psispace-sys.md)
 - [Standard Actions](standards/actions.md)
 - [psitester]()
   - [Getting Started]()
