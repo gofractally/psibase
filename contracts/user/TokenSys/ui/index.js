@@ -13,7 +13,7 @@ initializeApplet(async () => {
     {
         id: "credit",
         exec: async ({symbol, receiver, amount, memo}) => {
-  
+
           //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
           let tokens = await getJson(await siblingUrl(null, thisApplet, "api/getTokenTypes"));
           let token = tokens.find(t=>t.symbolId === symbol.toLowerCase());

@@ -479,8 +479,8 @@ export async function initializeApplet(initializer = ()=>{})
     let rootUrl = await siblingUrl(null, null, null);
     window.iFrameResizer = {
         targetOrigin: rootUrl,
-        onReady: ()=>{
-            bufferedMessages.forEach(m => m());
+        onReady: () => {
+            bufferedMessages.forEach(async (m) => await m());
             bufferedMessages = [];
         },
         onMessage: async (msg)=>{
@@ -514,7 +514,7 @@ export async function initializeApplet(initializer = ()=>{})
                 return;
             }
         },
-      };
+    };
 
     await import("/common/iframeResizer.contentWindow.js");
 
@@ -595,13 +595,17 @@ function stopOperation()
  */
 export function operation(applet, subPath, name, params)
 {
-    // Todo - There may be a way to short-circuit calling common-sys when 
-    //    opApplet == await getJson('/common/thiscontract');
+    const operationPromise = new Promise((resolve, reject) => {
+        // Will leave memory hanging if we don't get a response as expected
+        let callbackId = storePromise(resolve, reject);
 
-    sendToParent({
-        type: MessageTypes.Operation,
-        payload: { opApplet: applet, opSubPath: subPath, opName: name, opParams: params },
+        sendToParent({
+            type: MessageTypes.Operation,
+            payload: { callbackId, opApplet: applet, opSubPath: subPath, opName: name, opParams: params },
+        });
     });
+
+    return operationPromise;
 }
 
 /**

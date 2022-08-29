@@ -101,47 +101,72 @@ const constructTransaction = async (actions) => {
     return trans;
 };
 
-let getIframeId = (appletStr, subPath) => {
+class AppletId {
+    constructor(appletName, subPath = "")
+    {
+        this.name = appletName;
+        this.subPath = subPath;
+    }
+
+    get fullPath()
+    {
+        let suffix = this.subPath !== "" ? "/" + this.subPath : "";
+        return this.name + suffix;
+    }
+
+    equals(appletId)
+    {
+        return this.name    === appletId.name 
+            && this.subPath === appletId.subPath;
+    }
+
+    async url()
+    {
+        return await getSiblingUrl(null, this.name, this.subPath);
+    }
+
+    static fromFullPath(fullPath) {
+        const startOfSubpath = fullPath.indexOf("/");
+        let subPath = (startOfSubpath != -1)? fullPath.substring(startOfSubpath) : "";
+        let applet = (startOfSubpath != -1)? fullPath.substring(0, startOfSubpath) : fullPath;
+        return new this(applet, subPath);
+    }
+}
+
+let getIframeId = (appletId) => {
     // Do more than one iFrame of the same appletStr/subPath ever need to be opened simultaneously?
     //    If so, this method needs to change to add a refCount to the ID or something, to ensure the IDs
     //    are unique.
-    return "applet_" + appletStr + "_" + subPath;
+    return "applet_" + appletId.name + "_" + appletId.subPath;
 };
 
 function Applet(appletParams, handleMessage) {
-    let {appletStr, subPath, state, onInit} = appletParams;
+    let {appletId, state, onInit} = appletParams;
     let [appletSrc, setAppletSrc] = useState('');
-
-    if (!appletStr)
-    {
-        console.error("No applet specified");
-        return;
-    }
+    let [iFrameId, setIframeId] = useState(getIframeId(appletId));
 
     if (onInit === undefined) 
         onInit = ()=>{};
 
     useEffect(()=>{
         let doSetAppletSrc = async () => {
-            setAppletSrc(await getSiblingUrl(null, appletStr, subPath));
+            setAppletSrc(await appletId.url());
         };
         doSetAppletSrc();
     },[]);
     
     useEffect(()=>{ // Set document title
-        if (appletStr && state === AppletStates.primary)
+        if (appletId && state === AppletStates.primary)
         {
-            window.document.title = appletStr;
+            window.document.title = appletId.name;
         }
     }, []);
 
     let doHandleMessage = useCallback((request)=>{
-        handleMessage({applet: appletStr, subPath, state}, request);
+        handleMessage(appletId, request);
     }, []);
 
     useEffect(() => { // Configure iFrameResizer
-        
-        let iFrameId = getIframeId(appletStr, subPath);
         let iFrame = document.getElementById(iFrameId);
         if (iFrame)
         {
@@ -150,7 +175,7 @@ function Applet(appletParams, handleMessage) {
             iFrameResize(
                 {
                     // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
-                    //log: true,
+                    // log: true,
                     checkOrigin: true,
                     heightCalculationMethod: "lowestElement",
                     onMessage: doHandleMessage,
@@ -164,17 +189,19 @@ function Applet(appletParams, handleMessage) {
         }
     }, [appletSrc]);
 
-    if (!appletSrc) 
+    if (!appletId || !appletSrc)
+    {
         return;
+    }
     else
     {
         return html`
         <iframe
-            id=${getIframeId(appletStr, subPath)}
+            id=${iFrameId}
             style=${appletStyles[state]}
             src="${appletSrc}"
             allow="camera;microphone"
-            title="${appletStr}"
+            title="${appletId.name}"
             frameborder="0"
         ></iframe>
     `;
@@ -250,17 +277,48 @@ function Dashboard() {
 
 function getAppletInURL() {
     const pathname = window.location.pathname;
-    var appletStr = pathname.substring(appletPrefix.length);
-    var subPath = "";
-    const startOfSubpath = appletStr.indexOf("/");
-    if (startOfSubpath != -1) {
-        subPath = appletStr.substring(startOfSubpath);
-        appletStr = appletStr.substring(0, startOfSubpath);
-    }
-    return {appletStr, subPath};
+    var fullPath = pathname.substring(appletPrefix.length);
+    return AppletId.fromFullPath(fullPath);
 }
 
-let currentOps = [];
+class Operations
+{
+    static currentOps = [];
+
+    static add(sender) {
+        this.currentOps = this.currentOps.concat([sender]);
+    }
+
+    static get numOps() {
+        return this.currentOps.length;
+    }
+
+    static isEmpty()
+    {
+        return this.currentOps.length === 0;
+    }
+
+    static allCompleted()
+    {
+        // TODO this should search the data structure to see 
+        //    if any are awaiting return
+        return this.currentOps.length === 0;
+    }
+
+    static opCompleted(sender)
+    {
+        let idx = this.currentOps.findIndex(op => op.equals(sender));
+
+        if (idx != -1)
+        {
+            this.currentOps.splice(idx, 1); 
+        }
+        else 
+        {
+            throw "Applet tried to stop an operation it never started";
+        }
+    }
+}
 
 function makeAction(application, actionName, params, sender)
 {
@@ -276,37 +334,43 @@ function OtherApplets({applets, handleMessage})
             });
 }
 
-let transaction = [];
+// TODO: Ensure pending transaction is cleared if there are any errors
+//         Otherwise, we could accidentally submit double actions
+//         if the user retries an action.
+let pendingTransaction = [];
 
+let injectSender = (transaction, sender) => {
+    transaction.forEach(action => {
+        if (action.sender === null)
+        {
+            action.sender = sender;
+        }
+    });
+    return transaction;
+};
+
+// Todo - check that promises are appropriately rejected 
+//           and rejections are handled.
 function App() {
-    let {appletStr, subPath} = getAppletInURL();
-    let [applets, setApplets] = useState([{appletStr, subPath, state: AppletStates.primary, onInit: ()=>{}}]);
+    let activeApplet = getAppletInURL();
+    let [applets, setApplets] = useState([{appletId: activeApplet, state: AppletStates.primary, onInit: ()=>{}}]);
 
     const appletsRef = useRef();
     appletsRef.current = applets;
 
-    let getIndex = useCallback((appletStr, subPath)=>{
-        // Finds the index of the specified applet in state: "applets"
-        var index = -1;
-        appletsRef.current.some((a, i) => {
-            if (a.appletStr == appletStr && a.subPath == subPath)
-            {
-                index = i;
-                return true;
-            }
-            return false;
+    let getIndex = useCallback((appletId)=>{
+        return appletsRef.current.findIndex(a => {
+            return a.appletId.equals(appletId);
         });
-        return index;
     }, []);
 
-    let open = useCallback(({appletStr, subPath, state}) => {
+    let open = useCallback((appletId) => {
         return new Promise((resolve, reject) => {
-            
             // Opens an applet if it's not already open
-            let index = getIndex(appletStr, subPath);
+            let index = getIndex(appletId);
             if (index === -1)
             {
-                setApplets([...appletsRef.current, {appletStr, subPath, state, onInit: resolve}]);
+                setApplets([...appletsRef.current, {appletId, state: AppletStates.headless, onInit: resolve}]);
             }
             else
             {   // Applet is already open, invoke callback immediately
@@ -316,80 +380,70 @@ function App() {
     }, [getIndex]);
 
     let urlApplet = useCallback(() => {
-        return Applet({appletStr, subPath, state: AppletStates.primary}, handleMessage);
+        return Applet({appletId: activeApplet, state: AppletStates.primary}, handleMessage);
     }, []);
 
-
     let sendMessage = useCallback(async (messageType, sender, receiver, payload, shouldOpenReceiver)=>{
-        let {rApplet, rSubPath} = receiver;
-
-        if (!shouldOpenReceiver && getIndex(rApplet, rSubPath) === -1)
+        try 
         {
-            console.error("Cannot find applet target for sendMessage");
-            return;
+            if (!shouldOpenReceiver && getIndex(receiver) === -1)
+            {
+                console.error("Cannot find receiver applet: " + receiver.fullPath + " for sendMessage");
+                return;
+            }
+
+            await open(receiver);
+
+            var iframe = document.getElementById(getIframeId(receiver));
+            if (iframe == null)
+            {
+                console.error("Applet " + receiver.fullPath + " not found, send message failed.");
+                return;
+            }
+
+            // TODO: Could check that sender isn't on a blacklist before
+            //       making the IPC call.
+
+            let restrictedTargetOrigin = await receiver.url();
+            iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
+        } catch (e) {
+            let msg = sender.fullPath + "@" + receiver.fullPath + ":" + payload.identifier;
+            console.error("Common-sys failed to route message " + msg);
+            console.error(e);
         }
-
-        await open({appletStr: rApplet, 
-            subPath: rSubPath, 
-            state: AppletStates.headless
-        });
-
-        var iframe = document.getElementById(getIframeId(rApplet, rSubPath));
-        if (iframe == null)
-        {
-            console.error("Applet " + rApplet + "/" + rSubPath + " not found, send message failed.");
-            return;
-        }
-
-        // TODO: Could check that sender isn't on a blacklist before
-        //       making the IPC call.
-
-        let restrictedTargetOrigin = await getSiblingUrl(null, rApplet, rSubPath);
-        iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
 
     }, [open, getIndex]);
 
-    let runQuery = useCallback((senderApplet, qApplet, qSubPath, qName, params)=>{
+    let runQuery = useCallback((sender, receiver, qName, params)=>{
         return new Promise((resolve, reject) => {
-            let coreCallbackId = storeCallback(({responseApplet, response, errors})=>{
-                if (responseApplet.applet !== qApplet || responseApplet.subPath !== qSubPath)
+            let coreCallbackId = storeCallback(({sender : responseApplet, response, errors})=>{
+                if (!responseApplet.equals(receiver))
                 {
                     return;
                 }
-                resolve({responseApplet, response, errors});
+                resolve({response, errors});
+                // TODO: Consider creating a QueryResponse object with these two fields
             });
     
-            sendMessage(MessageTypes.Query, 
-                senderApplet,
-                {rApplet: qApplet, rSubPath: qSubPath}, 
+            sendMessage(MessageTypes.Query, sender, receiver, 
                 {identifier: qName, params, callbackId: coreCallbackId}, 
                 true
             );
         });
     }, [sendMessage]);
 
-    let coreQuery = useCallback(async (qApplet, qSubPath, qName, params) => {
-        let senderApplet = {applet: "common-sys", subPath: ""};
-        return await runQuery(senderApplet, qApplet, qSubPath, qName, params);
+    let coreQuery = useCallback(async (receiver, qName, params = {}) => {
+        let sender = new AppletId("common-sys");
+        return await runQuery(sender, receiver, qName, params);
     }, [runQuery]);
-
-    let injectSender = useCallback((actions, sender) => {
-        actions.forEach(action => {
-            if (action.sender === null)
-            {
-                action.sender = sender;
-            }
-        });
-        return actions;
-    }, []);
 
     let executeTransaction = useCallback(async () => {
         try
         {
-            let {response: sender} = await coreQuery("account-sys", "", "getLoggedInUser", {});
-            let trans = await constructTransaction(injectSender(transaction, sender));
-            let {response: signedTransaction,} = 
-                await coreQuery("account-sys", "", "getAuthedTransaction", {transaction: trans});
+            let accountSys = new AppletId("account-sys");
+            let {response: user} = await coreQuery(accountSys, "getLoggedInUser");
+            let transaction = await constructTransaction(injectSender(pendingTransaction, user));
+            let {response: signedTransaction,} = await coreQuery(accountSys, "getAuthedTransaction", {transaction});
             let baseUrl = ''; // default
             let trace = await packAndPushSignedTransaction(baseUrl, signedTransaction);
             console.log(trace);
@@ -398,8 +452,8 @@ function App() {
         {
             console.error(e);
         }
-        transaction = [];
-    }, [coreQuery, injectSender]);
+        pendingTransaction = [];
+    }, [coreQuery]);
 
     let messageRouting = useMemo(() => [
         {
@@ -411,46 +465,14 @@ function App() {
                 }
                 return false;
             },
-            handle: (senderApplet, payload) =>
+            handle: (sender, payload) =>
             {
-                let {applet, subPath} = senderApplet;
-                let stopIgnored = ()=>{
-                    console.error("stopOp request from " + applet + "/" + subPath + " ignored");
-                };
-                let {command} = payload;
-                if (command === "stopOp")
+                if (payload.command === "stopOp")
                 {
-                    if (currentOps.length === 0)
+                    Operations.opCompleted(sender);
+                    if (Operations.allCompleted())
                     {
-                        stopIgnored(); // No current ops
-                        return;
-                    }
-                    else
-                    {
-                        let idx = -1;
-                        let exists = currentOps.some((a, i) => {
-                            if (a.applet === senderApplet.applet &&
-                                a.subPath === senderApplet.subPath &&
-                                a.state === senderApplet.state)
-                            {
-                                idx = i;
-                                return true;
-                            }
-                            return false;
-                        });
-                        if (!exists) 
-                        {
-                            stopIgnored();
-                            return; // stopOp received from applet that never started an operation.
-                        }
-
-                        // Otherwise, track that this applet completed an operation.
-                        currentOps.splice(idx, 1); 
-
-                        if (currentOps.length === 0)
-                        {   // All operations are completed
-                            executeTransaction();
-                        }
+                        executeTransaction();
                     }
                 }
             },
@@ -458,27 +480,19 @@ function App() {
         {
             type: MessageTypes.Operation,
             validate: (payload) => {
-                return verifyFields(payload, ["opApplet", "opSubPath", "opName", "opParams"]);
+                return verifyFields(payload, ["callbackId", "opApplet", "opSubPath", "opName", "opParams"]);
             },
-            handle: (senderApplet, payload) => {
+            handle: (sender, payload) => {
                 let { opApplet, opSubPath, opName, opParams } = payload;
 
-                currentOps = currentOps.concat([senderApplet]);
-                try{
-                    sendMessage(MessageTypes.Operation, 
-                        senderApplet, 
-                        {rApplet: opApplet, rSubPath: opSubPath}, 
-                        {identifier: opName, params: opParams}, 
-                        true
-                    );
-                }
-                catch (e)
-                {
-                    let {applet, subPath} = senderApplet;
-                    let msg = applet + "/" + subPath + "@" + opApplet + "/" + opSubPath + ":" + opName;
-                    console.error("Failed to send message " + msg);
-                    console.error(e);
-                }
+                Operations.add(sender);
+
+                sendMessage(MessageTypes.Operation, 
+                    sender,
+                    new AppletId(opApplet, opSubPath),
+                    {identifier: opName, params: opParams}, 
+                    true
+                );
             },
         },
         {
@@ -486,9 +500,13 @@ function App() {
             validate: (payload) => {
                 return verifyFields(payload, ["application", "actionName", "params", "sender"]);
             },
-            handle: async (senderApplet, payload) => {
-                let {application, actionName, params, sender} = payload;
-                transaction.push(makeAction(application, actionName, params, sender));
+            handle: async (sender, payload) => {
+                // Todo: change Action payload to use "user" rather than sender. 
+                //       Sender is always the applet, user is the person
+                let {application, actionName, params, sender : user} = payload;
+                pendingTransaction.push(makeAction(application, actionName, params, user));
+
+                // TODO: If no operation is currently being executed, execute the transaction.
             }
         },
         {
@@ -496,16 +514,13 @@ function App() {
             validate: (payload) => {
                 return verifyFields(payload, ["callbackId", "qApplet", "qSubPath", "qName", "qParams"]);
             },
-            handle: async (senderApplet, payload) => {
+            handle: async (sender, payload) => {
                 let {callbackId, qApplet, qSubPath, qName, qParams} = payload;
 
-                let res = await runQuery(senderApplet, qApplet, qSubPath, qName, qParams);
-                let {responseApplet, response, errors} = res;
-                let {applet : rApplet, subPath : rSubPath} = senderApplet;
-                let {applet : sApplet, subPath : sSubPath} = responseApplet;
+                let receiver = new AppletId(qApplet, qSubPath);
+                let {response, errors} = await runQuery(sender, receiver, qName, qParams);
                 sendMessage(MessageTypes.QueryResponse, 
-                    {sApplet, sSubPath},
-                    {rApplet, rSubPath},
+                    receiver, sender,
                     {callbackId, response, errors},
                     false
                 );
@@ -516,16 +531,16 @@ function App() {
             validate: (payload) => {
                 return verifyFields(payload, ["callbackId", "response", "errors"]);
             },
-            handle: (senderApplet, payload) =>
+            handle: (sender, payload) =>
             {
                 let {callbackId, response, errors} = payload;
-                executeCallback(callbackId, {responseApplet: senderApplet, response, errors});
+                executeCallback(callbackId, {sender, response, errors});
             },
         },
 
     ], [open, executeTransaction, sendMessage, runQuery]);
 
-    let handleMessage = useCallback(async ({applet, subPath, state}, request)=>{
+    let handleMessage = useCallback(async (sender, request)=>{
         let {type, payload} = request.message;
         if (type === undefined || payload === undefined)
         {
@@ -547,7 +562,7 @@ function App() {
             console.error(payload);
             return;
         }
-        route.handle({applet, subPath, state}, payload);
+        route.handle(sender, payload);
 
     }, [messageRouting]);
 
