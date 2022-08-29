@@ -21,6 +21,7 @@
     - [psibase::Connection]
   - [psibase::EventDecoder]
   - [psibase::EventQuery]
+  - [psibase::makeEventConnection]
 
 ## Routing
 
@@ -110,6 +111,7 @@ These help implement basic functionality:
   - [psibase::Connection]
 - [psibase::EventDecoder]
 - [psibase::EventQuery]
+- [psibase::makeEventConnection]
 
 Here's a common pattern for using these functions:
 
@@ -148,3 +150,4 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::Connection}}
 {{#cpp-doc ::psibase::EventDecoder}}
 {{#cpp-doc ::psibase::EventQuery}}
+{{#cpp-doc ::psibase::makeEventConnection}}
