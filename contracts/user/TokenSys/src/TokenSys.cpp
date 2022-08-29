@@ -229,6 +229,16 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
       balance.balance += amount.value;
       db.open<BalanceTable>().put(balance);
       emit().merkle().transferred(tokenId, sender, receiver, amount, memo);
+
+      auto senderHolder             = getTokenHolder(sender);
+      senderHolder.lastHistoryEvent = emit().history().transferred(
+          tokenId, senderHolder.lastHistoryEvent, sender, receiver, amount, memo);
+      db.open<TokenHolderTable>().put(senderHolder);
+
+      auto receiverHolder             = getTokenHolder(receiver);
+      receiverHolder.lastHistoryEvent = emit().history().transferred(
+          tokenId, receiverHolder.lastHistoryEvent, sender, receiver, amount, memo);
+      db.open<TokenHolderTable>().put(receiverHolder);
    }
 }
 
@@ -284,6 +294,16 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    db.open<BalanceTable>().put(receiverBalance);
 
    emit().merkle().transferred(tokenId, sender, receiver, amount, memo);
+
+   auto senderHolder             = getTokenHolder(sender);
+   senderHolder.lastHistoryEvent = emit().history().transferred(
+       tokenId, senderHolder.lastHistoryEvent, sender, receiver, amount, memo);
+   db.open<TokenHolderTable>().put(senderHolder);
+
+   auto receiverHolder             = getTokenHolder(receiver);
+   receiverHolder.lastHistoryEvent = emit().history().transferred(
+       tokenId, receiverHolder.lastHistoryEvent, sender, receiver, amount, memo);
+   db.open<TokenHolderTable>().put(receiverHolder);
 }
 
 void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
@@ -305,6 +325,11 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    balanceTable.put(fromBalance);
 
    emit().merkle().recalled(tokenId, from, amount, memo);
+
+   auto holder = getTokenHolder(from);
+   holder.lastHistoryEvent =
+       emit().history().recalled(tokenId, holder.lastHistoryEvent, from, amount, memo);
+   db.open<TokenHolderTable>().put(holder);
 }
 
 void TokenSys::mapSymbol(TID tokenId, SID symbolId)

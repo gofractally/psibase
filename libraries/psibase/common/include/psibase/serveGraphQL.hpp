@@ -560,6 +560,13 @@ namespace psibase
       DbId          db;
       uint64_t      eventId;
       AccountNumber contract;
+
+      struct Reflect
+      {
+         static constexpr psio::FixedString name      = psio::reflect<Events>::name;
+         static constexpr bool              is_struct = false;
+      };
+      friend Reflect get_reflect_impl(const EventDecoder&);
    };
 
    template <typename Events>
@@ -965,5 +972,101 @@ namespace psibase
       friend Reflect get_reflect_impl(const EventQuery&);
       friend auto    get_type_name(EventQuery*) { return get_type_name((Events*)nullptr); }
    };  // EventQuery
+
+   template <typename Events>
+   auto makeEventConnection(DbId                              db,
+                            uint64_t                          eventId,
+                            AccountNumber                     contract,
+                            std::string_view                  fieldName,
+                            std::optional<uint32_t>           first,
+                            const std::optional<std::string>& after)
+   {
+      using Decoder    = EventDecoder<Events>;
+      using Connection = Connection<  //
+          Decoder, psio::reflect<Decoder>::name + "Connection",
+          psio::reflect<Decoder>::name + "Edge">;
+      Connection result;
+      result.pageInfo.hasNextPage = true;
+      bool excludeFirst           = false;
+      if (after.has_value())
+      {
+         uint64_t a;
+         auto     result = std::from_chars(after->c_str(), after->c_str() + after->size(), a);
+         if (result.ec == std::errc{} && result.ptr == after->c_str() + after->size())
+         {
+            eventId      = a;
+            excludeFirst = true;
+         }
+      }
+
+      while (eventId && (!first || result.edges.size() < *first))
+      {
+         if (!excludeFirst)
+            result.edges.push_back({
+                .node   = {db, eventId, contract},
+                .cursor = std::to_string(eventId),
+            });
+         excludeFirst = false;
+         auto v       = getSequentialRaw(db, eventId);
+         if (!v)
+         {
+            result.pageInfo.hasNextPage = false;
+            break;
+         }
+         psio::input_stream stream(v->data(), v->size());
+
+         AccountNumber c;
+         fracunpack(c, stream);
+         if (c != contract)
+         {
+            result.pageInfo.hasNextPage = false;
+            break;
+         }
+
+         MethodNumber type;
+         fracunpack(type, stream);
+
+         bool found = false;
+         psio::reflect<Events>::get_by_name(
+             type.value,
+             [&](auto meta, auto member)
+             {
+                using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+                static_assert(MT::isFunction);
+                using TT = decltype(psio::tuple_remove_view(
+                    std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+                // TODO: EventDecoder validates and unpacks this again
+                if (psio::fracvalidate<TT>(stream.pos, stream.end).valid)
+                {
+                   auto value = psio::convert_from_frac<TT>(stream);
+                   get_event_field<0>(  //
+                       value, fieldName, {}, {meta.param_names.begin(), meta.param_names.end()},
+                       [&](auto _, const auto& field)
+                       {
+                          if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(field)>>)
+                          {
+                             if (field)
+                             {
+                                eventId = field;
+                                found   = true;
+                             }
+                          }
+                       });
+                }
+             });
+         if (!found)
+         {
+            result.pageInfo.hasNextPage = false;
+            break;
+         }
+      }  // while (!first || result.edges.size() < *first)
+
+      if (!result.edges.empty())
+      {
+         result.pageInfo.startCursor = result.edges.front().cursor;
+         result.pageInfo.endCursor   = result.edges.back().cursor;
+      }
+      return result;
+   }  // makeEventConnection
 
 }  // namespace psibase

@@ -124,12 +124,13 @@ namespace UserContract
    {
       psibase::AccountNumber account;
       psibase::Bitset<8>     config;
+      uint64_t               lastHistoryEvent = 0;
 
       using Configurations = psibase::NamedBits<psibase::NamedBit{"manualDebit"}>;
 
       auto operator<=>(const TokenHolderRecord&) const = default;
    };
-   PSIO_REFLECT(TokenHolderRecord, account, config);
+   PSIO_REFLECT(TokenHolderRecord, account, config, lastHistoryEvent);
    using TokenHolderTable = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
 
 }  // namespace UserContract

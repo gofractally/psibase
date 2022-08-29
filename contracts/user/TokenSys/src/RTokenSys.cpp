@@ -25,7 +25,6 @@ namespace
 
       return HttpReply{.contentType = "text/html", .body = std::vector<char>{d.begin(), d.end()}};
    };
-
 }
 
 struct TokenQuery
@@ -36,8 +35,24 @@ struct TokenQuery
    }
 
    auto events() const { return EventQuery<TokenSys::Events>{TokenSys::contract}; }
+
+   auto holderEvents(AccountNumber                     holder,
+                     std::optional<uint32_t>           first,
+                     const std::optional<std::string>& after) const
+   {
+      TokenSys::Tables tables{TokenSys::contract};
+      auto             holders = tables.open<TokenHolderTable>().getIndex<0>();
+      uint64_t         eventId = 0;
+      if (auto record = holders.get(holder))
+         eventId = record->lastHistoryEvent;
+      return psibase::makeEventConnection<TokenSys::Events::History>(
+          DbId::historyEvent, eventId, TokenSys::contract, "prevEvent", first, after);
+   }
 };
-PSIO_REFLECT(TokenQuery, method(balances), method(events))
+PSIO_REFLECT(TokenQuery,
+             method(balances),
+             method(events),
+             method(holderEvents, holder, first, after))
 
 optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {
