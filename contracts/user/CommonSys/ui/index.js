@@ -1,5 +1,5 @@
 import { siblingUrl as getSiblingUrl, packAndPushSignedTransaction, getTaposForHeadBlock,
-    MessageTypes, verifyFields, storeCallback, executeCallback } from "/common/rpc.mjs";
+    MessageTypes, verifyFields, storeCallback, executeCallback, AppletId } from "/common/rpc.mjs";
 import htm from "/common/htm.module.js";
 await import("/common/react-router-dom.min.js");
 
@@ -100,38 +100,6 @@ const constructTransaction = async (actions) => {
 
     return trans;
 };
-
-class AppletId {
-    constructor(appletName, subPath = "")
-    {
-        this.name = appletName;
-        this.subPath = subPath;
-    }
-
-    get fullPath()
-    {
-        let suffix = this.subPath !== "" ? "/" + this.subPath : "";
-        return this.name + suffix;
-    }
-
-    equals(appletId)
-    {
-        return this.name    === appletId.name 
-            && this.subPath === appletId.subPath;
-    }
-
-    async url()
-    {
-        return await getSiblingUrl(null, this.name, this.subPath);
-    }
-
-    static fromFullPath(fullPath) {
-        const startOfSubpath = fullPath.indexOf("/");
-        let subPath = (startOfSubpath != -1)? fullPath.substring(startOfSubpath) : "";
-        let applet = (startOfSubpath != -1)? fullPath.substring(0, startOfSubpath) : fullPath;
-        return new this(applet, subPath);
-    }
-}
 
 let getIframeId = (appletId) => {
     // Do more than one iFrame of the same appletStr/subPath ever need to be opened simultaneously?
@@ -407,9 +375,10 @@ function App() {
             let restrictedTargetOrigin = await receiver.url();
             iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
         } catch (e) {
+            console.error(e);
+
             let msg = sender.fullPath + "@" + receiver.fullPath + ":" + payload.identifier;
             console.error("Common-sys failed to route message " + msg);
-            console.error(e);
         }
 
     }, [open, getIndex]);
@@ -480,18 +449,36 @@ function App() {
         {
             type: MessageTypes.Operation,
             validate: (payload) => {
-                return verifyFields(payload, ["callbackId", "opApplet", "opSubPath", "opName", "opParams"]);
+                return verifyFields(payload, ["callbackId", "appletId", "name", "params"]);
             },
             handle: (sender, payload) => {
-                let { opApplet, opSubPath, opName, opParams } = payload;
+                let { callbackId, appletId, name, params } = payload;
 
                 Operations.add(sender);
 
                 sendMessage(MessageTypes.Operation, 
                     sender,
-                    new AppletId(opApplet, opSubPath),
-                    {identifier: opName, params: opParams}, 
+                    AppletId.fromJSON(appletId),
+                    {identifier: name, params},
                     true
+                );
+            },
+        },
+        {
+            type: MessageTypes.Query,
+            validate: (payload) => {
+                return verifyFields(payload, ["callbackId", "appletId", "name", "params"]);
+            },
+            handle: async (sender, payload) => {
+                let {callbackId, appletId, name, params} = payload;
+
+                let receiver = AppletId.fromJSON(appletId);
+                let {response, errors} = await runQuery(sender, receiver, name, params);
+                sendMessage(MessageTypes.QueryResponse, 
+                    receiver, 
+                    sender,
+                    {callbackId, response, errors},
+                    false
                 );
             },
         },
@@ -508,23 +495,6 @@ function App() {
 
                 // TODO: If no operation is currently being executed, execute the transaction.
             }
-        },
-        {
-            type: MessageTypes.Query,
-            validate: (payload) => {
-                return verifyFields(payload, ["callbackId", "qApplet", "qSubPath", "qName", "qParams"]);
-            },
-            handle: async (sender, payload) => {
-                let {callbackId, qApplet, qSubPath, qName, qParams} = payload;
-
-                let receiver = new AppletId(qApplet, qSubPath);
-                let {response, errors} = await runQuery(sender, receiver, qName, qParams);
-                sendMessage(MessageTypes.QueryResponse, 
-                    receiver, sender,
-                    {callbackId, response, errors},
-                    false
-                );
-            },
         },
         {
             type: MessageTypes.QueryResponse,

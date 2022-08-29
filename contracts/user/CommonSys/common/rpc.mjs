@@ -236,6 +236,44 @@ export const MessageTypes = {
     QueryResponse: "QueryResponse", // A response to a prior query
 };
 
+export class AppletId {
+    constructor(appletName, subPath = "")
+    {
+        this.name = appletName;
+        this.subPath = subPath;
+    }
+
+    get fullPath()
+    {
+        let suffix = this.subPath !== "" ? "/" + this.subPath : "";
+        return this.name + suffix;
+    }
+
+    equals(appletId)
+    {
+        return this.name    === appletId.name 
+            && this.subPath === appletId.subPath;
+    }
+
+    async url()
+    {
+        return await siblingUrl(null, this.name, this.subPath);
+    }
+
+    static fromFullPath(fullPath) 
+    {
+        const startOfSubpath = fullPath.indexOf("/");
+        let subPath = (startOfSubpath != -1)? fullPath.substring(startOfSubpath) : "";
+        let applet = (startOfSubpath != -1)? fullPath.substring(0, startOfSubpath) : fullPath;
+        return new this(applet, subPath);
+    }
+
+    static fromJSON(jsonObj)
+    {
+        return new this(jsonObj.name, jsonObj.subPath);
+    }
+}
+
 var ops = []; // Operations defined by an applet
 
 var qrs = []; // Queries defined by an applet
@@ -259,16 +297,9 @@ export function storePromise(resolve, reject)
 
 export function executeCallback(callbackId, response)
 {
-    let idx = -1;
-    let found = queryCallbacks.some((q, i) => {
-        if (q.callbackId === callbackId)
-        {
-            idx = i;
-            return true;
-        }
-        return false;
-    });
-    if (!found)
+    let idx = queryCallbacks.findIndex(q => q.callbackId === callbackId);
+
+    if (idx === -1)
     {
         console.error("Callback with ID " + callbackId + " not found.");
         return false;
@@ -288,16 +319,8 @@ export function executeCallback(callbackId, response)
 
 export function executePromise(callbackId, response, errors)
 {
-    let idx = -1;
-    let found = promises.some((q, i) => {
-        if (q.callbackId === callbackId)
-        {
-            idx = i;
-            return true;
-        }
-        return false;
-    });
-    if (!found)
+    let idx = promises.findIndex(q => q.callbackId === callbackId);
+    if (idx === -1)
     {
         console.error("Promise with ID " + callbackId + " not found.");
         return false;
@@ -588,12 +611,11 @@ function stopOperation()
 /**
  * Description: Runs the specified operation
  * 
- * @param {String} applet - The name of the applet that handles the specified operation.
- * @param {String} subPath - The page of the applet that handles the specified operation.
+ * @param {AppletId} appletId - An instance of AppletId that identifies the applet that handles the specified operation.
  * @param {String} name - The name of the operation to run.
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
-export function operation(applet, subPath, name, params)
+export function operation(appletId, name, params)
 {
     const operationPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
@@ -601,7 +623,7 @@ export function operation(applet, subPath, name, params)
 
         sendToParent({
             type: MessageTypes.Operation,
-            payload: { callbackId, opApplet: applet, opSubPath: subPath, opName: name, opParams: params },
+            payload: { callbackId, appletId, name, params },
         });
     });
 
@@ -630,12 +652,11 @@ export function action(application, actionName, params, sender = null)
  * Description: Calls the specified query on another applet. 
  * Returns a promise that resolves with the result of the query.
  * 
- * @param {String} applet - The name of the applet being queried.
- * @param {String} subPath - The page of the applet that handles the specified query.
- * @param {String} queryName - The name of the query being executed.
+ * @param {AppletId} appletId - An instance of AppletId that identifies the applet that handles the specified query.
+ * @param {String} name - The name of the query being executed.
  * @param {Object} params - The object containing all parameters expected by the query handler.
  */
-export function query(applet, subPath, queryName, params = {})
+export function query(appletId, name, params = {})
 {
     const queryPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
@@ -643,7 +664,7 @@ export function query(applet, subPath, queryName, params = {})
 
         sendToParent({
             type: MessageTypes.Query,
-            payload: { callbackId, qApplet: applet, qSubPath: subPath, qName: queryName, qParams: params },
+            payload: { callbackId, appletId, name, params },
         });
 
     });

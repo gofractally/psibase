@@ -1,12 +1,13 @@
 import htm from "/common/htm.module.js";
 import { initializeApplet, getJson, action, siblingUrl,
-  query, setOperations, operation } from "/common/rpc.mjs";
+  query, setOperations, operation, AppletId } from "/common/rpc.mjs";
 
 const html = htm.bind(React.createElement);
 const { useEffect, useState, useCallback } = React;
 const { Segment, Header, Form, Table, Input, Button, Message, Tab, Container } = semanticUIReact;
 
-const thisApplet = await getJson('/common/thiscontract');
+const contractName = await getJson('/common/thiscontract');
+const accountSys = new AppletId("account-sys", "");
 
 initializeApplet(async () => {
   setOperations([
@@ -14,8 +15,8 @@ initializeApplet(async () => {
         id: "credit",
         exec: async ({symbol, receiver, amount, memo}) => {
 
-          //TODO: let tokenId = query("symbol-sys", "getTokenId", {symbol});
-          let tokens = await getJson(await siblingUrl(null, thisApplet, "api/getTokenTypes"));
+          //TODO: let tokenId = query(symbolSys, "getTokenId", {symbol});
+          let tokens = await getJson(await siblingUrl(null, contractName, "api/getTokenTypes"));
           let token = tokens.find(t=>t.symbolId === symbol.toLowerCase());
           if (!token)
           {
@@ -24,7 +25,7 @@ initializeApplet(async () => {
           }
           let tokenId = token.id;
 
-          await action(thisApplet, "credit", 
+          await action(contractName, "credit", 
             { 
               tokenId, 
               receiver, 
@@ -66,7 +67,7 @@ function BalanceTable({loggedInUser}) {
   const getBalances = useCallback(async () => {
     if (user)
     {
-      let res = await getJson(await siblingUrl(null, thisApplet, "api/balances/" + user));
+      let res = await getJson(await siblingUrl(null, contractName, "api/balances/" + user));
       setBalances(res);
     }
   }, [user]);
@@ -149,7 +150,7 @@ function SendPanel() {
 
   const onSendSubmit = (e) => {
     e.preventDefault();
-    operation(thisApplet, "", "credit", {symbol: "PSI", receiver, amount: amountToSend, memo: "Test"});
+    operation(new AppletId(contractName), "credit", {symbol: "PSI", receiver, amount: amountToSend, memo: "Test"});
   };
 
   return html`
@@ -191,7 +192,7 @@ function App() {
   const [user, setUser] = useState("");
 
   useEffect(async ()=>{
-      let user = await query("account-sys", "", "getLoggedInUser").catch(console.error);
+      let user = await query(accountSys, "getLoggedInUser").catch(console.error);
       setUser(user);
   }, []);
 
