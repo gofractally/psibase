@@ -469,7 +469,7 @@ function App() {
 
                 setOperationCountdown(false);
 
-                let receiver = AppletId.fromJSON(appletId);
+                let receiver = AppletId.fromObject(appletId);
                 ClientOps.add(receiver);
 
                 var reply = null;
@@ -494,7 +494,7 @@ function App() {
             handle: async (sender, payload) => {
                 let {callbackId, appletId, name, params} = payload;
 
-                let receiver = AppletId.fromJSON(appletId);
+                let receiver = AppletId.fromObject(appletId);
 
                 var reply = null;
                 try {

@@ -268,9 +268,9 @@ export class AppletId {
         return new this(applet, subPath);
     }
 
-    static fromJSON(jsonObj)
+    static fromObject(obj)
     {
-        return new this(jsonObj.name, jsonObj.subPath);
+        return new this(obj.name, obj.subPath);
     }
 }
 
