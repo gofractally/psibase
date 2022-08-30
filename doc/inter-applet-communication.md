@@ -15,7 +15,8 @@ initializeApplet(async () => {
             id: "create",
             exec: ({symbol}) => {
                 let maxDebit = getCurrentSymbolPrice() * 1.1;
-                operation("token-sys", "", "credit", {
+                let tokenApplet = new AppletId("token-sys", "");
+                operation(tokenApplet, "credit", {
                     symbol: "PSI",
                     receiver: "symbol-sys",
                     amount: maxDebit,

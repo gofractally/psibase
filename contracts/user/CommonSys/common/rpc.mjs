@@ -229,12 +229,50 @@ export const ErrorMessages = [
 ]
 
 export const MessageTypes = {
-    Core: "Core", // A message to the core layer itself
     Action: "Action", // An action send to an on-chain application
     Query: "Query",  // A query to another client-side applet, expect a response
     Operation: "Operation", // A procedure which can include multiple other queries, actions, and operations
     QueryResponse: "QueryResponse", // A response to a prior query
+    OperationResponse: "OperationResponse"
 };
+
+export class AppletId {
+    constructor(appletName, subPath = "")
+    {
+        this.name = appletName;
+        this.subPath = subPath;
+    }
+
+    get fullPath()
+    {
+        let suffix = this.subPath !== "" ? "/" + this.subPath : "";
+        return this.name + suffix;
+    }
+
+    equals(appletId)
+    {
+        return this.name    === appletId.name 
+            && this.subPath === appletId.subPath;
+    }
+
+    async url()
+    {
+        return await siblingUrl(null, this.name, this.subPath);
+    }
+
+    static fromFullPath(fullPath) 
+    {
+        const startOfSubpath = fullPath.indexOf("/");
+        let subPath = (startOfSubpath !== -1)? fullPath.substring(startOfSubpath) : "";
+        let applet = (startOfSubpath !== -1)? fullPath.substring(0, startOfSubpath) : fullPath;
+        return new this(applet, subPath);
+    }
+
+    static fromObject(obj)
+    {
+        return new this(obj.name, obj.subPath);
+    }
+}
 
 var ops = []; // Operations defined by an applet
 
@@ -259,16 +297,9 @@ export function storePromise(resolve, reject)
 
 export function executeCallback(callbackId, response)
 {
-    let idx = -1;
-    let found = queryCallbacks.some((q, i) => {
-        if (q.callbackId === callbackId)
-        {
-            idx = i;
-            return true;
-        }
-        return false;
-    });
-    if (!found)
+    let idx = queryCallbacks.findIndex(q => q.callbackId === callbackId);
+
+    if (idx === -1)
     {
         console.error("Callback with ID " + callbackId + " not found.");
         return false;
@@ -288,28 +319,19 @@ export function executeCallback(callbackId, response)
 
 export function executePromise(callbackId, response, errors)
 {
-    let idx = -1;
-    let found = promises.some((q, i) => {
-        if (q.callbackId === callbackId)
-        {
-            idx = i;
-            return true;
-        }
-        return false;
-    });
-    if (!found)
+    let idx = promises.findIndex(q => q.callbackId === callbackId);
+    if (idx === -1)
     {
         console.error("Promise with ID " + callbackId + " not found.");
         return false;
     }
 
+    let promise = promises.splice(idx, 1)[0];
     if (errors.length > 0)
-        promises[idx].reject(errors);
+        promise.reject(errors);
     else
-        promises[idx].resolve(response);
-    
-    // Remove the promise now that it's been handled
-    promises.splice(idx, 1);
+        promise.resolve(response);
+
     return true;
 }
 
@@ -374,100 +396,101 @@ let handleErrorCode = (code) => {
     return true;
 };
 
+var contractName = '';
+export async function getContractName()
+{
+    if (contractName !== '') 
+    {
+        return contractName;
+    }
+    else
+    {
+        contractName = await getJson("/common/thiscontract");
+        return contractName;
+    }
+}
+
 let messageRouting = [
     {
         type: MessageTypes.Operation,
-        validate: (payload)=>{
-            return verifyFields(payload, ["identifier", "params"]);
-        },
+        fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
-            let {identifier, params} = payload;
-
-            let doRouteMessage = async ()=>{
-                let op = ops.find(o => o.id === identifier);
-                if (op !== undefined)
-                {
-                    try {
-                         await op.exec(params);
-                    }
-                    catch (e)
-                    {
-                        console.error("Error running operation " + identifier);
-                        console.error(e);
-                        stopOperation();
-                        throw e;
-                    }
+            let {identifier, params, callbackId} = payload;
+            let responsePayload = {callbackId, response: null, errors: []};
+            let contractName = await getContractName();
+            let op = ops.find(o => o.id === identifier);
+            var errors = [];
+            if (op === undefined)
+            {
+                responsePayload.errors.push("Contract " + contractName + " has no operation, \"" + identifier + "\"");
+            }
+            else
+            {
+                try {
+                    let res = await op.exec(params);
+                    if (res !== undefined)
+                        responsePayload.response = res;
                 }
-                else
+                catch (e)
                 {
-                    console.error("Operation not found: " + identifier);
+                    responsePayload.errors.push(e);
                 }
+            }
 
-                stopOperation();
-                return true;
-            };
+            sendToParent({
+                type: MessageTypes.OperationResponse,
+                payload: responsePayload,
+            });
 
-            return await doRouteMessage();
+            return true;
         },
     },
     {
         type: MessageTypes.Query,
-        validate: (payload)=>{
-            return verifyFields(payload, ["identifier", "params", "callbackId"]);
-        },
+        fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
             let {identifier, params, callbackId} = payload;
-
-            let doRouteMessage = async ()=>{
-                let qu = qrs.find(q => q.id === identifier);
-                if (qu !== undefined)
+            let responsePayload = {callbackId, response: null, errors: []};
+            let contractName = await getContractName();
+            let qu = qrs.find(q => q.id === identifier);
+            if (qu === undefined)
+            {
+                responsePayload.errors.push("Contract " + contractName + " has no query, \"" + identifier + "\"");
+            }
+            else
+            {
+                try
                 {
-                    try {
-                        let reply = null;
-                        let errors = [];
-                        try
-                        {
-                            reply = await qu.exec(params, reply);
-                        } 
-                        catch (e)
-                        {
-                            errors.push(e);
-                        }
-
-                        sendToParent({
-                            type: MessageTypes.QueryResponse,
-                            payload: { callbackId, response: reply, errors },
-                        });
-                        
-                    }
-                    catch (e)
-                    {
-                        console.error("Error running query " + identifier);
-                        console.error(e);
-                        throw e;
-                    }
-                }
-                else
+                    responsePayload.response = await qu.exec(params);
+                } 
+                catch (e)
                 {
-                    console.error("Query not found: " + identifier);
+                    responsePayload.errors.push(e);
                 }
+            }
 
-                return true;
-            };
-
-            return await doRouteMessage();
+            sendToParent({
+                type: MessageTypes.QueryResponse,
+                payload: responsePayload,
+            });
         },
     },
     {
         type: MessageTypes.QueryResponse,
-        validate: (payload) => {
-            return verifyFields(payload, ["callbackId", "response", "errors"]);
-        },
+        fields: ["callbackId", "response", "errors"],
         route: (payload) => {
             let {callbackId, response, errors} = payload;
             return executePromise(callbackId, response, errors);
         },
-    }
+    },
+    {
+        type: MessageTypes.OperationResponse,
+        fields: ["callbackId", "response", "errors"],
+        route: (payload) => {
+            let {callbackId, response, errors} = payload;
+            return executePromise(callbackId, response, errors);
+        },
+    },
 ];
 
 let bufferedMessages = [];
@@ -479,11 +502,11 @@ export async function initializeApplet(initializer = ()=>{})
     let rootUrl = await siblingUrl(null, null, null);
     window.iFrameResizer = {
         targetOrigin: rootUrl,
-        onReady: ()=>{
-            bufferedMessages.forEach(m => m());
+        onReady: () => {
+            bufferedMessages.forEach(async (m) => await m());
             bufferedMessages = [];
         },
-        onMessage: async (msg)=>{
+        onMessage: (msg)=>{
             let {type, payload} = msg;
             if (type === undefined || payload === undefined)
             {
@@ -498,7 +521,7 @@ export async function initializeApplet(initializer = ()=>{})
                 return;
             }
 
-            if (!route.validate(payload))
+            if (!verifyFields(payload, route.fields))
             {
                 console.error("Message from core failed validation checks");
                 return;
@@ -507,14 +530,9 @@ export async function initializeApplet(initializer = ()=>{})
             if (handleErrorCode(payload.error))
                 return;
 
-            let routed = await route.route(payload);
-            if (!routed)
-            {
-                console.error("Child failed to route message: " + msg);
-                return;
-            }
+            route.route(payload);
         },
-      };
+    };
 
     await import("/common/iframeResizer.contentWindow.js");
 
@@ -574,34 +592,26 @@ export function setQueries(queries)
     set({targetArray: qrs, newElements: queries}, "setQueries");
 }
 
-function stopOperation()
-{
-    let tempDelay = 100; // TODO: remove this, add message buffering to core
-    setTimeout(()=>{
-        sendToParent({
-            type: MessageTypes.Core,
-            payload: {command: "stopOp"},
-        });
-    }, tempDelay);
-}
-
 /**
  * Description: Runs the specified operation
  * 
- * @param {String} applet - The name of the applet that handles the specified operation.
- * @param {String} subPath - The page of the applet that handles the specified operation.
+ * @param {AppletId} appletId - An instance of AppletId that identifies the applet that handles the specified operation.
  * @param {String} name - The name of the operation to run.
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
-export function operation(applet, subPath, name, params)
+export function operation(appletId, name, params = {})
 {
-    // Todo - There may be a way to short-circuit calling common-sys when 
-    //    opApplet == await getJson('/common/thiscontract');
+    const operationPromise = new Promise((resolve, reject) => {
+        // Will leave memory hanging if we don't get a response as expected
+        let callbackId = storePromise(resolve, reject);
 
-    sendToParent({
-        type: MessageTypes.Operation,
-        payload: { opApplet: applet, opSubPath: subPath, opName: name, opParams: params },
+        sendToParent({
+            type: MessageTypes.Operation,
+            payload: { callbackId, appletId, name, params },
+        });
     });
+
+    return operationPromise;
 }
 
 /**
@@ -626,12 +636,11 @@ export function action(application, actionName, params, sender = null)
  * Description: Calls the specified query on another applet. 
  * Returns a promise that resolves with the result of the query.
  * 
- * @param {String} applet - The name of the applet being queried.
- * @param {String} subPath - The page of the applet that handles the specified query.
- * @param {String} queryName - The name of the query being executed.
+ * @param {AppletId} appletId - An instance of AppletId that identifies the applet that handles the specified query.
+ * @param {String} name - The name of the query being executed.
  * @param {Object} params - The object containing all parameters expected by the query handler.
  */
-export function query(applet, subPath, queryName, params = {})
+export function query(appletId, name, params = {})
 {
     const queryPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
@@ -639,7 +648,7 @@ export function query(applet, subPath, queryName, params = {})
 
         sendToParent({
             type: MessageTypes.Query,
-            payload: { callbackId, qApplet: applet, qSubPath: subPath, qName: queryName, qParams: params },
+            payload: { callbackId, appletId, name, params },
         });
 
     });

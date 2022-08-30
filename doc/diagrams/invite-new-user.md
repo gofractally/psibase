@@ -9,7 +9,7 @@ sequenceDiagram
    participant Invite applet
    participant Psibase blockchain
 
-   note over Bob, Account applet: client-side
+   note over Alice, Invite applet: client-side
 
    note over Alice: Notices she has available invite credits
    Alice->>Account applet: Generate invite link
@@ -35,17 +35,18 @@ sequenceDiagram
 
    title Bob accepts Alice's invite to the chain
    actor Bob
-   actor Alice
    participant Core
    participant Accounts applet
+   participant Keystore applet
    participant Psibase blockchain
-   note over Bob, Auth applet: client-side
+   note over Bob, Keystore applet: client-side
 
    Note over Bob: Navigates to invite link<br>Sees "invite from Alice" interface
    Bob->>Accounts applet: Specify new account name (Optional advanced auth config), click "Join"
-   Note over Accounts applet: Generate keypair
-   Accounts applet->>Core: Send accept@invite-sys signed<br>with invite private key
-   Core->>Psibase blockchain: [invitepubkey@invite-sys] acceptInvite(NewAccount)
+   Accounts applet->>Keystore applet: Generate keypair
+   Keystore applet-->>Accounts applet: Pubkey
+   Accounts applet->>Core: Call acceptInvite operation
+   Core->>Psibase blockchain: [invitepubkey@invite-sys] acceptInvite(NewAccount, pubkey)
    Note over Psibase blockchain: invite-sys:acceptInvite only accepted if signed with invitepubkey
    Note over Psibase blockchain: NewAccount object: <br>  - New_acc_name (bob)<br>  - pubkey
    Psibase blockchain->>Psibase blockchain: [invite-sys@account-sys] newAccount(newAccount)

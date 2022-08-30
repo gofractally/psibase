@@ -1,24 +1,27 @@
 import htm from "https://unpkg.com/htm@3.1.0?module";
-import { getJson, initializeApplet, action, operation, query, setOperations, setQueries, signTransaction } from "/common/rpc.mjs";
+import { getJson, initializeApplet, action, operation, query, 
+    setOperations, setQueries, signTransaction, AppletId } from "/common/rpc.mjs";
 import { genKeyPair, KeyType } from "/common/keyConversions.mjs";
 
 
 const html = htm.bind(React.createElement);
 
-const thisApplet = await getJson("/common/thiscontract");
+const contractName = await getJson("/common/thiscontract");
+const accountSys = new AppletId(contractName, "");
+
 initializeApplet(async () => {
     setOperations([
         {
             id: "newAcc",
             exec: ({ name, pubKey }) => {
-                action(thisApplet, "newAccount", { 
+                action(contractName, "newAccount", { 
                     name, 
                     authContract: "auth-any-sys", 
                     requireNew: true,
                 });
     
                 if (pubKey !== "") {
-                    operation(thisApplet, "", "setKey", { name, pubKey });
+                    operation(accountSys, "setKey", { name, pubKey });
                 }
             },
         },
@@ -27,7 +30,7 @@ initializeApplet(async () => {
             exec: ({ name, pubKey }) => {
                 if (pubKey !== "") {
                     action("auth-ec-sys", "setKey", { key: pubKey }, name);
-                    action(thisApplet, "setAuthCntr", { authContract: "auth-ec-sys" }, name);
+                    action(contractName, "setAuthCntr", { authContract: "auth-ec-sys" }, name);
                 }
             },
         },
@@ -43,7 +46,7 @@ initializeApplet(async () => {
         {
             id: "getAuthedTransaction",
             exec: async ({transaction}) => {
-                let user = await query(thisApplet, "", "getLoggedInUser"); 
+                let user = await query(accountSys, "getLoggedInUser");
                 let accounts = await getJson("/accounts");
                 let u = accounts.find(a => a.accountNum === user);
                 if (u.authContract === "auth-ec-sys")
@@ -101,7 +104,7 @@ const newAccount = async (name, pubKey, addMsg, clearMsg) => {
     try {
         clearMsg();
         addMsg("Pushing transaction...");
-        operation(thisApplet, "", "newAcc", { name, pubKey });
+        operation(accountSys, "newAcc", { name, pubKey });
     } catch (e) {
         console.error(e);
         addMsg(e.message);
@@ -204,7 +207,10 @@ const App = () => {
     // Private: PVT_K1_22vrGgActn3X4H1wwvy2KH4hxGke7cGy6ypy2njMjnyZBZyU7h
 
     let setAuth = () => {
-        operation(thisApplet, "", "setKey", { name: "alice", pubKey: "PUB_K1_53cz2oXcYTqy76vfCTsknKHS2NauiRyUwe8pAgDe2j9YHsmZqg" });
+        operation(accountSys, "setKey", { 
+            name: "alice", 
+            pubKey: "PUB_K1_53cz2oXcYTqy76vfCTsknKHS2NauiRyUwe8pAgDe2j9YHsmZqg" 
+        });
     }
 
     return html`
