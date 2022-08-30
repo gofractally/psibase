@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <psibase/Prover.hpp>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
 
@@ -37,7 +38,7 @@ namespace psibase
                                                      TermNum                     term     = {});
       void                                     start(Block&& src);
       void                                     callStartBlock();
-      std::pair<ConstRevisionPtr, Checksum256> writeRevision();
+      std::pair<ConstRevisionPtr, Checksum256> writeRevision(const Prover&, const Claim&);
 
       void verifyProof(const SignedTransaction&                 trx,
                        TransactionTrace&                        trace,

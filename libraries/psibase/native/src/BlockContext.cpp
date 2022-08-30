@@ -121,7 +121,8 @@ namespace psibase
       active = true;
    }
 
-   std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision()
+   std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision(const Prover& prover,
+                                                                        const Claim&  claim)
    {
       checkActive();
       check(!needGenesisAction, "missing genesis action in block");
@@ -147,6 +148,10 @@ namespace psibase
       // TODO: store block proofs somewhere
       // TODO: avoid repacking
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
+      db.kvPut(DbId::blockProof, current.header.blockNum,
+               prover.prove({reinterpret_cast<const char*>(status->head->blockId.data()),
+                             status->head->blockId.size()},
+                            claim));
 
       return {session.writeRevision(status->head->blockId), status->head->blockId};
    }

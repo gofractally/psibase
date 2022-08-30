@@ -7,7 +7,7 @@ use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
 use libpsibase::{
     account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
-    ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction, Tapos, TaposRefBlock,
+    Claim, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction, Tapos, TaposRefBlock,
     TimePointSec, Transaction,
 };
 use reqwest::Url;
@@ -236,6 +236,29 @@ fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
         contract: account!("setcode-sys"),
         method: method!("setCode"),
         raw_data: set_code_action.packed_bytes(),
+    }
+}
+
+#[derive(Serialize, Deserialize, Fracpack)]
+pub struct ProducerConfigRow {
+    pub producer_name: AccountNumber,
+    pub producer_auth: Claim,
+}
+
+fn set_producers_action(name: AccountNumber, key: &PublicKey) -> Action {
+    let prod = ProducerConfigRow {
+        producer_name: name,
+        producer_auth: Claim {
+            contract: account!("verifyec-sys"),
+            raw_data: key.packed_bytes()
+        }
+    };
+    let set_producers_action = (vec![prod],);
+    Action {
+        sender: account!("producer-sys"),
+        contract: account!("producer-sys"),
+        method: method!("setProducers"),
+        raw_data: set_producers_action.packed_bytes(),
     }
 }
 

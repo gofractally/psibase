@@ -1,3 +1,4 @@
+#include <psibase/EcdsaProver.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/cft.hpp>
 #include <psibase/contractEntry.hpp>
@@ -23,6 +24,15 @@
 
 using namespace psibase;
 using namespace psibase::net;
+
+namespace psibase
+{
+   void validate(boost::any& v, const std::vector<std::string>& values, PrivateKey*, int)
+   {
+      boost::program_options::validators::check_first_occurrence(v);
+      v = privateKeyFromString(boost::program_options::validators::get_single_string(values));
+   }
+}  // namespace psibase
 
 struct transaction_queue
 {
@@ -279,6 +289,7 @@ using cft_consensus = basic_cft_consensus<Derived, timer_type>;
 void run(const std::string&                db_path,
          AccountNumber                     producer,
          const std::vector<AccountNumber>& producers,
+         std::shared_ptr<Prover>           prover,
          const std::vector<std::string>&   peers,
          const std::string&                host,
          unsigned short                    port,
@@ -297,7 +308,7 @@ void run(const std::string&                db_path,
    boost::asio::io_context chainContext;
 
    using node_type = node<peer_manager, direct_routing, cft_consensus, ForkDb>;
-   node_type node(chainContext, system.get());
+   node_type node(chainContext, system.get(), std::move(prover));
    node.set_producer_id(producer);
    node.set_producers(producers);
 
@@ -481,6 +492,7 @@ int main(int argc, char* argv[])
    std::string              db_path;
    std::string              producer = {};
    std::vector<std::string> prods;
+   std::vector<PrivateKey>  keys;
    std::string              host       = {};
    unsigned short           port       = 8080;
    bool                     host_perf  = false;
@@ -496,6 +508,7 @@ int main(int argc, char* argv[])
        "Path to database");
    opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
    opt("prods", po::value(&prods), "Names of all producers");
+   opt("sign,s", po::value(&keys), "Sign with this key");
    opt("peer", po::value(&peers), "Peer endpoint");
    opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
    opt("port", po::value(&port), "http server port");
@@ -539,8 +552,14 @@ int main(int argc, char* argv[])
       {
          producers.push_back(AccountNumber{pname});
       }
-      run(db_path, AccountNumber{producer}, producers, peers, host, port, host_perf, leeway_us,
-          allow_slow);
+      auto prover = std::make_shared<CompoundProver>();
+      for (const auto& key : keys)
+      {
+         prover->provers.push_back(
+             std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"}, key));
+      }
+      run(db_path, AccountNumber{producer}, producers, prover, peers, host, port, host_perf,
+          leeway_us, allow_slow);
       return 0;
    }
    catch (std::exception& e)

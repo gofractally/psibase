@@ -1,5 +1,5 @@
 use crate::{
-    new_account_action, reg_server, set_auth_contract_action, set_key_action, store_sys,
+    new_account_action, reg_server, set_auth_contract_action, set_key_action, set_producers_action, store_sys,
     without_tapos, Args, Error,
 };
 use anyhow::Context;
@@ -16,7 +16,7 @@ use serde_json::Value;
 #[derive(Fracpack)]
 struct Empty {}
 
-const ACCOUNTS: [AccountNumber; 20] = [
+const ACCOUNTS: [AccountNumber; 21] = [
     account!("account-sys"),
     account!("alice"),
     account!("auth-ec-sys"),
@@ -26,6 +26,7 @@ const ACCOUNTS: [AccountNumber; 20] = [
     account!("doc-sys"),
     account!("explore-sys"),
     account!("nft-sys"),
+    account!("producer-sys"),
     account!("proxy-sys"),
     account!("psispace-sys"),
     account!("r-account-sys"),
@@ -145,6 +146,7 @@ fn boot_trx() -> SignedTransaction {
         sgc!("common-sys", 0, "CommonSys.wasm"),
         sgc!("explore-sys", 0, "ExploreSys.wasm"),
         sgc!("nft-sys", 0, "NftSys.wasm"),
+        sgc!("producer-sys", 2, "ProducerSys.wasm"),
         sgc!("proxy-sys", 0, "ProxySys.wasm"),
         sgc!("psispace-sys", 0, "PsiSpaceSys.wasm"),
         sgc!("r-account-sys", 0, "RAccountSys.wasm"),
@@ -358,6 +360,7 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     actions.append(&mut create_and_fund_example_users);
 
     if let Some(k) = key {
+        actions.push(set_producers_action(account!("psibase"), k));
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
             actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));

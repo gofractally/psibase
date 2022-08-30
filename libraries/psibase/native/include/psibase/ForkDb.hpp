@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <psibase/BlockContext.hpp>
+#include <psibase/Prover.hpp>
+#include <psibase/VerifyProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
@@ -95,7 +97,9 @@ namespace psibase
             {
                if (BlockInfo{*block}.blockId == id)
                {
-                  return psio::shared_view_ptr<SignedBlock>(SignedBlock{*block});
+                  auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum);
+                  return psio::shared_view_ptr<SignedBlock>(
+                      SignedBlock{*block, proof ? *proof : std::vector<char>()});
                }
             }
             return nullptr;
@@ -136,7 +140,9 @@ namespace psibase
             auto     session = db.startRead();
             if (auto block = db.kvGet<Block>(DbId::blockLog, num))
             {
-               return psio::shared_view_ptr<SignedBlock>(SignedBlock{*block});
+               auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, num);
+               return psio::shared_view_ptr<SignedBlock>(
+                   SignedBlock{*block, proof ? *proof : std::vector<char>()});
             }
             else
             {
@@ -205,9 +211,13 @@ namespace psibase
                if (!next_state->revision)
                {
                   BlockContext ctx(*systemContext, state->revision, writer, true);
-                  ctx.start(Block(get(next_state->blockId())->block()));
+                  auto         blockPtr = get(next_state->blockId());
+                  ctx.start(Block(blockPtr->block()));
                   ctx.execAllInBlock();
-                  auto [newRevision, id] = ctx.writeRevision();
+                  BlockContext verifyBc(*systemContext, state->revision);
+                  VerifyProver prover{verifyBc, blockPtr->signature()};
+                  auto [newRevision, id] = ctx.writeRevision(
+                      prover, getProducerClaim(next_state->info.header.producer, state->revision));
                   // TODO: verify block id here?
                   // TODO: handle other errors and blacklist the block and its descendants
                   next_state->revision = newRevision;
@@ -322,10 +332,17 @@ namespace psibase
             return nullptr;
          }
          auto block          = blockContext->current;
-         auto [revision, id] = blockContext->writeRevision();
+         auto claim          = getProducerClaim(block.header.producer, head->revision);
+         auto [revision, id] = blockContext->writeRevision(*prover, claim);
          systemContext->sharedDatabase.setHead(*writer, revision);
          assert(head->blockId() == block.header.previous);
-         auto [iter, _] = blocks.try_emplace(id, SignedBlock{block});
+         auto proof = getBlockProof(revision, block.header.blockNum);
+         // TODO: fail if no key
+         if (claim.contract != AccountNumber{} && proof.empty())
+         {
+            std::cout << "No key found" << std::endl;
+         }
+         auto [iter, _] = blocks.try_emplace(id, SignedBlock{block, proof});
          // TODO: don't recompute sha
          BlockInfo info{*iter->second->block()};
          auto [state_iter, ins2] = states.try_emplace(iter->first, *head, info, revision);
@@ -337,9 +354,40 @@ namespace psibase
          return head;
       }
 
+      Claim getProducerClaim(AccountNumber producer, ConstRevisionPtr revision)
+      {
+         Database db{systemContext->sharedDatabase, std::move(revision)};
+         auto     session = db.startRead();
+         if (auto row =
+                 db.kvGet<ProducerConfigRow>(DbId::nativeConstrained, producerConfigKey(producer)))
+         {
+            return std::move(row->producerAuth);
+         }
+         else
+         {
+            return {};
+         }
+      }
+
+      std::vector<char> getBlockProof(ConstRevisionPtr revision, BlockNum blockNum)
+      {
+         Database db{systemContext->sharedDatabase, std::move(revision)};
+         auto     session = db.startRead();
+         if (auto row = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum))
+         {
+            return *row;
+         }
+         else
+         {
+            return {};
+         }
+      }
+
       bool isProducing() const { return !!blockContext; }
 
-      explicit ForkDb(SystemContext* sc)
+      explicit ForkDb(SystemContext*          sc,
+                      std::shared_ptr<Prover> prover = std::make_shared<CompoundProver>())
+          : prover(std::move(prover))
       {
          systemContext = sc;
          writer        = sc->sharedDatabase.createWriter();
@@ -401,6 +449,7 @@ namespace psibase
       std::optional<BlockContext>                               blockContext;
       SystemContext*                                            systemContext = nullptr;
       WriterPtr                                                 writer;
+      std::shared_ptr<Prover>                                   prover;
       BlockNum                                                  commitIndex = 1;
       BlockHeaderState*                                         head        = nullptr;
       std::map<Checksum256, psio::shared_view_ptr<SignedBlock>> blocks;
