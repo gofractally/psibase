@@ -252,21 +252,12 @@ function getAppletInURL() {
     return AppletId.fromFullPath(fullPath);
 }
 
-class Operations
+class ClientOps
 {
     static currentOps = [];
 
-    static add(sender) {
-        this.currentOps = this.currentOps.concat([sender]);
-    }
-
-    static get numOps() {
-        return this.currentOps.length;
-    }
-
-    static isEmpty()
-    {
-        return this.currentOps.length === 0;
+    static add(receiver) {
+        this.currentOps = this.currentOps.concat([receiver]);
     }
 
     static allCompleted()
@@ -276,7 +267,7 @@ class Operations
         return this.currentOps.length === 0;
     }
 
-    static opCompleted(sender)
+    static opReturned(sender)
     {
         let idx = this.currentOps.findIndex(op => op.equals(sender));
 
@@ -325,6 +316,7 @@ let injectSender = (transaction, sender) => {
 function App() {
     let activeApplet = getAppletInURL();
     let [applets, setApplets] = useState([{appletId: activeApplet, state: AppletStates.primary, onInit: ()=>{}}]);
+    let [operationCountdown, setOperationCountdown] = useState(false);
 
     const appletsRef = useRef();
     appletsRef.current = applets;
@@ -334,6 +326,21 @@ function App() {
             return a.appletId.equals(appletId);
         });
     }, []);
+
+    useEffect(()=>{
+        let timer = -1;
+        if (operationCountdown)
+        {
+            // Eventually we may not want to execute the transaction when the operation ends. 
+            // (Send the transaction to the msig applet or something)
+            timer = setTimeout(executeTransaction, 100);
+        }
+        else
+        {
+            clearTimeout(timer);
+        }
+
+    }, [operationCountdown])
 
     let open = useCallback((appletId) => {
         return new Promise((resolve, reject) => {
@@ -354,92 +361,79 @@ function App() {
         return Applet({appletId: activeApplet, state: AppletStates.primary}, handleMessage);
     }, []);
 
+    let getIframe = useCallback(async (appletId, shouldOpen) =>
+    {
+        if (!shouldOpen && getIndex(appletId) === -1)
+        {
+            throw "Applet [" + appletId.fullPath + "] not open, but it should have been.";
+        }
+
+        await open(appletId);
+
+        var iframe = document.getElementById(getIframeId(appletId));
+        if (iframe == null)
+        {
+            throw "Applet " + appletId.fullPath + " not found, send message failed.";
+        }
+
+        return iframe;
+    }, [open, getIndex])
+
     let sendMessage = useCallback(async (messageType, sender, receiver, payload, shouldOpenReceiver)=>{
+
+        var iframe;
         try 
         {
-            if (!shouldOpenReceiver && getIndex(receiver) === -1)
-            {
-                console.error("Cannot find receiver applet: " + receiver.fullPath + " for sendMessageGetResponse");
-                return;
-            }
+            iframe = await getIframe(receiver, shouldOpenReceiver);
+        } 
+        catch(e) 
+        {
+            // Did the initiator applet navigate to a different page before getting a response?
+            console.error(e);
+        }
 
-            await open(receiver);
 
-            var iframe = document.getElementById(getIframeId(receiver));
-            if (iframe == null)
-            {
-                console.error("Applet " + receiver.fullPath + " not found, send message failed.");
-                return;
-            }
+        // TODO: Could check that sender isn't on a blacklist before
+        //       making the IPC call.
 
-            // TODO: Could check that sender isn't on a blacklist before
-            //       making the IPC call.
+        let restrictedTargetOrigin = await receiver.url();
+        iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
+
+    }, [getIframe]);
+
+    let sendMessageGetResponse = useCallback(async (messageType, sender, receiver, payload, shouldOpenReceiver)=>{
+
+        // TODO: Could check that sender isn't on a blacklist before
+        //       making the IPC call.
+
+        // TODO: handle timeout if I never get a response from an applet
+
+        return new Promise(async (resolve, reject) => {
+            let iframe = await getIframe(receiver, shouldOpenReceiver);
+
+            payload.callbackId = storeCallback(({sender : responseApplet, response, errors})=>{
+                if (!responseApplet.equals(receiver))
+                {
+                    return;
+                }
+                resolve({response, errors});
+                // TODO: Consider creating a QueryResponse object with these two fields
+            });
 
             let restrictedTargetOrigin = await receiver.url();
             iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
+        });
+    }, [getIframe]);
 
-        } catch (e) {
-            console.error(e);
-
-            let msg = sender.fullPath + "@" + receiver.fullPath + ":" + payload.identifier;
-            console.error("Common-sys failed to route message " + msg);
-        }
-
-    }, [open, getIndex]);
-
-    let sendMessageGetResponse = useCallback(async (messageType, sender, receiver, payload, shouldOpenReceiver)=>{
-        try 
-        {
-            if (!shouldOpenReceiver && getIndex(receiver) === -1)
-            {
-                console.error("Cannot find receiver applet: " + receiver.fullPath + " for sendMessageGetResponse");
-                return;
-            }
-
-            await open(receiver);
-
-            var iframe = document.getElementById(getIframeId(receiver));
-            if (iframe == null)
-            {
-                console.error("Applet " + receiver.fullPath + " not found, send message failed.");
-                return;
-            }
-
-            // TODO: Could check that sender isn't on a blacklist before
-            //       making the IPC call.
-
-            return new Promise(async (resolve, reject) => {
-                payload.callbackId = storeCallback(({sender : responseApplet, response, errors})=>{
-                    if (!responseApplet.equals(receiver))
-                    {
-                        return;
-                    }
-                    resolve({response, errors});
-                    // TODO: Consider creating a QueryResponse object with these two fields
-                });
-
-                let restrictedTargetOrigin = await receiver.url();
-                iframe.iFrameResizer.sendMessage({type: messageType, payload}, restrictedTargetOrigin);
-            });
-
-        } catch (e) {
-            console.error(e);
-
-            let msg = sender.fullPath + "@" + receiver.fullPath + ":" + payload.identifier;
-            console.error("Common-sys failed to route message " + msg);
-        }
-
-    }, [open, getIndex]);
-
-    let query = useCallback(async (receiver, name, params = {}) => {
-        return await sendMessageGetResponse(MessageTypes.Query, commonSys, receiver, 
+    let query = useCallback(async (sender, receiver, name, params = {}) => {
+        return await sendMessageGetResponse(MessageTypes.Query, sender, receiver,
             {identifier: name, params}, 
             true
         );
     }, [sendMessageGetResponse]);
 
-    let operation = useCallback(async (receiver, name, params = {}) => {
-        return await sendMessageGetResponse(MessageTypes.Operation, commonSys, receiver, 
+    let operation = useCallback(async (sender, receiver, name, params = {}) => {
+        return await sendMessageGetResponse(MessageTypes.Operation, sender, receiver,
             {identifier: name, params}, 
             true
         );
@@ -452,9 +446,9 @@ function App() {
         try
         {
             let accountSys = new AppletId("account-sys");
-            let {response: user} = await query(accountSys, "getLoggedInUser");
+            let {response: user} = await query(commonSys, accountSys, "getLoggedInUser");
             let transaction = await constructTransaction(injectSender(pendingTransaction, user));
-            let {response: signedTransaction,} = await query(accountSys, "getAuthedTransaction", {transaction});
+            let {response: signedTransaction,} = await query(commonSys, accountSys, "getAuthedTransaction", {transaction});
             let baseUrl = ''; // default
             let trace = await packAndPushSignedTransaction(baseUrl, signedTransaction);
             console.log(trace);
@@ -469,58 +463,57 @@ function App() {
     let messageRouting = useMemo(() => [
         {
             type: MessageTypes.Operation,
-            validate: (payload) => {
-                return verifyFields(payload, ["callbackId", "appletId", "name", "params"]);
-            },
+            fields: ["callbackId", "appletId", "name", "params"],
             handle: async (sender, payload) => {
                 let { callbackId, appletId, name, params } = payload;
 
-                let receiver = AppletId.fromJSON(appletId);
-                Operations.add(receiver);
-                let {response, errors} = await sendMessageGetResponse(MessageTypes.Operation, 
-                    sender,
-                    receiver,
-                    {identifier: name, params},
-                    true
-                );
+                setOperationCountdown(false);
 
-                sendMessage(MessageTypes.OperationResponse, 
-                    receiver, 
-                    sender,
-                    {callbackId, response, errors},
-                    false
-                );
+                let receiver = AppletId.fromJSON(appletId);
+                ClientOps.add(receiver);
+
+                var reply = null;
+                try 
+                {
+                    reply = await operation(sender, receiver, name, params);
+                    reply.callbackId = callbackId;
+                }
+                catch (e) 
+                {
+                    let msg = sender.fullPath + "@" + receiver.fullPath + ":" + name;
+                    msg = "Common-sys failed to route message: " + msg;
+                    reply = {callbackId, response: null, errors: [e, msg]}
+                }
+
+                sendMessage(MessageTypes.OperationResponse, receiver, sender, reply, false);
             },
         },
         {
             type: MessageTypes.Query,
-            validate: (payload) => {
-                return verifyFields(payload, ["callbackId", "appletId", "name", "params"]);
-            },
+            fields: ["callbackId", "appletId", "name", "params"],
             handle: async (sender, payload) => {
                 let {callbackId, appletId, name, params} = payload;
 
                 let receiver = AppletId.fromJSON(appletId);
-                let {response, errors} = await sendMessageGetResponse(MessageTypes.Query, 
-                    sender, 
-                    receiver, 
-                    {identifier: name, params}, 
-                    true
-                );
 
-                sendMessage(MessageTypes.QueryResponse, 
-                    receiver, 
-                    sender,
-                    {callbackId, response, errors},
-                    false
-                );
+                var reply = null;
+                try {
+                    reply = await query(sender, receiver, name, params);
+                    reply.callbackId = callbackId;
+                }
+                catch (e)
+                {
+                    let msg = sender.fullPath + "@" + receiver.fullPath + ":" + name;
+                    msg = "Common-sys failed to route message: " + msg;
+                    reply = {callbackId, response: null, errors: [e, msg]}
+                }
+
+                sendMessage(MessageTypes.QueryResponse, receiver, sender, reply, false);
             },
         },
         {
             type: MessageTypes.Action,
-            validate: (payload) => {
-                return verifyFields(payload, ["application", "actionName", "params", "sender"]);
-            },
+            fields: ["application", "actionName", "params", "sender"],
             handle: async (sender, payload) => {
                 // Todo: change Action payload to use "user" rather than sender. 
                 //       Sender is always the applet, user is the person
@@ -532,9 +525,7 @@ function App() {
         },
         {
             type: MessageTypes.QueryResponse,
-            validate: (payload) => {
-                return verifyFields(payload, ["callbackId", "response", "errors"]);
-            },
+            fields: ["callbackId", "response", "errors"],
             handle: (sender, payload) =>
             {
                 let {callbackId, response, errors} = payload;
@@ -543,23 +534,20 @@ function App() {
         },
         {
             type: MessageTypes.OperationResponse,
-            validate: (payload) => {
-                return verifyFields(payload, ["callbackId", "response", "errors"]);
-            },
+            fields: ["callbackId", "response", "errors"],
             handle: (sender, payload) => {
                 let {callbackId, response, errors} = payload;
                 executeCallback(callbackId, {sender, response, errors});
 
-                Operations.opCompleted(sender);
-                if (Operations.allCompleted())
+                ClientOps.opReturned(sender);
+                if (ClientOps.allCompleted())
                 {
-                    // TODO - Eliminate race condition.
-                    setTimeout(executeTransaction, 1000);
+                    setOperationCountdown(true);
                 }
             },
         },
 
-    ], [open, executeTransaction, sendMessage, sendMessageGetResponse]);
+    ], [open, executeTransaction, sendMessage, sendMessageGetResponse, operationCountdown]);
 
     let handleMessage = useCallback(async (sender, request)=>{
         let {type, payload} = request.message;
@@ -574,15 +562,14 @@ function App() {
             console.error("Message from applet specifies unknown route.");
             return;
         }
-        if (!route.validate(payload)) 
+
+        if (!verifyFields(payload, route.fields))
         {
-            let t = type === MessageTypes.Operation ? 'Operation' : 
-                type === MessageTypes.Action ? 'Action' : 
-                type === MessageTypes.Query ? 'Query' : 'Unknown';
-            console.error(t + " invalid with payload:");
+            console.error(type + " invalid with payload:");
             console.error(payload);
             return;
         }
+
         route.handle(sender, payload);
 
     }, [messageRouting]);

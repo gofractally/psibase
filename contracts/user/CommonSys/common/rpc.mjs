@@ -229,7 +229,6 @@ export const ErrorMessages = [
 ]
 
 export const MessageTypes = {
-    Core: "Core", // A message to the core layer itself
     Action: "Action", // An action send to an on-chain application
     Query: "Query",  // A query to another client-side applet, expect a response
     Operation: "Operation", // A procedure which can include multiple other queries, actions, and operations
@@ -414,9 +413,7 @@ export async function getContractName()
 let messageRouting = [
     {
         type: MessageTypes.Operation,
-        validate: (payload)=>{
-            return verifyFields(payload, ["identifier", "params", "callbackId"]);
-        },
+        fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
             let {identifier, params, callbackId} = payload;
             let responsePayload = {callbackId, response: null, errors: []};
@@ -450,9 +447,7 @@ let messageRouting = [
     },
     {
         type: MessageTypes.Query,
-        validate: (payload)=>{
-            return verifyFields(payload, ["identifier", "params", "callbackId"]);
-        },
+        fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
             let {identifier, params, callbackId} = payload;
             let responsePayload = {callbackId, response: null, errors: []};
@@ -482,9 +477,7 @@ let messageRouting = [
     },
     {
         type: MessageTypes.QueryResponse,
-        validate: (payload) => {
-            return verifyFields(payload, ["callbackId", "response", "errors"]);
-        },
+        fields: ["callbackId", "response", "errors"],
         route: (payload) => {
             let {callbackId, response, errors} = payload;
             return executePromise(callbackId, response, errors);
@@ -492,9 +485,7 @@ let messageRouting = [
     },
     {
         type: MessageTypes.OperationResponse,
-        validate: (payload) => {
-            return verifyFields(payload, ["callbackId", "response", "errors"]);
-        },
+        fields: ["callbackId", "response", "errors"],
         route: (payload) => {
             let {callbackId, response, errors} = payload;
             return executePromise(callbackId, response, errors);
@@ -530,7 +521,7 @@ export async function initializeApplet(initializer = ()=>{})
                 return;
             }
 
-            if (!route.validate(payload))
+            if (!verifyFields(payload, route.fields))
             {
                 console.error("Message from core failed validation checks");
                 return;
@@ -608,7 +599,7 @@ export function setQueries(queries)
  * @param {String} name - The name of the operation to run.
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
-export function operation(appletId, name, params)
+export function operation(appletId, name, params = {})
 {
     const operationPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected

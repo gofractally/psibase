@@ -46,7 +46,7 @@ initializeApplet(async () => {
         {
             id: "getAuthedTransaction",
             exec: async ({transaction}) => {
-                let user = await query(accountSys, "getLoggedInUser"); 
+                let user = await query(accountSys, "getLoggedInUser");
                 let accounts = await getJson("/accounts");
                 let u = accounts.find(a => a.accountNum === user);
                 if (u.authContract === "auth-ec-sys")
