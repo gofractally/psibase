@@ -469,12 +469,104 @@ namespace psibase
                 event_type,
                 event_unpack_ok)
 
+   /// GraphQL support for decoding an event
+   ///
+   /// If a GraphQL query function returns this type, then the system
+   /// fetches and decodes an event.
+   ///
+   /// The GraphQL result is an object with these fields, plus more:
+   ///
+   /// ```text
+   /// type MyContract_EventsUi {
+   ///     event_db: Float!                   # Database ID (uint32_t)
+   ///     event_id: String!                  # Event ID (uint64_t)
+   ///     event_found: Boolean!              # Was the event found in db?
+   ///     event_contract: String!            # Contract that created the event
+   ///     event_supported_contract: Boolean! # Is this contract the one
+   ///                                        #    that created it?
+   ///     event_type: String!                # Event type
+   ///     event_unpack_ok: Boolean!          # Did it decode OK?
+   /// }
+   /// ```
+   ///
+   /// `EventDecoder` will only attempt to decode an event which meets all of the following:
+   /// * It's found in the `EventDecoder::db` database (`event_found` will be true)
+   /// * Was written by the contract which matches the `EventDecoder::contract` field (`event_supported_contract` will be true)
+   /// * Has a type which matches one of the definitions in the `Events` template argument
+   ///
+   /// If decoding is successful, `EventDecoder` will set the GraphQL `event_unpack_ok`
+   /// field to true. It will include any event fields which were in the query request.
+   /// It will include all event fields if the query request includes the special field
+   /// `event_all_content`. `EventDecoder` silently ignores any requested fields which
+   /// don't match the fields of the decoded event.
+   ///
+   /// #### EventDecoder example
+   ///
+   /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
+   /// have [defined events](contracts-events.md#defining-events) for your contract.
+   /// It's rare to define a query method like this one; use [EventQuery] instead,
+   /// which handles history, ui, and merkle events.
+   ///
+   /// ```c++
+   /// struct Query
+   /// {
+   ///    psibase::AccountNumber contract;
+   ///
+   ///    auto getUiEvent(uint64_t eventId) const
+   ///    {
+   ///       return EventDecoder<MyContract::Events::Ui>{
+   ///          DbId::uiEvent, eventId, contract};
+   ///    }
+   /// };
+   /// PSIO_REFLECT(Query, method(getUiEvent, eventId))
+   /// ```
+   ///
+   /// Example query:
+   ///
+   /// ```text
+   /// {
+   ///   getUiEvent(eventId: "13") {
+   ///     event_id
+   ///     event_type
+   ///     event_all_content
+   ///   }
+   /// }
+   /// ```
+   ///
+   /// Example reply:
+   ///
+   /// ```text
+   /// {
+   ///   "data": {
+   ///     "getUiEvent": {
+   ///       "event_id": "13",
+   ///       "event_type": "credited",
+   ///       "tokenId": 1,
+   ///       "sender": "symbol-sys",
+   ///       "receiver": "alice",
+   ///       "amount": {
+   ///         "value": "100000000000"
+   ///       },
+   ///       "memo": {
+   ///         "contents": "memo"
+   ///       }
+   ///     }
+   ///   }
+   /// }
+   /// ```
    template <typename Events>
    struct EventDecoder
    {
       DbId          db;
       uint64_t      eventId;
       AccountNumber contract;
+
+      struct Reflect
+      {
+         static constexpr psio::FixedString name      = psio::reflect<Events>::name;
+         static constexpr bool              is_struct = false;
+      };
+      friend Reflect get_reflect_impl(const EventDecoder&);
    };
 
    template <typename Events>
@@ -705,5 +797,408 @@ namespace psibase
 
       return ok;
    }  // gql_query(EventDecoder)
+
+   /// GraphQL support for decoding multiple events
+   ///
+   /// If a GraphQL query function returns this type, then the system
+   /// returns a GraphQL object with the following query methods:
+   ///
+   /// ```text
+   /// type MyContract_Events {
+   ///     history(ids: [String!]!): [MyContract_EventsHistory!]!
+   ///     ui(ids: [String!]!):      [MyContract_EventsUi!]!
+   ///     merkle(ids: [String!]!):  [MyContract_EventsMerkle!]!
+   /// }
+   /// ```
+   ///
+   /// These methods take an array of event IDs. They return arrays
+   /// of objects containing the decoded (if possible) events.
+   /// See [EventDecoder] for how to interact with the return values;
+   /// `MyContract_EventsHistory`, `MyContract_EventsUi`, and
+   /// `MyContract_EventsMerkle` all behave the same.
+   ///
+   ///
+   /// #### EventQuery example
+   ///
+   /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
+   /// have [defined events](contracts-events.md#defining-events) for your contract.
+   ///
+   /// ```c++
+   /// struct Query
+   /// {
+   ///    psibase::AccountNumber contract;
+   ///
+   ///    auto events() const
+   ///    {
+   ///       return psibase::EventQuery<MyContract::Events>{contract};
+   ///    }
+   /// };
+   /// PSIO_REFLECT(Query, method(events))
+   /// ```
+   ///
+   /// Example query:
+   ///
+   /// ```text
+   /// {
+   ///   events {
+   ///     history(ids: ["3", "4"]) {
+   ///       event_id
+   ///       event_all_content
+   ///     }
+   ///   }
+   /// }
+   /// ```
+   ///
+   /// Example reply:
+   ///
+   /// ```text
+   /// {
+   ///   "data": {
+   ///     "events": {
+   ///       "history": [
+   ///         {
+   ///           "event_id": "3",
+   ///           "tokenId": 1,
+   ///           "creator": "token-sys",
+   ///           "precision": {
+   ///             "value": 8
+   ///           },
+   ///           "maxSupply": {
+   ///             "value": "100000000000000000"
+   ///           }
+   ///         },
+   ///         {
+   ///           "event_id": "4",
+   ///           "prevEvent": 1,
+   ///           "tokenId": "3",
+   ///           "setter": "token-sys",
+   ///           "flag": "untradeable",
+   ///           "enable": true
+   ///         }
+   ///       ]
+   ///     }
+   ///   }
+   /// }
+   /// ```
+   template <typename Events>
+   struct EventQuery
+   {
+      AccountNumber contract;
+
+      /// Decode history events
+      auto history(const std::vector<uint64_t>& ids) const
+      {
+         std::vector<EventDecoder<typename Events::History>> result;
+         result.reserve(ids.size());
+         for (auto id : ids)
+            result.push_back({DbId::historyEvent, id, contract});
+         return result;
+      }
+
+      /// Decode user interface events
+      auto ui(const std::vector<uint64_t>& ids) const
+      {
+         std::vector<EventDecoder<typename Events::Ui>> result;
+         result.reserve(ids.size());
+         for (auto id : ids)
+            result.push_back({DbId::uiEvent, id, contract});
+         return result;
+      }
+
+      /// Decode merkle events
+      auto merkle(const std::vector<uint64_t>& ids) const
+      {
+         std::vector<EventDecoder<typename Events::Merkle>> result;
+         result.reserve(ids.size());
+         for (auto id : ids)
+            result.push_back({DbId::merkleEvent, id, contract});
+         return result;
+      }
+
+      struct Reflect
+      {
+         static constexpr bool is_defined = true;
+         static constexpr bool is_struct  = true;
+         template <typename L>
+         constexpr inline static void for_each(L&& lambda)
+         {
+            lambda(
+                psio::meta{
+                    .name        = "history",
+                    .param_names = {"ids"},
+                },
+                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::history)
+                { return &psio::remove_cvref_t<decltype(*p)>::history; });
+            lambda(
+                psio::meta{
+                    .name        = "ui",
+                    .param_names = {"ids"},
+                },
+                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::ui)
+                { return &psio::remove_cvref_t<decltype(*p)>::ui; });
+            lambda(
+                psio::meta{
+                    .name        = "merkle",
+                    .param_names = {"ids"},
+                },
+                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::merkle)
+                { return &psio::remove_cvref_t<decltype(*p)>::merkle; });
+         }
+         template <typename L>
+         inline static bool get_by_name(uint64_t n, L&& lambda)
+         {
+            switch (n)
+            {
+               case psio::hash_name(BOOST_PP_STRINGIZE(history)):
+                  (void)lambda(psio::meta{.name = "history", .param_names = {"ids"}},
+                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::history)
+                               { return &psio::remove_cvref_t<decltype(*p)>::history; });
+                  break;
+               case psio::hash_name(BOOST_PP_STRINGIZE(ui)):
+                  (void)lambda(psio::meta{.name = "ui", .param_names = {"ids"}},
+                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::ui)
+                               { return &psio::remove_cvref_t<decltype(*p)>::ui; });
+                  break;
+               case psio::hash_name(BOOST_PP_STRINGIZE(merkle)):
+                  (void)lambda(psio::meta{.name = "merkle", .param_names = {"ids"}},
+                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::merkle)
+                               { return &psio::remove_cvref_t<decltype(*p)>::merkle; });
+                  break;
+            }
+            return false;
+         }
+      };  // Reflect
+
+      friend Reflect get_reflect_impl(const EventQuery&);
+      friend auto    get_type_name(EventQuery*) { return get_type_name((Events*)nullptr); }
+   };  // EventQuery
+
+   /// GraphQL support for a linked list of events
+   ///
+   /// This function returns a GraphQL [Connection] which pages
+   /// through a linked list of events, starting at either `eventId`
+   /// or one event past `after` (a decimal number in string form
+   /// which acts as a GraphQL cursor). At each decoded event, it
+   /// looks for a field with a name which matches `fieldName`.
+   /// If it finds one, and it's a numeric type, then it uses that
+   /// field as the link to the next event. It stops when the
+   /// maximum number of results (`first`) is found, it encounters
+   /// an event from another contract, it encounters an event not
+   /// defined in `Events`, it can't find a field with a name
+   /// that matches `fieldName`, or there's a decoding error. Each
+   /// node in the resulting Connection is produced by [EventDecoder].
+   ///
+   /// #### makeEventConnection example
+   ///
+   /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
+   /// have [defined events](contracts-events.md#defining-events) for your contract.
+   ///
+   /// ```c++
+   /// struct Query
+   /// {
+   ///    psibase::AccountNumber contract;
+   ///
+   ///    auto holderEvents(
+   ///        psibase::AccountNumber      holder,
+   ///        std::optional<uint32_t>     first,
+   ///        std::optional<std::string>  after
+   ///    ) const
+   ///    {
+   ///       ExampleTokenContract::Tables tables{contract};
+   ///
+   ///       // Each holder (user) has a record which points to the most recent event
+   ///       // which affected the user's balance.
+   ///       auto     holders = tables.open<TokenHolderTable>().getIndex<0>();
+   ///       uint64_t eventId = 0;
+   ///       if (auto record = holders.get(holder))
+   ///          eventId = record->lastHistoryEvent;
+   ///
+   ///       // Create the Connection. Each event has a field named "prevEvent"
+   ///       // which points to the previous event which affected the user's balance.
+   ///       return psibase::makeEventConnection<ExampleTokenContract::Events::History>(
+   ///           psibase::DbId::historyEvent, eventId, contract, "prevEvent", first, after);
+   ///    }
+   /// };
+   /// PSIO_REFLECT(Query, method(holderEvents, holder, first, after))
+   /// ```
+   ///
+   /// Example query:
+   ///
+   /// ```text
+   /// {
+   ///   holderEvents(holder: "alice", first: 3) {
+   ///     pageInfo {
+   ///       hasNextPage
+   ///       endCursor
+   ///     }
+   ///     edges {
+   ///       node {
+   ///         event_id
+   ///         event_type
+   ///         event_all_content
+   ///       }
+   ///     }
+   ///   }
+   /// }
+   /// ```
+   ///
+   /// Example reply:
+   ///
+   /// ```text
+   /// {
+   ///   "data": {
+   ///     "holderEvents": {
+   ///       "pageInfo": {
+   ///         "hasNextPage": true,
+   ///         "endCursor": "13"
+   ///       },
+   ///       "edges": [
+   ///         {
+   ///           "node": {
+   ///             "event_id": "17",
+   ///             "event_type": "transferred",
+   ///             "tokenId": 1,
+   ///             "prevEvent": "15",
+   ///             "sender": "bob",
+   ///             "receiver": "alice",
+   ///             "amount": {
+   ///               "value": "4000000000"
+   ///             },
+   ///             "memo": {
+   ///               "contents": "memo"
+   ///             }
+   ///           }
+   ///         },
+   ///         {
+   ///           "node": {
+   ///             "event_id": "15",
+   ///             "event_type": "recalled",
+   ///             "tokenId": 1,
+   ///             "prevEvent": "13",
+   ///             "from": "alice",
+   ///             "amount": {
+   ///               "value": "1000000000"
+   ///             },
+   ///             "memo": {
+   ///               "contents": "penalty for spamming"
+   ///             }
+   ///           }
+   ///         },
+   ///         {
+   ///           "node": {
+   ///             "event_id": "13",
+   ///             "event_type": "transferred",
+   ///             "tokenId": 1,
+   ///             "prevEvent": "10",
+   ///             "sender": "alice",
+   ///             "receiver": "bob",
+   ///             "amount": {
+   ///               "value": "30000000000"
+   ///             },
+   ///             "memo": {
+   ///               "contents": "memo"
+   ///             }
+   ///           }
+   ///         }
+   ///       ]
+   ///     }
+   ///   }
+   /// }
+   /// ```
+   template <typename Events>
+   auto makeEventConnection(DbId                              db,
+                            uint64_t                          eventId,
+                            AccountNumber                     contract,
+                            std::string_view                  fieldName,
+                            std::optional<uint32_t>           first,
+                            const std::optional<std::string>& after)
+   {
+      using Decoder    = EventDecoder<Events>;
+      using Connection = Connection<  //
+          Decoder, psio::reflect<Decoder>::name + "Connection",
+          psio::reflect<Decoder>::name + "Edge">;
+      Connection result;
+      result.pageInfo.hasNextPage = true;
+      bool excludeFirst           = false;
+      if (after.has_value())
+      {
+         uint64_t a;
+         auto     result = std::from_chars(after->c_str(), after->c_str() + after->size(), a);
+         if (result.ec == std::errc{} && result.ptr == after->c_str() + after->size())
+         {
+            eventId      = a;
+            excludeFirst = true;
+         }
+      }
+
+      while (eventId && (!first || result.edges.size() < *first))
+      {
+         if (!excludeFirst)
+            result.edges.push_back({
+                .node   = {db, eventId, contract},
+                .cursor = std::to_string(eventId),
+            });
+         excludeFirst = false;
+         auto v       = getSequentialRaw(db, eventId);
+         if (!v)
+         {
+            result.pageInfo.hasNextPage = false;
+            break;
+         }
+         psio::input_stream stream(v->data(), v->size());
+
+         AccountNumber c;
+         fracunpack(c, stream);
+         if (c != contract)
+         {
+            result.pageInfo.hasNextPage = false;
+            break;
+         }
+
+         MethodNumber type;
+         fracunpack(type, stream);
+
+         bool found = false;
+         psio::reflect<Events>::get_by_name(
+             type.value,
+             [&](auto meta, auto member)
+             {
+                using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+                static_assert(MT::isFunction);
+                using TT = decltype(psio::tuple_remove_view(
+                    std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+                // TODO: EventDecoder validates and unpacks this again
+                if (psio::fracvalidate<TT>(stream.pos, stream.end).valid)
+                {
+                   auto value = psio::convert_from_frac<TT>(stream);
+                   get_event_field<0>(  //
+                       value, fieldName, {}, {meta.param_names.begin(), meta.param_names.end()},
+                       [&](auto _, const auto& field)
+                       {
+                          if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(field)>>)
+                          {
+                             if (field)
+                             {
+                                eventId = field;
+                                found   = true;
+                             }
+                          }
+                       });
+                }
+             });
+         if (!found)
+         {
+            result.pageInfo.hasNextPage = false;
+            break;
+         }
+      }  // while (!first || result.edges.size() < *first)
+
+      if (!result.edges.empty())
+      {
+         result.pageInfo.startCursor = result.edges.front().cursor;
+         result.pageInfo.endCursor   = result.edges.back().cursor;
+      }
+      return result;
+   }  // makeEventConnection
 
 }  // namespace psibase

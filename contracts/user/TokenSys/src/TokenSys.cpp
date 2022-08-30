@@ -64,7 +64,7 @@ void TokenSys::init()
    auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
-   emit().ui().initialized();
+   emit().history().initialized();
 
    auto tokContract = at<TokenSys>();
    auto nftContract = at<NftSys>();
@@ -108,7 +108,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
       nftContract.credit(*nftId, creator, "Nft for new token ID: " + std::to_string(newId));
    }
 
-   auto lastEvent = emit().ui().created(newId, creator, precision, maxSupply);
+   auto lastEvent = emit().history().created(newId, creator, precision, maxSupply);
 
    tokenTable.put(TokenRecord{
        .id        = newId,      //
@@ -132,7 +132,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
    check(not sumExceeds(token.currentSupply.value, amount.value, token.maxSupply.value),
          maxSupplyExceeded);
 
-   token.lastEvent = emit().ui().minted(tokenId, token.lastEvent, sender, amount, memo);
+   token.lastEvent = emit().history().minted(tokenId, token.lastEvent, sender, amount, memo);
 
    token.currentSupply += amount;
    balance.balance += amount.value;
@@ -160,7 +160,7 @@ void TokenSys::burn(TID tokenId, Quantity amount)
       db.open<BalanceTable>().put(balance);
    }
 
-   token.lastEvent = emit().ui().burned(tokenId, token.lastEvent, sender, amount);
+   token.lastEvent = emit().history().burned(tokenId, token.lastEvent, sender, amount);
 
    db.open<TokenTable>().put(token);
 }
@@ -176,7 +176,7 @@ void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
    hodler.config.set(flagBit, enable);
    db.open<TokenHolderTable>().put(hodler);
 
-   emit().ui().userConfSet(sender, flag, enable);
+   emit().history().userConfSet(sender, flag, enable);
 }
 
 void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
@@ -190,7 +190,8 @@ void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
    auto token     = getToken(tokenId);
    auto flagIndex = TokenRecord::Configurations::getIndex(flag);
 
-   token.lastEvent = emit().ui().tokenConfSet(tokenId, token.lastEvent, getSender(), flag, enable);
+   token.lastEvent =
+       emit().history().tokenConfSet(tokenId, token.lastEvent, getSender(), flag, enable);
 
    token.config.set(flagIndex, enable);
    db.open<TokenTable>().put(token);
@@ -227,7 +228,17 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
       auto balance = getBalance(tokenId, receiver);
       balance.balance += amount.value;
       db.open<BalanceTable>().put(balance);
-      emit().ui().transferred(tokenId, sender, receiver, amount, memo);
+      emit().merkle().transferred(tokenId, sender, receiver, amount, memo);
+
+      auto senderHolder             = getTokenHolder(sender);
+      senderHolder.lastHistoryEvent = emit().history().transferred(
+          tokenId, senderHolder.lastHistoryEvent, sender, receiver, amount, memo);
+      db.open<TokenHolderTable>().put(senderHolder);
+
+      auto receiverHolder             = getTokenHolder(receiver);
+      receiverHolder.lastHistoryEvent = emit().history().transferred(
+          tokenId, receiverHolder.lastHistoryEvent, sender, receiver, amount, memo);
+      db.open<TokenHolderTable>().put(receiverHolder);
    }
 }
 
@@ -282,7 +293,17 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    }
    db.open<BalanceTable>().put(receiverBalance);
 
-   emit().ui().transferred(tokenId, sender, receiver, amount, memo);
+   emit().merkle().transferred(tokenId, sender, receiver, amount, memo);
+
+   auto senderHolder             = getTokenHolder(sender);
+   senderHolder.lastHistoryEvent = emit().history().transferred(
+       tokenId, senderHolder.lastHistoryEvent, sender, receiver, amount, memo);
+   db.open<TokenHolderTable>().put(senderHolder);
+
+   auto receiverHolder             = getTokenHolder(receiver);
+   receiverHolder.lastHistoryEvent = emit().history().transferred(
+       tokenId, receiverHolder.lastHistoryEvent, sender, receiver, amount, memo);
+   db.open<TokenHolderTable>().put(receiverHolder);
 }
 
 void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
@@ -303,7 +324,12 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    auto balanceTable = db.open<BalanceTable>();
    balanceTable.put(fromBalance);
 
-   emit().ui().recalled(tokenId, from, amount, memo);
+   emit().merkle().recalled(tokenId, from, amount, memo);
+
+   auto holder = getTokenHolder(from);
+   holder.lastHistoryEvent =
+       emit().history().recalled(tokenId, holder.lastHistoryEvent, from, amount, memo);
+   db.open<TokenHolderTable>().put(holder);
 }
 
 void TokenSys::mapSymbol(TID tokenId, SID symbolId)
@@ -323,7 +349,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
    nftContract.debit(symbol.ownerNft, debitMemo);
 
    // Emit mapped event
-   token.lastEvent = emit().ui().symbolMapped(tokenId, token.lastEvent, sender, symbolId);
+   token.lastEvent = emit().history().symbolMapped(tokenId, token.lastEvent, sender, symbolId);
 
    // Store mapping
    token.symbolId = symbolId;

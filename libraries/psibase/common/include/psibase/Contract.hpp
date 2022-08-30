@@ -69,11 +69,9 @@ namespace psibase
    /// - [DbId::uiEvent]
    /// - [DbId::merkleEvent]
    ///
-   /// To define events for a contract, declare the event functions as below, then reflect them using the macros below. Skip any macro for event types you do not have.
+   /// To define events for a contract, declare the event functions as below, then reflect them using the 4 macros below. Each of the `History`, `Ui`, and `Merkle` structs must be present and reflected, even when they don't have any events declared within.
    ///
    /// After you have defined your events, use [Contract::emit] to emit them and [Contract::events] to read them.
-   ///
-   /// TODO: Merkle events aren't implemented yet
    ///
    /// ```c++
    /// struct MyContract: psibase::Contract<MyContract> {
@@ -100,6 +98,8 @@ namespace psibase
    ///       };
    ///    };
    /// };
+   ///
+   /// PSIBASE_REFLECT_EVENTS(MyContract)
    ///
    /// PSIBASE_REFLECT_HISTORY_EVENTS(
    ///    MyContract,
@@ -257,6 +257,10 @@ namespace psibase
    };
 
 };  // namespace psibase
+
+#define PSIBASE_REFLECT_EVENTS(CONTRACT)        \
+   using CONTRACT##_Events = CONTRACT ::Events; \
+   PSIO_REFLECT(CONTRACT##_Events)
 
 #define PSIBASE_REFLECT_HISTORY_EVENTS(CONTRACT, ...)           \
    using CONTRACT##_EventsHistory = CONTRACT ::Events::History; \

@@ -61,6 +61,8 @@ namespace psibase
                return (DbId)db;
             if (db == uint32_t(DbId::uiEvent))
                return (DbId)db;
+            if (db == uint32_t(DbId::merkleEvent))
+               return (DbId)db;
          }
          throw std::runtime_error("contract may not read this db, or must use another intrinsic");
       }
@@ -145,6 +147,8 @@ namespace psibase
          if (db == uint32_t(DbId::historyEvent))
             return (DbId)db;
          if (db == uint32_t(DbId::uiEvent))
+            return (DbId)db;
+         if (db == uint32_t(DbId::merkleEvent))
             return (DbId)db;
          throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
@@ -417,6 +421,8 @@ namespace psibase
                 indexNumber = dbStatus.nextHistoryEventNumber++;
              else if (db == uint32_t(DbId::uiEvent))
                 indexNumber = dbStatus.nextUIEventNumber++;
+             else if (db == uint32_t(DbId::merkleEvent))
+                indexNumber = dbStatus.nextMerkleEventNumber++;
              else
                 check(false, "putSequential: unsupported db");
              database.kvPut(DatabaseStatusRow::db, dbStatus.key(), dbStatus);

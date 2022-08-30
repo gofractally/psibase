@@ -8,9 +8,9 @@ namespace psibase
    /// The `proxy-sys` contract routes HTTP requests to the appropriate contract
    ///
    /// Rule set:
-   /// - If the request references an unregistered subdomain, then abort with a message indicating it needs registration.
-   /// - Else if the target starts with `/common`, then route the request to [CommonSys].
+   /// - If the target starts with `/common`, then route the request to [system_contract::CommonSys].
    /// - Else if there's a subdomain and it references a registered contract, then route the request to that contract.
+   /// - Else if the request references an unregistered subdomain, then route the request to `psispace-sys`.
    /// - Else route the request to [CommonSys]; this handles the chain's main domain.
    ///
    /// See [Web Services](../cpp-contract/reference/web-services.md) for more detail, including how to write contracts which serve HTTP requests.

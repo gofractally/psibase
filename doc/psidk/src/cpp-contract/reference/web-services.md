@@ -19,6 +19,9 @@
     - [psibase::PageInfo]
     - [psibase::Edge]
     - [psibase::Connection]
+  - [psibase::EventDecoder]
+  - [psibase::EventQuery]
+  - [psibase::makeEventConnection]
 
 ## Routing
 
@@ -42,16 +45,28 @@
          |        +--------------+      |
          |        |                     |
          v        v                     v
-      +-----------------+       +------------------+
-      | common-sys      |       | registered       |
-      | contract's      |       | contract's       |
-      | serveSys action |       | serveSys action  |
-      +-----------------+       +------------------+
+      +-----------------+     +------------+
+      | common-sys      |    /              \
+      | contract's      |   /  registered?   \
+      | serveSys action |   \                /
+      +-----------------+    \              /
+                              +------------+
+                              no |      | yes
+                  +--------------+      |
+                  |                     |
+                  v                     v
+   +-----------------+     +-----------------+
+   | psispace-sys    |     | registered      |
+   | contract's      |     | contract's      |
+   | serveSys action |     | serveSys action |
+   +-----------------+     +-----------------+
 ```
 
 `psinode` passes most HTTP requests to the [psibase::ProxySys] contract, which then routes requests to the appropriate contract's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The contracts run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
 [system_contract::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
+
+[system_contract::PsiSpaceSys] provides web hosting to non-contract accounts.
 
 `psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Contracts don't serve these.
 
@@ -94,6 +109,9 @@ These help implement basic functionality:
   - [psibase::PageInfo]
   - [psibase::Edge]
   - [psibase::Connection]
+- [psibase::EventDecoder]
+- [psibase::EventQuery]
+- [psibase::makeEventConnection]
 
 Here's a common pattern for using these functions:
 
@@ -130,3 +148,6 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::PageInfo}}
 {{#cpp-doc ::psibase::Edge}}
 {{#cpp-doc ::psibase::Connection}}
+{{#cpp-doc ::psibase::EventDecoder}}
+{{#cpp-doc ::psibase::EventQuery}}
+{{#cpp-doc ::psibase::makeEventConnection}}

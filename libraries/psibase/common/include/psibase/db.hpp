@@ -81,6 +81,9 @@ namespace psibase
       /// Only usable with these native functions:
       /// * [putSequential]
       /// * [getSequential]
+      ///
+      /// TODO: right now the value must begin with the contract. Revisit
+      /// whether beginning with the block number is useful.
       historyEvent,
 
       /// Short-term history event storage
@@ -101,11 +104,14 @@ namespace psibase
       /// Only usable with these native functions:
       /// * [putSequential]
       /// * [getSequential]
+      ///
+      /// TODO: right now the value must begin with the contract. Revisit
+      /// whether beginning with the block number is useful.
       uiEvent,
 
       /// Events which go into the merkle tree
       ///
-      /// TODO: not implemented
+      /// TODO: read support; right now only RPC mode can read
       ///
       /// Contracts may produce these events during transactions and may read them
       /// up to 1 hour (configurable) after they were produced, or they reach finality,
@@ -120,8 +126,14 @@ namespace psibase
       /// Only usable with these native functions:
       /// * [putSequential]
       /// * [getSequential]
+      ///
+      /// TODO: right now the value must begin with the contract. Revisit
+      /// whether beginning with the block number is useful.
       merkleEvent,
 
+      /// Number of defined databases
+      ///
+      /// This number may grow in the future
       numDatabases,
    };
 

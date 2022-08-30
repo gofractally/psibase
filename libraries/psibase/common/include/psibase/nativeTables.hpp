@@ -139,12 +139,13 @@ namespace psibase
    {
       uint64_t nextHistoryEventNumber = 1;
       uint64_t nextUIEventNumber      = 1;
+      uint64_t nextMerkleEventNumber  = 1;
 
       // This table is in nativeConstrained. The native code blocks contracts
       // from writing to this since it could break backing stores.
       static constexpr auto db = psibase::DbId::nativeConstrained;
       static auto           key() { return databaseStatusKey(); }
    };
-   PSIO_REFLECT(DatabaseStatusRow, nextHistoryEventNumber, nextUIEventNumber)
+   PSIO_REFLECT(DatabaseStatusRow, nextHistoryEventNumber, nextUIEventNumber, nextMerkleEventNumber)
 
 }  // namespace psibase

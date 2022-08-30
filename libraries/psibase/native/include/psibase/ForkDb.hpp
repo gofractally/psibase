@@ -206,6 +206,7 @@ namespace psibase
                {
                   BlockContext ctx(*systemContext, state->revision, writer, true);
                   ctx.start(Block(get(next_state->blockId())->block()));
+                  ctx.callStartBlock();
                   ctx.execAllInBlock();
                   auto [newRevision, id] = ctx.writeRevision();
                   // TODO: verify block id here?
