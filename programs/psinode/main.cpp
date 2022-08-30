@@ -17,6 +17,7 @@
 #include <boost/asio/system_timer.hpp>
 
 #include <charconv>
+#include <fstream>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -38,8 +39,11 @@ struct transaction_queue
    std::vector<entry> entries;
 };
 
-#define RETHROW_BAD_ALLOC \
-   catch (std::bad_alloc&) { throw; }
+#define RETHROW_BAD_ALLOC  \
+   catch (std::bad_alloc&) \
+   {                       \
+      throw;               \
+   }
 
 #define CATCH_IGNORE \
    catch (...) {}
@@ -280,11 +284,14 @@ void run(const std::string&                db_path,
          AccountNumber                     producer,
          const std::vector<AccountNumber>& producers,
          const std::vector<std::string>&   peers,
+         bool                              enable_incoming_p2p,
          const std::string&                host,
          unsigned short                    port,
          bool                              host_perf,
          uint32_t                          leeway_us,
-         bool                              allow_slow)
+         bool                              allow_slow,
+         const std::string&                replay_blocks,
+         const std::string&                save_blocks)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -298,25 +305,22 @@ void run(const std::string&                db_path,
 
    using node_type = node<peer_manager, direct_routing, cft_consensus, ForkDb>;
    node_type node(chainContext, system.get());
-   node.set_producer_id(producer);
-   node.set_producers(producers);
 
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
 
+   auto http_config = std::make_shared<http::http_config>();
    if (!host.empty())
    {
       // TODO: command-line options
-      auto http_config = std::make_shared<http::http_config>(http::http_config{
-          .num_threads      = 4,
-          .max_request_size = 10 * 1024 * 1024,
-          .idle_timeout_ms  = std::chrono::milliseconds{4000},
-          .allow_origin     = "*",
-          .address          = "0.0.0.0",
-          .port             = port,
-          .host             = host,
-          .host_perf        = host_perf,
-      });
+      http_config->num_threads      = 4;
+      http_config->max_request_size = 10 * 1024 * 1024;
+      http_config->idle_timeout_ms  = std::chrono::milliseconds{4000};
+      http_config->allow_origin     = "*";
+      http_config->address          = "0.0.0.0";
+      http_config->port             = port;
+      http_config->host             = host;
+      http_config->host_perf        = host_perf;
 
       // TODO: speculative execution on non-producers
       if (producer != AccountNumber{})
@@ -341,8 +345,9 @@ void run(const std::string&                db_path,
       // TODO: The websocket uses the http server's io_context, but does not
       // do anything to keep it alive. Stopping the server doesn't close the
       // websocket either.
-      http_config->accept_p2p_websocket = [&node](auto&& stream)
-      { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
+      if (enable_incoming_p2p)
+         http_config->accept_p2p_websocket = [&node](auto&& stream)
+         { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {
@@ -406,9 +411,69 @@ void run(const std::string&                db_path,
       auto server = http::server::create(http_config, sharedState);
    }
 
-   bool showedBootMsg = false;
+   if (!replay_blocks.empty())
+   {
+      std::cout << "Replaying blocks from " << replay_blocks << "\n";
+      std::fstream file(replay_blocks, std::ios_base::binary | std::ios_base::in);
+      if (!file.is_open())
+         throw std::runtime_error("failed to open " + replay_blocks);
 
-   // TODO: replay
+      Database                db{system->sharedDatabase, system->sharedDatabase.getHead()};
+      auto                    session = db.startRead();
+      std::optional<BlockNum> skipping;
+      std::vector<char>       raw;
+      while (true)
+      {
+         uint64_t size;
+         if (!file.read((char*)&size, sizeof(size)))
+            break;
+         raw.resize(size);
+         if (!file.read(raw.data(), raw.size()))
+            break;
+         SignedBlock sb;
+         sb.block = psio::convert_from_frac<Block>(raw);
+         BlockInfo info{sb.block};
+
+         bool foundExisting = node.chain().get_state(info.blockId);
+         if (!foundExisting)
+            if (auto existing = db.kvGet<Block>(DbId::blockLog, info.header.blockNum))
+               if (info.blockId == BlockInfo{*existing}.blockId)
+                  foundExisting = true;
+
+         if (foundExisting)
+         {
+            if (!skipping)
+            {
+               std::cout << "Skipping existing blocks\n";
+               skipping = info.header.blockNum;
+            }
+            continue;
+         }
+         if (skipping)
+         {
+            std::cout << "Skipped existing blocks " << *skipping << "-" << info.header.blockNum - 1
+                      << "\n";
+            skipping = std::nullopt;
+         }
+
+         if (!node.chain().insert(sb))
+            throw std::runtime_error(
+                "Block " + psio::convert_to_json(info.blockId) +
+                " failed to link; most likely it tries to fork out an irreversible block");
+         node.chain().async_switch_fork(
+             [&node, &info](BlockHeader* h)
+             {
+                node.consensus().on_fork_switch(h);
+                node.chain().commit(info.header.blockNum);
+             });
+      }
+   }
+
+   node.set_producer_id(producer);
+   node.set_producers(producers);
+   http_config->ready_for_p2p = true;
+
+   bool showedBootMsg = false;
 
    for (const std::string& peer : peers)
    {
@@ -416,6 +481,31 @@ void run(const std::string&                db_path,
       //node.async_connect(peer.substr(0, pos), peer.substr(pos + 1));
       async_connect(std::make_shared<websocket_connection>(chainContext), resolver, host, service,
                     [&node](auto&& conn) { node.add_connection(std::move(conn)); });
+   }
+
+   if (!save_blocks.empty())
+   {
+      std::cout << "Saving blocks to " << save_blocks << "\n";
+      std::fstream file(save_blocks,
+                        std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+      if (!file.is_open())
+         throw std::runtime_error("failed to open " + save_blocks);
+
+      Database db{system->sharedDatabase, system->sharedDatabase.getHead()};
+      auto     session    = db.startRead();
+      BlockNum num        = 2;
+      int      numWritten = 0;
+      while (auto block = db.kvGetRaw(DbId::blockLog, psio::convert_to_key(num)))
+      {
+         if (num == 2 || !(num % 10000))
+            std::cout << "writing block " << num << " to " << save_blocks << "\n";
+         uint64_t size = block->remaining();
+         file.write((char*)&size, sizeof(size));
+         file.write(block->pos, block->remaining());
+         ++num;
+         ++numWritten;
+      }
+      std::cout << "wrote " << numWritten << " blocks to " << save_blocks << "\n";
    }
 
    timer_type timer(chainContext);
@@ -487,6 +577,9 @@ int main(int argc, char* argv[])
    uint32_t                 leeway_us  = 200000;  // TODO: real value once resources are in place
    bool                     allow_slow = false;
    std::vector<std::string> peers;
+   bool                     enable_incoming_p2p = false;
+   std::string              replay_blocks       = {};
+   std::string              save_blocks         = {};
 
    namespace po = boost::program_options;
 
@@ -497,6 +590,8 @@ int main(int argc, char* argv[])
    opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
    opt("prods", po::value(&prods), "Names of all producers");
    opt("peer", po::value(&peers), "Peer endpoint");
+   opt("p2p", po::bool_switch(&enable_incoming_p2p),
+       "Enable incoming p2p connections; requires --host");
    opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
    opt("port", po::value(&port), "http server port");
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
@@ -505,6 +600,10 @@ int main(int argc, char* argv[])
    opt("slow", po::bool_switch(&allow_slow),
        "Don't complain if unable to lock memory for database. This will still attempt to lock "
        "memory, but if it fails it will continue to run, but more slowly.");
+   opt("replay-blocks", po::value<std::string>(&replay_blocks)->value_name("file"),
+       "Replay blocks from file");
+   opt("save-blocks", po::value<std::string>(&save_blocks)->value_name("file"),
+       "Save blocks to file");
    opt("help,h", "Show this message");
 
    po::positional_options_description p;
@@ -539,8 +638,8 @@ int main(int argc, char* argv[])
       {
          producers.push_back(AccountNumber{pname});
       }
-      run(db_path, AccountNumber{producer}, producers, peers, host, port, host_perf, leeway_us,
-          allow_slow);
+      run(db_path, AccountNumber{producer}, producers, peers, enable_incoming_p2p, host, port,
+          host_perf, leeway_us, allow_slow, replay_blocks, save_blocks);
       return 0;
    }
    catch (std::exception& e)
