@@ -4,20 +4,20 @@ These instructions cover using `nginx` and [Let's Encrypt](https://letsencrypt.o
 
 psinode doesn't support https itself. It would create several complications if it did:
 
-- psinode's binary release supports multiple distributions. Unfortunately different distributions have incompatible versions of the OpenSSL library. About the only way to resolve that is to statically link OpenSLL, which makes it hard to keep up with its security fixes.
+- psinode's binary release supports multiple distributions. Unfortunately different distributions have incompatible versions of the OpenSSL library. About the only way to resolve that is to statically link OpenSSL, which makes it hard to keep up with its security fixes.
 - Since psinode hosts a variable set of subdomains, https requires wildcard certificates. Let's Encrypt's wildcard certificates require a periodic dance between the https server, the Let's Encrypt API, and DNS entries to confirm ownership of the domain. `certbot` knows how to do this dance using `nginx`.
 
 These instructions cover using GoDaddy. Unfortunately every DNS provider needs a different `certbot` plugin to support wildcard certificates; see [this issue](https://github.com/certbot/certbot/issues/6178). If you're using a different DNS provider, then check the lists at [DNS Plugins](https://eff-certbot.readthedocs.io/en/stable/using.html#dns-plugins) and [Third-party plugins](https://eff-certbot.readthedocs.io/en/stable/using.html#third-party-plugins). We're using the [dns-godaddy plugin](https://github.com/miigotu/certbot-dns-godaddy).
 
 These instructions cover using Ubuntu 22.04.
 
-## Root domain
+## Domain
 
-The rest of these instructions assume you're hosting on `my-psinode-domain.com`; adjust them to your domain.
+The rest of these instructions assume you're hosting on `my-psinode-domain.com`; adjust them to your domain. You need 2 DNS entries (A records): one for the domain and one for the wildcard (`*`).
 
 ## Install packages
 
-This assumes you've already followed the [Linux Installation](../linux.md) guide, including the Ubuntu 22.04 section. We're using `pip` packages instead of `snap` packages since, as of this writing, `certbot-dns-godaddy` [doesn't function correctly](https://github.com/miigotu/certbot-dns-godaddy/issues/6) when using the `certbot` snap package.
+This assumes you've already followed the [Linux Installation](../linux.md) guide, including the Ubuntu 22.04 instructions. We're using `pip` packages instead of `snap` packages since, as of this writing, `certbot-dns-godaddy` [doesn't function correctly](https://github.com/miigotu/certbot-dns-godaddy/issues/6) when using the `certbot` snap package.
 
 Make sure certbot isn't already installed: `which certbot`. If it is, uninstall it or it will conflict with these instructions.
 
