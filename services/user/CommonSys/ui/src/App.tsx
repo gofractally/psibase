@@ -297,6 +297,7 @@ const App = () => {
             );
             console.log(trace);
         } catch (e) {
+            // TODO: Don't swallow transaction errors!
             console.error(e);
         }
         pendingTransaction = [];

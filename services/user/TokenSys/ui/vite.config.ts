@@ -17,6 +17,7 @@ const psibase = (appletContract: string) => {
                             external: [
                                 "/common/rootdomain.mjs",
                                 "/common/rpc.mjs",
+                                "/common/useGraphQLQuery.mjs",
                                 "/common/iframeResizer.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
@@ -64,6 +65,10 @@ const psibase = (appletContract: string) => {
         alias({
             entries: [
                 { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
+                {
+                    find: "common/useGraphQLQuery.mjs",
+                    replacement: "/common/useGraphQLQuery.mjs",
+                },
             ],
         }),
     ];

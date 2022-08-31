@@ -14,52 +14,100 @@ export const Label: React.FC<{
     </label>
 );
 
-export interface InputProps extends HTMLProps<HTMLInputElement> {
-    label?: string;
-    rightIcon?: IconType;
+type SubText = {
     helperText?: string;
     successText?: string;
     errorText?: string;
-    onClickRightIcon?: () => void;
+};
+
+interface FieldSetProps {
+    disabled?: boolean;
+    label?: string;
+    id?: string;
+    children: React.ReactNode;
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
-    const {
-        label,
-        rightIcon,
-        helperText,
-        successText,
-        errorText,
-        onClickRightIcon,
-        ...inputProps
-    } = props;
-
-    const subText = props.errorText ?? props.successText ?? props.helperText;
-    const hasError = Boolean(props.errorText);
-
-    const borderColor = hasError
-        ? "border-red-500"
-        : "border-gray-500 focus-visible:border-gray-400";
+const FieldSet = ({
+    disabled,
+    label,
+    id,
+    helperText,
+    successText,
+    errorText,
+    children,
+}: FieldSetProps & SubText) => {
+    const subText = errorText ?? successText ?? helperText;
+    const hasError = Boolean(errorText);
 
     const subTextColor = hasError
         ? "text-red-500"
-        : props.successText
+        : successText
         ? "text-green-500"
         : "";
 
     return (
         <fieldset
             className="space-y-1 text-gray-500 disabled:text-gray-300"
-            disabled={props.disabled}
+            disabled={disabled}
         >
-            {props.label && (
-                <label htmlFor={props.id}>
-                    <Text span size="sm" className="select-none font-semibold">
-                        {props.label}
+            {label && (
+                <label htmlFor={id}>
+                    <Text
+                        span
+                        size="sm"
+                        className="select-none font-semibold text-gray-900"
+                    >
+                        {label}
                     </Text>
                 </label>
             )}
             <div className="relative">
+                {children}
+                {subText && (
+                    <Text
+                        span
+                        size="sm"
+                        className={`select-none font-semibold ${subTextColor}`}
+                    >
+                        {subText}
+                    </Text>
+                )}
+            </div>
+        </fieldset>
+    );
+};
+
+export interface InputProps extends HTMLProps<HTMLInputElement> {
+    label?: string;
+    rightIcon?: IconType;
+    onClickRightIcon?: () => void;
+}
+
+export const Input = forwardRef<HTMLInputElement, InputProps & SubText>(
+    (props, ref) => {
+        const {
+            label,
+            rightIcon,
+            helperText,
+            successText,
+            errorText,
+            onClickRightIcon,
+            ...inputProps
+        } = props;
+        const hasError = Boolean(errorText);
+        const borderColor = hasError
+            ? "border-red-500"
+            : "border-gray-500 focus-visible:border-gray-400";
+
+        return (
+            <FieldSet
+                disabled={props.disabled}
+                label={props.label}
+                id={props.id}
+                helperText={props.helperText}
+                successText={props.successText}
+                errorText={props.errorText}
+            >
                 <input
                     name={props.id}
                     className={`Input w-full border bg-white px-3 py-4 text-lg text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500 ${borderColor}`}
@@ -79,19 +127,46 @@ export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
                         />
                     </Button>
                 )}
-                {subText && (
-                    <Text
-                        span
-                        size="sm"
-                        className={`select-none font-semibold ${subTextColor}`}
-                    >
-                        {subText}
-                    </Text>
-                )}
-            </div>
-        </fieldset>
-    );
-});
+            </FieldSet>
+        );
+    }
+);
+
+export interface SelectProps extends HTMLProps<HTMLSelectElement> {
+    label?: string;
+    disabled?: boolean;
+}
+
+export const Select = forwardRef<HTMLSelectElement, SelectProps & SubText>(
+    (props, ref) => {
+        const { label, helperText, successText, errorText, ...selectProps } =
+            props;
+
+        const hasError = Boolean(errorText);
+        const borderColor = hasError
+            ? "border-red-500"
+            : "border-gray-500 focus-visible:border-gray-400";
+
+        return (
+            <FieldSet
+                disabled={props.disabled}
+                label={props.label}
+                id={props.id}
+                helperText={props.helperText}
+                successText={props.successText}
+                errorText={props.errorText}
+            >
+                <select
+                    className={`Input w-full border bg-white px-3 py-4 text-lg text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500 ${borderColor}`}
+                    {...selectProps}
+                    ref={ref}
+                >
+                    {props.children}
+                </select>
+            </FieldSet>
+        );
+    }
+);
 
 export interface FileInputProps extends HTMLProps<HTMLInputElement> {
     disabled?: boolean;
@@ -108,26 +183,6 @@ export const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                 <span>{props.label || "Attach File..."}</span>
                 <input ref={ref} type="file" className="sr-only" {...props} />
             </label>
-        );
-    }
-);
-
-export interface SelectProps extends HTMLProps<HTMLSelectElement> {
-    disabled?: boolean;
-}
-
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-    (props, ref) => {
-        return (
-            <select
-                className={`mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-blue-500 sm:text-sm ${
-                    props.disabled ? "bg-gray-50" : ""
-                }`}
-                {...props}
-                ref={ref}
-            >
-                {props.children}
-            </select>
         );
     }
 );

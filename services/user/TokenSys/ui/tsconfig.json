@@ -19,7 +19,11 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": ["src", "../../CommonSys/common/rpc.d.ts"],
+    "include": [
+        "src",
+        "../../CommonSys/common/rpc.d.ts",
+        "../../CommonSys/common/useGraphQLQuery.d.ts"
+    ],
     "references": [
         {
             "path": "./tsconfig.node.json"
