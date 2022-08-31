@@ -10,5 +10,8 @@ command = "../../build/rust/release/gen-cpp-doc"
 after = ["links","index"]
 
 [output.html]
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/gofractally/psibase"
 
 #[output.linkcheck]
