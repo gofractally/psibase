@@ -262,8 +262,6 @@ class ClientOps
 
     static allCompleted()
     {
-        // TODO this should search the data structure to see 
-        //    if any are awaiting return
         return this.currentOps.length === 0;
     }
 
@@ -515,12 +513,13 @@ function App() {
             type: MessageTypes.Action,
             fields: ["application", "actionName", "params", "sender"],
             handle: async (sender, payload) => {
-                // Todo: change Action payload to use "user" rather than sender. 
-                //       Sender is always the applet, user is the person
                 let {application, actionName, params, sender : user} = payload;
                 pendingTransaction.push(makeAction(application, actionName, params, user));
 
-                // TODO: If no operation is currently being executed, execute the transaction.
+                if (ClientOps.allCompleted())
+                {
+                    setOperationCountdown(true);
+                }
             }
         },
         {
