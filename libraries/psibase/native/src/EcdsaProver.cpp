@@ -1,5 +1,6 @@
 #include <secp256k1.h>
 #include <psibase/EcdsaProver.hpp>
+#include <psibase/block.hpp>
 
 namespace
 {

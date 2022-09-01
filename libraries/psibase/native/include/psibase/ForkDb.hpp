@@ -414,27 +414,31 @@ namespace psibase
             }
             return nullptr;
          }
-         auto block          = blockContext->current;
-         auto claim          = getProducerClaim(block.header.producer, head->revision);
-         auto [revision, id] = blockContext->writeRevision(*prover, claim);
-         systemContext->sharedDatabase.setHead(*writer, revision);
-         assert(head->blockId() == block.header.previous);
-         auto proof = getBlockProof(revision, block.header.blockNum);
-         // TODO: fail if no key
-         if (claim.contract != AccountNumber{} && proof.empty())
+         try
          {
-            std::cout << "No key found" << std::endl;
+            auto block          = blockContext->current;
+            auto claim          = getProducerClaim(block.header.producer, head->revision);
+            auto [revision, id] = blockContext->writeRevision(prover, claim);
+            systemContext->sharedDatabase.setHead(*writer, revision);
+            assert(head->blockId() == block.header.previous);
+            auto proof     = getBlockProof(revision, block.header.blockNum);
+            auto [iter, _] = blocks.try_emplace(id, SignedBlock{block, proof});
+            // TODO: don't recompute sha
+            BlockInfo info{*iter->second->block()};
+            auto [state_iter, ins2] = states.try_emplace(iter->first, *head, info, revision);
+            byOrderIndex.insert({state_iter->second.order(), id});
+            head = &state_iter->second;
+            byBlocknumIndex.insert({head->blockNum(), head->blockId()});
+            std::cout << psio::convert_to_json(blockContext->current.header) << "\n";
+            blockContext.reset();
+            return head;
          }
-         auto [iter, _] = blocks.try_emplace(id, SignedBlock{block, proof});
-         // TODO: don't recompute sha
-         BlockInfo info{*iter->second->block()};
-         auto [state_iter, ins2] = states.try_emplace(iter->first, *head, info, revision);
-         byOrderIndex.insert({state_iter->second.order(), id});
-         head = &state_iter->second;
-         byBlocknumIndex.insert({head->blockNum(), head->blockId()});
-         std::cout << psio::convert_to_json(blockContext->current.header) << "\n";
-         blockContext.reset();
-         return head;
+         catch (std::exception& e)
+         {
+            blockContext.reset();
+            std::cout << e.what() << std::endl;
+            return nullptr;
+         }
       }
 
       Claim getProducerClaim(AccountNumber producer, ConstRevisionPtr revision)
@@ -470,7 +474,7 @@ namespace psibase
 
       explicit ForkDb(SystemContext*          sc,
                       std::shared_ptr<Prover> prover = std::make_shared<CompoundProver>())
-          : prover(std::move(prover))
+          : prover{std::move(prover)}
       {
          systemContext = sc;
          writer        = sc->sharedDatabase.createWriter();
@@ -535,7 +539,7 @@ namespace psibase
       std::function<void(BlockHeader*)>                         switchForkCallback;
       SystemContext*                                            systemContext = nullptr;
       WriterPtr                                                 writer;
-      std::shared_ptr<Prover>                                   prover;
+      CheckedProver                                             prover;
       BlockNum                                                  commitIndex = 1;
       BlockHeaderState*                                         head        = nullptr;
       std::map<Checksum256, psio::shared_view_ptr<SignedBlock>> blocks;

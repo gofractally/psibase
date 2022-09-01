@@ -1,9 +1,12 @@
 #pragma once
 
+#include <psibase/AccountNumber.hpp>
 #include <psibase/Prover.hpp>
 
 namespace psibase
 {
+   struct PrivateKey;
+   struct Claim;
    struct EcdsaSecp256K1Sha256Prover : Prover
    {
      public:

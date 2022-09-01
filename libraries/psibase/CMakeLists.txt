@@ -158,6 +158,7 @@ function(add suffix)
             native/src/EcdsaProver.cpp
             native/src/ExecutionContext.cpp
             native/src/NativeFunctions.cpp
+            native/src/Prover.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
             native/src/useTriedent.cpp
