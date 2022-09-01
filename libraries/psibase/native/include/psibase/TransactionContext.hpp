@@ -41,6 +41,8 @@ namespace psibase
       // Caution: each call to exec*(), except execCalledAction(),
       //          must be in a fresh TransactionContext instance.
       void execVerifyProof(size_t i);
+
+      void execVerifyProof(const Checksum256& id, Claim claim, std::vector<char> proof);
       void checkFirstAuth();
       void execTransaction();
 

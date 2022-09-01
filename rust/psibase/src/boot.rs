@@ -1,12 +1,12 @@
 use crate::{
-    new_account_action, reg_server, set_auth_contract_action, set_key_action, store_sys,
-    without_tapos, Args, Error,
+    new_account_action, reg_server, set_auth_contract_action, set_key_action, set_producers_action, store_sys,
+    to_claim, without_tapos, Args, Error,
 };
 use anyhow::Context;
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
 use libpsibase::{
-    account, method, AccountNumber, Action, Fracpack, PublicKey, SharedGenesisActionData,
+    account, method, AccountNumber, Action, Claim, ExactAccountNumber, Fracpack, PublicKey, SharedGenesisActionData,
     SharedGenesisContract, SignedTransaction,
 };
 use serde_json::Value;
@@ -16,7 +16,7 @@ use serde_json::Value;
 #[derive(Fracpack)]
 struct Empty {}
 
-const ACCOUNTS: [AccountNumber; 20] = [
+const ACCOUNTS: [AccountNumber; 21] = [
     account!("account-sys"),
     account!("alice"),
     account!("auth-ec-sys"),
@@ -26,6 +26,7 @@ const ACCOUNTS: [AccountNumber; 20] = [
     account!("doc-sys"),
     account!("explore-sys"),
     account!("nft-sys"),
+    account!("producer-sys"),
     account!("proxy-sys"),
     account!("psispace-sys"),
     account!("r-account-sys"),
@@ -43,8 +44,9 @@ pub(super) async fn boot(
     args: &Args,
     client: reqwest::Client,
     key: &Option<PublicKey>,
+    producer: &Option<ExactAccountNumber>,
 ) -> Result<(), anyhow::Error> {
-    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx(key)];
+    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx(key, producer)];
     push_boot(args, client, new_signed_transactions.packed_bytes()).await?;
     println!("Ok");
     Ok(())
@@ -145,6 +147,7 @@ fn boot_trx() -> SignedTransaction {
         sgc!("common-sys", 0, "CommonSys.wasm"),
         sgc!("explore-sys", 0, "ExploreSys.wasm"),
         sgc!("nft-sys", 0, "NftSys.wasm"),
+        sgc!("producer-sys", 2, "ProducerSys.wasm"),
         sgc!("proxy-sys", 0, "ProxySys.wasm"),
         sgc!("psispace-sys", 0, "PsiSpaceSys.wasm"),
         sgc!("r-account-sys", 0, "RAccountSys.wasm"),
@@ -197,7 +200,7 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>) {
     }
 }
 
-fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
+fn common_startup_trx(key: &Option<PublicKey>, producer: &Option<ExactAccountNumber>) -> SignedTransaction {
     let mut init_actions = vec![
         Action {
             sender: account!("account-sys"),
@@ -360,6 +363,20 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     actions.append(&mut token_sys_files);
     actions.append(&mut doc_actions);
     actions.append(&mut create_and_fund_example_users);
+
+    actions.push(set_producers_action(
+        match producer {
+            Some(p) => AccountNumber::from(*p),
+            None => account!("psibase")
+        },
+        match key {
+            Some(k) => to_claim(k),
+            None => Claim {
+                contract: AccountNumber::new(0),
+                raw_data: vec![]
+            }
+        }
+    ));
 
     if let Some(k) = key {
         for account in ACCOUNTS {

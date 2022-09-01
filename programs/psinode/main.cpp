@@ -1,3 +1,4 @@
+#include <psibase/EcdsaProver.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/cft.hpp>
 #include <psibase/contractEntry.hpp>
@@ -24,6 +25,15 @@
 
 using namespace psibase;
 using namespace psibase::net;
+
+namespace psibase
+{
+   void validate(boost::any& v, const std::vector<std::string>& values, PrivateKey*, int)
+   {
+      boost::program_options::validators::check_first_occurrence(v);
+      v = privateKeyFromString(boost::program_options::validators::get_single_string(values));
+   }
+}  // namespace psibase
 
 struct transaction_queue
 {
@@ -280,18 +290,18 @@ using timer_type = boost::asio::system_timer;
 template <typename Derived>
 using cft_consensus = basic_cft_consensus<Derived, timer_type>;
 
-void run(const std::string&                db_path,
-         AccountNumber                     producer,
-         const std::vector<AccountNumber>& producers,
-         const std::vector<std::string>&   peers,
-         bool                              enable_incoming_p2p,
-         const std::string&                host,
-         unsigned short                    port,
-         bool                              host_perf,
-         uint32_t                          leeway_us,
-         bool                              allow_slow,
-         const std::string&                replay_blocks,
-         const std::string&                save_blocks)
+void run(const std::string&              db_path,
+         AccountNumber                   producer,
+         std::shared_ptr<Prover>         prover,
+         const std::vector<std::string>& peers,
+         bool                            enable_incoming_p2p,
+         const std::string&              host,
+         unsigned short                  port,
+         bool                            host_perf,
+         uint32_t                        leeway_us,
+         bool                            allow_slow,
+         const std::string&              replay_blocks,
+         const std::string&              save_blocks)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -304,7 +314,9 @@ void run(const std::string&                db_path,
    boost::asio::io_context chainContext;
 
    using node_type = node<peer_manager, direct_routing, cft_consensus, ForkDb>;
-   node_type node(chainContext, system.get());
+   node_type node(chainContext, system.get(), std::move(prover));
+   node.set_producer_id(producer);
+   node.load_producers();
 
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
@@ -570,7 +582,7 @@ int main(int argc, char* argv[])
 {
    std::string              db_path;
    std::string              producer = {};
-   std::vector<std::string> prods;
+   std::vector<PrivateKey>  keys;
    std::string              host       = {};
    unsigned short           port       = 8080;
    bool                     host_perf  = false;
@@ -588,7 +600,7 @@ int main(int argc, char* argv[])
    opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
        "Path to database");
    opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
-   opt("prods", po::value(&prods), "Names of all producers");
+   opt("sign,s", po::value(&keys), "Sign with this key");
    opt("peer", po::value(&peers), "Peer endpoint");
    opt("p2p", po::bool_switch(&enable_incoming_p2p),
        "Enable incoming p2p connections; requires --host");
@@ -633,12 +645,13 @@ int main(int argc, char* argv[])
 
    try
    {
-      std::vector<AccountNumber> producers;
-      for (const auto& pname : prods)
+      auto prover = std::make_shared<CompoundProver>();
+      for (const auto& key : keys)
       {
-         producers.push_back(AccountNumber{pname});
+         prover->provers.push_back(
+             std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"}, key));
       }
-      run(db_path, AccountNumber{producer}, producers, peers, enable_incoming_p2p, host, port,
+      run(db_path, AccountNumber{producer}, prover, peers, enable_incoming_p2p, host, port,
           host_perf, leeway_us, allow_slow, replay_blocks, save_blocks);
       return 0;
    }

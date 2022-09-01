@@ -149,17 +149,20 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent ${Boost_LIBRARIES})
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 ${Boost_LIBRARIES})
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
+            native/src/EcdsaProver.cpp
             native/src/ExecutionContext.cpp
             native/src/NativeFunctions.cpp
+            native/src/Prover.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
             native/src/useTriedent.cpp
+            native/src/VerifyProver.cpp
         )
 
         add_subdirectory(common/tests)

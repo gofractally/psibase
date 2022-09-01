@@ -97,3 +97,26 @@ if(IS_WASM)
     copy_headers(simdjson/include simdjson/include)
     set_target_properties(simdjson PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
 endif()
+
+if(NOT IS_WASM)
+  ExternalProject_Add(secp256k1-ext
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/secp256k1
+    BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/secp256k1
+    EXCLUDE_FROM_ALL 1
+    CONFIGURE_COMMAND
+            cp -aur ${CMAKE_CURRENT_SOURCE_DIR}/secp256k1 ${CMAKE_CURRENT_BINARY_DIR}/secp256k1-build
+            && cd ${CMAKE_CURRENT_BINARY_DIR}/secp256k1-build
+            && ./autogen.sh
+            && export "CC=${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}"
+            && export AR=${CMAKE_AR}
+            && export RANLIB=${CMAKE_RANLIB}
+            && ./configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/secp256k1
+     BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/secp256k1/lib/libsecp256k1.a
+     BUILD_COMMAND cd ../secp256k1-build && make
+     INSTALL_COMMAND cd ../secp256k1-build && make install
+  )
+  add_library(secp256k1 INTERFACE)
+  target_include_directories(secp256k1 INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/secp256k1/include)
+  target_link_libraries(secp256k1 INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/secp256k1/lib/libsecp256k1.a)
+  add_dependencies(secp256k1 secp256k1-ext)
+endif()
