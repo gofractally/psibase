@@ -50,6 +50,10 @@ enum Commands {
         /// Set all accounts to authenticate using this key
         #[clap(short = 'k', long, value_name = "KEY")]
         key: Option<PublicKey>,
+
+        /// Sets the name of the block producer
+        #[clap(short = 'p', long, value_name = "PRODUCER")]
+        producer: Option<ExactAccountNumber>
     },
 
     /// Create or modify an account
@@ -245,13 +249,17 @@ pub struct ProducerConfigRow {
     pub producer_auth: Claim,
 }
 
-fn set_producers_action(name: AccountNumber, key: &PublicKey) -> Action {
+fn to_claim(key: &PublicKey) -> Claim {
+    return Claim {
+        contract: account!("verifyec-sys"),
+        raw_data: key.packed_bytes()
+    }
+}
+
+fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
     let prod = ProducerConfigRow {
         producer_name: name,
-        producer_auth: Claim {
-            contract: account!("verifyec-sys"),
-            raw_data: key.packed_bytes()
-        }
+        producer_auth: key,
     };
     let set_producers_action = (vec![prod],);
     Action {
@@ -636,7 +644,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Commands::Boot { key } => boot::boot(&args, client, key).await?,
+        Commands::Boot { key, producer } => boot::boot(&args, client, key, producer).await?,
         Commands::Create {
             account,
             key,

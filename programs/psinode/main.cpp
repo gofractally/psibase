@@ -310,7 +310,7 @@ void run(const std::string&                db_path,
    using node_type = node<peer_manager, direct_routing, cft_consensus, ForkDb>;
    node_type node(chainContext, system.get(), std::move(prover));
    node.set_producer_id(producer);
-   node.set_producers(producers);
+   node.load_producers();
 
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);

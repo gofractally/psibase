@@ -1,12 +1,12 @@
 use crate::{
     new_account_action, reg_server, set_auth_contract_action, set_key_action, set_producers_action, store_sys,
-    without_tapos, Args, Error,
+    to_claim, without_tapos, Args, Error,
 };
 use anyhow::Context;
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
 use libpsibase::{
-    account, method, AccountNumber, Action, Fracpack, PublicKey, SharedGenesisActionData,
+    account, method, AccountNumber, Action, Claim, ExactAccountNumber, Fracpack, PublicKey, SharedGenesisActionData,
     SharedGenesisContract, SignedTransaction,
 };
 use serde_json::Value;
@@ -44,8 +44,9 @@ pub(super) async fn boot(
     args: &Args,
     client: reqwest::Client,
     key: &Option<PublicKey>,
+    producer: &Option<ExactAccountNumber>,
 ) -> Result<(), anyhow::Error> {
-    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx(key)];
+    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx(key, producer)];
     push_boot(args, client, new_signed_transactions.packed_bytes()).await?;
     println!("Ok");
     Ok(())
@@ -199,7 +200,7 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>) {
     }
 }
 
-fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
+fn common_startup_trx(key: &Option<PublicKey>, producer: &Option<ExactAccountNumber>) -> SignedTransaction {
     let mut init_actions = vec![
         Action {
             sender: account!("account-sys"),
@@ -359,8 +360,21 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     actions.append(&mut doc_actions);
     actions.append(&mut create_and_fund_example_users);
 
+    actions.push(set_producers_action(
+        match producer {
+            Some(p) => AccountNumber::from(*p),
+            None => account!("psibase")
+        },
+        match key {
+            Some(k) => to_claim(k),
+            None => Claim {
+                contract: AccountNumber::new(0),
+                raw_data: vec![]
+            }
+        }
+    ));
+
     if let Some(k) = key {
-        actions.push(set_producers_action(account!("psibase"), k));
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
             actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));

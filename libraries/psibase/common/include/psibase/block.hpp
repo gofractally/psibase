@@ -50,6 +50,7 @@ namespace psibase
    {
       AccountNumber     contract;
       std::vector<char> rawData;
+      friend bool       operator==(const Claim&, const Claim&) = default;
    };
    PSIO_REFLECT(Claim, contract, rawData)
 

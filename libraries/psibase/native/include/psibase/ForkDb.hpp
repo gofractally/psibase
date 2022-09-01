@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/container/flat_map.hpp>
 #include <iostream>
 #include <psibase/BlockContext.hpp>
 #include <psibase/Prover.hpp>
@@ -21,11 +22,36 @@ namespace psibase
    };
    PSIO_REFLECT(ExtendedBlockId, _id, _num)
 
+   struct ProducerSet
+   {
+      boost::container::flat_map<AccountNumber, Claim> activeProducers;
+      bool                                             isProducer(AccountNumber producer) const
+      {
+         return activeProducers.find(producer) != activeProducers.end();
+      }
+      std::optional<std::size_t> getIndex(AccountNumber producer) const
+      {
+         auto iter = activeProducers.find(producer);
+         if (iter != activeProducers.end())
+         {
+            return iter - activeProducers.begin();
+         }
+         else
+         {
+            return {};
+         }
+      }
+      std::size_t size() const { return activeProducers.size(); }
+      friend bool operator==(const ProducerSet&, const ProducerSet&) = default;
+   };
+
    struct BlockHeaderState
    {
       BlockInfo info;
       // May be null if the block has not been executed
       ConstRevisionPtr revision;
+      // The producer set for the next block
+      std::shared_ptr<ProducerSet> producers;
       BlockHeaderState() : info() { info.header.blockNum = 1; }
       BlockHeaderState(const BlockInfo& info, ConstRevisionPtr revision = nullptr)
           : info(info), revision(revision)
@@ -158,10 +184,12 @@ namespace psibase
       template <typename F>
       void async_switch_fork(F&& callback)
       {
-         // Don't switch if we are currently building a block...
-         // FIXME: This means that we need to switch if a block is aborted
+         // Don't switch if we are currently building a block.
          if (blockContext)
+         {
+            switchForkCallback = std::move(callback);
             return;
+         }
          auto pos = byOrderIndex.end();
          --pos;
          auto new_head = get_state(pos->second);
@@ -240,11 +268,59 @@ namespace psibase
             return nullptr;
          }
       }
-      bool is_complete_chain(const id_type& id) { return get_state(id) != nullptr; }
-      void commit(BlockNum num)
+      bool        is_complete_chain(const id_type& id) { return get_state(id) != nullptr; }
+      ProducerSet getProducers(Database& db)
       {
-         commitIndex = std::max(std::min(num, head->blockNum()), commitIndex);
+         // get producers
+         std::vector key       = psio::convert_to_key(producerConfigTable);
+         auto        prefixLen = key.size();
+         using mapType         = decltype(ProducerSet::activeProducers);
+         mapType::sequence_type prods;
+         while (auto data = db.kvGreaterEqualRaw(DbId::nativeConstrained, key, prefixLen))
+         {
+            auto prod = psio::convert_from_frac<ProducerConfigRow>(data->value);
+            prods.emplace_back(prod.producerName, prod.producerAuth);
+            //
+            key.clear();
+            key.insert(key.begin(), data->key.pos, data->key.end);
+            key.push_back(0);
+         }
+         ProducerSet result;
+         result.activeProducers.adopt_sequence(std::move(prods));
+         return result;
+      }
+      // TODO: handle joint consensus
+      // Note: If wasm has not specified a producer, then the
+      // block producer must be the same as the previous block producer.
+      ProducerSet getProducers()
+      {
+         auto iter = byBlocknumIndex.find(commitIndex);
+         // The last committed block is guaranteed to be present
+         assert(iter != byBlocknumIndex.end());
+         auto stateIter = states.find(iter->second);
+         // We'd better have a state for this block
+         assert(stateIter != states.end());
+         assert(stateIter->second.revision);
+         Database db(systemContext->sharedDatabase, stateIter->second.revision);
+         auto     session  = db.startRead();
+         auto     result   = getProducers(db);
+         auto     producer = stateIter->second.info.header.producer;
+         if (result.size() == 0 && producer != AccountNumber{})
+         {
+            result.activeProducers.try_emplace(producer);
+         }
+         return result;
+      }
+      bool commit(BlockNum num)
+      {
+         auto newCommitIndex = std::max(std::min(num, head->blockNum()), commitIndex);
+         auto result         = newCommitIndex != commitIndex;
+         commitIndex         = newCommitIndex;
          systemContext->sharedDatabase.removeRevisions(*writer, byBlocknumIndex.find(num)->second);
+         // TODO: clean up committed blocks/states (needs to be a separate function, because
+         // block propagation needs to know the last commit, but also needs to happen before
+         // this cleanup.
+         return result;
       }
 
       template <typename T>
@@ -329,6 +405,13 @@ namespace psibase
          if (blockContext->needGenesisAction)
          {
             abort_block();
+            // if we've received blocks while trying to produce, make sure that
+            // we handle them.
+            if (switchForkCallback)
+            {
+               auto callback = std::move(switchForkCallback);
+               async_switch_fork(std::move(callback));
+            }
             return nullptr;
          }
          auto block          = blockContext->current;
@@ -431,6 +514,8 @@ namespace psibase
                }
             } while (blockNum--);
          }
+         // TODO: if this doesn't exist, the database is corrupt
+         commitIndex = byBlocknumIndex.begin()->first;
       }
       BlockContext* getBlockContext()
       {
@@ -447,6 +532,7 @@ namespace psibase
 
      private:
       std::optional<BlockContext>                               blockContext;
+      std::function<void(BlockHeader*)>                         switchForkCallback;
       SystemContext*                                            systemContext = nullptr;
       WriterPtr                                                 writer;
       std::shared_ptr<Prover>                                   prover;
