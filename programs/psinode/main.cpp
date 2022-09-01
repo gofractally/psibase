@@ -482,7 +482,6 @@ void run(const std::string&              db_path,
    }
 
    node.set_producer_id(producer);
-   node.set_producers(producers);
    http_config->ready_for_p2p = true;
 
    bool showedBootMsg = false;
