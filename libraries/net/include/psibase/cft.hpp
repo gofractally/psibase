@@ -35,7 +35,7 @@ namespace psibase::net
       {
          rem += d1;
       }
-      return tp - d1;
+      return tp - rem;
    }
 
    std::string to_string(const Checksum256& c)
