@@ -286,16 +286,15 @@ using timer_type = boost::asio::system_timer;
 template <typename Derived>
 using cft_consensus = basic_cft_consensus<Derived, timer_type>;
 
-void run(const std::string&                db_path,
-         AccountNumber                     producer,
-         const std::vector<AccountNumber>& producers,
-         std::shared_ptr<Prover>           prover,
-         const std::vector<std::string>&   peers,
-         const std::string&                host,
-         unsigned short                    port,
-         bool                              host_perf,
-         uint32_t                          leeway_us,
-         bool                              allow_slow)
+void run(const std::string&              db_path,
+         AccountNumber                   producer,
+         std::shared_ptr<Prover>         prover,
+         const std::vector<std::string>& peers,
+         const std::string&              host,
+         unsigned short                  port,
+         bool                            host_perf,
+         uint32_t                        leeway_us,
+         bool                            allow_slow)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -491,7 +490,6 @@ int main(int argc, char* argv[])
 {
    std::string              db_path;
    std::string              producer = {};
-   std::vector<std::string> prods;
    std::vector<PrivateKey>  keys;
    std::string              host       = {};
    unsigned short           port       = 8080;
@@ -507,7 +505,6 @@ int main(int argc, char* argv[])
    opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
        "Path to database");
    opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
-   opt("prods", po::value(&prods), "Names of all producers");
    opt("sign,s", po::value(&keys), "Sign with this key");
    opt("peer", po::value(&peers), "Peer endpoint");
    opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
@@ -547,19 +544,14 @@ int main(int argc, char* argv[])
 
    try
    {
-      std::vector<AccountNumber> producers;
-      for (const auto& pname : prods)
-      {
-         producers.push_back(AccountNumber{pname});
-      }
       auto prover = std::make_shared<CompoundProver>();
       for (const auto& key : keys)
       {
          prover->provers.push_back(
              std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"}, key));
       }
-      run(db_path, AccountNumber{producer}, producers, prover, peers, host, port, host_perf,
-          leeway_us, allow_slow);
+      run(db_path, AccountNumber{producer}, prover, peers, host, port, host_perf, leeway_us,
+          allow_slow);
       return 0;
    }
    catch (std::exception& e)

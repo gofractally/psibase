@@ -19,8 +19,7 @@ psinode [OPTIONS] <DATABASE>
 
 If you don't give it any other options, psinode will just sit there with nothing to do. There are three important options for creating and running a local test chain:
 
-- `-p` or `--producer` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below).  It's argument is a name for the producer and must match one of the names provided by the `--prods` arg.  Multiple distinct nodes must not use the same producer name.
-- `--prods` tells psinode the set of producer nodes.  This argument may appear multiple times for a multi-producer network.  For a single producer network, it should appear once and should have the same argument as `-p`.  All nodes in the network must specify the same set of producers.  (TODO: This argument is temporary.  The set of producers will be configured on chain)
+- `-p` or `--producer` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below).  It's argument is a name for the producer.  psinode will only produce blocks when it is this producer's turn according to consensus.  Multiple distinct nodes must not use the same producer name.
 - `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on address `0.0.0.0` (TODO).  The port defaults to 8080 but can be configured with `--port`.  The http interface also accepts p2p websocket connections from other nodes (see `--peer`).
 
 Two more options are important for connecting multiple nodes together in a network:
@@ -63,13 +62,14 @@ This will:
 In a separate terminal, while `psinode` is running, run the following:
 
 ```
-psibase boot
+psibase boot -p prod
 ```
 
 This will create a new chain which has:
 
 - A set of system contracts suitable for development
 - A set of web-based user interfaces suitable for development
+- `prod` as the sole block producer
 
 `psibase boot` creates system accounts with no authentication, making it easy to manage them. If you intend to make the chain public, use boot's `-k` or `--key` option to set the public key for those accounts.
 
