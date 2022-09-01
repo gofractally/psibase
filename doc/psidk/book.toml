@@ -11,6 +11,7 @@ after = ["links","index"]
 
 [output.html]
 default-theme = "ayu"
+additional-js = ["psibase.js"]
 preferred-dark-theme = "ayu"
 git-repository-url = "https://github.com/gofractally/psibase"
 
