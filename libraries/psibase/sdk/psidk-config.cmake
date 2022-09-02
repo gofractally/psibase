@@ -52,7 +52,7 @@ function(add_libs suffix)
 
     add_library(c++abi-replacements${suffix} EXCLUDE_FROM_ALL)
     target_link_libraries(c++abi-replacements${suffix} PUBLIC wasm-base${suffix})
-    target_sources(c++abi-replacements${suffix} PRIVATE ${psidk_DIR}/contract/src/abort_message.cpp)
+    target_sources(c++abi-replacements${suffix} PRIVATE ${psidk_DIR}/service/src/abort_message.cpp)
     add_custom_command(
         TARGET c++abi-replacements${suffix}
         PRE_LINK
@@ -83,7 +83,7 @@ function(add_libs suffix)
         -Wl,--no-merge-data-segments
         -nostdlib
     )
-    target_include_directories(psibase-contract-base${suffix} INTERFACE ${psidk_DIR}/psibase/contract/include)
+    target_include_directories(psibase-contract-base${suffix} INTERFACE ${psidk_DIR}/psibase/service/include)
 
     file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
@@ -126,7 +126,7 @@ function(add_libs suffix)
         ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
     )
     target_include_directories(psitestlib${suffix} INTERFACE
-        ${psidk_DIR}/psibase/contract/include
+        ${psidk_DIR}/psibase/service/include
         ${psidk_DIR}/psibase/tester/include
         ${psidk_DIR}/services/system/AccountSys/include
         ${psidk_DIR}/services/system/AuthEcSys/include

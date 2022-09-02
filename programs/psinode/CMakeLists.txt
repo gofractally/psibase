@@ -19,7 +19,7 @@ elseif(UNIX)
 endif()
 
 target_include_directories(psinode PUBLIC
-    ../../libraries/psibase/contract/include
+    ../../libraries/psibase/service/include
     ../../services/psibase_tests)
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 add_custom_command(TARGET psinode POST_BUILD
