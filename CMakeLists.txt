@@ -87,7 +87,7 @@ endif()
 option(BUILD_RUST "Build rust" ON)
 if(BUILD_RUST)
     set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
-    set(THIRD_SRC ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common/thirdParty/src)
+    set(THIRD_SRC ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/thirdParty/src)
     set(THIRD_DEST ${BOOT_IMAGE}/CommonSys/common/thirdParty)
     ExternalProject_Add(
         rust
@@ -116,12 +116,12 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm               ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm                  ${BOOT_IMAGE}
 
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/system/AccountSys/ui    ${BOOT_IMAGE}/AccountSys/ui
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/system/AuthEcSys/ui     ${BOOT_IMAGE}/AuthEcSys/ui
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common   ${BOOT_IMAGE}/CommonSys/common
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/ui       ${BOOT_IMAGE}/CommonSys/ui
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/TokenSys/ui        ${BOOT_IMAGE}/TokenSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui    ${BOOT_IMAGE}/AccountSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui     ${BOOT_IMAGE}/AuthEcSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common   ${BOOT_IMAGE}/CommonSys/common
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/ui       ${BOOT_IMAGE}/CommonSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui        ${BOOT_IMAGE}/TokenSys/ui
 
         COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc || mkdir -p ${BOOT_IMAGE}/doc"
 

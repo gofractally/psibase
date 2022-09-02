@@ -1,11 +1,11 @@
-#include <contracts/system/AccountSys.hpp>
-#include <contracts/system/TransactionSys.hpp>
-#include <contracts/system/commonErrors.hpp>
-#include <contracts/user/SymbolSys.hpp>
 #include <psibase/dispatch.hpp>
+#include <services/system/AccountSys.hpp>
+#include <services/system/TransactionSys.hpp>
+#include <services/system/commonErrors.hpp>
+#include <services/user/SymbolSys.hpp>
 
-#include "contracts/user/NftSys.hpp"
-#include "contracts/user/TokenSys.hpp"
+#include "services/user/NftSys.hpp"
+#include "services/user/TokenSys.hpp"
 
 using namespace UserContract;
 using namespace psibase;

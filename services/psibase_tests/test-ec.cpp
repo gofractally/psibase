@@ -1,6 +1,6 @@
-#include <contracts/system/AuthEcSys.hpp>
-#include <contracts/system/VerifyEcSys.hpp>
 #include <psibase/DefaultTestChain.hpp>
+#include <services/system/AuthEcSys.hpp>
+#include <services/system/VerifyEcSys.hpp>
 
 #include <psibase/contractEntry.hpp>
 #include <psibase/nativeTables.hpp>

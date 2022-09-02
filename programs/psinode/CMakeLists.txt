@@ -20,7 +20,7 @@ endif()
 
 target_include_directories(psinode PUBLIC
     ../../libraries/psibase/contract/include
-    ../../contracts/psibase_tests)
+    ../../services/psibase_tests)
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 add_custom_command(TARGET psinode POST_BUILD
     COMMAND mkdir -p ${ROOT_BINARY_DIR}/psidk/bin

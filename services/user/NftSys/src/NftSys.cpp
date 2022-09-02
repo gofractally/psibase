@@ -1,9 +1,9 @@
-#include <contracts/system/AccountSys.hpp>
-#include <contracts/system/commonErrors.hpp>
-#include <contracts/user/NftSys.hpp>
 #include <psibase/Bitset.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/fracpack.hpp>
+#include <services/system/AccountSys.hpp>
+#include <services/system/commonErrors.hpp>
+#include <services/user/NftSys.hpp>
 
 using namespace psibase;
 using namespace UserContract;

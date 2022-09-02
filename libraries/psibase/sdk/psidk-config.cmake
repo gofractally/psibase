@@ -128,15 +128,15 @@ function(add_libs suffix)
     target_include_directories(psitestlib${suffix} INTERFACE
         ${psidk_DIR}/psibase/contract/include
         ${psidk_DIR}/psibase/tester/include
-        ${psidk_DIR}/contracts/system/AccountSys/include
-        ${psidk_DIR}/contracts/system/AuthEcSys/include
-        ${psidk_DIR}/contracts/system/AuthAnySys/include
-        ${psidk_DIR}/contracts/system/ProxySys/include
-        ${psidk_DIR}/contracts/system/RAccountSys/include
-        ${psidk_DIR}/contracts/system/RAuthEcSys/include
-        ${psidk_DIR}/contracts/system/SetCodeSys/include
-        ${psidk_DIR}/contracts/system/TransactionSys/include
-        ${psidk_DIR}/contracts/system/VerifyEcSys/include
+        ${psidk_DIR}/services/system/AccountSys/include
+        ${psidk_DIR}/services/system/AuthEcSys/include
+        ${psidk_DIR}/services/system/AuthAnySys/include
+        ${psidk_DIR}/services/system/ProxySys/include
+        ${psidk_DIR}/services/system/RAccountSys/include
+        ${psidk_DIR}/services/system/RAuthEcSys/include
+        ${psidk_DIR}/services/system/SetCodeSys/include
+        ${psidk_DIR}/services/system/TransactionSys/include
+        ${psidk_DIR}/services/system/VerifyEcSys/include
     )
     target_link_options(psitestlib${suffix} INTERFACE
         -Wl,--entry,_start

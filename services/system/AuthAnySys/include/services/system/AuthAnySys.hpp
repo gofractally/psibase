@@ -1,6 +1,6 @@
 #pragma once
 
-#include <contracts/system/TransactionSys.hpp>
+#include <services/system/TransactionSys.hpp>
 
 namespace system_contract
 {

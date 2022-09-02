@@ -1,5 +1,5 @@
 #include <secp256k1_preallocated.h>
-#include <contracts/system/VerifyEcSys.hpp>
+#include <services/system/VerifyEcSys.hpp>
 #include <psibase/check.hpp>
 #include <psibase/contractEntry.hpp>
 #include <psio/from_bin.hpp>

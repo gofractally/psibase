@@ -1,14 +1,14 @@
-#include <contracts/system/AccountSys.hpp>
-#include <contracts/system/ProxySys.hpp>
-#include <contracts/system/commonErrors.hpp>
-#include <contracts/user/RTokenSys.hpp>
-#include <contracts/user/TokenSys.hpp>
-#include <contracts/user/tokenErrors.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
+#include <services/system/AccountSys.hpp>
+#include <services/system/ProxySys.hpp>
+#include <services/system/commonErrors.hpp>
+#include <services/user/RTokenSys.hpp>
+#include <services/user/TokenSys.hpp>
+#include <services/user/tokenErrors.hpp>
 
-#include "contracts/user/SymbolSys.hpp"
+#include "services/user/SymbolSys.hpp"
 
 using namespace UserContract;
 using namespace UserContract::Errors;

@@ -7,10 +7,10 @@
 #include <psibase/serveContent.hpp>
 #include <string>
 
-#include <contracts/user/tokenErrors.hpp>
-#include <contracts/user/tokenTables.hpp>
-#include <contracts/user/tokenTypes.hpp>
-#include "contracts/user/symbolTables.hpp"
+#include <services/user/tokenErrors.hpp>
+#include <services/user/tokenTables.hpp>
+#include <services/user/tokenTypes.hpp>
+#include "services/user/symbolTables.hpp"
 
 namespace UserContract
 {

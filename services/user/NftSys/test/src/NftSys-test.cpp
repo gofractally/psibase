@@ -1,12 +1,12 @@
 #define CATCH_CONFIG_MAIN
 
-#include <contracts/system/AccountSys.hpp>
-#include <contracts/system/commonErrors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psio/fracpack.hpp>
+#include <services/system/AccountSys.hpp>
+#include <services/system/commonErrors.hpp>
 #include <string>
 
-#include "contracts/user/NftSys.hpp"
+#include "services/user/NftSys.hpp"
 
 using namespace UserContract;
 using namespace UserContract::Errors;

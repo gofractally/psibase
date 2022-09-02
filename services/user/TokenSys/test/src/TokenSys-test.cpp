@@ -1,14 +1,14 @@
 #define CATCH_CONFIG_MAIN
 
-#include <contracts/system/commonErrors.hpp>
-#include <contracts/user/RTokenSys.hpp>
-#include <contracts/user/TokenSys.hpp>
+#include <services/system/commonErrors.hpp>
+#include <services/user/RTokenSys.hpp>
+#include <services/user/TokenSys.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/print.hpp>
 #include <psibase/testUtils.hpp>
 
-#include "contracts/user/SymbolSys.hpp"
+#include "services/user/SymbolSys.hpp"
 
 using namespace psibase;
 using namespace psibase::benchmarking;

@@ -1,11 +1,11 @@
-#include "contracts/system/CommonSys.hpp"
+#include "services/system/CommonSys.hpp"
 
-#include <contracts/system/ProxySys.hpp>
-#include <contracts/system/TransactionSys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serveContent.hpp>
 #include <psio/to_json.hpp>
+#include <services/system/ProxySys.hpp>
+#include <services/system/TransactionSys.hpp>
 
 static constexpr bool enable_print = false;
 

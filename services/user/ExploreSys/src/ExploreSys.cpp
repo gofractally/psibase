@@ -1,10 +1,10 @@
-#include "contracts/user/ExploreSys.hpp"
+#include "services/user/ExploreSys.hpp"
 
-#include <contracts/system/CommonSys.hpp>
-#include <contracts/system/ProxySys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
+#include <services/system/CommonSys.hpp>
+#include <services/system/ProxySys.hpp>
 
 using Tables = psibase::ContractTables<psibase::WebContentTable>;
 

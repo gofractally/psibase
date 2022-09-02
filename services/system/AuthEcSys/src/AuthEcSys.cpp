@@ -1,7 +1,7 @@
-#include <contracts/system/AuthEcSys.hpp>
-#include <contracts/system/VerifyEcSys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/print.hpp>
+#include <services/system/AuthEcSys.hpp>
+#include <services/system/VerifyEcSys.hpp>
 
 using namespace psibase;
 

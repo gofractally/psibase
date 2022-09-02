@@ -84,7 +84,7 @@ function(add_psidk_base_lib suffix)
     target_compile_options(wasm-base${suffix}-psidk INTERFACE
             -ffile-prefix-map=${ROOT_BINARY_DIR}/wasm/boost/=psidk:/boost/
             -ffile-prefix-map=${ROOT_BINARY_DIR}/wasm/catch2/=psidk:/catch2/
-            -ffile-prefix-map=${ROOT_SOURCE_DIR}/contracts/=psidk:/contracts/
+            -ffile-prefix-map=${ROOT_SOURCE_DIR}/services/=psidk:/services/
             -ffile-prefix-map=${ROOT_SOURCE_DIR}/external/=psidk:/
             -ffile-prefix-map=${ROOT_SOURCE_DIR}/libraries/=psidk:/
             -ffile-prefix-map=${WASI_SDK_PREFIX}/=psidk-wasi-sdk:/
@@ -211,6 +211,6 @@ endif()
 
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
-add_subdirectory(../contracts contracts)
+add_subdirectory(../services contracts)
 add_subdirectory(../programs programs)
 add_subdirectory(boost)

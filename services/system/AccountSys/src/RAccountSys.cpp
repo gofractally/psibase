@@ -1,13 +1,13 @@
-#include "contracts/system/RAccountSys.hpp"
+#include "services/system/RAccountSys.hpp"
 
-#include <contracts/system/AccountSys.hpp>
-#include <contracts/system/ProxySys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
+#include <services/system/AccountSys.hpp>
+#include <services/system/ProxySys.hpp>
 
 static constexpr bool enable_print = false;
 

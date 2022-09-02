@@ -1,13 +1,13 @@
 #define CATCH_CONFIG_MAIN
 
-#include <contracts/system/commonErrors.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
+#include <services/system/commonErrors.hpp>
 
-#include "contracts/user/RTokenSys.hpp"
-#include "contracts/user/SymbolSys.hpp"
-#include "contracts/user/TokenSys.hpp"
+#include "services/user/RTokenSys.hpp"
+#include "services/user/SymbolSys.hpp"
+#include "services/user/TokenSys.hpp"
 
 using namespace psibase;
 using namespace psibase::benchmarking;
@@ -33,13 +33,13 @@ SCENARIO("Testing default psibase chain")
    auto tokenSysRpc = t.as(RTokenSys::service).at<RTokenSys>();
 
    // Old UI
-   std::string comUiDir = "../contracts/user/CommonSys/ui/vanilla/";
+   std::string comUiDir = "../services/user/CommonSys/ui/vanilla/";
    tokenSysRpc.storeSys("/index.html", "text/html", readWholeFile(comUiDir + "common.index.html"));
-   std::string rpcUiDir = "../contracts/user/TokenSys/ui/vanilla/";
+   std::string rpcUiDir = "../services/user/TokenSys/ui/vanilla/";
    tokenSysRpc.storeSys("/ui/index.js", "text/javascript", readWholeFile(rpcUiDir + "index.js"));
 
    // New UI
-   // std::string rpcUiDir    = "../contracts/user/TokenSys/ui/dist/";
+   // std::string rpcUiDir    = "../services/user/TokenSys/ui/dist/";
    // tokenSysRpc.storeSys("/index.html", "text/html", readWholeFile(rpcUiDir + "index.html"));
    // tokenSysRpc.storeSys("/index.js", "text/javascript", readWholeFile(rpcUiDir + "index.js"));
    // tokenSysRpc.storeSys("/style.css", "text/css", readWholeFile(rpcUiDir + "style.css"));

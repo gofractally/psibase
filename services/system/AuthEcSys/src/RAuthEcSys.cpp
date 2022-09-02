@@ -1,9 +1,9 @@
-#include "contracts/system/RAuthEcSys.hpp"
+#include "services/system/RAuthEcSys.hpp"
 
-#include <contracts/system/AuthEcSys.hpp>
-#include <contracts/system/ProxySys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveSimpleUI.hpp>
+#include <services/system/AuthEcSys.hpp>
+#include <services/system/ProxySys.hpp>
 
 #include <string>
 #include <string_view>

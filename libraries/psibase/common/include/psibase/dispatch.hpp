@@ -1,5 +1,6 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/nativeFunctions.hpp>
 #include <psio/fracpack.hpp>
 

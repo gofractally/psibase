@@ -1,6 +1,6 @@
-#include <contracts/system/ProducerSys.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
+#include <services/system/ProducerSys.hpp>
 
 using namespace psibase;
 

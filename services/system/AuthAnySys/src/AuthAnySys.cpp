@@ -1,4 +1,4 @@
-#include <contracts/system/AuthAnySys.hpp>
+#include <services/system/AuthAnySys.hpp>
 
 #include <psibase/dispatch.hpp>
 #include <psibase/print.hpp>

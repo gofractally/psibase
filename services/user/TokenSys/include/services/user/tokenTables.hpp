@@ -1,13 +1,13 @@
 #pragma once
 
 #include <compare>
-#include <contracts/user/tokenTypes.hpp>
+#include <services/user/tokenTypes.hpp>
 #include <limits>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
 
-#include "contracts/user/NftSys.hpp"
-#include "contracts/user/symbolTables.hpp"
+#include "services/user/NftSys.hpp"
+#include "services/user/symbolTables.hpp"
 
 namespace UserContract
 {

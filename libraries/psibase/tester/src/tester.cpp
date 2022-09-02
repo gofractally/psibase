@@ -1,8 +1,8 @@
 #include <psibase/tester.hpp>
 
 #include <secp256k1.h>
-#include <contracts/system/TransactionSys.hpp>
-#include <contracts/system/VerifyEcSys.hpp>
+#include <services/system/TransactionSys.hpp>
+#include <services/system/VerifyEcSys.hpp>
 
 namespace
 {

@@ -1,9 +1,9 @@
-#include "contracts/system/RProxySys.hpp"
+#include "services/system/RProxySys.hpp"
 
-#include <contracts/system/ProxySys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveSimpleUI.hpp>
+#include <services/system/ProxySys.hpp>
 
 using namespace psibase;
 using Tables = psibase::ContractTables<psibase::WebContentTable>;

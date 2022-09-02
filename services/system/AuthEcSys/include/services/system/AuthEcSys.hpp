@@ -1,9 +1,9 @@
 #pragma once
 
-#include <contracts/system/TransactionSys.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/serveContent.hpp>
+#include <services/system/TransactionSys.hpp>
 
 namespace system_contract
 {

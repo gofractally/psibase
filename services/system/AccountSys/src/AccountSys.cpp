@@ -1,10 +1,10 @@
-#include <contracts/system/AccountSys.hpp>
+#include <services/system/AccountSys.hpp>
 
-#include <contracts/system/AuthAnySys.hpp>
-#include <contracts/system/TransactionSys.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
+#include <services/system/AuthAnySys.hpp>
+#include <services/system/TransactionSys.hpp>
 
 static constexpr bool enable_print = false;
 

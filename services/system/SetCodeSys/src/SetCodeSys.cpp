@@ -1,4 +1,4 @@
-#include <contracts/system/SetCodeSys.hpp>
+#include <services/system/SetCodeSys.hpp>
 #include <psibase/dispatch.hpp>
 
 using namespace psibase;

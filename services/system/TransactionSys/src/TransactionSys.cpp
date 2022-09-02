@@ -1,7 +1,7 @@
-#include <contracts/system/AccountSys.hpp>
-#include <contracts/system/AuthAnySys.hpp>
-#include <contracts/system/TransactionSys.hpp>
 #include <psibase/dispatch.hpp>
+#include <services/system/AccountSys.hpp>
+#include <services/system/AuthAnySys.hpp>
+#include <services/system/TransactionSys.hpp>
 
 #include <boost/container/flat_map.hpp>
 #include <psibase/contractEntry.hpp>

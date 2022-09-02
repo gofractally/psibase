@@ -1,13 +1,13 @@
 #include <psibase/serveGraphQL.hpp>
 
-#include <contracts/system/CommonSys.hpp>
-#include <contracts/user/RTokenSys.hpp>
-#include <contracts/user/SymbolSys.hpp>
-#include <contracts/user/TokenSys.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/print.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
+#include <services/system/CommonSys.hpp>
+#include <services/user/RTokenSys.hpp>
+#include <services/user/SymbolSys.hpp>
+#include <services/user/TokenSys.hpp>
 #include <string>
 #include <vector>
 

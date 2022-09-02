@@ -1,18 +1,18 @@
 #include <psibase/DefaultTestChain.hpp>
 
-#include <contracts/system/AccountSys.hpp>
-#include <contracts/system/AuthAnySys.hpp>
-#include <contracts/system/AuthEcSys.hpp>
-#include <contracts/system/CommonSys.hpp>
-#include <contracts/system/ProxySys.hpp>
-#include <contracts/system/RAccountSys.hpp>
-#include <contracts/system/RAuthEcSys.hpp>
-#include <contracts/system/RProxySys.hpp>
-#include <contracts/system/SetCodeSys.hpp>
-#include <contracts/system/TransactionSys.hpp>
-#include <contracts/system/VerifyEcSys.hpp>
-#include <contracts/user/ExploreSys.hpp>
-#include <contracts/user/PsiSpaceSys.hpp>
+#include <services/system/AccountSys.hpp>
+#include <services/system/AuthAnySys.hpp>
+#include <services/system/AuthEcSys.hpp>
+#include <services/system/CommonSys.hpp>
+#include <services/system/ProxySys.hpp>
+#include <services/system/RAccountSys.hpp>
+#include <services/system/RAuthEcSys.hpp>
+#include <services/system/RProxySys.hpp>
+#include <services/system/SetCodeSys.hpp>
+#include <services/system/TransactionSys.hpp>
+#include <services/system/VerifyEcSys.hpp>
+#include <services/user/ExploreSys.hpp>
+#include <services/user/PsiSpaceSys.hpp>
 #include <psibase/contractEntry.hpp>
 #include <utility>
 #include <vector>
@@ -233,7 +233,7 @@ void DefaultTestChain::registerSysRpc()
    transactor<RAuthEcSys>  rpcAuthEc(RAuthEcSys::service, RAuthEcSys::service);
 
    // Store UI files
-   std::string cdir      = "../contracts";
+   std::string cdir      = "../services";
    std::string comDir    = cdir + "/user/CommonSys";
    std::string accDir    = cdir + "/system/AccountSys";
    std::string expDir    = cdir + "/user/ExploreSys";

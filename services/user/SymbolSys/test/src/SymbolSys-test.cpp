@@ -1,13 +1,13 @@
 #define CATCH_CONFIG_MAIN
 #include <psio/fracpack.hpp>
 
-#include <contracts/system/AccountSys.hpp>
-#include <contracts/system/commonErrors.hpp>
 #include <psibase/DefaultTestChain.hpp>
+#include <services/system/AccountSys.hpp>
+#include <services/system/commonErrors.hpp>
 
-#include "contracts/user/NftSys.hpp"
-#include "contracts/user/SymbolSys.hpp"
-#include "contracts/user/TokenSys.hpp"
+#include "services/user/NftSys.hpp"
+#include "services/user/SymbolSys.hpp"
+#include "services/user/TokenSys.hpp"
 
 using namespace psibase;
 using namespace UserContract;

@@ -127,19 +127,19 @@ function(add suffix)
         target_include_directories(psitestlib${suffix} PUBLIC
             contract/include
             tester/include
-            ../../contracts/system/AccountSys/include
-            ../../contracts/system/AuthEcSys/include
-            ../../contracts/system/AuthAnySys/include
-            ../../contracts/system/ProxySys/include
-            ../../contracts/system/SetCodeSys/include
-            ../../contracts/system/TransactionSys/include
-            ../../contracts/system/VerifyEcSys/include
-            ../../contracts/user/CommonSys/include
-            ../../contracts/user/ExploreSys/include
-            ../../contracts/user/PsiSpaceSys/include
+            ../../services/system/AccountSys/include
+            ../../services/system/AuthEcSys/include
+            ../../services/system/AuthAnySys/include
+            ../../services/system/ProxySys/include
+            ../../services/system/SetCodeSys/include
+            ../../services/system/TransactionSys/include
+            ../../services/system/VerifyEcSys/include
+            ../../services/user/CommonSys/include
+            ../../services/user/ExploreSys/include
+            ../../services/user/PsiSpaceSys/include
         )
         target_include_directories(psitestlib${suffix} PRIVATE
-            ../../contracts/system/VerifyEcSys/include
+            ../../services/system/VerifyEcSys/include
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start

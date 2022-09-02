@@ -1,8 +1,8 @@
 #pragma once
 
-#include <contracts/system/TransactionSys.hpp>
 #include <psibase/Contract.hpp>
 #include <psibase/nativeTables.hpp>
+#include <services/system/TransactionSys.hpp>
 
 namespace system_contract
 {

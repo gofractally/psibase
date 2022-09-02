@@ -46,6 +46,6 @@ add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
 
 if(NOT CLIO_ONLY)
-    add_subdirectory(../contracts contracts)
+    add_subdirectory(../services contracts)
     add_subdirectory(../programs programs)
 endif()
