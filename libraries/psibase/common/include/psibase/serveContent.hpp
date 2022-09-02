@@ -49,6 +49,7 @@ namespace psibase
                      std::vector<char>&&              content,
                      const ContractTables<Tables...>& tables)
    {
+      check(path.starts_with('/'), "Path doesn't begin with /");
       psibase::WebContentRow row{
           .path        = std::move(path),
           .contentType = std::move(contentType),

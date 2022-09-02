@@ -124,7 +124,7 @@ export function privateStringToKeyPair(s) {
     else if (s.substr(0, 7) === 'PVT_R1_')
         [keyType, data, ec] = [KeyType.r1, stringToKey(s.substr(7), privateKeyDataSize, 'R1'), getR1()];
     else
-        throw new Error('unsupported key type');
+        throw new Error('private key must begin with PVT_K1_ or PVT_R1_');
     return { keyType, keyPair: ec.keyFromPrivate(data) };
 }
 
@@ -136,7 +136,7 @@ export function publicStringToKeyPair(s) {
     else if (s.substr(0, 7) === 'PUB_R1_')
         [keyType, data, ec] = [KeyType.r1, stringToKey(s.substr(7), publicKeyDataSize, 'R1'), getR1()];
     else
-        throw new Error('unsupported key type');
+        throw new Error('public key must begin with PUB_K1_ or PUB_R1_');
     return { keyType, keyPair: ec.keyPair({ pub: data }) };
 }
 
@@ -187,8 +187,7 @@ export function signatureToFracpack({ keyType, signature }) {
     ].concat(r, s));
 }
 
-export function keyPairStrings(key)
-{
+export function keyPairStrings(key) {
     return {
         pub: publicKeyPairToString(key),
         priv: privateKeyPairToString(key),

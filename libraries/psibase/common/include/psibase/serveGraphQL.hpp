@@ -1105,6 +1105,9 @@ namespace psibase
    ///   }
    /// }
    /// ```
+   // TODO: range search with just a prefix of multi-field keys. Should we
+   //       play games by relaxing GraphQL's too-strict rules again? e.g.
+   //       allowing `le:{a:7}` when the key also has fields b and c?
    template <typename Events>
    auto makeEventConnection(DbId                              db,
                             uint64_t                          eventId,

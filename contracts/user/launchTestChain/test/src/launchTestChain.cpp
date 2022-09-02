@@ -30,12 +30,12 @@ SCENARIO("Testing default psibase chain")
 {
    DefaultTestChain t(neededContracts, 1'000'000'000ul, 32, 32, 32, 38);
 
-   auto        tokenSysRpc = t.as(RTokenSys::contract).at<RTokenSys>();
+   auto tokenSysRpc = t.as(RTokenSys::contract).at<RTokenSys>();
 
    // Old UI
-   std::string comUiDir    = "../contracts/user/CommonSys/ui/vanilla/";
+   std::string comUiDir = "../contracts/user/CommonSys/ui/vanilla/";
    tokenSysRpc.storeSys("/index.html", "text/html", readWholeFile(comUiDir + "common.index.html"));
-   std::string rpcUiDir    = "../contracts/user/TokenSys/ui/vanilla/";
+   std::string rpcUiDir = "../contracts/user/TokenSys/ui/vanilla/";
    tokenSysRpc.storeSys("/ui/index.js", "text/javascript", readWholeFile(rpcUiDir + "index.js"));
 
    // New UI
@@ -85,5 +85,6 @@ SCENARIO("Testing default psibase chain")
    psibase::execute("rm -rf tester_psinode_db");
    psibase::execute("mkdir tester_psinode_db");
    psibase::execute("cp -a " + t.getPath() + "/. tester_psinode_db/");
-   psibase::execute("psinode --slow -o psibase.127.0.0.1.sslip.io tester_psinode_db --producer testchain --prods testchain");
+   psibase::execute(
+       "psinode --slow -o psibase.127.0.0.1.sslip.io tester_psinode_db --producer testchain");
 }
