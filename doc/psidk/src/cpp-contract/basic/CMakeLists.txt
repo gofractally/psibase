@@ -9,12 +9,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Libraries for building contracts and tests
+# Libraries for building services and tests
 find_package(psidk REQUIRED)
 
-# Build example.wasm contract
+# Build example.wasm service
 add_executable(example example.cpp)
-target_link_libraries(example psibase-contract-simple-malloc)
+target_link_libraries(example psibase-service-simple-malloc)
 
 # These symlinks help vscode
 execute_process(COMMAND ln -sfT ${psidk_DIR} ${CMAKE_CURRENT_BINARY_DIR}/psidk)

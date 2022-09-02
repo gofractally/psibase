@@ -1,5 +1,5 @@
 function(add suffix)
-    add_user_contract("${suffix}" mincon src/mincon.cpp)
+    add_user_service("${suffix}" mincon src/mincon.cpp)
 endfunction(add)
 
 conditional_add()

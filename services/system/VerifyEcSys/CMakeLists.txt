@@ -1,5 +1,5 @@
 function(add suffix)
-    add_system_contract("${suffix}" VerifyEcSys src/VerifyEcSys.cpp)
+    add_system_service("${suffix}" VerifyEcSys src/VerifyEcSys.cpp)
     target_link_libraries(VerifyEcSys${suffix} PUBLIC -lsecp256k1)
     set_target_properties(VerifyEcSys${suffix} PROPERTIES
         RUNTIME_OUTPUT_NAME         VerifyEcSys-prestart${suffix}

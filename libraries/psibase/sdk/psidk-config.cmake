@@ -69,13 +69,13 @@ function(add_libs suffix)
         boost
     )
 
-    add_library(psibase-contract-base${suffix} INTERFACE)
-    target_link_libraries(psibase-contract-base${suffix} INTERFACE
+    add_library(psibase-service-base${suffix} INTERFACE)
+    target_link_libraries(psibase-service-base${suffix} INTERFACE
         psibase${suffix}
-        -lpsibase-contract-base${suffix}
+        -lpsibase-service-base${suffix}
     )
-    target_compile_options(psibase-contract-base${suffix} INTERFACE -DCOMPILING_CONTRACT)
-    target_link_options(psibase-contract-base${suffix} INTERFACE
+    target_compile_options(psibase-service-base${suffix} INTERFACE -DCOMPILING_SERVICE)
+    target_link_options(psibase-service-base${suffix} INTERFACE
         -Wl,--stack-first
         -Wl,--entry,start
         -Wl,--export=called
@@ -83,33 +83,33 @@ function(add_libs suffix)
         -Wl,--no-merge-data-segments
         -nostdlib
     )
-    target_include_directories(psibase-contract-base${suffix} INTERFACE ${psidk_DIR}/psibase/service/include)
+    target_include_directories(psibase-service-base${suffix} INTERFACE ${psidk_DIR}/psibase/service/include)
 
     file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
     # Contract with simple malloc/free
-    add_library(psibase-contract-simple-malloc${suffix} INTERFACE)
-    target_link_libraries(psibase-contract-simple-malloc${suffix} INTERFACE
+    add_library(psibase-service-simple-malloc${suffix} INTERFACE)
+    target_link_libraries(psibase-service-simple-malloc${suffix} INTERFACE
         -L${CMAKE_CURRENT_BINARY_DIR}
-        psibase-contract-base${suffix}
+        psibase-service-base${suffix}
         -lc++
         -lc++abi-shrunk${suffix}
         c++abi-replacements${suffix}
         -lc-no-malloc${suffix}
         simple-malloc${suffix}
-        -lpsibase-contracts-wasi-polyfill${suffix}
+        -lpsibase-service-wasi-polyfill${suffix}
         ${LIBCLANG_RT_BUILTINS}
     )
 
     # Contract with full malloc/free
-    add_library(psibase-contract${suffix} INTERFACE)
-    target_link_libraries(psibase-contract${suffix} INTERFACE
-        psibase-contract-base${suffix}
+    add_library(psibase-service${suffix} INTERFACE)
+    target_link_libraries(psibase-service${suffix} INTERFACE
+        psibase-service-base${suffix}
         -lc++
         -lc++abi-shrunk${suffix}
         c++abi-replacements${suffix}
         -lc
-        -lpsibase-contracts-wasi-polyfill${suffix}
+        -lpsibase-service-wasi-polyfill${suffix}
         ${LIBCLANG_RT_BUILTINS}
     )
 

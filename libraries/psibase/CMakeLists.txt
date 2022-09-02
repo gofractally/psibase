@@ -34,24 +34,24 @@ function(add suffix)
             COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc++abi-shrunk${suffix}.a abort_message.cpp.o
         )
 
-        add_library(psibase-contracts-wasi-polyfill${suffix})
-        target_link_libraries(psibase-contracts-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
-        target_sources(psibase-contracts-wasi-polyfill${suffix} PRIVATE
+        add_library(psibase-service-wasi-polyfill${suffix})
+        target_link_libraries(psibase-service-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
+        target_sources(psibase-service-wasi-polyfill${suffix} PRIVATE
             service/src/wasi-polyfill/__wasi_fd_fdstat_get.cpp
             service/src/wasi-polyfill/__wasi_fd_close.cpp
             service/src/wasi-polyfill/__wasi_fd_seek.cpp
             service/src/wasi-polyfill/__wasi_fd_write.cpp
         )
 
-        add_library(psibase-contract-base${suffix})
-        target_sources(psibase-contract-base${suffix} PRIVATE
+        add_library(psibase-service-base${suffix})
+        target_sources(psibase-service-base${suffix} PRIVATE
             service/src/intrinsic.cpp
             service/src/print.cpp
             service/src/Service.cpp
         )
-        target_link_libraries(psibase-contract-base${suffix} PUBLIC psibase${suffix})
-        target_compile_options(psibase-contract-base${suffix} PUBLIC -DCOMPILING_CONTRACT)
-        target_link_options(psibase-contract-base${suffix} PUBLIC
+        target_link_libraries(psibase-service-base${suffix} PUBLIC psibase${suffix})
+        target_compile_options(psibase-service-base${suffix} PUBLIC -DCOMPILING_SERVICE)
+        target_link_options(psibase-service-base${suffix} PUBLIC
             -Wl,--stack-first
             -Wl,--entry,start
             -Wl,--export=called
@@ -59,33 +59,33 @@ function(add suffix)
             -Wl,--no-merge-data-segments
             -nostdlib
         )
-        target_include_directories(psibase-contract-base${suffix} PUBLIC service/include)
+        target_include_directories(psibase-service-base${suffix} PUBLIC service/include)
 
         file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
-        # Contract with simple malloc/free
-        add_library(psibase-contract-simple-malloc${suffix} INTERFACE)
-        target_link_libraries(psibase-contract-simple-malloc${suffix} INTERFACE
+        # Service with simple malloc/free
+        add_library(psibase-service-simple-malloc${suffix} INTERFACE)
+        target_link_libraries(psibase-service-simple-malloc${suffix} INTERFACE
             -L${ROOT_BINARY_DIR}/wasm/libraries/psibase
-            psibase-contract-base${suffix}
+            psibase-service-base${suffix}
             -lc++
             -lc++abi-shrunk${suffix}
             c++abi-replacements${suffix}
             -lc-no-malloc${suffix}
             simple-malloc${suffix}
-            psibase-contracts-wasi-polyfill${suffix}
+            psibase-service-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
 
-        # Contract with full malloc/free
-        add_library(psibase-contract${suffix} INTERFACE)
-        target_link_libraries(psibase-contract${suffix} INTERFACE
-            psibase-contract-base${suffix}
+        # Service with full malloc/free
+        add_library(psibase-service${suffix} INTERFACE)
+        target_link_libraries(psibase-service${suffix} INTERFACE
+            psibase-service-base${suffix}
             -lc++
             -lc++abi-shrunk${suffix}
             c++abi-replacements${suffix}
             -lc
-            psibase-contracts-wasi-polyfill${suffix}
+            psibase-service-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
 
@@ -177,7 +177,7 @@ if(DEFINED IS_WASM)
     add("-debug-psidk")
 
     foreach(suffix "" "-debug")
-        foreach(lib psibase psibase-contract-base psibase-contracts-wasi-polyfill psitestlib)
+        foreach(lib psibase psibase-service-base psibase-service-wasi-polyfill psitestlib)
             set_target_properties(${lib}${suffix}-psidk PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
             set_target_properties(${lib}${suffix}-psidk PROPERTIES ARCHIVE_OUTPUT_NAME ${lib}${suffix})
         endforeach()

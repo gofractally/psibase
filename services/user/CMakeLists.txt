@@ -1,4 +1,4 @@
-function(add_user_contract suffix name)
+function(add_user_service suffix name)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC
         include
@@ -15,9 +15,9 @@ function(add_user_contract suffix name)
         ../../system/TransactionSys/include
         ../../system/VerifyEcSys/include
     )
-    target_link_libraries(${name}${suffix} PUBLIC contracts_system${suffix} psibase-contract-simple-malloc${suffix})
+    target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} psibase-service-simple-malloc${suffix})
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
-endfunction(add_user_contract)
+endfunction(add_user_service)
 
 function(add_user_test suffix name)
     set(TARGET ${name}-test${suffix})
@@ -37,7 +37,7 @@ function(add_user_test suffix name)
       ../../../system/TransactionSys/include
       ../../../system/VerifyEcSys/include
      ${CMAKE_CURRENT_LIST_DIR})
-    target_link_libraries(${TARGET} contracts_system${suffix} psitestlib)
+    target_link_libraries(${TARGET} services_system${suffix} psitestlib)
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add_user_test)
 
@@ -54,8 +54,8 @@ function(add_user_test_debug name)
 endfunction()
 
 function(add suffix)
-    add_library(contracts_user${suffix} INTERFACE)
-    target_include_directories(contracts_user${suffix} INTERFACE
+    add_library(services_user${suffix} INTERFACE)
+    target_include_directories(services_user${suffix} INTERFACE
         NftSys/include
     )
 endfunction(add)

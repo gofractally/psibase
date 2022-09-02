@@ -9,16 +9,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Libraries for building contracts and tests
+# Libraries for building services and tests
 find_package(psidk REQUIRED)
 
-# Build arithmetic.wasm contract
+# Build arithmetic.wasm service
 add_executable(arithmetic arithmetic.cpp)
-target_link_libraries(arithmetic psibase-contract-simple-malloc)
+target_link_libraries(arithmetic psibase-service-simple-malloc)
 
-# Build caller.wasm contract
+# Build caller.wasm service
 add_executable(caller caller.cpp)
-target_link_libraries(caller psibase-contract-simple-malloc)
+target_link_libraries(caller psibase-service-simple-malloc)
 
 # These symlinks help vscode
 execute_process(COMMAND ln -sfT ${psidk_DIR} ${CMAKE_CURRENT_BINARY_DIR}/psidk)

@@ -1,5 +1,5 @@
 function(add suffix)
-    add_user_contract("${suffix}" ExchangeSys src/ExchangeSys.cpp)
+    add_user_service("${suffix}" ExchangeSys src/ExchangeSys.cpp)
 endfunction(add)
 
 conditional_add()

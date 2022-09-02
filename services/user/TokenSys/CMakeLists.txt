@@ -1,6 +1,6 @@
 function(add suffix)
-    add_user_contract("${suffix}" TokenSys src/TokenSys.cpp)
-    add_user_contract("${suffix}" RTokenSys src/RTokenSys.cpp)
+    add_user_service("${suffix}" TokenSys src/TokenSys.cpp)
+    add_user_service("${suffix}" RTokenSys src/RTokenSys.cpp)
 endfunction(add)
 
 conditional_add()

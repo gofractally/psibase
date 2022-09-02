@@ -211,6 +211,6 @@ endif()
 
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
-add_subdirectory(../services contracts)
+add_subdirectory(../services services)
 add_subdirectory(../programs programs)
 add_subdirectory(boost)

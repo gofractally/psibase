@@ -2,14 +2,14 @@ add_executable(psinode main.cpp)
 
 if(APPLE)
     target_link_libraries(psinode
-        contracts_system
+        services_system
         psibase_http
         debug_eos_vm
         psibase_net
     )
 elseif(UNIX)
     target_link_libraries(psinode
-        contracts_system
+        services_system
         psibase_http
         debug_eos_vm
         psibase_net

@@ -1,5 +1,5 @@
 function(add suffix)
-    add_user_contract("${suffix}" NftSys src/NftSys.cpp)
+    add_user_service("${suffix}" NftSys src/NftSys.cpp)
 endfunction(add)
 
 conditional_add()

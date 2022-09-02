@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(contract-lab)
+project(psibase)
 include(ExternalProject)
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)

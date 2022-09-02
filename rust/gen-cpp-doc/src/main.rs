@@ -697,7 +697,7 @@ fn parse<'tu>(
         "-nostdinc",
         "-nostdinc++",
         "-nostdlib++",
-        "-DCOMPILING_CONTRACT",
+        "-DCOMPILING_SERVICE",
         "-DCOMPILING_WASM",
         &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include/c++/v1"),
         &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include"),
