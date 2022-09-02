@@ -1,7 +1,7 @@
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/Rpc.hpp>
 
-struct Caller : psibase::Contract<Caller>
+struct Caller : psibase::Service<Caller>
 {
    static constexpr auto service = psibase::AccountNumber("caller");
 

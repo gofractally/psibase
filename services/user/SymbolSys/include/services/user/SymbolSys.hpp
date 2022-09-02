@@ -1,7 +1,7 @@
 #pragma once
 
 #include <compare>
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <services/user/symbolErrors.hpp>
 #include <services/user/symbolTables.hpp>
@@ -11,7 +11,7 @@
 
 namespace UserContract
 {
-   class SymbolSys : public psibase::Contract<SymbolSys>
+   class SymbolSys : public psibase::Service<SymbolSys>
    {
      public:
       using tables = psibase::

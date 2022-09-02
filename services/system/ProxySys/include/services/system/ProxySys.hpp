@@ -1,5 +1,5 @@
 #pragma once
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
 
@@ -27,7 +27,7 @@ namespace psibase
    /// an HTTP request that contracts may serve. This function does the actual routing.
    /// `psinode` has a local option (TODO: implement) which may choose an alternative
    /// routing contract instead.
-   struct ProxySys : psibase::Contract<ProxySys>
+   struct ProxySys : psibase::Service<ProxySys>
    {
       static constexpr auto service = psibase::proxyContractNum;
 

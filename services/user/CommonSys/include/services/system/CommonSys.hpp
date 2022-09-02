@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/serviceEntry.hpp>
 
 namespace system_contract
@@ -8,7 +8,7 @@ namespace system_contract
    /// TODO: doc
    ///
    /// See [HTTP and Javascript](../http.md)
-   struct CommonSys : psibase::Contract<CommonSys>
+   struct CommonSys : psibase::Service<CommonSys>
    {
       static constexpr auto service = psibase::AccountNumber("common-sys");
 

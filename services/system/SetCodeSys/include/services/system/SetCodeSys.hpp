@@ -1,11 +1,11 @@
 #pragma once
 
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
 
 namespace system_contract
 {
-   struct SetCodeSys : psibase::Contract<SetCodeSys>
+   struct SetCodeSys : psibase::Service<SetCodeSys>
    {
       static constexpr auto     service       = psibase::AccountNumber("setcode-sys");
       static constexpr uint64_t contractFlags = psibase::CodeRow::allowWriteNative;

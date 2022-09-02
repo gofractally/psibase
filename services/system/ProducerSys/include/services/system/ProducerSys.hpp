@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
 #include <services/system/TransactionSys.hpp>
 
@@ -8,7 +8,7 @@ namespace system_contract
 {
    // This contract manages the active producers.
    // It must have native write permission
-   class ProducerSys : public psibase::Contract<ProducerSys>
+   class ProducerSys : public psibase::Service<ProducerSys>
    {
      public:
       void setProducers(std::vector<psibase::ProducerConfigRow> prods);

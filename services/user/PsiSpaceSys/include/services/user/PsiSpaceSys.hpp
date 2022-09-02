@@ -1,7 +1,7 @@
 #pragma once
 
-#include <psibase/Contract.hpp>
 #include <psibase/Rpc.hpp>
+#include <psibase/Service.hpp>
 
 namespace system_contract
 {
@@ -55,7 +55,7 @@ namespace system_contract
    ///
    /// After files are uploaded, the site is available at either `http://$ACCOUNT.$DOMAIN` or
    /// `http://$DOMAIN/applet/$ACCOUNT`
-   struct PsiSpaceSys : psibase::Contract<PsiSpaceSys>
+   struct PsiSpaceSys : psibase::Service<PsiSpaceSys>
    {
       static constexpr auto service = psibase::AccountNumber("psispace-sys");
       using Tables                  = psibase::ContractTables<PsiSpaceContentTable>;

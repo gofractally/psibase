@@ -16,7 +16,7 @@ namespace system_contract
    };
    PSIO_REFLECT(AuthRecord, account, pubkey)
 
-   class AuthEcSys : public psibase::Contract<AuthEcSys>
+   class AuthEcSys : public psibase::Service<AuthEcSys>
    {
      public:
       static constexpr auto service = psibase::AccountNumber("auth-ec-sys");

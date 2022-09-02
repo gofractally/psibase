@@ -1,11 +1,11 @@
 #pragma once
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
 
 namespace system_contract
 {
-   struct ExploreSys : public psibase::Contract<ExploreSys>
+   struct ExploreSys : public psibase::Service<ExploreSys>
    {
       static constexpr auto service = psibase::AccountNumber("explore-sys");
 

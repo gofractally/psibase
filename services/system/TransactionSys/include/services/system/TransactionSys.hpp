@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
 
 namespace system_contract
@@ -175,7 +175,7 @@ namespace system_contract
    /// Other contracts use it to get information about the chain,
    /// current block, and head block. They also use it to call actions
    /// using other accounts' authorities via [runAs].
-   struct TransactionSys : psibase::Contract<TransactionSys>
+   struct TransactionSys : psibase::Service<TransactionSys>
    {
       /// "transact-sys"
       static constexpr auto service = psibase::AccountNumber("transact-sys");

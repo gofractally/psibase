@@ -1,12 +1,12 @@
 #pragma once
-#include <psibase/Contract.hpp>
 #include <psibase/Rpc.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serviceEntry.hpp>
 
 namespace system_contract
 {
-   class RAuthEcSys : public psibase::Contract<RAuthEcSys>
+   class RAuthEcSys : public psibase::Service<RAuthEcSys>
    {
      public:
       static constexpr auto service = psibase::AccountNumber("r-ath-ec-sys");

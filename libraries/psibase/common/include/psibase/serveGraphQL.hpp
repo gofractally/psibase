@@ -248,7 +248,7 @@ namespace psibase
    /// operations; you must use actions to write to a table.
    ///
    /// ```c++
-   /// #include <psibase/Contract.hpp>
+   /// #include <psibase/Service.hpp>
    /// #include <psibase/dispatch.hpp>
    /// #include <psibase/serveGraphQL.hpp>
    /// #include <psibase/serveSimpleUI.hpp>
@@ -285,7 +285,7 @@ namespace psibase
    /// };
    /// PSIO_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
    ///
-   /// struct ExampleContract : psibase::Contract<ExampleContract>
+   /// struct ExampleContract : psibase::Service<ExampleContract>
    /// {
    ///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
    ///    {

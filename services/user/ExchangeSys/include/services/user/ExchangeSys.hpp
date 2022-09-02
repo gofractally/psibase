@@ -1,12 +1,12 @@
 #pragma once
 
 #include <compare>
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <string_view>
 
 namespace ExchangeSys
 {
-   class exchange_contract : public psibase::Contract<exchange_contract>
+   class exchange_contract : public psibase::Service<exchange_contract>
    {
      public:
       static constexpr auto service = psibase::AccountNumber("exchange-sys");

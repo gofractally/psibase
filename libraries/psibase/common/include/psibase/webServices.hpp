@@ -1,4 +1,4 @@
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/serviceEntry.hpp>
 
 namespace psibase

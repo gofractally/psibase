@@ -1,11 +1,11 @@
 #pragma once
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/name.hpp>
 #include <psibase/nativeFunctions.hpp>
 
 namespace company
 {
-   class min_contract : public psibase::Contract<min_contract>
+   class min_contract : public psibase::Service<min_contract>
    {
      public:
       static constexpr psibase::account_id_type id = psibase::name_to_number("mincon");  //_a;

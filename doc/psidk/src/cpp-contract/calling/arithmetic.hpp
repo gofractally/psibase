@@ -1,8 +1,8 @@
-#include <psibase/Contract.hpp>
 #include <psibase/Rpc.hpp>
+#include <psibase/Service.hpp>
 
 // The header includes the class definition
-struct Arithmetic : psibase::Contract<Arithmetic>
+struct Arithmetic : psibase::Service<Arithmetic>
 {
    // The account this contract is normally installed on
    static constexpr auto service = psibase::AccountNumber("arithmetic");

@@ -4,7 +4,7 @@
 
 namespace system_contract
 {
-   struct AuthAnySys : psibase::Contract<AuthAnySys>
+   struct AuthAnySys : psibase::Service<AuthAnySys>
    {
       static constexpr psibase::AccountNumber service = psibase::AccountNumber("auth-any-sys");
 

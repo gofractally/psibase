@@ -1,5 +1,5 @@
 #pragma once
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/name.hpp>
 #include <psibase/nativeFunctions.hpp>
@@ -41,7 +41,7 @@ namespace system_contract
    // TODO: account deletion, with an index to prevent reusing IDs
    // TODO: a mode which restricts which account may use newAccount.
    //       also let the UI know.
-   class AccountSys : public psibase::Contract<AccountSys>
+   class AccountSys : public psibase::Service<AccountSys>
    {
      public:
       static constexpr auto                   service     = psibase::AccountNumber("account-sys");

@@ -1,10 +1,10 @@
 #pragma once
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/serviceEntry.hpp>
 
 namespace system_contract
 {
-   struct RAccountSys : public psibase::Contract<RAccountSys>
+   struct RAccountSys : public psibase::Service<RAccountSys>
    {
       static constexpr auto service = psibase::AccountNumber("r-account-sys");
 

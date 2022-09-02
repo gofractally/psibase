@@ -1,7 +1,7 @@
 #pragma once
 
-#include <psibase/Contract.hpp>
 #include <psibase/Rpc.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/String.hpp>
 #include <psibase/check.hpp>
 #include <psibase/serveContent.hpp>
@@ -15,7 +15,7 @@
 namespace UserContract
 {
 
-   class TokenSys : public psibase::Contract<TokenSys>
+   class TokenSys : public psibase::Service<TokenSys>
    {
      public:
       using Tables = psibase::

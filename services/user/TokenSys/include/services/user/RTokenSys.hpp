@@ -2,7 +2,7 @@
 
 namespace UserContract
 {
-   class RTokenSys : public psibase::Contract<RTokenSys>
+   class RTokenSys : public psibase::Service<RTokenSys>
    {
      public:
       static constexpr auto service = psibase::AccountNumber("r-tok-sys");
