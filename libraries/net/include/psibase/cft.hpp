@@ -401,6 +401,7 @@ namespace psibase::net
                    {
                       update_match_index(self, b->blockNum());
                       on_fork_switch(&b->info.header);
+                      chain().gc();
                    }
                    // finish_block might convert us to nonvoting
                    if (_state == producer_state::leader)
@@ -623,6 +624,7 @@ namespace psibase::net
                       set_producers(chain().getProducers());
                    }
                    on_fork_switch(h);
+                   chain().gc();
                 });
          }
       }

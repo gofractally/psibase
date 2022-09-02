@@ -11,6 +11,18 @@
 namespace psibase
 {
 
+   inline BlockNum getBlockNum(const Checksum256& id)
+   {
+      BlockNum result;
+      auto     src  = id.data();
+      auto     dest = reinterpret_cast<char*>(&result + 1);
+      while (dest != reinterpret_cast<char*>(&result))
+      {
+         *--dest = *src++;
+      }
+      return result;
+   }
+
    // TODO: num is encoded in id now
    struct ExtendedBlockId
    {
@@ -322,6 +334,34 @@ namespace psibase
          // block propagation needs to know the last commit, but also needs to happen before
          // this cleanup.
          return result;
+      }
+
+      // removes blocks and states before irreversible
+      void gc()
+      {
+         for (auto iter = blocks.begin(), end = blocks.end(); iter != end;)
+         {
+            auto blockNum = getBlockNum(iter->first);
+            if (blockNum < commitIndex ||
+                (blockNum == commitIndex &&
+                 !in_best_chain(ExtendedBlockId{iter->first, blockNum})) ||
+                (blockNum > commitIndex &&
+                 blocks.find(iter->second->block()->header()->previous()) == blocks.end()))
+            {
+               auto state_iter = states.find(iter->first);
+               if (state_iter != states.end())
+               {
+                  byOrderIndex.erase(state_iter->second.order());
+                  states.erase(state_iter);
+               }
+               iter = blocks.erase(iter);
+            }
+            else
+            {
+               ++iter;
+            }
+         }
+         byBlocknumIndex.erase(byBlocknumIndex.begin(), byBlocknumIndex.find(commitIndex));
       }
 
       template <typename T>
