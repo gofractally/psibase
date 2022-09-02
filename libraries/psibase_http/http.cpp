@@ -7,7 +7,7 @@
 
 #include "psibase/http.hpp"
 #include "psibase/TransactionContext.hpp"
-#include "psibase/contractEntry.hpp"
+#include "psibase/serviceEntry.hpp"
 
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/io_service.hpp>

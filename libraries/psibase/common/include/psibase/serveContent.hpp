@@ -1,7 +1,7 @@
 #pragma once
 
 #include <psibase/Table.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 
 namespace psibase
 {

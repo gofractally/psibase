@@ -1,11 +1,11 @@
 #include <psibase/EcdsaProver.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/cft.hpp>
-#include <psibase/contractEntry.hpp>
 #include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
 #include <psibase/node.hpp>
 #include <psibase/peer_manager.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>

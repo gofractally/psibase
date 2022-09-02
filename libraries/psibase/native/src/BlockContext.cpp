@@ -1,5 +1,5 @@
 #include <psibase/TransactionContext.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 
 namespace psibase
 {

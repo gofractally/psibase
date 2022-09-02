@@ -13,7 +13,7 @@
 #include <services/system/VerifyEcSys.hpp>
 #include <services/user/ExploreSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <utility>
 #include <vector>
 

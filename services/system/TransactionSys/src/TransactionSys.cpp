@@ -4,7 +4,7 @@
 #include <services/system/TransactionSys.hpp>
 
 #include <boost/container/flat_map.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/print.hpp>
 

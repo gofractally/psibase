@@ -1,7 +1,7 @@
 #pragma once
 #include <psibase/Contract.hpp>
-#include <psibase/contractEntry.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/serviceEntry.hpp>
 
 namespace system_contract
 {

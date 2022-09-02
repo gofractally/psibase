@@ -1,8 +1,8 @@
 #pragma once
 #include <psibase/Contract.hpp>
 #include <psibase/Rpc.hpp>
-#include <psibase/contractEntry.hpp>
 #include <psibase/serveContent.hpp>
+#include <psibase/serviceEntry.hpp>
 
 namespace system_contract
 {

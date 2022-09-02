@@ -3,7 +3,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psio/from_bin.hpp>
 #include <thread>
 

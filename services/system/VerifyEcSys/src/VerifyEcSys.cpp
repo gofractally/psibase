@@ -1,7 +1,7 @@
 #include <secp256k1_preallocated.h>
 #include <services/system/VerifyEcSys.hpp>
 #include <psibase/check.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psio/from_bin.hpp>
 
 using namespace psibase;

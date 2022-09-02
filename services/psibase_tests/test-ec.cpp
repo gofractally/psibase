@@ -2,8 +2,8 @@
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
 
-#include <psibase/contractEntry.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psio/to_json.hpp>
 
 #include "test-cntr.hpp"
