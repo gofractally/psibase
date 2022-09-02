@@ -73,6 +73,7 @@ namespace system_contract
       Tables tables{getReceiver()};
       auto   table = tables.template open<PsiSpaceContentTable>();
 
+      check(path.starts_with('/'), "Path doesn't begin with /");
       PsiSpaceContentRow row{
           .account     = getSender(),
           .path        = std::move(path),
