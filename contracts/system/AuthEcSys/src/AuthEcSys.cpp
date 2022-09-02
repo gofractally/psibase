@@ -37,7 +37,7 @@ namespace system_contract
       auto expected = psio::convert_to_frac(row->pubkey);
       for (auto& claim : claims)
       {
-         if (claim.contract == VerifyEcSys::contract && claim.rawData == expected)
+         if (claim.contract == VerifyEcSys::service && claim.rawData == expected)
          {
             // Billing rule: if first proof passes, and auth for first sender passes,
             // then then first sender will be charged even if the transaction fails,

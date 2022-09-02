@@ -281,7 +281,7 @@ namespace psibase
          template <typename Other>
          auto at() const
          {
-            return ContractUser<Other>(t, id, Other::contract);
+            return ContractUser<Other>(t, id, Other::service);
          }
 
          operator AccountNumber() { return id; }

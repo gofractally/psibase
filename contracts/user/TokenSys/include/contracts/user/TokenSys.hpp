@@ -20,7 +20,7 @@ namespace UserContract
      public:
       using Tables = psibase::
           ContractTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
-      static constexpr auto contract = psibase::AccountNumber("token-sys");
+      static constexpr auto service  = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken = TID{1};
 
       TokenSys(psio::shared_view_ptr<psibase::Action> action);
@@ -74,7 +74,7 @@ namespace UserContract
       bool                getTokenConf(TID tokenId, psibase::NamedBit flag);
 
      private:
-      Tables db{contract};
+      Tables db{psibase::getReceiver()};
 
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);

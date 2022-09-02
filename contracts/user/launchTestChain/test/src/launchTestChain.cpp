@@ -20,17 +20,17 @@ namespace
    const psibase::String memo{"memo"};
 
    const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
-       {TokenSys::contract, "TokenSys.wasm"},
-       {NftSys::contract, "NftSys.wasm"},
-       {SymbolSys::contract, "SymbolSys.wasm"},
-       {RTokenSys::contract, "RTokenSys.wasm"}};
+       {TokenSys::service, "TokenSys.wasm"},
+       {NftSys::service, "NftSys.wasm"},
+       {SymbolSys::service, "SymbolSys.wasm"},
+       {RTokenSys::service, "RTokenSys.wasm"}};
 }  // namespace
 
 SCENARIO("Testing default psibase chain")
 {
    DefaultTestChain t(neededContracts, 1'000'000'000ul, 32, 32, 32, 38);
 
-   auto tokenSysRpc = t.as(RTokenSys::contract).at<RTokenSys>();
+   auto tokenSysRpc = t.as(RTokenSys::service).at<RTokenSys>();
 
    // Old UI
    std::string comUiDir = "../contracts/user/CommonSys/ui/vanilla/";
@@ -53,7 +53,7 @@ SCENARIO("Testing default psibase chain")
    alice.at<TokenSys>().init();
    alice.at<SymbolSys>().init();
 
-   auto sysIssuer = t.as(SymbolSys::contract).at<TokenSys>();
+   auto sysIssuer = t.as(SymbolSys::service).at<TokenSys>();
    auto sysToken  = TokenSys::sysToken;
 
    // Let sys token be tradeable

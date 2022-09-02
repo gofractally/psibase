@@ -7,7 +7,7 @@ namespace system_contract
 {
    struct SetCodeSys : psibase::Contract<SetCodeSys>
    {
-      static constexpr auto     contract      = psibase::AccountNumber("setcode-sys");
+      static constexpr auto     service       = psibase::AccountNumber("setcode-sys");
       static constexpr uint64_t contractFlags = psibase::CodeRow::allowWriteNative;
 
       void setCode(psibase::AccountNumber contract,

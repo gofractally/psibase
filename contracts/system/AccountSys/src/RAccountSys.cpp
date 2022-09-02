@@ -32,7 +32,7 @@ namespace system_contract
          // TODO: replace with GraphQL
          if (request.target == "/accounts")
          {
-            auto accountSysTables = AccountSys::Tables(AccountSys::contract);
+            auto accountSysTables = AccountSys::Tables(AccountSys::service);
             auto accountTable     = accountSysTables.open<AccountTable>();
             auto accountIndex     = accountTable.getIndex<0>();
 

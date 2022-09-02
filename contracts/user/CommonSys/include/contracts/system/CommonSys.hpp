@@ -10,7 +10,7 @@ namespace system_contract
    /// See [HTTP and Javascript](../http.md)
    struct CommonSys : psibase::Contract<CommonSys>
    {
-      static constexpr auto contract = psibase::AccountNumber("common-sys");
+      static constexpr auto service = psibase::AccountNumber("common-sys");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       auto serveCommon(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;

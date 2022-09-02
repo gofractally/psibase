@@ -32,9 +32,9 @@ namespace
    const psibase::String memo{"memo"};
 
    const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
-       {TokenSys::contract, "TokenSys.wasm"},
-       {NftSys::contract, "NftSys.wasm"},
-       {SymbolSys::contract, "SymbolSys.wasm"}};
+       {TokenSys::service, "TokenSys.wasm"},
+       {NftSys::service, "NftSys.wasm"},
+       {SymbolSys::service, "SymbolSys.wasm"}};
 
    constexpr auto manualDebit  = "manualDebit"_m;
    constexpr auto unrecallable = "unrecallable"_m;
@@ -57,7 +57,7 @@ SCENARIO("Using system token")
       alice.at<TokenSys>().init();
       alice.at<SymbolSys>().init();
 
-      auto sysIssuer   = t.as(SymbolSys::contract).at<TokenSys>();
+      auto sysIssuer   = t.as(SymbolSys::service).at<TokenSys>();
       auto userBalance = 1'000'000e8;
       auto sysToken    = TokenSys::sysToken;
       sysIssuer.mint(sysToken, userBalance, memo);
@@ -769,7 +769,7 @@ SCENARIO("Mapping a symbol to a token")
       alice.at<SymbolSys>().init();
 
       // Issue system tokens
-      auto sysIssuer   = t.as(SymbolSys::contract).at<TokenSys>();
+      auto sysIssuer   = t.as(SymbolSys::service).at<TokenSys>();
       auto userBalance = 1'000'000e8;
       auto sysToken    = TokenSys::sysToken;
       sysIssuer.setTokenConf(sysToken, untradeable, false);
@@ -783,7 +783,7 @@ SCENARIO("Mapping a symbol to a token")
 
       // Purchase the symbol and claim the owner NFT
       auto symbolCost = alice.at<SymbolSys>().getPrice(3).returnVal();
-      a.credit(sysToken, SymbolSys::contract, symbolCost, memo);
+      a.credit(sysToken, SymbolSys::service, symbolCost, memo);
       auto symbolId     = "abc"_a;
       auto create       = alice.at<SymbolSys>().create(symbolId, symbolCost);
       auto symbolRecord = alice.at<SymbolSys>().getSymbol(symbolId).returnVal();
@@ -824,7 +824,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       THEN("Alice is able to map the symbol to the token")
       {
-         alice.at<NftSys>().credit(nftId, TokenSys::contract, memo);
+         alice.at<NftSys>().credit(nftId, TokenSys::service, memo);
          CHECK(a.mapSymbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
@@ -835,7 +835,7 @@ SCENARIO("Mapping a symbol to a token")
       WHEN("Alice maps the symbol to the token")
       {
          t.startBlock();
-         alice.at<NftSys>().credit(nftId, TokenSys::contract, memo);
+         alice.at<NftSys>().credit(nftId, TokenSys::service, memo);
          a.mapSymbol(newToken, symbolId);
 
          THEN("The symbol record is identical")
@@ -846,12 +846,12 @@ SCENARIO("Mapping a symbol to a token")
 
          THEN("Alice may not map a new symbol to the same token")
          {
-            a.credit(sysToken, SymbolSys::contract, symbolCost, memo);
+            a.credit(sysToken, SymbolSys::service, symbolCost, memo);
             auto newSymbol = "bcd"_a;
             alice.at<SymbolSys>().create(newSymbol, symbolCost);
             auto newNft = alice.at<SymbolSys>().getSymbol(newSymbol).returnVal().ownerNft;
 
-            alice.at<NftSys>().credit(newNft, TokenSys::contract, memo);
+            alice.at<NftSys>().credit(newNft, TokenSys::service, memo);
             CHECK(a.mapSymbol(newToken, newSymbol).failed(tokenHasSymbol));
          }
       }

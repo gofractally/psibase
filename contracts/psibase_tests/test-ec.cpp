@@ -25,8 +25,8 @@ TEST_CASE("ec")
    DefaultTestChain t;
    auto             test_contract = t.add_contract("test-cntr"_a, "test-cntr.wasm");
 
-   transactor<system_contract::AuthEcSys> ecsys(system_contract::AuthEcSys::contract,
-                                                system_contract::AuthEcSys::contract);
+   transactor<system_contract::AuthEcSys> ecsys(system_contract::AuthEcSys::service,
+                                                system_contract::AuthEcSys::service);
 
    auto alice = t.as(t.add_account(AccountNumber("alice")));
    auto bob   = t.as(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
@@ -49,7 +49,7 @@ TEST_CASE("ec")
        .rawData  = psio::convert_to_frac(test_cntr::payload{}),
    }});
    ec_trx.claims.push_back({
-       .contract = system_contract::VerifyEcSys::contract,
+       .contract = system_contract::VerifyEcSys::service,
        .rawData  = psio::convert_to_frac(pub_key1),
    });
    expect(t.pushTransaction(ec_trx), "proofs and claims must have same size");

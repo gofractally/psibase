@@ -425,8 +425,8 @@ namespace psibase
              psio::input_stream v{value.data(), value.size()};
              check(v.remaining() >= sizeof(AccountNumber::value),
                    "value prefix must match contract during write");
-             auto contract = psio::from_bin<AccountNumber>(v);
-             check(contract == code.codeNum, "value prefix must match contract during write");
+             auto service = psio::from_bin<AccountNumber>(v);
+             check(service == code.codeNum, "value prefix must match contract during write");
 
              auto&    dbStatus = transactionContext.blockContext.databaseStatus;
              uint64_t indexNumber;

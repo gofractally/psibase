@@ -82,10 +82,10 @@ void TokenSys::init()
 
    // Pass system token ownership to symbol contract
    auto tNft = getToken(*tid).ownerNft;
-   nftContract.credit(tNft, SymbolSys::contract, "Passing system token ownership");
+   nftContract.credit(tNft, SymbolSys::service, "Passing system token ownership");
 
    // Register proxy
-   at<ProxySys>().registerServer(RTokenSys::contract);
+   at<ProxySys>().registerServer(RTokenSys::service);
 }
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
@@ -103,7 +103,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    check(maxSupply.value > 0, supplyGt0);
 
    auto nftId = nftContract.mint();
-   if (creator != TokenSys::contract)
+   if (creator != TokenSys::service)
    {
       nftContract.credit(*nftId, creator, "Nft for new token ID: " + std::to_string(newId));
    }

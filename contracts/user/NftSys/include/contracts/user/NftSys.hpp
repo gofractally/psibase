@@ -12,7 +12,7 @@ namespace UserContract
      public:
       using tables = psibase::ContractTables<NftTable, NftHolderTable, CreditTable, InitTable>;
 
-      static constexpr auto contract = psibase::AccountNumber("nft-sys");
+      static constexpr auto service = psibase::AccountNumber("nft-sys");
 
       NftSys(psio::shared_view_ptr<psibase::Action> action);
 
@@ -34,7 +34,7 @@ namespace UserContract
       bool            getUserConf(psibase::AccountNumber account, psibase::NamedBit flag);
 
      private:
-      tables db{contract};
+      tables db{psibase::getReceiver()};
 
      public:
       struct Events

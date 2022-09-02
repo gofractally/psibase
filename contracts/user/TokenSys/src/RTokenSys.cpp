@@ -31,22 +31,22 @@ struct TokenQuery
 {
    auto balances() const
    {
-      return TokenSys::Tables{TokenSys::contract}.open<BalanceTable>().getIndex<0>();
+      return TokenSys::Tables{TokenSys::service}.open<BalanceTable>().getIndex<0>();
    }
 
-   auto events() const { return EventQuery<TokenSys::Events>{TokenSys::contract}; }
+   auto events() const { return EventQuery<TokenSys::Events>{TokenSys::service}; }
 
    auto holderEvents(AccountNumber                     holder,
                      std::optional<uint32_t>           first,
                      const std::optional<std::string>& after) const
    {
-      TokenSys::Tables tables{TokenSys::contract};
+      TokenSys::Tables tables{TokenSys::service};
       auto             holders = tables.open<TokenHolderTable>().getIndex<0>();
       uint64_t         eventId = 0;
       if (auto record = holders.get(holder))
          eventId = record->lastHistoryEvent;
       return psibase::makeEventConnection<TokenSys::Events::History>(
-          DbId::historyEvent, eventId, TokenSys::contract, "prevEvent", first, after);
+          DbId::historyEvent, eventId, TokenSys::service, "prevEvent", first, after);
    }
 };
 PSIO_REFLECT(TokenQuery,
@@ -117,7 +117,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          auto parameters = request.target.substr(string("/api/getTokenTypes").size());
          check(parameters.find('/') == string::npos, "invalid request");
 
-         TokenSys::Tables db{TokenSys::contract};
+         TokenSys::Tables db{TokenSys::service};
          auto             idx = db.open<TokenTable>().getIndex<0>();
 
          std::vector<UserContract::TokenRecord> allTokens;
@@ -133,7 +133,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          check(user.find('/') == string::npos, "invalid user " + user);
          psibase::AccountNumber acc(string_view{user});
 
-         TokenSys::Tables db{TokenSys::contract};
+         TokenSys::Tables db{TokenSys::service};
          auto             idx = db.open<TokenTable>().getIndex<0>();
          check(idx.begin() != idx.end(), "No tokens");
 

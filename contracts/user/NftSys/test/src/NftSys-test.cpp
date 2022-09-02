@@ -36,7 +36,7 @@ SCENARIO("Minting & burning nfts")
 {
    GIVEN("An empty chain with registered users Alice and Bob")
    {
-      DefaultTestChain t({{NftSys::contract, "NftSys.wasm"}});
+      DefaultTestChain t({{NftSys::service, "NftSys.wasm"}});
 
       auto alice = t.as(t.add_account("alice"_a));
       auto bob   = t.as(t.add_account("bob"_a));
@@ -112,7 +112,7 @@ SCENARIO("Transferring NFTs")
 {
    GIVEN("A chain with registered users Alice, Bob, and Charlie")
    {
-      DefaultTestChain t({{NftSys::contract, "NftSys.wasm"}});
+      DefaultTestChain t({{NftSys::service, "NftSys.wasm"}});
 
       auto alice   = t.as(t.add_account("alice"));
       auto bob     = t.as(t.add_account("bob"));

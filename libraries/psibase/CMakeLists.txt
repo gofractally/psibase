@@ -47,6 +47,7 @@ function(add suffix)
         target_sources(psibase-contract-base${suffix} PRIVATE
             contract/src/intrinsic.cpp
             contract/src/print.cpp
+            contract/src/Service.cpp
         )
         target_link_libraries(psibase-contract-base${suffix} PUBLIC psibase${suffix})
         target_compile_options(psibase-contract-base${suffix} PUBLIC -DCOMPILING_CONTRACT)

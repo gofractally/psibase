@@ -33,7 +33,7 @@ namespace system_contract
                                    request.host.size() - request.rootHost.size() - 1};
       auto             account = AccountNumber(accountName);
 
-      if (account == PsiSpaceSys::contract)
+      if (account == PsiSpaceSys::service)
       {
          if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
             return result;

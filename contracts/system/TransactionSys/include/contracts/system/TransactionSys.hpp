@@ -178,7 +178,7 @@ namespace system_contract
    struct TransactionSys : psibase::Contract<TransactionSys>
    {
       /// "transact-sys"
-      static constexpr auto contract = psibase::AccountNumber("transact-sys");
+      static constexpr auto service = psibase::AccountNumber("transact-sys");
 
       /// Flags this contract must run with
       static constexpr uint64_t contractFlags =
@@ -288,7 +288,7 @@ namespace system_contract
          return *summary;
 #endif
 
-      auto table = TransactionSys::Tables(TransactionSys::contract).open<BlockSummaryTable>();
+      auto table = TransactionSys::Tables(TransactionSys::service).open<BlockSummaryTable>();
       auto idx   = table.getIndex<0>();
       summary    = idx.get(std::tuple<>{});
       if (!summary)

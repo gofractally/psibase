@@ -10,7 +10,7 @@
 - [psibase::EventEmitter]
 - [psibase::EventReader]
 
-{{#cpp-doc ::psibase::Contract}}
+{{#cpp-doc ::psibase::Service}}
 {{#cpp-doc ::psibase::Actor}}
 {{#cpp-doc ::psibase::EventEmitter}}
 {{#cpp-doc ::psibase::EventReader}}

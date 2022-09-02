@@ -491,7 +491,7 @@ namespace psibase
    ///
    /// `EventDecoder` will only attempt to decode an event which meets all of the following:
    /// * It's found in the `EventDecoder::db` database (`event_found` will be true)
-   /// * Was written by the contract which matches the `EventDecoder::contract` field (`event_supported_contract` will be true)
+   /// * Was written by the contract which matches the `EventDecoder::service` field (`event_supported_contract` will be true)
    /// * Has a type which matches one of the definitions in the `Events` template argument
    ///
    /// If decoding is successful, `EventDecoder` will set the GraphQL `event_unpack_ok`

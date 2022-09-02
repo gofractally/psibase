@@ -44,7 +44,7 @@ namespace system_contract
    class AccountSys : public psibase::Contract<AccountSys>
    {
      public:
-      static constexpr auto                   contract    = psibase::AccountNumber("account-sys");
+      static constexpr auto                   service     = psibase::AccountNumber("account-sys");
       static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
 
       using Tables = psibase::ContractTables<AccountSysStatusTable, AccountTable, CreatorTable>;

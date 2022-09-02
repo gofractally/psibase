@@ -7,7 +7,7 @@ namespace system_contract
 {
    struct ExploreSys : public psibase::Contract<ExploreSys>
    {
-      static constexpr auto contract = psibase::AccountNumber("explore-sys");
+      static constexpr auto service = psibase::AccountNumber("explore-sys");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);

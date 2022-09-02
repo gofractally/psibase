@@ -6,6 +6,6 @@ namespace system_contract
 {
    namespace VerifyEcSys
    {
-      static constexpr auto contract = psibase::AccountNumber("verifyec-sys");
+      static constexpr auto service = psibase::AccountNumber("verifyec-sys");
    }  // namespace VerifyEcSys
 }  // namespace system_contract

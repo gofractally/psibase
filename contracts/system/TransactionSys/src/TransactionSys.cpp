@@ -19,7 +19,7 @@ namespace system_contract
 {
    void TransactionSys::startup()
    {
-      auto tables      = TransactionSys::Tables(TransactionSys::contract);
+      auto tables      = TransactionSys::Tables(TransactionSys::service);
       auto statusTable = tables.open<TransactionSysStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
@@ -47,7 +47,7 @@ namespace system_contract
    {
       check(getSender().value == 0, "Only native code may call startBlock");
 
-      Tables tables(TransactionSys::contract);
+      Tables tables(TransactionSys::service);
 
       // Add head block to BlockSummaryTable; processTransaction uses it to
       // verify TAPoS on transactions.
@@ -86,14 +86,14 @@ namespace system_contract
    {
       auto requester = getSender();
 
-      auto tables               = TransactionSys::Tables(TransactionSys::contract);
+      auto tables               = TransactionSys::Tables(TransactionSys::service);
       auto statusTable          = tables.open<TransactionSysStatusTable>();
       auto statusIdx            = statusTable.getIndex<0>();
       auto transactionSysStatus = statusIdx.get(std::tuple{});
 
       if (transactionSysStatus && transactionSysStatus->enforceAuth)
       {
-         auto accountSysTables = AccountSys::Tables(AccountSys::contract);
+         auto accountSysTables = AccountSys::Tables(AccountSys::service);
          auto accountTable     = accountSysTables.open<AccountTable>();
          auto accountIndex     = accountTable.getIndex<0>();
          auto account          = accountIndex.get(action.sender);
@@ -127,7 +127,7 @@ namespace system_contract
                   flags = AuthInterface::runAsOtherReq;
             }
 
-            Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
+            Actor<AuthInterface> auth(TransactionSys::service, account->authContract);
             auth.checkAuthSys(flags, requester, action, allowedActions, std::vector<Claim>{});
          }  // if (requester != account->authContract)
       }     // if(enforceAuth)
@@ -202,7 +202,7 @@ namespace system_contract
       check(trx.tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
             "transaction was submitted too early");
 
-      auto tables        = TransactionSys::Tables(TransactionSys::contract);
+      auto tables        = TransactionSys::Tables(TransactionSys::service);
       auto statusTable   = tables.open<TransactionSysStatusTable>();
       auto statusIdx     = statusTable.getIndex<0>();
       auto includedTable = tables.open<IncludedTrxTable>();
@@ -242,7 +242,7 @@ namespace system_contract
       }
 
       auto transactionSysStatus = statusIdx.get(std::tuple{});
-      auto accountSysTables     = AccountSys::Tables(AccountSys::contract);
+      auto accountSysTables     = AccountSys::Tables(AccountSys::service);
       auto accountTable         = accountSysTables.open<AccountTable>();
       auto accountIndex         = accountTable.getIndex<0>();
 
@@ -257,7 +257,7 @@ namespace system_contract
             if constexpr (enable_print)
                print("call checkAuthSys on ", account->authContract.str(), " for account ",
                      act.sender.str(), "\n");
-            Actor<AuthInterface> auth(TransactionSys::contract, account->authContract);
+            Actor<AuthInterface> auth(TransactionSys::service, account->authContract);
             uint32_t             flags = AuthInterface::topActionReq;
             if (&act == &trx.actions[0])
                flags |= AuthInterface::firstAuthFlag;

@@ -300,7 +300,7 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
 {
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
-          .contract = system_contract::VerifyEcSys::contract,
+          .contract = system_contract::VerifyEcSys::service,
           .rawData  = psio::convert_to_frac(pub),
       });
    SignedTransaction signedTrx;

@@ -57,8 +57,8 @@ namespace system_contract
    /// `http://$DOMAIN/applet/$ACCOUNT`
    struct PsiSpaceSys : psibase::Contract<PsiSpaceSys>
    {
-      static constexpr auto contract = psibase::AccountNumber("psispace-sys");
-      using Tables                   = psibase::ContractTables<PsiSpaceContentTable>;
+      static constexpr auto service = psibase::AccountNumber("psispace-sys");
+      using Tables                  = psibase::ContractTables<PsiSpaceContentTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);

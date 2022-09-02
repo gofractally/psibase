@@ -5,7 +5,7 @@
 struct Arithmetic : psibase::Contract<Arithmetic>
 {
    // The account this contract is normally installed on
-   static constexpr auto contract = psibase::AccountNumber("arithmetic");
+   static constexpr auto service = psibase::AccountNumber("arithmetic");
 
    // The header declares but doesn't implement the actions
    int32_t add(int32_t a, int32_t b);

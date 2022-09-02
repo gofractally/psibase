@@ -114,8 +114,9 @@ namespace system_contract
          {
             if (target == request.target)
             {
-               auto index =
-                   ContractTables<WebContentTable>{contract}.open<WebContentTable>().getIndex<0>();
+               auto index = ContractTables<WebContentTable>{getReceiver()}
+                                .open<WebContentTable>()
+                                .getIndex<0>();
                if (auto content = index.get(std::string(replacement)))
                {
                   return HttpReply{

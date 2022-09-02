@@ -35,7 +35,7 @@ namespace system_contract
          }
          accountTable.put({
              .accountNum   = code.codeNum,
-             .authContract = AuthAnySys::contract,
+             .authContract = AuthAnySys::service,
          });
          ++totalAccounts;
       }

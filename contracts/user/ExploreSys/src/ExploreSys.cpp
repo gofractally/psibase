@@ -27,16 +27,16 @@ namespace system_contract
          return result;
       if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
-      if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
+      if (auto result = psibase::serveContent(request, Tables{psibase::getReceiver()}))
          return result;
       return std::nullopt;
    }
 
    void ExploreSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
-      psibase::check(getSender() == getReceiver(), "wrong sender");
+      psibase::check(psibase::getSender() == psibase::getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
-                            Tables{getReceiver()});
+                            Tables{psibase::getReceiver()});
    }
 }  // namespace system_contract
 

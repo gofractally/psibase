@@ -29,7 +29,7 @@ namespace psibase
    /// routing contract instead.
    struct ProxySys : psibase::Contract<ProxySys>
    {
-      static constexpr auto contract = psibase::proxyContractNum;
+      static constexpr auto service = psibase::proxyContractNum;
 
       /// Register senders's subdomain
       ///

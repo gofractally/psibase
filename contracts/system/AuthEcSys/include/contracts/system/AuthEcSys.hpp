@@ -19,7 +19,7 @@ namespace system_contract
    class AuthEcSys : public psibase::Contract<AuthEcSys>
    {
      public:
-      static constexpr auto contract = psibase::AccountNumber("auth-ec-sys");
+      static constexpr auto service = psibase::AccountNumber("auth-ec-sys");
       using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::byPubkey>;
       using Tables    = psibase::ContractTables<AuthTable>;
 
@@ -32,7 +32,7 @@ namespace system_contract
       void setKey(psibase::PublicKey key);
 
      private:
-      Tables db{contract};
+      Tables db{psibase::getReceiver()};
    };
    PSIO_REFLECT(AuthEcSys,  //
                 method(checkAuthSys, flags, requester, action, allowedActions, claims),

@@ -56,7 +56,7 @@ void TokenSys::createAndMap(Precision p, Quantity maxSupply, SID symbolId)
     senderAt<NftSys>().debit(symbolNft, "Take ownership of new symbol");
 
     // Map symbol to token
-    senderAt<NftSys>().credit(symbolNft, SymbolSys::contract, "Give symbol to symbol-sys");
+    senderAt<NftSys>().credit(symbolNft, SymbolSys::service, "Give symbol to symbol-sys");
     senderAt<SymbolSys>().mapToken(tid, symbolId);
 }
 

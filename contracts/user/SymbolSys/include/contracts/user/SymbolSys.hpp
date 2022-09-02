@@ -16,7 +16,7 @@ namespace UserContract
      public:
       using tables = psibase::
           ContractTables<SymbolTable, SymbolLengthTable, PriceAdjustmentSingleton, InitTable>;
-      static constexpr auto contract       = psibase::AccountNumber("symbol-sys");
+      static constexpr auto service        = psibase::AccountNumber("symbol-sys");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 
       SymbolSys(psio::shared_view_ptr<psibase::Action> action);
@@ -39,7 +39,7 @@ namespace UserContract
       void updatePrices();
 
      private:
-      tables db{contract};
+      tables db{psibase::getReceiver()};
 
      public:
       struct Events

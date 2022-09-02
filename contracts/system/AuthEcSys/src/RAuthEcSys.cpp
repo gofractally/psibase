@@ -58,7 +58,7 @@ namespace system_contract
 
             check(pubkeyParam.find('/') == string::npos, "invalid public key: " + pubkeyParam);
 
-            AuthEcSys::Tables db{AuthEcSys::contract};
+            AuthEcSys::Tables db{AuthEcSys::service};
             auto              authIdx = db.open<AuthEcSys::AuthTable>().getIndex<1>();
 
             auto pubkey = publicKeyFromString(string_view{pubkeyParam});

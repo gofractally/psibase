@@ -86,7 +86,7 @@ void SymbolSys::init()
 
    // Offer system token symbol
    auto symbolOwnerNft = getSymbol(sysTokenSymbol);
-   at<NftSys>().credit(symbolOwnerNft.ownerNft, TokenSys::contract,
+   at<NftSys>().credit(symbolOwnerNft.ownerNft, TokenSys::service,
                        "System token symbol ownership nft");
    at<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
 
@@ -108,7 +108,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
 
    // Debit the sender the cost of the new symbol
    auto debitMemo = "This transfer created the new symbol: " + symString;
-   if (sender != contract)
+   if (sender != getReceiver())
    {
       at<TokenSys>().debit(TokenSys::sysToken, sender, cost, debitMemo);
    }
@@ -116,7 +116,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    // Mint and offer ownership NFT
    newSym.ownerNft    = *at<NftSys>().mint();
    auto nftCreditMemo = "This NFT conveys ownership of symbol: " + symString;
-   if (sender != contract)
+   if (sender != getReceiver())
    {
       at<NftSys>().credit(newSym.ownerNft, sender, nftCreditMemo);
    }

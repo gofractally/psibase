@@ -54,67 +54,67 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                      .contracts =  // g.a.d--^ is config file for gen
                     {
                          {
-                             .contract = system_contract::TransactionSys::contract,
+                             .contract = system_contract::TransactionSys::service,
                              .flags    = system_contract::TransactionSys::contractFlags,
                              .code     = readWholeFile("TransactionSys.wasm"),
                         },
                          {
-                             .contract = system_contract::SetCodeSys::contract,
+                             .contract = system_contract::SetCodeSys::service,
                              .flags    = system_contract::SetCodeSys::contractFlags,
                              .code     = readWholeFile("SetCodeSys.wasm"),
                         },
                          {
-                             .contract = system_contract::AccountSys::contract,
+                             .contract = system_contract::AccountSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("AccountSys.wasm"),
                         },
                          {
-                             .contract = ProxySys::contract,
+                             .contract = ProxySys::service,
                              .flags    = 0,
                              .code     = readWholeFile("ProxySys.wasm"),
                         },
                          {
-                             .contract = system_contract::AuthAnySys::contract,
+                             .contract = system_contract::AuthAnySys::service,
                              .flags    = 0,
                              .code     = readWholeFile("AuthAnySys.wasm"),
                         },
                          {
-                             .contract = system_contract::AuthEcSys::contract,
+                             .contract = system_contract::AuthEcSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("AuthEcSys.wasm"),
                         },
                          {
-                             .contract = system_contract::VerifyEcSys::contract,
+                             .contract = system_contract::VerifyEcSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("VerifyEcSys.wasm"),
                         },
                          {
-                             .contract = CommonSys::contract,
+                             .contract = CommonSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("CommonSys.wasm"),
                         },
                          {
-                             .contract = RAccountSys::contract,
+                             .contract = RAccountSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("RAccountSys.wasm"),
                         },
                          {
-                             .contract = ExploreSys::contract,
+                             .contract = ExploreSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("ExploreSys.wasm"),
                         },
                          {
-                             .contract = RAuthEcSys::contract,
+                             .contract = RAuthEcSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("RAuthEcSys.wasm"),
                         },
                          {
-                             .contract = RProxySys::contract,
+                             .contract = RProxySys::service,
                              .flags    = 0,
                              .code     = readWholeFile("RProxySys.wasm"),
                         },
                          {
-                             .contract = PsiSpaceSys::contract,
+                             .contract = PsiSpaceSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("PsiSpaceSys.wasm"),
                         },
@@ -128,10 +128,10 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
 
 void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
 {
-   transactor<system_contract::AccountSys>     asys{system_contract::TransactionSys::contract,
-                                                system_contract::AccountSys::contract};
-   transactor<system_contract::TransactionSys> tsys{system_contract::TransactionSys::contract,
-                                                    system_contract::TransactionSys::contract};
+   transactor<system_contract::AccountSys>     asys{system_contract::TransactionSys::service,
+                                                system_contract::AccountSys::service};
+   transactor<system_contract::TransactionSys> tsys{system_contract::TransactionSys::service,
+                                                    system_contract::TransactionSys::service};
    auto trace = pushTransaction(makeTransaction({asys.startup(), tsys.startup()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system contract accounts");
@@ -142,8 +142,8 @@ AccountNumber DefaultTestChain::add_account(
     AccountNumber authContract /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
 {
-   transactor<system_contract::AccountSys> asys(system_contract::TransactionSys::contract,
-                                                system_contract::AccountSys::contract);
+   transactor<system_contract::AccountSys> asys(system_contract::TransactionSys::service,
+                                                system_contract::AccountSys::service);
 
    auto trace = pushTransaction(  //
        makeTransaction({asys.newAccount(acc, authContract, true)}));
@@ -165,15 +165,15 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                                                const PublicKey& public_key,
                                                bool             show /* = false */)
 {
-   transactor<system_contract::AccountSys> asys(system_contract::AccountSys::contract,
-                                                system_contract::AccountSys::contract);
-   transactor<system_contract::AuthEcSys>  ecsys(system_contract::AuthEcSys::contract,
-                                                 system_contract::AuthEcSys::contract);
+   transactor<system_contract::AccountSys> asys(system_contract::AccountSys::service,
+                                                system_contract::AccountSys::service);
+   transactor<system_contract::AuthEcSys>  ecsys(system_contract::AuthEcSys::service,
+                                                 system_contract::AuthEcSys::service);
 
    auto trace = pushTransaction(makeTransaction({
-       asys.newAccount(name, system_contract::AuthAnySys::contract, true),
+       asys.newAccount(name, system_contract::AuthAnySys::service, true),
        ecsys.as(name).setKey(public_key),
-       asys.as(name).setAuthCntr(system_contract::AuthEcSys::contract),
+       asys.as(name).setAuthCntr(system_contract::AuthEcSys::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -191,9 +191,9 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
                                              const char*   filename,
                                              bool          show /* = false */)
 {
-   add_account(acc, system_contract::AuthAnySys::contract, show);
+   add_account(acc, system_contract::AuthAnySys::service, show);
 
-   transactor<system_contract::SetCodeSys> scsys{acc, system_contract::SetCodeSys::contract};
+   transactor<system_contract::SetCodeSys> scsys{acc, system_contract::SetCodeSys::service};
 
    auto trace =
        pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
@@ -212,25 +212,25 @@ AccountNumber DefaultTestChain::add_contract(const char* acc,
 
 void DefaultTestChain::registerSysRpc()
 {
-   auto r = ProxySys::contract;
+   auto r = ProxySys::service;
 
    // Register servers
    std::vector<psibase::Action> a{
-       transactor<ProxySys>{CommonSys::contract, r}.registerServer(CommonSys::contract),
-       transactor<ProxySys>{AccountSys::contract, r}.registerServer(RAccountSys::contract),
-       transactor<ProxySys>{ExploreSys::contract, r}.registerServer(ExploreSys::contract),
-       transactor<ProxySys>{AuthEcSys::contract, r}.registerServer(RAuthEcSys::contract),
-       transactor<ProxySys>{ProxySys::contract, r}.registerServer(RProxySys::contract),
-       transactor<ProxySys>{PsiSpaceSys::contract, r}.registerServer(PsiSpaceSys::contract),
+       transactor<ProxySys>{CommonSys::service, r}.registerServer(CommonSys::service),
+       transactor<ProxySys>{AccountSys::service, r}.registerServer(RAccountSys::service),
+       transactor<ProxySys>{ExploreSys::service, r}.registerServer(ExploreSys::service),
+       transactor<ProxySys>{AuthEcSys::service, r}.registerServer(RAuthEcSys::service),
+       transactor<ProxySys>{ProxySys::service, r}.registerServer(RProxySys::service),
+       transactor<ProxySys>{PsiSpaceSys::service, r}.registerServer(PsiSpaceSys::service),
    };
 
    auto trace = pushTransaction(makeTransaction(std::move(a)));
    check(psibase::show(false, trace) == "", "Failed to register system rpc contracts");
 
-   transactor<CommonSys>   rpcCommon(CommonSys::contract, CommonSys::contract);
-   transactor<RAccountSys> rpcAccount(RAccountSys::contract, RAccountSys::contract);
-   transactor<ExploreSys>  rpcExplore(ExploreSys::contract, ExploreSys::contract);
-   transactor<RAuthEcSys>  rpcAuthEc(RAuthEcSys::contract, RAuthEcSys::contract);
+   transactor<CommonSys>   rpcCommon(CommonSys::service, CommonSys::service);
+   transactor<RAccountSys> rpcAccount(RAccountSys::service, RAccountSys::service);
+   transactor<ExploreSys>  rpcExplore(ExploreSys::service, ExploreSys::service);
+   transactor<RAuthEcSys>  rpcAuthEc(RAuthEcSys::service, RAuthEcSys::service);
 
    // Store UI files
    std::string cdir      = "../contracts";
