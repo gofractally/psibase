@@ -52,7 +52,7 @@ function(add_libs suffix)
 
     add_library(c++abi-replacements${suffix} EXCLUDE_FROM_ALL)
     target_link_libraries(c++abi-replacements${suffix} PUBLIC wasm-base${suffix})
-    target_sources(c++abi-replacements${suffix} PRIVATE ${psidk_DIR}/contract/src/abort_message.cpp)
+    target_sources(c++abi-replacements${suffix} PRIVATE ${psidk_DIR}/service/src/abort_message.cpp)
     add_custom_command(
         TARGET c++abi-replacements${suffix}
         PRE_LINK
@@ -69,13 +69,13 @@ function(add_libs suffix)
         boost
     )
 
-    add_library(psibase-contract-base${suffix} INTERFACE)
-    target_link_libraries(psibase-contract-base${suffix} INTERFACE
+    add_library(psibase-service-base${suffix} INTERFACE)
+    target_link_libraries(psibase-service-base${suffix} INTERFACE
         psibase${suffix}
-        -lpsibase-contract-base${suffix}
+        -lpsibase-service-base${suffix}
     )
-    target_compile_options(psibase-contract-base${suffix} INTERFACE -DCOMPILING_CONTRACT)
-    target_link_options(psibase-contract-base${suffix} INTERFACE
+    target_compile_options(psibase-service-base${suffix} INTERFACE -DCOMPILING_SERVICE)
+    target_link_options(psibase-service-base${suffix} INTERFACE
         -Wl,--stack-first
         -Wl,--entry,start
         -Wl,--export=called
@@ -83,33 +83,33 @@ function(add_libs suffix)
         -Wl,--no-merge-data-segments
         -nostdlib
     )
-    target_include_directories(psibase-contract-base${suffix} INTERFACE ${psidk_DIR}/psibase/contract/include)
+    target_include_directories(psibase-service-base${suffix} INTERFACE ${psidk_DIR}/psibase/service/include)
 
     file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
     # Contract with simple malloc/free
-    add_library(psibase-contract-simple-malloc${suffix} INTERFACE)
-    target_link_libraries(psibase-contract-simple-malloc${suffix} INTERFACE
+    add_library(psibase-service-simple-malloc${suffix} INTERFACE)
+    target_link_libraries(psibase-service-simple-malloc${suffix} INTERFACE
         -L${CMAKE_CURRENT_BINARY_DIR}
-        psibase-contract-base${suffix}
+        psibase-service-base${suffix}
         -lc++
         -lc++abi-shrunk${suffix}
         c++abi-replacements${suffix}
         -lc-no-malloc${suffix}
         simple-malloc${suffix}
-        -lpsibase-contracts-wasi-polyfill${suffix}
+        -lpsibase-service-wasi-polyfill${suffix}
         ${LIBCLANG_RT_BUILTINS}
     )
 
     # Contract with full malloc/free
-    add_library(psibase-contract${suffix} INTERFACE)
-    target_link_libraries(psibase-contract${suffix} INTERFACE
-        psibase-contract-base${suffix}
+    add_library(psibase-service${suffix} INTERFACE)
+    target_link_libraries(psibase-service${suffix} INTERFACE
+        psibase-service-base${suffix}
         -lc++
         -lc++abi-shrunk${suffix}
         c++abi-replacements${suffix}
         -lc
-        -lpsibase-contracts-wasi-polyfill${suffix}
+        -lpsibase-service-wasi-polyfill${suffix}
         ${LIBCLANG_RT_BUILTINS}
     )
 
@@ -126,17 +126,17 @@ function(add_libs suffix)
         ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
     )
     target_include_directories(psitestlib${suffix} INTERFACE
-        ${psidk_DIR}/psibase/contract/include
+        ${psidk_DIR}/psibase/service/include
         ${psidk_DIR}/psibase/tester/include
-        ${psidk_DIR}/contracts/system/AccountSys/include
-        ${psidk_DIR}/contracts/system/AuthEcSys/include
-        ${psidk_DIR}/contracts/system/AuthAnySys/include
-        ${psidk_DIR}/contracts/system/ProxySys/include
-        ${psidk_DIR}/contracts/system/RAccountSys/include
-        ${psidk_DIR}/contracts/system/RAuthEcSys/include
-        ${psidk_DIR}/contracts/system/SetCodeSys/include
-        ${psidk_DIR}/contracts/system/TransactionSys/include
-        ${psidk_DIR}/contracts/system/VerifyEcSys/include
+        ${psidk_DIR}/services/system/AccountSys/include
+        ${psidk_DIR}/services/system/AuthEcSys/include
+        ${psidk_DIR}/services/system/AuthAnySys/include
+        ${psidk_DIR}/services/system/ProxySys/include
+        ${psidk_DIR}/services/system/RAccountSys/include
+        ${psidk_DIR}/services/system/RAuthEcSys/include
+        ${psidk_DIR}/services/system/SetCodeSys/include
+        ${psidk_DIR}/services/system/TransactionSys/include
+        ${psidk_DIR}/services/system/VerifyEcSys/include
     )
     target_link_options(psitestlib${suffix} INTERFACE
         -Wl,--entry,_start

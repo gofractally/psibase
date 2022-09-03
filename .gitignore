@@ -13,7 +13,6 @@ build-*
 CMakeCache.txt
 CMakeFiles
 compile_commands.json
-dist
 Makefile
 node_modules
 temp

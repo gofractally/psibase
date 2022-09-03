@@ -1,0 +1,72 @@
+declare module "common/rpc.mjs" {
+  function getRootDomain(): Promise<string>;
+
+  function siblingUrl(
+    baseUrl?: string | null,
+    contract?: string,
+    path?: string,
+  ): Promise<string>;
+
+  function initializeApplet(fn: (data: any) => Promise<void>): void;
+
+  function getJson<T = any>(url: string): Promise<T>;
+
+  const MessageTypes = {
+    Action: "Action",
+    Query: "Query",
+    Operation: "Operation",
+    QueryResponse: "QueryResponse",
+    OperationResponse: "OperationResponse",
+  };
+
+  declare class AppletId {
+    constructor(appletName: string, subPath?: string);
+
+    name: string;
+    subPath: string;
+    fullPath: string;
+
+    equals: (appletId: AppletId) => boolean;
+    url: () => Promise<string>;
+    static fromFullPath: (fullPath: string) => AppletId;
+    static fromObject: (obj: string) => AppletId;
+  }
+
+  function setQueries(queries: any): void;
+
+  function query<Params, Response>(
+    appletId: AppletId,
+    name: string,
+    params?: Params,
+  ): Promise<Response>;
+
+  function action<ActionParams>(
+    application: string,
+    actionName: string,
+    params: ActionParams,
+    sender?: string,
+  ): void;
+
+  type Operation = { id: string; exec: (params: any) => Promise<void> };
+
+  function setOperations(operations: Operation[]): void;
+
+  function operation<Params>(
+    appletId: AppletId,
+    name: string,
+    params?: Params,
+  ): Promise<any>;
+
+  function storeCallback(callback: any): number;
+
+  function executeCallback(callbackId: any, response: any): boolean;
+
+  function getTaposForHeadBlock(baseUrl?: string): Promise<any>;
+
+  function packAndPushSignedTransaction(
+    baseUrl: any,
+    signedTransaction: any,
+  ): Promise<any>;
+
+  function verifyFields(obj: any, fieldNames: any): boolean;
+}

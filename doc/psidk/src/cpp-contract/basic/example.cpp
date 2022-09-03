@@ -1,8 +1,8 @@
-#include <psibase/Contract.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/dispatch.hpp>
 
 // The contract
-struct ExampleContract : psibase::Contract<ExampleContract>
+struct ExampleContract : psibase::Service<ExampleContract>
 {
    // Add two numbers
    int32_t add(int32_t a, int32_t b) { return a + b; }

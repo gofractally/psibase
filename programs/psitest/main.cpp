@@ -2,6 +2,7 @@
 #include <debug_eos_vm/debug_eos_vm.hpp>
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeFunctions.hpp>
+#include <psibase/Prover.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 
@@ -84,6 +85,11 @@ struct assert_exception : std::exception
    assert_exception(std::string&& msg) : msg(std::move(msg)) {}
 
    const char* what() const noexcept override { return msg.c_str(); }
+};
+
+struct NullProver : psibase::Prover
+{
+   std::vector<char> prove(std::span<const char>, const psibase::Claim&) const { return {}; }
 };
 
 struct file;
@@ -202,7 +208,7 @@ struct test_chain
          nativeFunctions.reset();
          nativeFunctionsActionContext.reset();
          nativeFunctionsTransactionContext.reset();
-         auto [revision, blockId] = blockContext->writeRevision();
+         auto [revision, blockId] = blockContext->writeRevision(NullProver{}, psibase::Claim{});
          db.setHead(*writer, revision);
          db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
          blockContext.reset();

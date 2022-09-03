@@ -35,7 +35,7 @@ namespace psibase::net
       {
          rem += d1;
       }
-      return tp - d1;
+      return tp - rem;
    }
 
    std::string to_string(const Checksum256& c)
@@ -115,7 +115,7 @@ namespace psibase::net
       }
 
       producer_id              self = null_producer;
-      std::vector<producer_id> active_producers;
+      ProducerSet              active_producers;
       term_id                  current_term = 0;
       producer_id              voted_for    = null_producer;
       std::vector<producer_id> votes_for_me;
@@ -329,13 +329,18 @@ namespace psibase::net
          connection.peer_ready = true;
       }
       void set_producer_id(producer_id prod) { self = prod; }
-      void set_producers(std::vector<producer_id> prods)
+      void set_producers(ProducerSet prods)
       {
-         active_producers = prods;
          if (_state == producer_state::leader)
          {
             // fix match_index
+            if (active_producers != prods)
+            {
+               match_index.clear();
+               match_index.resize(prods.size());
+            }
          }
+         active_producers = std::move(prods);
          if (is_producer())
          {
             if (_state == producer_state::nonvoting)
@@ -354,10 +359,13 @@ namespace psibase::net
             _state = producer_state::nonvoting;
          }
       }
+      void load_producers() { set_producers(chain().getProducers()); }
       bool is_producer() const
       {
-         return std::find(active_producers.begin(), active_producers.end(), self) !=
-                active_producers.end();
+         // If there are no producers set on chain, then any
+         // producer can produce a block
+         return (active_producers.size() == 0 && self != AccountNumber()) ||
+                active_producers.isProducer(self);
       }
       producer_id producer_name() const { return self; }
 
@@ -365,6 +373,7 @@ namespace psibase::net
 
       void start_leader()
       {
+         assert(_state == producer_state::leader);
          // The next block production time is the later of:
          // - The last block interval boundary before the current time
          // - The head block time + the block interval
@@ -391,10 +400,14 @@ namespace psibase::net
                    if (auto* b = chain().finish_block())
                    {
                       update_match_index(self, b->blockNum());
-                      update_committed();
                       on_fork_switch(&b->info.header);
+                      chain().gc();
                    }
-                   start_leader();
+                   // finish_block might convert us to nonvoting
+                   if (_state == producer_state::leader)
+                   {
+                      start_leader();
+                   }
                 }
              });
       }
@@ -499,11 +512,17 @@ namespace psibase::net
       // ------------------- Implementation utilities ----- -----------
       void update_match_index(producer_id producer, block_num match)
       {
-         auto pos = std::find(active_producers.begin(), active_producers.end(), producer);
-         if (pos != active_producers.end())
+         if (auto idx = active_producers.getIndex(producer))
          {
-            auto idx         = pos - active_producers.begin();
-            match_index[idx] = std::max(match_index[idx], match);
+            match_index[*idx] = std::max(match_index[*idx], match);
+            update_committed();
+         }
+         else if (active_producers.size() == 0 && producer == self)
+         {
+            if (chain().commit(match))
+            {
+               set_producers(chain().getProducers());
+            }
          }
       }
       void update_committed()
@@ -511,7 +530,10 @@ namespace psibase::net
          std::vector<block_num> match = match_index;
          auto                   mid   = match.size() / 2;
          std::nth_element(match.begin(), match.begin() + mid, match.end());
-         chain().commit(match[mid]);
+         if (chain().commit(match[mid]))
+         {
+            set_producers(chain().getProducers());
+         }
       }
       // This should always run first when handling any message
       void update_term(term_id term)
@@ -544,7 +566,7 @@ namespace psibase::net
       void randomize_timer()
       {
          // Don't bother waiting if we're the only producer
-         if (active_producers.size() == 1 && active_producers[0] == self)
+         if (active_producers.size() <= 1)
          {
             if (_state == producer_state::follower)
             {
@@ -597,8 +619,12 @@ namespace psibase::net
             chain().async_switch_fork(
                 [this, max_commit](BlockHeader* h)
                 {
-                   chain().commit(max_commit);
+                   if (chain().commit(max_commit))
+                   {
+                      set_producers(chain().getProducers());
+                   }
                    on_fork_switch(h);
+                   chain().gc();
                 });
          }
       }
@@ -610,7 +636,6 @@ namespace psibase::net
             if (_state == producer_state::leader)
             {
                update_match_index(response.follower_id, response.head_num);
-               update_committed();
             }
          }
          // otherwise ignore out-dated response

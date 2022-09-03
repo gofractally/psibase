@@ -1,8 +1,8 @@
 #pragma once
 
-#include <psibase/contractEntry.hpp>
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/servePackAction.hpp>
+#include <psibase/serviceEntry.hpp>
 
 namespace psibase
 {
