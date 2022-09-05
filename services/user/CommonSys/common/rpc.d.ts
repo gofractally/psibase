@@ -4,7 +4,7 @@ declare module "common/rpc.mjs" {
   function siblingUrl(
     baseUrl?: string | null,
     contract?: string,
-    path?: string,
+    path?: string
   ): Promise<string>;
 
   function initializeApplet(fn: (data: any) => Promise<void>): void;
@@ -37,14 +37,14 @@ declare module "common/rpc.mjs" {
   function query<Params, Response>(
     appletId: AppletId,
     name: string,
-    params?: Params,
+    params?: Params
   ): Promise<Response>;
 
   function action<ActionParams>(
     application: string,
     actionName: string,
     params: ActionParams,
-    sender?: string,
+    sender?: string
   ): void;
 
   type Operation = { id: string; exec: (params: any) => Promise<void> };
@@ -54,7 +54,7 @@ declare module "common/rpc.mjs" {
   function operation<Params>(
     appletId: AppletId,
     name: string,
-    params?: Params,
+    params?: Params
   ): Promise<any>;
 
   function storeCallback(callback: any): number;
@@ -65,8 +65,15 @@ declare module "common/rpc.mjs" {
 
   function packAndPushSignedTransaction(
     baseUrl: any,
-    signedTransaction: any,
+    signedTransaction: any
   ): Promise<any>;
 
   function verifyFields(obj: any, fieldNames: any): boolean;
+
+  function postGraphQLGetJson<GqlResponse>(
+    url: string,
+    query: string
+  ): Promise<GqlResponse>;
+
+  function uint8ArrayToHex(data: Uint8Array): string;
 }
