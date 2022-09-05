@@ -1,13 +1,13 @@
 use crate::{
-    new_account_action, reg_server, set_auth_contract_action, set_key_action, set_producers_action, store_sys,
-    to_claim, without_tapos, Args, Error,
+    new_account_action, reg_server, set_auth_contract_action, set_key_action, set_producers_action,
+    store_sys, to_claim, without_tapos, Args, Error,
 };
 use anyhow::Context;
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
 use libpsibase::{
-    account, method, AccountNumber, Action, Claim, ExactAccountNumber, Fracpack, PublicKey, SharedGenesisActionData,
-    SharedGenesisContract, SignedTransaction,
+    account, method, AccountNumber, Action, Claim, ExactAccountNumber, Fracpack, PublicKey,
+    SharedGenesisActionData, SharedGenesisContract, SignedTransaction,
 };
 use serde_json::Value;
 
@@ -46,7 +46,8 @@ pub(super) async fn boot(
     key: &Option<PublicKey>,
     producer: &Option<ExactAccountNumber>,
 ) -> Result<(), anyhow::Error> {
-    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx(key, producer)];
+    let new_signed_transactions: Vec<SignedTransaction> =
+        vec![boot_trx(), common_startup_trx(key, producer)];
     push_boot(args, client, new_signed_transactions.packed_bytes()).await?;
     println!("Ok");
     Ok(())
@@ -200,7 +201,10 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>) {
     }
 }
 
-fn common_startup_trx(key: &Option<PublicKey>, producer: &Option<ExactAccountNumber>) -> SignedTransaction {
+fn common_startup_trx(
+    key: &Option<PublicKey>,
+    producer: &Option<ExactAccountNumber>,
+) -> SignedTransaction {
     let mut init_actions = vec![
         Action {
             sender: account!("account-sys"),
@@ -249,14 +253,24 @@ fn common_startup_trx(key: &Option<PublicKey>, producer: &Option<ExactAccountNum
     ];
 
     let mut common_sys_files = vec![
-        store!("common-sys", "/index.html", html, "CommonSys/ui/vanilla/index.html"),
+        store!(
+            "common-sys",
+            "/index.html",
+            html,
+            "CommonSys/ui/vanilla/index.html"
+        ),
         store!(
             "common-sys",
             "/ui/common.index.html",
             html,
             "CommonSys/ui/vanilla/common.index.html"
         ),
-        store!("common-sys", "/ui/index.js", js, "CommonSys/ui/vanilla/index.js"),
+        store!(
+            "common-sys",
+            "/ui/index.js",
+            js,
+            "CommonSys/ui/vanilla/index.js"
+        ),
         store_common!("keyConversions.mjs", js),
         store_common!("rpc.mjs", js),
         store_common!("SimpleUI.mjs", js),
@@ -305,8 +319,18 @@ fn common_startup_trx(key: &Option<PublicKey>, producer: &Option<ExactAccountNum
     )];
 
     let mut token_sys_files = vec![
-        store!("r-tok-sys", "/index.html", html, "CommonSys/ui/vanilla/common.index.html"),
-        store!("r-tok-sys", "/ui/index.js", js, "TokenSys/ui/vanilla/index.js"),
+        store!(
+            "r-tok-sys",
+            "/index.html",
+            html,
+            "CommonSys/ui/vanilla/common.index.html"
+        ),
+        store!(
+            "r-tok-sys",
+            "/ui/index.js",
+            js,
+            "TokenSys/ui/vanilla/index.js"
+        ),
         // store!("r-tok-sys", "/index.html", html, "TokenSys/ui/dist/index.html"),
         // store!("r-tok-sys", "/index.js", js, "TokenSys/ui/dist/index.js"),
         // store!("r-tok-sys", "/style.css", css, "TokenSys/ui/dist/style.css"),
@@ -371,15 +395,15 @@ fn common_startup_trx(key: &Option<PublicKey>, producer: &Option<ExactAccountNum
     actions.push(set_producers_action(
         match producer {
             Some(p) => AccountNumber::from(*p),
-            None => account!("psibase")
+            None => account!("psibase"),
         },
         match key {
             Some(k) => to_claim(k),
             None => Claim {
                 contract: AccountNumber::new(0),
-                raw_data: vec![]
-            }
-        }
+                raw_data: vec![],
+            },
+        },
     ));
 
     if let Some(k) = key {
