@@ -310,7 +310,11 @@ fn common_startup_trx(key: &Option<PublicKey>, producer: &Option<ExactAccountNum
         // store!("r-tok-sys", "/index.html", html, "TokenSys/ui/dist/index.html"),
         // store!("r-tok-sys", "/index.js", js, "TokenSys/ui/dist/index.js"),
         // store!("r-tok-sys", "/style.css", css, "TokenSys/ui/dist/style.css"),
-        // store!("r-tok-sys", "/vite.svg", svg, "TokenSys/ui/dist/vite.svg"),
+        // store!("r-tok-sys", "/incoming.svg", svg, "TokenSys/ui/dist/incoming.svg"),
+        // store!("r-tok-sys", "/outgoing.svg", svg, "TokenSys/ui/dist/outgoing.svg"),
+        // store!("r-tok-sys", "/loader.svg", svg, "TokenSys/ui/dist/loader.svg"),
+        // store!("r-tok-sys", "/app-wallet-icon.svg", svg, "TokenSys/ui/dist/app-wallet-icon.svg"),
+        // store!("r-tok-sys", "/arrow-up-solid.svg", svg, "TokenSys/ui/dist/arrow-up-solid.svg"),
     ];
 
     let mut doc_actions = vec![
