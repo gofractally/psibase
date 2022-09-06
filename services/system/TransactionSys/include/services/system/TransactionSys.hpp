@@ -225,17 +225,19 @@ namespace system_contract
       /// Get the currently executing transaction
       psibase::Transaction getTransaction() const;
 
-      // TODO: currentBlockNum(), currentBlockTime(): fetch from new status fields
-      //       also update contracts which use `head + 1`
+      /// Get the current block header
+      psibase::BlockHeader currentBlock() const;
 
-      /// Get the head block number
+      /// Get the head block header
       ///
-      /// This is *not* the currently executing block number.
-      psibase::BlockNum headBlockNum() const;
+      /// This is *not* the currently executing block.
+      /// See [currentBlock].
+      psibase::BlockHeader headBlock() const;
 
       /// Get the head block time
       ///
       /// This is *not* the currently executing block time.
+      /// TODO: remove
       psibase::TimePointSec headBlockTime() const;
    };
    PSIO_REFLECT(TransactionSys,
@@ -243,7 +245,8 @@ namespace system_contract
                 method(startBlock),
                 method(runAs, action, allowedActions),
                 method(getTransaction),
-                method(headBlockNum),
+                method(currentBlock),
+                method(headBlock),
                 method(headBlockTime))
 
    // The status will never be nullopt during transaction execution or during RPC.

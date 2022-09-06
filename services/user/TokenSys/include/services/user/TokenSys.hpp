@@ -95,8 +95,9 @@ namespace UserContract
             void userConfSet(Account account, psibase::NamedBit flag, bool enable) {}
             void tokenConfSet(TID tokenId, uint64_t prevEvent, Account setter, psibase::NamedBit flag, bool enable) {}
             void symbolMapped(TID tokenId, uint64_t prevEvent, Account account, SID symbolId) {}
-            void transferred(TID tokenId, uint64_t prevEvent, Account sender, Account receiver, Quantity amount, StringView memo) {}
-            void recalled(TID tokenId, uint64_t prevEvent, Account from, Quantity amount, StringView memo) {}
+            // TODO: time is redundant with which block the event was written in
+            void transferred(TID tokenId, uint64_t prevEvent, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, StringView memo) {}
+            void recalled(TID tokenId, uint64_t prevEvent, psibase::TimePointSec time, Account from, Quantity amount, StringView memo) {}
          };
 
          struct Ui
@@ -145,8 +146,8 @@ namespace UserContract
       method(userConfSet, account, flag, enable),
       method(tokenConfSet, prevEvent, tokenId, setter, flag, enable),
       method(symbolMapped, prevEvent, tokenId, account, symbolId),
-      method(transferred, tokenId, prevEvent, sender, receiver, amount, memo),
-      method(recalled, tokenId, prevEvent, from, amount, memo),
+      method(transferred, tokenId, prevEvent, time, sender, receiver, amount, memo),
+      method(recalled, tokenId, prevEvent, time, from, amount, memo),
    );
    PSIBASE_REFLECT_UI_EVENTS(TokenSys,
       method(credited, tokenId, sender, receiver, amount, memo),

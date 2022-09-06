@@ -4,9 +4,9 @@
 #include <services/system/TransactionSys.hpp>
 
 #include <boost/container/flat_map.hpp>
-#include <psibase/serviceEntry.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/print.hpp>
+#include <psibase/serviceEntry.hpp>
 
 using namespace psibase;
 
@@ -149,13 +149,18 @@ namespace system_contract
       return trx;
    }
 
-   psibase::BlockNum TransactionSys::headBlockNum() const
+   psibase::BlockHeader TransactionSys::currentBlock() const
+   {
+      return getStatus().current;
+   }
+
+   psibase::BlockHeader TransactionSys::headBlock() const
    {
       auto& stat = getStatus();
-      if (stat.head)
-         return stat.head->header.blockNum;
-      return 1;  // next block (currently being produced) is 2 (genesis)
+      check(stat.head.has_value(), "head does not exist yet");
+      return stat.head->header;
    }
+
    psibase::TimePointSec TransactionSys::headBlockTime() const
    {
       auto& stat = getStatus();

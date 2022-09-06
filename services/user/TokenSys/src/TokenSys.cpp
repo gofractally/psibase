@@ -3,6 +3,7 @@
 #include <psibase/serveGraphQL.hpp>
 #include <services/system/AccountSys.hpp>
 #include <services/system/ProxySys.hpp>
+#include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/RTokenSys.hpp>
 #include <services/user/TokenSys.hpp>
@@ -15,6 +16,7 @@ using namespace UserContract::Errors;
 using namespace psibase;
 using psio::const_view;
 using system_contract::AccountSys;
+using system_contract::TransactionSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
 // For helpers
@@ -225,6 +227,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    }
    else
    {
+      auto time    = at<TransactionSys>().currentBlock().unpack().time;
       auto balance = getBalance(tokenId, receiver);
       balance.balance += amount.value;
       db.open<BalanceTable>().put(balance);
@@ -232,12 +235,12 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
 
       auto senderHolder             = getTokenHolder(sender);
       senderHolder.lastHistoryEvent = emit().history().transferred(
-          tokenId, senderHolder.lastHistoryEvent, sender, receiver, amount, memo);
+          tokenId, senderHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
       db.open<TokenHolderTable>().put(senderHolder);
 
       auto receiverHolder             = getTokenHolder(receiver);
       receiverHolder.lastHistoryEvent = emit().history().transferred(
-          tokenId, receiverHolder.lastHistoryEvent, sender, receiver, amount, memo);
+          tokenId, receiverHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
       db.open<TokenHolderTable>().put(receiverHolder);
    }
 }
@@ -276,6 +279,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    auto receiver        = getSender();  //The action sender is the token receiver
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
    auto receiverBalance = getBalance(tokenId, receiver);
+   auto time            = at<TransactionSys>().currentBlock().unpack().time;
 
    check(amount.value > 0, quantityGt0);
    check(sharedBalance.balance >= amount.value, insufficientBalance);
@@ -297,12 +301,12 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
    auto senderHolder             = getTokenHolder(sender);
    senderHolder.lastHistoryEvent = emit().history().transferred(
-       tokenId, senderHolder.lastHistoryEvent, sender, receiver, amount, memo);
+       tokenId, senderHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
    db.open<TokenHolderTable>().put(senderHolder);
 
    auto receiverHolder             = getTokenHolder(receiver);
    receiverHolder.lastHistoryEvent = emit().history().transferred(
-       tokenId, receiverHolder.lastHistoryEvent, sender, receiver, amount, memo);
+       tokenId, receiverHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
    db.open<TokenHolderTable>().put(receiverHolder);
 }
 
@@ -312,6 +316,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    auto token           = getToken(tokenId);
    auto fromBalance     = getBalance(tokenId, from);
    auto unrecallableBit = TokenRecord::Configurations::getIndex(tokenConfig::unrecallable);
+   auto time            = at<TransactionSys>().currentBlock().unpack().time;
 
    check(isSenderIssuer(tokenId), missingRequiredAuth);
    check(not token.config.get(unrecallableBit), tokenUnrecallable);
@@ -328,7 +333,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
 
    auto holder = getTokenHolder(from);
    holder.lastHistoryEvent =
-       emit().history().recalled(tokenId, holder.lastHistoryEvent, from, amount, memo);
+       emit().history().recalled(tokenId, holder.lastHistoryEvent, time, from, amount, memo);
    db.open<TokenHolderTable>().put(holder);
 }
 
