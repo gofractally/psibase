@@ -74,7 +74,7 @@ tar xf wasi-sdk-14.0-linux.tar.gz
 cd ~/work
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env
-cargo install mdbook mdbook-linkcheck
+cargo install mdbook mdbook-linkcheck mdbook-mermaid
 ```
 
 ### Windows
