@@ -241,8 +241,8 @@ fn add_startup_trx(
 
     let html = "text/html";
     let js = "text/javascript";
-    // let css = "text/css";
-    // let svg = "image/svg+xml";
+    let css = "text/css";
+    let svg = "image/svg+xml";
 
     let mut reg_actions = vec![
         reg_server(account!("account-sys"), account!("r-account-sys")),
@@ -293,54 +293,54 @@ fn add_startup_trx(
     ];
 
     let mut account_sys_files = vec![
-        store!(
-            "r-account-sys",
-            "/index.html",
-            html,
-            "AccountSys/ui/vanilla/index.html"
-        ),
-        store!(
-            "r-account-sys",
-            "/ui/index.js",
-            js,
-            "AccountSys/ui/vanilla/index.js"
-        ),
-        // store!(
-        //     "r-account-sys",
-        //     "/app-account.svg",
-        //     js,
-        //     "AccountSys/ui/dist/app-account.svg"
-        // ),
         // store!(
         //     "r-account-sys",
         //     "/index.html",
         //     html,
-        //     "AccountSys/ui/dist/index.html"
+        //     "AccountSys/ui/vanilla/index.html"
         // ),
         // store!(
         //     "r-account-sys",
-        //     "/index.js",
+        //     "/ui/index.js",
         //     js,
-        //     "AccountSys/ui/dist/index.js"
+        //     "AccountSys/ui/vanilla/index.js"
         // ),
-        // store!(
-        //     "r-account-sys",
-        //     "/style.css",
-        //     js,
-        //     "AccountSys/ui/dist/style.css"
-        // ),
-        // store!(
-        //     "r-account-sys",
-        //     "/refresh.svg",
-        //     js,
-        //     "AccountSys/ui/dist/refresh.svg"
-        // ),
-        // store!(
-        //     "r-account-sys",
-        //     "/logout.svg",
-        //     js,
-        //     "AccountSys/ui/dist/logout.svg"
-        // ),
+        store!(
+            "r-account-sys",
+            "/app-account.svg",
+            js,
+            "AccountSys/ui/dist/app-account.svg"
+        ),
+        store!(
+            "r-account-sys",
+            "/index.html",
+            html,
+            "AccountSys/ui/dist/index.html"
+        ),
+        store!(
+            "r-account-sys",
+            "/index.js",
+            js,
+            "AccountSys/ui/dist/index.js"
+        ),
+        store!(
+            "r-account-sys",
+            "/style.css",
+            js,
+            "AccountSys/ui/dist/style.css"
+        ),
+        store!(
+            "r-account-sys",
+            "/refresh.svg",
+            js,
+            "AccountSys/ui/dist/refresh.svg"
+        ),
+        store!(
+            "r-account-sys",
+            "/logout.svg",
+            js,
+            "AccountSys/ui/dist/logout.svg"
+        ),
     ];
 
     let mut auth_ec_sys_files = vec![
@@ -356,26 +356,56 @@ fn add_startup_trx(
     )];
 
     let mut token_sys_files = vec![
+        // store!(
+        //     "r-tok-sys",
+        //     "/index.html",
+        //     html,
+        //     "CommonSys/ui/vanilla/common.index.html"
+        // ),
+        // store!(
+        //     "r-tok-sys",
+        //     "/ui/index.js",
+        //     js,
+        //     "TokenSys/ui/vanilla/index.js"
+        // ),
         store!(
             "r-tok-sys",
             "/index.html",
             html,
-            "CommonSys/ui/vanilla/common.index.html"
+            "TokenSys/ui/dist/index.html"
+        ),
+        store!("r-tok-sys", "/index.js", js, "TokenSys/ui/dist/index.js"),
+        store!("r-tok-sys", "/style.css", css, "TokenSys/ui/dist/style.css"),
+        store!(
+            "r-tok-sys",
+            "/incoming.svg",
+            svg,
+            "TokenSys/ui/dist/incoming.svg"
         ),
         store!(
             "r-tok-sys",
-            "/ui/index.js",
-            js,
-            "TokenSys/ui/vanilla/index.js"
+            "/outgoing.svg",
+            svg,
+            "TokenSys/ui/dist/outgoing.svg"
         ),
-        // store!("r-tok-sys", "/index.html", html, "TokenSys/ui/dist/index.html"),
-        // store!("r-tok-sys", "/index.js", js, "TokenSys/ui/dist/index.js"),
-        // store!("r-tok-sys", "/style.css", css, "TokenSys/ui/dist/style.css"),
-        // store!("r-tok-sys", "/incoming.svg", svg, "TokenSys/ui/dist/incoming.svg"),
-        // store!("r-tok-sys", "/outgoing.svg", svg, "TokenSys/ui/dist/outgoing.svg"),
-        // store!("r-tok-sys", "/loader.svg", svg, "TokenSys/ui/dist/loader.svg"),
-        // store!("r-tok-sys", "/app-wallet-icon.svg", svg, "TokenSys/ui/dist/app-wallet-icon.svg"),
-        // store!("r-tok-sys", "/arrow-up-solid.svg", svg, "TokenSys/ui/dist/arrow-up-solid.svg"),
+        store!(
+            "r-tok-sys",
+            "/loader.svg",
+            svg,
+            "TokenSys/ui/dist/loader.svg"
+        ),
+        store!(
+            "r-tok-sys",
+            "/app-wallet-icon.svg",
+            svg,
+            "TokenSys/ui/dist/app-wallet-icon.svg"
+        ),
+        store!(
+            "r-tok-sys",
+            "/arrow-up-solid.svg",
+            svg,
+            "TokenSys/ui/dist/arrow-up-solid.svg"
+        ),
     ];
 
     let mut doc_actions = vec![
