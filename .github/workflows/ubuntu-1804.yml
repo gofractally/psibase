@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_1804_IMAGE: "ghcr.io/gofractally/internal-ubuntu-1804-builder:128ece71a3a1a298fa9925c4337e551aef22483596408afbf1b4156f7f4beec6"
+  UBUNTU_1804_IMAGE: "ghcr.io/gofractally/internal-ubuntu-1804-builder:9a0cff04f7c94760ee79487b86eaf11b07a8631d"
 
 jobs:
   ubuntu-1804-build:
