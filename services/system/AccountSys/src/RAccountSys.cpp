@@ -30,6 +30,17 @@ namespace system_contract
       if (request.method == "GET")
       {
          // TODO: replace with GraphQL
+         // if (request.target.starts_with("/api/accounts"))
+         // {
+         //    auto accountSysTables = AccountSys::Tables(AccountSys::contract);
+         //    auto accountTable     = accountSysTables.open<AccountTable>();
+         //    auto accountIndex     = accountTable.getIndex<0>();
+
+         //    std::vector<Account> rows;
+         //    for (auto it = accountIndex.begin(); it != accountIndex.end(); ++it)
+         //       rows.push_back(*it);
+         //    return to_json(rows);
+         // }
          if (request.target == "/accounts")
          {
             auto accountSysTables = AccountSys::Tables(AccountSys::service);

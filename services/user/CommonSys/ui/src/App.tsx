@@ -87,7 +87,11 @@ const App = () => {
     };
 
     useEffect(() => {
-        getCurrentUser();
+        const getUserFn = async () => {
+            await getCurrentUser();
+            // NOTE: 1000 ms wasn't enough...
+        };
+        setInterval(getUserFn, 2000);
     }, []);
 
     const getIndex = useCallback((appletId: AppletId) => {
