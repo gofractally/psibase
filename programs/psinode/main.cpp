@@ -326,7 +326,7 @@ void run(const std::string&              db_path,
    {
       // TODO: command-line options
       http_config->num_threads      = 4;
-      http_config->max_request_size = 10 * 1024 * 1024;
+      http_config->max_request_size = 20 * 1024 * 1024;
       http_config->idle_timeout_ms  = std::chrono::milliseconds{4000};
       http_config->allow_origin     = "*";
       http_config->address          = "0.0.0.0";

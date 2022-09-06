@@ -46,9 +46,9 @@ pub(super) async fn boot(
     key: &Option<PublicKey>,
     producer: &Option<ExactAccountNumber>,
 ) -> Result<(), anyhow::Error> {
-    let new_signed_transactions: Vec<SignedTransaction> =
-        vec![boot_trx(), common_startup_trx(key, producer)];
-    push_boot(args, client, new_signed_transactions.packed_bytes()).await?;
+    let mut transactions = vec![boot_trx()];
+    add_startup_trx(&mut transactions, key, producer);
+    push_boot(args, client, transactions.packed_bytes()).await?;
     println!("Ok");
     Ok(())
 }
@@ -201,10 +201,11 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>) {
     }
 }
 
-fn common_startup_trx(
+fn add_startup_trx(
+    transactions: &mut Vec<SignedTransaction>,
     key: &Option<PublicKey>,
     producer: &Option<ExactAccountNumber>,
-) -> SignedTransaction {
+) {
     let mut init_actions = vec![
         Action {
             sender: account!("account-sys"),
@@ -437,8 +438,16 @@ fn common_startup_trx(
         }
     }
 
-    SignedTransaction {
-        transaction: without_tapos(actions).packed_bytes(),
-        proofs: vec![],
+    while !actions.is_empty() {
+        let mut n = 0;
+        let mut size = 0;
+        while n < actions.len() && size < 1024 * 1024 {
+            size += actions[n].raw_data.len();
+            n += 1;
+        }
+        transactions.push(SignedTransaction {
+            transaction: without_tapos(actions.drain(..n).collect()).packed_bytes(),
+            proofs: vec![],
+        });
     }
 }
