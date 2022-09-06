@@ -7,8 +7,8 @@ use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
 use libpsibase::{
     account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
-    Claim, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction, Tapos, TaposRefBlock,
-    TimePointSec, Transaction,
+    Claim, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction, Tapos,
+    TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -53,7 +53,7 @@ enum Commands {
 
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
-        producer: Option<ExactAccountNumber>
+        producer: Option<ExactAccountNumber>,
     },
 
     /// Create or modify an account
@@ -252,8 +252,8 @@ pub struct ProducerConfigRow {
 fn to_claim(key: &PublicKey) -> Claim {
     return Claim {
         contract: account!("verifyec-sys"),
-        raw_data: key.packed_bytes()
-    }
+        raw_data: key.packed_bytes(),
+    };
 }
 
 fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
