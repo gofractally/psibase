@@ -1,6 +1,6 @@
 import { FC, SVGProps } from "react";
 
-import { Loader } from "./icons";
+import { ArrowUpSolid, Incoming, Loader, Outgoing } from "./icons";
 
 export type IconProps = {
     type: IconType;
@@ -33,7 +33,7 @@ const SIZES: { [key in IconSize]: string } = {
     unset: "",
 };
 
-export type IconType = "loading";
+export type IconType = "arrow-up" | "incoming" | "loading" | "outgoing";
 
 type Icon = {
     [key in IconType]:
@@ -45,7 +45,10 @@ type Icon = {
 };
 
 const ICONS: Icon = {
+    "arrow-up": ArrowUpSolid,
+    incoming: Incoming,
     loading: Loader,
+    outgoing: Outgoing,
 };
 
 export type IconStyle = "solid" | "outline";

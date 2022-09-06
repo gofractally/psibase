@@ -1,3 +1,3 @@
 import Generic from "./generic";
 
-export const { Loader } = Generic;
+export const { ArrowUpSolid, Incoming, Loader, Outgoing } = Generic;
