@@ -82,6 +82,13 @@ namespace system_contract
       };
       table.put(row);
    }
+
+   void PsiSpaceSys::removeSys(std::string path)
+   {
+      Tables tables{getReceiver()};
+      auto   table = tables.template open<PsiSpaceContentTable>();
+      table.erase(PsiSpaceContentKey{getSender(), path});
+   }
 }  // namespace system_contract
 
 PSIBASE_DISPATCH(system_contract::PsiSpaceSys)
