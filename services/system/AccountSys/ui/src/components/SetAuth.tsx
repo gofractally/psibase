@@ -10,9 +10,9 @@ let setAuth = async () => {
 
 export const SetAuth = () => {
     return (
-        <>
-            <h2>Set Alice on Chain</h2>
-            <button onClick={(e) => setAuth()}>Set Auth</button>
-        </>
+        <div className="rounded-lg my-4 py-2 shadow-md">
+            <h2>Dev buttons</h2>
+            <button className="p-4 bg-green-500 rounded-lg" onClick={(e) => setAuth()}>Set auth Alice on chain</button>
+        </div>
     );
 };

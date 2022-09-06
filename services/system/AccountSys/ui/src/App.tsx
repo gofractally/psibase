@@ -9,6 +9,10 @@ import { AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
 import { getLoggedInUser, useMsg } from "./helpers";
 import { initAppFn } from "./appInit";
 
+import closedIcon from "./components/assets/icons/lock-closed.svg";
+import openIcon from "./components/assets/icons/lock-open.svg";
+
+
 // needed for common files that won't necessarily use bundles
 window.React = React;
 
@@ -29,14 +33,27 @@ const useAccountsWithKeys = (addMsg: any, clearMsg: any) => {
     ]);
     return accounts;
 };
+
+interface Account {
+    accountNum: string;
+    authContract: string;
+}
+
+export interface ViewAccount extends Account {
+    isSecure: boolean;
+}
+
+const toViewAccount = (account: Account): ViewAccount => ({ ...account, isSecure: account.authContract !== 'auth-any-sys' })
+
 const useAccounts = (addMsg: any, clearMsg: any) => {
-    const [accounts, setAccounts] = useState([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
 
     const refreshAccounts = () => {
         addMsg("Fetching accounts...");
         (async () => {
             try {
-                setAccounts(await getJson("/accounts"));
+                const accounts = await getJson<Account[]>("/accounts");
+                setAccounts(accounts);
             } catch (e) {
                 console.info("refreshAccounts().catch().e:");
                 console.info(e);
@@ -56,6 +73,8 @@ function App() {
     const { msg, addMsg, clearMsg } = useMsg();
     const accountsWithKeys = useAccountsWithKeys(addMsg, clearMsg);
     const allAccounts = useAccounts(addMsg, clearMsg);
+
+    const allViewAccounts = allAccounts.map(toViewAccount)
     const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
     useEffect(() => {
         initAppFn(() => {
@@ -85,6 +104,7 @@ function App() {
         }
     };
 
+    console.log({ allAccounts, accountsWithKeys })
     return (
         <div className="ui container p-4">
             <div className="flex gap-2">
@@ -112,15 +132,24 @@ function App() {
             <div className="bg-slate-50 mt-4">
                 <CreateAccountForm addMsg={addMsg} clearMsg={clearMsg} />
             </div>
-            <SetAuth />
             <hr />
-            <h2>Available accounts</h2>
-            <div>Choose and account below to make it active.</div>
-            <AccountList
-                accounts={allAccounts}
-                addMsg={addMsg}
-                clearMsg={clearMsg}
-            />
+
+            <h2>All accounts</h2>
+            <div className="flex flex-col space-y-2">
+
+                {allViewAccounts.map(account => (
+                    <div className="flex justify-between">
+                        <div>{account.accountNum}</div>
+                        <div className="w-5">                        <img src={account.isSecure ? closedIcon : openIcon} alt="" />
+                        </div>
+                    </div>
+                ))}
+
+            </div>
+            <hr />
+
+            <SetAuth />
+
             <hr />
             <h2>Messages</h2>
             <pre style={{ border: "1px solid" }}>
