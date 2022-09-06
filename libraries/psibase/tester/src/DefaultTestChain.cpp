@@ -1,5 +1,6 @@
 #include <psibase/DefaultTestChain.hpp>
 
+#include <psibase/serviceEntry.hpp>
 #include <services/system/AccountSys.hpp>
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/AuthEcSys.hpp>
@@ -13,7 +14,6 @@
 #include <services/system/VerifyEcSys.hpp>
 #include <services/user/ExploreSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
-#include <psibase/serviceEntry.hpp>
 #include <utility>
 #include <vector>
 
@@ -242,8 +242,8 @@ void DefaultTestChain::registerSysRpc()
 
    const std::string html = "text/html";
    const std::string js   = "text/javascript";
-   const std::string css   = "text/css";
-   const std::string svg   = "image/svg+xml";
+   const std::string css  = "text/css";
+   const std::string svg  = "image/svg+xml";
 
    std::vector<psibase::Action> b{
        // CommonSys Fancy UI
@@ -252,16 +252,22 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/style.css", css, readWholeFile(comDir + "/ui/dist/style.css")),
        rpcCommon.storeSys("/ninebox.svg", svg, readWholeFile(comDir + "/ui/dist/ninebox.svg")),
        rpcCommon.storeSys("/psibase.svg", svg, readWholeFile(comDir + "/ui/dist/psibase.svg")),
-       rpcCommon.storeSys("/app-account-desktop.svg", svg, readWholeFile(comDir + "/ui/dist/app-account-desktop.svg")),
-       rpcCommon.storeSys("/app-account-mobile.svg", svg, readWholeFile(comDir + "/ui/dist/app-account-mobile.svg")),
-       rpcCommon.storeSys("/app-explore-desktop.svg", svg, readWholeFile(comDir + "/ui/dist/app-explore-desktop.svg")),
-       rpcCommon.storeSys("/app-explore-mobile.svg", svg, readWholeFile(comDir + "/ui/dist/app-explore-mobile.svg")),
-       rpcCommon.storeSys("/app-wallet-desktop.svg", svg, readWholeFile(comDir + "/ui/dist/app-wallet-desktop.svg")),
-       rpcCommon.storeSys("/app-wallet-mobile.svg", svg, readWholeFile(comDir + "/ui/dist/app-wallet-mobile.svg")),
+       rpcCommon.storeSys("/app-account-desktop.svg", svg,
+                          readWholeFile(comDir + "/ui/dist/app-account-desktop.svg")),
+       rpcCommon.storeSys("/app-account-mobile.svg", svg,
+                          readWholeFile(comDir + "/ui/dist/app-account-mobile.svg")),
+       rpcCommon.storeSys("/app-explore-desktop.svg", svg,
+                          readWholeFile(comDir + "/ui/dist/app-explore-desktop.svg")),
+       rpcCommon.storeSys("/app-explore-mobile.svg", svg,
+                          readWholeFile(comDir + "/ui/dist/app-explore-mobile.svg")),
+       rpcCommon.storeSys("/app-wallet-desktop.svg", svg,
+                          readWholeFile(comDir + "/ui/dist/app-wallet-desktop.svg")),
+       rpcCommon.storeSys("/app-wallet-mobile.svg", svg,
+                          readWholeFile(comDir + "/ui/dist/app-wallet-mobile.svg")),
 
        // CommonSys Basic UI
-    //    rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/vanilla/index.html")),
-    //    rpcCommon.storeSys("/ui/index.js", js, readWholeFile(comDir + "/ui/vanilla/index.js")),
+       //    rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/vanilla/index.html")),
+       //    rpcCommon.storeSys("/ui/index.js", js, readWholeFile(comDir + "/ui/vanilla/index.js")),
 
        // CommonSys Other
        rpcCommon.storeSys("/ui/common.index.html", html,
@@ -270,6 +276,7 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/common/rpc.mjs", js, readWholeFile(comDir + "/common/rpc.mjs")),
        rpcCommon.storeSys("/common/useGraphQLQuery.mjs", js,
                           readWholeFile(comDir + "/common/useGraphQLQuery.mjs")),
+       rpcCommon.storeSys("/common/useLocalStorage.mjs", js, readWholeFile(comDir + "/common/useLocalStorage.mjs")),
        rpcCommon.storeSys("/common/SimpleUI.mjs", js,
                           readWholeFile(comDir + "/common/SimpleUI.mjs")),
        rpcCommon.storeSys("/common/keyConversions.mjs", js,
@@ -298,8 +305,13 @@ void DefaultTestChain::registerSysRpc()
                           readWholeFile(thirdPty + "/useLocalStorageState.js")),
 
        // AccountSys
-       rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/index.html")),
-       rpcAccount.storeSys("/ui/index.js", js, readWholeFile(accDir + "/ui/index.js")),
+       rpcAccount.storeSys("/app-account.svg", svg,
+                           readWholeFile(accDir + "/ui/dist/app-account.svg")),
+       rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/dist/index.html")),
+       rpcAccount.storeSys("/index.js", js, readWholeFile(accDir + "/ui/dist/index.js")),
+       rpcAccount.storeSys("/logout.svg", svg, readWholeFile(accDir + "/ui/dist/logout.svg")),
+       rpcAccount.storeSys("/refresh.svg", svg, readWholeFile(accDir + "/ui/dist/refresh.svg")),
+       rpcAccount.storeSys("/style.css", css, readWholeFile(accDir + "/ui/dist/style.css")),
 
        // AuthEcSys
        rpcAuthEc.storeSys("/index.html", html, readWholeFile(authEcDir + "/ui/index.html")),

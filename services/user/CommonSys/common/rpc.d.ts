@@ -32,11 +32,10 @@ declare module "common/rpc.mjs" {
     static fromObject: (obj: string) => AppletId;
   }
 
-  function setQueries(queries: any): void;
-
+  function getCurrentApplet(): Promise<string>;
   function query<Params, Response>(
     appletId: AppletId,
-    name: string,
+    queryName: string,
     params?: Params
   ): Promise<Response>;
 
@@ -49,14 +48,6 @@ declare module "common/rpc.mjs" {
 
   type Operation = { id: string; exec: (params: any) => Promise<void> };
 
-  function setOperations(operations: Operation[]): void;
-
-  function operation<Params>(
-    appletId: AppletId,
-    name: string,
-    params?: Params
-  ): Promise<any>;
-
   function storeCallback(callback: any): number;
 
   function executeCallback(callbackId: any, response: any): boolean;
@@ -68,6 +59,18 @@ declare module "common/rpc.mjs" {
     signedTransaction: any
   ): Promise<any>;
 
+  function setOperations(operations: Operation[]): void;
+  function setQueries(queries: Query[]): void;
+  function operation<Params>(
+    appletId: AppletId,
+    name: string,
+    params?: Params
+  ): Promise<any>;
+  function signTransaction(
+    baseUrl: string,
+    transaction: any,
+    privateKeys?: string[] // TODO: remove optional once we're done with fake-auth
+  ): Promise<any>;
   function verifyFields(obj: any, fieldNames: any): boolean;
 
   function postGraphQLGetJson<GqlResponse>(
