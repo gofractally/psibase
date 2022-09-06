@@ -4,9 +4,6 @@
 // Other contract
 #include "arithmetic.hpp"
 
-#include <psibase/dispatch.hpp>
-#include <psibase/serveSimpleUI.hpp>
-
 int32_t Caller::mult_add(int32_t a, int32_t b, int32_t c, int32_t d)
 {
    // This allows us to call into the Arithmetic contract

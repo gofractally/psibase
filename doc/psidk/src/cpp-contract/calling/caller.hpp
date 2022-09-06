@@ -1,5 +1,4 @@
-#include <psibase/Service.hpp>
-#include <psibase/Rpc.hpp>
+#include <psibase/psibase.hpp>
 
 struct Caller : psibase::Service<Caller>
 {

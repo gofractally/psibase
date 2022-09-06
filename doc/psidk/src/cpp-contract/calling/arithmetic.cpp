@@ -1,8 +1,5 @@
 #include "arithmetic.hpp"
 
-#include <psibase/dispatch.hpp>
-#include <psibase/serveSimpleUI.hpp>
-
 // The implementation file has the action definitions
 int32_t Arithmetic::add(int32_t a, int32_t b)
 {

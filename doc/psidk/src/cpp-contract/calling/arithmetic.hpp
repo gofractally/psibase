@@ -1,5 +1,4 @@
-#include <psibase/Rpc.hpp>
-#include <psibase/Service.hpp>
+#include <psibase/psibase.hpp>
 
 // The header includes the class definition
 struct Arithmetic : psibase::Service<Arithmetic>

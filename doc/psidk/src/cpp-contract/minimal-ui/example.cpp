@@ -1,6 +1,4 @@
-#include <psibase/Service.hpp>
-#include <psibase/dispatch.hpp>
-#include <psibase/serveSimpleUI.hpp>
+#include <psibase/psibase.hpp>
 
 struct ExampleContract : psibase::Service<ExampleContract>
 {
