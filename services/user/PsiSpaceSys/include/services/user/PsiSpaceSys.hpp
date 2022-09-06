@@ -62,9 +62,11 @@ namespace system_contract
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
+      void removeSys(std::string path);
    };
 
    PSIO_REFLECT(PsiSpaceSys,
                 method(serveSys, request),
-                method(storeSys, path, contentType, content))
+                method(storeSys, path, contentType, content),
+                method(removeSys, path))
 }  // namespace system_contract
