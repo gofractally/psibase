@@ -10,7 +10,7 @@
 int32_t Caller::mult_add(int32_t a, int32_t b, int32_t c, int32_t d)
 {
    // This allows us to call into the Arithmetic contract
-   auto otherContract = at<Arithmetic>(Arithmetic::service);
+   auto otherContract = to<Arithmetic>(Arithmetic::service);
 
    // Compute the result. Calls into the Arithmetic contract 3 times.
    return otherContract

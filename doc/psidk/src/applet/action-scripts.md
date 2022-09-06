@@ -60,9 +60,9 @@ void TokenSys::createAndMap(Precision p, Quantity maxSupply, SID symbolId)
     senderAt<NftSys>().debit(tokenNft, "Debit token ownership NFT");
 
     // Create new symbol
-    auto cost = at<SymbolSys>().getCost(symbolId.str().size());
+    auto cost = to<SymbolSys>().getCost(symbolId.str().size());
     senderAt<SymbolSys>().create(symbolId, cost);
-    auto symbolNft = at<SymbolSys>().getSymbol(symbolId).ownerNft;
+    auto symbolNft = to<SymbolSys>().getSymbol(symbolId).ownerNft;
     senderAt<NftSys>().debit(symbolNft, "Take ownership of new symbol");
 
     // Map symbol to token

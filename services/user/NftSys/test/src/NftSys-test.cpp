@@ -38,11 +38,11 @@ SCENARIO("Minting & burning nfts")
    {
       DefaultTestChain t({{NftSys::service, "NftSys.wasm"}});
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto bob   = t.as(t.add_account("bob"_a));
+      auto alice = t.from(t.add_account("alice"_a));
+      auto bob   = t.from(t.add_account("bob"_a));
 
-      auto a = alice.at<NftSys>();
-      auto b = bob.at<NftSys>();
+      auto a = alice.to<NftSys>();
+      auto b = bob.to<NftSys>();
 
       a.init();
 
@@ -114,13 +114,13 @@ SCENARIO("Transferring NFTs")
    {
       DefaultTestChain t({{NftSys::service, "NftSys.wasm"}});
 
-      auto alice   = t.as(t.add_account("alice"));
-      auto bob     = t.as(t.add_account("bob"));
-      auto charlie = t.as(t.add_account("charlie"));
+      auto alice   = t.from(t.add_account("alice"));
+      auto bob     = t.from(t.add_account("bob"));
+      auto charlie = t.from(t.add_account("charlie"));
 
-      auto a = alice.at<NftSys>();
-      auto b = bob.at<NftSys>();
-      auto c = charlie.at<NftSys>();
+      auto a = alice.to<NftSys>();
+      auto b = bob.to<NftSys>();
+      auto c = charlie.to<NftSys>();
 
       a.init();
 

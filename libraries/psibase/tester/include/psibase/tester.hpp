@@ -279,7 +279,7 @@ namespace psibase
          AccountNumber id;
 
          template <typename Other>
-         auto at() const
+         auto to() const
          {
             return ContractUser<Other>(t, id, Other::service);
          }
@@ -287,7 +287,7 @@ namespace psibase
          operator AccountNumber() { return id; }
       };
 
-      auto as(AccountNumber id) { return UserContext{*this, id}; }
+      auto from(AccountNumber id) { return UserContext{*this, id}; }
    };  // TestChain
 
 }  // namespace psibase

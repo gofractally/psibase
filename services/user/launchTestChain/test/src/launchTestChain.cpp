@@ -30,7 +30,7 @@ SCENARIO("Testing default psibase chain")
 {
    DefaultTestChain t(neededContracts, 1'000'000'000ul, 32, 32, 32, 38);
 
-   auto tokenSysRpc = t.as(RTokenSys::service).at<RTokenSys>();
+   auto tokenSysRpc = t.from(RTokenSys::service).to<RTokenSys>();
 
    // Old UI
    std::string comUiDir = "../services/user/CommonSys/ui/vanilla/";
@@ -45,15 +45,15 @@ SCENARIO("Testing default psibase chain")
    // tokenSysRpc.storeSys("/style.css", "text/css", readWholeFile(rpcUiDir + "style.css"));
    // tokenSysRpc.storeSys("/vite.svg", "image/svg+xml", readWholeFile(rpcUiDir + "vite.svg"));
 
-   auto alice = t.as(t.add_account("alice"_a));
-   auto bob   = t.as(t.add_account("bob"_a));
+   auto alice = t.from(t.add_account("alice"_a));
+   auto bob   = t.from(t.add_account("bob"_a));
 
    // Initialize user contracts
-   alice.at<NftSys>().init();
-   alice.at<TokenSys>().init();
-   alice.at<SymbolSys>().init();
+   alice.to<NftSys>().init();
+   alice.to<TokenSys>().init();
+   alice.to<SymbolSys>().init();
 
-   auto sysIssuer = t.as(SymbolSys::service).at<TokenSys>();
+   auto sysIssuer = t.from(SymbolSys::service).to<TokenSys>();
    auto sysToken  = TokenSys::sysToken;
 
    // Let sys token be tradeable
@@ -65,8 +65,8 @@ SCENARIO("Testing default psibase chain")
    sysIssuer.credit(sysToken, alice, 1'000e8, memo);
    sysIssuer.credit(sysToken, bob, 1'000e8, memo);
 
-   auto create = alice.at<TokenSys>().create(4, 1'000'000e4);
-   alice.at<TokenSys>().mint(create.returnVal(), 100e4, memo);
+   auto create = alice.to<TokenSys>().create(4, 1'000'000e4);
+   alice.to<TokenSys>().mint(create.returnVal(), 100e4, memo);
 
    t.startBlock();
 

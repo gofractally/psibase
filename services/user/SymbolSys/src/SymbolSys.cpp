@@ -51,8 +51,8 @@ void SymbolSys::init()
    initTable.put(InitializedRecord{});
 
    // Configure manualDebit
-   at<TokenSys>().setUserConf("manualDebit"_m, true);
-   at<NftSys>().setUserConf("manualDebit"_m, true);
+   to<TokenSys>().setUserConf("manualDebit"_m, true);
+   to<NftSys>().setUserConf("manualDebit"_m, true);
 
    // Configure default symbol length records to establish initial prices
    auto nextSym = [](SymbolLengthRecord& s)
@@ -82,13 +82,13 @@ void SymbolSys::init()
    priceAdjustmentSingleton.put(PriceAdjustmentRecord{0, increasePct, decreasePct});
 
    // Create system token symbol
-   at<SymbolSys>().create(sysTokenSymbol, initialPrice);
+   to<SymbolSys>().create(sysTokenSymbol, initialPrice);
 
    // Offer system token symbol
    auto symbolOwnerNft = getSymbol(sysTokenSymbol);
-   at<NftSys>().credit(symbolOwnerNft.ownerNft, TokenSys::service,
+   to<NftSys>().credit(symbolOwnerNft.ownerNft, TokenSys::service,
                        "System token symbol ownership nft");
-   at<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
+   to<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
 
    emit().ui().initialized();
 }
@@ -110,20 +110,20 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    auto debitMemo = "This transfer created the new symbol: " + symString;
    if (sender != getReceiver())
    {
-      at<TokenSys>().debit(TokenSys::sysToken, sender, cost, debitMemo);
+      to<TokenSys>().debit(TokenSys::sysToken, sender, cost, debitMemo);
    }
 
    // Mint and offer ownership NFT
-   newSym.ownerNft    = *at<NftSys>().mint();
+   newSym.ownerNft    = *to<NftSys>().mint();
    auto nftCreditMemo = "This NFT conveys ownership of symbol: " + symString;
    if (sender != getReceiver())
    {
-      at<NftSys>().credit(newSym.ownerNft, sender, nftCreditMemo);
+      to<NftSys>().credit(newSym.ownerNft, sender, nftCreditMemo);
    }
 
    // Update symbol type statistics
    symType.createCounter++;
-   symType.lastPriceUpdateTime = *at<TransactionSys>().headBlockTime();
+   symType.lastPriceUpdateTime = *to<TransactionSys>().headBlockTime();
 
    db.open<SymbolTable>().put(newSym);
    db.open<SymbolLengthTable>().put(symType);
@@ -136,7 +136,7 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
    auto seller       = getSender();
    auto symbolRecord = getSymbol(symbol);
    auto nft          = symbolRecord.ownerNft;
-   auto nftContract  = at<NftSys>();
+   auto nftContract  = to<NftSys>();
 
    check(price.value != 0, priceTooLow);
    check(nft != 0, symbolDNE);
@@ -160,7 +160,7 @@ void SymbolSys::buySymbol(SID symbol)
    auto buyer               = getSender();
    auto symbolRecord        = getSymbol(symbol);
    auto [salePrice, seller] = symbolRecord.saleDetails;
-   auto tokenContract       = at<TokenSys>();
+   auto tokenContract       = to<TokenSys>();
 
    check(symbolRecord.ownerNft != 0, symbolDNE);
    check(buyer != seller, buyerIsSeller);
@@ -169,7 +169,7 @@ void SymbolSys::buySymbol(SID symbol)
    auto sellerMemo = "Symbol " + symbol.str() + " sold";
    tokenContract.debit(TokenSys::sysToken, buyer, salePrice, buyerMemo);
    tokenContract.credit(TokenSys::sysToken, seller, salePrice, sellerMemo);
-   at<NftSys>().credit(symbolRecord.ownerNft, buyer, buyerMemo);
+   to<NftSys>().credit(symbolRecord.ownerNft, buyer, buyerMemo);
 
    symbolRecord.saleDetails.seller    = AccountNumber{0};
    symbolRecord.saleDetails.salePrice = 0;
@@ -188,7 +188,7 @@ void SymbolSys::unlistSymbol(SID symbol)
    check(seller == symbolRecord.saleDetails.seller, missingRequiredAuth);
 
    auto unlistMemo = "Unlisting symbol " + symbol.str();
-   at<NftSys>().credit(symbolRecord.ownerNft, seller, unlistMemo);
+   to<NftSys>().credit(symbolRecord.ownerNft, seller, unlistMemo);
 
    symbolRecord.saleDetails = SaleDetails{};
 
@@ -245,7 +245,7 @@ void SymbolSys::updatePrices()
    auto dec                = static_cast<uint64_t>((uint8_t)100 - priceAdjustmentRec.decreasePct);
    auto inc                = static_cast<uint64_t>((uint8_t)100 + priceAdjustmentRec.increasePct);
 
-   auto lastBlockTime = at<TransactionSys>().headBlockTime().unpack();
+   auto lastBlockTime = to<TransactionSys>().headBlockTime().unpack();
    for (auto symbolType : symLengthIndex)
    {
       if (lastBlockTime.seconds - symbolType.lastPriceUpdateTime.seconds > secondsInDay)

@@ -48,16 +48,16 @@ SCENARIO("Using system token")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
-      auto sysIssuer   = t.as(SymbolSys::service).at<TokenSys>();
+      auto sysIssuer   = t.from(SymbolSys::service).to<TokenSys>();
       auto userBalance = 1'000'000e8;
       auto sysToken    = TokenSys::sysToken;
       sysIssuer.mint(sysToken, userBalance, memo);
@@ -97,14 +97,14 @@ SCENARIO("Creating a token")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       THEN("Alice may create a token")
       {
@@ -177,15 +177,15 @@ SCENARIO("Minting tokens")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
-      auto b     = bob.at<TokenSys>();
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto b     = bob.to<TokenSys>();
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
 
@@ -239,15 +239,15 @@ SCENARIO("Recalling tokens")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
-      auto b     = bob.at<TokenSys>();
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto b     = bob.to<TokenSys>();
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -299,19 +299,19 @@ SCENARIO("Interactions with the Issuer NFT")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
-      auto b     = bob.at<TokenSys>();
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto b     = bob.to<TokenSys>();
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto nft     = alice.at<NftSys>().getNft(token.ownerNft).returnVal();
+      auto nft     = alice.to<NftSys>().getNft(token.ownerNft).returnVal();
       t.startBlock();
 
       THEN("The Issuer NFT is owned by Alice")
@@ -320,11 +320,11 @@ SCENARIO("Interactions with the Issuer NFT")
       }
       WHEN("Alice credits the issuer NFT to Bob")
       {
-         alice.at<NftSys>().credit(nft.id, bob, memo);
+         alice.to<NftSys>().credit(nft.id, bob, memo);
 
          THEN("The NFT is owned by Bob")
          {
-            auto newNft = alice.at<NftSys>().getNft(token.ownerNft).returnVal();
+            auto newNft = alice.to<NftSys>().getNft(token.ownerNft).returnVal();
             nft.owner   = bob.id;
             CHECK(newNft == nft);
          }
@@ -358,7 +358,7 @@ SCENARIO("Interactions with the Issuer NFT")
          Quantity quantity{1'000e8};
          a.mint(tokenId, quantity, memo);
          a.credit(tokenId, bob, quantity, memo);
-         alice.at<NftSys>().burn(nft.id);
+         alice.to<NftSys>().burn(nft.id);
          t.startBlock();
 
          THEN("Alice may not mint new tokens")
@@ -367,7 +367,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not credit the issuer NFT to anyone")
          {
-            CHECK(alice.at<NftSys>().credit(nft.id, bob, memo).failed(nftDNE));
+            CHECK(alice.to<NftSys>().credit(nft.id, bob, memo).failed(nftDNE));
          }
          THEN("Alice may not recall Bob's tokens")
          {
@@ -391,15 +391,15 @@ SCENARIO("Burning tokens")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
-      auto b     = bob.at<TokenSys>();
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto b     = bob.to<TokenSys>();
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -475,15 +475,15 @@ SCENARIO("Toggling manual-debit")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
-      auto b     = bob.at<TokenSys>();
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto b     = bob.to<TokenSys>();
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       THEN("Alice and Bob both have manualDebit disabled")
       {
@@ -544,15 +544,15 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
-      auto b     = bob.at<TokenSys>();
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto b     = bob.to<TokenSys>();
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -621,15 +621,15 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto a     = alice.at<TokenSys>();
-      auto bob   = t.as(t.add_account("bob"_a));
-      auto b     = bob.at<TokenSys>();
+      auto alice = t.from(t.add_account("alice"_a));
+      auto a     = alice.to<TokenSys>();
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto b     = bob.to<TokenSys>();
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -758,18 +758,18 @@ SCENARIO("Mapping a symbol to a token")
    {
       DefaultTestChain t(neededContracts);
 
-      auto alice = t.as(t.add_account("alice"_a));
-      auto bob   = t.as(t.add_account("bob"_a));
-      auto a     = alice.at<TokenSys>();
-      auto b     = bob.at<TokenSys>();
+      auto alice = t.from(t.add_account("alice"_a));
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto a     = alice.to<TokenSys>();
+      auto b     = bob.to<TokenSys>();
 
       // Initialize user contracts
-      alice.at<NftSys>().init();
-      alice.at<TokenSys>().init();
-      alice.at<SymbolSys>().init();
+      alice.to<NftSys>().init();
+      alice.to<TokenSys>().init();
+      alice.to<SymbolSys>().init();
 
       // Issue system tokens
-      auto sysIssuer   = t.as(SymbolSys::service).at<TokenSys>();
+      auto sysIssuer   = t.from(SymbolSys::service).to<TokenSys>();
       auto userBalance = 1'000'000e8;
       auto sysToken    = TokenSys::sysToken;
       sysIssuer.setTokenConf(sysToken, untradeable, false);
@@ -782,11 +782,11 @@ SCENARIO("Mapping a symbol to a token")
       a.mint(newToken, userBalance, memo);
 
       // Purchase the symbol and claim the owner NFT
-      auto symbolCost = alice.at<SymbolSys>().getPrice(3).returnVal();
+      auto symbolCost = alice.to<SymbolSys>().getPrice(3).returnVal();
       a.credit(sysToken, SymbolSys::service, symbolCost, memo);
       auto symbolId     = "abc"_a;
-      auto create       = alice.at<SymbolSys>().create(symbolId, symbolCost);
-      auto symbolRecord = alice.at<SymbolSys>().getSymbol(symbolId).returnVal();
+      auto create       = alice.to<SymbolSys>().create(symbolId, symbolCost);
+      auto symbolRecord = alice.to<SymbolSys>().getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
 
       THEN("Bob is unable to map the symbol to the token")
@@ -795,7 +795,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       WHEN("Alice burns the symbol owner NFT")
       {
-         alice.at<NftSys>().burn(nftId);
+         alice.to<NftSys>().burn(nftId);
 
          THEN("Alice is unable to map the symbol to the token")
          {
@@ -805,7 +805,7 @@ SCENARIO("Mapping a symbol to a token")
       WHEN("Alice burns the token owner NFT")
       {
          auto tokenNft = a.getToken(newToken).returnVal().ownerNft;
-         alice.at<NftSys>().burn(tokenNft);
+         alice.to<NftSys>().burn(tokenNft);
 
          THEN("Alice is unable to map the symbol to the token")
          {
@@ -824,7 +824,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       THEN("Alice is able to map the symbol to the token")
       {
-         alice.at<NftSys>().credit(nftId, TokenSys::service, memo);
+         alice.to<NftSys>().credit(nftId, TokenSys::service, memo);
          CHECK(a.mapSymbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
@@ -835,12 +835,12 @@ SCENARIO("Mapping a symbol to a token")
       WHEN("Alice maps the symbol to the token")
       {
          t.startBlock();
-         alice.at<NftSys>().credit(nftId, TokenSys::service, memo);
+         alice.to<NftSys>().credit(nftId, TokenSys::service, memo);
          a.mapSymbol(newToken, symbolId);
 
          THEN("The symbol record is identical")
          {
-            auto symbolRecord2 = alice.at<SymbolSys>().getSymbol(symbolId).returnVal();
+            auto symbolRecord2 = alice.to<SymbolSys>().getSymbol(symbolId).returnVal();
             CHECK(symbolRecord == symbolRecord2);
          }
 
@@ -848,10 +848,10 @@ SCENARIO("Mapping a symbol to a token")
          {
             a.credit(sysToken, SymbolSys::service, symbolCost, memo);
             auto newSymbol = "bcd"_a;
-            alice.at<SymbolSys>().create(newSymbol, symbolCost);
-            auto newNft = alice.at<SymbolSys>().getSymbol(newSymbol).returnVal().ownerNft;
+            alice.to<SymbolSys>().create(newSymbol, symbolCost);
+            auto newNft = alice.to<SymbolSys>().getSymbol(newSymbol).returnVal().ownerNft;
 
-            alice.at<NftSys>().credit(newNft, TokenSys::service, memo);
+            alice.to<NftSys>().credit(newNft, TokenSys::service, memo);
             CHECK(a.mapSymbol(newToken, newSymbol).failed(tokenHasSymbol));
          }
       }

@@ -56,7 +56,7 @@ PSIO_REFLECT(TokenQuery,
 
 optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {
-   // if (auto result = at<system_contract::CommonSys>().serveCommon(request).unpack())
+   // if (auto result = to<system_contract::CommonSys>().serveCommon(request).unpack())
    //    return result;
 
    if (auto result = servePackAction<TokenSys>(request))
@@ -142,8 +142,8 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          TID                         tokenId = 1;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)
          {
-            auto balance = at<TokenSys>().getBalance(tokenId, acc).unpack();
-            auto token   = at<TokenSys>().getToken(balance.key.tokenId).unpack();
+            auto balance = to<TokenSys>().getBalance(tokenId, acc).unpack();
+            auto token   = to<TokenSys>().getToken(balance.key.tokenId).unpack();
 
             if (balance.balance != 0)
             {

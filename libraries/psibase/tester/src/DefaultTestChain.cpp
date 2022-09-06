@@ -172,8 +172,8 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
 
    auto trace = pushTransaction(makeTransaction({
        asys.newAccount(name, system_contract::AuthAnySys::service, true),
-       ecsys.as(name).setKey(public_key),
-       asys.as(name).setAuthCntr(system_contract::AuthEcSys::service),
+       ecsys.from(name).setKey(public_key),
+       asys.from(name).setAuthCntr(system_contract::AuthEcSys::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");

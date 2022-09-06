@@ -28,8 +28,8 @@ TEST_CASE("ec")
    transactor<system_contract::AuthEcSys> ecsys(system_contract::AuthEcSys::service,
                                                 system_contract::AuthEcSys::service);
 
-   auto alice = t.as(t.add_account(AccountNumber("alice")));
-   auto bob   = t.as(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
+   auto alice = t.from(t.add_account(AccountNumber("alice")));
+   auto bob   = t.from(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
    auto sue   = t.add_ec_account("sue", pub_key1);
 
    expect(t.pushTransaction(t.makeTransaction({{
@@ -91,7 +91,7 @@ TEST_CASE("ec")
                             {{pub_key1, priv_key2}}),
           "incorrect signature");
 
-   expect(t.pushTransaction(t.makeTransaction({ecsys.as(sue).setKey(pub_key2)}),
+   expect(t.pushTransaction(t.makeTransaction({ecsys.from(sue).setKey(pub_key2)}),
                             {{pub_key1, priv_key1}}));
 
    expect(t.pushTransaction(t.makeTransaction({{

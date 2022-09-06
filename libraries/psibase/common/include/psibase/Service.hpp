@@ -69,13 +69,13 @@ namespace psibase
    /// To call another service:
    ///
    /// ```c++
-   /// auto result = at<OtherServiceClass>(otherServiceAccount).someMethod(args...);
+   /// auto result = to<OtherServiceClass>(otherServiceAccount).someMethod(args...);
    /// ```
    ///
    /// To call into this service recursively:
    ///
    /// ```c++
-   /// auto result = as().someMethod(args...);
+   /// auto result = from().someMethod(args...);
    /// ```
    ///
    /// You rarely need to do this. It has higher overhead than simply calling your own functions directly.
@@ -164,10 +164,10 @@ namespace psibase
       /// Example use:
       ///
       /// ```c++
-      /// auto result = at<OtherServiceClass>(otherServiceAccount).someMethod(args...);
+      /// auto result = to<OtherServiceClass>(otherServiceAccount).someMethod(args...);
       /// ```
       template <typename Other = DerivedService>
-      Actor<Other> at(AccountNumber receiver)
+      Actor<Other> to(AccountNumber receiver)
       {
          return Actor<Other>(getReceiver(), receiver);
       }
@@ -185,12 +185,12 @@ namespace psibase
       /// Example use:
       ///
       /// ```c++
-      /// auto result = at<OtherServiceClass>().someMethod(args...);
+      /// auto result = to<OtherServiceClass>().someMethod(args...);
       /// ```
       template <DefinesService Other = DerivedService>
-      Actor<Other> at()
+      Actor<Other> to()
       {
-         return at<Other>(Other::service);
+         return to<Other>(Other::service);
       }
 
       /// Call a service
@@ -206,11 +206,11 @@ namespace psibase
       ///
       /// ```c++
       /// auto result =
-      ///   as(userAccount)
-      ///   .at<OtherServiceClass, otherServiceAccount>()
+      ///   from(userAccount)
+      ///   .to<OtherServiceClass, otherServiceAccount>()
       ///   .someMethod(args...);
       /// ```
-      Actor<DerivedService> as(AccountNumber u = AccountNumber())
+      Actor<DerivedService> from(AccountNumber u = AccountNumber())
       {
          if (u == AccountNumber())
             return {getSender(), getReceiver()};
