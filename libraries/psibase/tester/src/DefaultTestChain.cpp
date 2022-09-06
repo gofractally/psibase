@@ -304,14 +304,18 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/common/use-local-storage-state.mjs", js,
                           readWholeFile(thirdPty + "/useLocalStorageState.js")),
 
-       // AccountSys
-       rpcAccount.storeSys("/app-account.svg", svg,
-                           readWholeFile(accDir + "/ui/dist/app-account.svg")),
-       rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/dist/index.html")),
-       rpcAccount.storeSys("/index.js", js, readWholeFile(accDir + "/ui/dist/index.js")),
-       rpcAccount.storeSys("/logout.svg", svg, readWholeFile(accDir + "/ui/dist/logout.svg")),
-       rpcAccount.storeSys("/refresh.svg", svg, readWholeFile(accDir + "/ui/dist/refresh.svg")),
-       rpcAccount.storeSys("/style.css", css, readWholeFile(accDir + "/ui/dist/style.css")),
+       // AccountSys Basic UI
+       rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/vanilla/index.html")),
+       rpcAccount.storeSys("/ui/index.js", js, readWholeFile(accDir + "/ui/vanilla/index.js")),
+       
+       // AccountSys Fancy UI
+    //    rpcAccount.storeSys("/app-account.svg", svg,
+    //                        readWholeFile(accDir + "/ui/dist/app-account.svg")),
+    //    rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/dist/index.html")),
+    //    rpcAccount.storeSys("/index.js", js, readWholeFile(accDir + "/ui/dist/index.js")),
+    //    rpcAccount.storeSys("/logout.svg", svg, readWholeFile(accDir + "/ui/dist/logout.svg")),
+    //    rpcAccount.storeSys("/refresh.svg", svg, readWholeFile(accDir + "/ui/dist/refresh.svg")),
+    //    rpcAccount.storeSys("/style.css", css, readWholeFile(accDir + "/ui/dist/style.css")),
 
        // AuthEcSys
        rpcAuthEc.storeSys("/index.html", html, readWholeFile(authEcDir + "/ui/index.html")),

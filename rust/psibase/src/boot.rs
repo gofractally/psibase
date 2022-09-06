@@ -294,40 +294,52 @@ fn common_startup_trx(
     let mut account_sys_files = vec![
         store!(
             "r-account-sys",
-            "/app-account.svg",
-            js,
-            "AccountSys/ui/dist/app-account.svg"
-        ),
-        store!(
-            "r-account-sys",
             "/index.html",
             html,
-            "AccountSys/ui/dist/index.html"
+            "AccountSys/ui/vanilla/index.html"
         ),
         store!(
             "r-account-sys",
-            "/index.js",
+            "/ui/index.js",
             js,
-            "AccountSys/ui/dist/index.js"
+            "AccountSys/ui/vanilla/index.js"
         ),
-        store!(
-            "r-account-sys",
-            "/style.css",
-            js,
-            "AccountSys/ui/dist/style.css"
-        ),
-        store!(
-            "r-account-sys",
-            "/refresh.svg",
-            js,
-            "AccountSys/ui/dist/refresh.svg"
-        ),
-        store!(
-            "r-account-sys",
-            "/logout.svg",
-            js,
-            "AccountSys/ui/dist/logout.svg"
-        ),
+        // store!(
+        //     "r-account-sys",
+        //     "/app-account.svg",
+        //     js,
+        //     "AccountSys/ui/dist/app-account.svg"
+        // ),
+        // store!(
+        //     "r-account-sys",
+        //     "/index.html",
+        //     html,
+        //     "AccountSys/ui/dist/index.html"
+        // ),
+        // store!(
+        //     "r-account-sys",
+        //     "/index.js",
+        //     js,
+        //     "AccountSys/ui/dist/index.js"
+        // ),
+        // store!(
+        //     "r-account-sys",
+        //     "/style.css",
+        //     js,
+        //     "AccountSys/ui/dist/style.css"
+        // ),
+        // store!(
+        //     "r-account-sys",
+        //     "/refresh.svg",
+        //     js,
+        //     "AccountSys/ui/dist/refresh.svg"
+        // ),
+        // store!(
+        //     "r-account-sys",
+        //     "/logout.svg",
+        //     js,
+        //     "AccountSys/ui/dist/logout.svg"
+        // ),
     ];
 
     let mut auth_ec_sys_files = vec![
