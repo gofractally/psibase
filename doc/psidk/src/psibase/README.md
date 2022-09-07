@@ -41,7 +41,7 @@ psinode does not include https hosting; use a [reverse proxy](https.md) to add t
 
 - `-a` or `--api` tells it which api endpoint to connect to. This defaults to `http://psibase.127.0.0.1.sslip.io:8080/`.
 - `boot` boots an empty chain; see below
-- `deploy` deploys a contract; see [Basic Contract](../cpp-contract/basic/)
+- `deploy` deploys a contract; see [Basic Contract](../cpp-service/basic/)
 
 ## Booting a chain
 

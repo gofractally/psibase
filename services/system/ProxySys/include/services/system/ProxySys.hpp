@@ -13,7 +13,7 @@ namespace psibase
    /// - Else if the request references an unregistered subdomain, then route the request to `psispace-sys`.
    /// - Else route the request to [CommonSys]; this handles the chain's main domain.
    ///
-   /// See [Web Services](../cpp-contract/reference/web-services.md) for more detail, including how to write contracts which serve HTTP requests.
+   /// See [Web Services](../cpp-service/reference/web-services.md) for more detail, including how to write contracts which serve HTTP requests.
    ///
    /// #### serve export (not an action)
    ///

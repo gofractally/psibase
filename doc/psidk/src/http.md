@@ -101,7 +101,7 @@ psinode provides virtual hosting. Domains have 2 categories:
 | 4           | contract | `/common*` | [Common contract services](#common-contract-services). Registered contracts only.     |
 | 5 (lowest)  | contract | `*`        | [Contract-provided services](#contract-provided-services). Registered contracts only. |
 
-The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys contract](system-contract/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct chains and by individual node operators.
+The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys contract](system-service/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct chains and by individual node operators.
 
 ### CORS and authorization (http)
 
@@ -145,7 +145,7 @@ Future psinode versions may trim the action traces when not in a developer mode.
 - [Key Conversions (js)](#key-conversions-js)
 - [React GraphQL hooks (js)](#react-graphql-hooks-js)
 
-The [common-sys contract](system-contract/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
+The [common-sys contract](system-service/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
 | Method | URL                              | Description                                                                                                               |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
