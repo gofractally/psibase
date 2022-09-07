@@ -19,10 +19,12 @@ const psibase = (appletContract: string) => {
                             external: [
                                 "/common/rootdomain.mjs",
                                 "/common/rpc.mjs",
-                                "/common/useGraphQLQuery.mjs",
                                 "/common/iframeResizer.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
+                            output: {
+                                assetFileNames: "_app/assets/[name][extname]",
+                            },
                         },
                     },
                     server: {

@@ -13,16 +13,17 @@
             href="https://fonts.googleapis.com/css2?family=Red+Hat+Mono:wght@300..700&display=block"
             rel="stylesheet"
     />
+    <link href="/_app/assets/style.css" rel="stylesheet" />
     <style>
         iframe {
             width: 1px;
             min-width: 100%;
         }
     </style>
-<!--    <script src="/common/react.production.min.js"></script>-->
     <script src="/common/iframeResizer.js"></script>
+    %sveltekit.head%
 </head>
 <body>
-    <div>INDEX</div>
+<div>%sveltekit.body%</div>
 </body>
 </html>
