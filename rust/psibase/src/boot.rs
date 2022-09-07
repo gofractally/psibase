@@ -373,7 +373,7 @@ fn add_startup_trx(
             sender: account!("symbol-sys"),
             contract: account!("token-sys"),
             method: method!("setTokenConf"),
-            raw_data: (1u32, method!("untradeable"), true).packed_bytes(),
+            raw_data: (1u32, method!("untradeable"), false).packed_bytes(),
         },
         Action {
             sender: account!("symbol-sys"),
