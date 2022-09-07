@@ -50,6 +50,7 @@ namespace psibase
    {
       AccountNumber     contract;
       std::vector<char> rawData;
+      friend bool       operator==(const Claim&, const Claim&) = default;
    };
    PSIO_REFLECT(Claim, contract, rawData)
 
@@ -138,8 +139,8 @@ namespace psibase
    /// TODO: you have signed block headers, not signed blocks
    struct SignedBlock
    {
-      Block block;      // TODO: shared_view_ptr?
-      Claim signature;  // TODO: switch to proofs?
+      Block             block;  // TODO: shared_view_ptr?
+      std::vector<char> signature;
    };
    PSIO_REFLECT(SignedBlock, block, signature)
 

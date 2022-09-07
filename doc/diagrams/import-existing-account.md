@@ -1,27 +1,28 @@
+
 ```mermaid
+
 sequenceDiagram
-   title Testnet user intro experience (Import existing account)
    actor Alice
    participant Account applet
-   participant Core applet
-   participant Auth applet
-   note over Alice, Auth applet: client-side
+   participant Keystore applet
+   participant Psibase
+   note over Alice, Keystore applet: client-side
 
    Note over Alice: Navigates to psibase homepage, <br>navigates to Account applet
-   Note over Account applet: Shows "No accounts" with button for Import
-   Alice->>Account applet: Clicks "import account"
-   Account applet-->>Alice: Redirects to Auth applet
-   Alice->>Auth applet: Fills out account name and<br>private key, clicks "Import existing account"
-   Note over Auth applet: Notices is has no encryption key
-   Auth applet->>Core applet: Asks for encryption key
-   Note over Core applet: Notices it doesn't have the encryption<br>key in session storage
-   Note over Core applet: Notices it doesn't have any master<br>public key in local storage
-   Core applet->>Alice: Show Master Password wizard
-   Note over Alice: Saves master password offline
-   Alice-->>Core applet: 
-   Note over Core applet: Generates encryption key for Auth applet<br>using master private key?
-   Core applet-->>Auth applet: 
-   Note over Auth applet: Stores user private key in local storage (encrypted)
-   Auth applet-->>Alice: Shows success
+   Note over Account applet: Shows "No accounts" with button for "Import with private key"
+   Alice->>Account applet: Clicks import
+   Account applet-->>Keystore applet: Import by key
+   activate Keystore applet
+   Keystore applet-->>Alice: Modal prompt for key
+   Alice->>Keystore applet: Enters private key, clicks "Import"
+   Keystore applet->>Psibase: Check that key has corresponding account
+   Psibase-->>Keystore applet: 
+   Note over Keystore applet: Save private key to local storage
+   Keystore applet-->>Account applet: public key
+   deactivate Keystore applet
    
+   Account applet->>Alice: Offer list of accounts to import
+   Alice-->>Account applet: Makes selection
+   Note over Account applet: Imports selected accounts
+
 ```

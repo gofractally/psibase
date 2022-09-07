@@ -197,6 +197,17 @@ namespace psibase
                "WasmConfigRow has incorrect key");
       }
 
+      void verifyProducerConfigRow(psio::input_stream key, psio::input_stream value)
+      {
+         check(psio::fracvalidate<ProducerConfigRow>(value.pos, value.end).valid_and_known(),
+               "ProducerConfigRow has invalid format");
+         auto row          = psio::convert_from_frac<ProducerConfigRow>(value);
+         auto expected_key = psio::convert_to_key(row.key());
+         check(key.remaining() == expected_key.size() &&
+                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+               "ProducerConfigRow has incorrect key");
+      }
+
       void verifyWriteConstrained(psio::input_stream key, psio::input_stream value)
       {
          NativeTableNum table;
@@ -209,6 +220,8 @@ namespace psibase
             verifyConfigRow(key, value);
          else if (table == transactionWasmConfigTable || table == proofWasmConfigTable)
             verifyWasmConfigRow(table, key, value);
+         else if (table == producerConfigTable)
+            verifyProducerConfigRow(key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeConstrained");
       }
@@ -412,8 +425,8 @@ namespace psibase
              psio::input_stream v{value.data(), value.size()};
              check(v.remaining() >= sizeof(AccountNumber::value),
                    "value prefix must match contract during write");
-             auto contract = psio::from_bin<AccountNumber>(v);
-             check(contract == code.codeNum, "value prefix must match contract during write");
+             auto service = psio::from_bin<AccountNumber>(v);
+             check(service == code.codeNum, "value prefix must match contract during write");
 
              auto&    dbStatus = transactionContext.blockContext.databaseStatus;
              uint64_t indexNumber;

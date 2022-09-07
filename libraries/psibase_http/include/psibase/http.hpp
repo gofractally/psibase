@@ -52,6 +52,7 @@ namespace psibase::http
       connect_t                 connect                = {};
       connect_t                 disconnect             = {};
       bool                      host_perf              = false;
+      std::atomic<bool>         ready_for_p2p;
    };
 
    struct server

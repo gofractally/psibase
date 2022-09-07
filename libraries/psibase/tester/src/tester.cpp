@@ -1,8 +1,8 @@
 #include <psibase/tester.hpp>
 
 #include <secp256k1.h>
-#include <contracts/system/TransactionSys.hpp>
-#include <contracts/system/VerifyEcSys.hpp>
+#include <services/system/TransactionSys.hpp>
+#include <services/system/VerifyEcSys.hpp>
 
 namespace
 {
@@ -300,7 +300,7 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
 {
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
-          .contract = system_contract::VerifyEcSys::contract,
+          .contract = system_contract::VerifyEcSys::service,
           .rawData  = psio::convert_to_frac(pub),
       });
    SignedTransaction signedTrx;

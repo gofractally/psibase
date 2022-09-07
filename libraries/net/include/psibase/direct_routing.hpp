@@ -143,6 +143,11 @@ namespace psibase::net
          {
             return recv(peer, psio::convert_from_frac<T>(s));
          }
+         catch (std::exception& e)
+         {
+            std::cout << "peer " << peer << ": " << e.what() << std::endl;
+            peers().disconnect(peer);
+         }
          catch (...)
          {
             std::cout << "invalid message from peer " << peer << std::endl;

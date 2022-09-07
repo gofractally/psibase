@@ -61,10 +61,10 @@ RUN cd /root \
 RUN cd /opt \
     && curl -LO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz \
     && tar xf wasi-sdk-14.0-linux.tar.gz \
-    && curl -LO https://nodejs.org/dist/v14.16.0/node-v14.16.0-linux-x64.tar.xz \
-    && tar xf node-v14.16.0-linux-x64.tar.xz \
+    && curl -LO https://nodejs.org/dist/v16.17.0/node-v16.17.0-linux-x64.tar.xz \
+    && tar xf node-v16.17.0-linux-x64.tar.xz \
     && rm *.tar.* \
-    && export PATH="/opt/node-v14.16.0-linux-x64/bin:$PATH" \
+    && export PATH="/opt/node-v16.17.0-linux-x64/bin:$PATH" \
     && npm i -g yarn
 
 ENV RUSTUP_HOME=/opt/rustup
@@ -80,4 +80,4 @@ RUN cd /root \
     && rm rustup.sh
 
 ENV WASI_SDK_PREFIX=/opt/wasi-sdk-14.0
-ENV PATH=/opt/cargo/bin:/opt/node-v14.16.0-linux-x64/bin:/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH
+ENV PATH=/opt/cargo/bin:/opt/node-v16.17.0-linux-x64/bin:/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH

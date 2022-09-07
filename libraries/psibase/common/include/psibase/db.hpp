@@ -131,6 +131,9 @@ namespace psibase
       /// whether beginning with the block number is useful.
       merkleEvent,
 
+      /// block signatures
+      blockProof,
+
       /// Number of defined databases
       ///
       /// This number may grow in the future

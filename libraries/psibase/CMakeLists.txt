@@ -16,7 +16,7 @@ function(add suffix)
 
         add_library(simple-malloc${suffix})
         target_link_libraries(simple-malloc${suffix} PUBLIC wasm-base${suffix})
-        target_sources(simple-malloc${suffix} PRIVATE contract/src/simple_malloc.cpp)
+        target_sources(simple-malloc${suffix} PRIVATE service/src/simple_malloc.cpp)
         add_custom_command(
             TARGET simple-malloc${suffix}
             PRE_LINK
@@ -26,7 +26,7 @@ function(add suffix)
 
         add_library(c++abi-replacements${suffix})
         target_link_libraries(c++abi-replacements${suffix} PUBLIC wasm-base${suffix})
-        target_sources(c++abi-replacements${suffix} PRIVATE contract/src/abort_message.cpp)
+        target_sources(c++abi-replacements${suffix} PRIVATE service/src/abort_message.cpp)
         add_custom_command(
             TARGET c++abi-replacements${suffix}
             PRE_LINK
@@ -34,23 +34,24 @@ function(add suffix)
             COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc++abi-shrunk${suffix}.a abort_message.cpp.o
         )
 
-        add_library(psibase-contracts-wasi-polyfill${suffix})
-        target_link_libraries(psibase-contracts-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
-        target_sources(psibase-contracts-wasi-polyfill${suffix} PRIVATE
-            contract/src/wasi-polyfill/__wasi_fd_fdstat_get.cpp
-            contract/src/wasi-polyfill/__wasi_fd_close.cpp
-            contract/src/wasi-polyfill/__wasi_fd_seek.cpp
-            contract/src/wasi-polyfill/__wasi_fd_write.cpp
+        add_library(psibase-service-wasi-polyfill${suffix})
+        target_link_libraries(psibase-service-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
+        target_sources(psibase-service-wasi-polyfill${suffix} PRIVATE
+            service/src/wasi-polyfill/__wasi_fd_fdstat_get.cpp
+            service/src/wasi-polyfill/__wasi_fd_close.cpp
+            service/src/wasi-polyfill/__wasi_fd_seek.cpp
+            service/src/wasi-polyfill/__wasi_fd_write.cpp
         )
 
-        add_library(psibase-contract-base${suffix})
-        target_sources(psibase-contract-base${suffix} PRIVATE
-            contract/src/intrinsic.cpp
-            contract/src/print.cpp
+        add_library(psibase-service-base${suffix})
+        target_sources(psibase-service-base${suffix} PRIVATE
+            service/src/intrinsic.cpp
+            service/src/print.cpp
+            service/src/Service.cpp
         )
-        target_link_libraries(psibase-contract-base${suffix} PUBLIC psibase${suffix})
-        target_compile_options(psibase-contract-base${suffix} PUBLIC -DCOMPILING_CONTRACT)
-        target_link_options(psibase-contract-base${suffix} PUBLIC
+        target_link_libraries(psibase-service-base${suffix} PUBLIC psibase${suffix})
+        target_compile_options(psibase-service-base${suffix} PUBLIC -DCOMPILING_SERVICE)
+        target_link_options(psibase-service-base${suffix} PUBLIC
             -Wl,--stack-first
             -Wl,--entry,start
             -Wl,--export=called
@@ -58,33 +59,33 @@ function(add suffix)
             -Wl,--no-merge-data-segments
             -nostdlib
         )
-        target_include_directories(psibase-contract-base${suffix} PUBLIC contract/include)
+        target_include_directories(psibase-service-base${suffix} PUBLIC service/include)
 
         file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
-        # Contract with simple malloc/free
-        add_library(psibase-contract-simple-malloc${suffix} INTERFACE)
-        target_link_libraries(psibase-contract-simple-malloc${suffix} INTERFACE
+        # Service with simple malloc/free
+        add_library(psibase-service-simple-malloc${suffix} INTERFACE)
+        target_link_libraries(psibase-service-simple-malloc${suffix} INTERFACE
             -L${ROOT_BINARY_DIR}/wasm/libraries/psibase
-            psibase-contract-base${suffix}
+            psibase-service-base${suffix}
             -lc++
             -lc++abi-shrunk${suffix}
             c++abi-replacements${suffix}
             -lc-no-malloc${suffix}
             simple-malloc${suffix}
-            psibase-contracts-wasi-polyfill${suffix}
+            psibase-service-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
 
-        # Contract with full malloc/free
-        add_library(psibase-contract${suffix} INTERFACE)
-        target_link_libraries(psibase-contract${suffix} INTERFACE
-            psibase-contract-base${suffix}
+        # Service with full malloc/free
+        add_library(psibase-service${suffix} INTERFACE)
+        target_link_libraries(psibase-service${suffix} INTERFACE
+            psibase-service-base${suffix}
             -lc++
             -lc++abi-shrunk${suffix}
             c++abi-replacements${suffix}
             -lc
-            psibase-contracts-wasi-polyfill${suffix}
+            psibase-service-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
 
@@ -93,7 +94,7 @@ function(add suffix)
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
             tester/src/testUtils.cpp
-            contract/src/intrinsic.cpp
+            service/src/intrinsic.cpp
             tester/src/tester_intrinsics.cpp
             tester/src/wasi_polyfill/__wasi_args_get.cpp
             tester/src/wasi_polyfill/__wasi_args_sizes_get.cpp
@@ -124,21 +125,21 @@ function(add suffix)
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
         )
         target_include_directories(psitestlib${suffix} PUBLIC
-            contract/include
+            service/include
             tester/include
-            ../../contracts/system/AccountSys/include
-            ../../contracts/system/AuthEcSys/include
-            ../../contracts/system/AuthAnySys/include
-            ../../contracts/system/ProxySys/include
-            ../../contracts/system/SetCodeSys/include
-            ../../contracts/system/TransactionSys/include
-            ../../contracts/system/VerifyEcSys/include
-            ../../contracts/user/CommonSys/include
-            ../../contracts/user/ExploreSys/include
-            ../../contracts/user/PsiSpaceSys/include
+            ../../services/system/AccountSys/include
+            ../../services/system/AuthEcSys/include
+            ../../services/system/AuthAnySys/include
+            ../../services/system/ProxySys/include
+            ../../services/system/SetCodeSys/include
+            ../../services/system/TransactionSys/include
+            ../../services/system/VerifyEcSys/include
+            ../../services/user/CommonSys/include
+            ../../services/user/ExploreSys/include
+            ../../services/user/PsiSpaceSys/include
         )
         target_include_directories(psitestlib${suffix} PRIVATE
-            ../../contracts/system/VerifyEcSys/include
+            ../../services/system/VerifyEcSys/include
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start
@@ -149,17 +150,20 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent ${Boost_LIBRARIES})
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 ${Boost_LIBRARIES})
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
+            native/src/EcdsaProver.cpp
             native/src/ExecutionContext.cpp
             native/src/NativeFunctions.cpp
+            native/src/Prover.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
             native/src/useTriedent.cpp
+            native/src/VerifyProver.cpp
         )
 
         add_subdirectory(common/tests)
@@ -173,7 +177,7 @@ if(DEFINED IS_WASM)
     add("-debug-psidk")
 
     foreach(suffix "" "-debug")
-        foreach(lib psibase psibase-contract-base psibase-contracts-wasi-polyfill psitestlib)
+        foreach(lib psibase psibase-service-base psibase-service-wasi-polyfill psitestlib)
             set_target_properties(${lib}${suffix}-psidk PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR}/psidk/lib-wasm)
             set_target_properties(${lib}${suffix}-psidk PROPERTIES ARCHIVE_OUTPUT_NAME ${lib}${suffix})
         endforeach()
@@ -182,10 +186,10 @@ endif()
 
 if(IS_WASM)
     copy_headers(common/include/psibase psibase/common/include/psibase)
-    copy_headers(contract/include/psibase psibase/contract/include/psibase)
+    copy_headers(service/include/psibase psibase/service/include/psibase)
     copy_headers(tester/include/psibase psibase/tester/include/psibase)
-    configure_file(contract/src/abort_message.cpp ${ROOT_BINARY_DIR}/psidk/contract/src/abort_message.cpp COPYONLY)
-    configure_file(contract/src/simple_malloc.cpp ${ROOT_BINARY_DIR}/psidk/psibase/simple_malloc.cpp COPYONLY)
+    configure_file(service/src/abort_message.cpp ${ROOT_BINARY_DIR}/psidk/service/src/abort_message.cpp COPYONLY)
+    configure_file(service/src/simple_malloc.cpp ${ROOT_BINARY_DIR}/psidk/psibase/simple_malloc.cpp COPYONLY)
     configure_file(sdk/psidk-cmake-args ${ROOT_BINARY_DIR}/psidk/bin/psidk-cmake-args COPYONLY)
     configure_file(sdk/toolchain.cmake ${ROOT_BINARY_DIR}/psidk/toolchain.cmake COPYONLY)
     configure_file(sdk/psidk-config.cmake ${ROOT_BINARY_DIR}/psidk/psidk-config.cmake COPYONLY)

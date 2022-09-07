@@ -220,7 +220,7 @@ namespace psibase
       /// This returns a new `EventEmitter` object instead of modifying this.
       ///
       /// You probably don't need this; use [Contract::emit] instead.
-      auto at(AccountNumber sender) const
+      auto from(AccountNumber sender) const
       {
          return EventEmitter(sender, this->psio_get_proxy().event_log);
       }
@@ -312,7 +312,7 @@ namespace psibase
       /// This returns a new `EventReader` object instead of modifying this.
       ///
       /// You probably don't need this; use [Contract::events] instead.
-      auto at(AccountNumber sender)
+      auto from(AccountNumber sender)
       {
          return EventReader(sender, this->psio_get_proxy().event_log);
       }
@@ -331,10 +331,10 @@ namespace psibase
       using Base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
       using Base::Base;
 
-      auto as(AccountNumber other) const { return Actor(other, Base::receiver); }
+      auto from(AccountNumber other) const { return Actor(other, Base::receiver); }
 
       template <typename Other, uint64_t OtherReceiver>
-      auto at() const
+      auto to() const
       {
          return Actor<Other>(Base::sender, AccountNumber(OtherReceiver));
       }
@@ -354,10 +354,10 @@ namespace psibase
       {
       }
 
-      auto as(AccountNumber other) const { return Actor(other, receiver); }
+      auto from(AccountNumber other) const { return Actor(other, receiver); }
 
       template <typename Other, uint64_t OtherReceiver>
-      auto at() const
+      auto to() const
       {
          return Actor<Other>(sender, AccountNumber(OtherReceiver));
       }
@@ -381,7 +381,7 @@ namespace psibase
    /// For example, if `SomeContract` has this set of methods:
    ///
    /// ```c++
-   /// struct SomeContract : psibase::Contract<SomeContract>
+   /// struct SomeContract : psibase::Service<SomeContract>
    /// {
    ///    void        doSomething(std::string_view str);
    ///    std::string doAnother(uint32_t x, psibase::AccountNumber y);
@@ -424,7 +424,7 @@ namespace psibase
       /// This returns a new `Actor` object instead of modifying this.
       ///
       /// Non-priviledged contracts may only use their own authority.
-      Actor<T> as(AccountNumber other) const;
+      Actor<T> from(AccountNumber other) const;
 
       /// Select a contract to send actions to
       ///
@@ -434,7 +434,7 @@ namespace psibase
       ///
       /// This returns a new `Actor` object instead of modifying this.
       template <typename Other, uint64_t OtherReceiver>
-      Actor<Other> at() const;
+      Actor<Other> to() const;
 
       /// Return this
       Actor<T>* operator->() const;
@@ -454,13 +454,13 @@ namespace psibase
       using base = typename psio::reflect<T>::template proxy<action_builder_proxy>;
       using base::base;
 
-      auto as(AccountNumber other) const
+      auto from(AccountNumber other) const
       {
          return transactor(other, base::psio_get_proxy().receiver);
       }
 
       template <typename Other, uint64_t OtherReceiver>
-      auto at() const
+      auto to() const
       {
          return transactor<Other>(base::psio_get_proxy().sender, OtherReceiver);
       }

@@ -1,7 +1,7 @@
 # Transaction Life Cycle
 
 Every transaction is valid for a very specific window of time after which it
-becomes invalid. This window ends with the expiration time on the contract
+becomes invalid. This window ends with the expiration time on the service
 and starts with the TaPoS (Transactions as Proof of Stake) included in the
 transaction header.
 
@@ -14,7 +14,7 @@ referenced block.  All told, this prevents attackers from forking a chain in sec
 migrating most of the transactions from the legitimate chain to a forked chain. This hash is
 "proof" the the transactor has some stake in building on a particular state.
 
-TaPoS data will be available via a special KV_MAP which can only be read by the transact contract. This
+TaPoS data will be available via a special KV_MAP which can only be read by the transact service. This
 will allow it to utilize a circular buffer optimization rather than using 65k database rows.
 
 ## Transaction Sequence Numbers
@@ -69,7 +69,7 @@ before expiration.
 
 The principle of Psibase is that "transactions" or "groups of actions" are not something that should
 be user-facing. Unlike Bitcoin, where every transaction is a "transfer", a token "transfer" could be
-initiated either directly or indirectly by other contracts and users. Therefore, the event log is what
+initiated either directly or indirectly by other services and users. Therefore, the event log is what
 you need to provide as evidence of transfer, not the input transcation that caused it. For example,
 an exchange would be foolish to assume that all transfers are represented in transactions which
 are logged in the blockchain. Proof of transfer would be provided by giving someone a link to a query

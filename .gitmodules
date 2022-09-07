@@ -13,3 +13,6 @@
 [submodule "eos-vm"]
 	path = external/eos-vm
 	url = https://github.com/eosnetworkfoundation/mandel-eos-vm.git
+[submodule "external/mdbook-mermaid"]
+	path = external/mdbook-mermaid
+	url = https://github.com/badboy/mdbook-mermaid.git

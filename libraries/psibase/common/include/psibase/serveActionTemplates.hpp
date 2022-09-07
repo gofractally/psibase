@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psibase/Rpc.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/to_json.hpp>
 

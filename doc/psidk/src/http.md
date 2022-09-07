@@ -6,7 +6,7 @@
 - [Native services](#native-services)
   - [Push transaction (http)](#push-transaction-http)
   - [Boot chain (http)](#boot-chain-http)
-- [Common contract services](#common-contract-services)
+- [Common services](#common-services)
   - [Common files (http)](#common-files-http)
   - [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js)
   - [Pack transaction (http)](#pack-transaction-http)
@@ -17,7 +17,7 @@
   - [Key Conversions (js)](#key-conversions-js)
   - [React GraphQL hooks (js)](#react-graphql-hooks-js)
 - [Root services](#root-services)
-- [Contract-provided services](#contract-provided-services)
+- [Service-provided services](#service-provided-services)
   - [Packing actions (http)](#packing-actions-http)
 
 ## TLDR: Pushing a transaction
@@ -61,7 +61,7 @@ try {
         actions: [
             {
                 sender: "sue",          // account requesting action
-                contract: "example",    // contract executing action
+                service: "example",     // service executing action
                 method: "add",          // method to execute
                 data: {                 // arguments to method
                     "a": 0,
@@ -90,18 +90,18 @@ try {
 
 psinode provides virtual hosting. Domains have 2 categories:
 
-- root domain, e.g. `psibase.127.0.0.1.sslip.io`. This hosts the main page for the chain and also provides contract-independent services.
-- contract domain, e.g. `my-contract.psibase.127.0.0.1.sslip.io`. This hosts user interfaces and RPC services for individual contracts. Contracts must register for this service.
+- root domain, e.g. `psibase.127.0.0.1.sslip.io`. This hosts the main page for the chain and also provides service-independent services.
+- service domain, e.g. `my-service.psibase.127.0.0.1.sslip.io`. This hosts user interfaces and RPC services for individual services. Services must register for this service.
 
-| Priority    | Domain   | Path       | Description                                                                           |
-| ----------- | -------- | ---------- | ------------------------------------------------------------------------------------- |
-| 1 (highest) | any      | `/native*` | [Native services](#native-services)                                                   |
-| 2           | root     | `/common*` | [Common contract services](#common-contract-services)                                 |
-| 3           | root     | `*`        | [Root services](#root-services)                                                       |
-| 4           | contract | `/common*` | [Common contract services](#common-contract-services). Registered contracts only.     |
-| 5 (lowest)  | contract | `*`        | [Contract-provided services](#contract-provided-services). Registered contracts only. |
+| Priority    | Domain  | Path       | Description                                                                        |
+| ----------- | ------- | ---------- | ---------------------------------------------------------------------------------- |
+| 1 (highest) | any     | `/native*` | [Native services](#native-services)                                                |
+| 2           | root    | `/common*` | [Common services](#common-services)                                                |
+| 3           | root    | `*`        | [Root services](#root-services)                                                    |
+| 4           | service | `/common*` | [Common services](#common-services). Registered services only.                     |
+| 5 (lowest)  | service | `*`        | [Service-provided services](#service-provided-services). Registered services only. |
 
-The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys contract](system-contract/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct chains and by individual node operators.
+The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys service](system-service/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct chains and by individual node operators.
 
 ### CORS and authorization (http)
 
@@ -133,7 +133,7 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 `POST /native/push_boot` boots the chain. This is only available when psinode does not have a chain yet. Use the `psibase boot` command to boot a chain. TODO: document the body content.
 
-## Common contract services
+## Common services
 
 - [Common files (http)](#common-files-http)
 - [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js)
@@ -145,15 +145,15 @@ Future psinode versions may trim the action traces when not in a developer mode.
 - [Key Conversions (js)](#key-conversions-js)
 - [React GraphQL hooks (js)](#react-graphql-hooks-js)
 
-The [common-sys contract](system-contract/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
+The [common-sys service](system-service/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
-| Method | URL                              | Description                                                                                                               |
-| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/common/thiscontract`           | Returns a JSON string containing the contract associated with the domain. If it's the root domain, returns `"common-sys"` |
-| `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                     |
-| `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction-http)                                                                             |
-| `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction-http)                                                                      |
-| `GET`  | `/common/<other>`                | [Common files (http)](#common-files-http)                                                                                 |
+| Method | URL                              | Description                                                                                                              |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `GET`  | `/common/thiscontract`           | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-sys"` |
+| `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                    |
+| `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction-http)                                                                            |
+| `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction-http)                                                                     |
+| `GET`  | `/common/<other>`                | [Common files (http)](#common-files-http)                                                                                |
 
 ### Common files (http)
 
@@ -161,7 +161,7 @@ The [common-sys contract](system-contract/common-sys.md) provides services which
 
 | Path                          | Description                                                                                                                                                           |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/common/SimpleUI.mjs`        | Default UI for contracts under development                                                                                                                            |
+| `/common/SimpleUI.mjs`        | Default UI for services under development                                                                                                                             |
 | `/common/rpc.mjs`             | [Simple RPC wrappers (js)](#simple-rpc-wrappers-js)<br/>[Conversions (js)](#conversions-js)<br/>[Transactions (js)](#transactions-js)<br/>[Signing (js)](#signing-js) |
 | `/common/keyConversions.mjs`  | [Key Conversions (js)](#key-conversions-js)                                                                                                                           |
 | `/common/useGraphQLQuery.mjs` | [React GraphQL hooks (js)](#react-graphql-hooks-js)                                                                                                                   |
@@ -170,14 +170,14 @@ The [common-sys contract](system-contract/common-sys.md) provides services which
 
 `getRootDomain` calls the `/common/rootdomain/` endpoint, which returns the root domain for the queried node (e.g. `psibase.127.0.0.1.sslip.io`). The result is cached so subsequent calls will not make additional queries to the node.
 
-`siblingUrl` makes it easy for scripts to reference other contracts' domains. It automatically navigates through reverse proxies, which may change the protocol (e.g. to HTTPS) or port (e.g. to 443) from what psinode provides. `baseUrl` may point within either the root domain or one of the contract domains. It also may be empty, null, or undefined for scripts running on webpages served by psinode.
+`siblingUrl` makes it easy for scripts to reference other services' domains. It automatically navigates through reverse proxies, which may change the protocol (e.g. to HTTPS) or port (e.g. to 443) from what psinode provides. `baseUrl` may point within either the root domain or one of the service domains. It also may be empty, null, or undefined for scripts running on webpages served by psinode.
 
 Example uses:
 
 - `siblingUrl(null, '', '/foo/bar')`: Gets URL to `/foo/bar` on the root domain. This form is only usable by scripts running on webpages served by psinode.
-- `siblingUrl(null, 'other-contract', '/foo/bar')`: Gets URL to `/foo/bar` on the `other-contract` domain. This form is only usable by scripts running on webpages served by psinode.
+- `siblingUrl(null, 'other-service', '/foo/bar')`: Gets URL to `/foo/bar` on the `other-service` domain. This form is only usable by scripts running on webpages served by psinode.
 - `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', '', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
-- `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', 'other-contract', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
+- `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', 'other-service', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
 
 ### Pack transaction (http)
 
@@ -215,7 +215,7 @@ TODO: document additional tapos fields once they're operational
 ```
 {
   "sender": "...",      // The account name authorizing the action
-  "contract": "...",    // The contract name to receive the action
+  "service": "...",     // The service name to receive the action
   "method": "...",      // The method name of the action
   "rawData": "..."      // Hex string containing action data (arguments)
 }
@@ -225,7 +225,7 @@ TODO: document additional tapos fields once they're operational
 
 ```
 {
-  "contract": "...",    // The contract which verifies the proof meets
+  "service": "...",     // The service which verifies the proof meets
                         // the claim, e.g. "verifyec-sys"
   "rawData": "..."      // Hex string containing the claim data.
                         // e.g. `verifyec-sys` expects a public key
@@ -241,24 +241,24 @@ claims and proofs.
 
 `/common/rpc.mjs` exports a set of utilities to aid interacting with psinode's RPC interface.
 
-| Function or Type                      |       | Description                                                                                                                                                                                        |
-| ------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RPCError`                            |       | Error type. This extends `Error` with a new field, `trace`, which contains the trace returned by [`/native/push_transaction`](#push-transaction-http), if available.                               |
-| `throwIfError(response)`              |       | Throw an `RPCError` if the argument (a Response object) indicates a failure. Doesn't fill `trace` since traces are only present with status 200. Returns the argument (Response) if not a failure. |
-| `siblingUrl(baseUrl, contract, path)` |       | Reexport of `siblingUrl` from [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js).                                                                                                     |
-| `get(url)`                            | async | fetch/GET. Returns Response object if ok or throws `RPCError`.                                                                                                                                     |
-| `getJson(url)`                        | async | fetch/GET. Returns JSON if ok or throws `RPCError`.                                                                                                                                                |
-| `getText(url)`                        | async | fetch/GET. Returns text if ok or throws `RPCError`.                                                                                                                                                |
-| `postArrayBuffer(url, data)`          | async | fetch/POST ArrayBuffer. Returns Response object if ok or throws `RPCError`.                                                                                                                        |
-| `postArrayBufferGetJson(data)`        | async | fetch/POST ArrayBuffer. Returns JSON if ok or throws `RPCError`.                                                                                                                                   |
-| `postGraphQL(url, data)`              | async | fetch/POST GraphQL. Returns Response object if ok or throws `RPCError`.                                                                                                                            |
-| `postGraphQLGetJson(data)`            | async | fetch/POST GraphQL. Returns JSON if ok or throws `RPCError`.                                                                                                                                       |
-| `postJson(url, data)`                 | async | fetch/POST JSON. Returns Response object if ok or throws `RPCError`.                                                                                                                               |
-| `postJsonGetArrayBuffer(data)`        | async | fetch/POST JSON. Returns ArrayBuffer if ok or throws `RPCError`.                                                                                                                                   |
-| `postJsonGetJson(data)`               | async | fetch/POST JSON. Returns JSON if ok or throws `RPCError`.                                                                                                                                          |
-| `postJsonGetText(data)`               | async | fetch/POST JSON. Returns text if ok or throws `RPCError`.                                                                                                                                          |
-| `postText(url, data)`                 | async | fetch/POST text. Returns Response object if ok or throws `RPCError`.                                                                                                                               |
-| `postTextGetJson(data)`               | async | fetch/POST text. Returns JSON if ok or throws `RPCError`.                                                                                                                                          |
+| Function or Type                     |       | Description                                                                                                                                                                                        |
+| ------------------------------------ | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RPCError`                           |       | Error type. This extends `Error` with a new field, `trace`, which contains the trace returned by [`/native/push_transaction`](#push-transaction-http), if available.                               |
+| `throwIfError(response)`             |       | Throw an `RPCError` if the argument (a Response object) indicates a failure. Doesn't fill `trace` since traces are only present with status 200. Returns the argument (Response) if not a failure. |
+| `siblingUrl(baseUrl, service, path)` |       | Reexport of `siblingUrl` from [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js).                                                                                                     |
+| `get(url)`                           | async | fetch/GET. Returns Response object if ok or throws `RPCError`.                                                                                                                                     |
+| `getJson(url)`                       | async | fetch/GET. Returns JSON if ok or throws `RPCError`.                                                                                                                                                |
+| `getText(url)`                       | async | fetch/GET. Returns text if ok or throws `RPCError`.                                                                                                                                                |
+| `postArrayBuffer(url, data)`         | async | fetch/POST ArrayBuffer. Returns Response object if ok or throws `RPCError`.                                                                                                                        |
+| `postArrayBufferGetJson(data)`       | async | fetch/POST ArrayBuffer. Returns JSON if ok or throws `RPCError`.                                                                                                                                   |
+| `postGraphQL(url, data)`             | async | fetch/POST GraphQL. Returns Response object if ok or throws `RPCError`.                                                                                                                            |
+| `postGraphQLGetJson(data)`           | async | fetch/POST GraphQL. Returns JSON if ok or throws `RPCError`.                                                                                                                                       |
+| `postJson(url, data)`                | async | fetch/POST JSON. Returns Response object if ok or throws `RPCError`.                                                                                                                               |
+| `postJsonGetArrayBuffer(data)`       | async | fetch/POST JSON. Returns ArrayBuffer if ok or throws `RPCError`.                                                                                                                                   |
+| `postJsonGetJson(data)`              | async | fetch/POST JSON. Returns JSON if ok or throws `RPCError`.                                                                                                                                          |
+| `postJsonGetText(data)`              | async | fetch/POST JSON. Returns text if ok or throws `RPCError`.                                                                                                                                          |
+| `postText(url, data)`                | async | fetch/POST text. Returns Response object if ok or throws `RPCError`.                                                                                                                               |
+| `postTextGetJson(data)`              | async | fetch/POST text. Returns JSON if ok or throws `RPCError`.                                                                                                                                          |
 
 ### Conversions (js)
 
@@ -292,7 +292,7 @@ claims and proofs.
 | `signAndPushTransaction(baseUrl, transaction, privateKeys)` | async | Sign, pack, and push transaction.                                                                                         |
 
 `signTransaction` signs a transaction; it also packs any actions if needed.
-`baseUrl` must point to within the root domain, one of the contract domains,
+`baseUrl` must point to within the root domain, one of the service domains,
 or be empty or null; see [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js).
 `transaction` must have the following form:
 
@@ -314,7 +314,7 @@ or be empty or null; see [rootdomain and siblingUrl (js)](#rootdomain-and-siblin
 ```
 {
   sender: "...",    // The account name authorizing the action
-  contract: "...",  // The contract name to receive the action
+  contract: "...",  // The service name to receive the action
   method: "...",    // The method name of the action
 
   data: {...},      // Method's arguments. Not needed if `rawData` is present.
@@ -371,7 +371,7 @@ TODO
 
 TODO
 
-## Contract-provided services
+## Service-provided services
 
 TODO
 

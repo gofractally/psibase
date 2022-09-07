@@ -1,13 +1,13 @@
 use crate::{
-    new_account_action, reg_server, set_auth_contract_action, set_key_action, store_sys,
-    without_tapos, Args, Error,
+    new_account_action, reg_server, set_auth_contract_action, set_key_action, set_producers_action,
+    store_sys, to_claim, without_tapos, Args, Error,
 };
 use anyhow::Context;
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
 use libpsibase::{
-    account, method, AccountNumber, Action, Fracpack, PublicKey, SharedGenesisActionData,
-    SharedGenesisContract, SignedTransaction,
+    account, method, AccountNumber, Action, Claim, ExactAccountNumber, Fracpack, PublicKey,
+    SharedGenesisActionData, SharedGenesisContract, SignedTransaction,
 };
 use serde_json::Value;
 
@@ -16,7 +16,7 @@ use serde_json::Value;
 #[derive(Fracpack)]
 struct Empty {}
 
-const ACCOUNTS: [AccountNumber; 20] = [
+const ACCOUNTS: [AccountNumber; 21] = [
     account!("account-sys"),
     account!("alice"),
     account!("auth-ec-sys"),
@@ -26,6 +26,7 @@ const ACCOUNTS: [AccountNumber; 20] = [
     account!("doc-sys"),
     account!("explore-sys"),
     account!("nft-sys"),
+    account!("producer-sys"),
     account!("proxy-sys"),
     account!("psispace-sys"),
     account!("r-account-sys"),
@@ -43,9 +44,11 @@ pub(super) async fn boot(
     args: &Args,
     client: reqwest::Client,
     key: &Option<PublicKey>,
+    producer: &Option<ExactAccountNumber>,
 ) -> Result<(), anyhow::Error> {
-    let new_signed_transactions: Vec<SignedTransaction> = vec![boot_trx(), common_startup_trx(key)];
-    push_boot(args, client, new_signed_transactions.packed_bytes()).await?;
+    let mut transactions = vec![boot_trx()];
+    add_startup_trx(&mut transactions, key, producer);
+    push_boot(args, client, transactions.packed_bytes()).await?;
     println!("Ok");
     Ok(())
 }
@@ -145,6 +148,7 @@ fn boot_trx() -> SignedTransaction {
         sgc!("common-sys", 0, "CommonSys.wasm"),
         sgc!("explore-sys", 0, "ExploreSys.wasm"),
         sgc!("nft-sys", 0, "NftSys.wasm"),
+        sgc!("producer-sys", 2, "ProducerSys.wasm"),
         sgc!("proxy-sys", 0, "ProxySys.wasm"),
         sgc!("psispace-sys", 0, "PsiSpaceSys.wasm"),
         sgc!("r-account-sys", 0, "RAccountSys.wasm"),
@@ -176,17 +180,23 @@ fn boot_trx() -> SignedTransaction {
     }
 }
 
-fn fill_dir(dir: &Dir, actions: &mut Vec<Action>) {
+fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, contract: AccountNumber) {
     for e in dir.entries() {
         match e {
-            include_dir::DirEntry::Dir(d) => fill_dir(d, actions),
+            include_dir::DirEntry::Dir(d) => fill_dir(d, actions, sender, contract),
             include_dir::DirEntry::File(e) => {
                 let path = e.path().to_str().unwrap();
                 if let Some(t) = mime_guess::from_path(path).first() {
-                    // println!("{} {}", &("/".to_owned() + path), t.essence_str());
+                    // println!(
+                    //     "{} {} {} {}",
+                    //     sender,
+                    //     contract,
+                    //     &("/".to_owned() + path),
+                    //     t.essence_str()
+                    // );
                     actions.push(store_sys(
-                        account!("psispace-sys"),
-                        account!("doc-sys"),
+                        contract,
+                        sender,
                         &("/".to_owned() + path),
                         t.essence_str(),
                         e.contents(),
@@ -197,7 +207,11 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>) {
     }
 }
 
-fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
+fn add_startup_trx(
+    transactions: &mut Vec<SignedTransaction>,
+    key: &Option<PublicKey>,
+    producer: &Option<ExactAccountNumber>,
+) {
     let mut init_actions = vec![
         Action {
             sender: account!("account-sys"),
@@ -244,20 +258,25 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     ];
 
     let mut common_sys_files = vec![
-        store!("common-sys", "/index.html", html, "CommonSys/ui/index.html"),
         store!(
             "common-sys",
             "/ui/common.index.html",
             html,
-            "CommonSys/ui/common.index.html"
+            "CommonSys/ui/vanilla/common.index.html"
         ),
-        store!("common-sys", "/ui/index.js", js, "CommonSys/ui/index.js"),
         store_common!("keyConversions.mjs", js),
         store_common!("rpc.mjs", js),
         store_common!("SimpleUI.mjs", js),
         store_common!("useGraphQLQuery.mjs", js),
         store_common!("widgets.mjs", js),
     ];
+
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/CommonSys/ui/dist"),
+        &mut common_sys_files,
+        account!("common-sys"),
+        account!("common-sys"),
+    );
 
     let mut common_sys_3rd_party_files = vec![
         store_third_party!("htm.module.js", js),
@@ -273,38 +292,66 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     ];
 
     let mut account_sys_files = vec![
-        store!(
-            "r-account-sys",
-            "/index.html",
-            html,
-            "AccountSys/ui/index.html"
-        ),
-        store!(
-            "r-account-sys",
-            "/ui/index.js",
-            js,
-            "AccountSys/ui/index.js"
-        ),
+        // store!(
+        //     "r-account-sys",
+        //     "/index.html",
+        //     html,
+        //     "AccountSys/ui/vanilla/index.html"
+        // ),
+        // store!(
+        //     "r-account-sys",
+        //     "/ui/index.js",
+        //     js,
+        //     "AccountSys/ui/vanilla/index.js"
+        // ),
     ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/AccountSys/ui/dist"),
+        &mut account_sys_files,
+        account!("r-account-sys"),
+        account!("r-account-sys"),
+    );
 
     let mut auth_ec_sys_files = vec![
         store!("r-ath-ec-sys", "/", html, "AuthEcSys/ui/index.html"),
         store!("r-ath-ec-sys", "/ui/index.js", js, "AuthEcSys/ui/index.js"),
     ];
 
-    let mut explore_sys_files = vec![store!(
-        "explore-sys",
-        "/ui/index.js",
-        js,
-        "ExploreSys/ui/index.js"
-    )];
+    let mut explore_sys_files = vec![
+        // store!(
+        //    "explore-sys",
+        //    "/ui/index.js",
+        //    js,
+        //    "ExploreSys/ui/index.js"
+        // ),
+    ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/ExploreSys/ui/dist"),
+        &mut explore_sys_files,
+        account!("explore-sys"),
+        account!("explore-sys"),
+    );
 
-    let mut token_sys_files = vec![store!(
-        "r-tok-sys",
-        "/ui/index.js",
-        js,
-        "TokenSys/ui/index.js"
-    )];
+    let mut token_sys_files = vec![
+        // store!(
+        //     "r-tok-sys",
+        //     "/index.html",
+        //     html,
+        //     "CommonSys/ui/vanilla/common.index.html"
+        // ),
+        // store!(
+        //     "r-tok-sys",
+        //     "/ui/index.js",
+        //     js,
+        //     "TokenSys/ui/vanilla/index.js"
+        // ),
+    ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/TokenSys/ui/dist"),
+        &mut token_sys_files,
+        account!("r-tok-sys"),
+        account!("r-tok-sys"),
+    );
 
     let mut doc_actions = vec![
         new_account_action(account!("account-sys"), account!("doc-sys")), //
@@ -312,6 +359,8 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
         &mut doc_actions,
+        account!("doc-sys"),
+        account!("psispace-sys"),
     );
 
     // TODO: make this optional
@@ -357,6 +406,20 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
     actions.append(&mut doc_actions);
     actions.append(&mut create_and_fund_example_users);
 
+    actions.push(set_producers_action(
+        match producer {
+            Some(p) => AccountNumber::from(*p),
+            None => account!("psibase"),
+        },
+        match key {
+            Some(k) => to_claim(k),
+            None => Claim {
+                contract: AccountNumber::new(0),
+                raw_data: vec![],
+            },
+        },
+    ));
+
     if let Some(k) = key {
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
@@ -364,8 +427,16 @@ fn common_startup_trx(key: &Option<PublicKey>) -> SignedTransaction {
         }
     }
 
-    SignedTransaction {
-        transaction: without_tapos(actions).packed_bytes(),
-        proofs: vec![],
+    while !actions.is_empty() {
+        let mut n = 0;
+        let mut size = 0;
+        while n < actions.len() && size < 1024 * 1024 {
+            size += actions[n].raw_data.len();
+            n += 1;
+        }
+        transactions.push(SignedTransaction {
+            transaction: without_tapos(actions.drain(..n).collect()).packed_bytes(),
+            proofs: vec![],
+        });
     }
 }

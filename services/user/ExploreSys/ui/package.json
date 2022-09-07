@@ -1,0 +1,42 @@
+{
+  "name": "tester",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --strictPort",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@rollup/plugin-alias": "^3.1.9",
+    "@types/node": "^18.7.15"
+  },
+  "devDependencies": {
+    "@poppanator/sveltekit-svg": "^1.0.0",
+    "@sveltejs/adapter-static": "^1.0.0-next.42",
+    "@sveltejs/kit": "^1.0.0-next.474",
+    "@tailwindcss/forms": "^0.5.2",
+    "autoprefixer": "^10.4.8",
+    "classnames": "^2.3.1",
+    "eslint": "^8.23.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-svelte3": "^4.0.0",
+    "postcss": "^8.4.16",
+    "postcss-import": "^15.0.0",
+    "postcss-load-config": "^4.0.1",
+    "prettier": "^2.7.1",
+    "prettier-plugin-svelte": "^2.7.0",
+    "prettier-plugin-tailwindcss": "^0.1.13",
+    "react": "^18.2.0",
+    "svelte": "^3.50.0",
+    "svelte-check": "^2.9.0",
+    "svelte-preprocess": "^4.10.7",
+    "tailwindcss": "^3.1.8",
+    "typescript": "^4.8.2",
+    "vite": "^3.1.0",
+    "vite-plugin-iso-import": "^0.1.3"
+  }
+}

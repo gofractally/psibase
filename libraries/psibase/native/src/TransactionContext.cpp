@@ -1,11 +1,11 @@
 #include <psibase/TransactionContext.hpp>
 
 #include <condition_variable>
-#include <thread>   
 #include <mutex>
 #include <psibase/ActionContext.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psio/from_bin.hpp>
+#include <thread>
 
 namespace psibase
 {
@@ -168,6 +168,33 @@ namespace psibase
           .transactionHash = id,
           .claim           = claimsView[i],
           .proof           = proof,
+      };
+      Action action{
+          .sender   = {},
+          .contract = data.claim.contract,
+          .rawData  = psio::convert_to_frac(data),
+      };
+      auto& atrace     = transactionTrace.actionTraces.emplace_back();
+      atrace.action    = action;
+      ActionContext ac = {*this, action, atrace};
+      auto&         ec = getExecutionContext(action.contract);
+      ec.execVerify(ac);
+   }
+
+   void TransactionContext::execVerifyProof(const Checksum256& id,
+                                            Claim              claim,
+                                            std::vector<char>  proof)
+   {
+      auto& db         = blockContext.db;
+      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
+      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
+                                                          WasmConfigRow::key(proofWasmConfigTable));
+      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
+
+      VerifyArgs data{
+          .transactionHash = id,
+          .claim           = std::move(claim),
+          .proof           = std::move(proof),
       };
       Action action{
           .sender   = {},

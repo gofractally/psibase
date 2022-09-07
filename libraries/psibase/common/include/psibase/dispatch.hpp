@@ -1,23 +1,11 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
+#include <psibase/Service.hpp>
 #include <psibase/nativeFunctions.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
 {
-   /*
-   namespace detail
-   {
-      struct raw_variant_view
-      {
-         uint8_t  action_idx;
-         uint32_t size;
-         char     data[];
-      };
-
-   };  // namespace detail
-   */
-
    template <typename R, typename T, typename MemberPtr, typename... Args>
    void call_method(T& contract, MemberPtr method, Args&&... args)
    {
@@ -33,7 +21,11 @@ namespace psibase
    template <typename Contract>
    void dispatch(AccountNumber sender, AccountNumber receiver)
    {
-      auto act          = getCurrentActionView();
+      auto act           = getCurrentActionView();
+      auto prevSender    = internal::sender;
+      internal::sender   = sender;
+      internal::receiver = receiver;
+
       auto makeContract = [&]()
       {
          if constexpr (std::is_constructible<Contract, psio::shared_view_ptr<psibase::Action>>{})
@@ -46,8 +38,6 @@ namespace psibase
          }
       };
       auto contract{makeContract()};
-
-      contract.dispatchSetSenderReceiver(sender, receiver);
 
       bool called = psio::reflect<Contract>::get_by_name(
           act->method()->value(),
@@ -81,6 +71,7 @@ namespace psibase
           });         // reflect::get
       if (!called)
          abortMessage("unknown contract action: " + act->method()->get().str());
+      internal::sender = prevSender;
       // psio::member_proxy
    }  // dispatch
 

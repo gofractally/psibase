@@ -1,7 +1,7 @@
 #pragma once
 
 #include <psibase/Table.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
 #include <psio/to_hex.hpp>
 
@@ -248,7 +248,7 @@ namespace psibase
    /// operations; you must use actions to write to a table.
    ///
    /// ```c++
-   /// #include <psibase/Contract.hpp>
+   /// #include <psibase/Service.hpp>
    /// #include <psibase/dispatch.hpp>
    /// #include <psibase/serveGraphQL.hpp>
    /// #include <psibase/serveSimpleUI.hpp>
@@ -285,7 +285,7 @@ namespace psibase
    /// };
    /// PSIO_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
    ///
-   /// struct ExampleContract : psibase::Contract<ExampleContract>
+   /// struct ExampleContract : psibase::Service<ExampleContract>
    /// {
    ///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
    ///    {
@@ -491,7 +491,7 @@ namespace psibase
    ///
    /// `EventDecoder` will only attempt to decode an event which meets all of the following:
    /// * It's found in the `EventDecoder::db` database (`event_found` will be true)
-   /// * Was written by the contract which matches the `EventDecoder::contract` field (`event_supported_contract` will be true)
+   /// * Was written by the contract which matches the `EventDecoder::service` field (`event_supported_contract` will be true)
    /// * Has a type which matches one of the definitions in the `Events` template argument
    ///
    /// If decoding is successful, `EventDecoder` will set the GraphQL `event_unpack_ok`
@@ -1105,6 +1105,9 @@ namespace psibase
    ///   }
    /// }
    /// ```
+   // TODO: range search with just a prefix of multi-field keys. Should we
+   //       play games by relaxing GraphQL's too-strict rules again? e.g.
+   //       allowing `le:{a:7}` when the key also has fields b and c?
    template <typename Events>
    auto makeEventConnection(DbId                              db,
                             uint64_t                          eventId,

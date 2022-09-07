@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(contract-lab)
+project(psibase)
 include(ExternalProject)
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -84,14 +84,35 @@ if(BUILD_DOC)
     )
 endif()
 
+set(JS_DIRS
+    services/system/AccountSys/ui:AccountSys_js
+    # services/user/PsiSpaceSys/ui:PsiSpaceSys_js
+    services/user/CommonSys/ui:CommonSys_js
+    services/user/TokenSys/ui:TokenSys_js
+    services/user/ExploreSys/ui:ExploreSys_js
+)
+
+option(BUILD_JS "Build JS" ON)
+if(BUILD_JS)
+    list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
+    foreach(ENTRY ${JS_DIRS})
+        string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
+        string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
+        add_custom_target(
+            ${DEP}
+            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
+        )
+    endforeach()
+endif()
+
 option(BUILD_RUST "Build rust" ON)
 if(BUILD_RUST)
     set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
-    set(THIRD_SRC ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common/thirdParty/src)
+    set(THIRD_SRC ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/thirdParty/src)
     set(THIRD_DEST ${BOOT_IMAGE}/CommonSys/common/thirdParty)
     ExternalProject_Add(
         rust
-        DEPENDS wasm ${DOC_DEP}
+        DEPENDS wasm ${DOC_DEP} ${JS_DEPS}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
         CONFIGURE_COMMAND ""
         BUILD_COMMAND   rm -rf ${BOOT_IMAGE}
@@ -103,6 +124,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm                       ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm                  ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm                     ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm                  ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm                  ${BOOT_IMAGE}
@@ -115,12 +137,12 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm               ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm                  ${BOOT_IMAGE}
 
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/system/AccountSys/ui    ${BOOT_IMAGE}/AccountSys/ui
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/system/AuthEcSys/ui     ${BOOT_IMAGE}/AuthEcSys/ui
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/common   ${BOOT_IMAGE}/CommonSys/common
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/CommonSys/ui       ${BOOT_IMAGE}/CommonSys/ui
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
-        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/contracts/user/TokenSys/ui        ${BOOT_IMAGE}/TokenSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui    ${BOOT_IMAGE}/AccountSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui     ${BOOT_IMAGE}/AuthEcSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common   ${BOOT_IMAGE}/CommonSys/common
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/ui       ${BOOT_IMAGE}/CommonSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui        ${BOOT_IMAGE}/TokenSys/ui
 
         COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc || mkdir -p ${BOOT_IMAGE}/doc"
 
@@ -146,7 +168,7 @@ endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
-    add_subdirectory(doc/psidk/src/cpp-contract doc-examples)
+    add_subdirectory(doc/psidk/src/cpp-service doc-examples)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

@@ -4,28 +4,28 @@ This repo contains the sources to
 
 - `psinode`, the psibase node
 - `psibase`, the command-line utility for pushing transactions and booting a chain
-- psibase contracts
-- `psidk`, the contract development kit
+- psibase services
+- `psidk`, the service development kit
 
 ## Binary Release
 
-If you want to operate a node, build contracts, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the documentation for installation instructions.
+If you want to operate a node, build services, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the documentation for installation instructions.
 
 ## Documentation
 
-Documentation is at (TODO: add link). This covers installing the binary packages, starting a local test chain, and developing contracts.
+Documentation is at (TODO: add link). This covers installing the binary packages, starting a local test chain, and developing services.
 
 ## Building this repo from source
 
 See the architecture-specific instructions below.
 
-Set the `WASI_SDK_PREFIX` environment variable before building. Alternatively, use cmake's `-DWASI_SDK_PREFIX=....` option. Also make sure `nodejs 14`, `npm 6.14`, and `yarn 1.22` are in your path.
+Set the `WASI_SDK_PREFIX` environment variable before building. Alternatively, use cmake's `-DWASI_SDK_PREFIX=....` option. Also make sure `node 16.17`, `npm 8.19`, `yarn 1.22`, `cargo 1.63`, and `wasm-opt` (or later versions) are in your path.
 
 ```sh
 git submodule update --init --recursive
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DOC=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -Wno-dev ..
 make -j $(nproc)
 ctest -j $(nproc)
 ```
@@ -55,26 +55,31 @@ sudo apt-get install -yq    \
     llvm-dev                \
     pkg-config              \
     python-is-python3       \
-    wget                    \
+    wget
 
 export WASI_SDK_PREFIX=~/work/wasi-sdk-14.0
-export PATH=~/work/node-v14.16.0-linux-x64/bin:$PATH
+export PATH=~/work/node-v16.17.0-linux-x64/bin:~/.cargo/bin:$PATH
 
 cd ~/work
 wget https://boostorg.jfrog.io/artifactory/main/release/1.78.0/source/boost_1_78_0.tar.gz
 tar xf boost_1_78_0.tar.gz
 cd boost_1_78_0
 ./bootstrap.sh
-sudo ./b2 --prefix=/usr/local --build-dir=build variant=release --with-chrono --with-date_time --with-filesystem --with-iostreams --with-program_options --with-system --with-test install
+sudo ./b2 --prefix=/usr/local --build-dir=build variant=release --with-chrono --with-date_time \
+     --with-filesystem --with-iostreams --with-program_options --with-system --with-test install
 
 cd ~/work
 wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz
 tar xf wasi-sdk-14.0-linux.tar.gz
 
 cd ~/work
+wget https://nodejs.org/dist/v16.17.0/node-v16.17.0-linux-x64.tar.xz
+tar xf node-v16.17.0-linux-x64.tar.xz
+npm i -g npm yarn
+
+cd ~/work
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-cargo install mdbook mdbook-linkcheck
+cargo install mdbook mdbook-linkcheck mdbook-mermaid
 ```
 
 ### Windows

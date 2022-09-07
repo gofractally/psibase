@@ -1,7 +1,7 @@
 #pragma once
 
 #include <psibase/Table.hpp>
-#include <psibase/contractEntry.hpp>
+#include <psibase/serviceEntry.hpp>
 
 namespace psibase
 {
@@ -49,6 +49,7 @@ namespace psibase
                      std::vector<char>&&              content,
                      const ContractTables<Tables...>& tables)
    {
+      check(path.starts_with('/'), "Path doesn't begin with /");
       psibase::WebContentRow row{
           .path        = std::move(path),
           .contentType = std::move(contentType),

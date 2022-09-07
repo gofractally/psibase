@@ -7,7 +7,7 @@
 
 #include "psibase/http.hpp"
 #include "psibase/TransactionContext.hpp"
-#include "psibase/contractEntry.hpp"
+#include "psibase/serviceEntry.hpp"
 
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/io_service.hpp>
@@ -338,7 +338,7 @@ namespace psibase::http
             return;
          }  // push_transaction
          else if (req.target() == "/native/p2p" && websocket::is_upgrade(req) &&
-                  server.http_config->accept_p2p_websocket)
+                  server.http_config->accept_p2p_websocket && server.http_config->ready_for_p2p)
          {
             // Stop reading HTTP requests
             send.pause_read = true;
@@ -371,6 +371,9 @@ namespace psibase::http
          else if (req.target() == "/native/admin/connect" && req.method() == bhttp::verb::post &&
                   server.http_config->connect)
          {
+            if (!server.http_config->ready_for_p2p)
+               throw std::runtime_error("not ready for p2p connections");
+
             // takes a string endpoint
             send.pause_read = true;
             server.http_config->connect(
@@ -545,8 +548,11 @@ namespace psibase::http
                      websocket::stream<decltype(self.derived_session().stream)> stream;
                   };
 
-                  auto ptr =  std::make_shared<op>( op{std::move(request), websocket::stream<decltype(self.derived_session().stream)>{ std::move(self.derived_session().stream)}}); 
-                  
+                  auto ptr = std::make_shared<op>(
+                      op{std::move(request),
+                         websocket::stream<decltype(self.derived_session().stream)>{
+                             std::move(self.derived_session().stream)}});
+
                   auto p = ptr.get();
                   // Capture server, not self, because after returning, there is
                   // no longer anything keeping the session alive
