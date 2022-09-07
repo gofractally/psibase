@@ -84,10 +84,12 @@ The system transfers packed data between services. `unpack()` unpacks it.
 
 # Who called me?
 
-A service may call its `getSender()` method to find out:
+A service may call the `getSender()` function to find out:
 
 - Which service called it, or
 - Which account authorized it if it's a top-level action or a [system_contract::TransactionSys::runAs] request
+
+A service also may use the `getReceiver()` function to get the account that the service is running on.
 
 ```c++
 void MyService::doSomething()
