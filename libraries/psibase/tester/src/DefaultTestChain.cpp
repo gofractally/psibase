@@ -323,7 +323,8 @@ void DefaultTestChain::registerSysRpc()
        rpcAuthEc.storeSys("/ui/index.js", js, readWholeFile(authEcDir + "/ui/index.js")),
 
        // ExploreSys
-       rpcExplore.storeSys("/ui/index.js", js, readWholeFile(expDir + "/ui/index.js"))};
+       //    rpcExplore.storeSys("/ui/index.js", js, readWholeFile(expDir + "/ui/index.js"))
+   };
 
    trace = pushTransaction(makeTransaction(std::move(b)));
    check(psibase::show(false, trace) == "", "Failed to add UI files to system rpc contracts");
