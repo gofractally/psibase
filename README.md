@@ -19,7 +19,7 @@ Documentation is at (TODO: add link). This covers installing the binary packages
 
 See the architecture-specific instructions below.
 
-Set the `WASI_SDK_PREFIX` environment variable before building. Alternatively, use cmake's `-DWASI_SDK_PREFIX=....` option. Also make sure `nodejs 16.17`, `npm 8.19`, `yarn 1.22`, `cargo 1.63`, and `wasm-opt` (or later versions) are in your path.
+Set the `WASI_SDK_PREFIX` environment variable before building. Alternatively, use cmake's `-DWASI_SDK_PREFIX=....` option. Also make sure `node 16.17`, `npm 8.19`, `yarn 1.22`, `cargo 1.63`, and `wasm-opt` (or later versions) are in your path.
 
 ```sh
 git submodule update --init --recursive
