@@ -180,17 +180,23 @@ fn boot_trx() -> SignedTransaction {
     }
 }
 
-fn fill_dir(dir: &Dir, actions: &mut Vec<Action>) {
+fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, contract: AccountNumber) {
     for e in dir.entries() {
         match e {
-            include_dir::DirEntry::Dir(d) => fill_dir(d, actions),
+            include_dir::DirEntry::Dir(d) => fill_dir(d, actions, sender, contract),
             include_dir::DirEntry::File(e) => {
                 let path = e.path().to_str().unwrap();
                 if let Some(t) = mime_guess::from_path(path).first() {
-                    // println!("{} {}", &("/".to_owned() + path), t.essence_str());
+                    // println!(
+                    //     "{} {} {} {}",
+                    //     sender,
+                    //     contract,
+                    //     &("/".to_owned() + path),
+                    //     t.essence_str()
+                    // );
                     actions.push(store_sys(
-                        account!("psispace-sys"),
-                        account!("doc-sys"),
+                        contract,
+                        sender,
                         &("/".to_owned() + path),
                         t.essence_str(),
                         e.contents(),
@@ -241,8 +247,8 @@ fn add_startup_trx(
 
     let html = "text/html";
     let js = "text/javascript";
-    let css = "text/css";
-    let svg = "image/svg+xml";
+    // let css = "text/css";
+    // let svg = "image/svg+xml";
 
     let mut reg_actions = vec![
         reg_server(account!("account-sys"), account!("r-account-sys")),
@@ -305,43 +311,13 @@ fn add_startup_trx(
         //     js,
         //     "AccountSys/ui/vanilla/index.js"
         // ),
-        store!(
-            "r-account-sys",
-            "/app-account.svg",
-            js,
-            "AccountSys/ui/dist/app-account.svg"
-        ),
-        store!(
-            "r-account-sys",
-            "/index.html",
-            html,
-            "AccountSys/ui/dist/index.html"
-        ),
-        store!(
-            "r-account-sys",
-            "/index.js",
-            js,
-            "AccountSys/ui/dist/index.js"
-        ),
-        store!(
-            "r-account-sys",
-            "/style.css",
-            js,
-            "AccountSys/ui/dist/style.css"
-        ),
-        store!(
-            "r-account-sys",
-            "/refresh.svg",
-            js,
-            "AccountSys/ui/dist/refresh.svg"
-        ),
-        store!(
-            "r-account-sys",
-            "/logout.svg",
-            js,
-            "AccountSys/ui/dist/logout.svg"
-        ),
     ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/AccountSys/ui/dist"),
+        &mut account_sys_files,
+        account!("r-account-sys"),
+        account!("r-account-sys"),
+    );
 
     let mut auth_ec_sys_files = vec![
         store!("r-ath-ec-sys", "/", html, "AuthEcSys/ui/index.html"),
@@ -368,45 +344,13 @@ fn add_startup_trx(
         //     js,
         //     "TokenSys/ui/vanilla/index.js"
         // ),
-        store!(
-            "r-tok-sys",
-            "/index.html",
-            html,
-            "TokenSys/ui/dist/index.html"
-        ),
-        store!("r-tok-sys", "/index.js", js, "TokenSys/ui/dist/index.js"),
-        store!("r-tok-sys", "/style.css", css, "TokenSys/ui/dist/style.css"),
-        store!(
-            "r-tok-sys",
-            "/incoming.svg",
-            svg,
-            "TokenSys/ui/dist/incoming.svg"
-        ),
-        store!(
-            "r-tok-sys",
-            "/outgoing.svg",
-            svg,
-            "TokenSys/ui/dist/outgoing.svg"
-        ),
-        store!(
-            "r-tok-sys",
-            "/loader.svg",
-            svg,
-            "TokenSys/ui/dist/loader.svg"
-        ),
-        store!(
-            "r-tok-sys",
-            "/app-wallet-icon.svg",
-            svg,
-            "TokenSys/ui/dist/app-wallet-icon.svg"
-        ),
-        store!(
-            "r-tok-sys",
-            "/arrow-up-solid.svg",
-            svg,
-            "TokenSys/ui/dist/arrow-up-solid.svg"
-        ),
     ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/TokenSys/ui/dist"),
+        &mut token_sys_files,
+        account!("r-tok-sys"),
+        account!("r-tok-sys"),
+    );
 
     let mut doc_actions = vec![
         new_account_action(account!("account-sys"), account!("doc-sys")), //
@@ -414,6 +358,8 @@ fn add_startup_trx(
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
         &mut doc_actions,
+        account!("doc-sys"),
+        account!("psispace-sys"),
     );
 
     // TODO: make this optional
