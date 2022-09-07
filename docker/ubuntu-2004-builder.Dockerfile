@@ -80,4 +80,4 @@ RUN cd /root \
     && rm rustup.sh
 
 ENV WASI_SDK_PREFIX=/opt/wasi-sdk-14.0
-ENV PATH=/opt/cargo/bin:/opt/node-v14.16.0-linux-x64/bin:/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH
+ENV PATH=/opt/cargo/bin:/opt/node-v16.17.0-linux-x64/bin:/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH
