@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { getJson, operation } from "common/rpc.mjs";
+import { AppletId, getJson, operation } from "common/rpc.mjs";
 import { genKeyPair, KeyType } from "common/keyConversions.mjs";
 
 import refresh from "./assets/icons/refresh.svg";
@@ -8,20 +8,16 @@ import { MsgProps } from "../helpers";
 import Button from "./Button";
 
 const onCreateAccount = async (
-    name: string,
-    publicKey: string,
-    privateKey: string,
-    addMsg: (message: string) => void,
-    clearMsg: () => void,
-    onAccountCreation: MsgProps['onAccountCreation']
+    name: any,
+    pubKey: any,
+    addMsg: any,
+    clearMsg: any
 ) => {
-    console.log({ name, publicKey, addMsg, clearMsg })
     const thisApplet = await getJson("/common/thiscontract");
     try {
         clearMsg();
         addMsg("Pushing transaction...");
-        operation(thisApplet, "newAcc", { name, pubKey: publicKey });
-        onAccountCreation({ account: name, privateKey, publicKey })
+        operation(thisApplet, "newAcc", { name, pubKey });
     } catch (e: any) {
         console.error(e);
         addMsg(e.message);
@@ -29,7 +25,7 @@ const onCreateAccount = async (
         addMsg("trace: " + JSON.stringify(e.trace, null, 4));
     }
 };
-export const CreateAccountForm = ({ addMsg, clearMsg, onAccountCreation }: MsgProps) => {
+export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
     const [name, setName] = useState("");
     const [pubKey, setPubKey] = useState("");
     const [privKey, setPrivKey] = useState("");
@@ -85,7 +81,7 @@ export const CreateAccountForm = ({ addMsg, clearMsg, onAccountCreation }: MsgPr
                 <Button
                     type="primary"
                     onClick={(e) =>
-                        onCreateAccount(name, pubKey, privKey, addMsg, clearMsg, onAccountCreation)
+                        onCreateAccount(name, pubKey, addMsg, clearMsg)
                     }
                 >
                     Create Account

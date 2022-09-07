@@ -250,10 +250,10 @@ pub struct ProducerConfigRow {
 }
 
 fn to_claim(key: &PublicKey) -> Claim {
-    return Claim {
+    Claim {
         contract: account!("verifyec-sys"),
         raw_data: key.packed_bytes(),
-    };
+    }
 }
 
 fn set_producers_action(name: AccountNumber, key: Claim) -> Action {

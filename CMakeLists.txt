@@ -84,6 +84,26 @@ if(BUILD_DOC)
     )
 endif()
 
+set(JS_DIRS
+    services/system/AccountSys/ui:AccountSys_js
+    # services/user/PsiSpaceSys/ui:PsiSpaceSys_js
+    services/user/CommonSys/ui:CommonSys_js
+    services/user/TokenSys/ui:TokenSys_js
+)
+
+option(BUILD_JS "Build JS" ON)
+if(BUILD_JS)
+    list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
+    foreach(ENTRY ${JS_DIRS})
+        string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
+        string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
+        add_custom_target(
+            ${DEP}
+            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
+        )
+    endforeach()
+endif()
+
 option(BUILD_RUST "Build rust" ON)
 if(BUILD_RUST)
     set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
@@ -91,7 +111,7 @@ if(BUILD_RUST)
     set(THIRD_DEST ${BOOT_IMAGE}/CommonSys/common/thirdParty)
     ExternalProject_Add(
         rust
-        DEPENDS wasm ${DOC_DEP}
+        DEPENDS wasm ${DOC_DEP} ${JS_DEPS}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
         CONFIGURE_COMMAND ""
         BUILD_COMMAND   rm -rf ${BOOT_IMAGE}

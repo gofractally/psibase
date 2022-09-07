@@ -7,6 +7,7 @@ import {
     setQueries,
     signTransaction,
     getJson,
+    AppletId,
 } from "common/rpc.mjs";
 
 export const initAppFn = (setAppInitialized: () => void) =>
@@ -16,7 +17,10 @@ export const initAppFn = (setAppInitialized: () => void) =>
             pubKey?: any;
             transaction?: any;
         }
-        const thisApplet = await getJson("/common/thiscontract");
+
+        const thisApplet = await getJson<string>("/common/thiscontract");
+        const accountSysApplet = new AppletId(thisApplet, "");
+
         setOperations([
             {
                 id: "newAcc",
@@ -28,7 +32,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                     });
 
                     if (pubKey !== "") {
-                        operation(thisApplet, "setKey", { name, pubKey });
+                        operation(accountSysApplet, "setKey", { name, pubKey });
                     }
                 },
             },
@@ -60,12 +64,11 @@ export const initAppFn = (setAppInitialized: () => void) =>
             {
                 id: "getAuthedTransaction",
                 exec: async ({ transaction }: execArgs) => {
-                    let user = await query(thisApplet, "", "getLoggedInUser");
+                    let user = await query(accountSysApplet, "getLoggedInUser");
                     let accounts = await getJson("/accounts");
                     let u = accounts.find((a: any) => a.accountNum === user);
                     if (u.authContract === "auth-ec-sys") {
-                        // Todo: Should sign with the private key mapped to the logged-in
-                        //        user stored in localstorage
+                        // Todo: Should sign with the private key mapped to the logged-in user stored in localstorage
                         return await signTransaction("", transaction, [
                             "PVT_K1_22vrGgActn3X4H1wwvy2KH4hxGke7cGy6ypy2njMjnyZBZyU7h",
                         ]);
