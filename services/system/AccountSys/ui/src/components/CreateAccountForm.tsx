@@ -8,16 +8,20 @@ import { MsgProps } from "../helpers";
 import Button from "./Button";
 
 const onCreateAccount = async (
-    name: any,
-    pubKey: any,
-    addMsg: any,
-    clearMsg: any
+    name: string,
+    publicKey: string,
+    privateKey: string,
+    addMsg: (message: string) => void,
+    clearMsg: () => void,
+    onAccountCreation: MsgProps['onAccountCreation']
 ) => {
+    console.log({ name, publicKey, addMsg, clearMsg })
     const thisApplet = await getJson("/common/thiscontract");
     try {
         clearMsg();
         addMsg("Pushing transaction...");
-        operation(thisApplet, "newAcc", { name, pubKey });
+        operation(thisApplet, "newAcc", { name, pubKey: publicKey });
+        onAccountCreation({ account: name, privateKey, publicKey })
     } catch (e: any) {
         console.error(e);
         addMsg(e.message);
@@ -25,7 +29,7 @@ const onCreateAccount = async (
         addMsg("trace: " + JSON.stringify(e.trace, null, 4));
     }
 };
-export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
+export const CreateAccountForm = ({ addMsg, clearMsg, onAccountCreation }: MsgProps) => {
     const [name, setName] = useState("");
     const [pubKey, setPubKey] = useState("");
     const [privKey, setPrivKey] = useState("");
@@ -81,7 +85,7 @@ export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
                 <Button
                     type="primary"
                     onClick={(e) =>
-                        onCreateAccount(name, pubKey, addMsg, clearMsg)
+                        onCreateAccount(name, pubKey, privKey, addMsg, clearMsg, onAccountCreation)
                     }
                 >
                     Create Account

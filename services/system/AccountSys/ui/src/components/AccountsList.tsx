@@ -1,4 +1,4 @@
-import { ViewAccount } from "../App"
+import { Account } from "../App";
 import closedIcon from "./assets/icons/lock-closed.svg";
 import openIcon from "./assets/icons/lock-open.svg";
 
@@ -7,7 +7,7 @@ function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ')
 }
 
-export function AccountsList({ accounts, onSelectAccount, selectedAccount }: { accounts: ViewAccount[], onSelectAccount: (account: string) => void, selectedAccount: string }) {
+export function AccountsList({ accounts, onSelectAccount, selectedAccount }: { accounts: Account[], onSelectAccount: (account: string) => void, selectedAccount: string }) {
     return (
         <div className="px-4 sm:px-6 lg:px-8">
             <div className="sm:flex sm:items-center">
@@ -20,9 +20,10 @@ export function AccountsList({ accounts, onSelectAccount, selectedAccount }: { a
                 <div className="mt-4 border text-black sm:mt-0 sm:ml-16 sm:flex-none">
                     <button
                         type="button"
-                        className="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:w-auto text-black"
+                        disabled={true}
+                        className="inline-flex disabled:opacity-50 items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:w-auto text-black"
                     >
-                        Update credit card
+                        Create account
                     </button>
                 </div>
             </div>
@@ -69,7 +70,7 @@ export function AccountsList({ accounts, onSelectAccount, selectedAccount }: { a
                                 >
                                     <div className="w-6 flex justify-center">
 
-                                        <img src={account.isSecure ? closedIcon : openIcon} alt="" />
+                                        <img src={account.authContract === 'auth-any-sys' ? openIcon : closedIcon} alt="" />
                                     </div>
 
                                 </td>

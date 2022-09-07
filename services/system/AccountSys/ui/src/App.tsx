@@ -16,8 +16,13 @@ import openIcon from "./components/assets/icons/lock-open.svg";
 // needed for common files that won't necessarily use bundles
 window.React = React;
 
+export interface Account {
+    accountNum: string;
+    authContract: string;
+}
+
 const useAccountsWithKeys = (addMsg: any, clearMsg: any) => {
-    const [accounts, setAccounts] = useState([
+    const [accounts, setAccounts] = useState<Account[]>([
         {
             accountNum: "alice",
             authContract: "auth-any-sys",
@@ -34,12 +39,9 @@ const useAccountsWithKeys = (addMsg: any, clearMsg: any) => {
     return accounts;
 };
 
-interface Account {
-    accountNum: string;
-    authContract: string;
-}
 
-export interface ViewAccount extends Account {
+
+interface ViewAccount extends Account {
     isSecure: boolean;
 }
 
@@ -77,6 +79,8 @@ function App() {
     const allViewAccounts = allAccounts.map(toViewAccount);
 
     const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
+    const [keyPairs, setKeyPairs] = useLocalStorage<{ privateKey: string, publicKey: string }[]>("keyPairs", []);
+
     useEffect(() => {
         initAppFn(() => {
             setAppInitialized(true);
@@ -110,6 +114,11 @@ function App() {
     };
 
 
+    const onAccountCreation = ({ publicKey, privateKey }: { account: string, publicKey: string, privateKey: string }) => {
+        const withoutExisting = keyPairs.filter(pair => pair.privateKey !== privateKey && pair.publicKey !== publicKey);
+        setKeyPairs([...withoutExisting, { privateKey, publicKey }]);
+    }
+
 
     console.log({ allAccounts, accountsWithKeys })
     return (
@@ -121,9 +130,8 @@ function App() {
                 </Heading>
             </div>
             <AccountsList accounts={accountsWithKeys} selectedAccount={currentUser} onSelectAccount={onSelectAccount} />
-
             <div className="bg-slate-50 mt-4">
-                <CreateAccountForm addMsg={addMsg} clearMsg={clearMsg} />
+                <CreateAccountForm isLoading={false} onAccountCreation={onAccountCreation} addMsg={addMsg} clearMsg={clearMsg} />
             </div>
             <hr />
 
