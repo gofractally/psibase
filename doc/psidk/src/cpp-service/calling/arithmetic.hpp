@@ -3,7 +3,7 @@
 // The header includes the class definition
 struct Arithmetic : psibase::Service<Arithmetic>
 {
-   // The account this contract is normally installed on
+   // The account this service is normally installed on
    static constexpr auto service = psibase::AccountNumber("arithmetic");
 
    // The header declares but doesn't implement the actions

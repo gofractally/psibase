@@ -4,16 +4,16 @@ This repo contains the sources to
 
 - `psinode`, the psibase node
 - `psibase`, the command-line utility for pushing transactions and booting a chain
-- psibase contracts
-- `psidk`, the contract development kit
+- psibase services
+- `psidk`, the service development kit
 
 ## Binary Release
 
-If you want to operate a node, build contracts, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the documentation for installation instructions.
+If you want to operate a node, build services, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the documentation for installation instructions.
 
 ## Documentation
 
-Documentation is at (TODO: add link). This covers installing the binary packages, starting a local test chain, and developing contracts.
+Documentation is at (TODO: add link). This covers installing the binary packages, starting a local test chain, and developing services.
 
 ## Building this repo from source
 

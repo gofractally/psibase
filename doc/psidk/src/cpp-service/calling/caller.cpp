@@ -1,19 +1,19 @@
-// This contract
+// This service
 #include "caller.hpp"
 
-// Other contract
+// Other service
 #include "arithmetic.hpp"
 
 int32_t Caller::mult_add(int32_t a, int32_t b, int32_t c, int32_t d)
 {
-   // This allows us to call into the Arithmetic contract
-   auto otherContract = to<Arithmetic>(Arithmetic::service);
+   // This allows us to call into the Arithmetic service
+   auto otherService = to<Arithmetic>(Arithmetic::service);
 
-   // Compute the result. Calls into the Arithmetic contract 3 times.
-   return otherContract
-       .add(                                       //
-           otherContract.multiply(a, b).unpack(),  //
-           otherContract.multiply(c, d).unpack())
+   // Compute the result. Calls into the Arithmetic service 3 times.
+   return otherService
+       .add(                                      //
+           otherService.multiply(a, b).unpack(),  //
+           otherService.multiply(c, d).unpack())
        .unpack();
 }
 

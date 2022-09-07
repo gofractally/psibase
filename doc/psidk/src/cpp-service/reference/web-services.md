@@ -28,7 +28,7 @@
 ```svgbob
 +---------+      +---------+      +-----------+
 | HTTP    |      |         |      | proxy-sys |
-| Request | ---> | psinode | ---> | contract  |
+| Request | ---> | psinode | ---> | service   |
 |         |      |         |      |           |
 +---------+      +---------+      +-----------+
                                        |
@@ -47,7 +47,7 @@
          v        v                     v
       +-----------------+     +------------+
       | common-sys      |    /              \
-      | contract's      |   /  registered?   \
+      | service's       |   /  registered?   \
       | serveSys action |   \                /
       +-----------------+    \              /
                               +------------+
@@ -57,32 +57,32 @@
                   v                     v
    +-----------------+     +-----------------+
    | psispace-sys    |     | registered      |
-   | contract's      |     | contract's      |
+   | service's       |     | service's       |
    | serveSys action |     | serveSys action |
    +-----------------+     +-----------------+
 ```
 
-`psinode` passes most HTTP requests to the [psibase::ProxySys] contract, which then routes requests to the appropriate contract's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The contracts run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
+`psinode` passes most HTTP requests to the [psibase::ProxySys] service, which then routes requests to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
 [system_contract::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
-[system_contract::PsiSpaceSys] provides web hosting to non-contract accounts.
+[system_contract::PsiSpaceSys] provides web hosting to non-service accounts.
 
-`psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Contracts don't serve these.
+`psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Services don't serve these.
 
 ## Registration
 
-Contracts which wish to serve HTTP requests need to register using the [psibase::ProxySys] contract's [psibase::ProxySys::registerServer] action. There are multiple ways to do this:
+Services which wish to serve HTTP requests need to register using the [psibase::ProxySys] service's [psibase::ProxySys::registerServer] action. There are multiple ways to do this:
 
-- `psibase deploy` has a `--register-proxy` option (shortcut `-p`) that can do this while deploying the contract.
+- `psibase deploy` has a `--register-proxy` option (shortcut `-p`) that can do this while deploying the service.
 - `psibase register-proxy` can also do it. TODO: implement `psibase register-proxy`.
-- A contract may call `registerServer` during its own initialization action.
+- A service may call `registerServer` during its own initialization action.
 
-A contract doesn't have to serve HTTP requests itself; it may delegate this to another contract during registration.
+A service doesn't have to serve HTTP requests itself; it may delegate this to another service during registration.
 
 ## Interfaces
 
-Contracts which serve HTML implement these interfaces:
+Services which serve HTML implement these interfaces:
 
 - [psibase::ServerInterface] (required)
   - [psibase::HttpRequest]
@@ -118,10 +118,10 @@ Here's a common pattern for using these functions:
 ```c++
 std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {
-   if (auto result = psibase::serveActionTemplates<ExampleContract>(request))
+   if (auto result = psibase::serveActionTemplates<ExampleService>(request))
       return result;
 
-   if (auto result = psibase::servePackAction<ExampleContract>(request))
+   if (auto result = psibase::servePackAction<ExampleService>(request))
       return result;
 
    if (request.method == "GET" && request.target == "/")

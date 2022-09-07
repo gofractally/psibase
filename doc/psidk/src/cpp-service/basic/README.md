@@ -1,6 +1,6 @@
-# Basic Contract
+# Basic Service
 
-Here is a basic contract definition. Place `example.cpp` and `CMakeLists.txt` in an empty folder.
+Here is a basic service definition. Place `example.cpp` and `CMakeLists.txt` in an empty folder.
 
 ## `example.cpp`
 
@@ -25,27 +25,27 @@ cmake `psidk-cmake-args` ..
 make -j $(nproc)
 ```
 
-## Deploying the contract
+## Deploying the service
 
 This, when run on a local test chain, will:
 
 - Create the `example` account, if it doesn't already exist. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public chains. `-i` is a shortcut for `--create-insecure-account`.
-- Deploy the `example.wasm` contract on that contract.
+- Deploy the `example.wasm` service on that service.
 
 ```sh
 psibase deploy -i example example.wasm
 ```
 
-## Trying the contract
+## Trying the service
 
-Even though other contracts may call into our contract's `add` and `multiply` methods,
+Even though other services may call into our service's `add` and `multiply` methods,
 we haven't provided end users with a way to construct transactions which use them.
 That's the topic of the next section, [Minimal User Interface](../minimal-ui/).
 
 ## Homework
 
 There's a potentially-exploitable bug in `add` and `multiply`. What is it? Why is it
-more dangerous in C++ than it is in psibase's other contract languages? How can
+more dangerous in C++ than it is in psibase's other service languages? How can
 you avoid it?
 
 ## vscode support

@@ -1,9 +1,9 @@
-# Contracts and Events
+# Services and Events
 
 - [psibase::Service]
-  - [Defining a contract](#defining-a-contract)
+  - [Defining a service](#defining-a-service)
   - [Reserved action names](#reserved-action-names)
-  - [Calling other contracts](#calling-other-contracts)
+  - [Calling other services](#calling-other-services)
   - [Defining events](#defining-events)
   - [Recursion safety](#recursion-safety)
 - [psibase::Actor]

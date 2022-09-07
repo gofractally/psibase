@@ -2,7 +2,7 @@
 
 psidk comes with two executables for working with chains:
 
-- `psinode` runs a chain. It can optionally be a producer or a non-producer node on a chain. It also optionally hosts an http interface which provides RPC services, GraphQL services, and hosts web UIs. On-chain contracts define most of the http interface.
+- `psinode` runs a chain. It can optionally be a producer or a non-producer node on a chain. It also optionally hosts an http interface which provides RPC services, GraphQL services, and hosts web UIs. On-chain services define most of the http interface.
 - `psibase` is a command-line client for interacting with the chain. It connects to the http interface on a running node.
 
 psinode has an explicit interface; it won't boot a new chain or connect to an existing chain unless you instruct it to. It also won't open any ports you didn't request or store its database at a location you didn't tell it about.
@@ -37,11 +37,11 @@ psinode does not include https hosting; use a [reverse proxy](https.md) to add t
 
 ## psibase
 
-`psibase` provides commands for booting a chain, creating accounts, deploying contracts, and more. Notable options and commands for contract development:
+`psibase` provides commands for booting a chain, creating accounts, deploying services, and more. Notable options and commands for service development:
 
 - `-a` or `--api` tells it which api endpoint to connect to. This defaults to `http://psibase.127.0.0.1.sslip.io:8080/`.
 - `boot` boots an empty chain; see below
-- `deploy` deploys a contract; see [Basic Contract](../cpp-service/basic/)
+- `deploy` deploys a service; see [Basic Service](../cpp-service/basic/)
 
 ## Booting a chain
 
@@ -69,7 +69,7 @@ psibase boot -p prod
 
 This will create a new chain which has:
 
-- A set of system contracts suitable for development
+- A set of system services suitable for development
 - A set of web-based user interfaces suitable for development
 - `prod` as the sole block producer
 
