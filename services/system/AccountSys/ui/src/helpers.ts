@@ -4,6 +4,8 @@ import { AppletId, query } from "common/rpc.mjs";
 export interface MsgProps {
     addMsg: any;
     clearMsg: any;
+    isLoading: boolean;
+    onAccountCreation: (account: { publicKey: string, privateKey: string, account: string }) => void
 }
 
 export const fetchQuery = <T>(
