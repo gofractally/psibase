@@ -5,13 +5,17 @@ import { useLocalStorage } from "common/useLocalStorage.mjs";
 
 import appAccountIcon from "./components/assets/icons/app-account.svg";
 
-import { CreateAccountForm, Heading, SetAuth, AccountsList } from "./components";
+import {
+    CreateAccountForm,
+    Heading,
+    SetAuth,
+    AccountsList,
+} from "./components";
 import { getLoggedInUser, useMsg } from "./helpers";
 import { initAppFn } from "./appInit";
 
 import closedIcon from "./components/assets/icons/lock-closed.svg";
 import openIcon from "./components/assets/icons/lock-open.svg";
-
 
 // needed for common files that won't necessarily use bundles
 window.React = React;
@@ -39,19 +43,20 @@ const useAccountsWithKeys = (addMsg: any, clearMsg: any) => {
     return accounts;
 };
 
-
-
 interface ViewAccount extends Account {
     isSecure: boolean;
 }
 
-const toViewAccount = (account: Account): ViewAccount => ({ ...account, isSecure: account.authContract !== 'auth-any-sys' })
+const toViewAccount = (account: Account): ViewAccount => ({
+    ...account,
+    isSecure: account.authContract !== "auth-any-sys",
+});
 
-const useAccounts = (addMsg: any, clearMsg: any) => {
+const useAccounts = (addMsg: any, clearMsg: any): [Account[], () => void] => {
     const [accounts, setAccounts] = useState<Account[]>([]);
 
     const refreshAccounts = () => {
-        addMsg("Fetching accounts...");
+        console.info("Fetching accounts...");
         (async () => {
             try {
                 const accounts = await getJson<Account[]>("/accounts");
@@ -67,19 +72,21 @@ const useAccounts = (addMsg: any, clearMsg: any) => {
 
     useEffect(refreshAccounts, []);
 
-    return accounts;
+    return [accounts, refreshAccounts];
 };
 
 function App() {
     const [appInitialized, setAppInitialized] = useState(false);
     const { msg, addMsg, clearMsg } = useMsg();
     const accountsWithKeys = useAccountsWithKeys(addMsg, clearMsg);
-    const allAccounts = useAccounts(addMsg, clearMsg);
+    const [allAccounts, refreshAccounts] = useAccounts(addMsg, clearMsg);
 
     const allViewAccounts = allAccounts.map(toViewAccount);
 
     const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
-    const [keyPairs, setKeyPairs] = useLocalStorage<{ privateKey: string, publicKey: string }[]>("keyPairs", []);
+    const [keyPairs, setKeyPairs] = useLocalStorage<
+        { privateKey: string; publicKey: string }[]
+    >("keyPairs", []);
 
     useEffect(() => {
         initAppFn(() => {
@@ -104,23 +111,31 @@ function App() {
     }, [appInitialized]);
 
     const onSelectAccount = (account: string) => {
-
         const isSelectedAccount = account === currentUser;
         if (isSelectedAccount) {
-            console.log('perform logout')
+            console.log("perform logout");
         } else {
-            setCurrentUser(account)
+            setCurrentUser(account);
         }
     };
 
-
-    const onAccountCreation = ({ publicKey, privateKey }: { account: string, publicKey: string, privateKey: string }) => {
-        const withoutExisting = keyPairs.filter(pair => pair.privateKey !== privateKey && pair.publicKey !== publicKey);
+    const onAccountCreation = ({
+        publicKey,
+        privateKey,
+    }: {
+        account: string;
+        publicKey: string;
+        privateKey: string;
+    }) => {
+        const withoutExisting = keyPairs.filter(
+            (pair) =>
+                pair.privateKey !== privateKey && pair.publicKey !== publicKey
+        );
         setKeyPairs([...withoutExisting, { privateKey, publicKey }]);
-    }
+        refreshAccounts();
+    };
 
-
-    console.log({ allAccounts, accountsWithKeys })
+    console.log({ allAccounts, accountsWithKeys });
     return (
         <div className="ui container p-4">
             <div className="flex gap-2">
@@ -129,23 +144,38 @@ function App() {
                     Accounts
                 </Heading>
             </div>
-            <AccountsList accounts={accountsWithKeys} selectedAccount={currentUser} onSelectAccount={onSelectAccount} />
+            <AccountsList
+                accounts={accountsWithKeys}
+                selectedAccount={currentUser}
+                onSelectAccount={onSelectAccount}
+            />
             <div className="bg-slate-50 mt-4">
-                <CreateAccountForm isLoading={false} onAccountCreation={onAccountCreation} addMsg={addMsg} clearMsg={clearMsg} />
+                <CreateAccountForm
+                    isLoading={false}
+                    onAccountCreation={onAccountCreation}
+                    addMsg={addMsg}
+                    clearMsg={clearMsg}
+                />
             </div>
             <hr />
 
             <h2>All accounts</h2>
             <div className="flex flex-col space-y-2">
-
-                {allViewAccounts.map(account => (
-                    <div className="flex justify-between">
+                {allViewAccounts.map((account) => (
+                    <div
+                        key={account.accountNum}
+                        className="flex justify-between"
+                    >
                         <div>{account.accountNum}</div>
-                        <div className="w-5">                        <img src={account.isSecure ? closedIcon : openIcon} alt="" />
+                        <div className="w-5">
+                            {" "}
+                            <img
+                                src={account.isSecure ? closedIcon : openIcon}
+                                alt=""
+                            />
                         </div>
                     </div>
                 ))}
-
             </div>
             <hr />
 
