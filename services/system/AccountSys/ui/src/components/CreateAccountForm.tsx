@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { getJson, operation } from "common/rpc.mjs";
+import { AppletId, getJson, operation } from "common/rpc.mjs";
 import { genKeyPair, KeyType } from "common/keyConversions.mjs";
 
 import refresh from "./assets/icons/refresh.svg";
@@ -17,7 +17,10 @@ const onCreateAccount = async (
     try {
         clearMsg();
         addMsg("Pushing transaction...");
-        operation(thisApplet, "newAcc", { name, pubKey });
+        await operation(new AppletId(thisApplet, ""), "newAcc", {
+            name,
+            pubKey,
+        });
     } catch (e: any) {
         console.error(e);
         addMsg(e.message);

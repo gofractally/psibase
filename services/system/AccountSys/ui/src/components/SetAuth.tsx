@@ -1,8 +1,8 @@
-import { getJson, operation } from "common/rpc.mjs";
+import { AppletId, getJson, operation } from "common/rpc.mjs";
 
 let setAuth = async () => {
     const thisApplet = await getJson("/common/thiscontract");
-    operation(thisApplet, "setKey", {
+    operation(new AppletId(thisApplet, ""), "setKey", {
         name: "alice",
         pubKey: "PUB_K1_53cz2oXcYTqy76vfCTsknKHS2NauiRyUwe8pAgDe2j9YHsmZqg",
     });
