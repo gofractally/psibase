@@ -13,18 +13,12 @@ const psibase = (appletContract: string) => {
             config: () => {
                 return {
                     build: {
-                        assetsDir: "",
-                        cssCodeSplit: false,
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
                                 "/common/rpc.mjs",
                                 "/common/iframeResizer.js",
                             ],
-                            makeAbsoluteExternalsRelative: false,
-                            output: {
-                                assetFileNames: "_app/assets/[name][extname]",
-                            },
                         },
                     },
                     server: {
@@ -33,6 +27,7 @@ const psibase = (appletContract: string) => {
                         proxy: {
                             "/": {
                                 target: "http://psibase.127.0.0.1.sslip.io:8080",
+                                // target: process.env.PSINET_URL,
                                 bypass: (
                                     req: any,
                                     _res: any,
