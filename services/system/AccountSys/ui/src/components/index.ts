@@ -1,4 +1,4 @@
-export { AccountList } from "./AccountList";
+export { AccountsList } from "./AccountsList";
 export { Button } from "./Button";
 export { CreateAccountForm } from "./CreateAccountForm";
 export { GenerateKeyPair } from "./GenerateKeyPair";

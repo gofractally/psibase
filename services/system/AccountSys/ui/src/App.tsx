@@ -5,7 +5,7 @@ import { useLocalStorage } from "common/useLocalStorage.mjs";
 
 import appAccountIcon from "./components/assets/icons/app-account.svg";
 
-import { AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
+import { CreateAccountForm, Heading, SetAuth, AccountsList } from "./components";
 import { getLoggedInUser, useMsg } from "./helpers";
 import { initAppFn } from "./appInit";
 
@@ -74,7 +74,8 @@ function App() {
     const accountsWithKeys = useAccountsWithKeys(addMsg, clearMsg);
     const allAccounts = useAccounts(addMsg, clearMsg);
 
-    const allViewAccounts = allAccounts.map(toViewAccount)
+    const allViewAccounts = allAccounts.map(toViewAccount);
+
     const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
     useEffect(() => {
         initAppFn(() => {
@@ -98,11 +99,17 @@ function App() {
         })();
     }, [appInitialized]);
 
-    const onSelectAccount = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.id) {
-            setCurrentUser(e.target.id);
+    const onSelectAccount = (account: string) => {
+
+        const isSelectedAccount = account === currentUser;
+        if (isSelectedAccount) {
+            console.log('perform logout')
+        } else {
+            setCurrentUser(account)
         }
     };
+
+
 
     console.log({ allAccounts, accountsWithKeys })
     return (
@@ -113,22 +120,8 @@ function App() {
                     Accounts
                 </Heading>
             </div>
-            <div className="bg-slate-50">
-                <h2 className="pt-6">Available accounts</h2>
-                <div>Choose and account below to make it active.</div>
-                <div className="flex w-full flex-nowrap place-content-between">
-                    <div className="w-20 text-center">Active</div>
-                    <div className="w-32">Accounts</div>
-                    <div className="grow">Pubkey</div>
-                    <div className="w-20">Action</div>
-                </div>
-                <AccountList
-                    accounts={accountsWithKeys}
-                    onSelectAccount={onSelectAccount}
-                    addMsg={addMsg}
-                    clearMsg={clearMsg}
-                />
-            </div>
+            <AccountsList accounts={accountsWithKeys} selectedAccount={currentUser} onSelectAccount={onSelectAccount} />
+
             <div className="bg-slate-50 mt-4">
                 <CreateAccountForm addMsg={addMsg} clearMsg={clearMsg} />
             </div>
