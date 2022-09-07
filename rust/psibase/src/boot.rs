@@ -317,12 +317,20 @@ fn add_startup_trx(
         store!("r-ath-ec-sys", "/ui/index.js", js, "AuthEcSys/ui/index.js"),
     ];
 
-    let mut explore_sys_files = vec![store!(
-        "explore-sys",
-        "/ui/index.js",
-        js,
-        "ExploreSys/ui/index.js"
-    )];
+    let mut explore_sys_files = vec![
+        // store!(
+        //    "explore-sys",
+        //    "/ui/index.js",
+        //    js,
+        //    "ExploreSys/ui/index.js"
+        // ),
+    ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/ExploreSys/ui/dist"),
+        &mut explore_sys_files,
+        account!("explore-sys"),
+        account!("explore-sys"),
+    );
 
     let mut token_sys_files = vec![
         // store!(
