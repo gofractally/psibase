@@ -268,6 +268,7 @@ fn add_startup_trx(
         store_common!("rpc.mjs", js),
         store_common!("SimpleUI.mjs", js),
         store_common!("useGraphQLQuery.mjs", js),
+        store_common!("useLocalStorage.mjs", js),
         store_common!("widgets.mjs", js),
     ];
 
