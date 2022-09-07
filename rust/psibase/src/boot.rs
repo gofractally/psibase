@@ -247,8 +247,6 @@ fn add_startup_trx(
 
     let html = "text/html";
     let js = "text/javascript";
-    // let css = "text/css";
-    // let svg = "image/svg+xml";
 
     let mut reg_actions = vec![
         reg_server(account!("account-sys"), account!("r-account-sys")),
@@ -262,21 +260,9 @@ fn add_startup_trx(
     let mut common_sys_files = vec![
         store!(
             "common-sys",
-            "/index.html",
-            html,
-            "CommonSys/ui/vanilla/index.html"
-        ),
-        store!(
-            "common-sys",
             "/ui/common.index.html",
             html,
             "CommonSys/ui/vanilla/common.index.html"
-        ),
-        store!(
-            "common-sys",
-            "/ui/index.js",
-            js,
-            "CommonSys/ui/vanilla/index.js"
         ),
         store_common!("keyConversions.mjs", js),
         store_common!("rpc.mjs", js),
@@ -284,6 +270,13 @@ fn add_startup_trx(
         store_common!("useGraphQLQuery.mjs", js),
         store_common!("widgets.mjs", js),
     ];
+
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/CommonSys/ui/dist"),
+        &mut common_sys_files,
+        account!("common-sys"),
+        account!("common-sys"),
+    );
 
     let mut common_sys_3rd_party_files = vec![
         store_third_party!("htm.module.js", js),
