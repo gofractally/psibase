@@ -325,6 +325,12 @@ fn add_startup_trx(
         //    "ExploreSys/ui/index.js"
         // ),
     ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/ExploreSys/ui/dist"),
+        &mut explore_sys_files,
+        account!("explore-sys"),
+        account!("explore-sys"),
+    );
 
     let mut token_sys_files = vec![
         // store!(
