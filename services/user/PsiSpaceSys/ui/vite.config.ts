@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
+import svgr from "vite-plugin-svgr";
 
 const psibase = (appletContract: string) => {
     return [
@@ -69,12 +70,18 @@ const psibase = (appletContract: string) => {
 };
 
 const root = path.resolve(__dirname, "src");
+const outDir = path.resolve(__dirname, "dist");
 
 // https://vitejs.dev/config/
 export default defineConfig({
     root,
-    plugins: [react(), psibase("psispace-sys")],
+    plugins: [
+        react(),
+        svgr({ exportAsDefault: true }),
+        psibase("psispace-sys"),
+    ],
     build: {
+        outDir,
         rollupOptions: {
             input: {
                 main: path.resolve(root, "index.html"),
