@@ -85,11 +85,7 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: path.resolve(root, "index.html"),
-                defaultProfile: path.resolve(
-                    root,
-                    "DefaultProfile",
-                    "default-profile.html"
-                ),
+                defaultProfile: path.resolve(root, "default-profile.html"),
             },
         },
     },
