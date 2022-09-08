@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import { getJson } from "common/rpc.mjs";
+import { AppletId, getJson, operation } from "common/rpc.mjs";
 import { useLocalStorage } from "common/useLocalStorage.mjs";
 
 import appAccountIcon from "./components/assets/icons/app-account.svg";
@@ -8,6 +8,7 @@ import appAccountIcon from "./components/assets/icons/app-account.svg";
 import { AccountsList, AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
 import { getLoggedInUser, useMsg } from "./helpers";
 import { initAppFn } from "./appInit";
+import { AccountPair } from "./components/CreateAccountForm";
 
 
 
@@ -87,6 +88,7 @@ function App() {
     console.log({ currentUser })
     const [keyPairs, setKeyPairs] = useLocalStorage<KeyPair[]>('keyPairs', [])
     const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
 
     useEffect(() => {
@@ -111,9 +113,24 @@ function App() {
         })();
     }, [appInitialized]);
 
-    const onCreateAccount = (account: any) => {
-        console.log(account)
-    }
+    const onCreateAccount = async (account: AccountPair) => {
+
+        try {
+            setIsLoading(true)
+            setErrorMessage('')
+            const thisApplet = await getJson("/common/thiscontract");
+            await operation(new AppletId(thisApplet, ""), "newAcc", {
+                name: account,
+                pubKey: account.publicKey,
+            });
+        } catch (e: any) {
+            setErrorMessage(e.message)
+            console.error(e, 'q');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
 
     return (
         <div className="ui container p-4">
@@ -132,7 +149,7 @@ function App() {
                 />
             </div>
             <div className="bg-slate-50 mt-4">
-                <CreateAccountForm isLoading={isLoading} onCreateAccount={onCreateAccount} />
+                <CreateAccountForm errorMessage={errorMessage} isLoading={isLoading} onCreateAccount={onCreateAccount} />
             </div>
             {/* <SetAuth /> */}
             <AccountsList

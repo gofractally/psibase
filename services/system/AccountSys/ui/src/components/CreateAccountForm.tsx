@@ -6,13 +6,13 @@ import { genKeyPair, KeyType } from "common/keyConversions.mjs";
 import refresh from "./assets/icons/refresh.svg";
 import Button from "./Button";
 
-interface AccountPair {
+export interface AccountPair {
     privateKey: string;
     publicKey: string;
     account: string;
 }
 
-export const CreateAccountForm = ({ onCreateAccount, isLoading }: { isLoading: boolean, onCreateAccount: (pair: AccountPair) => void }) => {
+export const CreateAccountForm = ({ onCreateAccount, isLoading, errorMessage }: { isLoading: boolean, errorMessage: string, onCreateAccount: (pair: AccountPair) => void }) => {
     const [name, setName] = useState("");
     const [pubKey, setPubKey] = useState("");
     const [privKey, setPrivKey] = useState("");
@@ -78,6 +78,9 @@ export const CreateAccountForm = ({ onCreateAccount, isLoading }: { isLoading: b
                 >
                     {isLoading ? 'Loading..' : 'Create Account'}
                 </Button>
+            </div>
+            <div className="mt-4 h-8 text-red-700">
+                {errorMessage}
             </div>
         </div>
     );
