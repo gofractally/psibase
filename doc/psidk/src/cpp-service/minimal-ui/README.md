@@ -33,7 +33,7 @@ The `--register-proxy` option (shortcut `-p`) registers the service with the [`p
 - Optionally respond to RPC requests
 - Optionally respond to GraphQL requests
 
-[`proxy-sys`](../../system-service/proxy-sys.md) calls into the service's `serveSys` action. See [Calling Other Services](../calling/) to see how services do this.
+[`proxy-sys`](../../system-service/proxy-sys.md) calls into the service's `serveSys` action. See the next section, [Calling Other Services](../calling/), to see how services do this.
 
 ```sh
 psibase deploy -ip example example.wasm

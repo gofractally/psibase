@@ -6,8 +6,9 @@
 
 int32_t Caller::mult_add(int32_t a, int32_t b, int32_t c, int32_t d)
 {
-   // This allows us to call into the Arithmetic service
-   auto otherService = to<Arithmetic>(Arithmetic::service);
+   // This allows us to call into the Arithmetic service. It fetches
+   // the account number from Arithmetic::service.
+   auto otherService = psibase::to<Arithmetic>();
 
    // Compute the result. Calls into the Arithmetic service 3 times.
    return otherService

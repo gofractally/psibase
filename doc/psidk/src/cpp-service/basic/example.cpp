@@ -10,8 +10,8 @@ struct ExampleService
    int32_t multiply(int32_t a, int32_t b) { return a * b; }
 };
 
-// Enable reflection. This enables PSIBASE_DISPATCH and other
-// mechanisms to operate.
+// Reflect the service's methods. This enables
+// PSIBASE_DISPATCH and other mechanisms to operate.
 PSIO_REFLECT(ExampleService,  //
              method(add, a, b),
              method(multiply, a, b))
