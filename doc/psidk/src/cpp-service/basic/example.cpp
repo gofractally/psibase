@@ -1,7 +1,7 @@
 #include <psibase/psibase.hpp>
 
 // The service
-struct ExampleService : psibase::Service<ExampleService>
+struct ExampleService
 {
    // Add two numbers
    int32_t add(int32_t a, int32_t b) { return a + b; }

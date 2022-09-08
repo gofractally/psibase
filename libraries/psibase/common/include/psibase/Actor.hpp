@@ -3,10 +3,15 @@
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
 #include <psibase/nativeFunctions.hpp>
+#include <psibase/serviceState.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
 {
+   template <typename T>
+   concept DefinesService =
+       std::same_as<std::decay_t<decltype(T::service)>, psibase::AccountNumber>;
+
    /**
     *  When an action is called it returns
     *
@@ -179,31 +184,22 @@ namespace psibase
       ///
       /// Initialize the emitter with:
       ///
-      /// - `sender`: the account emitting the events
       /// - `elog`: the event log to emit to
       ///
-      /// You probably don't need this constructor; use [Contract::emit] instead.
-      EventEmitter(AccountNumber sender, DbId elog = psibase::DbId::historyEvent)
-          : Base{sender, elog}
-      {
-      }
+      /// [Contract::emit] is a shortcut to constructing this.
+      EventEmitter(DbId elog = psibase::DbId::historyEvent) : Base{getReceiver(), elog} {}
 
       /// Emit Ui events
       ///
       /// See [Emit Methods](#emit-methods)
-      auto ui() const
-      {
-         return EventEmitter<typename T::Events::Ui>(this->psio_get_proxy().sender,
-                                                     psibase::DbId::uiEvent);
-      }
+      auto ui() const { return EventEmitter<typename T::Events::Ui>(psibase::DbId::uiEvent); }
 
       /// Emit History events
       ///
       /// See [Emit Methods](#emit-methods)
       auto history() const
       {
-         return EventEmitter<typename T::Events::History>(this->psio_get_proxy().sender,
-                                                          psibase::DbId::historyEvent);
+         return EventEmitter<typename T::Events::History>(psibase::DbId::historyEvent);
       }
 
       /// Emit Merkle events
@@ -211,8 +207,7 @@ namespace psibase
       /// See [Emit Methods](#emit-methods)
       auto merkle() const
       {
-         return EventEmitter<typename T::Events::Merkle>(this->psio_get_proxy().sender,
-                                                         psibase::DbId::merkleEvent);
+         return EventEmitter<typename T::Events::Merkle>(psibase::DbId::merkleEvent);
       }
 
       /// Emit events from sender
@@ -271,14 +266,10 @@ namespace psibase
       ///
       /// Initialize the reader with:
       ///
-      /// - `sender`: the account which emitted the events
       /// - `elog`: the event log to read from
       ///
-      /// You probably don't need this constructor; use [Contract::events] instead.
-      EventReader(AccountNumber sender, DbId elog = psibase::DbId::historyEvent)
-          : Base{sender, elog}
-      {
-      }
+      /// [Contract::events] is a shortcut for constructing this.
+      EventReader(DbId elog = psibase::DbId::historyEvent) : Base{getReceiver(), elog} {}
 
       /// Read Ui events
       ///
@@ -414,7 +405,7 @@ namespace psibase
       ///
       /// This actor will send actions to `receiver` using `sender` authority.
       ///
-      /// You probably don't need this constructor; use [Contract::at] or [Contract::as].
+      /// You probably don't need this constructor; use [psibase::to] or [psibase::from].
       ///
       /// Non-priviledged contracts may only use their own authority.
       Actor(AccountNumber sender, AccountNumber receiver);
@@ -443,6 +434,76 @@ namespace psibase
       Actor<T>& operator*() const;
    };
 #endif
+
+   struct EmptyService
+   {
+   };
+   PSIO_REFLECT(EmptyService)
+
+   /// Call a service
+   ///
+   /// Template arguments:
+   /// - `Service`: the receiver's class
+   ///
+   /// Returns an [Actor] for calling `receiver` using the current service's authority.
+   /// This version sets receiver to `Service::service`; this works if `Service` defined
+   /// a const member named `service` which identifies the account that service is
+   /// normally deployed on.
+   ///
+   /// [See the other overload](#psibaseto-1)
+   ///
+   /// Example use:
+   ///
+   /// ```c++
+   /// auto result = to<OtherServiceClass>().someMethod(args...);
+   /// ```
+   template <DefinesService Service>
+   Actor<Service> to()
+   {
+      return to<Service>(Service::service);
+   }
+
+   /// Call a service
+   ///
+   /// Template arguments:
+   /// - `Service`: the receiver's class
+   ///
+   /// Returns an [Actor] for calling `receiver` using the current service's authority.
+   ///
+   /// [See the other overload](#psibaseto)
+   ///
+   /// Example use:
+   ///
+   /// ```c++
+   /// auto result = to<OtherServiceClass>(otherServiceAccount).someMethod(args...);
+   /// ```
+   template <typename Service>
+   Actor<Service> to(AccountNumber receiver)
+   {
+      return Actor<Service>(getReceiver(), receiver);
+   }
+
+   /// Call a service
+   ///
+   /// - If `u` is `0` (the default), then use this service's authority ([getReceiver]).
+   /// - If `u` is non-0, then use `u`'s authority. Non-priviledged services may only use their own authority.
+   ///
+   /// [See psibase::to](#psibaseto); it covers the majority use case.
+   ///
+   /// Example use:
+   ///
+   /// ```c++
+   /// auto result =
+   ///   from(userAccount)
+   ///   .to<OtherServiceClass, otherServiceAccount>()
+   ///   .someMethod(args...);
+   /// ```
+   inline Actor<EmptyService> from(AccountNumber u = AccountNumber())
+   {
+      if (u == AccountNumber())
+         return Actor<EmptyService>{getSender(), getReceiver()};
+      return Actor<EmptyService>{u, getReceiver()};
+   }
 
    /**
  *  Builds actions to add to transactions

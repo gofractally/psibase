@@ -1,6 +1,6 @@
 #include <psibase/psibase.hpp>
 
-struct Caller : psibase::Service<Caller>
+struct Caller
 {
    static constexpr auto service = psibase::AccountNumber("caller");
 

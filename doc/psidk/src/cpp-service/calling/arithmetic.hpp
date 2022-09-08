@@ -1,7 +1,7 @@
 #include <psibase/psibase.hpp>
 
 // The header includes the class definition
-struct Arithmetic : psibase::Service<Arithmetic>
+struct Arithmetic
 {
    // The account this service is normally installed on
    static constexpr auto service = psibase::AccountNumber("arithmetic");
