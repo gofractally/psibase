@@ -27,7 +27,6 @@ const psibase = (appletContract: string) => {
                         proxy: {
                             "/": {
                                 target: "http://psibase.127.0.0.1.sslip.io:8080",
-                                // target: process.env.PSINET_URL,
                                 bypass: (
                                     req: any,
                                     _res: any,

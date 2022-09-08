@@ -58,7 +58,10 @@ export async function loadData(args) {
             pagedResult,
         };
     } catch (error) {
-        console.error("Error in load function for /: ", error);
+        console.error("Error in loadData :", error);
+        return {
+            error
+        };
     }
 }
 
@@ -102,6 +105,9 @@ export async function loadBlockData(blockNum) {
             transactions,
         };
     } catch (error) {
-        console.error("Error in loadBlockData function", error);
+        console.error("Error in loadBlockData :", error);
+        return {
+            error
+        };
     }
 }
