@@ -176,7 +176,7 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
    else
    {
       check(account != AccountSys::nullAccount, invalidAccount);
-      check(*to<AccountSys>().exists(account), invalidAccount);
+      check(to<AccountSys>().exists(account), invalidAccount);
 
       return NftHolderRecord{account};
    }

@@ -11,11 +11,9 @@ int32_t Caller::mult_add(int32_t a, int32_t b, int32_t c, int32_t d)
    auto otherService = psibase::to<Arithmetic>();
 
    // Compute the result. Calls into the Arithmetic service 3 times.
-   return otherService
-       .add(                                      //
-           otherService.multiply(a, b).unpack(),  //
-           otherService.multiply(c, d).unpack())
-       .unpack();
+   return otherService.add(          //
+       otherService.multiply(a, b),  //
+       otherService.multiply(c, d));
 }
 
 std::optional<psibase::HttpReply> Caller::serveSys(  //

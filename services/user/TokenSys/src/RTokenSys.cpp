@@ -142,8 +142,8 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          TID                         tokenId = 1;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)
          {
-            auto balance = to<TokenSys>().getBalance(tokenId, acc).unpack();
-            auto token   = to<TokenSys>().getToken(balance.key.tokenId).unpack();
+            auto balance = to<TokenSys>().getBalance(tokenId, acc);
+            auto token   = to<TokenSys>().getToken(balance.key.tokenId);
 
             if (balance.balance != 0)
             {

@@ -78,10 +78,6 @@ The system keeps each service alive during the entire transaction. This allows s
 - Services may call into each other recursively. Be careful; you need to either plan for this or disable it. TODO: make it easy for services to opt out of recursion.
 - A service method may store intermediate results in global variables then return. Future calls to that service, within the same transaction, have access to those global variables. They're wiped at the end of the transaction.
 
-# Unpack()?
-
-The system transfers packed data between services. `unpack()` unpacks it.
-
 # Who called me?
 
 A service may call [psibase::getSender] to find out which service or user called it. A service also may use [psibase::getReceiver] to get the account that the service is running on.

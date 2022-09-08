@@ -47,7 +47,6 @@ namespace psibase
       }
    };
 
-   //#ifdef __wasm__
    template <typename T>
    psio::shared_view_ptr<T> fraccall(const Action& a)
    {
@@ -88,6 +87,27 @@ namespace psibase
          {
             psibase::fraccall<void>(act);
          }
+      }
+   };
+
+   struct sync_call_unpack_proxy
+   {
+      sync_call_unpack_proxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
+
+      AccountNumber sender;
+      AccountNumber receiver;
+
+      // TODO: remove idx (unused)
+      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+      auto call(Args&&... args) const
+      {
+         auto act = action_builder_proxy(sender, receiver)
+                        .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
+         using result_type = decltype(psio::result_of(MemberPtr));
+         if constexpr (not std::is_same_v<void, result_type>)
+            return psibase::fraccall<result_type>(act).unpack();
+         else
+            psibase::fraccall<void>(act);
       }
    };
 
@@ -313,9 +333,9 @@ namespace psibase
 
 #ifndef GENERATING_DOCUMENTATION
    template <typename T = void>
-   struct Actor : public psio::reflect<T>::template proxy<sync_call_proxy>
+   struct Actor : public psio::reflect<T>::template proxy<sync_call_unpack_proxy>
    {
-      using Base = typename psio::reflect<T>::template proxy<sync_call_proxy>;
+      using Base = typename psio::reflect<T>::template proxy<sync_call_unpack_proxy>;
       using Base::Base;
 
       auto from(AccountNumber other) const { return Actor(other, Base::receiver); }
@@ -328,6 +348,12 @@ namespace psibase
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
+
+      auto view() const
+      {
+         return typename psio::reflect<T>::template proxy<sync_call_proxy>{
+             Base::psio_get_proxy().sender, Base::psio_get_proxy().receiver};
+      }
    };
 
    template <>

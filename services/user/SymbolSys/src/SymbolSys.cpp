@@ -114,7 +114,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    }
 
    // Mint and offer ownership NFT
-   newSym.ownerNft    = *to<NftSys>().mint();
+   newSym.ownerNft    = to<NftSys>().mint();
    auto nftCreditMemo = "This NFT conveys ownership of symbol: " + symString;
    if (sender != getReceiver())
    {
@@ -123,7 +123,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
 
    // Update symbol type statistics
    symType.createCounter++;
-   symType.lastPriceUpdateTime = *to<TransactionSys>().headBlockTime();
+   symType.lastPriceUpdateTime = to<TransactionSys>().headBlockTime();
 
    db.open<SymbolTable>().put(newSym);
    db.open<SymbolLengthTable>().put(symType);
@@ -140,9 +140,8 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
 
    check(price.value != 0, priceTooLow);
    check(nft != 0, symbolDNE);
-   check(seller == nftContract.getNft(nft)->owner(), missingRequiredAuth);
-   check(nftContract.getCredRecord(nft)->debitor() != AccountSys::nullAccount,
-         creditSymbolRequired);
+   check(seller == nftContract.getNft(nft).owner, missingRequiredAuth);
+   check(nftContract.getCredRecord(nft).debitor != AccountSys::nullAccount, creditSymbolRequired);
 
    auto debitMemo = "Symbol " + symbol.str() + " is listed for sale.";
 
@@ -245,7 +244,7 @@ void SymbolSys::updatePrices()
    auto dec                = static_cast<uint64_t>((uint8_t)100 - priceAdjustmentRec.decreasePct);
    auto inc                = static_cast<uint64_t>((uint8_t)100 + priceAdjustmentRec.increasePct);
 
-   auto lastBlockTime = to<TransactionSys>().headBlockTime().unpack();
+   auto lastBlockTime = to<TransactionSys>().headBlockTime();
    for (auto symbolType : symLengthIndex)
    {
       if (lastBlockTime.seconds - symbolType.lastPriceUpdateTime.seconds > secondsInDay)
