@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import wait from "waait";
-import JSZip from "jszip";
 
-import { executeUpload } from "../../operations";
-import { pollForUploadedFiles, useFilesForAccount } from "../../queries";
+import { executeRemove, executeUpload } from "../../operations";
+import {
+    pollForRemovedFiles,
+    pollForUploadedFiles,
+    useFilesForAccount,
+} from "../../queries";
 import { FileItem } from "./file-items";
 import { NamedAccountFile } from "./interfaces";
 import { PathBreadcrumbs } from "./path-breadcrumbs";
-import { UploadZone } from "./upload-zone";
+import { UploadingFile, UploadZone } from "./upload-zone";
 import {
+    extractFileUploadGroups,
     extractPathContent,
     mapRawFilesToUploadParams,
     processArchiveFiles,
@@ -21,7 +25,7 @@ export type FilesManagerProps = {
 export const FilesManager = ({ account }: FilesManagerProps) => {
     const { accountFiles, refreshFiles } = useFilesForAccount(account);
     const [path, setPath] = useState("/");
-    const [newFiles, setNewFiles] = useState<File[]>([]);
+    const [newFiles, setNewFiles] = useState<UploadingFile[]>([]);
     const [pathFiles, setPathFiles] = useState<NamedAccountFile[]>([]);
     const [pathFolders, setPathFolders] = useState<string[]>([]);
 
@@ -32,20 +36,88 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
     }, [path, accountFiles]);
 
     const uploadFiles = async () => {
-        const filesParam = await Promise.all(
-            newFiles.map(mapRawFilesToUploadParams)
-        );
-        executeUpload({ path, files: filesParam });
+        let uploadingFiles = newFiles.map((file) => {
+            if (file.uploadStatus === "fail") {
+                file.uploadStatus = undefined;
+            }
+            return file;
+        });
+        setNewFiles([...uploadingFiles]);
 
-        await wait(2000); // TODO: Would be great if the operation returned a value
+        const uploadGroups = extractFileUploadGroups(uploadingFiles);
 
-        await pollForUploadedFiles(
-            account,
-            path,
-            filesParam.map((fp) => fp.name)
-        );
+        for (const filesGroup of uploadGroups) {
+            const filesParam = await Promise.all(
+                filesGroup.map(mapRawFilesToUploadParams)
+            );
+
+            // set to pending
+            uploadingFiles = uploadingFiles.map((file) =>
+                setFileStatusBasedOnCurrentGroup(file, filesGroup, "pending")
+            );
+            setNewFiles([...uploadingFiles]);
+
+            executeUpload({ path, files: filesParam });
+            await wait(2000); // TODO: Would be great if the operation returned a value
+
+            const polledFiles = await pollForUploadedFiles(
+                account,
+                path,
+                filesGroup.map((file) => file.name)
+            );
+
+            // set success/fail statuses
+            uploadingFiles = uploadingFiles.map((file) =>
+                setFileStatusBasedOnCurrentGroup(
+                    file,
+                    filesGroup,
+                    polledFiles.includes(file.name) ? "success" : "fail"
+                )
+            );
+            setNewFiles([...uploadingFiles]);
+        }
 
         refreshFiles();
+
+        const hasFailures = uploadingFiles.some(
+            (file) => file.uploadStatus === "fail"
+        );
+        if (hasFailures) {
+            throw new Error("One or more files have failed to upload.");
+        }
+    };
+
+    const setFileStatusBasedOnCurrentGroup = (
+        file: UploadingFile,
+        filesGroup: UploadingFile[],
+        uploadStatus: "success" | "fail" | "pending"
+    ) => {
+        const isRelevant = filesGroup.find((fg) => fg.name === file.name);
+        if (!isRelevant) {
+            return file;
+        }
+        file.uploadStatus = uploadStatus;
+        return file;
+    };
+
+    const removeFiles = async (filePaths: string[]) => {
+        executeRemove({ filePaths });
+        await wait(2000); // TODO: Would be great if the operation returned a value
+        await pollForRemovedFiles(account, filePaths);
+        refreshFiles();
+    };
+
+    const handleRemoveFileClick = async (fileName: string) => {
+        const filePaths = [path + fileName];
+        await removeFiles(filePaths);
+    };
+
+    const handleRemoveFolderClick = async (folder: string) => {
+        const folderPath = path + folder + "/";
+        const filePaths = accountFiles
+            .filter((accountFile) => accountFile.path.startsWith(folderPath))
+            .map((accountFile) => accountFile.path);
+        await removeFiles(filePaths);
     };
 
     const handleChangeFiles = async (files: File[]) => {
@@ -57,6 +129,13 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
         }
 
         setNewFiles(processingFiles);
+    };
+
+    const handleRemoveNewFile = (fileName: string) => {
+        const updatedNewFiles = newFiles.filter(
+            (file) => file.name !== fileName
+        );
+        setNewFiles(updatedNewFiles);
     };
 
     const handleFolderClick = (folderName: string) => {
@@ -75,21 +154,20 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
 
     return (
         <>
-            <div className="flex items-center justify-between">
-                <div className="m-4 font-bold">
-                    <PathBreadcrumbs
-                        account={account}
-                        path={path}
-                        onPathChange={setPath}
-                    />
-                </div>
-
-                <UploadZone
-                    files={newFiles}
-                    onChangeFiles={handleChangeFiles}
-                    onSubmitUploads={uploadFiles}
+            <div className="m-4 font-bold">
+                <PathBreadcrumbs
+                    account={account}
+                    path={path}
+                    onPathChange={setPath}
                 />
             </div>
+
+            <UploadZone
+                files={newFiles}
+                onChangeFiles={handleChangeFiles}
+                onSubmitUploads={uploadFiles}
+                onRemoveNewFile={handleRemoveNewFile}
+            />
 
             {accountFiles.length === 0 && (
                 <div className="m-16 text-center">
@@ -106,6 +184,7 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
                         name={folder}
                         isFolder
                         onClick={() => handleFolderClick(folder)}
+                        onRemoveClick={() => handleRemoveFolderClick(folder)}
                     />
                 ))}
 
@@ -115,6 +194,7 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
                         name={file.name}
                         type={file.accountFile.contentType}
                         onClick={() => handleFileClick(file)}
+                        onRemoveClick={() => handleRemoveFileClick(file.name)}
                     />
                 ))}
             </div>

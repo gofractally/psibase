@@ -61,10 +61,8 @@ export const pollForUploadedFiles = async (
     path: string,
     files: string[],
     attempt = 1
-): Promise<void> => {
+): Promise<string[]> => {
     console.log(`Checking for uploaded files; Attempt: ${attempt}.`);
-
-    checkMaxAttempts(attempt);
 
     const queryResult: any = await postGraphQLGetJson(
         "/graphql",
@@ -72,25 +70,47 @@ export const pollForUploadedFiles = async (
     );
     const accountFiles = mapQueryResultToAccountFiles(queryResult);
 
-    if (
-        files.every((fileName) =>
-            accountFiles.find((accFile) => accFile.path === path + fileName)
-        )
-    ) {
-        return;
+    const MAX_ATTEMPTS = 5;
+    const tooManyAttempts = attempt > MAX_ATTEMPTS;
+
+    const foundFiles = files.filter((fileName) =>
+        accountFiles.find((accFile) => accFile.path === path + fileName)
+    );
+    if (foundFiles.length === files.length || tooManyAttempts) {
+        return foundFiles;
     }
 
     await wait(500);
     return pollForUploadedFiles(account, path, files, attempt + 1);
 };
 
-const MAX_ATTEMPTS = 5;
-const checkMaxAttempts = (attempt: number) => {
+export const pollForRemovedFiles = async (
+    account: string,
+    files: string[],
+    attempt = 1
+): Promise<void> => {
+    console.log(`Checking for removed files; Attempt: ${attempt}.`);
+
+    const queryResult: any = await postGraphQLGetJson(
+        "/graphql",
+        getContentQuery(account)
+    );
+    const accountFiles = mapQueryResultToAccountFiles(queryResult);
+
+    const MAX_ATTEMPTS = 5;
     const tooManyAttempts = attempt > MAX_ATTEMPTS;
 
-    if (tooManyAttempts) {
-        throw new Error(
-            `Exceeded polling deadline after ${MAX_ATTEMPTS} attempts.`
-        );
+    const foundAnyRemovedFile = files.some((fileName) =>
+        accountFiles.find((accFile) => accFile.path === fileName)
+    );
+    if (!foundAnyRemovedFile) {
+        return;
     }
+
+    if (tooManyAttempts) {
+        throw new Error("Too many attempts when trying to read removed files.");
+    }
+
+    await wait(500);
+    return pollForRemovedFiles(account, files, attempt + 1);
 };
