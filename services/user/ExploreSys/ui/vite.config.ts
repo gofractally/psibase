@@ -19,6 +19,7 @@ const psibase = (appletContract: string) => {
                                 "/common/rpc.mjs",
                                 "/common/iframeResizer.js",
                             ],
+                            makeAbsoluteExternalsRelative: false,
                         },
                     },
                     server: {
