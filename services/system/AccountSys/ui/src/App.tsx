@@ -113,16 +113,16 @@ function App() {
         })();
     }, [appInitialized]);
 
+
     const onCreateAccount = async (account: AccountPair) => {
 
         try {
             setIsLoading(true)
             setErrorMessage('')
-            const thisApplet = await getJson("/common/thiscontract");
-            await operation(new AppletId(thisApplet, ""), "newAcc", {
-                name: account,
-                pubKey: account.publicKey,
-            });
+            const thisApplet = await getJson<string>("/common/thiscontract");
+            const appletId = new AppletId(thisApplet)
+
+            operation(appletId, 'newAcc', { name: account.account, ...(account.publicKey && { pubKey: account.publicKey }) })
         } catch (e: any) {
             setErrorMessage(e.message)
             console.error(e, 'q');

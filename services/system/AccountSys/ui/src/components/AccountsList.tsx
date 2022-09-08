@@ -21,13 +21,13 @@ export const AccountsList = ({
                 </thead>
                 <tbody>
                     {accounts.map((account) => (
-                        <tr key={account.accountNum} className="w-8">
+                        <tr key={account.accountNum} className="w-8 h-12">
                             <td>
                                 <div className="w-32 text-lg">{account.accountNum}</div>
                             </td>
                             <td className="">
                                 <div className="w-8">
-                                    {account.authContract == 'auth-any-sys' ? <img src={openIcon} alt={account.authContract} /> : <div>{account.publicKey}</div>}
+                                    {account.authContract == 'auth-any-sys' ? <img src={openIcon} alt={account.authContract} /> : <img src={closedIcon} alt={account.authContract} />}
                                 </div>
                             </td>
                         </tr>
