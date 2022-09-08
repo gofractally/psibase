@@ -155,7 +155,10 @@ namespace psibase::net
          term_id                   term;
          producer_id               follower_id;
          BlockNum                  head_num;
-         PSIO_REFLECT_INLINE(append_entries_response, term, follower_id, head_num);
+         Claim                     claim;
+
+         Claim signer() const { return claim; }
+         PSIO_REFLECT_INLINE(append_entries_response, term, follower_id, head_num, claim);
          std::string to_string() const
          {
             return "append_entries response: term=" + std::to_string(term) +
@@ -170,11 +173,15 @@ namespace psibase::net
          producer_id               candidate_id;
          block_num                 last_log_index;
          term_id                   last_log_term;
+         Claim                     claim;
+
+         Claim signer() const { return claim; }
          PSIO_REFLECT_INLINE(request_vote_request,
                              term,
                              candidate_id,
                              last_log_index,
-                             last_log_term)
+                             last_log_term,
+                             claim)
          std::string to_string() const
          {
             return "request_vote: term=" + std::to_string(term) +
@@ -188,7 +195,15 @@ namespace psibase::net
          producer_id               candidate_id;
          producer_id               voter_id;
          bool                      vote_granted;
-         PSIO_REFLECT_INLINE(request_vote_response, term, candidate_id, voter_id, vote_granted)
+         Claim                     claim;
+
+         Claim signer() const { return claim; }
+         PSIO_REFLECT_INLINE(request_vote_response,
+                             term,
+                             candidate_id,
+                             voter_id,
+                             vote_granted,
+                             claim)
          std::string to_string() const
          {
             return "vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str() +
@@ -369,6 +384,31 @@ namespace psibase::net
       }
       producer_id producer_name() const { return self; }
 
+      void validate_producer(producer_id producer, const Claim& claim)
+      {
+         auto expected = active_producers.getClaim(producer);
+         if (!expected)
+         {
+            throw std::runtime_error(producer.str() + " is not an active producer");
+         }
+         else if (claim != *expected)
+         {
+            throw std::runtime_error("Wrong key for " + producer.str());
+         }
+      }
+
+      Claim myKey() const
+      {
+         if (auto claim = active_producers.getClaim(self))
+         {
+            return *claim;
+         }
+         else
+         {
+            return {};
+         }
+      }
+
       // ---------------- block production loop --------------------------
 
       void start_leader()
@@ -465,8 +505,9 @@ namespace psibase::net
          if (_state == producer_state::follower && new_head->term == current_term &&
              new_head->blockNum > chain().commit_index())
          {
-            network().sendto(new_head->producer,
-                             append_entries_response{current_term, self, new_head->blockNum});
+            network().sendto(
+                new_head->producer,
+                append_entries_response{current_term, self, new_head->blockNum, myKey()});
          }
          // TODO: how do we handle a fork switch during connection startup?
          for (auto& peer : _peers)
@@ -596,7 +637,7 @@ namespace psibase::net
          _state = producer_state::candidate;
          randomize_timer();
          network().multicast_producers(request_vote_request{
-             current_term, self, chain().get_head()->blockNum, chain().get_head()->term});
+             current_term, self, chain().get_head()->blockNum, chain().get_head()->term, myKey()});
          check_votes();
       }
       // ----------- handling of incoming messages -------------
@@ -631,6 +672,7 @@ namespace psibase::net
       }
       void recv(peer_id, const append_entries_response& response)
       {
+         validate_producer(response.follower_id, response.claim);
          update_term(response.term);
          if (response.term == current_term)
          {
@@ -643,6 +685,7 @@ namespace psibase::net
       }
       void recv(peer_id, const request_vote_request& request)
       {
+         validate_producer(request.candidate_id, request.claim);
          update_term(request.term);
          bool vote_granted = false;
          // Can we vote for this candidate?
@@ -665,11 +708,13 @@ namespace psibase::net
                              request_vote_response{.term         = current_term,
                                                    .candidate_id = request.candidate_id,
                                                    .voter_id     = self,
-                                                   .vote_granted = vote_granted});
+                                                   .vote_granted = vote_granted,
+                                                   .claim        = myKey()});
          }
       }
       void recv(peer_id, const request_vote_response& response)
       {
+         validate_producer(response.voter_id, response.claim);
          update_term(response.term);
          if (response.candidate_id == self && response.term == current_term &&
              response.vote_granted && _state == producer_state::candidate)

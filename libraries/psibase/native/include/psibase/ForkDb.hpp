@@ -53,6 +53,18 @@ namespace psibase
             return {};
          }
       }
+      std::optional<Claim> getClaim(AccountNumber producer) const
+      {
+         auto iter = activeProducers.find(producer);
+         if (iter != activeProducers.end())
+         {
+            return iter->second;
+         }
+         else
+         {
+            return {};
+         }
+      }
       std::size_t size() const { return activeProducers.size(); }
       friend bool operator==(const ProducerSet&, const ProducerSet&) = default;
    };
@@ -547,7 +559,12 @@ namespace psibase
                {
                   break;
                }
-               blocks.try_emplace(info.blockId, SignedBlock{*block});
+               auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum);
+               if (!proof)
+               {
+                  proof.emplace();
+               }
+               blocks.try_emplace(info.blockId, SignedBlock{*block, *proof});
                auto [state_iter, _] = states.try_emplace(info.blockId, info, revision);
                byOrderIndex.try_emplace(state_iter->second.order(), info.blockId);
                byBlocknumIndex.try_emplace(blockNum, info.blockId);
@@ -573,6 +590,25 @@ namespace psibase
          }
       }
       ConstRevisionPtr getHeadRevision() { return head->revision; }
+
+      std::vector<char> sign(std::span<char> data, const Claim& claim)
+      {
+         return prover.prove(data, claim);
+      }
+
+      void verify(std::span<char> data, const Claim& claim, const std::vector<char>& signature)
+      {
+         auto iter = byBlocknumIndex.find(commitIndex);
+         // The last committed block is guaranteed to be present
+         assert(iter != byBlocknumIndex.end());
+         auto stateIter = states.find(iter->second);
+         // We'd better have a state for this block
+         assert(stateIter != states.end());
+         assert(stateIter->second.revision);
+         BlockContext verifyBc(*systemContext, stateIter->second.revision);
+         VerifyProver prover{verifyBc, signature};
+         prover.prove(data, claim);
+      }
 
      private:
       std::optional<BlockContext>                               blockContext;

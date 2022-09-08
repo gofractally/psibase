@@ -7,6 +7,7 @@
 #include <boost/mp11/algorithm.hpp>
 #include <iostream>
 #include <memory>
+#include <psibase/SignedMessage.hpp>
 #include <psibase/net_base.hpp>
 #include <psio/fracpack.hpp>
 #include <queue>
@@ -25,6 +26,7 @@ namespace psibase::net
    struct direct_routing
    {
       auto& peers() { return static_cast<Derived*>(this)->peers(); }
+      auto& chain() { return static_cast<Derived*>(this)->chain(); }
       explicit direct_routing(boost::asio::io_context& ctx) {}
       static const std::uint32_t protocol_version = 0;
       struct init_message
@@ -127,7 +129,7 @@ namespace psibase::net
          return true;
       }
       template <typename Msg>
-      static std::vector<char> serialize_message(const Msg& msg)
+      static std::vector<char> serialize_unsigned_message(const Msg& msg)
       {
          static_assert(Msg::type < 128);
          std::vector<char> result(psio::fracpack_size(msg) + 1);
@@ -136,12 +138,34 @@ namespace psibase::net
          psio::fracpack(msg, s);
          return result;
       }
+      template <typename Msg>
+      std::vector<char> serialize_signed_message(const Msg& msg)
+      {
+         // TODO: avoid serializing the message twice
+         auto  raw   = serialize_unsigned_message(msg);
+         Claim claim = msg.signer();
+         auto  sig   = chain().sign({raw.data(), raw.size()}, claim);
+         return serialize_unsigned_message(SignedMessage<Msg>{msg, sig});
+      }
+      template <typename Msg>
+      auto serialize_message(const Msg& msg)
+      {
+         return serialize_unsigned_message(msg);
+      }
+      template <NeedsSignature Msg>
+      auto serialize_message(const Msg& msg)
+      {
+         return serialize_signed_message(msg);
+      }
       template <typename T>
       void try_recv_impl(peer_id peer, psio::input_stream& s)
       {
          try
          {
-            return recv(peer, psio::convert_from_frac<T>(s));
+            return recv(
+                peer,
+                psio::convert_from_frac<std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>>(
+                    s));
          }
          catch (std::exception& e)
          {
@@ -176,6 +200,14 @@ namespace psibase::net
       void recv(peer_id peer, const producer_message& msg)
       {
          producers.insert({msg.producer, peer});
+      }
+      template <typename T>
+      void recv(peer_id peer, const SignedMessage<T>& msg)
+      {
+         auto  raw   = serialize_unsigned_message(msg.data);
+         Claim claim = msg.data.signer();
+         chain().verify({raw.data(), raw.size()}, claim, msg.signature);
+         static_cast<Derived*>(this)->consensus().recv(peer, msg.data);
       }
       void recv(peer_id peer, const auto& msg)
       {
