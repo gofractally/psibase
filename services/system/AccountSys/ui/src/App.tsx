@@ -5,49 +5,70 @@ import { useLocalStorage } from "common/useLocalStorage.mjs";
 
 import appAccountIcon from "./components/assets/icons/app-account.svg";
 
-import { AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
+import { AccountsList, AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
 import { getLoggedInUser, useMsg } from "./helpers";
 import { initAppFn } from "./appInit";
+
+
 
 // needed for common files that won't necessarily use bundles
 window.React = React;
 
+interface KeyPair {
+    privateKey: string;
+    publicKey: string;
+}
+
 export interface Account {
     accountNum: string;
     authContract: string;
+    publicKey: KeyPair['publicKey']
 }
 
-const useAccountsWithKeys = (addMsg: any, clearMsg: any) => {
+const useAccountsWithKeys = (): [Account[], (key: string) => void] => {
     const [accounts, setAccounts] = useState<Account[]>([
         {
             accountNum: "alice",
             authContract: "auth-any-sys",
+            publicKey: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(2)
         },
         {
             accountNum: "bob",
             authContract: "auth-any-sys",
+            publicKey: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(2)
         },
         {
             accountNum: "carol",
             authContract: "auth-any-sys",
+            publicKey: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(2)
         },
     ]);
-    return accounts;
+    const dropAccount = (accountNum: string) => {
+        const foundAccount = accounts.find(a => accountNum == a.accountNum);
+        if (foundAccount) {
+            const key = foundAccount.publicKey;
+            setAccounts(accounts => accounts.filter(account => account.publicKey !== key))
+        } else {
+            console.warn(`Failed to find account ${accountNum} to drop`)
+        }
+    }
+    return [accounts, dropAccount];
 };
-const useAccounts = (addMsg: any, clearMsg: any) => {
-    const [accounts, setAccounts] = useState([]);
+
+
+const useAccounts = (): [Account[], () => void] => {
+    const [accounts, setAccounts] = useState<Account[]>([]);
 
     const refreshAccounts = () => {
         console.info("Fetching accounts...");
         (async () => {
             try {
                 const accounts = await getJson<Account[]>("/accounts");
+                console.log(accounts, 'are the accounts')
                 setAccounts(accounts);
             } catch (e) {
                 console.info("refreshAccounts().catch().e:");
                 console.info(e);
-                clearMsg();
-                addMsg(e);
             }
         })();
     };
@@ -59,10 +80,15 @@ const useAccounts = (addMsg: any, clearMsg: any) => {
 
 function App() {
     const [appInitialized, setAppInitialized] = useState(false);
-    const { msg, addMsg, clearMsg } = useMsg();
-    const accountsWithKeys = useAccountsWithKeys(addMsg, clearMsg);
-    const allAccounts = useAccounts(addMsg, clearMsg);
+    const [accountsWithKeys, dropAccount] = useAccountsWithKeys();
+    const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
+
+    console.log({ currentUser })
+    const [keyPairs, setKeyPairs] = useLocalStorage<KeyPair[]>('keyPairs', [])
+    const [isLoading, setIsLoading] = useState(false);
+
+
     useEffect(() => {
         initAppFn(() => {
             setAppInitialized(true);
@@ -85,11 +111,9 @@ function App() {
         })();
     }, [appInitialized]);
 
-    const onSelectAccount = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.id) {
-            setCurrentUser(e.target.id);
-        }
-    };
+    const onCreateAccount = (account: any) => {
+        console.log(account)
+    }
 
     return (
         <div className="ui container p-4">
@@ -100,31 +124,22 @@ function App() {
                 </Heading>
             </div>
             <div className="bg-slate-50">
-                <h2 className="pt-6">Available accounts</h2>
-                <div>Choose and account below to make it active.</div>
-                <div className="flex w-full flex-nowrap place-content-between">
-                    <div className="w-20 text-center">Active</div>
-                    <div className="w-32">Accounts</div>
-                    <div className="grow">Pubkey</div>
-                    <div className="w-20">Action</div>
-                </div>
                 <AccountList
+                    onLogout={dropAccount}
+                    selectedAccount={currentUser}
                     accounts={accountsWithKeys}
-                    onSelectAccount={onSelectAccount}
-                    addMsg={addMsg}
-                    clearMsg={clearMsg}
+                    onSelectAccount={setCurrentUser}
                 />
             </div>
             <div className="bg-slate-50 mt-4">
-                <CreateAccountForm addMsg={addMsg} clearMsg={clearMsg} />
+                <CreateAccountForm isLoading={isLoading} onCreateAccount={onCreateAccount} />
             </div>
-            <SetAuth />
+            {/* <SetAuth /> */}
+            <AccountsList
+                accounts={allAccounts}
+            />
 
-            <hr />
-            <h2>Messages</h2>
-            <pre style={{ border: "1px solid" }}>
-                <code>{msg}</code>
-            </pre>
+
         </div>
     );
 }

@@ -4,28 +4,15 @@ import { AppletId, getJson, operation } from "common/rpc.mjs";
 import { genKeyPair, KeyType } from "common/keyConversions.mjs";
 
 import refresh from "./assets/icons/refresh.svg";
-import { MsgProps } from "../helpers";
 import Button from "./Button";
 
-const onCreateAccount = async (
-    name: any,
-    pubKey: any,
-    addMsg: any,
-    clearMsg: any
-) => {
-    const thisApplet = await getJson("/common/thiscontract");
-    try {
-        clearMsg();
-        addMsg("Pushing transaction...");
-        operation(thisApplet, "newAcc", { name, pubKey });
-    } catch (e: any) {
-        console.error(e);
-        addMsg(e.message);
-        if (!e.trace) return;
-        addMsg("trace: " + JSON.stringify(e.trace, null, 4));
-    }
-};
-export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
+interface AccountPair {
+    privateKey: string;
+    publicKey: string;
+    account: string;
+}
+
+export const CreateAccountForm = ({ onCreateAccount, isLoading }: { isLoading: boolean, onCreateAccount: (pair: AccountPair) => void }) => {
     const [name, setName] = useState("");
     const [pubKey, setPubKey] = useState("");
     const [privKey, setPrivKey] = useState("");
@@ -35,6 +22,10 @@ export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
         setPubKey(kp.pub);
         setPrivKey(kp.priv);
     };
+
+    const isValid = name !== '' && pubKey !== ''
+
+    const isDisabled = isLoading || !isValid
 
     return (
         <div>
@@ -77,14 +68,15 @@ export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
                     onChange={(e) => setPubKey(e.target.value)}
                 ></input>
             </div>
-            <div>
+            <div className="mt-4">
                 <Button
                     type="primary"
+                    disabled={isDisabled}
                     onClick={(e) =>
-                        onCreateAccount(name, pubKey, addMsg, clearMsg)
+                        onCreateAccount({ account: name, publicKey: pubKey, privateKey: privKey })
                     }
                 >
-                    Create Account
+                    {isLoading ? 'Loading..' : 'Create Account'}
                 </Button>
             </div>
         </div>
