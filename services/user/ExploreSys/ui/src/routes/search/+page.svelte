@@ -1,10 +1,12 @@
 <script>
-    import { loadBlockData } from "/src/lib/loadData.js";
+    import {loadBlockData} from "/src/lib/loadData.js";
     import Logo from "/src/assets/icons/app-explorer-icon.svg";
     import Button from "/src/components/Button.svelte";
     import TextInput from "/src/components/TextInput.svelte";
     import LeftArrow from "/src/assets/icons/leftArrow.svg";
+    import searchIconUrl from "/src/assets/icons/search.svg?url";
     import ResultsTable from "/src/components/ResultsTable.svelte";
+
     let searchTerm;
     let blocks = [];
 
@@ -22,9 +24,9 @@
 
 <div>
     <div class="mb-6 flex items-center gap-2">
-        <Logo />
+        <Logo/>
         <h1 class="text-6xl text-gray-600">Block Explorer</h1>
-        <div class="flex-grow" />
+        <div class="flex-grow"/>
     </div>
     <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
         Block explorer
@@ -34,14 +36,14 @@
     </h4>
     <div class="mb-4 flex items-center">
         <TextInput
-            leftIconSvg="search.svg"
-            class="mr-2 w-96"
-            id="search_input"
-            placeholder="#block"
-            bind:value={searchTerm}
+                leftIconUrl={searchIconUrl}
+                class="mr-2 w-96"
+                id="search_input"
+                placeholder="#block"
+                bind:value={searchTerm}
         />
         <Button on:click={search}>Search</Button>
     </div>
     <h5 class="mb-4 text-xl">Search results</h5>
-    <ResultsTable {blocks} />
+    <ResultsTable {blocks}/>
 </div>

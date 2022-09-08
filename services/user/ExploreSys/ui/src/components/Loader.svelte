@@ -3,7 +3,7 @@
 </script>
 
 <div aria-modal="true">
-    <Icon class="h-8 w-6 animate-spin" />
+    <Icon style="width: 48px; height: 48px;" class="animate-spin" />
 </div>
 
 <style>

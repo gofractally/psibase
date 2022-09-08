@@ -7,8 +7,8 @@
     "allowJs": false,
     "paths": {
       "/common": ["../../CommonSys/common"],
-      "$lib":["src/lib"],
-      "$lib/*":["src/lib/*"]
+      "$lib":["./src/lib"],
+      "$lib/*":["./src/lib/*"]
     },
     "skipLibCheck": true,
     "esModuleInterop": true,

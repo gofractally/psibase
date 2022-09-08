@@ -2,6 +2,7 @@
     import { page } from "$app/stores";
     import { onMount } from "svelte";
     import Button from "/src/components/Button.svelte";
+    import Error from "/src/components/Error.svelte";
     import LeftArrow from "/src/assets/icons/leftArrow.svg";
     import { loadBlockData } from "/src/lib/loadData.js";
     import ResultsTable from "/src/components/ResultsTable.svelte";
@@ -11,19 +12,25 @@
 
     onMount(async () => {
         data = await loadBlockData($page.params.num);
-        if (data.block)
+        if (data.block) {
             blocks = [
                 {
                     header: data.block,
                     transactions: data.transactions,
                 },
             ];
+        }
     });
 </script>
 
 <div class="ml-4">
     {#if !data}
         <Loader />
+    {:else if data.error}
+        <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
+            Block explorer
+        </Button>
+        <Error value={data.error} />
     {:else}
         <div class="mb-4">
             <h1 class="text-6xl text-gray-600">Block Detail</h1>

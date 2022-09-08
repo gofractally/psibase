@@ -13,8 +13,6 @@ const psibase = (appletContract: string) => {
             config: () => {
                 return {
                     build: {
-                        assetsDir: "",
-                        cssCodeSplit: false,
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
@@ -22,9 +20,6 @@ const psibase = (appletContract: string) => {
                                 "/common/iframeResizer.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
-                            output: {
-                                assetFileNames: "_app/assets/[name][extname]",
-                            },
                         },
                     },
                     server: {

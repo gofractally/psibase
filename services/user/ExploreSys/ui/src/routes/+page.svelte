@@ -10,9 +10,10 @@
     import Button from "/src/components/Button.svelte";
     import ResultsTable from "/src/components/ResultsTable.svelte";
     import Loader from "/src/components/Loader.svelte";
+    import Error from "/src/components/Error.svelte";
 
     let apiInterval = null;
-    let data;
+    let data = null;
     let autoUpdateMode = true;
 
     const setArgs = async (args) => {
@@ -31,7 +32,7 @@
         if (window.location.search) args = window.location.search;
         if (args !== "?last=50") autoUpdateMode = false;
         data = await loadData(args);
-        if (autoUpdateMode) startAutoUpdates();
+        if (data.blocks && autoUpdateMode) startAutoUpdates();
     });
 
     onDestroy(() => {
@@ -75,6 +76,8 @@
 <div>
     {#if !data}
         <Loader />
+    {:else if data.error}
+        <Error value={data.error} />
     {:else}
         <div class="mb-6 flex items-center gap-2">
             <ExplorerIcon />
@@ -100,16 +103,20 @@
             <Button
                 on:click={() => processPagingRequests(data.pagedResult.last)}
                 >Last</Button>
-            <div
-                class="flex cursor-pointer items-center gap-1 pl-4 text-sm"
-                on:click={toggleAutoUpdateMode}>
-                <Dot
-                    class={autoUpdateMode
+            <Button class="AutoUpdatingButton" leftIcon={Dot}
+                    iconClass={autoUpdateMode
                         ? "text-green-500"
-                        : "text-gray-500"} />
-                <div>Auto updating</div>
-            </div>
+                        : "text-gray-500"}
+                    on:click={toggleAutoUpdateMode}>
+                Auto updating
+            </Button>
         </ButtonSet>
         <ResultsTable blocks={data.blocks} />
     {/if}
 </div>
+
+<style>
+    :global(.AutoUpdatingButton) {
+        border-width: 0 0 0 1px !important;
+    }
+</style>

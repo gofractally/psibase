@@ -6,7 +6,4 @@
     .ButtonSet > :global(button):first-child {
         border-right: none;
     }
-    .ButtonSet > :global(button):last-child {
-        @apply border-r;
-    }
 </style>
