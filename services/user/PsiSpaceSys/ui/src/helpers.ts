@@ -49,3 +49,7 @@ export function useGraphQLQuery(url: string, query: string) {
     }, [url, query, refetch]);
     return [cachedQueryResult, invalidateQuery];
 } // useGraphQLQuery
+
+export const capitalizeFirstLetter = (txt: string) => {
+    return txt.charAt(0).toUpperCase() + txt.slice(1);
+};

@@ -68,7 +68,22 @@ const psibase = (appletContract: string) => {
     ];
 };
 
+const root = path.resolve(__dirname, "src");
+
 // https://vitejs.dev/config/
 export default defineConfig({
+    root,
     plugins: [react(), psibase("psispace-sys")],
+    build: {
+        rollupOptions: {
+            input: {
+                main: path.resolve(root, "index.html"),
+                defaultProfile: path.resolve(
+                    root,
+                    "DefaultProfile",
+                    "default-profile.html"
+                ),
+            },
+        },
+    },
 });

@@ -1,23 +1,103 @@
+import { useState } from "react";
+import Button from "../button";
+
 export type FileItemProps = {
     name: string;
     isFolder?: boolean;
     type?: string;
     onClick: () => void;
+    onRemoveClick: () => Promise<void>;
 };
 
-export const FileItem = ({ name, onClick, isFolder, type }: FileItemProps) => {
-    let className =
-        "cursor-pointer border-b-2 border-b-gray-200 p-4 hover:bg-gray-50";
+export const FileItem = ({
+    name,
+    onClick,
+    isFolder,
+    type,
+    onRemoveClick,
+}: FileItemProps) => {
+    const [isConfirmingDeletion, setIsConfirmingDeletion] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
-    if (isFolder) {
-        className += " font-bold";
-    }
+    const handleConfirmDeletionClick = async (
+        e: React.MouseEvent<HTMLButtonElement, MouseEvent>
+    ) => {
+        e.stopPropagation();
+        setErrorMessage("");
+        setIsDeleting(true);
+        try {
+            await onRemoveClick();
+        } catch (e) {
+            setErrorMessage((e as Error).message || "Fail to delete");
+            setIsDeleting(false);
+        }
+    };
+
+    const handleRemoveClick = async (
+        e: React.MouseEvent<HTMLButtonElement, MouseEvent>
+    ) => {
+        e.stopPropagation();
+        setIsConfirmingDeletion(true);
+    };
+
+    const handleCancelDeletionClick = async (
+        e: React.MouseEvent<HTMLButtonElement, MouseEvent>
+    ) => {
+        e.stopPropagation();
+        setIsConfirmingDeletion(false);
+    };
 
     return (
-        <div onClick={onClick} className={className}>
-            <FileTypeIcon type={isFolder ? "folder" : type} />
-            {name}
-            {isFolder && "/"}
+        <div
+            onClick={onClick}
+            className={
+                "flex cursor-pointer justify-between border-b-2 border-b-gray-50 p-4 hover:bg-gray-50"
+            }
+        >
+            <div className={isFolder ? "font-semibold" : ""}>
+                <FileTypeIcon type={isFolder ? "folder" : type} />
+                {name}
+                {isFolder && "/"}
+            </div>
+            <div>
+                {isDeleting ? (
+                    "Deleting..."
+                ) : errorMessage ? (
+                    <div>
+                        <span className="text-red-500">{errorMessage}</span>
+                        <Button
+                            className="ml-4"
+                            type="outline"
+                            onClick={handleConfirmDeletionClick}
+                        >
+                            Retry
+                        </Button>
+                    </div>
+                ) : isConfirmingDeletion ? (
+                    <div>
+                        Are you sure you want to delete?{" "}
+                        <Button
+                            className="ml-4"
+                            type="icon"
+                            onClick={handleConfirmDeletionClick}
+                        >
+                            Yes
+                        </Button>
+                        <Button
+                            className="ml-4"
+                            type="icon"
+                            onClick={handleCancelDeletionClick}
+                        >
+                            No
+                        </Button>
+                    </div>
+                ) : (
+                    <Button type="icon" onClick={handleRemoveClick}>
+                        🗑️
+                    </Button>
+                )}
+            </div>
         </div>
     );
 };

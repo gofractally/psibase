@@ -28,7 +28,7 @@ function App() {
             setOperations(operations);
         });
 
-        wait(1500).then(async () => {
+        wait(2500).then(async () => {
             console.info("fetching logged user...");
             const loggedInUser = await getLoggedInUser();
             console.log("getLoggedInUser:", loggedInUser);
@@ -37,7 +37,7 @@ function App() {
     }, []);
 
     return (
-        <>
+        <div>
             <div className="flex items-center">
                 <Heading tag="h2">My PsiSpace</Heading>
                 <div className="ml-4 mt-2">manage your files, easily!</div>
@@ -48,7 +48,7 @@ function App() {
             ) : (
                 <FilesManager account={currentUser} />
             )}
-        </>
+        </div>
     );
 }
 

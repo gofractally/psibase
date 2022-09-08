@@ -32,12 +32,19 @@ export type UploadFileParam = {
 
 export class PsiSpaceContract extends Contract {
     public async actionUpload(path = "/", files: UploadFileParam[]) {
-        // Todo: Maybe convert to Promise.all?
         for (const f of files) {
             await action("psispace-sys", "storeSys", {
                 path: path + f.name,
                 contentType: f.type,
                 content: f.contentHex,
+            });
+        }
+    }
+
+    public async actionRemove(filePaths: string[]) {
+        for (const filePath of filePaths) {
+            await action("psispace-sys", "removeSys", {
+                path: filePath,
             });
         }
     }
