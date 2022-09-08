@@ -329,10 +329,8 @@ namespace psibase
          auto newCommitIndex = std::max(std::min(num, head->blockNum()), commitIndex);
          auto result         = newCommitIndex != commitIndex;
          commitIndex         = newCommitIndex;
-         systemContext->sharedDatabase.removeRevisions(*writer, byBlocknumIndex.find(num)->second);
-         // TODO: clean up committed blocks/states (needs to be a separate function, because
-         // block propagation needs to know the last commit, but also needs to happen before
-         // this cleanup.
+         systemContext->sharedDatabase.removeRevisions(*writer,
+                                                       byBlocknumIndex.find(commitIndex)->second);
          return result;
       }
 
@@ -560,6 +558,7 @@ namespace psibase
             } while (blockNum--);
          }
          // TODO: if this doesn't exist, the database is corrupt
+         assert(!byBlocknumIndex.empty());
          commitIndex = byBlocknumIndex.begin()->first;
       }
       BlockContext* getBlockContext()

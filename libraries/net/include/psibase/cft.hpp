@@ -591,6 +591,7 @@ namespace psibase::net
       {
          ++current_term;
          voted_for = self;
+         votes_for_me.clear();
          votes_for_me.push_back(self);
          _state = producer_state::candidate;
          randomize_timer();
