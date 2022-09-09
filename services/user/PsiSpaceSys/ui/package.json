@@ -5,7 +5,9 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc && vite build",
+        "build": "tsc && yarn build-psispace && yarn build-default-profile",
+        "build-psispace": "vite build",
+        "build-default-profile": "vite build -c vite.config-default-profile.ts",
         "preview": "vite preview"
     },
     "dependencies": {

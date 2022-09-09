@@ -7,8 +7,6 @@ import {
 } from "common/rpc.mjs";
 import wait from "waait";
 
-import "./App.css";
-
 import useEffectOnce from "./hooks/useEffectOnce";
 import { operations } from "./operations";
 import { Heading } from "./components";
