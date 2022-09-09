@@ -4,7 +4,7 @@
 #include <psibase/nativeTables.hpp>
 #include <services/system/TransactionSys.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    // This contract manages the active producers.
    // It must have native write permission
@@ -24,4 +24,4 @@ namespace system_contract
    PSIO_REFLECT(ProducerSys,
                 method(setProducers, producers),
                 method(checkAuthSys, flags, requester, action, allowedActions, claims))
-}  // namespace system_contract
+}  // namespace SystemService

@@ -10,7 +10,7 @@ namespace
    { return std::tie(lhs.contract, lhs.rawData) < std::tie(rhs.contract, rhs.rawData); };
 }
 
-namespace system_contract
+namespace SystemService
 {
 
    void ProducerSys::setProducers(std::vector<psibase::ProducerConfigRow> prods)
@@ -74,6 +74,6 @@ namespace system_contract
       }
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::ProducerSys)
+PSIBASE_DISPATCH(SystemService::ProducerSys)

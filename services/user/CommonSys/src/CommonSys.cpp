@@ -12,7 +12,7 @@ static constexpr bool enable_print = false;
 using namespace psibase;
 using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
-namespace system_contract
+namespace SystemService
 {
    static constexpr std::pair<const char*, const char*> commonResMap[]{
        {"/", "/ui/common.index.html"}};
@@ -130,6 +130,6 @@ namespace system_contract
       return std::nullopt;
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::CommonSys)
+PSIBASE_DISPATCH(SystemService::CommonSys)

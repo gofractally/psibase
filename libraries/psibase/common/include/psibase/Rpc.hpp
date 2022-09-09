@@ -18,7 +18,7 @@ namespace psibase
    /// An HTTP Request
    ///
    /// Most contracts receive this via their `serveSys` action.
-   /// [psibase::ProxySys] receives it via its `serve` exported function.
+   /// [SystemService::ProxySys] receives it via its `serve` exported function.
    struct HttpRequest
    {
       std::string       host;         ///< Fully-qualified domain name

@@ -15,8 +15,8 @@ using namespace UserContract;
 using namespace UserContract::Errors;
 using namespace psibase;
 using psio::const_view;
-using system_contract::AccountSys;
-using system_contract::TransactionSys;
+using SystemService::AccountSys;
+using SystemService::TransactionSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
 // For helpers
@@ -87,7 +87,7 @@ void TokenSys::init()
    nftContract.credit(tNft, SymbolSys::service, "Passing system token ownership");
 
    // Register proxy
-   to<ProxySys>().registerServer(RTokenSys::service);
+   to<SystemService::ProxySys>().registerServer(RTokenSys::service);
 }
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)

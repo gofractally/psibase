@@ -10,7 +10,7 @@
 using namespace UserContract;
 using namespace psibase;
 using namespace UserContract::Errors;
-using namespace system_contract;
+using namespace SystemService;
 using Quantity_t = typename Quantity::Quantity_t;
 
 namespace

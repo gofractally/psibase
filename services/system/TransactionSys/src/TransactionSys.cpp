@@ -15,7 +15,7 @@ static constexpr bool enable_print = false;
 // TODO: remove this limit after billing accounts for the storage
 static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
 
-namespace system_contract
+namespace SystemService
 {
    void TransactionSys::startup()
    {
@@ -27,7 +27,7 @@ namespace system_contract
 
       // TODO: Move these to a config contract
       // TODO: Reduce numExecutionMemories on proofWasmConfigTable. Waiting for
-      //       a fix to SystemContract caching, to prevent frequent allocating
+      //       a fix to SystemContext caching, to prevent frequent allocating
       //       and freeing of ExecutionMemory instances.
       ConfigRow config;
       kvPut(config.db, config.key(), config);
@@ -279,6 +279,6 @@ namespace system_contract
       }
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::TransactionSys)
+PSIBASE_DISPATCH(SystemService::TransactionSys)

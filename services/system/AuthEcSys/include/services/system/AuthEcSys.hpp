@@ -5,7 +5,7 @@
 #include <psibase/serveContent.hpp>
 #include <services/system/TransactionSys.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    struct AuthRecord
    {
@@ -40,4 +40,4 @@ namespace system_contract
                 method(newAccount, account, payload)
                 //
    )
-}  // namespace system_contract
+}  // namespace SystemService

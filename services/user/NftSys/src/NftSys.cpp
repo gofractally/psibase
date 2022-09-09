@@ -10,7 +10,7 @@ using namespace UserContract;
 using namespace Errors;
 using psio::const_view;
 using std::string;
-using system_contract::AccountSys;
+using SystemService::AccountSys;
 
 NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
 {

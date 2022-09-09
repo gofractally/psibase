@@ -7,7 +7,7 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-namespace system_contract
+namespace SystemService
 {
    void AuthEcSys::checkAuthSys(uint32_t                    flags,
                                 psibase::AccountNumber      requester,
@@ -76,6 +76,6 @@ namespace system_contract
       authTable.put(AuthRecord{.account = getSender(), .pubkey = key});
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::AuthEcSys)
+PSIBASE_DISPATCH(SystemService::AuthEcSys)

@@ -1,3 +1,3 @@
 # common-sys
 
-{{#cpp-doc ::system_contract::CommonSys}}
+{{#cpp-doc ::SystemService::CommonSys}}

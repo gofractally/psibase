@@ -8,7 +8,7 @@
 using namespace psibase;
 using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
-namespace system_contract
+namespace SystemService
 {
    std::optional<HttpReply> RProxySys::serveSys(HttpRequest request)
    {
@@ -25,6 +25,6 @@ namespace system_contract
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
                             Tables{getReceiver()});
    }
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::RProxySys)
+PSIBASE_DISPATCH(SystemService::RProxySys)

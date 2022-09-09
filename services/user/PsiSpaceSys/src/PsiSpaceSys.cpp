@@ -6,7 +6,7 @@
 
 using namespace psibase;
 
-namespace system_contract
+namespace SystemService
 {
    namespace
    {
@@ -89,6 +89,6 @@ namespace system_contract
       auto   table = tables.template open<PsiSpaceContentTable>();
       table.erase(PsiSpaceContentKey{getSender(), path});
    }
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::PsiSpaceSys)
+PSIBASE_DISPATCH(SystemService::PsiSpaceSys)

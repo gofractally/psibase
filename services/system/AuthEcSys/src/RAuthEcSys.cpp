@@ -12,7 +12,7 @@ using namespace psibase;
 using std::string;
 using std::string_view;
 
-namespace system_contract
+namespace SystemService
 {
    std::optional<HttpReply> RAuthEcSys::serveSys(HttpRequest request)
    {
@@ -80,6 +80,6 @@ namespace system_contract
    }
 
    // getKeys
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::RAuthEcSys)
+PSIBASE_DISPATCH(SystemService::RAuthEcSys)

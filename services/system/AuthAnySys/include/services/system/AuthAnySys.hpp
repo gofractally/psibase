@@ -2,7 +2,7 @@
 
 #include <services/system/TransactionSys.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    struct AuthAnySys : psibase::Service<AuthAnySys>
    {
@@ -15,4 +15,4 @@ namespace system_contract
                         std::vector<psibase::Claim> claims);
    };
    PSIO_REFLECT(AuthAnySys, method(checkAuthSys, flags, requester, action, allowedActions, claims))
-}  // namespace system_contract
+}  // namespace SystemService

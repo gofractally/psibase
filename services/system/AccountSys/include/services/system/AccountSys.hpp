@@ -5,7 +5,7 @@
 #include <psibase/nativeFunctions.hpp>
 #include <psibase/nativeTables.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    struct AccountSysStatus
    {
@@ -80,4 +80,4 @@ namespace system_contract
                 method(setCreator, creator)
                 //
    )
-}  // namespace system_contract
+}  // namespace SystemService

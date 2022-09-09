@@ -3,7 +3,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    struct PsiSpaceContentKey
    {
@@ -69,4 +69,4 @@ namespace system_contract
                 method(serveSys, request),
                 method(storeSys, path, contentType, content),
                 method(removeSys, path))
-}  // namespace system_contract
+}  // namespace SystemService

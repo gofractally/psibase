@@ -62,17 +62,17 @@
    +-----------------+     +-----------------+
 ```
 
-`psinode` passes most HTTP requests to the [psibase::ProxySys] service, which then routes requests to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
+`psinode` passes most HTTP requests to the [SystemService::ProxySys] service, which then routes requests to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
-[system_contract::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
+[SystemService::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
-[system_contract::PsiSpaceSys] provides web hosting to non-service accounts.
+[SystemService::PsiSpaceSys] provides web hosting to non-service accounts.
 
 `psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Services don't serve these.
 
 ## Registration
 
-Services which wish to serve HTTP requests need to register using the [psibase::ProxySys] service's [psibase::ProxySys::registerServer] action. There are multiple ways to do this:
+Services which wish to serve HTTP requests need to register using the [SystemService::ProxySys] service's [SystemService::ProxySys::registerServer] action. There are multiple ways to do this:
 
 - `psibase deploy` has a `--register-proxy` option (shortcut `-p`) that can do this while deploying the service.
 - `psibase register-proxy` can also do it. TODO: implement `psibase register-proxy`.

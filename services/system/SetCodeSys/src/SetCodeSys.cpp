@@ -1,9 +1,9 @@
-#include <services/system/SetCodeSys.hpp>
 #include <psibase/dispatch.hpp>
+#include <services/system/SetCodeSys.hpp>
 
 using namespace psibase;
 
-namespace system_contract
+namespace SystemService
 {
    void SetCodeSys::setCode(AccountNumber     contract,
                             uint8_t           vmType,
@@ -85,6 +85,6 @@ namespace system_contract
          kvRemove(account->db, account->key());
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::SetCodeSys)
+PSIBASE_DISPATCH(SystemService::SetCodeSys)

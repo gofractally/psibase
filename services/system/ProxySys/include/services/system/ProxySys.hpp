@@ -3,12 +3,12 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
 
-namespace psibase
+namespace SystemService
 {
    /// The `proxy-sys` contract routes HTTP requests to the appropriate contract
    ///
    /// Rule set:
-   /// - If the target starts with `/common`, then route the request to [system_contract::CommonSys].
+   /// - If the target starts with `/common`, then route the request to [SystemService::CommonSys].
    /// - Else if there's a subdomain and it references a registered contract, then route the request to that contract.
    /// - Else if the request references an unregistered subdomain, then route the request to `psispace-sys`.
    /// - Else route the request to [CommonSys]; this handles the chain's main domain.
@@ -34,7 +34,7 @@ namespace psibase
       /// Register senders's subdomain
       ///
       /// `serverContract` will handle requests to this subdomain.
-      void registerServer(AccountNumber serverContract);
+      void registerServer(psibase::AccountNumber serverContract);
    };
    PSIO_REFLECT(ProxySys, method(registerServer, serverContract))
-}  // namespace psibase
+}  // namespace SystemService

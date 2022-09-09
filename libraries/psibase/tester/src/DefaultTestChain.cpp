@@ -18,7 +18,7 @@
 #include <vector>
 
 using namespace psibase;
-using namespace system_contract;
+using namespace SystemService;
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts,
@@ -54,17 +54,17 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                      .contracts =  // g.a.d--^ is config file for gen
                     {
                          {
-                             .contract = system_contract::TransactionSys::service,
-                             .flags    = system_contract::TransactionSys::contractFlags,
+                             .contract = SystemService::TransactionSys::service,
+                             .flags    = SystemService::TransactionSys::contractFlags,
                              .code     = readWholeFile("TransactionSys.wasm"),
                         },
                          {
-                             .contract = system_contract::SetCodeSys::service,
-                             .flags    = system_contract::SetCodeSys::contractFlags,
+                             .contract = SystemService::SetCodeSys::service,
+                             .flags    = SystemService::SetCodeSys::contractFlags,
                              .code     = readWholeFile("SetCodeSys.wasm"),
                         },
                          {
-                             .contract = system_contract::AccountSys::service,
+                             .contract = SystemService::AccountSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("AccountSys.wasm"),
                         },
@@ -74,17 +74,17 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
                              .code     = readWholeFile("ProxySys.wasm"),
                         },
                          {
-                             .contract = system_contract::AuthAnySys::service,
+                             .contract = SystemService::AuthAnySys::service,
                              .flags    = 0,
                              .code     = readWholeFile("AuthAnySys.wasm"),
                         },
                          {
-                             .contract = system_contract::AuthEcSys::service,
+                             .contract = SystemService::AuthEcSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("AuthEcSys.wasm"),
                         },
                          {
-                             .contract = system_contract::VerifyEcSys::service,
+                             .contract = SystemService::VerifyEcSys::service,
                              .flags    = 0,
                              .code     = readWholeFile("VerifyEcSys.wasm"),
                         },
@@ -128,10 +128,10 @@ void DefaultTestChain::deploySystemContracts(bool show /* = false */)
 
 void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
 {
-   transactor<system_contract::AccountSys>     asys{system_contract::TransactionSys::service,
-                                                system_contract::AccountSys::service};
-   transactor<system_contract::TransactionSys> tsys{system_contract::TransactionSys::service,
-                                                    system_contract::TransactionSys::service};
+   transactor<SystemService::AccountSys>     asys{SystemService::TransactionSys::service,
+                                              SystemService::AccountSys::service};
+   transactor<SystemService::TransactionSys> tsys{SystemService::TransactionSys::service,
+                                                  SystemService::TransactionSys::service};
    auto trace = pushTransaction(makeTransaction({asys.startup(), tsys.startup()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system contract accounts");
@@ -142,8 +142,8 @@ AccountNumber DefaultTestChain::add_account(
     AccountNumber authContract /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
 {
-   transactor<system_contract::AccountSys> asys(system_contract::TransactionSys::service,
-                                                system_contract::AccountSys::service);
+   transactor<SystemService::AccountSys> asys(SystemService::TransactionSys::service,
+                                              SystemService::AccountSys::service);
 
    auto trace = pushTransaction(  //
        makeTransaction({asys.newAccount(acc, authContract, true)}));
@@ -165,15 +165,15 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                                                const PublicKey& public_key,
                                                bool             show /* = false */)
 {
-   transactor<system_contract::AccountSys> asys(system_contract::AccountSys::service,
-                                                system_contract::AccountSys::service);
-   transactor<system_contract::AuthEcSys>  ecsys(system_contract::AuthEcSys::service,
-                                                 system_contract::AuthEcSys::service);
+   transactor<SystemService::AccountSys> asys(SystemService::AccountSys::service,
+                                              SystemService::AccountSys::service);
+   transactor<SystemService::AuthEcSys>  ecsys(SystemService::AuthEcSys::service,
+                                               SystemService::AuthEcSys::service);
 
    auto trace = pushTransaction(makeTransaction({
-       asys.newAccount(name, system_contract::AuthAnySys::service, true),
+       asys.newAccount(name, SystemService::AuthAnySys::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthCntr(system_contract::AuthEcSys::service),
+       asys.from(name).setAuthCntr(SystemService::AuthEcSys::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -191,9 +191,9 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
                                              const char*   filename,
                                              bool          show /* = false */)
 {
-   add_account(acc, system_contract::AuthAnySys::service, show);
+   add_account(acc, SystemService::AuthAnySys::service, show);
 
-   transactor<system_contract::SetCodeSys> scsys{acc, system_contract::SetCodeSys::service};
+   transactor<SystemService::SetCodeSys> scsys{acc, SystemService::SetCodeSys::service};
 
    auto trace =
        pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));

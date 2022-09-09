@@ -5,7 +5,7 @@
 
 static constexpr bool enable_print = false;
 
-namespace system_contract
+namespace SystemService
 {
    void AuthAnySys::checkAuthSys(uint32_t                    flags,
                                  psibase::AccountNumber      requester,
@@ -16,6 +16,6 @@ namespace system_contract
       if (enable_print)
          psibase::print("auth_check\n");
    }
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::AuthAnySys)
+PSIBASE_DISPATCH(SystemService::AuthAnySys)

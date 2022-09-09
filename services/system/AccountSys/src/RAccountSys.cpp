@@ -14,7 +14,7 @@ static constexpr bool enable_print = false;
 using namespace psibase;
 using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
-namespace system_contract
+namespace SystemService
 {
    std::optional<HttpReply> RAccountSys::serveSys(HttpRequest request)
    {
@@ -68,6 +68,6 @@ namespace system_contract
                             Tables{getReceiver()});
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::RAccountSys)
+PSIBASE_DISPATCH(SystemService::RAccountSys)

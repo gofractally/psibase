@@ -3,7 +3,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    struct SetCodeSys : psibase::Service<SetCodeSys>
    {
@@ -20,4 +20,4 @@ namespace system_contract
    PSIO_REFLECT(SetCodeSys,
                 method(setCode, contact, vmType, vmVersion, code),
                 method(setFlags, contract, flags))
-}  // namespace system_contract
+}  // namespace SystemService

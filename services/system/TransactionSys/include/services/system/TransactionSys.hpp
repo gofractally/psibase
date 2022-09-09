@@ -3,7 +3,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    /// Identify a contract and method
    ///
@@ -170,7 +170,7 @@ namespace system_contract
    ///
    /// This privileged contract dispatches top-level actions to other
    /// contracts, checks TAPoS, detects duplicate transactions, and
-   /// checks authorizations using [system_contract::AuthInterface].
+   /// checks authorizations using [SystemService::AuthInterface].
    ///
    /// Other contracts use it to get information about the chain,
    /// current block, and head block. They also use it to call actions
@@ -337,4 +337,4 @@ namespace system_contract
       else
          return {0, 0};  // Usable for transactions in the genesis block
    }
-}  // namespace system_contract
+}  // namespace SystemService

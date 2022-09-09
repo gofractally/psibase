@@ -4,7 +4,7 @@
 #include <psibase/serveContent.hpp>
 #include <psibase/serviceEntry.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    class RAuthEcSys : public psibase::Service<RAuthEcSys>
    {
@@ -21,4 +21,4 @@ namespace system_contract
    PSIO_REFLECT(RAuthEcSys,  //
                 method(serveSys, request),
                 method(storeSys, path, contentType, content))
-}  // namespace system_contract
+}  // namespace SystemService

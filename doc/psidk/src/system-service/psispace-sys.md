@@ -1,3 +1,3 @@
 # psispace-sys
 
-{{#cpp-doc ::system_contract::PsiSpaceSys}}
+{{#cpp-doc ::SystemService::PsiSpaceSys}}

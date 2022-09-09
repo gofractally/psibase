@@ -10,7 +10,7 @@ static constexpr bool enable_print = false;
 
 using namespace psibase;
 
-namespace system_contract
+namespace SystemService
 {
    void AccountSys::startup()
    {
@@ -119,6 +119,6 @@ namespace system_contract
           CreatorRecord{.key = SingletonKey{}, .accountCreator = creator});
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::AccountSys)
+PSIBASE_DISPATCH(SystemService::AccountSys)

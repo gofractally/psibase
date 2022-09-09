@@ -7,7 +7,9 @@
 
 static constexpr bool enable_print = false;
 
-namespace psibase
+using namespace psibase;
+
+namespace SystemService
 {
    namespace
    {
@@ -87,6 +89,6 @@ namespace psibase
       setRetval(result);
    }  // serve()
 
-}  // namespace psibase
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(psibase::ProxySys)
+PSIBASE_DISPATCH(SystemService::ProxySys)
