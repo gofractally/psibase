@@ -10,7 +10,7 @@
 static constexpr bool enable_print = false;
 
 using namespace psibase;
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace system_contract
 {
@@ -114,7 +114,7 @@ namespace system_contract
          {
             if (target == request.target)
             {
-               auto index = ContractTables<WebContentTable>{getReceiver()}
+               auto index = ServiceTables<WebContentTable>{getReceiver()}
                                 .open<WebContentTable>()
                                 .getIndex<0>();
                if (auto content = index.get(std::string(replacement)))

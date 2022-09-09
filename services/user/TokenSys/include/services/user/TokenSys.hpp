@@ -19,7 +19,7 @@ namespace UserContract
    {
      public:
       using Tables = psibase::
-          ContractTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
+          ServiceTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
       static constexpr auto service  = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken = TID{1};
 

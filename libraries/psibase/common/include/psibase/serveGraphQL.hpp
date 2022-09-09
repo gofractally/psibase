@@ -270,7 +270,7 @@ namespace psibase
    ///
    /// using MyTable  = psibase::Table<
    ///    MyType, &MyType::primaryKey, &MyType::secondaryKey>;
-   /// using MyTables = psibase::ContractTables<MyTable>;
+   /// using MyTables = psibase::ServiceTables<MyTable>;
    ///
    /// struct Query
    /// {

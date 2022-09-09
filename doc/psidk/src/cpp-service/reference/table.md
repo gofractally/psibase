@@ -1,6 +1,6 @@
 # Table
 
-- [psibase::ContractTables]
+- [psibase::ServiceTables]
   - [Modifying table set](#modifying-table-set)
   - [Prefix format](#prefix-format)
 - [psibase::Table]
@@ -10,7 +10,7 @@
 - [psibase::KvIterator]
 - [psibase::KeyView]
 
-{{#cpp-doc ::psibase::ContractTables}}
+{{#cpp-doc ::psibase::ServiceTables}}
 {{#cpp-doc ::psibase::Table}}
 {{#cpp-doc ::psibase::TableIndex}}
 {{#cpp-doc ::psibase::KvIterator}}

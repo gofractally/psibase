@@ -6,7 +6,7 @@
 #include <services/system/ProxySys.hpp>
 
 using namespace psibase;
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace system_contract
 {

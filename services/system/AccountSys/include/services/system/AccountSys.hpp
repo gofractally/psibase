@@ -47,7 +47,7 @@ namespace system_contract
       static constexpr auto                   service     = psibase::AccountNumber("account-sys");
       static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
 
-      using Tables = psibase::ContractTables<AccountSysStatusTable, AccountTable, CreatorTable>;
+      using Tables = psibase::ServiceTables<AccountSysStatusTable, AccountTable, CreatorTable>;
 
       void startup();
       void newAccount(psibase::AccountNumber name,

@@ -35,7 +35,7 @@ namespace table_test
    PSIO_REFLECT(S2, key1, key2, value, method(compound_key));
    using table2 = Table<S2, &S2::key1, &S2::compound_key>;
 
-   using test_tables = ContractTables<table0, table1, table2>;
+   using test_tables = ServiceTables<table0, table1, table2>;
 
    void test0(AccountNumber this_contract)
    {

@@ -21,7 +21,7 @@ namespace system_contract
      public:
       static constexpr auto service = psibase::AccountNumber("auth-ec-sys");
       using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::byPubkey>;
-      using Tables    = psibase::ContractTables<AuthTable>;
+      using Tables    = psibase::ServiceTables<AuthTable>;
 
       void checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,

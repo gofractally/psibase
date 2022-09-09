@@ -58,7 +58,7 @@ namespace system_contract
    struct PsiSpaceSys : psibase::Service<PsiSpaceSys>
    {
       static constexpr auto service = psibase::AccountNumber("psispace-sys");
-      using Tables                  = psibase::ContractTables<PsiSpaceContentTable>;
+      using Tables                  = psibase::ServiceTables<PsiSpaceContentTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);

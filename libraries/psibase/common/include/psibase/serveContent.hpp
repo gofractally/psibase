@@ -33,7 +33,7 @@ namespace psibase
    ///
    /// ```c++
    /// // Don't forget to include your contract's other tables in this!
-   /// using Tables = psibase::ContractTables<psibase::WebContentTable>;
+   /// using Tables = psibase::ServiceTables<psibase::WebContentTable>;
    ///
    /// void MyContract::storeSys(
    ///    std::string path, std::string contentType, std::vector<char> content)
@@ -44,10 +44,10 @@ namespace psibase
    /// }
    /// ```
    template <typename... Tables>
-   void storeContent(std::string&&                    path,
-                     std::string&&                    contentType,
-                     std::vector<char>&&              content,
-                     const ContractTables<Tables...>& tables)
+   void storeContent(std::string&&                   path,
+                     std::string&&                   contentType,
+                     std::vector<char>&&             content,
+                     const ServiceTables<Tables...>& tables)
    {
       check(path.starts_with('/'), "Path doesn't begin with /");
       psibase::WebContentRow row{
@@ -66,7 +66,7 @@ namespace psibase
    /// Example use:
    /// ```c++
    /// // Don't forget to include your contract's other tables in this!
-   /// using Tables = psibase::ContractTables<psibase::WebContentTable>;
+   /// using Tables = psibase::ServiceTables<psibase::WebContentTable>;
    ///
    /// std::optional<psibase::HttpReply> MyContract::serveSys(
    ///    psibase::HttpRequest request)
@@ -77,8 +77,8 @@ namespace psibase
    /// }
    /// ```
    template <typename... Tables>
-   std::optional<HttpReply> serveContent(const HttpRequest&               request,
-                                         const ContractTables<Tables...>& tables)
+   std::optional<HttpReply> serveContent(const HttpRequest&              request,
+                                         const ServiceTables<Tables...>& tables)
    {
       if (request.method == "GET")
       {

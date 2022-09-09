@@ -13,7 +13,7 @@
 using namespace system_contract;
 using namespace psibase;
 
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 struct ProducerQuery
 {

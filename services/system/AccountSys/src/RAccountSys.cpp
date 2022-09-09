@@ -12,7 +12,7 @@
 static constexpr bool enable_print = false;
 
 using namespace psibase;
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace system_contract
 {

@@ -185,7 +185,7 @@ namespace system_contract
           psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
 
       using Tables =
-          psibase::ContractTables<TransactionSysStatusTable, BlockSummaryTable, IncludedTrxTable>;
+          psibase::ServiceTables<TransactionSysStatusTable, BlockSummaryTable, IncludedTrxTable>;
 
       /// Only called once during chain initialization
       ///

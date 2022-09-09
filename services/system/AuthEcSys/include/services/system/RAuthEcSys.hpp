@@ -10,7 +10,7 @@ namespace system_contract
    {
      public:
       static constexpr auto service = psibase::AccountNumber("r-ath-ec-sys");
-      using Tables                  = psibase::ContractTables<psibase::WebContentTable>;
+      using Tables                  = psibase::ServiceTables<psibase::WebContentTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);

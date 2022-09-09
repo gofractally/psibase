@@ -15,7 +15,7 @@ namespace UserContract
    {
      public:
       using tables = psibase::
-          ContractTables<SymbolTable, SymbolLengthTable, PriceAdjustmentSingleton, InitTable>;
+          ServiceTables<SymbolTable, SymbolLengthTable, PriceAdjustmentSingleton, InitTable>;
       static constexpr auto service        = psibase::AccountNumber("symbol-sys");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 

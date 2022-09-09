@@ -15,7 +15,7 @@ using namespace UserContract;
 using namespace std;
 using namespace psibase;
 
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace
 {
