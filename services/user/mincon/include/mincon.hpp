@@ -5,12 +5,12 @@
 
 namespace company
 {
-   class min_contract : public psibase::Service<min_contract>
+   class MinService : public psibase::Service<MinService>
    {
      public:
       static constexpr psibase::account_id_type id = psibase::name_to_number("mincon");  //_a;
       void                                      hello() { psibase::writeConsole("hello world"); }
    };
 
-   PSIO_REFLECT(min_contract, method(hello))
+   PSIO_REFLECT(MinService, method(hello))
 }  // namespace company

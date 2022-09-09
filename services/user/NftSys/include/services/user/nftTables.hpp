@@ -4,7 +4,7 @@
 #include <psibase/Bitset.hpp>
 #include <psibase/Table.hpp>
 
-namespace UserContract
+namespace UserService
 {
    using NID = uint32_t;
 
@@ -56,4 +56,4 @@ namespace UserContract
    PSIO_REFLECT(CreditRecord, nftId, debitor);
    using CreditTable = psibase::Table<CreditRecord, &CreditRecord::nftId>;
 
-}  // namespace UserContract
+}  // namespace UserService

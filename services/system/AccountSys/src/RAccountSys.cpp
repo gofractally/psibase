@@ -32,7 +32,7 @@ namespace SystemService
          // TODO: replace with GraphQL
          // if (request.target.starts_with("/api/accounts"))
          // {
-         //    auto accountSysTables = AccountSys::Tables(AccountSys::contract);
+         //    auto accountSysTables = AccountSys::Tables(AccountSys::service);
          //    auto accountTable     = accountSysTables.open<AccountTable>();
          //    auto accountIndex     = accountTable.getIndex<0>();
 
@@ -41,6 +41,8 @@ namespace SystemService
          //       rows.push_back(*it);
          //    return to_json(rows);
          // }
+
+         // TODO: replace with GraphQL
          if (request.target == "/accounts")
          {
             auto accountSysTables = AccountSys::Tables(AccountSys::service);

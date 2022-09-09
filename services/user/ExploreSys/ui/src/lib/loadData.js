@@ -79,7 +79,7 @@ const GraphQLBlockQuery = `
           transaction {
             actions {
               sender
-              contract
+              service
               method
             }
           }

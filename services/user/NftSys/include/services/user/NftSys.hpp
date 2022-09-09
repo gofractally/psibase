@@ -5,7 +5,7 @@
 #include "nftErrors.hpp"
 #include "nftTables.hpp"
 
-namespace UserContract
+namespace UserService
 {
    class NftSys : public psibase::Service<NftSys>
    {
@@ -97,4 +97,4 @@ namespace UserContract
    );
    // clang-format on
 
-}  // namespace UserContract
+}  // namespace UserService

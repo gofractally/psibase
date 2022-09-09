@@ -66,20 +66,20 @@ namespace psibase
    /// Handle `/pack_action/` request
    ///
    /// If `request` is a POST to `/pack_action/x`, where `x` is an action
-   /// on `Contract`, then this parses a JSON object containing the arguments
+   /// on `Service`, then this parses a JSON object containing the arguments
    /// to `x`, packs them using frackpac, and returns the result as an
    /// `application/octet-stream`.
    ///
    /// If `request` doesn't match the above, or the action name is not found,
    /// then this returns `std::nullopt`.
-   template <typename Contract>
+   template <typename Service>
    std::optional<HttpReply> servePackAction(const HttpRequest& request)
    {
       if (request.method == "POST")
       {
          if (request.target.starts_with("/pack_action/"))
          {
-            if (auto result = fracpackActionFromJson<Contract>(  //
+            if (auto result = fracpackActionFromJson<Service>(  //
                     std::string_view{request.target}.substr(13),
                     std::string_view{request.body.data(), request.body.size()}))
             {

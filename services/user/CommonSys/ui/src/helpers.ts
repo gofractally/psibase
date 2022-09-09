@@ -40,7 +40,7 @@ export function makeAction(
     params: any,
     sender: any
 ) {
-    return { contract: application, method: actionName, data: params, sender };
+    return { service: application, method: actionName, data: params, sender };
 }
 
 export const injectSender = (transaction: any[], sender: any) => {

@@ -12,7 +12,7 @@
 #include <services/user/tokenTypes.hpp>
 #include "services/user/symbolTables.hpp"
 
-namespace UserContract
+namespace UserService
 {
 
    class TokenSys : public psibase::Service<TokenSys>
@@ -159,4 +159,4 @@ namespace UserContract
    );
    // clang-format on
 
-}  // namespace UserContract
+}  // namespace UserService

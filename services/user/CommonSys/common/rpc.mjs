@@ -12,7 +12,7 @@ export async function getRootDomain() {
     }
 }
 
-export async function siblingUrl(baseUrl, contract, path) {
+export async function siblingUrl(baseUrl, service, path) {
 
     const rootDomain = await getRootDomain();
 
@@ -21,7 +21,7 @@ export async function siblingUrl(baseUrl, contract, path) {
         loc = location;
     else
         loc = new URL(baseUrl);
-    return loc.protocol + '//' + (contract ? contract + '.' : '') + rootDomain + ':' + loc.port + '/' + (path || '').replace(/^\/+/, '');
+    return loc.protocol + '//' + (service ? service + '.' : '') + rootDomain + ':' + loc.port + '/' + (path || '').replace(/^\/+/, '');
 }
 export class RPCError extends Error {
     constructor(message, trace) {
@@ -117,13 +117,13 @@ export async function getTaposForHeadBlock(baseUrl = '') {
 }
 
 export async function packAction(baseUrl, action) {
-    let { sender, contract, method, data, rawData } = action;
+    let { sender, service, method, data, rawData } = action;
     if (!rawData) {
         rawData = uint8ArrayToHex(new Uint8Array(await postJsonGetArrayBuffer(
-            await siblingUrl(baseUrl, contract, '/pack_action/' + method),
+            await siblingUrl(baseUrl, service, '/pack_action/' + method),
             data)));
     }
-    return { sender, contract, method, rawData };
+    return { sender, service, method, rawData };
 }
 
 export async function packActions(baseUrl, actions) {
@@ -164,7 +164,7 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
             return k;
     });
     const claims = keys.map(k => ({
-        contract: 'verifyec-sys',
+        service: 'verifyec-sys',
         rawData: uint8ArrayToHex(publicKeyPairToFracpack(k))
     }));
     transaction = new Uint8Array(await packTransaction(baseUrl, { ...transaction, claims }));
@@ -422,7 +422,7 @@ let messageRouting = [
             var errors = [];
             if (op === undefined)
             {
-                responsePayload.errors.push("Contract " + contractName + " has no operation, \"" + identifier + "\"");
+                responsePayload.errors.push("Service " + contractName + " has no operation, \"" + identifier + "\"");
             }
             else
             {
@@ -455,7 +455,7 @@ let messageRouting = [
             let qu = qrs.find(q => q.id === identifier);
             if (qu === undefined)
             {
-                responsePayload.errors.push("Contract " + contractName + " has no query, \"" + identifier + "\"");
+                responsePayload.errors.push("Service " + contractName + " has no query, \"" + identifier + "\"");
             }
             else
             {

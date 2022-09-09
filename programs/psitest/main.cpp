@@ -708,7 +708,7 @@ struct callbacks
          if (!proofBC.needGenesisAction)
          {
             // checkFirstAuth isn't necessary here, but including it catches
-            // the case where an auth contract modifies its tables while
+            // the case where an auth service modifies its tables while
             // running in read-only mode.
             //
             // We run the check within blockContext to make it easier for
@@ -902,13 +902,13 @@ OPTIONS:
 
             Show detailed logging
 
-      -s contract.wasm debug.wasm
-      --subst contract.wasm debug.wasm
+      -s service.wasm debug.wasm
+      --subst service.wasm debug.wasm
 
-            Whenever contract.wasm needs to run, substitute debug.wasm in its
+            Whenever service.wasm needs to run, substitute debug.wasm in its
             place and enable debugging support. This bypasses size limits and
-            other constraints on debug.wasm. eosiolib still enforces
-            constraints on contract.wasm. (repeatable)
+            other constraints on debug.wasm. psibase still enforces
+            constraints on service.wasm. (repeatable)
 
       --timing 
 

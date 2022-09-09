@@ -5,34 +5,34 @@
 
 namespace SystemService
 {
-   /// Identify a contract and method
+   /// Identify a service and method
    ///
-   /// An empty `contract` or `method` indicates a wildcard.
-   struct ContractMethod
+   /// An empty `service` or `method` indicates a wildcard.
+   struct ServiceMethod
    {
-      psibase::AccountNumber contract;
+      psibase::AccountNumber service;
       psibase::MethodNumber  method;
    };
-   PSIO_REFLECT(ContractMethod, contract, method)
+   PSIO_REFLECT(ServiceMethod, service, method)
 
    /// Authenticate actions
    ///
-   /// [TransactionSys] calls into auth contracts using this interface
+   /// [TransactionSys] calls into auth services using this interface
    /// to authenticate senders of top-level actions and uses of
-   /// [TransactionSys::runAs]. Any contract may become an auth
-   /// contract by implementing `AuthInterface`. Any account may
-   /// select any contract to be its authenticator. Be careful;
-   /// this allows that contract to act on the account's behalf and
-   /// that contract to authorize other accounts and contracts to
+   /// [TransactionSys::runAs]. Any service may become an auth
+   /// service by implementing `AuthInterface`. Any account may
+   /// select any service to be its authenticator. Be careful;
+   /// this allows that service to act on the account's behalf and
+   /// that service to authorize other accounts and services to
    /// act on the account's behalf. It can also can lock out that
    /// account. See `AuthEcSys` for a canonical example of
    /// implementing this interface.
    ///
    /// This interface can't authenticate non-top-level actions other
-   /// than [TransactionSys::runAs] actions. Most contracts shouldn't
+   /// than [TransactionSys::runAs] actions. Most services shouldn't
    /// call or implement `AuthInterface`; use `getSender()`.
    ///
-   /// Auth contracts shouldn't inherit from this struct. Instead,
+   /// Auth services shouldn't inherit from this struct. Instead,
    /// they should define methods with matching signatures.
    struct AuthInterface
    {
@@ -41,9 +41,9 @@ namespace SystemService
       /// The database is in read-only mode. This flag is only
       /// used for `topActionReq`.
       ///
-      /// Auth contracts shouldn't try writing to the database if
+      /// Auth services shouldn't try writing to the database if
       /// readOnly is set. If they do, the transaction will abort.
-      /// Auth contracts shouldn't skip their check based on the
+      /// Auth services shouldn't skip their check based on the
       /// value of the read-only flag. If they do, they'll hurt
       /// their users, either by allowing charging where it
       /// shouldn't be allowed, or by letting actions execute
@@ -55,7 +55,7 @@ namespace SystemService
       /// Transaction's first authorizer. This flag is only
       /// used for `topActionReq`.
       ///
-      /// Auth contracts should be aware that if this flag
+      /// Auth services should be aware that if this flag
       /// is set, then only the first proof has been verified.
       /// If they rely on other proofs when this flag is set,
       /// they'll open up the accounts they're trying to
@@ -73,7 +73,7 @@ namespace SystemService
       /// `runAs` request. The requester matches the action's
       /// sender.
       ///
-      /// Auth contracts should normally approve this unless
+      /// Auth services should normally approve this unless
       /// they enforce stronger rules, e.g. by restricting
       /// `action` or `allowedActions`.
       static constexpr uint32_t runAsRequesterReq = 0x02;
@@ -82,10 +82,10 @@ namespace SystemService
       ///
       /// `runAs` request. The request matches the criteria from
       /// a `runAs` request currently in the call stack. `requester`
-      /// matches the earlier `action.contract`. `action` matches
+      /// matches the earlier `action.service`. `action` matches
       /// one of the earlier `allowedActions` from the same request.
       ///
-      /// Auth contracts should normally approve this unless
+      /// Auth services should normally approve this unless
       /// they enforce stronger rules.
       static constexpr uint32_t runAsMatchedReq = 0x03;
 
@@ -95,7 +95,7 @@ namespace SystemService
       /// requestor provided a non-empty `allowedActions`. This
       /// expands the authority beyond what was originally granted.
       ///
-      /// Auth contracts should normally reject this unless
+      /// Auth services should normally reject this unless
       /// they have filtering criteria which allow it.
       static constexpr uint32_t runAsMatchedExpandedReq = 0x04;
 
@@ -103,7 +103,7 @@ namespace SystemService
       ///
       /// `runAs` request. The other criteria don't match.
       ///
-      /// Auth contracts should normally reject this unless
+      /// Auth services should normally reject this unless
       /// they have filtering criteria which allow it.
       static constexpr uint32_t runAsOtherReq = 0x05;
 
@@ -125,11 +125,11 @@ namespace SystemService
       void checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::Action             action,
-                        std::vector<ContractMethod> allowedActions,
+                        std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
-      // TODO: add a method to allow the auth contract to verify
-      //       that it's OK with being the auth contract for a
+      // TODO: add a method to allow the auth service to verify
+      //       that it's OK with being the auth service for a
       //       particular account. AccountSys would call it.
    };
    PSIO_REFLECT(AuthInterface,
@@ -166,13 +166,13 @@ namespace SystemService
    PSIO_REFLECT(IncludedTrx, expiration, id)
    using IncludedTrxTable = psibase::Table<IncludedTrx, &IncludedTrx::key>;
 
-   /// All transactions enter the chain through this contract
+   /// All transactions enter the chain through this service
    ///
-   /// This privileged contract dispatches top-level actions to other
-   /// contracts, checks TAPoS, detects duplicate transactions, and
+   /// This privileged service dispatches top-level actions to other
+   /// services, checks TAPoS, detects duplicate transactions, and
    /// checks authorizations using [SystemService::AuthInterface].
    ///
-   /// Other contracts use it to get information about the chain,
+   /// Other services use it to get information about the chain,
    /// current block, and head block. They also use it to call actions
    /// using other accounts' authorities via [runAs].
    struct TransactionSys : psibase::Service<TransactionSys>
@@ -180,8 +180,8 @@ namespace SystemService
       /// "transact-sys"
       static constexpr auto service = psibase::AccountNumber("transact-sys");
 
-      /// Flags this contract must run with
-      static constexpr uint64_t contractFlags =
+      /// Flags this service must run with
+      static constexpr uint64_t serviceFlags =
           psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
 
       using Tables =
@@ -200,27 +200,27 @@ namespace SystemService
 
       /// Run `action` using `action.sender's` authority
       ///
-      /// Also adds `allowedActions` to the list of actions that `action.contract`
+      /// Also adds `allowedActions` to the list of actions that `action.service`
       /// may perform on `action.sender's` behalf, for as long as this call to
-      /// `runAs` is in the call stack. Use `""` for `contract` in
-      /// `allowedActions` to allow use of any contract (danger!). Use `""` for
+      /// `runAs` is in the call stack. Use `""` for `service` in
+      /// `allowedActions` to allow use of any service (danger!). Use `""` for
       /// `method` to allow any method.
       ///
       /// Returns the action's return value, if any.
       ///
       /// This will succeed if any of the following are true:
-      /// * `getSender() == action.sender's authContract`
-      /// * `getSender() == action.sender`. Requires `action.sender's authContract`
+      /// * `getSender() == action.sender's authService`
+      /// * `getSender() == action.sender`. Requires `action.sender's authService`
       ///   to approve with flag `AuthInterface::runAsRequesterReq` (normally succeeds).
       /// * An existing `runAs` is currently on the call stack, `getSender()` matches
-      ///   `action.contract` on that earlier call, and `action` matches
+      ///   `action.service` on that earlier call, and `action` matches
       ///   `allowedActions` from that same earlier call. Requires `action.sender's
-      ///   authContract` to approve with flag `AuthInterface::runAsMatchedReq`
+      ///   authService` to approve with flag `AuthInterface::runAsMatchedReq`
       ///   if `allowedActions` is empty (normally succeeds), or
       ///   `AuthInterface::runAsMatchedExpandedReq` if not empty (normally fails).
-      /// * All other cases, requires `action.sender's authContract`
+      /// * All other cases, requires `action.sender's authService`
       ///   to approve with flag `AuthInterface::runAsOtherReq` (normally fails).
-      std::vector<char> runAs(psibase::Action action, std::vector<ContractMethod> allowedActions);
+      std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
       /// Get the currently executing transaction
       psibase::Transaction getTransaction() const;

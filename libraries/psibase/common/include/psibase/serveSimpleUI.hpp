@@ -25,12 +25,12 @@ namespace psibase
    /// &lt;script src="/common/SimpleUI.mjs" type="module"&gt;&lt;/script&gt;
    /// &lt;/html&gt;
    /// ```
-   template <typename Contract, bool IncludeRoot>
+   template <typename Service, bool IncludeRoot>
    std::optional<HttpReply> serveSimpleUI(const HttpRequest& request)
    {
-      if (auto result = serveActionTemplates<Contract>(request))
+      if (auto result = serveActionTemplates<Service>(request))
          return result;
-      if (auto result = servePackAction<Contract>(request))
+      if (auto result = servePackAction<Service>(request))
          return result;
       if (IncludeRoot && request.method == "GET" && request.target == "/")
       {

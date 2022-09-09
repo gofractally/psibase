@@ -9,7 +9,7 @@
 
 #include "services/user/tokenTypes.hpp"
 
-namespace UserContract
+namespace UserService
 {
    class SymbolSys : public psibase::Service<SymbolSys>
    {
@@ -87,4 +87,4 @@ namespace UserContract
    );
    // clang-format on
 
-}  // namespace UserContract
+}  // namespace UserService

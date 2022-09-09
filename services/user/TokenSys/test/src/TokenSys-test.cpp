@@ -1,20 +1,20 @@
 #define CATCH_CONFIG_MAIN
 
-#include <services/system/commonErrors.hpp>
-#include <services/user/RTokenSys.hpp>
-#include <services/user/TokenSys.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/print.hpp>
 #include <psibase/testUtils.hpp>
+#include <services/system/commonErrors.hpp>
+#include <services/user/RTokenSys.hpp>
+#include <services/user/TokenSys.hpp>
 
 #include "services/user/SymbolSys.hpp"
 
 using namespace psibase;
 using namespace psibase::benchmarking;
-using UserContract::TokenSys;
-using namespace UserContract::Errors;
-using namespace UserContract;
+using UserService::TokenSys;
+using namespace UserService::Errors;
+using namespace UserService;
 
 namespace
 {
@@ -31,7 +31,7 @@ namespace
 
    const psibase::String memo{"memo"};
 
-   const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
+   const std::vector<std::pair<AccountNumber, const char*>> neededServices = {
        {TokenSys::service, "TokenSys.wasm"},
        {NftSys::service, "NftSys.wasm"},
        {SymbolSys::service, "SymbolSys.wasm"}};
@@ -46,7 +46,7 @@ SCENARIO("Using system token")
 {
    GIVEN("An empty chain with user Alice")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -95,7 +95,7 @@ SCENARIO("Creating a token")
 {
    GIVEN("An empty chain with user Alice")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -175,7 +175,7 @@ SCENARIO("Minting tokens")
 {
    GIVEN("Alice created a token")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -237,7 +237,7 @@ SCENARIO("Recalling tokens")
 {
    GIVEN("Alice created a new token and issued some to Bob")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -297,7 +297,7 @@ SCENARIO("Interactions with the Issuer NFT")
 {
    GIVEN("Alice created and distributed a token")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -389,7 +389,7 @@ SCENARIO("Burning tokens")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -473,7 +473,7 @@ SCENARIO("Toggling manual-debit")
 {
    GIVEN("A chain with users Alice and Bob")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -542,7 +542,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -619,7 +619,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
@@ -756,7 +756,7 @@ SCENARIO("Mapping a symbol to a token")
 {
    GIVEN("Alice has created a token and created a symbol")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto bob   = t.from(t.add_account("bob"_a));

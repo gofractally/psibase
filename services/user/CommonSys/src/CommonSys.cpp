@@ -39,15 +39,15 @@ namespace SystemService
          }
          if (request.target == "/common/thisservice")
          {
-            std::string contractName;
+            std::string serviceName;
             if (request.host.size() > request.rootHost.size() + 1 &&
                 request.host.ends_with(request.rootHost) &&
                 request.host[request.host.size() - request.rootHost.size() - 1] == '.')
-               contractName.assign(request.host.begin(),
-                                   request.host.end() - request.rootHost.size() - 1);
+               serviceName.assign(request.host.begin(),
+                                  request.host.end() - request.rootHost.size() - 1);
             else
-               contractName = "common-sys";
-            return to_json(contractName);
+               serviceName = "common-sys";
+            return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
             return to_json(request.rootHost);

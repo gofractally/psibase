@@ -21,7 +21,7 @@ using namespace psibase;
 using namespace SystemService;
 
 DefaultTestChain::DefaultTestChain(
-    const std::vector<std::pair<AccountNumber, const char*>>& additionalContracts,
+    const std::vector<std::pair<AccountNumber, const char*>>& additionalServices,
     uint64_t                                                  max_objects,
     uint64_t                                                  hot_addr_bits,
     uint64_t                                                  warm_addr_bits,
@@ -30,103 +30,108 @@ DefaultTestChain::DefaultTestChain(
     : TestChain{max_objects, hot_addr_bits, warm_addr_bits, cool_addr_bits, cold_addr_bits}
 {
    startBlock();
-   deploySystemContracts();
+   deploySystemServices();
    startBlock();
-   createSysContractAccounts();
+   createSysServiceAccounts();
    registerSysRpc();
 
-   for (const auto& c : additionalContracts)
+   for (const auto& c : additionalServices)
    {
-      add_contract(c.first, c.second);
+      addService(c.first, c.second);
    }
 }
 
-void DefaultTestChain::deploySystemContracts(bool show /* = false */)
+void DefaultTestChain::deploySystemServices(bool show /* = false */)
 {
-   auto trace = pushTransaction(  //
-       makeTransaction(           //
-           {                      //
-            Action{
-                .sender   = AccountNumber{"foo"},  // ignored
-                .contract = AccountNumber{"bar"},  // ignored
-                .method   = {},
-                .rawData  = psio::convert_to_frac(GenesisActionData{
-                     .contracts =  // g.a.d--^ is config file for gen
-                    {
-                         {
-                             .contract = SystemService::TransactionSys::service,
-                             .flags    = SystemService::TransactionSys::contractFlags,
-                             .code     = readWholeFile("TransactionSys.wasm"),
-                        },
-                         {
-                             .contract = SystemService::SetCodeSys::service,
-                             .flags    = SystemService::SetCodeSys::contractFlags,
-                             .code     = readWholeFile("SetCodeSys.wasm"),
-                        },
-                         {
-                             .contract = SystemService::AccountSys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("AccountSys.wasm"),
-                        },
-                         {
-                             .contract = ProxySys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("ProxySys.wasm"),
-                        },
-                         {
-                             .contract = SystemService::AuthAnySys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("AuthAnySys.wasm"),
-                        },
-                         {
-                             .contract = SystemService::AuthEcSys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("AuthEcSys.wasm"),
-                        },
-                         {
-                             .contract = SystemService::VerifyEcSys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("VerifyEcSys.wasm"),
-                        },
-                         {
-                             .contract = CommonSys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("CommonSys.wasm"),
-                        },
-                         {
-                             .contract = RAccountSys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("RAccountSys.wasm"),
-                        },
-                         {
-                             .contract = ExploreSys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("ExploreSys.wasm"),
-                        },
-                         {
-                             .contract = RAuthEcSys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("RAuthEcSys.wasm"),
-                        },
-                         {
-                             .contract = RProxySys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("RProxySys.wasm"),
-                        },
-                         {
-                             .contract = PsiSpaceSys::service,
-                             .flags    = 0,
-                             .code     = readWholeFile("PsiSpaceSys.wasm"),
-                        },
-                    },
-                }),
-            }}),
-       {});
+   auto
+       trace =
+           pushTransaction(      //
+               makeTransaction(  //
+                   {             //
+                    Action{
+                        .sender  = AccountNumber{"foo"},  // ignored
+                        .service = AccountNumber{"bar"},  // ignored
+                        .method  = {},
+                        .rawData =
+                            psio::convert_to_frac(
+                                GenesisActionData{
+                                    .services =
+                                        {
+                                            {
+                                                .service = SystemService::TransactionSys::service,
+                                                .flags =
+                                                    SystemService::TransactionSys::serviceFlags,
+                                                .code = readWholeFile("TransactionSys.wasm"),
+                                            },
+                                            {
+                                                .service = SystemService::SetCodeSys::service,
+                                                .flags   = SystemService::SetCodeSys::serviceFlags,
+                                                .code    = readWholeFile("SetCodeSys.wasm"),
+                                            },
+                                            {
+                                                .service = SystemService::AccountSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("AccountSys.wasm"),
+                                            },
+                                            {
+                                                .service = ProxySys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("ProxySys.wasm"),
+                                            },
+                                            {
+                                                .service = SystemService::AuthAnySys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("AuthAnySys.wasm"),
+                                            },
+                                            {
+                                                .service = SystemService::AuthEcSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("AuthEcSys.wasm"),
+                                            },
+                                            {
+                                                .service = SystemService::VerifyEcSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("VerifyEcSys.wasm"),
+                                            },
+                                            {
+                                                .service = CommonSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("CommonSys.wasm"),
+                                            },
+                                            {
+                                                .service = RAccountSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("RAccountSys.wasm"),
+                                            },
+                                            {
+                                                .service = ExploreSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("ExploreSys.wasm"),
+                                            },
+                                            {
+                                                .service = RAuthEcSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("RAuthEcSys.wasm"),
+                                            },
+                                            {
+                                                .service = RProxySys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("RProxySys.wasm"),
+                                            },
+                                            {
+                                                .service = PsiSpaceSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("PsiSpaceSys.wasm"),
+                                            },
+                                        },
+                                }),
+                    }}),
+               {});
 
-   check(psibase::show(show, trace) == "", "Failed to deploy genesis contracts");
+   check(psibase::show(show, trace) == "", "Failed to deploy genesis services");
 }
 
-void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
+void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
 {
    transactor<SystemService::AccountSys>     asys{SystemService::TransactionSys::service,
                                               SystemService::AccountSys::service};
@@ -134,19 +139,19 @@ void DefaultTestChain::createSysContractAccounts(bool show /* = false */)
                                                   SystemService::TransactionSys::service};
    auto trace = pushTransaction(makeTransaction({asys.startup(), tsys.startup()}));
 
-   check(psibase::show(show, trace) == "", "Failed to create system contract accounts");
+   check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
 
 AccountNumber DefaultTestChain::add_account(
     AccountNumber acc,
-    AccountNumber authContract /* = AccountNumber("auth-any-sys") */,
+    AccountNumber authService /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
 {
    transactor<SystemService::AccountSys> asys(SystemService::TransactionSys::service,
                                               SystemService::AccountSys::service);
 
    auto trace = pushTransaction(  //
-       makeTransaction({asys.newAccount(acc, authContract, true)}));
+       makeTransaction({asys.newAccount(acc, authService, true)}));
 
    check(psibase::show(show, trace) == "", "Failed to add account");
 
@@ -155,10 +160,10 @@ AccountNumber DefaultTestChain::add_account(
 
 AccountNumber DefaultTestChain::add_account(
     const char*   acc,
-    AccountNumber authContract /* = AccountNumber("auth-any-sys")*/,
+    AccountNumber authService /* = AccountNumber("auth-any-sys")*/,
     bool          show /* = false */)
 {
-   return add_account(AccountNumber(acc), authContract, show);
+   return add_account(AccountNumber(acc), authService, show);
 }
 
 AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
@@ -187,9 +192,9 @@ AccountNumber DefaultTestChain::add_ec_account(const char*      name,
    return add_ec_account(AccountNumber(name), public_key, show);
 }
 
-AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
-                                             const char*   filename,
-                                             bool          show /* = false */)
+AccountNumber DefaultTestChain::addService(AccountNumber acc,
+                                           const char*   filename,
+                                           bool          show /* = false */)
 {
    add_account(acc, SystemService::AuthAnySys::service, show);
 
@@ -198,16 +203,16 @@ AccountNumber DefaultTestChain::add_contract(AccountNumber acc,
    auto trace =
        pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
 
-   check(psibase::show(show, trace) == "", "Failed to create contract");
+   check(psibase::show(show, trace) == "", "Failed to create service");
 
    return acc;
-}  // add_contract()
+}  // addService()
 
-AccountNumber DefaultTestChain::add_contract(const char* acc,
-                                             const char* filename,
-                                             bool        show /* = false */)
+AccountNumber DefaultTestChain::addService(const char* acc,
+                                           const char* filename,
+                                           bool        show /* = false */)
 {
-   return add_contract(AccountNumber(acc), filename, show);
+   return addService(AccountNumber(acc), filename, show);
 }
 
 void DefaultTestChain::registerSysRpc()
@@ -225,7 +230,7 @@ void DefaultTestChain::registerSysRpc()
    };
 
    auto trace = pushTransaction(makeTransaction(std::move(a)));
-   check(psibase::show(false, trace) == "", "Failed to register system rpc contracts");
+   check(psibase::show(false, trace) == "", "Failed to register system rpc services");
 
    transactor<CommonSys>   rpcCommon(CommonSys::service, CommonSys::service);
    transactor<RAccountSys> rpcAccount(RAccountSys::service, RAccountSys::service);
@@ -327,5 +332,5 @@ void DefaultTestChain::registerSysRpc()
    };
 
    trace = pushTransaction(makeTransaction(std::move(b)));
-   check(psibase::show(false, trace) == "", "Failed to add UI files to system rpc contracts");
+   check(psibase::show(false, trace) == "", "Failed to add UI files to system rpc services");
 }

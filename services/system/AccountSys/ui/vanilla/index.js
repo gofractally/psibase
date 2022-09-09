@@ -24,7 +24,7 @@ initializeApplet(async () => {
       exec: ({ name, pubKey }) => {
         action(contractName, "newAccount", {
           name,
-          authContract: "auth-any-sys",
+          authService: "auth-any-sys",
           requireNew: true,
         });
 
@@ -41,7 +41,7 @@ initializeApplet(async () => {
           action(
             contractName,
             "setAuthCntr",
-            { authContract: "auth-ec-sys" },
+            { authService: "auth-ec-sys" },
             name,
           );
         }
@@ -62,7 +62,7 @@ initializeApplet(async () => {
         let user = await query(accountSys, "getLoggedInUser");
         let accounts = await getJson("/accounts");
         let u = accounts.find((a) => a.accountNum === user);
-        if (u.authContract === "auth-ec-sys") {
+        if (u.authService === "auth-ec-sys") {
           // Todo: Should sign with the private key mapped to the logged-in
           //        user stored in localstorage
           return await signTransaction("", transaction, [
@@ -104,7 +104,7 @@ const AccountList = ({ addMsg, clearMsg }) => {
           (account) => html`
             <tr key=${account.num}>
               <td style=${{ border: "2px solid" }}>${account.accountNum}</td>
-              <td style=${{ border: "2px solid" }}>${account.authContract}</td>
+              <td style=${{ border: "2px solid" }}>${account.authService}</td>
             </tr>
           `,
         )}

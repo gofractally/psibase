@@ -7,7 +7,7 @@ namespace psibase
 {
    /// Content for serving over HTTP
    ///
-   /// This the table row format for contracts which store and serve HTTP files
+   /// This the table row format for services which store and serve HTTP files
    /// using [storeContent] and [serveContent].
    ///
    /// Also includes this definition:
@@ -26,16 +26,16 @@ namespace psibase
 
    /// Store web content in table
    ///
-   /// This stores web content into a contract's `WebContentTable`.
+   /// This stores web content into a service's `WebContentTable`.
    /// [serveContent] serves this content via HTTP.
    ///
    /// Example use:
    ///
    /// ```c++
-   /// // Don't forget to include your contract's other tables in this!
+   /// // Don't forget to include your service's other tables in this!
    /// using Tables = psibase::ServiceTables<psibase::WebContentTable>;
    ///
-   /// void MyContract::storeSys(
+   /// void MyService::storeSys(
    ///    std::string path, std::string contentType, std::vector<char> content)
    /// {
    ///    psibase::check(getSender() == getReceiver(), "wrong sender");
@@ -65,10 +65,10 @@ namespace psibase
    ///
    /// Example use:
    /// ```c++
-   /// // Don't forget to include your contract's other tables in this!
+   /// // Don't forget to include your service's other tables in this!
    /// using Tables = psibase::ServiceTables<psibase::WebContentTable>;
    ///
-   /// std::optional<psibase::HttpReply> MyContract::serveSys(
+   /// std::optional<psibase::HttpReply> MyService::serveSys(
    ///    psibase::HttpRequest request)
    /// {
    ///    if (auto result = psibase::serveContent(request, Tables{getReceiver()}))

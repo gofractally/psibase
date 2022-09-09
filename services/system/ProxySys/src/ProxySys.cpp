@@ -25,29 +25,26 @@ namespace SystemService
    // TODO: switch to Table wrapper
    using table_num = uint16_t;
 
-   static constexpr table_num registered_contract_table = 1;
+   static constexpr table_num registeredServiceTable = 1;
 
-   inline auto registeredContractKey(AccountNumber this_contract, AccountNumber contract)
+   inline auto registeredServiceKey(AccountNumber thisService, AccountNumber service)
    {
-      return std::tuple{this_contract, registered_contract_table, contract};
+      return std::tuple{thisService, registeredServiceTable, service};
    }
-   struct RegisteredContractRow
+   struct RegisteredServiceRow
    {
-      AccountNumber contract       = {};
-      AccountNumber serverContract = {};
+      AccountNumber service = {};
+      AccountNumber server  = {};
 
-      auto key(AccountNumber this_contract)
-      {
-         return registeredContractKey(this_contract, contract);
-      }
+      auto key(AccountNumber thisService) { return registeredServiceKey(thisService, service); }
    };
-   PSIO_REFLECT(RegisteredContractRow, contract, serverContract)
+   PSIO_REFLECT(RegisteredServiceRow, service, server)
 
-   void ProxySys::registerServer(AccountNumber serverContract)
+   void ProxySys::registerServer(AccountNumber server)
    {
-      RegisteredContractRow row{
-          .contract       = getSender(),
-          .serverContract = serverContract,
+      RegisteredServiceRow row{
+          .service = getSender(),
+          .server  = server,
       };
       kvPut(row.key(getReceiver()), row);
    }
@@ -58,33 +55,33 @@ namespace SystemService
       // TODO: use a view
       auto req = psio::convert_from_frac<HttpRequest>(act.rawData);
 
-      std::string contractName;
+      std::string serviceName;
 
       // Path reserved across all subdomains
       if (req.target.starts_with("/common"))
-         contractName = "common-sys";
+         serviceName = "common-sys";
 
       // subdomain
       else if (isSubdomain(req))
-         contractName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
+         serviceName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
 
       // root domain
       else
-         contractName = "common-sys";
+         serviceName = "common-sys";
 
-      auto contract = AccountNumber(contractName);
-      auto reg      = kvGet<RegisteredContractRow>(registeredContractKey(act.contract, contract));
+      auto service = AccountNumber(serviceName);
+      auto reg     = kvGet<RegisteredServiceRow>(registeredServiceKey(act.service, service));
       if (reg)
-         contract = reg->serverContract;
+         service = reg->server;
       else
-         contract = "psispace-sys"_a;
+         service = "psispace-sys"_a;
 
       // TODO: avoid repacking (both directions)
-      psibase::Actor<ServerInterface> iface(act.contract, contract);
+      psibase::Actor<ServerInterface> iface(act.service, service);
 
       auto result = iface.serveSys(std::move(req));
-      if (result && !result->headers.empty() && contractName != "common-sys")
-         abortMessage("contract " + contract.str() + " attempted to set an http header");
+      if (result && !result->headers.empty() && serviceName != "common-sys")
+         abortMessage("service " + service.str() + " attempted to set an http header");
 
       setRetval(result);
    }  // serve()

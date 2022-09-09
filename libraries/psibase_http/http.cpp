@@ -217,9 +217,9 @@ namespace psibase::http
                                  "Need genesis block; use 'psibase boot' to boot chain"));
             SignedTransaction trx;
             Action            action{
-                           .sender   = AccountNumber(),
-                           .contract = proxyContractNum,
-                           .rawData  = psio::convert_to_frac(data),
+                           .sender  = AccountNumber(),
+                           .service = proxyServiceNum,
+                           .rawData = psio::convert_to_frac(data),
             };
             TransactionTrace   trace;
             TransactionContext tc{bc, trx, trace, true, false, true};
@@ -241,7 +241,7 @@ namespace psibase::http
                report += "handling " + data.host + " " + data.method + " " + data.target + "\n";
                report += "   pack request:   " + t(startExecTime - startTime) + " us\n";
                report +=
-                   "   load contracts: " + t(endExecTime - startExecTime - tc.getBillableTime()) +
+                   "   load services: " + t(endExecTime - startExecTime - tc.getBillableTime()) +
                    " us\n";
                report += "   database:       " + t(tc.databaseTime) + " us\n";
                report +=

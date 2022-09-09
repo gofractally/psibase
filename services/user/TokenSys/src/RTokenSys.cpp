@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-using namespace UserContract;
+using namespace UserService;
 using namespace std;
 using namespace psibase;
 
@@ -120,7 +120,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          TokenSys::Tables db{TokenSys::service};
          auto             idx = db.open<TokenTable>().getIndex<0>();
 
-         std::vector<UserContract::TokenRecord> allTokens;
+         std::vector<UserService::TokenRecord> allTokens;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)
          {
             allTokens.push_back(*itr);
@@ -166,4 +166,4 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
    return std::nullopt;
 }
 
-PSIBASE_DISPATCH(UserContract::RTokenSys)
+PSIBASE_DISPATCH(UserService::RTokenSys)

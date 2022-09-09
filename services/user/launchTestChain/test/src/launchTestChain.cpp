@@ -11,15 +11,15 @@
 
 using namespace psibase;
 using namespace psibase::benchmarking;
-using UserContract::TokenSys;
-using namespace UserContract::Errors;
-using namespace UserContract;
+using UserService::TokenSys;
+using namespace UserService::Errors;
+using namespace UserService;
 
 namespace
 {
    const psibase::String memo{"memo"};
 
-   const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
+   const std::vector<std::pair<AccountNumber, const char*>> neededServices = {
        {TokenSys::service, "TokenSys.wasm"},
        {NftSys::service, "NftSys.wasm"},
        {SymbolSys::service, "SymbolSys.wasm"},
@@ -28,7 +28,7 @@ namespace
 
 SCENARIO("Testing default psibase chain")
 {
-   DefaultTestChain t(neededContracts, 1'000'000'000ul, 32, 32, 32, 38);
+   DefaultTestChain t(neededServices, 1'000'000'000ul, 32, 32, 32, 38);
 
    auto tokenSysRpc = t.from(RTokenSys::service).to<RTokenSys>();
 
@@ -54,7 +54,7 @@ SCENARIO("Testing default psibase chain")
    auto alice = t.from(t.add_account("alice"_a));
    auto bob   = t.from(t.add_account("bob"_a));
 
-   // Initialize user contracts
+   // Initialize user services
    alice.to<NftSys>().init();
    alice.to<TokenSys>().init();
    alice.to<SymbolSys>().init();

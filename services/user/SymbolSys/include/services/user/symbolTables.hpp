@@ -10,7 +10,7 @@
 #include "services/user/NftSys.hpp"
 #include "services/user/tokenTypes.hpp"
 
-namespace UserContract
+namespace UserService
 {
    using SID = psibase::AccountNumber;
 
@@ -69,4 +69,4 @@ namespace UserContract
    PSIO_REFLECT(SymbolRecord, symbolId, ownerNft, saleDetails);
    using SymbolTable = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
 
-}  // namespace UserContract
+}  // namespace UserService

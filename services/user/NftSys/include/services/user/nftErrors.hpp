@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-namespace UserContract
+namespace UserService
 {
    namespace Errors
    {
@@ -17,4 +17,4 @@ namespace UserContract
       constexpr std::string_view redundantUpdate = "Specified update is redundant";
       constexpr std::string_view nftBurned       = "NFT was burned";
    }  // namespace Errors
-}  // namespace UserContract
+}  // namespace UserService

@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-namespace UserContract
+namespace UserService
 {
    namespace Errors
    {
@@ -15,4 +15,4 @@ namespace UserContract
       constexpr std::string_view invalidSymbol =
           "Symbol may only contain 3 to 7 lowercase alphabetic characters";
    }  // namespace Errors
-}  // namespace UserContract
+}  // namespace UserService

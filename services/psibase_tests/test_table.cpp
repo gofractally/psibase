@@ -37,9 +37,9 @@ namespace table_test
 
    using test_tables = ServiceTables<table0, table1, table2>;
 
-   void test0(AccountNumber this_contract)
+   void test0(AccountNumber thisService)
    {
-      test_tables t{this_contract};
+      test_tables t{thisService};
       auto        t0   = t.open<table0>();
       auto        idx0 = t0.getIndex<0>();
       t0.put(S0{0, 1});
@@ -50,9 +50,9 @@ namespace table_test
       check(idx0.get(0) == S0{0, 2} && idx0.get(1) == S0{1, 3}, "get after different key");
    }
 
-   void test1(AccountNumber this_contract)
+   void test1(AccountNumber thisService)
    {
-      test_tables t{this_contract};
+      test_tables t{thisService};
       auto        t1   = t.open<table1>();
       auto        idx0 = t1.getIndex<0>();
       auto        idx1 = t1.getIndex<1>();
@@ -65,9 +65,9 @@ namespace table_test
       check(idx1.get(1) == std::nullopt, "get1 removed");
    }
 
-   void test2(AccountNumber this_contract)
+   void test2(AccountNumber thisService)
    {
-      test_tables t{this_contract};
+      test_tables t{thisService};
       auto        t2   = t.open<table2>();
       auto        idx1 = t2.getIndex<1>();
       t2.put(S2{0, 1, 2});
@@ -84,9 +84,9 @@ namespace table_test
       check(result[1] == S2{3, 1, 4}, "iter val1");
    }
 
-   void test3(AccountNumber this_contract)
+   void test3(AccountNumber thisService)
    {
-      test_tables t{this_contract};
+      test_tables t{thisService};
       auto        t0   = t.open<table0>();
       auto        idx0 = t0.getIndex<0>();
       t0.put(S0{0, 1});
@@ -97,9 +97,9 @@ namespace table_test
       check(!idx0.get(2).has_value(), "remove without secondary");
    }
 
-   void test4(AccountNumber this_contract)
+   void test4(AccountNumber thisService)
    {
-      test_tables t{this_contract};
+      test_tables t{thisService};
       auto        t1   = t.open<table1>();
       auto        idx0 = t1.getIndex<0>();
       auto        idx1 = t1.getIndex<1>();
@@ -113,17 +113,17 @@ namespace table_test
       check(!idx1.get(4).has_value(), "remove secondary");
    }
 
-   extern "C" void called(AccountNumber this_contract, AccountNumber sender)
+   extern "C" void called(AccountNumber thisService, AccountNumber sender)
    {
-      test0(this_contract);
-      test1(this_contract);
-      test2(this_contract);
-      test3(this_contract);
-      test4(this_contract);
+      test0(thisService);
+      test1(thisService);
+      test2(thisService);
+      test3(thisService);
+      test4(thisService);
    }
 
    extern "C" void __wasm_call_ctors();
-   extern "C" void start(AccountNumber this_contract)
+   extern "C" void start(AccountNumber thisService)
    {
       __wasm_call_ctors();
    }

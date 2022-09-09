@@ -19,11 +19,11 @@ namespace SystemService
    struct Account
    {
       psibase::AccountNumber accountNum;
-      psibase::AccountNumber authContract;
+      psibase::AccountNumber authService;
 
       auto key() const { return accountNum; }
    };
-   PSIO_REFLECT(Account, accountNum, authContract)
+   PSIO_REFLECT(Account, accountNum, authService)
    using AccountTable = psibase::Table<Account, &Account::key>;
 
    struct SingletonKey
@@ -51,9 +51,9 @@ namespace SystemService
 
       void startup();
       void newAccount(psibase::AccountNumber name,
-                      psibase::AccountNumber authContract,
+                      psibase::AccountNumber authService,
                       bool                   requireNew);
-      void setAuthCntr(psibase::AccountNumber authContract);
+      void setAuthCntr(psibase::AccountNumber authService);
       bool exists(psibase::AccountNumber num);
 
       void setCreator(psibase::AccountNumber creator);
@@ -74,8 +74,8 @@ namespace SystemService
 
    PSIO_REFLECT(AccountSys,
                 method(startup, existing_accounts),
-                method(newAccount, name, authContract, requireNew),
-                method(setAuthCntr, authContract),
+                method(newAccount, name, authService, requireNew),
+                method(setAuthCntr, authService),
                 method(exists, num),
                 method(setCreator, creator)
                 //

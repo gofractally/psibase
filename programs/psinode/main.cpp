@@ -81,7 +81,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
                trace = {};
                if (!trx.proofs.empty())
                   // Proofs execute as of the state at the beginning of a block.
-                  // That state is empty, so there are no proof contracts installed.
+                  // That state is empty, so there are no proof services installed.
                   trace.error = "Transactions in boot block may not have proofs";
                else
                   bc.pushTransaction(trx, trace, std::nullopt);
@@ -173,17 +173,17 @@ void pushTransaction(psibase::SharedState&                  sharedState,
             // All proofs execute as of the state at block begin. This will allow
             // consistent parallel execution of all proofs within a block during
             // replay. Proofs don't have direct database access, but they do rely
-            // on the set of contracts stored within the database. They may call
-            // other contracts; e.g. to call crypto functions.
+            // on the set of services stored within the database. They may call
+            // other services; e.g. to call crypto functions.
             //
             // TODO: move proof execution to background threads
             // TODO: track CPU usage of proofs and pass it somehow to the main
             //       execution for charging
             // TODO: If by the time the transaction executes it's on a different
             //       block than the proofs were verified on, then either the proofs
-            //       need to be rerun, or the hashes of the contracts which ran
+            //       need to be rerun, or the hashes of the services which ran
             //       during the proofs need to be compared against the current
-            //       contract hashes. This will prevent a poison block.
+            //       service hashes. This will prevent a poison block.
             // TODO: If the first proof and the first auth pass, but the transaction
             //       fails (including other proof failures), then charge the first
             //       authorizer
@@ -207,7 +207,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
             // the transaction being rejected because it passes on one fork but not
             // another, potentially charging the user for the failed transaction. The
             // first auth check, when not part of the main execution, runs in read-only
-            // mode. TransactionSys lets the account's auth contract know it's in a
+            // mode. TransactionSys lets the account's auth service know it's in a
             // read-only mode so it doesn't fail the transaction trying to update its
             // tables.
             //

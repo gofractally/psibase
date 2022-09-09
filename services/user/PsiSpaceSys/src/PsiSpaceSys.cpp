@@ -12,11 +12,11 @@ namespace SystemService
    {
       struct Query
       {
-         AccountNumber contract;
+         AccountNumber service;
 
          auto content() const
          {
-            return PsiSpaceSys::Tables{contract}.open<PsiSpaceContentTable>().getIndex<0>();
+            return PsiSpaceSys::Tables{service}.open<PsiSpaceContentTable>().getIndex<0>();
          }
       };
       PSIO_REFLECT(  //

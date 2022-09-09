@@ -2,7 +2,7 @@
 
 ## Dev Instructions
 
--   update contract name at bottom of `vite.config.ts` (`plugins: [psibase("explore-sys")],`)
+-   update service name at bottom of `vite.config.ts` (`plugins: [psibase("explore-sys")],`)
 -   `yarn` to install dependencies
 -   `yarn dev` and open `http://psibase.127.0.0.1.sslip.io:8081` for HMR!
 

@@ -5,7 +5,7 @@ using namespace psibase;
 
 namespace SystemService
 {
-   void SetCodeSys::setCode(AccountNumber     contract,
+   void SetCodeSys::setCode(AccountNumber     service,
                             uint8_t           vmType,
                             uint8_t           vmVersion,
                             std::vector<char> code)
@@ -13,14 +13,14 @@ namespace SystemService
       // TODO: validate code here?
       // TODO: special rule for resource charging: pretend CodeByHashRow isn't shared
       // TODO: move numRefs to a different row?
-      check(getSender() == contract, "sender must match contract account");
+      check(getSender() == service, "sender must match service account");
       check(vmType == 0 && vmVersion == 0, "unsupported type or version");
 
-      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(contract));
+      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(service));
       if (!account)
       {
          account.emplace();
-         account->codeNum = contract;
+         account->codeNum = service;
       }
 
       Checksum256 codeHash;
@@ -69,14 +69,14 @@ namespace SystemService
       }
    }  // setCode
 
-   void SetCodeSys::setFlags(psibase::AccountNumber contract, uint64_t flags)
+   void SetCodeSys::setFlags(psibase::AccountNumber service, uint64_t flags)
    {
       check(getSender() == getReceiver(), "incorrect sender");
-      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(contract));
+      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(service));
       if (!account)
       {
          account.emplace();
-         account->codeNum = contract;
+         account->codeNum = service;
       }
       account->flags = flags;
       if (account->codeHash != Checksum256{} || account->flags)

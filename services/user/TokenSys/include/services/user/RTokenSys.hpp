@@ -1,6 +1,6 @@
 #include "TokenSys.hpp"
 
-namespace UserContract
+namespace UserService
 {
    class RTokenSys : public psibase::Service<RTokenSys>
    {
@@ -15,4 +15,4 @@ namespace UserContract
    };
    PSIO_REFLECT(RTokenSys, method(serveSys, request), method(storeSys, path, contentType, content))
 
-}  // namespace UserContract
+}  // namespace UserService

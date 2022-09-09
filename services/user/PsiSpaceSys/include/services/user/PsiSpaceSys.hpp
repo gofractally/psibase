@@ -32,7 +32,7 @@ namespace SystemService
 
    /// Provide web hosting
    ///
-   /// This contract provides web hosting to non-contract accounts. It supports both an
+   /// This service provides web hosting to non-service accounts. It supports both an
    /// upload UI (TODO) and command-line upload using `psibase upload` and
    /// `psibase upload tree`.
    ///

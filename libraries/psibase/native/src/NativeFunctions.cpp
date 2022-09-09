@@ -37,10 +37,10 @@ namespace psibase
             return (DbId)db;
          if (db == uint32_t(DbId::subjective))
          {
-            // TODO: RPC contract queries currently can read subjective data to monitor node status.
+            // TODO: RPC service queries currently can read subjective data to monitor node status.
             //       However, there's a possibility this may make it easier on an active attacker.
             //       Make this capability a node configuration toggle? Allow node config to whitelist
-            //       contracts for this?
+            //       services for this?
             if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
                return (DbId)db;
          }
@@ -48,7 +48,7 @@ namespace psibase
             return (DbId)db;
          if (db == uint32_t(DbId::blockLog) && self.allowDbReadSubjective)
             return (DbId)db;
-         throw std::runtime_error("contract may not read this db, or must use another intrinsic");
+         throw std::runtime_error("service may not read this db, or must use another intrinsic");
       }
 
       DbId getDbReadSequential(NativeFunctions& self, uint32_t db)
@@ -64,10 +64,10 @@ namespace psibase
             if (db == uint32_t(DbId::merkleEvent))
                return (DbId)db;
          }
-         throw std::runtime_error("contract may not read this db, or must use another intrinsic");
+         throw std::runtime_error("service may not read this db, or must use another intrinsic");
       }
 
-      bool keyHasContractPrefix(uint32_t db)
+      bool keyHasServicePrefix(uint32_t db)
       {
          return db == uint32_t(DbId::service) || db == uint32_t(DbId::writeOnly) ||
                 db == uint32_t(DbId::subjective);
@@ -86,15 +86,15 @@ namespace psibase
                "database access disabled during proof verification or first auth");
          check(self.allowDbWrite, "database writes disabled during query");
 
-         if (keyHasContractPrefix(db))
+         if (keyHasServicePrefix(db))
          {
             uint64_t prefix = self.code.codeNum.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
-                  "key prefix must match contract during write");
+                  "key prefix must match service during write");
          };
 
-         // User-written subjective contracts writing to subjective storage isn't really
+         // User-written subjective services writing to subjective storage isn't really
          // viable, so it requires an additional permission bit. The oddities:
          //
          // * It has billing issues since database billing is objective
@@ -103,19 +103,19 @@ namespace psibase
          // * Forking doesn't roll back subjective storage
          // * Subjective execution doesn't happen when nodes get the produced block
          //
-         // The unusual semantics exist to enable trusted subjective contracts to do
+         // The unusual semantics exist to enable trusted subjective services to do
          // subjective attack mitigation.
          //
          // TODO: reenable after subjective database support is working as intended
          if (false && db == uint32_t(DbId::subjective) &&
              (self.code.flags & CodeRow::isSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
-            // Not chargeable since subjective contracts are skipped during replay
+            // Not chargeable since subjective services are skipped during replay
             return {(DbId)db, false, false};
 
-         // Prevent poison block; subjective contracts skip execution during replay
+         // Prevent poison block; subjective services skip execution during replay
          check(!(self.code.flags & CodeRow::isSubjective),
-               "subjective contracts may only write to DbId::subjective");
+               "subjective services may only write to DbId::subjective");
 
          if (db == uint32_t(DbId::service))
             return {(DbId)db, true, true};
@@ -127,7 +127,7 @@ namespace psibase
          if (db == uint32_t(DbId::nativeUnconstrained) &&
              (self.code.flags & CodeRow::allowWriteNative))
             return {(DbId)db, true, true};
-         throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
+         throw std::runtime_error("service may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
       }
 
@@ -140,9 +140,9 @@ namespace psibase
                "database access disabled during proof verification or first auth");
          check(self.allowDbWrite, "writes disabled during query");
 
-         // Prevent poison block; subjective contracts skip execution during replay
+         // Prevent poison block; subjective services skip execution during replay
          check(!(self.code.flags & CodeRow::isSubjective),
-               "contract may not write this db, or must use another intrinsic");
+               "service may not write this db, or must use another intrinsic");
 
          if (db == uint32_t(DbId::historyEvent))
             return (DbId)db;
@@ -150,7 +150,7 @@ namespace psibase
             return (DbId)db;
          if (db == uint32_t(DbId::merkleEvent))
             return (DbId)db;
-         throw std::runtime_error("contract may not write this db (" + std::to_string(db) +
+         throw std::runtime_error("service may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
       }
 
@@ -288,18 +288,18 @@ namespace psibase
 
    void NativeFunctions::abortMessage(eosio::vm::span<const char> str)
    {
-      throw std::runtime_error("contract '" + code.codeNum.str() +
+      throw std::runtime_error("service '" + code.codeNum.str() +
                                "' aborted with message: " + std::string(str.data(), str.size()));
    }
 
    uint64_t NativeFunctions::getBillableTime()
    {
-      // A more-accurate message is "only subjective contracts may
-      // call getBillableTime", but that may mislead contract developers
-      // into thinking they should create a subjective contract;
+      // A more-accurate message is "only subjective services may
+      // call getBillableTime", but that may mislead service developers
+      // into thinking they should create a subjective service;
       // they shouldn't.
       check(code.flags & CodeRow::isSubjective,
-            "unprivileged contracts may not call getBillableTime");
+            "unprivileged services may not call getBillableTime");
       clearResult(*this);
       return transactionContext.getBillableTime().count();
    }
@@ -339,7 +339,7 @@ namespace psibase
    //          * Make it wait until all parallel executions complete?
    //          * Caution with waiting: vulnerability when combined with canNotTimeOut
    //      * Flag to indicate that a parallel run failure is an authorization failure.
-   //        Only privileged contracts can set this since it impacts billing.
+   //        Only privileged services can set this since it impacts billing.
    //        Iffy. There's got to be another way. Some of the billing policies seem to
    //        be leaking into native.
    //      * Need to prioritize proofs over other background tasks. Rely on the above flag?
@@ -359,7 +359,7 @@ namespace psibase
             "call: invalid data format");
       auto act = psio::convert_from_frac<Action>({data.data(), data.size()});
       check(act.sender == code.codeNum || (code.flags & CodeRow::allowSudo),
-            "contract is not authorized to call as another sender");
+            "service is not authorized to call as another sender");
 
       currentActContext->actionTrace.innerTraces.push_back({ActionTrace{}});
       auto& inner_action_trace =
@@ -424,9 +424,9 @@ namespace psibase
 
              psio::input_stream v{value.data(), value.size()};
              check(v.remaining() >= sizeof(AccountNumber::value),
-                   "value prefix must match contract during write");
+                   "value prefix must match service during write");
              auto service = psio::from_bin<AccountNumber>(v);
-             check(service == code.codeNum, "value prefix must match contract during write");
+             check(service == code.codeNum, "value prefix must match service during write");
 
              auto&    dbStatus = transactionContext.blockContext.databaseStatus;
              uint64_t indexNumber;
@@ -497,7 +497,7 @@ namespace psibase
           [&]
           {
              check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-             if (keyHasContractPrefix(db))
+             if (keyHasServicePrefix(db))
                 check(matchKeySize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
              return setResult(
@@ -515,7 +515,7 @@ namespace psibase
           [&]
           {
              check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-             if (keyHasContractPrefix(db))
+             if (keyHasServicePrefix(db))
                 check(matchKeySize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
              return setResult(*this,
@@ -530,7 +530,7 @@ namespace psibase
           *this,
           [&]
           {
-             if (keyHasContractPrefix(db))
+             if (keyHasServicePrefix(db))
                 check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
              return setResult(*this,
                               database.kvMaxRaw(getDbRead(*this, db), {key.data(), key.size()}));

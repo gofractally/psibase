@@ -244,7 +244,7 @@ namespace psibase
    ///
    /// This demonstrates exposing a table's contents via GraphQL. This example
    /// doesn't include a way to fill the table; that's left as an exercise to the
-   /// reader. Hint: contract-based RPC and GraphQL only support read-only
+   /// reader. Hint: service-based RPC and GraphQL only support read-only
    /// operations; you must use actions to write to a table.
    ///
    /// ```c++
@@ -274,31 +274,31 @@ namespace psibase
    ///
    /// struct Query
    /// {
-   ///    psibase::AccountNumber contract;
+   ///    psibase::AccountNumber service;
    ///
    ///    auto rowsByPrimary() const {
-   ///       return MyTables{contract}.open<MyTable>().getIndex<0>();
+   ///       return MyTables{service}.open<MyTable>().getIndex<0>();
    ///    }
    ///    auto rowsBySecondary() const {
-   ///       return MyTables{contract}.open<MyTable>().getIndex<1>();
+   ///       return MyTables{service}.open<MyTable>().getIndex<1>();
    ///    }
    /// };
    /// PSIO_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
    ///
-   /// struct ExampleContract : psibase::Service<ExampleContract>
+   /// struct ExampleService : psibase::Service<ExampleService>
    /// {
    ///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
    ///    {
-   ///       if (auto result = psibase::serveSimpleUI<ExampleContract, true>(request))
+   ///       if (auto result = psibase::serveSimpleUI<ExampleService, true>(request))
    ///          return result;
    ///       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
    ///          return result;
    ///       return std::nullopt;
    ///    }
    /// };
-   /// PSIO_REFLECT(ExampleContract, method(serveSys, request))
+   /// PSIO_REFLECT(ExampleService, method(serveSys, request))
    ///
-   /// PSIBASE_DISPATCH(ExampleContract)
+   /// PSIBASE_DISPATCH(ExampleService)
    /// ```
    ///
    /// This example doesn't call `makeConnection` directly; it's automatic.
@@ -455,8 +455,8 @@ namespace psibase
       uint32_t      event_db;
       uint64_t      event_id;
       bool          event_found;
-      AccountNumber event_contract;
-      bool          event_supported_contract;
+      AccountNumber event_service;
+      bool          event_supported_service;
       MethodNumber  event_type;
       bool          event_unpack_ok;
    };
@@ -464,8 +464,8 @@ namespace psibase
                 event_db,
                 event_id,
                 event_found,
-                event_contract,
-                event_supported_contract,
+                event_service,
+                event_supported_service,
                 event_type,
                 event_unpack_ok)
 
@@ -477,12 +477,12 @@ namespace psibase
    /// The GraphQL result is an object with these fields, plus more:
    ///
    /// ```text
-   /// type MyContract_EventsUi {
+   /// type MyService_EventsUi {
    ///     event_db: Float!                   # Database ID (uint32_t)
    ///     event_id: String!                  # Event ID (uint64_t)
    ///     event_found: Boolean!              # Was the event found in db?
-   ///     event_contract: String!            # Contract that created the event
-   ///     event_supported_contract: Boolean! # Is this contract the one
+   ///     event_service: String!             # Service that created the event
+   ///     event_supported_service: Boolean!  # Is this service the one
    ///                                        #    that created it?
    ///     event_type: String!                # Event type
    ///     event_unpack_ok: Boolean!          # Did it decode OK?
@@ -491,7 +491,7 @@ namespace psibase
    ///
    /// `EventDecoder` will only attempt to decode an event which meets all of the following:
    /// * It's found in the `EventDecoder::db` database (`event_found` will be true)
-   /// * Was written by the contract which matches the `EventDecoder::service` field (`event_supported_contract` will be true)
+   /// * Was written by the service which matches the `EventDecoder::service` field (`event_supported_service` will be true)
    /// * Has a type which matches one of the definitions in the `Events` template argument
    ///
    /// If decoding is successful, `EventDecoder` will set the GraphQL `event_unpack_ok`
@@ -503,19 +503,19 @@ namespace psibase
    /// #### EventDecoder example
    ///
    /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
-   /// have [defined events](contracts-events.md#defining-events) for your contract.
+   /// have [defined events](services-events.md#defining-events) for your service.
    /// It's rare to define a query method like this one; use [EventQuery] instead,
    /// which handles history, ui, and merkle events.
    ///
    /// ```c++
    /// struct Query
    /// {
-   ///    psibase::AccountNumber contract;
+   ///    psibase::AccountNumber service;
    ///
    ///    auto getUiEvent(uint64_t eventId) const
    ///    {
-   ///       return EventDecoder<MyContract::Events::Ui>{
-   ///          DbId::uiEvent, eventId, contract};
+   ///       return EventDecoder<MyService::Events::Ui>{
+   ///          DbId::uiEvent, eventId, service};
    ///    }
    /// };
    /// PSIO_REFLECT(Query, method(getUiEvent, eventId))
@@ -559,7 +559,7 @@ namespace psibase
    {
       DbId          db;
       uint64_t      eventId;
-      AccountNumber contract;
+      AccountNumber service;
 
       struct Reflect
       {
@@ -629,9 +629,9 @@ namespace psibase
          f(alias, decoder.eventId);
       else if (name == "event_found")
          f(alias, true);
-      else if (name == "event_contract")
-         f(alias, decoder.contract);
-      else if (name == "event_supported_contract")
+      else if (name == "event_service")
+         f(alias, decoder.service);
+      else if (name == "event_supported_service")
          f(alias, true);
       else if (name == "event_type")
          f(alias, type);
@@ -732,30 +732,30 @@ namespace psibase
       if (!v)
          return gql_query(
              EventDecoderStatus{
-                 .event_db                 = (uint32_t)decoder.db,
-                 .event_id                 = decoder.eventId,
-                 .event_found              = false,
-                 .event_contract           = {},
-                 .event_supported_contract = false,
-                 .event_type               = {},
-                 .event_unpack_ok          = false,
+                 .event_db                = (uint32_t)decoder.db,
+                 .event_id                = decoder.eventId,
+                 .event_found             = false,
+                 .event_service           = {},
+                 .event_supported_service = false,
+                 .event_type              = {},
+                 .event_unpack_ok         = false,
              },
              input_stream, output_stream, error, true);
 
       psio::input_stream stream(v->data(), v->size());
 
-      AccountNumber contract;
-      fracunpack(contract, stream);
-      if (contract != decoder.contract)
+      AccountNumber service;
+      fracunpack(service, stream);
+      if (service != decoder.service)
          return gql_query(
              EventDecoderStatus{
-                 .event_db                 = (uint32_t)decoder.db,
-                 .event_id                 = decoder.eventId,
-                 .event_found              = true,
-                 .event_contract           = contract,
-                 .event_supported_contract = false,
-                 .event_type               = {},
-                 .event_unpack_ok          = false,
+                 .event_db                = (uint32_t)decoder.db,
+                 .event_id                = decoder.eventId,
+                 .event_found             = true,
+                 .event_service           = service,
+                 .event_supported_service = false,
+                 .event_type              = {},
+                 .event_unpack_ok         = false,
              },
              input_stream, output_stream, error, true);
 
@@ -785,13 +785,13 @@ namespace psibase
       if (!found)
          return gql_query(
              EventDecoderStatus{
-                 .event_db                 = (uint32_t)decoder.db,
-                 .event_id                 = decoder.eventId,
-                 .event_found              = true,
-                 .event_contract           = contract,
-                 .event_supported_contract = true,
-                 .event_type               = type,
-                 .event_unpack_ok          = false,
+                 .event_db                = (uint32_t)decoder.db,
+                 .event_id                = decoder.eventId,
+                 .event_found             = true,
+                 .event_service           = service,
+                 .event_supported_service = true,
+                 .event_type              = type,
+                 .event_unpack_ok         = false,
              },
              input_stream, output_stream, error, true);
 
@@ -804,33 +804,33 @@ namespace psibase
    /// returns a GraphQL object with the following query methods:
    ///
    /// ```text
-   /// type MyContract_Events {
-   ///     history(ids: [String!]!): [MyContract_EventsHistory!]!
-   ///     ui(ids: [String!]!):      [MyContract_EventsUi!]!
-   ///     merkle(ids: [String!]!):  [MyContract_EventsMerkle!]!
+   /// type MyService_Events {
+   ///     history(ids: [String!]!): [MyService_EventsHistory!]!
+   ///     ui(ids: [String!]!):      [MyService_EventsUi!]!
+   ///     merkle(ids: [String!]!):  [MyService_EventsMerkle!]!
    /// }
    /// ```
    ///
    /// These methods take an array of event IDs. They return arrays
    /// of objects containing the decoded (if possible) events.
    /// See [EventDecoder] for how to interact with the return values;
-   /// `MyContract_EventsHistory`, `MyContract_EventsUi`, and
-   /// `MyContract_EventsMerkle` all behave the same.
+   /// `MyService_EventsHistory`, `MyService_EventsUi`, and
+   /// `MyService_EventsMerkle` all behave the same.
    ///
    ///
    /// #### EventQuery example
    ///
    /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
-   /// have [defined events](contracts-events.md#defining-events) for your contract.
+   /// have [defined events](services-events.md#defining-events) for your service.
    ///
    /// ```c++
    /// struct Query
    /// {
-   ///    psibase::AccountNumber contract;
+   ///    psibase::AccountNumber service;
    ///
    ///    auto events() const
    ///    {
-   ///       return psibase::EventQuery<MyContract::Events>{contract};
+   ///       return psibase::EventQuery<MyService::Events>{service};
    ///    }
    /// };
    /// PSIO_REFLECT(Query, method(events))
@@ -883,7 +883,7 @@ namespace psibase
    template <typename Events>
    struct EventQuery
    {
-      AccountNumber contract;
+      AccountNumber service;
 
       /// Decode history events
       auto history(const std::vector<uint64_t>& ids) const
@@ -891,7 +891,7 @@ namespace psibase
          std::vector<EventDecoder<typename Events::History>> result;
          result.reserve(ids.size());
          for (auto id : ids)
-            result.push_back({DbId::historyEvent, id, contract});
+            result.push_back({DbId::historyEvent, id, service});
          return result;
       }
 
@@ -901,7 +901,7 @@ namespace psibase
          std::vector<EventDecoder<typename Events::Ui>> result;
          result.reserve(ids.size());
          for (auto id : ids)
-            result.push_back({DbId::uiEvent, id, contract});
+            result.push_back({DbId::uiEvent, id, service});
          return result;
       }
 
@@ -911,7 +911,7 @@ namespace psibase
          std::vector<EventDecoder<typename Events::Merkle>> result;
          result.reserve(ids.size());
          for (auto id : ids)
-            result.push_back({DbId::merkleEvent, id, contract});
+            result.push_back({DbId::merkleEvent, id, service});
          return result;
       }
 
@@ -983,7 +983,7 @@ namespace psibase
    /// If it finds one, and it's a numeric type, then it uses that
    /// field as the link to the next event. It stops when the
    /// maximum number of results (`first`) is found, it encounters
-   /// an event from another contract, it encounters an event not
+   /// an event from another service, it encounters an event not
    /// defined in `Events`, it can't find a field with a name
    /// that matches `fieldName`, or there's a decoding error. Each
    /// node in the resulting Connection is produced by [EventDecoder].
@@ -991,12 +991,12 @@ namespace psibase
    /// #### makeEventConnection example
    ///
    /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
-   /// have [defined events](contracts-events.md#defining-events) for your contract.
+   /// have [defined events](services-events.md#defining-events) for your service.
    ///
    /// ```c++
    /// struct Query
    /// {
-   ///    psibase::AccountNumber contract;
+   ///    psibase::AccountNumber service;
    ///
    ///    auto holderEvents(
    ///        psibase::AccountNumber      holder,
@@ -1004,7 +1004,7 @@ namespace psibase
    ///        std::optional<std::string>  after
    ///    ) const
    ///    {
-   ///       ExampleTokenContract::Tables tables{contract};
+   ///       ExampleTokenService::Tables tables{service};
    ///
    ///       // Each holder (user) has a record which points to the most recent event
    ///       // which affected the user's balance.
@@ -1015,8 +1015,8 @@ namespace psibase
    ///
    ///       // Create the Connection. Each event has a field named "prevEvent"
    ///       // which points to the previous event which affected the user's balance.
-   ///       return psibase::makeEventConnection<ExampleTokenContract::Events::History>(
-   ///           psibase::DbId::historyEvent, eventId, contract, "prevEvent", first, after);
+   ///       return psibase::makeEventConnection<ExampleTokenService::Events::History>(
+   ///           psibase::DbId::historyEvent, eventId, service, "prevEvent", first, after);
    ///    }
    /// };
    /// PSIO_REFLECT(Query, method(holderEvents, holder, first, after))
@@ -1111,7 +1111,7 @@ namespace psibase
    template <typename Events>
    auto makeEventConnection(DbId                              db,
                             uint64_t                          eventId,
-                            AccountNumber                     contract,
+                            AccountNumber                     service,
                             std::string_view                  fieldName,
                             std::optional<uint32_t>           first,
                             const std::optional<std::string>& after)
@@ -1138,7 +1138,7 @@ namespace psibase
       {
          if (!excludeFirst)
             result.edges.push_back({
-                .node   = {db, eventId, contract},
+                .node   = {db, eventId, service},
                 .cursor = std::to_string(eventId),
             });
          excludeFirst = false;
@@ -1152,7 +1152,7 @@ namespace psibase
 
          AccountNumber c;
          fracunpack(c, stream);
-         if (c != contract)
+         if (c != service)
          {
             result.pageInfo.hasNextPage = false;
             break;

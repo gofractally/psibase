@@ -4,9 +4,9 @@
 using namespace ExchangeSys;
 using namespace psibase;
 
-void exchange_contract::stub()
+void ExchangeService::stub()
 {
    // NOP
 }
 
-PSIBASE_DISPATCH(ExchangeSys::exchange_contract)
+PSIBASE_DISPATCH(ExchangeSys::ExchangeService)

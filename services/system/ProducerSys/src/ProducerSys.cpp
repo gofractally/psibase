@@ -7,7 +7,7 @@ using namespace psibase;
 namespace
 {
    auto compare_claim = [](const Claim& lhs, const Claim& rhs)
-   { return std::tie(lhs.contract, lhs.rawData) < std::tie(rhs.contract, rhs.rawData); };
+   { return std::tie(lhs.service, lhs.rawData) < std::tie(rhs.service, rhs.rawData); };
 }
 
 namespace SystemService
@@ -15,7 +15,7 @@ namespace SystemService
 
    void ProducerSys::setProducers(std::vector<psibase::ProducerConfigRow> prods)
    {
-      check(getSender() == getReceiver(), "sender must match contract account");
+      check(getSender() == getReceiver(), "sender must match service account");
       constexpr auto db = ProducerConfigRow::db;
       // Remove existing producer rows
       TableIndex<ProducerConfigRow, decltype(prods[0].key())> idx(db, std::vector<char>{}, false);
@@ -33,7 +33,7 @@ namespace SystemService
    void ProducerSys::checkAuthSys(uint32_t                    flags,
                                   psibase::AccountNumber      requester,
                                   psibase::Action             action,
-                                  std::vector<ContractMethod> allowedActions,
+                                  std::vector<ServiceMethod>  allowedActions,
                                   std::vector<psibase::Claim> claims)
    {
       Table<ProducerConfigRow, &ProducerConfigRow::key> t(ProducerConfigRow::db,

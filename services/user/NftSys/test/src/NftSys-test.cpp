@@ -8,14 +8,14 @@
 
 #include "services/user/NftSys.hpp"
 
-using namespace UserContract;
-using namespace UserContract::Errors;
+using namespace UserService;
+using namespace UserService::Errors;
 using namespace psibase;
 using std::optional;
 using std::pair;
 using std::string;
 using std::vector;
-using UserContract::NftRecord;
+using UserService::NftRecord;
 
 namespace
 {
