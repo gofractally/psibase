@@ -37,7 +37,7 @@ namespace SystemService
             // and request the applet to load inside an iframe.
             request.target = "/";
          }
-         if (request.target == "/common/thiscontract")
+         if (request.target == "/common/thisservice")
          {
             std::string contractName;
             if (request.host.size() > request.rootHost.size() + 1 &&

@@ -149,7 +149,7 @@ The [common-sys service](system-service/common-sys.md) provides services which s
 
 | Method | URL                              | Description                                                                                                              |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `GET`  | `/common/thiscontract`           | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-sys"` |
+| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-sys"` |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                    |
 | `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction-http)                                                                            |
 | `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction-http)                                                                     |

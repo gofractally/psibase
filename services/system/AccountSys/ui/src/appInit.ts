@@ -18,7 +18,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
             transaction?: any;
         }
 
-        const thisApplet = await getJson<string>("/common/thiscontract");
+        const thisApplet = await getJson<string>("/common/thisservice");
         const accountSysApplet = new AppletId(thisApplet, "");
 
         setOperations([

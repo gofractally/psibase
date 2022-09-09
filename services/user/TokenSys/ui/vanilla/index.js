@@ -6,7 +6,7 @@ const html = htm.bind(React.createElement);
 const { useEffect, useState, useCallback } = React;
 const { Segment, Header, Form, Table, Input, Button, Message, Tab, Container } = semanticUIReact;
 
-const contractName = await getJson('/common/thiscontract');
+const contractName = await getJson('/common/thisservice');
 const accountSys = new AppletId("account-sys", "");
 
 initializeApplet(async () => {

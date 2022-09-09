@@ -5,7 +5,7 @@ await import('/common/react.production.min.js');
 await import('/common/react-dom.production.min.js');
 const html = htm.bind(React.createElement);
 
-const contract = await getJson('/common/thiscontract');
+const contract = await getJson('/common/thisservice');
 const actionTemplates = await getJson('/action_templates');
 
 async function pushTransaction(transaction, keys, addMsg, clearMsg) {

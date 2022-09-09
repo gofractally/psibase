@@ -405,7 +405,7 @@ export async function getContractName()
     }
     else
     {
-        contractName = await getJson("/common/thiscontract");
+        contractName = await getJson("/common/thisservice");
         return contractName;
     }
 }

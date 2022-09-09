@@ -14,7 +14,7 @@ import { genKeyPair, KeyType } from "/common/keyConversions.mjs";
 
 const html = htm.bind(React.createElement);
 
-const contractName = await getJson("/common/thiscontract");
+const contractName = await getJson("/common/thisservice");
 const accountSys = new AppletId(contractName, "");
 
 initializeApplet(async () => {
