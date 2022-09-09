@@ -29,7 +29,7 @@ namespace psibase
       {
          check(self.allowDbRead,
                "database access disabled during proof verification or first auth");
-         if (db == uint32_t(DbId::contract))
+         if (db == uint32_t(DbId::service))
             return (DbId)db;
          if (db == uint32_t(DbId::nativeConstrained))
             return (DbId)db;
@@ -69,7 +69,7 @@ namespace psibase
 
       bool keyHasContractPrefix(uint32_t db)
       {
-         return db == uint32_t(DbId::contract) || db == uint32_t(DbId::writeOnly) ||
+         return db == uint32_t(DbId::service) || db == uint32_t(DbId::writeOnly) ||
                 db == uint32_t(DbId::subjective);
       }
 
@@ -117,7 +117,7 @@ namespace psibase
          check(!(self.code.flags & CodeRow::isSubjective),
                "subjective contracts may only write to DbId::subjective");
 
-         if (db == uint32_t(DbId::contract))
+         if (db == uint32_t(DbId::service))
             return {(DbId)db, true, true};
          if (db == uint32_t(DbId::writeOnly))
             return {(DbId)db, true, false};

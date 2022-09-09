@@ -60,13 +60,13 @@ void test(AccountNumber this_contract)
       print("kvPut\n");
    for (const auto& item : items)
       if (item.add)
-         kvPutRaw(DbId::contract, item.getKey(this_contract), psio::convert_to_bin(item.value));
+         kvPutRaw(DbId::service, item.getKey(this_contract), psio::convert_to_bin(item.value));
 
    if (enable_print)
       print("kvRemove\n");
    for (const auto& item : items)
       if (!item.keep)
-         kvRemoveRaw(DbId::contract, item.getKey(this_contract));
+         kvRemoveRaw(DbId::service, item.getKey(this_contract));
 
    auto run = [&](auto matchKeySize, auto expected, const auto& key, auto f)
    {
@@ -76,7 +76,7 @@ void test(AccountNumber this_contract)
             print("skip ");
          return;
       }
-      auto result = f(DbId::contract, key, matchKeySize + 4);
+      auto result = f(DbId::service, key, matchKeySize + 4);
       if (!result && !expected)
       {
          check(getKey().empty(), "getKey() not empty");

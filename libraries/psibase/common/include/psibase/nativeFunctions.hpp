@@ -218,7 +218,7 @@ namespace psibase
    template <typename K, NotOptional V>
    void kvPut(const K& key, const V& value)
    {
-      kvPut(DbId::contract, key, value);
+      kvPut(DbId::service, key, value);
    }
 
    /// Add a sequentially-numbered record
@@ -261,7 +261,7 @@ namespace psibase
    template <typename K>
    void kvRemove(const K& key)
    {
-      kvRemove(DbId::contract, key);
+      kvRemove(DbId::service, key);
    }
 
    /// Get size of stored value, if any
@@ -284,7 +284,7 @@ namespace psibase
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(const K& key)
    {
-      return kvGetSize(DbId::contract, key);
+      return kvGetSize(DbId::service, key);
    }
 
    /// Get a key-value pair, if any
@@ -311,7 +311,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGet(const K& key)
    {
-      return kvGet<V>(DbId::contract, key);
+      return kvGet<V>(DbId::service, key);
    }
 
    /// Get a value, or the default if not found
@@ -328,7 +328,7 @@ namespace psibase
    template <typename V, typename K>
    inline V kvGetOrDefault(const K& key)
    {
-      return kvGetOrDefault<V>(DbId::contract, key);
+      return kvGetOrDefault<V>(DbId::service, key);
    }
 
    /// Get a sequentially-numbered record, if available
@@ -422,7 +422,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGreaterEqual(const K& key, uint32_t matchKeySize)
    {
-      return kvGreaterEqual<V>(DbId::contract, key, matchKeySize);
+      return kvGreaterEqual<V>(DbId::service, key, matchKeySize);
    }
 
    /// Get the key-value pair immediately-before provided key
@@ -463,7 +463,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvLessThan(const K& key, uint32_t matchKeySize)
    {
-      return kvLessThan<V>(DbId::contract, key, matchKeySize);
+      return kvLessThan<V>(DbId::service, key, matchKeySize);
    }
 
    /// Get the maximum key-value pair which has key as a prefix
@@ -499,7 +499,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvMax(const K& key)
    {
-      return kvMax<V>(DbId::contract, key);
+      return kvMax<V>(DbId::service, key);
    }
 
    /// Write `message` to console

@@ -717,7 +717,7 @@ namespace psibase
       auto open() const
       {
          std::vector<char> key_prefix = psio::convert_to_key(std::tuple(account, Table));
-         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(DbId::contract,
+         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(DbId::service,
                                                                              std::move(key_prefix));
       }
 
