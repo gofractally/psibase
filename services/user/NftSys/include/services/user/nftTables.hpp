@@ -8,7 +8,7 @@ namespace UserService
 {
    using NID = uint32_t;
 
-   // This structure is shared between several User contracts that need a
+   // This structure is shared between several User services that need a
    //   flag to track initialization
    struct SingletonKey
    {

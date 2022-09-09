@@ -52,7 +52,7 @@ SCENARIO("Using system token")
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -101,7 +101,7 @@ SCENARIO("Creating a token")
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -182,7 +182,7 @@ SCENARIO("Minting tokens")
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -244,7 +244,7 @@ SCENARIO("Recalling tokens")
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -304,7 +304,7 @@ SCENARIO("Interactions with the Issuer NFT")
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -396,7 +396,7 @@ SCENARIO("Burning tokens")
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -480,7 +480,7 @@ SCENARIO("Toggling manual-debit")
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -549,7 +549,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -626,7 +626,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -763,7 +763,7 @@ SCENARIO("Mapping a symbol to a token")
       auto a     = alice.to<TokenSys>();
       auto b     = bob.to<TokenSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -865,18 +865,18 @@ TEST_CASE("Reading emitted events")
 
 TEST_CASE("Testing custom tokens")
 {
-   // Test a custom token contract that uses the main token contract
+   // Test a custom token service that uses the main token service
    //    hooks to customize distribution or other behavior.
    //CHECK(customTokensSupported);
 
-   GIVEN("A custom token contract")
+   GIVEN("A custom token service")
    {
-      THEN("It can't register with the main token contract without the token owner NFT") {}
-      THEN("It can register with the token contract if it does own the token owner NFT")
+      THEN("It can't register with the main token service without the token owner NFT") {}
+      THEN("It can register with the token service if it does own the token owner NFT")
       {
          AND_THEN("Storage costs are updated accordingly") {}
       }
-      WHEN("It registers with the main token contract")
+      WHEN("It registers with the main token service")
       {  //
          // Verify that all the various hooks can be called.
       }
