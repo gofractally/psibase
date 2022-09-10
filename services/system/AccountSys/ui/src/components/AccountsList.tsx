@@ -1,10 +1,10 @@
-import { Account } from "../App";
+import { AccountWithAuth } from "../App";
 import closedIcon from "./assets/icons/lock-closed.svg";
 import openIcon from "./assets/icons/lock-open.svg";
 
 export const AccountsList = ({
     accounts,
-}: { accounts: Account[] }) => {
+}: { accounts: AccountWithAuth[] }) => {
     return (
         <div>
             <h2 className="pt-6">Existing accounts</h2>

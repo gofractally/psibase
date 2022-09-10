@@ -1,5 +1,5 @@
 import logoutIcon from "./assets/icons/logout.svg";
-import { Account } from "../App";
+import { AccountWithAuth } from "../App";
 import closedIcon from "./assets/icons/lock-closed.svg";
 import openIcon from "./assets/icons/lock-open.svg";
 
@@ -8,7 +8,7 @@ export const AccountList = ({
     onSelectAccount,
     onLogout,
     selectedAccount
-}: { selectedAccount: string, accounts: Account[], onSelectAccount: (account: string) => void, onLogout: (account: string) => void }) => {
+}: { selectedAccount: string, accounts: AccountWithAuth[], onSelectAccount: (account: string) => void, onLogout: (account: string) => void }) => {
 
     const isAccountsAvailable = accounts.length > 0
 

@@ -291,12 +291,17 @@ const App = () => {
             let transaction = await constructTransaction(
                 injectSender(pendingTransaction, user)
             );
-            let { response: signedTransaction } = await query(
+            console.log('query params', { commonSys, accountSys, transaction })
+            let { errors, response: signedTransaction } = await query(
                 commonSys,
                 accountSys,
                 "getAuthedTransaction",
                 { transaction }
             );
+            if (!signedTransaction) {
+                console.error('there is no signed transaction?', { signedTransaction, errors })
+                throw new Error('No signed transaction returned')
+            }
             let baseUrl = ""; // default
             let trace = await packAndPushSignedTransaction(
                 baseUrl,

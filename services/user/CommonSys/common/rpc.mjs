@@ -153,10 +153,17 @@ export async function pushPackedSignedTransaction(baseUrl, packed) {
 }
 
 export async function packAndPushSignedTransaction(baseUrl, signedTransaction) {
-    return await pushPackedSignedTransaction(baseUrl, await packSignedTransaction(baseUrl, signedTransaction));
+    console.log('packAndPushSignedTransaction', { signedTransaction, baseUrl });
+    const packedTransaction = await packSignedTransaction(baseUrl, signedTransaction);
+    console.log(packedTransaction, 'transaction now signed, pushing')
+
+    const pushedTransaction = await pushPackedSignedTransaction(baseUrl, packedTransaction);
+    console.log('Pushed transaction', pushedTransaction)
+    return pushedTransaction;
 }
 
 export async function signTransaction(baseUrl, transaction, privateKeys) {
+    console.log('asked to sign transaction', { baseUrl, transaction, privateKeys })
     const keys = (privateKeys || []).map(k => {
         if (typeof k === 'string')
             return privateStringToKeyPair(k);
@@ -175,7 +182,11 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
             signature: k.keyPair.sign(digest),
         }))
     );
-    return { transaction: uint8ArrayToHex(transaction), proofs };
+    const signedTransaction = uint8ArrayToHex(transaction);
+    console.log('should not be null', signedTransaction);
+    const result = { transaction: signedTransaction, proofs }
+    console.log('result is', result)
+    return result
 }
 
 /**
@@ -186,7 +197,23 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
  * @param {Array} privateKeys - An array of strings that represent private keys used to sign this transaction
  */
 export async function signAndPushTransaction(baseUrl, transaction, privateKeys) {
-    return await packAndPushSignedTransaction(baseUrl, await signTransaction(baseUrl, transaction, privateKeys));
+    try {
+        console.log('Signing transaction...', { baseUrl, transaction, privateKeys });
+        const signedTransaction = await signTransaction(baseUrl, transaction, privateKeys);
+        console.log('Successfully signed transaction', { signedTransaction });
+
+        try {
+            console.log('Pushing transaction...')
+            const pushedTransaction = await packAndPushSignedTransaction(baseUrl, signedTransaction);
+            console.log('Transaction pushed!', { pushedTransaction })
+        } catch (e) {
+            console.error('Failed pushing transaction', e)
+            throw new Error(e)
+        }
+    } catch (e) {
+        console.error('Failed signing transaction', e)
+        throw new Error(e)
+    }
 }
 
 export function uint8ArrayToHex(data) {

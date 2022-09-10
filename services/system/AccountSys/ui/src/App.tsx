@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import { AppletId, getJson, operation } from "common/rpc.mjs";
+import { AppletId, getJson, operation, siblingUrl } from "common/rpc.mjs";
 import { useLocalStorage } from "common/useLocalStorage.mjs";
 
 import appAccountIcon from "./components/assets/icons/app-account.svg";
@@ -18,26 +18,50 @@ window.React = React;
 export interface KeyPair {
     privateKey: string;
     publicKey: string;
+    knownAccounts?: string[];
 }
 
-export interface Account {
+interface Account {
     accountNum: string;
-    authContract: string;
     publicKey: KeyPair['publicKey']
 }
+export interface AccountWithAuth extends Account {
+    authContract: string;
+}
 
-const useAccountsWithKeys = (): [Account[], (key: string) => void, (account: Account, privateKey: string) => void] => {
-    const [accounts, setAccounts] = useState<Account[]>([]);
+
+
+const fetchAccountsByKey = async (publicKey: string) => getJson<{ account: string; pubkey: string }[]>(await siblingUrl(null, 'auth-ec-sys', "accwithkey/" + publicKey))
+
+
+const uniqueAccounts = (accounts: AccountWithAuth[]) => accounts.filter((account, index, arr) => arr.findIndex(a => a.accountNum === account.accountNum) == index);
+
+const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (account: AccountWithAuth, privateKey: string) => void] => {
+    const [accounts, setAccounts] = useState<AccountWithAuth[]>([]);
     const [keyPairs, setKeyPairs] = useLocalStorage<KeyPair[]>('keyPairs', [])
 
-    const sortedAccounts = accounts.slice().sort((a, b) => a.accountNum < b.accountNum ? -1 : 1)
+    const sortedAccounts = accounts.slice().sort((a, b) => a.accountNum < b.accountNum ? -1 : 1);
 
     useEffect(() => {
-        fetchAccounts().then(accounts => setAccounts(currentAccounts => {
-            const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys'));
 
-            return [...currentAccounts, ...userAccounts].filter((account, index, arr) => arr.findIndex(a => a.accountNum === account.accountNum) == index)
-        }))
+        fetchAccounts().then(accounts => setAccounts(currentAccounts => {
+            console.log(accounts, 'are all the accounts')
+            const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys')).filter(account => account.authContract === 'auth-any-sys');
+
+            return uniqueAccounts([...currentAccounts, ...userAccounts])
+        }));
+        console.log(keyPairs, 'to load witfh')
+
+        Promise.all(keyPairs.map(keyPair => fetchAccountsByKey(keyPair.publicKey))).then(responses => {
+            const flatAccounts = responses.flat(1);
+            setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authContract: 'auth-ec-sys', publicKey: account.pubkey })), ...currentAccounts]))
+            const currentKeyPairs = keyPairs;
+            const newKeyPairs = currentKeyPairs.map((keyPair): KeyPair => {
+                const relevantAccounts = flatAccounts.filter(account => account.pubkey === keyPair.publicKey).map(account => account.account)
+                return relevantAccounts.length > 0 ? { ...keyPair, knownAccounts: relevantAccounts } : keyPair
+            })
+            setKeyPairs(newKeyPairs)
+        })
 
     }, [])
 
@@ -52,12 +76,15 @@ const useAccountsWithKeys = (): [Account[], (key: string) => void, (account: Acc
     };
 
 
-    const addAccount = (account: Account, privateKey: string) => {
+    const addAccount = (account: AccountWithAuth, privateKey: string) => {
         setAccounts(accounts => {
             const withoutExisting = accounts.filter(a => a.accountNum !== account.accountNum);
             return [...withoutExisting, account]
         });
-        setKeyPairs([...keyPairs.filter(pair => pair.publicKey !== account.publicKey), { privateKey, publicKey: account.publicKey }])
+        if (privateKey) {
+            const newKeyPair: KeyPair = { privateKey, publicKey: account.publicKey }
+            setKeyPairs([...keyPairs.filter(pair => pair.publicKey !== account.publicKey), newKeyPair])
+        }
     };
     return [sortedAccounts, dropAccount, addAccount];
 };
@@ -65,7 +92,7 @@ const useAccountsWithKeys = (): [Account[], (key: string) => void, (account: Acc
 
 const fetchAccounts = async () => {
     try {
-        const accounts = await getJson<Account[]>("/accounts");
+        const accounts = await getJson<AccountWithAuth[]>("/accounts");
 
         console.log(accounts, 'are the accounts')
         return accounts;
@@ -76,8 +103,8 @@ const fetchAccounts = async () => {
     }
 }
 
-const useAccounts = (): [Account[], () => void] => {
-    const [accounts, setAccounts] = useState<Account[]>([]);
+const useAccounts = (): [AccountWithAuth[], () => void] => {
+    const [accounts, setAccounts] = useState<AccountWithAuth[]>([]);
 
     const refreshAccounts = async () => {
         const res = await fetchAccounts()
@@ -136,7 +163,7 @@ function App() {
             const thisApplet = await getJson<string>("/common/thiscontract");
             const appletId = new AppletId(thisApplet)
 
-            const newAccount: Account = {
+            const newAccount: AccountWithAuth = {
                 accountNum: account.account,
                 authContract: account.publicKey ? 'auth-ec-sys' : 'auth-any-sys',
                 publicKey: account.publicKey
