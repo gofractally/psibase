@@ -12,10 +12,20 @@ export interface AccountPair {
     account: string;
 }
 
-export const CreateAccountForm = ({ onCreateAccount, isLoading, errorMessage }: { isLoading: boolean, errorMessage: string, onCreateAccount: (pair: AccountPair) => void }) => {
-    const [name, setName] = useState("");
-    const [pubKey, setPubKey] = useState("");
-    const [privKey, setPrivKey] = useState("");
+interface Props {
+    isLoading: boolean,
+    errorMessage: string,
+    onCreateAccount: (pair: AccountPair) => void,
+    name: string;
+    pubKey: string;
+    privKey: string;
+    setName: (name: string) => void
+    setPubKey: (publicKey: string) => void
+    setPrivKey: (privateKey: string) => void
+}
+
+export const CreateAccountForm = ({ onCreateAccount, isLoading, errorMessage, setName, setPrivKey, setPubKey, name, pubKey, privKey }: Props) => {
+
 
     const generateKeyPair = () => {
         const kp = genKeyPair(KeyType.k1);
@@ -23,7 +33,7 @@ export const CreateAccountForm = ({ onCreateAccount, isLoading, errorMessage }: 
         setPrivKey(kp.priv);
     };
 
-    const isValid = name !== '' && pubKey !== ''
+    const isValid = name !== ''
 
     const isDisabled = isLoading || !isValid
 

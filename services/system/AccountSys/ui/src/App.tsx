@@ -15,7 +15,7 @@ import { AccountPair } from "./components/CreateAccountForm";
 // needed for common files that won't necessarily use bundles
 window.React = React;
 
-interface KeyPair {
+export interface KeyPair {
     privateKey: string;
     publicKey: string;
 }
@@ -26,24 +26,21 @@ export interface Account {
     publicKey: KeyPair['publicKey']
 }
 
-const useAccountsWithKeys = (): [Account[], (key: string) => void] => {
-    const [accounts, setAccounts] = useState<Account[]>([
-        {
-            accountNum: "alice",
-            authContract: "auth-any-sys",
-            publicKey: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(2)
-        },
-        {
-            accountNum: "bob",
-            authContract: "auth-any-sys",
-            publicKey: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(2)
-        },
-        {
-            accountNum: "carol",
-            authContract: "auth-any-sys",
-            publicKey: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(2)
-        },
-    ]);
+const useAccountsWithKeys = (): [Account[], (key: string) => void, (account: Account, privateKey: string) => void] => {
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [keyPairs, setKeyPairs] = useLocalStorage<KeyPair[]>('keyPairs', [])
+
+    const sortedAccounts = accounts.slice().sort((a, b) => a.accountNum < b.accountNum ? -1 : 1)
+
+    useEffect(() => {
+        fetchAccounts().then(accounts => setAccounts(currentAccounts => {
+            const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys'));
+
+            return [...currentAccounts, ...userAccounts].filter((account, index, arr) => arr.findIndex(a => a.accountNum === account.accountNum) == index)
+        }))
+
+    }, [])
+
     const dropAccount = (accountNum: string) => {
         const foundAccount = accounts.find(a => accountNum == a.accountNum);
         if (foundAccount) {
@@ -52,41 +49,58 @@ const useAccountsWithKeys = (): [Account[], (key: string) => void] => {
         } else {
             console.warn(`Failed to find account ${accountNum} to drop`)
         }
-    }
-    return [accounts, dropAccount];
+    };
+
+
+    const addAccount = (account: Account, privateKey: string) => {
+        setAccounts(accounts => {
+            const withoutExisting = accounts.filter(a => a.accountNum !== account.accountNum);
+            return [...withoutExisting, account]
+        });
+        setKeyPairs([...keyPairs.filter(pair => pair.publicKey !== account.publicKey), { privateKey, publicKey: account.publicKey }])
+    };
+    return [sortedAccounts, dropAccount, addAccount];
 };
 
+
+const fetchAccounts = async () => {
+    try {
+        const accounts = await getJson<Account[]>("/accounts");
+
+        console.log(accounts, 'are the accounts')
+        return accounts;
+    } catch (e) {
+        console.info("refreshAccounts().catch().e:");
+        console.info(e);
+        return []
+    }
+}
 
 const useAccounts = (): [Account[], () => void] => {
     const [accounts, setAccounts] = useState<Account[]>([]);
 
-    const refreshAccounts = () => {
-        console.info("Fetching accounts...");
-        (async () => {
-            try {
-                const accounts = await getJson<Account[]>("/accounts");
-                console.log(accounts, 'are the accounts')
-                setAccounts(accounts);
-            } catch (e) {
-                console.info("refreshAccounts().catch().e:");
-                console.info(e);
-            }
-        })();
-    };
+    const refreshAccounts = async () => {
+        const res = await fetchAccounts()
+        setAccounts(res);
+    }
 
-    useEffect(refreshAccounts, []);
+    useEffect(() => { refreshAccounts() }, []);
 
     return [accounts, refreshAccounts];
 };
 
 function App() {
     const [appInitialized, setAppInitialized] = useState(false);
-    const [accountsWithKeys, dropAccount] = useAccountsWithKeys();
+    const [accountsWithKeys, dropAccount, addAccount] = useAccountsWithKeys();
+
+
     const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
 
-    console.log({ currentUser })
-    const [keyPairs, setKeyPairs] = useLocalStorage<KeyPair[]>('keyPairs', [])
+    const [name, setName] = useState("");
+    const [pubKey, setPubKey] = useState("");
+    const [privKey, setPrivKey] = useState("");
+
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -122,7 +136,19 @@ function App() {
             const thisApplet = await getJson<string>("/common/thiscontract");
             const appletId = new AppletId(thisApplet)
 
-            operation(appletId, 'newAcc', { name: account.account, ...(account.publicKey && { pubKey: account.publicKey }) })
+            const newAccount: Account = {
+                accountNum: account.account,
+                authContract: account.publicKey ? 'auth-ec-sys' : 'auth-any-sys',
+                publicKey: account.publicKey
+            }
+
+            operation(appletId, 'newAcc', { name: newAccount.accountNum, ...(account.publicKey && { pubKey: account.publicKey }) });
+
+            refreshAccounts()
+            addAccount(newAccount, account.privateKey);
+            setPrivKey('');
+            setPubKey('')
+            setName('')
         } catch (e: any) {
             setErrorMessage(e.message)
             console.error(e, 'q');
@@ -149,7 +175,7 @@ function App() {
                 />
             </div>
             <div className="bg-slate-50 mt-4">
-                <CreateAccountForm errorMessage={errorMessage} isLoading={isLoading} onCreateAccount={onCreateAccount} />
+                <CreateAccountForm name={name} privKey={privKey} pubKey={pubKey} setPrivKey={setPrivKey} setPubKey={setPubKey} setName={setName} errorMessage={errorMessage} isLoading={isLoading} onCreateAccount={onCreateAccount} />
             </div>
             {/* <SetAuth /> */}
             <AccountsList

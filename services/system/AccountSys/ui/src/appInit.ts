@@ -10,6 +10,17 @@ import {
     AppletId,
 } from "common/rpc.mjs";
 
+import { useLocalStorage } from "common/useLocalStorage.mjs";
+import { KeyPair } from "./App";
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const chill = async (ms: number = 3000) => {
+    console.log(`just chilling for ${ms} ms first...`)
+    await wait(ms);
+    console.log('chilled');
+}
+
 export const initAppFn = (setAppInitialized: () => void) =>
     initializeApplet(async () => {
         interface execArgs {
@@ -31,7 +42,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                         requireNew: true,
                     });
 
-                    if (pubKey !== "") {
+                    if (pubKey && pubKey !== "") {
                         operation(accountSysApplet, "setKey", { name, pubKey });
                     }
                 },
@@ -64,15 +75,26 @@ export const initAppFn = (setAppInitialized: () => void) =>
             {
                 id: "getAuthedTransaction",
                 exec: async ({ transaction }: execArgs) => {
-                    let user = await query(accountSysApplet, "getLoggedInUser");
-                    let accounts = await getJson("/accounts");
-                    let u = accounts.find((a: any) => a.accountNum === user);
-                    if (u.authContract === "auth-ec-sys") {
-                        // Todo: Should sign with the private key mapped to the logged-in user stored in localstorage
-                        return await signTransaction("", transaction, [
-                            "PVT_K1_22vrGgActn3X4H1wwvy2KH4hxGke7cGy6ypy2njMjnyZBZyU7h",
-                        ]);
-                    } else return await signTransaction("", transaction);
+                    const [user, accounts] = await Promise.all([query(accountSysApplet, "getLoggedInUser"), getJson("/accounts")]);
+
+                    const sendingAccount = accounts.find((a: any) => a.accountNum === user);
+                    const isSecureAccount = sendingAccount.authContract === "auth-ec-sys"
+                    if (isSecureAccount) {
+                        const keys = JSON.parse(localStorage.getItem('keyPairs') || '[]') as KeyPair[]
+
+                        const privateKeyToFind = 'PUB_K1_5BFmf4uRdpb4uSg1yE5AwJ5Mh7gq6oJnf4YKqXoKtGoZJ49UVc';
+                        const foundKey = keys.find(key => key.publicKey === privateKeyToFind);
+
+                        if (foundKey) {
+                            const signingPrivateKey = foundKey.privateKey;
+                            return signTransaction("", transaction, [signingPrivateKey]);
+                        } else {
+                            throw new Error(`Failed to find the private key for public key ${privateKeyToFind}`);
+                        }
+
+                    } else {
+                        return signTransaction("", transaction);
+                    }
                 },
             },
         ]);

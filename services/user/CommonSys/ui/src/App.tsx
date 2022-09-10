@@ -63,7 +63,7 @@ const App = () => {
         {
             appletId: activeApplet,
             state: AppletStates.primary,
-            onInit: () => {},
+            onInit: () => { },
         },
     ]);
     const [operationCountdown, setOperationCountdown] = useState(false);
@@ -276,7 +276,10 @@ const App = () => {
     );
 
     const executeTransaction = useCallback(async () => {
-        if (pendingTransaction.length === 0) return;
+        if (pendingTransaction.length === 0) {
+            console.log('returning now as there is no pendingTransaction?')
+            return;
+        }
 
         try {
             let accountSys = new AppletId("account-sys");

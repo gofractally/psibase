@@ -59,8 +59,8 @@ export const AccountList = ({
 
                             </td>
                             <td className="">
-                                <div className="w-8">
-                                    {account.authContract == 'auth-any-sys' ? <img src={openIcon} alt={account.authContract} /> : <div>{account.publicKey}</div>}
+                                <div className="w-8 h-10">
+                                    <img src={account.authContract == 'auth-any-sys' ? openIcon : closedIcon} alt={account.authContract} />
                                 </div>
                             </td>
                             <td className="flex flex-row-reverse">
