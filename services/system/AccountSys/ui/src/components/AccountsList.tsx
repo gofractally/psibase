@@ -38,5 +38,3 @@ export const AccountsList = ({
         </div>
     );
 };
-
-const number7 = 7

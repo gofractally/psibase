@@ -88,6 +88,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                             const signingPrivateKey = foundKey.privateKey;
                             return signTransaction("", transaction, [signingPrivateKey]);
                         } else {
+                            console.error(`Failed to find the key pair for sender ${user}`);
                             throw new Error(`Failed to find the key pair for sender ${user}`);
                         }
 

@@ -82,7 +82,7 @@ const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (acco
             return [...withoutExisting, account]
         });
         if (privateKey) {
-            const newKeyPair: KeyPair = { privateKey, publicKey: account.publicKey }
+            const newKeyPair: KeyPair = { privateKey, publicKey: account.publicKey, knownAccounts: [account.accountNum] }
             setKeyPairs([...keyPairs.filter(pair => pair.publicKey !== account.publicKey), newKeyPair])
         }
     };
