@@ -1,4 +1,5 @@
 <script>
+    import { action, AppletId, getJson, siblingUrl } from "common/rpc.mjs?client";
     import { page } from "$app/stores";
     import { onMount } from "svelte";
     import Button from "/src/components/Button.svelte";
@@ -7,7 +8,19 @@
     import { loadTransferHistory } from "/src/lib/loadData.js";
     import AccountHistory from "/src/components/AccountHistory.svelte";
     import Loader from "/src/components/Loader.svelte";
+    import Amount from "/src/components/Amount.svelte";
+
     let data = null;
+
+    const fetchTokenTypes = async () => {
+        const url = await siblingUrl(null, "token-sys", "api/getTokenTypes");
+        return getJson(url);
+    }
+
+    const fetchBalances = async (user) => {
+        const url = await siblingUrl(null, "token-sys", `api/balances/${user}`);
+        return getJson(url);
+    }
 
     onMount(async () => {
         const account = $page.params.name;
@@ -17,9 +30,29 @@
             (e) => e.node
         );
         console.log("history", history);
+
+        const tokenTypesRes = await fetchTokenTypes();
+        console.log("tokenTypesRes", tokenTypesRes);
+        const tokenTypes = tokenTypesRes.reduce(
+            (prev, token) => {
+                prev[token.id] = {
+                    precision: token.precision.value,
+                    symbol: token.symbolId,
+                };
+                return prev;
+            },
+            {}
+        );
+        console.log("tokenTypes", tokenTypes);
+
+        const balances = await fetchBalances(account);
+        console.log("balances", balances);
+
         data = {
+            tokenTypes,
             account,
             history,
+            balances,
         };
     });
 </script>
@@ -40,6 +73,12 @@
             Search
         </Button>
         <h4 class="py-4">{data.account}</h4>
+        <h6>Balances</h6>
+        {#each data.balances as b}
+            <div class="pb-4">
+                <Amount value={b.balance} precision={b.precision} symbol={b.symbol} />
+            </div>
+        {/each}
         <AccountHistory data={data} />
     {/if}
 </div>

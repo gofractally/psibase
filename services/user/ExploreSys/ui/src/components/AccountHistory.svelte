@@ -2,6 +2,7 @@
     import classNames from "classnames";
     import IncomingIcon from "/src/assets/icons/incoming.svg";
     import OutgoingIcon from "/src/assets/icons/incoming.svg";
+    import Amount from "/src/components/Amount.svelte";
 
     export let data = null;
 
@@ -28,7 +29,7 @@
             <td>{t.sender}</td>
             <td>{t.receiver}</td>
             <td><svelte:component this={getAction(t)} /></td>
-            <td>{t.amount.value}</td>
+            <td><Amount value={t.amount.value} token={data.tokenTypes[t.tokenId]} /></td>
         </tr>
     {/each}
     </tbody>
