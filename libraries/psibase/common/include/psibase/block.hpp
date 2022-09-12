@@ -15,7 +15,7 @@ namespace psibase
    /// It is the argument to [call] and can be fetched using
    /// [getCurrentAction].
    ///
-   /// [Transaction] also contains actions requested by the
+   /// Transactions also contains actions requested by the
    /// transaction authorizers.
    struct Action
    {

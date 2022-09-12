@@ -21,7 +21,7 @@ namespace psibase
    ///
    /// ```html
    /// &lt;html&gt;
-   /// &lt;div id="root"&gt;&lt;/div&gt;
+   /// &lt;div id="root" class="ui container"&gt;&lt;/div&gt;
    /// &lt;script src="/common/SimpleUI.mjs" type="module"&gt;&lt;/script&gt;
    /// &lt;/html&gt;
    /// ```

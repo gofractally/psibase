@@ -82,7 +82,7 @@ A service doesn't have to serve HTTP requests itself; it may delegate this to an
 
 ## Interfaces
 
-Services which serve HTML implement these interfaces:
+Services which serve HTTP implement these interfaces:
 
 - [psibase::ServerInterface] (required)
   - [psibase::HttpRequest]

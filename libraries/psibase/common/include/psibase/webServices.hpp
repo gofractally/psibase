@@ -48,7 +48,7 @@ namespace psibase
       /// should store the file in the service's tables. The service can then serve these
       /// files via HTTP.
       ///
-      /// - `path`: absolute path to file. e.g. `/` for the main page and `/index.js` for its script.
+      /// - `path`: absolute path to file. e.g. `/index.html` for the main page
       /// - `contentType`: `text/html`, `text/javascript`, `application/octet-stream`, ...
       /// - `content`: file content
       ///
