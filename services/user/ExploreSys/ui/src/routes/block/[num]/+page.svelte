@@ -5,7 +5,7 @@
     import Error from "/src/components/Error.svelte";
     import LeftArrow from "/src/assets/icons/leftArrow.svg";
     import { loadBlockData } from "/src/lib/loadData.js";
-    import ResultsTable from "/src/components/ResultsTable.svelte";
+    import Blocks from "/src/components/Blocks.svelte";
     import Loader from "/src/components/Loader.svelte";
     let data = null;
     let blocks = [];
@@ -38,7 +38,7 @@
         <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
             Block explorer
         </Button>
-        <ResultsTable clickable={false} class="mb-6" {blocks} />
+        <Blocks clickable={false} class="mb-6" {blocks} />
         <div>
             <table class="w-full table-fixed">
                 <tbody>
