@@ -6,6 +6,7 @@
 #include <concepts>
 #include <cstdint>
 #include <functional>
+#include <psibase/blob.hpp>
 #include <psibase/nativeFunctions.hpp>
 #include <psio/to_key.hpp>
 #include <span>
@@ -18,12 +19,15 @@ namespace psibase
 {
    // Eventually replace uses with <=> once the standard library
    // catches up with C++20
+   // Maybe not; char is signed
+   // TODO: consider a global replace of vector<char> with vector<uint8_t>, including in psio
    template <typename T>
    std::weak_ordering compare_wknd(const T& lhs, const T& rhs)
    {
-      if (lhs < rhs)
+      auto cmp = compare_blob(lhs, rhs);
+      if (cmp < 0)
          return std::weak_ordering::less;
-      else if (rhs < lhs)
+      else if (cmp > 0)
          return std::weak_ordering::greater;
       else
          return std::weak_ordering::equivalent;
