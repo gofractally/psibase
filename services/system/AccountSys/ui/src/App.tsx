@@ -6,9 +6,10 @@ import { useLocalStorage } from "common/useLocalStorage.mjs";
 import appAccountIcon from "./components/assets/icons/app-account.svg";
 
 import { AccountsList, AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
-import { getLoggedInUser, useMsg } from "./helpers";
+import { getLoggedInUser } from "./helpers";
 import { initAppFn } from "./appInit";
 import { AccountPair } from "./components/CreateAccountForm";
+import { ImportAccountForm } from "./components/ImportAccountForm";
 
 
 
@@ -28,15 +29,22 @@ interface Account {
 export interface AccountWithAuth extends Account {
     authContract: string;
 }
+interface AccountWithKey extends AccountWithAuth {
+    privateKey: KeyPair['privateKey']
+}
 
+const toAccountWithAuth = ({ accountNum, authContract, publicKey }: AccountWithKey): AccountWithAuth => ({ accountNum, authContract, publicKey });
 
+const fetchAccountsByKey = async (publicKey: string) => {
+    if (!publicKey) throw new Error(`No public key found ${publicKey}`)
+    return getJson<{ account: string; pubkey: string }[]>(await siblingUrl(null, 'auth-ec-sys', "accwithkey/" + publicKey))
 
-const fetchAccountsByKey = async (publicKey: string) => getJson<{ account: string; pubkey: string }[]>(await siblingUrl(null, 'auth-ec-sys', "accwithkey/" + publicKey))
+}
 
 
 const uniqueAccounts = (accounts: AccountWithAuth[]) => accounts.filter((account, index, arr) => arr.findIndex(a => a.accountNum === account.accountNum) == index);
 
-const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (account: AccountWithAuth, privateKey: string) => void] => {
+const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (accounts: AccountWithKey[]) => void] => {
     const [accounts, setAccounts] = useState<AccountWithAuth[]>([]);
     const [keyPairs, setKeyPairs] = useLocalStorage<KeyPair[]>('keyPairs', [])
 
@@ -45,12 +53,10 @@ const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (acco
     useEffect(() => {
 
         fetchAccounts().then(accounts => setAccounts(currentAccounts => {
-            console.log(accounts, 'are all the accounts')
             const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys')).filter(account => account.authContract === 'auth-any-sys');
 
             return uniqueAccounts([...currentAccounts, ...userAccounts])
         }));
-        console.log(keyPairs, 'to load witfh')
 
         Promise.all(keyPairs.map(keyPair => fetchAccountsByKey(keyPair.publicKey))).then(responses => {
             const flatAccounts = responses.flat(1);
@@ -76,14 +82,17 @@ const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (acco
     };
 
 
-    const addAccount = (account: AccountWithAuth, privateKey: string) => {
-        setAccounts(accounts => {
-            const withoutExisting = accounts.filter(a => a.accountNum !== account.accountNum);
-            return [...withoutExisting, account]
+    const addAccount = (newAccounts: AccountWithKey[]) => {
+        const plainAccounts = newAccounts.map(toAccountWithAuth);
+        setAccounts(existingAccounts => {
+            const withoutExisting = existingAccounts.filter(account => !plainAccounts.some(a => account.accountNum === a.accountNum))
+            return [...withoutExisting, ...plainAccounts]
         });
-        if (privateKey) {
-            const newKeyPair: KeyPair = { privateKey, publicKey: account.publicKey, knownAccounts: [account.accountNum] }
-            setKeyPairs([...keyPairs.filter(pair => pair.publicKey !== account.publicKey), newKeyPair])
+
+        const accountsWithPrivateKeys = newAccounts.filter(account => 'privateKey' in account);
+        if (accountsWithPrivateKeys.length > 0) {
+            const newKeyPairs: KeyPair[] = newAccounts.map((account): KeyPair => ({ privateKey: account.privateKey, knownAccounts: [account.accountNum], publicKey: account.publicKey }));
+            setKeyPairs([...keyPairs.filter(pair => !newKeyPairs.some(p => p.publicKey === pair.publicKey)), ...newKeyPairs])
         }
     };
     return [sortedAccounts, dropAccount, addAccount];
@@ -94,7 +103,6 @@ const fetchAccounts = async () => {
     try {
         const accounts = await getJson<AccountWithAuth[]>("/accounts");
 
-        console.log(accounts, 'are the accounts')
         return accounts;
     } catch (e) {
         console.info("refreshAccounts().catch().e:");
@@ -116,9 +124,16 @@ const useAccounts = (): [AccountWithAuth[], () => void] => {
     return [accounts, refreshAccounts];
 };
 
+
+const useData = (loadingState: boolean = false) => {
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(loadingState);
+    return { isLoading, error, setError, setIsLoading }
+}
+
 function App() {
     const [appInitialized, setAppInitialized] = useState(false);
-    const [accountsWithKeys, dropAccount, addAccount] = useAccountsWithKeys();
+    const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
 
 
     const [allAccounts, refreshAccounts] = useAccounts();
@@ -128,8 +143,7 @@ function App() {
     const [pubKey, setPubKey] = useState("");
     const [privKey, setPrivKey] = useState("");
 
-    const [isLoading, setIsLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
+    const { error: accountError, setError: setAccountError, isLoading: isAccountLoading, setIsLoading: setIsAccountLoading } = useData()
 
 
     useEffect(() => {
@@ -158,8 +172,8 @@ function App() {
     const onCreateAccount = async (account: AccountPair) => {
 
         try {
-            setIsLoading(true)
-            setErrorMessage('')
+            setIsAccountLoading(true)
+            setAccountError('')
             const thisApplet = await getJson<string>("/common/thiscontract");
             const appletId = new AppletId(thisApplet)
 
@@ -171,20 +185,41 @@ function App() {
 
             operation(appletId, 'newAcc', { name: newAccount.accountNum, ...(account.publicKey && { pubKey: account.publicKey }) });
 
-            refreshAccounts()
-            addAccount(newAccount, account.privateKey);
+            refreshAccounts();
+            addAccounts([{ ...newAccount, privateKey: account.privateKey }]);
             setPrivKey('');
             setPubKey('')
             setName('')
         } catch (e: any) {
-            setErrorMessage(e.message)
+            setAccountError(e.message)
             console.error(e, 'q');
         } finally {
-            setIsLoading(false);
+            setIsAccountLoading(false);
         }
     };
 
 
+    const { isLoading: isImportLoading, setIsLoading: setImportLoading, setError: setImportError, error: importError } = useData()
+
+
+    const onImport = async (acc: { privateKey: string; publicKey: string }) => {
+        try {
+            setImportLoading(true);
+            setImportError('');
+
+            const res = await fetchAccountsByKey(acc.publicKey);
+            if (res.length > 0) {
+                const accounts = res.map((res): AccountWithKey => ({ accountNum: res.account, authContract: 'auth-ec-sys', publicKey: res.pubkey, privateKey: acc.privateKey }));
+                addAccounts(accounts)
+            } else {
+                throw new Error(`No accounts found with public key ${acc.publicKey}`);
+            }
+        } catch (e) {
+            setImportError(`${e}`)
+        } finally {
+            setImportLoading(false)
+        }
+    }
     return (
         <div className="ui container p-4">
             <div className="flex gap-2">
@@ -201,8 +236,9 @@ function App() {
                     onSelectAccount={setCurrentUser}
                 />
             </div>
-            <div className="bg-slate-50 mt-4">
-                <CreateAccountForm name={name} privKey={privKey} pubKey={pubKey} setPrivKey={setPrivKey} setPubKey={setPubKey} setName={setName} errorMessage={errorMessage} isLoading={isLoading} onCreateAccount={onCreateAccount} />
+            <div className="bg-slate-50 mt-4 flex justify-between">
+                <CreateAccountForm name={name} privKey={privKey} pubKey={pubKey} setPrivKey={setPrivKey} setPubKey={setPubKey} setName={setName} errorMessage={accountError} isLoading={isAccountLoading} onCreateAccount={onCreateAccount} />
+                <ImportAccountForm errorMessage={importError} isLoading={isImportLoading} onImport={onImport} />
             </div>
             {/* <SetAuth /> */}
             <AccountsList
