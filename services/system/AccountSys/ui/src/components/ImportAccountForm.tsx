@@ -69,8 +69,10 @@ export const ImportAccountForm = ({ onImport, isLoading, errorMessage }: Props) 
                 <Button
                     type="primary"
                     disabled={isDisabled}
-                    onClick={(e) =>
+                    onClick={(e) => {
                         onImport({ privateKey, publicKey })
+                        setPrivateKey('')
+                    }
                     }
                 >
                     {isLoading ? 'Loading..' : 'Import Account'}
