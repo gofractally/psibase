@@ -7,18 +7,18 @@
 namespace psibase
 {
    template <typename R, typename T, typename MemberPtr, typename... Args>
-   void call_method(T& contract, MemberPtr method, Args&&... args)
+   void callMethod(T& service, MemberPtr method, Args&&... args)
    {
-      psio::shared_view_ptr<R> p((contract.*method)(std::forward<decltype(args)>(args)...));
+      psio::shared_view_ptr<R> p((service.*method)(std::forward<decltype(args)>(args)...));
       raw::setRetval(p.data(), p.size());
    }
 
    /**
-    *  This method is called when a contract receives a call and will
-    *  and will call the proper method on Contact assuming Contract has
+    *  This method is called when a service receives a call and will
+    *  and will call the proper method on Contact assuming Service has
     *  used the PSIO_REFLECT macro.
     */
-   template <typename Contract>
+   template <typename Service>
    void dispatch(AccountNumber sender, AccountNumber receiver)
    {
       auto act           = getCurrentActionView();
@@ -26,24 +26,24 @@ namespace psibase
       internal::sender   = sender;
       internal::receiver = receiver;
 
-      auto makeContract = [&]()
+      auto makeService = [&]()
       {
-         if constexpr (std::is_constructible<Contract, psio::shared_view_ptr<psibase::Action>>{})
+         if constexpr (std::is_constructible<Service, psio::shared_view_ptr<psibase::Action>>{})
          {
-            return Contract{act};
+            return Service{act};
          }
          else
          {
-            return Contract{};
+            return Service{};
          }
       };
-      auto contract{makeContract()};
+      auto service{makeService()};
 
-      bool called = psio::reflect<Contract>::get_by_name(
+      bool called = psio::reflect<Service>::get_by_name(
           act->method()->value(),
           [&](auto meta, auto member)
           {
-             auto member_func  = member(&contract);
+             auto member_func  = member(&service);
              using result_type = decltype(psio::result_of(member_func));
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
@@ -60,17 +60,17 @@ namespace psibase
                  {
                     if constexpr (std::is_same_v<void, result_type>)
                     {
-                       (contract.*member_func)(std::forward<decltype(args)>(args)...);
+                       (service.*member_func)(std::forward<decltype(args)>(args)...);
                     }
                     else
                     {
-                       call_method<result_type, Contract, decltype(member_func), decltype(args)...>(
-                           contract, member_func, std::forward<decltype(args)>(args)...);
+                       callMethod<result_type, Service, decltype(member_func), decltype(args)...>(
+                           service, member_func, std::forward<decltype(args)>(args)...);
                     }
                  });  // param_view::call
           });         // reflect::get
       if (!called)
-         abortMessage("unknown contract action: " + act->method()->get().str());
+         abortMessage("unknown service action: " + act->method()->get().str());
       internal::sender = prevSender;
       // psio::member_proxy
    }  // dispatch
@@ -78,13 +78,13 @@ namespace psibase
 }  // namespace psibase
 
 // TODO: prevent recursion, but allow opt-in
-#define PSIBASE_DISPATCH(CONTRACT)                                                        \
+#define PSIBASE_DISPATCH(SERVICE)                                                         \
    extern "C" void called(psibase::AccountNumber receiver, psibase::AccountNumber sender) \
    {                                                                                      \
-      psibase::dispatch<CONTRACT>(sender, receiver);                                      \
+      psibase::dispatch<SERVICE>(sender, receiver);                                       \
    }                                                                                      \
    extern "C" void __wasm_call_ctors();                                                   \
-   extern "C" void start(psibase::AccountNumber this_contract)                            \
+   extern "C" void start(psibase::AccountNumber thisService)                              \
    {                                                                                      \
       __wasm_call_ctors();                                                                \
    }

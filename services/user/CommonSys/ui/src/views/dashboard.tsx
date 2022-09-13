@@ -19,7 +19,7 @@ export const Dashboard = () => {
                 style={{ gridTemplateColumns: "repeat(auto-fill, 247px)" }}
             >
                 {applets.map((a) => (
-                    <AppletIcon applet={a} key={a.contract} />
+                    <AppletIcon applet={a} key={a.service} />
                 ))}
             </div>
         </div>
@@ -31,7 +31,7 @@ export default Dashboard;
 const AppletIcon = ({ applet }: { applet: AppletEntry }) => {
     return (
         <a
-            href={`${appletPrefix}${applet.contract}`}
+            href={`${appletPrefix}${applet.service}`}
             className="select-none no-underline hover:text-gray-900"
         >
             <div className="-mx-2 flex items-center gap-2 p-4 hover:bg-gray-100 sm:h-[184px] sm:w-[247px] sm:flex-col sm:justify-center sm:gap-3">

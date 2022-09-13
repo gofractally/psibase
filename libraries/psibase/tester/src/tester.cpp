@@ -257,7 +257,7 @@ const psibase::BlockInfo& psibase::TestChain::getHeadBlockInfo()
 {
    if (!headBlockInfo)
    {
-      if (auto status = system_contract::getOptionalStatus())
+      if (auto status = SystemService::getOptionalStatus())
          headBlockInfo = status->head;
    }
    return *headBlockInfo;
@@ -267,7 +267,7 @@ void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec)
 {
    auto& info                 = getHeadBlockInfo();
    t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
-   auto [index, suffix]       = system_contract::headTapos();
+   auto [index, suffix]       = SystemService::headTapos();
    t.tapos.refBlockIndex      = index;
    t.tapos.refBlockSuffix     = suffix;
 }
@@ -300,8 +300,8 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
 {
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
-          .contract = system_contract::VerifyEcSys::service,
-          .rawData  = psio::convert_to_frac(pub),
+          .service = SystemService::VerifyEcSys::service,
+          .rawData = psio::convert_to_frac(pub),
       });
    SignedTransaction signedTrx;
    signedTrx.transaction = trx;

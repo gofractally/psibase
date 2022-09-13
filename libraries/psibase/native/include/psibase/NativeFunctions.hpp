@@ -20,15 +20,15 @@ namespace psibase
       std::vector<char> result_key;
       std::vector<char> result_value;
 
-      // TODO: delete range. Need some way for system contracts to enable/disable it
+      // TODO: delete range. Need some way for system services to enable/disable it
       //       since it's only compatible with some resource models
       // TODO: some way for transaction-sys to indicate auth failures.
       //       Maybe not an intrinsic? Is there a way to tie this into the
       //       subjective mechanics?
       // TODO: related to ^. Some way to bill failed transactions after the first
-      //       authorizer has been verified. But... custom proof and auth contracts
+      //       authorizer has been verified. But... custom proof and auth services
       //       could abuse that. Maybe a time limit for the proofs and the first auth
-      //       contract? Can't limit just a single proof since first auth could depend
+      //       service? Can't limit just a single proof since first auth could depend
       //       on several proofs.
       // TODO: related to ^. See TODOs on NativeFunctions::call
 

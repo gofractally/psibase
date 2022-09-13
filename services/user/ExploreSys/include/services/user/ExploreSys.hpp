@@ -3,7 +3,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    struct ExploreSys : public psibase::Service<ExploreSys>
    {
@@ -15,4 +15,4 @@ namespace system_contract
    PSIO_REFLECT(ExploreSys,  //
                 method(serveSys, request),
                 method(storeSys, path, contentType, content))
-}  // namespace system_contract
+}  // namespace SystemService

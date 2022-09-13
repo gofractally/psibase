@@ -2,7 +2,7 @@ import { getJson, postGraphQLGetJson } from "common/rpc.mjs";
 import { useEffect, useState } from "react";
 
 export const getThisApplet = async (): Promise<string> =>
-    (await getJson("/common/thiscontract")) as string;
+    (await getJson("/common/thisservice")) as string;
 
 // Returns: {
 //     isLoading,   // Is the query in progress?
@@ -49,3 +49,7 @@ export function useGraphQLQuery(url: string, query: string) {
     }, [url, query, refetch]);
     return [cachedQueryResult, invalidateQuery];
 } // useGraphQLQuery
+
+export const capitalizeFirstLetter = (txt: string) => {
+    return txt.charAt(0).toUpperCase() + txt.slice(1);
+};

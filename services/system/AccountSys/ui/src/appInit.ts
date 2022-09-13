@@ -8,9 +8,7 @@ import {
     signTransaction,
     getJson,
     AppletId,
-    SignedTransaction,
 } from "common/rpc.mjs";
-import { KeyPair } from "./App";
 
 interface execArgs {
     name?: any;
@@ -21,7 +19,7 @@ interface execArgs {
 export const initAppFn = (setAppInitialized: () => void) =>
     initializeApplet(async () => {
 
-        const thisApplet = await getJson<string>("/common/thiscontract");
+        const thisApplet = await getJson<string>("/common/thisservice");
         const accountSysApplet = new AppletId(thisApplet, "");
 
         setOperations([
@@ -30,7 +28,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                 exec: async ({ name, pubKey }: execArgs) => {
                     action(thisApplet, "newAccount", {
                         name,
-                        authContract: "auth-any-sys",
+                        authService: "auth-any-sys",
                         requireNew: true,
                     });
 
@@ -47,7 +45,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                         action(
                             thisApplet,
                             "setAuthCntr",
-                            { authContract: "auth-ec-sys" },
+                            { authService: "auth-ec-sys" },
                             name
                         );
                     }

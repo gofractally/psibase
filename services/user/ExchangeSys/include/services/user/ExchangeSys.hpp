@@ -6,7 +6,7 @@
 
 namespace ExchangeSys
 {
-   class exchange_contract : public psibase::Service<exchange_contract>
+   class ExchangeService : public psibase::Service<ExchangeService>
    {
      public:
       static constexpr auto service = psibase::AccountNumber("exchange-sys");
@@ -16,7 +16,7 @@ namespace ExchangeSys
    };
 
    // clang-format off
-   PSIO_REFLECT(exchange_contract, 
+   PSIO_REFLECT(ExchangeService, 
       method(stub)
    );
    // clang-format on

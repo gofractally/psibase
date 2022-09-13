@@ -11,12 +11,12 @@
 
 #include "services/user/SymbolSys.hpp"
 
-using namespace UserContract;
-using namespace UserContract::Errors;
+using namespace UserService;
+using namespace UserService::Errors;
 using namespace psibase;
 using psio::const_view;
-using system_contract::AccountSys;
-using system_contract::TransactionSys;
+using SystemService::AccountSys;
+using SystemService::TransactionSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
 // For helpers
@@ -68,34 +68,34 @@ void TokenSys::init()
    initTable.put(InitializedRecord{});
    emit().history().initialized();
 
-   auto tokContract = to<TokenSys>();
-   auto nftContract = to<NftSys>();
+   auto tokService = to<TokenSys>();
+   auto nftService = to<NftSys>();
 
    // Configure manual debit for self and NFT
-   tokContract.setUserConf(userConfig::manualDebit, true);
-   nftContract.setUserConf(userConfig::manualDebit, true);
+   tokService.setUserConf(userConfig::manualDebit, true);
+   nftService.setUserConf(userConfig::manualDebit, true);
 
    // Create system token
-   auto tid = tokContract.create(Precision{8}, Quantity{1'000'000'000e8});
-   check(*tid == TID{1}, wrongSysTokenId);
+   auto tid = tokService.create(Precision{8}, Quantity{1'000'000'000e8});
+   check(tid == TID{1}, wrongSysTokenId);
 
    // Make system token default untradeable
-   tokContract.setTokenConf(*tid, tokenConfig::untradeable, true);
+   tokService.setTokenConf(tid, tokenConfig::untradeable, true);
 
-   // Pass system token ownership to symbol contract
-   auto tNft = getToken(*tid).ownerNft;
-   nftContract.credit(tNft, SymbolSys::service, "Passing system token ownership");
+   // Pass system token ownership to symbol service
+   auto tNft = getToken(tid).ownerNft;
+   nftService.credit(tNft, SymbolSys::service, "Passing system token ownership");
 
    // Register proxy
-   to<ProxySys>().registerServer(RTokenSys::service);
+   to<SystemService::ProxySys>().registerServer(RTokenSys::service);
 }
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)
 {
-   auto creator     = getSender();
-   auto tokenTable  = db.open<TokenTable>();
-   auto tokenIdx    = tokenTable.getIndex<0>();
-   auto nftContract = to<NftSys>();
+   auto creator    = getSender();
+   auto tokenTable = db.open<TokenTable>();
+   auto tokenIdx   = tokenTable.getIndex<0>();
+   auto nftService = to<NftSys>();
 
    // Todo - replace with auto incrementing when available
    TID newId = (tokenIdx.begin() == tokenIdx.end()) ? 1 : (*(--tokenIdx.end())).id + 1;
@@ -104,17 +104,17 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    check(TokenRecord::isValidKey(newId), invalidTokenId);
    check(maxSupply.value > 0, supplyGt0);
 
-   auto nftId = nftContract.mint();
+   auto nftId = nftService.mint();
    if (creator != TokenSys::service)
    {
-      nftContract.credit(*nftId, creator, "Nft for new token ID: " + std::to_string(newId));
+      nftService.credit(nftId, creator, "Nft for new token ID: " + std::to_string(newId));
    }
 
    auto lastEvent = emit().history().created(newId, creator, precision, maxSupply);
 
    tokenTable.put(TokenRecord{
        .id        = newId,      //
-       .ownerNft  = *nftId,     //
+       .ownerNft  = nftId,      //
        .precision = precision,  //
        .maxSupply = maxSupply,  //
        .lastEvent = lastEvent,  //
@@ -227,7 +227,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    }
    else
    {
-      auto time    = to<TransactionSys>().currentBlock().unpack().time;
+      auto time    = to<TransactionSys>().currentBlock().time;
       auto balance = getBalance(tokenId, receiver);
       balance.balance += amount.value;
       db.open<BalanceTable>().put(balance);
@@ -279,7 +279,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    auto receiver        = getSender();  //The action sender is the token receiver
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
    auto receiverBalance = getBalance(tokenId, receiver);
-   auto time            = to<TransactionSys>().currentBlock().unpack().time;
+   auto time            = to<TransactionSys>().currentBlock().time;
 
    check(amount.value > 0, quantityGt0);
    check(sharedBalance.balance >= amount.value, insufficientBalance);
@@ -316,7 +316,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    auto token           = getToken(tokenId);
    auto fromBalance     = getBalance(tokenId, from);
    auto unrecallableBit = TokenRecord::Configurations::getIndex(tokenConfig::unrecallable);
-   auto time            = to<TransactionSys>().currentBlock().unpack().time;
+   auto time            = to<TransactionSys>().currentBlock().time;
 
    check(isSenderIssuer(tokenId), missingRequiredAuth);
    check(not token.config.get(unrecallableBit), tokenUnrecallable);
@@ -339,19 +339,19 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
 
 void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 {
-   auto sender      = getSender();
-   auto symbol      = to<SymbolSys>().getSymbol(symbolId).unpack();
-   auto token       = getToken(tokenId);
-   auto nftContract = to<NftSys>();
+   auto sender     = getSender();
+   auto symbol     = to<SymbolSys>().getSymbol(symbolId);
+   auto token      = getToken(tokenId);
+   auto nftService = to<NftSys>();
 
    check(symbol.ownerNft != NID{0}, symbolDNE);
-   check(*nftContract.exists(symbol.ownerNft), missingRequiredAuth);
+   check(nftService.exists(symbol.ownerNft), missingRequiredAuth);
    check(token.symbolId == SID{0}, tokenHasSymbol);
    check(isSenderIssuer(tokenId), missingRequiredAuth);
 
    // Take ownership of the symbol owner NFT
    auto debitMemo = "Mapping symbol " + symbolId.str() + " to token " + std::to_string(tokenId);
-   nftContract.debit(symbol.ownerNft, debitMemo);
+   nftService.debit(symbol.ownerNft, debitMemo);
 
    // Emit mapped event
    token.lastEvent = emit().history().symbolMapped(tokenId, token.lastEvent, sender, symbolId);
@@ -361,7 +361,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
    db.open<TokenTable>().put(token);
 
    // Destroy symbol owner NFT, it can never be used or traded again
-   nftContract.burn(symbol.ownerNft);
+   nftService.burn(symbol.ownerNft);
 }
 
 TokenRecord TokenSys::getToken(TID tokenId)
@@ -400,7 +400,7 @@ BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
    }
    else
    {
-      check(*to<AccountSys>().exists(account), invalidAccount);
+      check(to<AccountSys>().exists(account), invalidAccount);
       check(exists(tokenId), tokenDNE);
 
       record = {.key = {account, tokenId}, .balance = 0};
@@ -479,17 +479,17 @@ bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit flag)
 
 void TokenSys::checkAccountValid(psibase::AccountNumber account)
 {
-   check(*to<AccountSys>().exists(account), invalidAccount);
+   check(to<AccountSys>().exists(account), invalidAccount);
    check(account != AccountSys::nullAccount, invalidAccount);
 }
 
 bool TokenSys::isSenderIssuer(TID tokenId)
 {
-   auto token       = getToken(tokenId);
-   auto nftContract = to<NftSys>();
+   auto token      = getToken(tokenId);
+   auto nftService = to<NftSys>();
 
-   return nftContract.exists(token.ownerNft) &&
-          nftContract.getNft(token.ownerNft)->owner() == getSender();
+   return nftService.exists(token.ownerNft) &&
+          nftService.getNft(token.ownerNft).owner == getSender();
 }
 
-PSIBASE_DISPATCH(UserContract::TokenSys)
+PSIBASE_DISPATCH(UserService::TokenSys)

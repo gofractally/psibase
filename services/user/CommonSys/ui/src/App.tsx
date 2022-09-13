@@ -50,8 +50,8 @@ function OtherApplets({
     );
 }
 
-let contractName = "common-sys";
-let commonSys = new AppletId(contractName);
+let serviceName = "common-sys";
+let commonSys = new AppletId(serviceName);
 
 // TODO: Ensure pending transaction is cleared if there are any errors. Otherwise, we could accidentally submit double actions if the user retries an action.
 let pendingTransaction: any[] = [];

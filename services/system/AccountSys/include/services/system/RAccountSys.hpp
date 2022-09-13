@@ -2,7 +2,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/serviceEntry.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    struct RAccountSys : public psibase::Service<RAccountSys>
    {
@@ -14,4 +14,4 @@ namespace system_contract
    PSIO_REFLECT(RAccountSys,
                 method(serveSys, request),
                 method(storeSys, path, contentType, content))
-}  // namespace system_contract
+}  // namespace SystemService

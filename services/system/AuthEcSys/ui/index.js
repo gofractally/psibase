@@ -9,7 +9,7 @@ const { Segment, Header, Icon, Modal, Form, Table, Input, Button, Message, Tab, 
 
 await initializeApplet();
 
-const thisApplet = await getJson('/common/thiscontract');
+const thisApplet = await getJson('/common/thisservice');
 
 // const transactionTypes = {
 //   credit: 0,

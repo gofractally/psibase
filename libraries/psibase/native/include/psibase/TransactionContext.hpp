@@ -50,11 +50,11 @@ namespace psibase
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execServe(const Action& act, ActionTrace& atrace);
 
-      ExecutionContext& getExecutionContext(AccountNumber contract);
+      ExecutionContext& getExecutionContext(AccountNumber service);
 
       std::chrono::nanoseconds getBillableTime();
 
-      // Set watchdog timer; it will expire at startTime + contractLoadTime + watchdogLimit.
+      // Set watchdog timer; it will expire at startTime + serviceLoadTime + watchdogLimit.
       // This may be called multiple times with different limits; the most-recent limit applies.
       void setWatchdog(std::chrono::steady_clock::duration watchdogLimit);
 

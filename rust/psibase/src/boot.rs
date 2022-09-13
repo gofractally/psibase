@@ -16,7 +16,7 @@ use serde_json::Value;
 #[derive(Fracpack)]
 struct Empty {}
 
-const ACCOUNTS: [AccountNumber; 21] = [
+const ACCOUNTS: [AccountNumber; 22] = [
     account!("account-sys"),
     account!("alice"),
     account!("auth-ec-sys"),
@@ -31,6 +31,7 @@ const ACCOUNTS: [AccountNumber; 21] = [
     account!("psispace-sys"),
     account!("r-account-sys"),
     account!("r-ath-ec-sys"),
+    account!("r-prod-sys"),
     account!("r-proxy-sys"),
     account!("r-tok-sys"),
     account!("setcode-sys"),
@@ -153,6 +154,7 @@ fn boot_trx() -> SignedTransaction {
         sgc!("psispace-sys", 0, "PsiSpaceSys.wasm"),
         sgc!("r-account-sys", 0, "RAccountSys.wasm"),
         sgc!("r-ath-ec-sys", 0, "RAuthEcSys.wasm"),
+        sgc!("r-prod-sys", 0, "RProducerSys.wasm"),
         sgc!("r-proxy-sys", 0, "RProxySys.wasm"),
         sgc!("r-tok-sys", 0, "RTokenSys.wasm"),
         sgc!("setcode-sys", 2, "SetCodeSys.wasm"), // TODO: flags
@@ -253,6 +255,7 @@ fn add_startup_trx(
         reg_server(account!("auth-ec-sys"), account!("r-ath-ec-sys")),
         reg_server(account!("common-sys"), account!("common-sys")),
         reg_server(account!("explore-sys"), account!("explore-sys")),
+        reg_server(account!("producer-sys"), account!("r-prod-sys")),
         reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
         reg_server(account!("psispace-sys"), account!("psispace-sys")),
     ];
@@ -268,6 +271,7 @@ fn add_startup_trx(
         store_common!("rpc.mjs", js),
         store_common!("SimpleUI.mjs", js),
         store_common!("useGraphQLQuery.mjs", js),
+        store_common!("useLocalStorage.mjs", js),
         store_common!("widgets.mjs", js),
     ];
 
@@ -317,12 +321,20 @@ fn add_startup_trx(
         store!("r-ath-ec-sys", "/ui/index.js", js, "AuthEcSys/ui/index.js"),
     ];
 
-    let mut explore_sys_files = vec![store!(
-        "explore-sys",
-        "/ui/index.js",
-        js,
-        "ExploreSys/ui/index.js"
-    )];
+    let mut explore_sys_files = vec![
+        // store!(
+        //    "explore-sys",
+        //    "/ui/index.js",
+        //    js,
+        //    "ExploreSys/ui/index.js"
+        // ),
+    ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/ExploreSys/ui/dist"),
+        &mut explore_sys_files,
+        account!("explore-sys"),
+        account!("explore-sys"),
+    );
 
     let mut token_sys_files = vec![
         // store!(
@@ -364,7 +376,7 @@ fn add_startup_trx(
             sender: account!("symbol-sys"),
             contract: account!("token-sys"),
             method: method!("setTokenConf"),
-            raw_data: (1u32, method!("untradeable"), true).packed_bytes(),
+            raw_data: (1u32, method!("untradeable"), false).packed_bytes(),
         },
         Action {
             sender: account!("symbol-sys"),

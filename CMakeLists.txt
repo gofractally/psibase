@@ -89,6 +89,7 @@ set(JS_DIRS
     # services/user/PsiSpaceSys/ui:PsiSpaceSys_js
     services/user/CommonSys/ui:CommonSys_js
     services/user/TokenSys/ui:TokenSys_js
+    services/user/ExploreSys/ui:ExploreSys_js
 )
 
 option(BUILD_JS "Build JS" ON)
@@ -128,6 +129,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm                  ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm                  ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm                 ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm                   ${BOOT_IMAGE}
@@ -167,7 +169,7 @@ endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
-    add_subdirectory(doc/psidk/src/cpp-contract doc-examples)
+    add_subdirectory(doc/psidk/src/cpp-service doc-examples)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

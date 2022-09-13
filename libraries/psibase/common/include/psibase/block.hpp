@@ -11,48 +11,48 @@ namespace psibase
 
    /// A synchronous call
    ///
-   /// An Action represents a synchronous call between contracts.
+   /// An Action represents a synchronous call between services.
    /// It is the argument to [call] and can be fetched using
    /// [getCurrentAction].
    ///
-   /// [Transaction] also contains actions requested by the
+   /// Transactions also contains actions requested by the
    /// transaction authorizers.
    struct Action
    {
-      AccountNumber     sender;    ///< Account sending the action
-      AccountNumber     contract;  ///< Contract to execute the action
-      MethodNumber      method;    ///< Contract method to execute
-      std::vector<char> rawData;   ///< Data for the method
+      AccountNumber     sender;   ///< Account sending the action
+      AccountNumber     service;  ///< Service to execute the action
+      MethodNumber      method;   ///< Service method to execute
+      std::vector<char> rawData;  ///< Data for the method
    };
-   PSIO_REFLECT(Action, sender, contract, method, rawData)
+   PSIO_REFLECT(Action, sender, service, method, rawData)
 
-   struct GenesisContract
+   struct GenesisService
    {
-      AccountNumber     contract;
+      AccountNumber     service;
       uint64_t          flags     = 0;
       uint8_t           vmType    = 0;
       uint8_t           vmVersion = 0;
       std::vector<char> code      = {};
    };
-   PSIO_REFLECT(GenesisContract, contract, flags, vmType, vmVersion, code)
+   PSIO_REFLECT(GenesisService, service, flags, vmType, vmVersion, code)
 
    // The genesis action is the first action of the first transaction of
    // the first block. The action struct's fields are ignored, except
    // rawData, which contains this struct.
    struct GenesisActionData
    {
-      std::string                  memo;
-      std::vector<GenesisContract> contracts;
+      std::string                 memo;
+      std::vector<GenesisService> services;
    };
-   PSIO_REFLECT(GenesisActionData, memo, contracts)
+   PSIO_REFLECT(GenesisActionData, memo, services)
 
    struct Claim
    {
-      AccountNumber     contract;
+      AccountNumber     service;
       std::vector<char> rawData;
       friend bool       operator==(const Claim&, const Claim&) = default;
    };
-   PSIO_REFLECT(Claim, contract, rawData)
+   PSIO_REFLECT(Claim, service, rawData)
 
    // Rules for TAPOS:
    // * Reference block's number must be either:
@@ -88,7 +88,7 @@ namespace psibase
    };
    PSIO_REFLECT(Tapos, definitionWillNotChange(), expiration, refBlockSuffix, flags, refBlockIndex)
 
-   // TODO: separate native-defined fields from contract-defined fields
+   // TODO: separate native-defined fields from service-defined fields
    struct Transaction
    {
       Tapos               tapos;
@@ -116,7 +116,7 @@ namespace psibase
    // TODO: Consensus fields
    // TODO: Protocol Activation? Main reason to put here is to support light-client validation.
    // TODO: Are we going to attempt to support light-client validation? Didn't seem to work out easy last time.
-   // TODO: Consider placing consensus alg in a contract; might affect how header is laid out.
+   // TODO: Consider placing consensus alg in a service; might affect how header is laid out.
    struct BlockHeader
    {
       Checksum256   previous = {};

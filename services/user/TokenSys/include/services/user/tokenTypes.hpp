@@ -6,7 +6,7 @@
 #include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
 
-namespace UserContract
+namespace UserService
 {
    using TID = uint32_t;
 
@@ -95,7 +95,7 @@ namespace UserContract
       {
          return value == static_cast<Quantity_t>(otherValue);
       }
-   };  // namespace UserContract
+   };  // namespace UserService
    PSIO_REFLECT(Quantity, value);
 
-}  // namespace UserContract
+}  // namespace UserService

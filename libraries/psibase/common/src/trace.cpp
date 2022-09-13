@@ -55,7 +55,7 @@ namespace psibase
    void prettyTrace(std::string& dest, const ActionTrace& atrace, const std::string& indent)
    {
       dest += indent + "action:\n";
-      dest += indent + "    " + atrace.action.sender.str() + " => " + atrace.action.contract.str() +
+      dest += indent + "    " + atrace.action.sender.str() + " => " + atrace.action.service.str() +
               "::" + atrace.action.method.str() + "\n";
       dest += indent + "    " + psio::convert_to_json(atrace.action.rawData) + "\n";
       for (auto& inner : atrace.innerTraces)

@@ -3,7 +3,7 @@ declare module "common/rpc.mjs" {
 
   function siblingUrl(
     baseUrl?: string | null,
-    contract?: string,
+    service?: string,
     path?: string
   ): Promise<string>;
 

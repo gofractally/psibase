@@ -53,7 +53,7 @@ enum Commands {
 
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
-        producer: Option<ExactAccountNumber>,
+        producer: ExactAccountNumber,
     },
 
     /// Create or modify an account
@@ -644,7 +644,9 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Commands::Boot { key, producer } => boot::boot(&args, client, key, producer).await?,
+        Commands::Boot { key, producer } => {
+            boot::boot(&args, client, key, &Some(*producer)).await?
+        }
         Commands::Create {
             account,
             key,

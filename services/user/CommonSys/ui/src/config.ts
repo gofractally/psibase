@@ -16,7 +16,7 @@ export const AppletStates = {
 export type AppletEntry = {
     title: string;
     description: string;
-    contract: string;
+    service: string;
     mobileIcon: string;
     desktopIcon: string;
 };
@@ -25,14 +25,14 @@ export const applets: AppletEntry[] = [
     {
         title: "Account creation",
         description: "Create a new account. Only available on testnet.",
-        contract: "account-sys",
+        service: "account-sys",
         mobileIcon: iconAccountMobile,
         desktopIcon: iconAccountDesktop,
     },
     {
         title: "Account management",
         description: "Used to manage your existing accounts.",
-        contract: "auth-ec-sys",
+        service: "auth-ec-sys",
         mobileIcon: iconExploreMobile,
         desktopIcon: iconExploreDesktop,
     },
@@ -40,7 +40,7 @@ export const applets: AppletEntry[] = [
         title: "Block explorer",
         description:
             "View the most recently produced blocks, all the way back to the beginning of the chain.",
-        contract: "explore-sys",
+        service: "explore-sys",
         mobileIcon: iconExploreMobile,
         desktopIcon: iconExploreDesktop,
     },
@@ -48,7 +48,7 @@ export const applets: AppletEntry[] = [
         title: "Wallet",
         description:
             "View your balance, send/swap tokens, other standard wallet functionality.",
-        contract: "token-sys",
+        service: "token-sys",
         mobileIcon: iconWalletMobile,
         desktopIcon: iconWalletDesktop,
     },

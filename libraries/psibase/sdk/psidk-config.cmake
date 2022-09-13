@@ -87,7 +87,7 @@ function(add_libs suffix)
 
     file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
-    # Contract with simple malloc/free
+    # Service with simple malloc/free
     add_library(psibase-service-simple-malloc${suffix} INTERFACE)
     target_link_libraries(psibase-service-simple-malloc${suffix} INTERFACE
         -L${CMAKE_CURRENT_BINARY_DIR}
@@ -101,7 +101,7 @@ function(add_libs suffix)
         ${LIBCLANG_RT_BUILTINS}
     )
 
-    # Contract with full malloc/free
+    # Service with full malloc/free
     add_library(psibase-service${suffix} INTERFACE)
     target_link_libraries(psibase-service${suffix} INTERFACE
         psibase-service-base${suffix}

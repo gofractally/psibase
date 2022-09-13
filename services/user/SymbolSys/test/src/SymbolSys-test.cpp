@@ -10,14 +10,14 @@
 #include "services/user/TokenSys.hpp"
 
 using namespace psibase;
-using namespace UserContract;
-using namespace UserContract::Errors;
+using namespace UserService;
+using namespace UserService::Errors;
 
 namespace
 {
    constexpr bool storageBillingImplemented = false;
 
-   const std::vector<std::pair<AccountNumber, const char*>> neededContracts = {
+   const std::vector<std::pair<AccountNumber, const char*>> neededServices = {
        {TokenSys::service, "TokenSys.wasm"},
        {NftSys::service, "NftSys.wasm"},
        {SymbolSys::service, "SymbolSys.wasm"}};
@@ -42,14 +42,14 @@ SCENARIO("Buying a symbol")
 {
    GIVEN("An standard setup chain")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<SymbolSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<SymbolSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -180,12 +180,12 @@ SCENARIO("Measuring price increases")
 {
    GIVEN("Alice has a lot of money")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<SymbolSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -306,13 +306,13 @@ SCENARIO("Using symbol ownership NFT")
 {
    GIVEN("Alice has created a symbol")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       auto alice = t.from(t.add_account("alice"_a));
       auto bob   = t.from(t.add_account("bob"_a));
       auto a     = alice.to<SymbolSys>();
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();
@@ -362,13 +362,13 @@ SCENARIO("Buying and selling symbols")
 {
    GIVEN("A chain with a system token")
    {
-      DefaultTestChain t(neededContracts);
+      DefaultTestChain t(neededServices);
 
       // Add a couple accounts
       auto alice = t.from(t.add_account("alice"_a));
       auto bob   = t.from(t.add_account("bob"_a));
 
-      // Initialize user contracts
+      // Initialize user services
       alice.to<NftSys>().init();
       alice.to<TokenSys>().init();
       alice.to<SymbolSys>().init();

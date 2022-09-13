@@ -10,11 +10,11 @@ namespace psibase
    struct EcdsaSecp256K1Sha256Prover : Prover
    {
      public:
-      EcdsaSecp256K1Sha256Prover(AccountNumber contract, const PrivateKey& key);
+      EcdsaSecp256K1Sha256Prover(AccountNumber service, const PrivateKey& key);
       std::vector<char> prove(std::span<const char> data, const Claim& claim) const;
 
      private:
-      AccountNumber     contract;
+      AccountNumber     service;
       std::vector<char> pubKey;
       unsigned char     privateKey[32];
    };

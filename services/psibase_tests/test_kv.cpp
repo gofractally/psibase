@@ -25,9 +25,9 @@ struct item
 
    std::optional<uint8_t> max;
 
-   auto getKey(AccountNumber this_contract) const
+   auto getKey(AccountNumber thisService) const
    {
-      auto k = psio::convert_to_key(this_contract);
+      auto k = psio::convert_to_key(thisService);
       k.insert(k.end(), key.begin(), key.end());
       return k;
    }
@@ -54,19 +54,19 @@ std::vector<item> items = {
 };
 // clang-format on
 
-void test(AccountNumber this_contract)
+void test(AccountNumber thisService)
 {
    if (enable_print)
       print("kvPut\n");
    for (const auto& item : items)
       if (item.add)
-         kvPutRaw(DbId::contract, item.getKey(this_contract), psio::convert_to_bin(item.value));
+         kvPutRaw(DbId::service, item.getKey(thisService), psio::convert_to_bin(item.value));
 
    if (enable_print)
       print("kvRemove\n");
    for (const auto& item : items)
       if (!item.keep)
-         kvRemoveRaw(DbId::contract, item.getKey(this_contract));
+         kvRemoveRaw(DbId::service, item.getKey(thisService));
 
    auto run = [&](auto matchKeySize, auto expected, const auto& key, auto f)
    {
@@ -76,7 +76,7 @@ void test(AccountNumber this_contract)
             print("skip ");
          return;
       }
-      auto result = f(DbId::contract, key, matchKeySize + 4);
+      auto result = f(DbId::service, key, matchKeySize + 4);
       if (!result && !expected)
       {
          check(getKey().empty(), "getKey() not empty");
@@ -98,7 +98,7 @@ void test(AccountNumber this_contract)
       {
          if (item.value != *expected)
             continue;
-         check(item.getKey(this_contract) == getKey(), "getKey() does not match");
+         check(item.getKey(thisService) == getKey(), "getKey() does not match");
          found = true;
       }
       check(found, "matching value missing in items");
@@ -110,7 +110,7 @@ void test(AccountNumber this_contract)
       print("kvLessThan\n");
    for (const auto& item : items)
    {
-      auto key = item.getKey(this_contract);
+      auto key = item.getKey(thisService);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
@@ -127,7 +127,7 @@ void test(AccountNumber this_contract)
       print("kvGreaterEqual\n");
    for (const auto& item : items)
    {
-      auto key = item.getKey(this_contract);
+      auto key = item.getKey(thisService);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
@@ -144,7 +144,7 @@ void test(AccountNumber this_contract)
       print("kvMax\n");
    for (const auto& item : items)
    {
-      auto key = item.getKey(this_contract);
+      auto key = item.getKey(thisService);
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
@@ -158,13 +158,13 @@ void test(AccountNumber this_contract)
 
 }  // test()
 
-extern "C" void called(AccountNumber this_contract, AccountNumber sender)
+extern "C" void called(AccountNumber thisService, AccountNumber sender)
 {
-   test(this_contract);
+   test(thisService);
 }
 
 extern "C" void __wasm_call_ctors();
-extern "C" void start(AccountNumber this_contract)
+extern "C" void start(AccountNumber thisService)
 {
    __wasm_call_ctors();
 }

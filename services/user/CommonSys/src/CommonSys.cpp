@@ -10,9 +10,9 @@
 static constexpr bool enable_print = false;
 
 using namespace psibase;
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
-namespace system_contract
+namespace SystemService
 {
    static constexpr std::pair<const char*, const char*> commonResMap[]{
        {"/", "/ui/common.index.html"}};
@@ -37,17 +37,17 @@ namespace system_contract
             // and request the applet to load inside an iframe.
             request.target = "/";
          }
-         if (request.target == "/common/thiscontract")
+         if (request.target == "/common/thisservice")
          {
-            std::string contractName;
+            std::string serviceName;
             if (request.host.size() > request.rootHost.size() + 1 &&
                 request.host.ends_with(request.rootHost) &&
                 request.host[request.host.size() - request.rootHost.size() - 1] == '.')
-               contractName.assign(request.host.begin(),
-                                   request.host.end() - request.rootHost.size() - 1);
+               serviceName.assign(request.host.begin(),
+                                  request.host.end() - request.rootHost.size() - 1);
             else
-               contractName = "common-sys";
-            return to_json(contractName);
+               serviceName = "common-sys";
+            return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
             return to_json(request.rootHost);
@@ -114,7 +114,7 @@ namespace system_contract
          {
             if (target == request.target)
             {
-               auto index = ContractTables<WebContentTable>{getReceiver()}
+               auto index = ServiceTables<WebContentTable>{getReceiver()}
                                 .open<WebContentTable>()
                                 .getIndex<0>();
                if (auto content = index.get(std::string(replacement)))
@@ -130,6 +130,6 @@ namespace system_contract
       return std::nullopt;
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::CommonSys)
+PSIBASE_DISPATCH(SystemService::CommonSys)

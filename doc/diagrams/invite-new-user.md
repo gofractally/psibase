@@ -51,7 +51,7 @@ sequenceDiagram
    Note over Psibase blockchain: NewAccount object: <br>  - New_acc_name (bob)<br>  - pubkey
    Psibase blockchain->>Psibase blockchain: [invite-sys@account-sys] newAccount(newAccount)
    Note over Psibase blockchain: account-sys:newAccount only accepted if sender is invite-sys
-   Psibase blockchain->>Psibase blockchain: [newAccount@auth-contract (runas)] setkey(pubkey)
+   Psibase blockchain->>Psibase blockchain: [newAccount@auth-service (runas)] setkey(pubkey)
    Psibase blockchain->>Psibase blockchain: [invite-sys@account-sys] setAuthContract(authEcSys)
    Psibase blockchain-->>Core: 
    Core-->>Accounts applet: 

@@ -99,10 +99,10 @@ namespace psibase
       active = false;
 
       Action action{
-          .sender   = {},
-          .contract = transactionContractNum,
-          .method   = MethodNumber("startBlock"),
-          .rawData  = {},
+          .sender  = {},
+          .service = transactionServiceNum,
+          .method  = MethodNumber("startBlock"),
+          .rawData = {},
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
@@ -135,7 +135,7 @@ namespace psibase
          status->chainId = status->head->blockId;
 
       // These values will be replaced at the start of the next block.
-      // Changing the these here gives contracts running in RPC mode
+      // Changing the these here gives services running in RPC mode
       // the illusion that they're running during the production of a new
       // block. This helps to give them a consistent view between production
       // and RPC modes.
@@ -169,7 +169,7 @@ namespace psibase
             t.setWatchdog(*watchdogLimit);
          t.execVerifyProof(i);
          if (!current.subjectiveData.empty())
-            throw std::runtime_error("proof called a subjective contract");
+            throw std::runtime_error("proof called a subjective service");
       }
       catch (const std::exception& e)
       {

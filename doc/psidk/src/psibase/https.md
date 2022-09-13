@@ -1,6 +1,6 @@
 # Serving https
 
-These instructions cover using `nginx` and [Let's Encrypt](https://letsencrypt.org/) to add https support to `psinode`.
+These instructions cover using [nginx](http://nginx.org/) and [Let's Encrypt](https://letsencrypt.org/) to add https support to `psinode`.
 
 psinode doesn't support https itself. It would create several complications if it did:
 
@@ -24,6 +24,7 @@ Make sure certbot isn't already installed: `which certbot`. If it is, uninstall 
 Run the following as `root`:
 
 ```
+apt-get update
 apt-get -y install nginx python3 python3-venv libaugeas0
 python3 -m venv /opt/certbot/
 /opt/certbot/bin/pip install --upgrade pip
@@ -33,7 +34,7 @@ ln -s /opt/certbot/bin/certbot /usr/bin/certbot
 
 ## GoDaddy credentials
 
-`certbot-dns-godaddy` needs a credentials file from [developer.godaddy.com/keys](https://developer.godaddy.com/keys). This allows it to respond to DNS challenges from Let's Encrypt. The file looks like the following:
+`certbot-dns-godaddy` needs a credentials file from [developer.godaddy.com/keys](https://developer.godaddy.com/keys). This allows it to respond to DNS challenges from Let's Encrypt. Select "Production"; "ote" (the default) won't work. The file looks like the following:
 
 ```
 dns_godaddy_secret = 0123456789abcdef0123456789abcdef01234567
@@ -49,19 +50,24 @@ Run the following as root. If this process succeeds, `certbot` will create the c
 Adjust the arguments to point to your credentials file, use your email address, and use your domain.
 
 ```
-certbot run \
+certbot \
   --authenticator dns-godaddy \
+  --installer nginx \
   --email email_goes_here@email_goes_here \
   --agree-tos \
-  -d 'my-psinode-domain.com' \
-  -d '*.my-psinode-domain.com' \
+  -d 'my-psinode-domain.com,*.my-psinode-domain.com' \
   --dns-godaddy-credentials /root/.secrets/certbot/godaddy.ini \
   --dns-godaddy-propagation-seconds 900 \
-  --server https://acme-v02.api.letsencrypt.org/directory \
-  --nginx \
   --keep-until-expiring \
   --non-interactive \
   --expand
+```
+
+Ignore this message:
+
+```
+Missing command line flag or config entry for this setting:
+Which server blocks would you like to modify?
 ```
 
 ## Auto renew
@@ -94,7 +100,7 @@ Create `/etc/nginx/sites-available/psinode`. Replace `my-psinode-domain.com` wit
 
 ```
 server {
-    listen 443;
+    listen 443 ssl;
 
     # This includes both the domain and subdomains
     server_name             my-psinode-domain.com *.my-psinode-domain.com;
@@ -102,6 +108,9 @@ server {
     ssl_certificate         /etc/letsencrypt/live/my-psinode-domain.com/fullchain.pem;
     ssl_certificate_key     /etc/letsencrypt/live/my-psinode-domain.com/privkey.pem;
     include                 /etc/letsencrypt/options-ssl-nginx.conf;
+
+    # Allow larger upload than nginx's default
+    client_max_body_size    2m;
 
     location / {
         proxy_pass       http://127.0.0.1:8080;
@@ -129,6 +138,7 @@ To enable it:
 
 ```
 ln -s /etc/nginx/sites-available/psinode /etc/nginx/sites-enabled/psinode
+
 service nginx restart
 ```
 

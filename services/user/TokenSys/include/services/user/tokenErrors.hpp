@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-namespace UserContract
+namespace UserService
 {
    namespace Errors
    {
@@ -20,4 +20,4 @@ namespace UserContract
       constexpr std::string_view invalidConfigUpdate = "Invalid configuration update";
       constexpr std::string_view tokenUntradeable    = "Token untradeable";
    }  // namespace Errors
-}  // namespace UserContract
+}  // namespace UserService

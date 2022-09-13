@@ -11,10 +11,10 @@ namespace psibase
    /// use when invoking those functions.
    enum class DbId : uint32_t
    {
-      /// Contracts should store their tables here
+      /// Services should store their tables here
       ///
-      /// The first 64 bits of the key match the contract.
-      contract,
+      /// The first 64 bits of the key match the service.
+      service,
 
       /// Data for RPC
       ///
@@ -22,28 +22,28 @@ namespace psibase
       /// Individual nodes may modify this database, expire data from this
       /// database, or wipe it entirely at will.
       ///
-      /// The first 64 bits of the key match the contract.
+      /// The first 64 bits of the key match the service.
       writeOnly,
 
       /// Data that is not part of consensus
       ///
-      /// Only accessible to subjective contracts during transactions,
-      /// but readable by all contracts during RPC. Doesn't undo
+      /// Only accessible to subjective services during transactions,
+      /// but readable by all services during RPC. Doesn't undo
       /// from aborting transactions, aborting blocks, or forking
       /// blocks. Individual nodes may modify this database or wipe
       //  it entirely at will.
       ///
-      /// The first 64 bits of the key match the contract.
+      /// The first 64 bits of the key match the service.
       subjective,
 
       /// Tables used by native code
       ///
       /// This database enforces constraints during write. Only
-      /// writable by priviledged contracts, but readable by all
-      /// contracts.
+      /// writable by priviledged services, but readable by all
+      /// services.
       ///
       /// Some writes to this database indicate chain upgrades. If a
-      /// priviledged contract writes to a table that an older
+      /// priviledged service writes to a table that an older
       /// node version doesn't know about, or writes new fields
       /// to an existing table that an older node doesn't know about,
       /// then that node will reject the write. If the producers
@@ -54,8 +54,8 @@ namespace psibase
       /// Tables used by native code
       ///
       /// This database doesn't enforce constraints during write.
-      /// Only writable by priviledged contracts, but readable by all
-      /// contracts.
+      /// Only writable by priviledged services, but readable by all
+      /// services.
       nativeUnconstrained,
 
       /// Block log
@@ -76,13 +76,13 @@ namespace psibase
       ///
       /// Value must begin with:
       /// * 32 bit: block number
-      /// * 64 bit: contract
+      /// * 64 bit: service
       ///
       /// Only usable with these native functions:
       /// * [putSequential]
       /// * [getSequential]
       ///
-      /// TODO: right now the value must begin with the contract. Revisit
+      /// TODO: right now the value must begin with the service. Revisit
       /// whether beginning with the block number is useful.
       historyEvent,
 
@@ -99,13 +99,13 @@ namespace psibase
       ///
       /// Value must begin with:
       /// * 32 bit: block number
-      /// * 64 bit: contract
+      /// * 64 bit: service
       ///
       /// Only usable with these native functions:
       /// * [putSequential]
       /// * [getSequential]
       ///
-      /// TODO: right now the value must begin with the contract. Revisit
+      /// TODO: right now the value must begin with the service. Revisit
       /// whether beginning with the block number is useful.
       uiEvent,
 
@@ -113,7 +113,7 @@ namespace psibase
       ///
       /// TODO: read support; right now only RPC mode can read
       ///
-      /// Contracts may produce these events during transactions and may read them
+      /// Services may produce these events during transactions and may read them
       /// up to 1 hour (configurable) after they were produced, or they reach finality,
       /// which ever is longer.
       ///
@@ -121,13 +121,13 @@ namespace psibase
       ///
       /// Value must begin with:
       /// * 32 bit: block number
-      /// * 64 bit: contract
+      /// * 64 bit: service
       ///
       /// Only usable with these native functions:
       /// * [putSequential]
       /// * [getSequential]
       ///
-      /// TODO: right now the value must begin with the contract. Revisit
+      /// TODO: right now the value must begin with the service. Revisit
       /// whether beginning with the block number is useful.
       merkleEvent,
 
@@ -144,12 +144,12 @@ namespace psibase
 
    struct KvResourceKey
    {
-      AccountNumber contract = {};
-      uint32_t      db       = {};
+      AccountNumber service = {};
+      uint32_t      db      = {};
 
       friend auto operator<=>(const KvResourceKey&, const KvResourceKey&) = default;
    };
-   PSIO_REFLECT(KvResourceKey, definitionWillNotChange(), contract, db)
+   PSIO_REFLECT(KvResourceKey, definitionWillNotChange(), service, db)
 
    struct KvResourceDelta
    {

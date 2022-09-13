@@ -4,11 +4,11 @@
 #include <psibase/Bitset.hpp>
 #include <psibase/Table.hpp>
 
-namespace UserContract
+namespace UserService
 {
    using NID = uint32_t;
 
-   // This structure is shared between several User contracts that need a
+   // This structure is shared between several User services that need a
    //   flag to track initialization
    struct SingletonKey
    {
@@ -56,4 +56,4 @@ namespace UserContract
    PSIO_REFLECT(CreditRecord, nftId, debitor);
    using CreditTable = psibase::Table<CreditRecord, &CreditRecord::nftId>;
 
-}  // namespace UserContract
+}  // namespace UserService

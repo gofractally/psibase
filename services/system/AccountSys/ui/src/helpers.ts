@@ -10,12 +10,12 @@ export interface MsgProps {
 
 export const fetchQuery = <T>(
     queryName: string,
-    contract: string,
+    service: string,
     params: any = {},
     subPath: string = ""
 ): Promise<T> => {
     return new Promise<T>((resolve) => {
-        query(new AppletId(contract, subPath), queryName, params);
+        query(new AppletId(service, subPath), queryName, params);
     });
 };
 

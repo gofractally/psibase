@@ -22,7 +22,7 @@ namespace psibase
       bool                                      shuttingDown      = false;
       std::map<AccountNumber, ExecutionContext> executionContexts = {};
       std::chrono::steady_clock::duration       watchdogLimit{0};
-      std::chrono::steady_clock::duration       contractLoadTime{0};
+      std::chrono::steady_clock::duration       serviceLoadTime{0};
    };
 
    TransactionContext::TransactionContext(BlockContext&            blockContext,
@@ -110,18 +110,18 @@ namespace psibase
          // TODO: verify, no extra data
          auto data = psio::convert_from_frac<GenesisActionData>(
              {action.rawData.data(), action.rawData.size()});
-         for (auto& contract : data.contracts)
+         for (auto& service : data.services)
          {
-            check(contract.contract.value, "account 0 is reserved");
-            check(!db.kvGet<CodeRow>(CodeRow::db, codeKey(contract.contract)),
+            check(service.service.value, "account 0 is reserved");
+            check(!db.kvGet<CodeRow>(CodeRow::db, codeKey(service.service)),
                   "account already created");
             CodeRow account{
-                .codeNum = contract.contract,
-                .flags   = contract.flags,
+                .codeNum = service.service,
+                .flags   = service.flags,
             };
             db.kvPut(CodeRow::db, account.key(), account);
-            setCode(db, contract.contract, contract.vmType, contract.vmVersion,
-                    {contract.code.data(), contract.code.size()});
+            setCode(db, service.service, service.vmType, service.vmVersion,
+                    {service.code.data(), service.code.size()});
          }
       }
       catch (const std::exception& e)
@@ -138,14 +138,14 @@ namespace psibase
                                   .checkFirstAuthAndExit = checkFirstAuthAndExit};
 
       Action action{
-          .sender   = AccountNumber(),
-          .contract = transactionContractNum,
-          .rawData  = psio::convert_to_frac(args),
+          .sender  = AccountNumber(),
+          .service = transactionServiceNum,
+          .rawData = psio::convert_to_frac(args),
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
       ActionContext ac = {self, action, self.transactionTrace.actionTraces.back()};
-      auto&         ec = self.getExecutionContext(transactionContractNum);
+      auto&         ec = self.getExecutionContext(transactionServiceNum);
       ec.execProcessTransaction(ac);
    }
 
@@ -170,14 +170,14 @@ namespace psibase
           .proof           = proof,
       };
       Action action{
-          .sender   = {},
-          .contract = data.claim.contract,
-          .rawData  = psio::convert_to_frac(data),
+          .sender  = {},
+          .service = data.claim.service,
+          .rawData = psio::convert_to_frac(data),
       };
       auto& atrace     = transactionTrace.actionTraces.emplace_back();
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.contract);
+      auto&         ec = getExecutionContext(action.service);
       ec.execVerify(ac);
    }
 
@@ -197,14 +197,14 @@ namespace psibase
           .proof           = std::move(proof),
       };
       Action action{
-          .sender   = {},
-          .contract = data.claim.contract,
-          .rawData  = psio::convert_to_frac(data),
+          .sender  = {},
+          .service = data.claim.service,
+          .rawData = psio::convert_to_frac(data),
       };
       auto& atrace     = transactionTrace.actionTraces.emplace_back();
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.contract);
+      auto&         ec = getExecutionContext(action.service);
       ec.execVerify(ac);
    }
 
@@ -220,7 +220,7 @@ namespace psibase
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.contract);
+      auto&         ec = getExecutionContext(action.service);
       ec.execCalled(callerFlags, ac);
    }
 
@@ -230,7 +230,7 @@ namespace psibase
    {
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.contract);
+      auto&         ec = getExecutionContext(action.service);
       ec.execCalled(callerFlags, ac);
    }
 
@@ -245,27 +245,27 @@ namespace psibase
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.contract);
+      auto&         ec = getExecutionContext(action.service);
       ec.execServe(ac);
    }
 
-   ExecutionContext& TransactionContext::getExecutionContext(AccountNumber contract)
+   ExecutionContext& TransactionContext::getExecutionContext(AccountNumber service)
    {
       auto                        loadStart = std::chrono::steady_clock::now();
       std::lock_guard<std::mutex> guard{impl->mutex};
       if (impl->timedOut)
          throw TimeoutException{};
-      auto it = impl->executionContexts.find(contract);
+      auto it = impl->executionContexts.find(service);
       if (it != impl->executionContexts.end())
          return it->second;
       check(impl->executionContexts.size() < blockContext.systemContext.executionMemories.size(),
-            "exceeded maximum number of running contracts");
+            "exceeded maximum number of running services");
       auto& memory = blockContext.systemContext.executionMemories[impl->executionContexts.size()];
       auto& result = impl->executionContexts
-                         .insert({contract, ExecutionContext{*this, impl->wasmConfig.vmOptions,
-                                                             memory, contract}})
+                         .insert({service, ExecutionContext{*this, impl->wasmConfig.vmOptions,
+                                                            memory, service}})
                          .first->second;
-      impl->contractLoadTime += std::chrono::steady_clock::now() - loadStart;
+      impl->serviceLoadTime += std::chrono::steady_clock::now() - loadStart;
       return result;
    }
 
@@ -273,7 +273,7 @@ namespace psibase
    {
       std::lock_guard<std::mutex> guard{impl->mutex};
       return std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::steady_clock::now() - startTime - impl->contractLoadTime);
+          std::chrono::steady_clock::now() - startTime - impl->serviceLoadTime);
    }
 
    void TransactionContext::setWatchdog(std::chrono::steady_clock::duration watchdogLimit)
@@ -295,7 +295,7 @@ namespace psibase
                    if (impl->timedOut || impl->shuttingDown)
                       return;
                    auto timeSpent =
-                       std::chrono::steady_clock::now() - startTime - impl->contractLoadTime;
+                       std::chrono::steady_clock::now() - startTime - impl->serviceLoadTime;
                    if (timeSpent >= impl->watchdogLimit)
                    {
                       impl->timedOut = true;
