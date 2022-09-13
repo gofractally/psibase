@@ -134,18 +134,18 @@ namespace psibase::net
       struct append_entries_request
       {
          static constexpr unsigned          type = 34;
-         term_id                            term;
-         producer_id                        leader_id;
-         BlockNum                           leader_commit;
          psio::shared_view_ptr<SignedBlock> block;
-         PSIO_REFLECT_INLINE(append_entries_request, term, leader_id, leader_commit, block)
+         PSIO_REFLECT_INLINE(append_entries_request, block)
          std::string to_string() const
          {
             BlockInfo info{*block->block()};
-            return "append_entries: term=" + std::to_string(term) + " leader=" + leader_id.str() +
+            return "append_entries: term=" +
+                   std::to_string(term_id{block->block()->header()->term()}) +
+                   " leader=" + AccountNumber{block->block()->header()->producer()}.str() +
                    " id=" + net::to_string(info.blockId) +
                    " blocknum=" + std::to_string(BlockNum{block->block()->header()->blockNum()}) +
-                   " irreversible=" + std::to_string(leader_commit);
+                   " irreversible=" +
+                   std::to_string(BlockNum{block->block()->header()->commitNum()});
          }
       };
 
@@ -519,14 +519,9 @@ namespace psibase::net
             peer.last_sent     = {next_block_id, peer.last_sent.num() + 1};
             auto next_block    = chain().get(next_block_id);
 
-            network().async_send_block(
-                peer.id,
-                // TODO: This should probably use the current term/leader not the
-                // term leader associated with the block.
-                append_entries_request{next_block->block()->header()->term(),
-                                       next_block->block()->header()->producer(),
-                                       chain().commit_index(), next_block},
-                [this, &peer](const std::error_code& e) { async_send_fork(peer); });
+            network().async_send_block(peer.id, append_entries_request{next_block},
+                                       [this, &peer](const std::error_code& e)
+                                       { async_send_fork(peer); });
          }
          else
          {
@@ -713,13 +708,12 @@ namespace psibase::net
       void recv(peer_id origin, const append_entries_request& request)
       {
          auto& connection = get_connection(origin);
-         update_term(request.term);
-         if (request.term >= current_term)
+         auto  term       = BlockNum{request.block->block()->header()->term()};
+         update_term(term);
+         if (term >= current_term)
          {
             _election_timer.restart();
          }
-         auto max_commit = std::min(request.leader_commit,
-                                    BlockNum(request.block->block()->header()->blockNum()));
          // TODO: should the leader ever accept a block from another source?
          if (chain().insert(request.block))
          {
@@ -728,9 +722,9 @@ namespace psibase::net
             on_recv_block(connection, xid);
             //std::cout << "recv node=" << self.str() << " id=" << to_string(xid.id()) << std::endl;
             chain().async_switch_fork(
-                [this, max_commit](BlockHeader* h)
+                [this](BlockHeader* h)
                 {
-                   if (chain().commit(max_commit))
+                   if (chain().commit(h->commitNum))
                    {
                       set_producers(chain().getProducers());
                    }
