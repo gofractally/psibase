@@ -4,7 +4,7 @@ Both C++ and Rust services support typed JSON serialization. C++ services use `p
 
 ## Structs
 
-Both psio and serde represent structs as JSON objects.
+Both psio and serde represent structs-with-fields as JSON objects.
 
 ## Numbers
 
@@ -63,4 +63,4 @@ Both psio and serde represent tuples as JSON arrays.
 
 There are probably as many ways to represent these in JSON as there are grains of sand on the beach. serde supports [4 approaches](https://serde.rs/enum-representations.html). Of these, only the [externally tagged](https://serde.rs/enum-representations.html#externally-tagged) and [adjacently tagged](https://serde.rs/enum-representations.html#adjacently-tagged) representations cover all situations unambiguously.
 
-- TODO: pick one. It will be easier on rust devs if we choose serde's default.
+- TODO: pick one. It will be easier on rust devs if we choose serde's default (externally tagged). It looks like I can take advantage of the syntax of the externally-tagged option to represent nested types in the schema without falling back on a DSL.
