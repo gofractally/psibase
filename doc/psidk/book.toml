@@ -13,6 +13,10 @@ after = ["links","index"]
 command = "mdbook-mermaid"
 
 [output.html]
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/gofractally/psibase"
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
 
 #[output.linkcheck]
