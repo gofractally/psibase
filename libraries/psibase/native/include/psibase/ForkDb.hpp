@@ -37,7 +37,17 @@ namespace psibase
    struct ProducerSet
    {
       boost::container::flat_map<AccountNumber, Claim> activeProducers;
-      bool                                             isProducer(AccountNumber producer) const
+      ProducerSet() = default;
+      ProducerSet(const std::vector<Producer>& prods)
+      {
+         decltype(activeProducers)::sequence_type result;
+         for (const auto& [name, claim] : prods)
+         {
+            result.emplace_back(name, claim);
+         }
+         activeProducers.adopt_sequence(std::move(result));
+      }
+      bool isProducer(AccountNumber producer) const
       {
          return activeProducers.find(producer) != activeProducers.end();
       }
@@ -76,16 +86,60 @@ namespace psibase
       ConstRevisionPtr revision;
       // The producer set for the next block
       std::shared_ptr<ProducerSet> producers;
-      BlockHeaderState() : info() { info.header.blockNum = 1; }
-      BlockHeaderState(const BlockInfo& info, ConstRevisionPtr revision = nullptr)
+      std::shared_ptr<ProducerSet> nextProducers;
+      // Only valid if nextProducers is non-null
+      BlockNum nextProducersBlockNum;
+      BlockHeaderState() : info()
+      {
+         info.header.blockNum = 1;
+         producers            = std::make_shared<ProducerSet>();
+      }
+      BlockHeaderState(const BlockInfo& info,
+                       SystemContext*   systemContext,
+                       ConstRevisionPtr revision)
           : info(info), revision(revision)
       {
+         // Reads the active producer set from the database
+         Database db{systemContext->sharedDatabase, revision};
+         auto     session = db.startRead();
+         auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         if (!status)
+         {
+            producers = std::make_shared<ProducerSet>();
+         }
+         else
+         {
+            producers = std::make_shared<ProducerSet>(status->producers);
+            if (status->nextProducers)
+            {
+               const auto& [prods, num] = *status->nextProducers;
+               nextProducers            = std::make_shared<ProducerSet>(prods);
+               nextProducersBlockNum    = num;
+            }
+         }
       }
       BlockHeaderState(const BlockHeaderState& prev,
                        const BlockInfo&        info,
                        ConstRevisionPtr        revision = nullptr)
-          : info(info), revision(revision)
+          : info(info),
+            revision(revision),
+            producers(prev.producers),
+            nextProducers(prev.nextProducers),
+            nextProducersBlockNum(prev.nextProducersBlockNum)
       {
+         // Handling of the producer schedule must match BlockContext::writeRevision
+         if (info.header.newProducers)
+         {
+            nextProducers = std::make_shared<ProducerSet>(*info.header.newProducers);
+            // N.B. joint consensus with two identical producer sets
+            // is functionally indistinguishable from non-joint consensus.
+            // Don't both detecting this case here.
+            nextProducersBlockNum = info.header.blockNum;
+         }
+         if (nextProducers && info.header.commitNum >= nextProducersBlockNum)
+         {
+            producers = std::move(nextProducers);
+         }
       }
       auto order() const
       {
@@ -293,31 +347,8 @@ namespace psibase
             return nullptr;
          }
       }
-      bool        is_complete_chain(const id_type& id) { return get_state(id) != nullptr; }
-      ProducerSet getProducers(Database& db)
-      {
-         // get producers
-         std::vector key       = psio::convert_to_key(producerConfigTable);
-         auto        prefixLen = key.size();
-         using mapType         = decltype(ProducerSet::activeProducers);
-         mapType::sequence_type prods;
-         while (auto data = db.kvGreaterEqualRaw(DbId::nativeConstrained, key, prefixLen))
-         {
-            auto prod = psio::convert_from_frac<ProducerConfigRow>(data->value);
-            prods.emplace_back(prod.producerName, prod.producerAuth);
-            //
-            key.clear();
-            key.insert(key.begin(), data->key.pos, data->key.end);
-            key.push_back(0);
-         }
-         ProducerSet result;
-         result.activeProducers.adopt_sequence(std::move(prods));
-         return result;
-      }
-      // TODO: handle joint consensus
-      // Note: If wasm has not specified a producer, then the
-      // block producer must be the same as the previous block producer.
-      ProducerSet getProducers()
+      bool is_complete_chain(const id_type& id) { return get_state(id) != nullptr; }
+      std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> getProducers()
       {
          auto iter = byBlocknumIndex.find(commitIndex);
          // The last committed block is guaranteed to be present
@@ -326,15 +357,7 @@ namespace psibase
          // We'd better have a state for this block
          assert(stateIter != states.end());
          assert(stateIter->second.revision);
-         Database db(systemContext->sharedDatabase, stateIter->second.revision);
-         auto     session  = db.startRead();
-         auto     result   = getProducers(db);
-         auto     producer = stateIter->second.info.header.producer;
-         if (result.size() == 0 && producer != AccountNumber{})
-         {
-            result.activeProducers.try_emplace(producer);
-         }
-         return result;
+         return {stateIter->second.producers, stateIter->second.nextProducers};
       }
       bool commit(BlockNum num)
       {
@@ -467,15 +490,15 @@ namespace psibase
          }
          try
          {
-            auto block          = blockContext->current;
-            auto claim          = getProducerClaim(block.header.producer, head->revision);
+            auto claim = getProducerClaim(blockContext->current.header.producer, head->revision);
             auto [revision, id] = blockContext->writeRevision(prover, claim);
             systemContext->sharedDatabase.setHead(*writer, revision);
-            assert(head->blockId() == block.header.previous);
-            auto proof     = getBlockProof(revision, block.header.blockNum);
-            auto [iter, _] = blocks.try_emplace(id, SignedBlock{block, proof});
+            assert(head->blockId() == blockContext->current.header.previous);
+            auto proof     = getBlockProof(revision, blockContext->current.header.blockNum);
+            auto [iter, _] = blocks.try_emplace(id, SignedBlock{blockContext->current, proof});
             // TODO: don't recompute sha
             BlockInfo info{*iter->second->block()};
+            assert(info.blockId == iter->first);
             auto [state_iter, ins2] = states.try_emplace(iter->first, *head, info, revision);
             byOrderIndex.insert({state_iter->second.order(), id});
             head = &state_iter->second;
@@ -565,7 +588,8 @@ namespace psibase
                   proof.emplace();
                }
                blocks.try_emplace(info.blockId, SignedBlock{*block, *proof});
-               auto [state_iter, _] = states.try_emplace(info.blockId, info, revision);
+               auto [state_iter, _] =
+                   states.try_emplace(info.blockId, info, systemContext, revision);
                byOrderIndex.try_emplace(state_iter->second.order(), info.blockId);
                byBlocknumIndex.try_emplace(blockNum, info.blockId);
                if (!head)

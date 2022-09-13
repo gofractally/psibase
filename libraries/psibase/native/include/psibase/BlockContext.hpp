@@ -35,7 +35,8 @@ namespace psibase
 
       StatusRow                                start(std::optional<TimePointSec> time     = {},
                                                      AccountNumber               producer = {},
-                                                     TermNum                     term     = {});
+                                                     TermNum                     term     = {},
+                                                     BlockNum                    irr      = {});
       void                                     start(Block&& src);
       void                                     callStartBlock();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(const Prover&, const Claim&);

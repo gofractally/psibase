@@ -114,11 +114,11 @@ namespace psibase::net
       {
       }
 
-      producer_id              self = null_producer;
-      ProducerSet              active_producers;
-      term_id                  current_term = 0;
-      producer_id              voted_for    = null_producer;
-      std::vector<producer_id> votes_for_me;
+      producer_id                  self = null_producer;
+      std::shared_ptr<ProducerSet> active_producers[2];
+      term_id                      current_term = 0;
+      producer_id                  voted_for    = null_producer;
+      std::vector<producer_id>     votes_for_me[2];
 
       block_num last_applied = 0;
 
@@ -128,7 +128,7 @@ namespace psibase::net
       std::chrono::milliseconds _timeout        = std::chrono::seconds(3);
       std::chrono::milliseconds _block_interval = std::chrono::seconds(1);
 
-      std::vector<block_num>                        match_index;
+      std::vector<block_num>                        match_index[2];
       std::vector<std::unique_ptr<peer_connection>> _peers;
 
       struct append_entries_request
@@ -344,18 +344,38 @@ namespace psibase::net
          connection.peer_ready = true;
       }
       void set_producer_id(producer_id prod) { self = prod; }
-      void set_producers(ProducerSet prods)
+      void set_producers(
+          std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> prods)
       {
          if (_state == producer_state::leader)
          {
-            // fix match_index
-            if (active_producers != prods)
+            // match_index
+            if (*active_producers[0] != *prods.first)
             {
-               match_index.clear();
-               match_index.resize(prods.size());
+               if (active_producers[1] && *active_producers[1] == *prods.first)
+               {
+                  // Leaving joint consensus
+                  match_index[0] = match_index[1];
+               }
+               else
+               {
+                  match_index[0].clear();
+                  match_index[0].resize(prods.first->size());
+               }
+            }
+            // Second match_index is only active during joint consensus
+            if (!prods.second)
+            {
+               match_index[1].clear();
+            }
+            else if (!active_producers[1] || *active_producers[1] != *prods.second)
+            {
+               match_index[1].clear();
+               match_index[1].resize(prods.second->size());
             }
          }
-         active_producers = std::move(prods);
+         active_producers[0] = std::move(prods.first);
+         active_producers[1] = std::move(prods.second);
          if (is_producer())
          {
             if (_state == producer_state::nonvoting)
@@ -375,37 +395,53 @@ namespace psibase::net
          }
       }
       void load_producers() { set_producers(chain().getProducers()); }
+      bool is_sole_producer() const
+      {
+         return ((active_producers[0]->size() == 0 && self != AccountNumber()) ||
+                 (active_producers[0]->size() == 1 && active_producers[0]->isProducer(self))) &&
+                !active_producers[1];
+      }
       bool is_producer() const
       {
          // If there are no producers set on chain, then any
          // producer can produce a block
-         return (active_producers.size() == 0 && self != AccountNumber()) ||
-                active_producers.isProducer(self);
+         return (active_producers[0]->size() == 0 && self != AccountNumber() &&
+                 !active_producers[1]) ||
+                active_producers[0]->isProducer(self) ||
+                (active_producers[1] && active_producers[1]->isProducer(self));
       }
       producer_id producer_name() const { return self; }
 
       void validate_producer(producer_id producer, const Claim& claim)
       {
-         auto expected = active_producers.getClaim(producer);
-         if (!expected)
+         auto expected0 = active_producers[0]->getClaim(producer);
+         auto expected1 =
+             active_producers[1] ? active_producers[1]->getClaim(producer) : decltype(expected0)();
+         if (!expected0 && !expected1)
          {
             throw std::runtime_error(producer.str() + " is not an active producer");
          }
-         else if (claim != *expected)
+         else if (claim != *expected0 && claim != *expected1)
          {
             throw std::runtime_error("Wrong key for " + producer.str());
          }
       }
 
-      Claim myKey() const
+      template <typename F>
+      void for_each_key(F&& f)
       {
-         if (auto claim = active_producers.getClaim(self))
+         auto claim0 = active_producers[0]->getClaim(self);
+         if (claim0)
          {
-            return *claim;
+            f(*claim0);
          }
-         else
+         if (active_producers[1])
          {
-            return {};
+            auto claim1 = active_producers[1]->getClaim(self);
+            if (claim1 && claim0 != claim1)
+            {
+               f(*claim1);
+            }
          }
       }
 
@@ -414,20 +450,21 @@ namespace psibase::net
       void start_leader()
       {
          assert(_state == producer_state::leader);
+         auto head = chain().get_head();
          // The next block production time is the later of:
          // - The last block interval boundary before the current time
          // - The head block time + the block interval
          //
-         auto head_time =
-             typename Timer::time_point{std::chrono::seconds(chain().get_head()->time.seconds)};
+         auto head_time   = typename Timer::time_point{std::chrono::seconds(head->time.seconds)};
          auto block_start = std::max(head_time + _block_interval,
                                      floor2(Timer::clock_type::now(), _block_interval));
          _block_timer.expires_at(block_start + _block_interval);
          // TODO: consensus should be responsible for most of the block header
+         auto commit_index = is_sole_producer() ? head->blockNum + 1 : chain().commit_index();
          chain().start_block(
              TimePointSec{static_cast<uint32_t>(
                  duration_cast<std::chrono::seconds>(block_start.time_since_epoch()).count())},
-             self, current_term);
+             self, current_term, commit_index);
          _block_timer.async_wait(
              [this](const std::error_code& ec)
              {
@@ -505,9 +542,13 @@ namespace psibase::net
          if (_state == producer_state::follower && new_head->term == current_term &&
              new_head->blockNum > chain().commit_index())
          {
-            network().sendto(
-                new_head->producer,
-                append_entries_response{current_term, self, new_head->blockNum, myKey()});
+            for_each_key(
+                [&](const auto& k)
+                {
+                   network().sendto(
+                       new_head->producer,
+                       append_entries_response{current_term, self, new_head->blockNum, k});
+                });
          }
          // TODO: how do we handle a fork switch during connection startup?
          for (auto& peer : _peers)
@@ -553,28 +594,37 @@ namespace psibase::net
       // ------------------- Implementation utilities ----- -----------
       void update_match_index(producer_id producer, block_num match)
       {
-         if (auto idx = active_producers.getIndex(producer))
+         auto jointCommitIndex = std::min(update_match_index(producer, match, 0),
+                                          update_match_index(producer, match, 1));
+         if (jointCommitIndex == std::numeric_limits<BlockNum>::max())
          {
-            match_index[*idx] = std::max(match_index[*idx], match);
-            update_committed();
+            assert(active_producers[0]->size() == 0);
+            assert(!active_producers[1]);
+            assert(producer == self);
+            jointCommitIndex = match;
          }
-         else if (active_producers.size() == 0 && producer == self)
-         {
-            if (chain().commit(match))
-            {
-               set_producers(chain().getProducers());
-            }
-         }
-      }
-      void update_committed()
-      {
-         std::vector<block_num> match = match_index;
-         auto                   mid   = match.size() / 2;
-         std::nth_element(match.begin(), match.begin() + mid, match.end());
-         if (chain().commit(match[mid]))
+         if (chain().commit(match))
          {
             set_producers(chain().getProducers());
          }
+      }
+      BlockNum update_match_index(producer_id producer, BlockNum confirmed, std::size_t group)
+      {
+         if (active_producers[group])
+         {
+            if (auto idx = active_producers[group]->getIndex(producer))
+            {
+               match_index[group][*idx] = std::max(match_index[group][*idx], confirmed);
+            }
+            if (!match_index[group].empty())
+            {
+               std::vector<block_num> match = match_index[group];
+               auto                   mid   = match.size() / 2;
+               std::nth_element(match.begin(), match.begin() + mid, match.end());
+               return match[mid];
+            }
+         }
+         return std::numeric_limits<BlockNum>::max();
       }
       // This should always run first when handling any message
       void update_term(term_id term)
@@ -583,11 +633,13 @@ namespace psibase::net
          {
             if (_state == producer_state::leader)
             {
-               match_index.clear();
+               match_index[0].clear();
+               match_index[1].clear();
                stop_leader();
                randomize_timer();
             }
-            votes_for_me.clear();
+            votes_for_me[0].clear();
+            votes_for_me[1].clear();
             current_term = term;
             voted_for    = null_producer;
             _state       = producer_state::follower;
@@ -595,11 +647,17 @@ namespace psibase::net
       }
       void check_votes()
       {
-         if (votes_for_me.size() > active_producers.size() / 2)
+         if (votes_for_me[0].size() > active_producers[0]->size() / 2 &&
+             (!active_producers[1] || votes_for_me[1].size() > active_producers[1]->size() / 2))
          {
             _state = producer_state::leader;
-            match_index.clear();
-            match_index.resize(active_producers.size());
+            match_index[0].clear();
+            match_index[0].resize(active_producers[0]->size());
+            if (active_producers[1])
+            {
+               match_index[1].clear();
+               match_index[1].resize(active_producers[1]->size());
+            }
             start_leader();
          }
       }
@@ -607,7 +665,7 @@ namespace psibase::net
       void randomize_timer()
       {
          // Don't bother waiting if we're the only producer
-         if (active_producers.size() <= 1)
+         if (active_producers[0]->size() <= 1 && !active_producers[1])
          {
             if (_state == producer_state::follower)
             {
@@ -632,12 +690,23 @@ namespace psibase::net
       {
          ++current_term;
          voted_for = self;
-         votes_for_me.clear();
-         votes_for_me.push_back(self);
+         votes_for_me[0].clear();
+         if (active_producers[0]->isProducer(self) || active_producers[0]->size() == 0)
+         {
+            votes_for_me[0].push_back(self);
+         }
+         if (active_producers[1] && active_producers[1]->isProducer(self))
+         {
+            votes_for_me[1].push_back(self);
+         }
          _state = producer_state::candidate;
          randomize_timer();
-         network().multicast_producers(request_vote_request{
-             current_term, self, chain().get_head()->blockNum, chain().get_head()->term, myKey()});
+         for_each_key(
+             [&](const auto& k)
+             {
+                network().multicast_producers(request_vote_request{
+                    current_term, self, chain().get_head()->blockNum, chain().get_head()->term, k});
+             });
          check_votes();
       }
       // ----------- handling of incoming messages -------------
@@ -704,12 +773,16 @@ namespace psibase::net
                   voted_for    = request.candidate_id;
                }
             }
-            network().sendto(request.candidate_id,
-                             request_vote_response{.term         = current_term,
-                                                   .candidate_id = request.candidate_id,
-                                                   .voter_id     = self,
-                                                   .vote_granted = vote_granted,
-                                                   .claim        = myKey()});
+            for_each_key(
+                [&](const auto& k)
+                {
+                   network().sendto(request.candidate_id,
+                                    request_vote_response{.term         = current_term,
+                                                          .candidate_id = request.candidate_id,
+                                                          .voter_id     = self,
+                                                          .vote_granted = vote_granted,
+                                                          .claim        = k});
+                });
          }
       }
       void recv(peer_id, const request_vote_response& response)
@@ -719,12 +792,16 @@ namespace psibase::net
          if (response.candidate_id == self && response.term == current_term &&
              response.vote_granted && _state == producer_state::candidate)
          {
-            if (std::find(votes_for_me.begin(), votes_for_me.end(), response.voter_id) ==
-                votes_for_me.end())
+            for (auto i : {0, 1})
             {
-               votes_for_me.push_back(response.voter_id);
-               check_votes();
+               auto& votes = votes_for_me[i];
+               if (active_producers[i] && active_producers[i]->isProducer(response.voter_id) &&
+                   std::find(votes.begin(), votes.end(), response.voter_id) == votes.end())
+               {
+                  votes.push_back(response.voter_id);
+               }
             }
+            check_votes();
          }
       }
    };

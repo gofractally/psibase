@@ -21,14 +21,16 @@ namespace psibase
    inline auto statusKey() { return std::tuple{statusTable, nativeTablePrimaryIndex}; }
    struct StatusRow
    {
-      Checksum256              chainId;
-      BlockHeader              current;
-      std::optional<BlockInfo> head;
+      Checksum256                                                chainId;
+      BlockHeader                                                current;
+      std::optional<BlockInfo>                                   head;
+      std::vector<Producer>                                      producers;
+      std::optional<std::tuple<std::vector<Producer>, BlockNum>> nextProducers;
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(StatusRow, chainId, current, head)
+   PSIO_REFLECT(StatusRow, chainId, current, head, producers, nextProducers)
 
    struct ConfigRow
    {
