@@ -27,7 +27,7 @@ export const AccountsList = ({
                             </td>
                             <td className="">
                                 <div className="w-8">
-                                    {account.authContract == 'auth-any-sys' ? <img src={openIcon} alt={account.authContract} /> : <img src={closedIcon} alt={account.authContract} />}
+                                    {account.authService == 'auth-any-sys' ? <img src={openIcon} alt={account.authService} /> : <img src={closedIcon} alt={account.authService} />}
                                 </div>
                             </td>
                         </tr>

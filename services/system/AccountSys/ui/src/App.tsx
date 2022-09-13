@@ -27,13 +27,13 @@ interface Account {
     publicKey: KeyPair['publicKey']
 }
 export interface AccountWithAuth extends Account {
-    authContract: string;
+    authService: string;
 }
 interface AccountWithKey extends AccountWithAuth {
     privateKey: KeyPair['privateKey']
 }
 
-const toAccountWithAuth = ({ accountNum, authContract, publicKey }: AccountWithKey): AccountWithAuth => ({ accountNum, authContract, publicKey });
+const toAccountWithAuth = ({ accountNum, authService, publicKey }: AccountWithKey): AccountWithAuth => ({ accountNum, authService, publicKey });
 
 const fetchAccountsByKey = async (publicKey: string) => {
     if (!publicKey) throw new Error(`No public key found ${publicKey}`)
@@ -53,14 +53,15 @@ const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (acco
     useEffect(() => {
 
         fetchAccounts().then(accounts => setAccounts(currentAccounts => {
-            const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys')).filter(account => account.authContract === 'auth-any-sys');
+            const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys')).filter(account => account.authService === 'auth-any-sys');
+            console.log({ currentAccounts, userAccounts, accounts })
 
             return uniqueAccounts([...currentAccounts, ...userAccounts])
         }));
 
         Promise.all(keyPairs.map(keyPair => fetchAccountsByKey(keyPair.publicKey))).then(responses => {
             const flatAccounts = responses.flat(1);
-            setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authContract: 'auth-ec-sys', publicKey: account.pubkey })), ...currentAccounts]))
+            setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authService: 'auth-ec-sys', publicKey: account.pubkey })), ...currentAccounts]))
             const currentKeyPairs = keyPairs;
             const newKeyPairs = currentKeyPairs.map((keyPair): KeyPair => {
                 const relevantAccounts = flatAccounts.filter(account => account.pubkey === keyPair.publicKey).map(account => account.account)
@@ -102,7 +103,7 @@ const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (acco
 const fetchAccounts = async () => {
     try {
         const accounts = await getJson<AccountWithAuth[]>("/accounts");
-
+        console.log('fetched:', accounts)
         return accounts;
     } catch (e) {
         console.info("refreshAccounts().catch().e:");
@@ -179,7 +180,7 @@ function App() {
 
             const newAccount: AccountWithAuth = {
                 accountNum: account.account,
-                authContract: account.publicKey ? 'auth-ec-sys' : 'auth-any-sys',
+                authService: account.publicKey ? 'auth-ec-sys' : 'auth-any-sys',
                 publicKey: account.publicKey
             }
 
@@ -209,7 +210,7 @@ function App() {
 
             const res = await fetchAccountsByKey(acc.publicKey);
             if (res.length > 0) {
-                const accounts = res.map((res): AccountWithKey => ({ accountNum: res.account, authContract: 'auth-ec-sys', publicKey: res.pubkey, privateKey: acc.privateKey }));
+                const accounts = res.map((res): AccountWithKey => ({ accountNum: res.account, authService: 'auth-ec-sys', publicKey: res.pubkey, privateKey: acc.privateKey }));
                 addAccounts(accounts)
             } else {
                 throw new Error(`No accounts found with public key ${acc.publicKey}`);

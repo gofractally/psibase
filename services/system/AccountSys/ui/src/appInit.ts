@@ -67,14 +67,14 @@ export const initAppFn = (setAppInitialized: () => void) =>
             {
                 id: "getAuthedTransaction",
                 exec: async ({ transaction }: execArgs): Promise<SignedTransaction> => {
-                    const [user, accounts] = await Promise.all([query<null, string>(accountSysApplet, "getLoggedInUser"), getJson<{ accountNum: string; authContract: string }[]>("/accounts")]);
+                    const [user, accounts] = await Promise.all([query<null, string>(accountSysApplet, "getLoggedInUser"), getJson<{ accountNum: string; authService: string }[]>("/accounts")]);
 
                     const sendingAccount = accounts.find(account => account.accountNum === user);
                     if (!sendingAccount) {
                         console.error('No sending account', sendingAccount, { loggedInUser: user, sending: transaction.actions[0].sender })
                         throw new Error('No sending account found');
                     }
-                    const isSecureAccount = sendingAccount.authContract === "auth-ec-sys"
+                    const isSecureAccount = sendingAccount.authService === "auth-ec-sys"
                     if (isSecureAccount) {
                         const keys = JSON.parse(localStorage.getItem('keyPairs') || '[]') as KeyPair[]
 
