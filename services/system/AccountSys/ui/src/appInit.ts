@@ -8,7 +8,9 @@ import {
     signTransaction,
     getJson,
     AppletId,
+    SignedTransaction,
 } from "common/rpc.mjs";
+import { KeyPair } from "./App";
 
 interface execArgs {
     name?: any;
