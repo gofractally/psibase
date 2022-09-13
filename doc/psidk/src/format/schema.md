@@ -35,7 +35,7 @@ An alias definition creates an alternative name for a type:
 ```json
 {
     "name": "NameGoesHere",
-    "alias": {type reference...}
+    "alias": {type reference}
 }
 ```
 
@@ -51,7 +51,7 @@ A struct definition has this form:
     "structFields": [
         {
             "name": "field1",
-            "type": {type reference...}
+            "type": {type reference}
         },
         {field...},
         {field...}
@@ -69,7 +69,7 @@ A union definition describes an `std::variant` in C++ or an `enum` in Rust.
     "unionFields": [
         {
             "name": "alternative0",
-            "type": {type reference...}
+            "type": {type reference}
         },
         {field...},
         {field...}
@@ -91,7 +91,7 @@ enum MyEnumType {
 }
 ```
 
-Discriminants aren't supported in Rust. `enum` isn't supported in C++.
+The schema format doesn't support discriminants in Rust or `enum` in C++.
 
 ```rust
 // Not supported
@@ -104,14 +104,14 @@ enum DoesNotWork {
 
 ## Type References
 
-We used `{type reference...}` to indicate a type reference in the definitions above. This can be one of the following:
+We used `{type reference}` to indicate a type reference in the definitions above. This can be one of the following:
 
-- `{"builtinType":"u32"}` - a [built-in type](#built-in-types)
-- `{"userType":"Foo"}` - a type defined in the [userType array](#type-definitions)
-- `{"vector":{inner type...}}` - a vector of inner type
-- `{"optional":{inner type...}}` - an optional of inner type
-- `{"tuple":[{inner type...}, inner type...]}` - a tuple of inner type
-- `{"array":{inner type...}, "size":8}` - a fixed-size array of inner type
+- `{"builtinType": "u32"}` - a [built-in type](#built-in-types)
+- `{"userType": "Foo"}` - a type defined in the [userType array](#type-definitions)
+- `{"vector": {inner type}}` - a vector of inner type
+- `{"optional": {inner type}}` - an optional of inner type
+- `{"tuple": [{inner type}, ...]}` - a tuple of inner type
+- `{"array": {inner type}, "size": 8}` - a fixed-size array of inner type
 
 Built-in types live in a separate namespace from user-defined types to minimize conflicts in the future if more built-in types are added.
 
