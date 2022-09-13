@@ -16,7 +16,7 @@ command = "mdbook-mermaid"
 default-theme = "ayu"
 preferred-dark-theme = "ayu"
 git-repository-url = "https://github.com/gofractally/psibase"
-additional-js = ["mermaid.min.js", "mermaid-init.js", "psibase.js"]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 
 #[output.linkcheck]
