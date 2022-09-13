@@ -4,8 +4,6 @@ import wait from "waait";
 import { useGraphQLQuery } from "./helpers";
 
 export const getContentQuery = (account = "") => {
-    // account = "psispace-sys";
-    // console.info("querying acc >>", account);
     if (account) {
         return `
         {
