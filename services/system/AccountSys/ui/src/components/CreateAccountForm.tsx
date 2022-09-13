@@ -13,7 +13,7 @@ const onCreateAccount = async (
     addMsg: any,
     clearMsg: any
 ) => {
-    const thisApplet = await getJson("/common/thiscontract");
+    const thisApplet = await getJson("/common/thisservice");
     try {
         clearMsg();
         addMsg("Pushing transaction...");

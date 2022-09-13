@@ -7,10 +7,10 @@
 #include "services/user/NftSys.hpp"
 #include "services/user/TokenSys.hpp"
 
-using namespace UserContract;
+using namespace UserService;
 using namespace psibase;
-using namespace UserContract::Errors;
-using namespace system_contract;
+using namespace UserService::Errors;
+using namespace SystemService;
 using Quantity_t = typename Quantity::Quantity_t;
 
 namespace
@@ -136,16 +136,16 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
    auto seller       = getSender();
    auto symbolRecord = getSymbol(symbol);
    auto nft          = symbolRecord.ownerNft;
-   auto nftContract  = to<NftSys>();
+   auto nftService   = to<NftSys>();
 
    check(price.value != 0, priceTooLow);
    check(nft != 0, symbolDNE);
-   check(seller == nftContract.getNft(nft).owner, missingRequiredAuth);
-   check(nftContract.getCredRecord(nft).debitor != AccountSys::nullAccount, creditSymbolRequired);
+   check(seller == nftService.getNft(nft).owner, missingRequiredAuth);
+   check(nftService.getCredRecord(nft).debitor != AccountSys::nullAccount, creditSymbolRequired);
 
    auto debitMemo = "Symbol " + symbol.str() + " is listed for sale.";
 
-   nftContract.debit(nft, debitMemo);
+   nftService.debit(nft, debitMemo);
    symbolRecord.saleDetails.salePrice = price;
    symbolRecord.saleDetails.seller    = seller;
 
@@ -159,15 +159,15 @@ void SymbolSys::buySymbol(SID symbol)
    auto buyer               = getSender();
    auto symbolRecord        = getSymbol(symbol);
    auto [salePrice, seller] = symbolRecord.saleDetails;
-   auto tokenContract       = to<TokenSys>();
+   auto tokenService        = to<TokenSys>();
 
    check(symbolRecord.ownerNft != 0, symbolDNE);
    check(buyer != seller, buyerIsSeller);
 
    auto buyerMemo  = "Buying symbol " + symbol.str();
    auto sellerMemo = "Symbol " + symbol.str() + " sold";
-   tokenContract.debit(TokenSys::sysToken, buyer, salePrice, buyerMemo);
-   tokenContract.credit(TokenSys::sysToken, seller, salePrice, sellerMemo);
+   tokenService.debit(TokenSys::sysToken, buyer, salePrice, buyerMemo);
+   tokenService.credit(TokenSys::sysToken, seller, salePrice, sellerMemo);
    to<NftSys>().credit(symbolRecord.ownerNft, buyer, buyerMemo);
 
    symbolRecord.saleDetails.seller    = AccountNumber{0};
@@ -279,4 +279,4 @@ bool SymbolSys::exists(SID symbol)
    return symOpt.has_value();
 }
 
-PSIBASE_DISPATCH(UserContract::SymbolSys)
+PSIBASE_DISPATCH(UserService::SymbolSys)

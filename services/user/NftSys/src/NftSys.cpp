@@ -6,11 +6,11 @@
 #include <services/user/NftSys.hpp>
 
 using namespace psibase;
-using namespace UserContract;
+using namespace UserService;
 using namespace Errors;
 using psio::const_view;
 using std::string;
-using system_contract::AccountSys;
+using SystemService::AccountSys;
 
 NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
 {
@@ -217,4 +217,4 @@ bool NftSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
    }
 }
 
-PSIBASE_DISPATCH(UserContract::NftSys)
+PSIBASE_DISPATCH(UserService::NftSys)

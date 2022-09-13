@@ -6,7 +6,7 @@
 #include <services/system/CommonSys.hpp>
 #include <services/system/ProxySys.hpp>
 
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 struct Query
 {
@@ -19,7 +19,7 @@ PSIO_REFLECT(  //
     Query,
     method(blocks))
 
-namespace system_contract
+namespace SystemService
 {
    std::optional<psibase::HttpReply> ExploreSys::serveSys(psibase::HttpRequest request)
    {
@@ -38,6 +38,6 @@ namespace system_contract
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
                             Tables{psibase::getReceiver()});
    }
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::ExploreSys)
+PSIBASE_DISPATCH(SystemService::ExploreSys)

@@ -3,7 +3,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/serviceEntry.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    /// TODO: doc
    ///
@@ -24,4 +24,4 @@ namespace system_contract
       method(storeSys, path, contentType, content)
    )
    // clang-format on
-}  // namespace system_contract
+}  // namespace SystemService

@@ -3,7 +3,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    struct PsiSpaceContentKey
    {
@@ -32,7 +32,7 @@ namespace system_contract
 
    /// Provide web hosting
    ///
-   /// This contract provides web hosting to non-contract accounts. It supports both an
+   /// This service provides web hosting to non-service accounts. It supports both an
    /// upload UI (TODO) and command-line upload using `psibase upload` and
    /// `psibase upload tree`.
    ///
@@ -58,7 +58,7 @@ namespace system_contract
    struct PsiSpaceSys : psibase::Service<PsiSpaceSys>
    {
       static constexpr auto service = psibase::AccountNumber("psispace-sys");
-      using Tables                  = psibase::ContractTables<PsiSpaceContentTable>;
+      using Tables                  = psibase::ServiceTables<PsiSpaceContentTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
@@ -69,4 +69,4 @@ namespace system_contract
                 method(serveSys, request),
                 method(storeSys, path, contentType, content),
                 method(removeSys, path))
-}  // namespace system_contract
+}  // namespace SystemService

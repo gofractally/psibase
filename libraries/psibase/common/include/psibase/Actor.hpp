@@ -17,7 +17,7 @@ namespace psibase
     *
     *  psibase::Action {
     *    .sender,
-    *    .contract,
+    *    .service,
     *    .rawData = actionnum, packed_parameters
     *  }
     *
@@ -176,15 +176,15 @@ namespace psibase
    /// Emits events
    ///
    /// Template arguments:
-   /// - `T`: the service class which defines the events (e.g. `MyContract`), or
-   /// - `T`: the inner-most struct within the service class which defines the events (e.g. `MyContract::Events::History`)
+   /// - `T`: the service class which defines the events (e.g. `MyService`), or
+   /// - `T`: the inner-most struct within the service class which defines the events (e.g. `MyService::Events::History`)
    ///
    /// #### Emit methods
    ///
    /// `EventEmitter` uses reflection to get the set of events on `T`. It adds methods to
    /// itself with the same names and arguments.
    ///
-   /// For example, assume `SomeContract` has the set of events in [Defining Events](#defining-events). `EventEmitter<MyContract> e` will support the following:
+   /// For example, assume `SomeService` has the set of events in [Defining Events](#defining-events). `EventEmitter<MyService> e` will support the following:
    ///
    /// * `e.history().myEvent(a, s);`
    /// * `e.ui().updateDisplay();`
@@ -248,15 +248,15 @@ namespace psibase
    /// Reads events
    ///
    /// Template arguments:
-   /// - `T`: the service class which defines the events (e.g. `MyContract`), or
-   /// - `T`: the inner-most struct within the service class which defines the events (e.g. `MyContract::Events::History`)
+   /// - `T`: the service class which defines the events (e.g. `MyService`), or
+   /// - `T`: the inner-most struct within the service class which defines the events (e.g. `MyService::Events::History`)
    ///
    /// #### Reader methods
    ///
    /// `EventReader` uses reflection to get the set of events on `T`. It adds methods to
    /// itself with the same names and arguments.
    ///
-   /// For example, assume `SomeContract` has the set of events in [Defining Events](#defining-events). `EventReader<MyContract> e` will support the following:
+   /// For example, assume `SomeService` has the set of events in [Defining Events](#defining-events). `EventReader<MyService> e` will support the following:
    ///
    /// * `auto eventAArguments = e.history().myEvent(eventANumber).unpack();`
    /// * `auto eventBArguments = e.ui().updateDisplay(eventBNumber).unpack();`
@@ -391,20 +391,20 @@ namespace psibase
    /// `Actor` uses reflection to get the set of methods on `T`. It adds methods to
    /// itself with the same names, arguments, and return types to simplify calling.
    ///
-   /// For example, if `SomeContract` has this set of methods:
+   /// For example, if `SomeService` has this set of methods:
    ///
    /// ```c++
-   /// struct SomeContract : psibase::Service<SomeContract>
+   /// struct SomeService : psibase::Service<SomeService>
    /// {
    ///    void        doSomething(std::string_view str);
    ///    std::string doAnother(uint32_t x, psibase::AccountNumber y);
    /// };
-   /// PSIO_REFLECT(SomeContract,
+   /// PSIO_REFLECT(SomeService,
    ///              method(doSomething, str),
    ///              method(doAnother, x, y))
    /// ```
    ///
-   /// Then `Actor<SomeContract>` will have the same methods. Actor's methods:
+   /// Then `Actor<SomeService>` will have the same methods. Actor's methods:
    /// - Pack their arguments, along with `sender` and `receiver` into [Action]
    /// - Use [call] to synchronously call `receiver` with the action data
    /// - Unpack the return value from the synchonous call

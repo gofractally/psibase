@@ -7,12 +7,12 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-namespace system_contract
+namespace SystemService
 {
    void AuthEcSys::checkAuthSys(uint32_t                    flags,
                                 psibase::AccountNumber      requester,
                                 psibase::Action             action,
-                                std::vector<ContractMethod> allowedActions,
+                                std::vector<ServiceMethod>  allowedActions,
                                 std::vector<psibase::Claim> claims)
    {
       if (enable_print)
@@ -37,7 +37,7 @@ namespace system_contract
       auto expected = psio::convert_to_frac(row->pubkey);
       for (auto& claim : claims)
       {
-         if (claim.contract == VerifyEcSys::service && claim.rawData == expected)
+         if (claim.service == VerifyEcSys::service && claim.rawData == expected)
          {
             // Billing rule: if first proof passes, and auth for first sender passes,
             // then then first sender will be charged even if the transaction fails,
@@ -54,13 +54,13 @@ namespace system_contract
       }
       abortMessage("transaction is not signed with key " + publicKeyToString(row->pubkey) +
                    " needed to authenticate sender " + action.sender.str() + " for action " +
-                   action.contract.str() + "::" + action.method.str());
+                   action.service.str() + "::" + action.method.str());
    }
 
    void AuthEcSys::newAccount(psibase::AccountNumber account, psibase::PublicKey payload)
    {
       check(false, "Not supported yet");
-      //check(getSender() == InviteSys::contract, "Only invite-sys can create a new account");
+      //check(getSender() == InviteSys::service, "Only invite-sys can create a new account");
       check(payload.data.index() == 0, "only k1 currently supported");
       auto authTable = db.open<AuthTable>();
       check(!authTable.getIndex<0>().get(account).has_value(), "account already exists");
@@ -76,6 +76,6 @@ namespace system_contract
       authTable.put(AuthRecord{.account = getSender(), .pubkey = key});
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::AuthEcSys)
+PSIBASE_DISPATCH(SystemService::AuthEcSys)

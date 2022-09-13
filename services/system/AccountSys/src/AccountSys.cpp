@@ -10,7 +10,7 @@ static constexpr bool enable_print = false;
 
 using namespace psibase;
 
-namespace system_contract
+namespace SystemService
 {
    void AccountSys::startup()
    {
@@ -34,8 +34,8 @@ namespace system_contract
             writeConsole(" ");
          }
          accountTable.put({
-             .accountNum   = code.codeNum,
-             .authContract = AuthAnySys::service,
+             .accountNum  = code.codeNum,
+             .authService = AuthAnySys::service,
          });
          ++totalAccounts;
       }
@@ -45,7 +45,7 @@ namespace system_contract
 
    // TODO: limit who can use -sys suffix
    // TODO: verify name round-trips through strings
-   void AccountSys::newAccount(AccountNumber name, AccountNumber authContract, bool requireNew)
+   void AccountSys::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
    {
       Tables tables{getReceiver()};
       auto   statusTable  = tables.open<AccountSysStatusTable>();
@@ -70,7 +70,7 @@ namespace system_contract
          writeConsole("new acc: ");
          writeConsole(name.str());
          writeConsole("auth con: ");
-         writeConsole(authContract.str());
+         writeConsole(authService.str());
       }
 
       check(name.value, "invalid account name");
@@ -80,11 +80,11 @@ namespace system_contract
             abortMessage("account already exists");
          return;
       }
-      check(accountIndex.get(authContract) != std::nullopt, "unknown auth contract");
+      check(accountIndex.get(authService) != std::nullopt, "unknown auth service");
 
       Account account{
-          .accountNum   = name,
-          .authContract = authContract,
+          .accountNum  = name,
+          .authService = authService,
       };
       accountTable.put(account);
 
@@ -92,14 +92,14 @@ namespace system_contract
       statusTable.put(*status);
    }
 
-   void AccountSys::setAuthCntr(psibase::AccountNumber authContract)
+   void AccountSys::setAuthCntr(psibase::AccountNumber authService)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
       auto   account      = accountIndex.get((getSender()));
       check(account.has_value(), "account does not exist");
-      account->authContract = authContract;
+      account->authService = authService;
       accountTable.put(*account);
    }
 
@@ -119,6 +119,6 @@ namespace system_contract
           CreatorRecord{.key = SingletonKey{}, .accountCreator = creator});
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::AccountSys)
+PSIBASE_DISPATCH(SystemService::AccountSys)

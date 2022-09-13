@@ -53,15 +53,15 @@ namespace psibase
       ///
       /// The result contains a fracpacked [Action]; use [getResult] to get it.
       ///
-      /// If the contract, while handling action A, calls itself with action B:
+      /// If the service, while handling action A, calls itself with action B:
       /// * Before the call to B, `getCurrentAction()` returns A.
       /// * After the call to B, `getCurrentAction()` returns B.
       /// * After B returns, `getCurrentAction()` returns A.
       ///
-      /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
+      /// Note: The above only applies if the service uses [call]. [Actor] uses [call].
       PSIBASE_NATIVE(getCurrentAction) uint32_t getCurrentAction();
 
-      /// Call a contract, store the return value into result, and return the result size
+      /// Call a service, store the return value into result, and return the result size
       ///
       /// `action` must contain a fracpacked [Action].
       ///
@@ -147,12 +147,12 @@ namespace psibase
    /// This function unpacks the data into the [Action] struct. For large
    /// data, [getCurrentActionView] can be more efficient.
    ///
-   /// If the contract, while handling action A, calls itself with action B:
+   /// If the service, while handling action A, calls itself with action B:
    /// * Before the call to B, `getCurrentAction()` returns A.
    /// * After the call to B, `getCurrentAction()` returns B.
    /// * After B returns, `getCurrentAction()` returns A.
    ///
-   /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
+   /// Note: The above only applies if the service uses [call]. [Actor] uses [call].
    Action getCurrentAction();
 
    /// Get the currently-executing action
@@ -160,23 +160,23 @@ namespace psibase
    /// This function creates a view, which can save time for large data. For small
    /// data, [getCurrentAction] can be more efficient.
    ///
-   /// If the contract, while handling action A, calls itself with action B:
+   /// If the service, while handling action A, calls itself with action B:
    /// * Before the call to B, `getCurrentAction()` returns A.
    /// * After the call to B, `getCurrentAction()` returns B.
    /// * After B returns, `getCurrentAction()` returns A.
    ///
-   /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
+   /// Note: The above only applies if the service uses [call]. [Actor] uses [call].
    psio::shared_view_ptr<Action> getCurrentActionView();
 
-   /// Call a contract and return its result
+   /// Call a service and return its result
    std::vector<char> call(const Action& action);
 
-   /// Call a contract and return its result
+   /// Call a service and return its result
    ///
    /// `action` must contain a fracpacked [Action].
    std::vector<char> call(const char* action, uint32_t len);
 
-   /// Call a contract and return its result
+   /// Call a service and return its result
    ///
    /// `action` must contain a fracpacked [Action].
    std::vector<char> call(psio::input_stream action);
@@ -218,7 +218,7 @@ namespace psibase
    template <typename K, NotOptional V>
    void kvPut(const K& key, const V& value)
    {
-      kvPut(DbId::contract, key, value);
+      kvPut(DbId::service, key, value);
    }
 
    /// Add a sequentially-numbered record
@@ -233,12 +233,12 @@ namespace psibase
    ///
    /// Returns the id.
    template <typename Type, NotOptional V>
-   uint64_t putSequential(DbId db, AccountNumber contract, Type type, const V& value)
+   uint64_t putSequential(DbId db, AccountNumber service, Type type, const V& value)
    {
-      std::vector<char>     packed(psio::fracpack_size(contract) + psio::fracpack_size(type) +
+      std::vector<char>     packed(psio::fracpack_size(service) + psio::fracpack_size(type) +
                                    psio::fracpack_size(value));
       psio::fast_buf_stream stream(packed.data(), packed.size());
-      psio::fracpack(contract, stream);
+      psio::fracpack(service, stream);
       psio::fracpack(type, stream);
       psio::fracpack(value, stream);
       return putSequentialRaw(db, packed);
@@ -261,7 +261,7 @@ namespace psibase
    template <typename K>
    void kvRemove(const K& key)
    {
-      kvRemove(DbId::contract, key);
+      kvRemove(DbId::service, key);
    }
 
    /// Get size of stored value, if any
@@ -284,7 +284,7 @@ namespace psibase
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(const K& key)
    {
-      return kvGetSize(DbId::contract, key);
+      return kvGetSize(DbId::service, key);
    }
 
    /// Get a key-value pair, if any
@@ -311,7 +311,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGet(const K& key)
    {
-      return kvGet<V>(DbId::contract, key);
+      return kvGet<V>(DbId::service, key);
    }
 
    /// Get a value, or the default if not found
@@ -328,7 +328,7 @@ namespace psibase
    template <typename V, typename K>
    inline V kvGetOrDefault(const K& key)
    {
-      return kvGetOrDefault<V>(DbId::contract, key);
+      return kvGetOrDefault<V>(DbId::service, key);
    }
 
    /// Get a sequentially-numbered record, if available
@@ -342,21 +342,21 @@ namespace psibase
 
    /// Get a sequentially-numbered record, if available
    ///
-   /// * If `matchContract` is non-null, and the record wasn't written by `matchContract`, then return nullopt.
+   /// * If `matchService` is non-null, and the record wasn't written by `matchService`, then return nullopt.
    ///   This prevents a spurious abort from mismatched serialization.
    /// * If `matchType` is non-null, and the record type doesn't match, then return nullopt.
    ///   This prevents a spurious abort from mismatched serialization.
-   /// * If `contract` is non-null, then it receives the contract that wrote the record. It is
+   /// * If `service` is non-null, then it receives the service that wrote the record. It is
    ///   left untouched if the record is not available.
    /// * If `type` is non-null, then it receives the record type. It is left untouched if either the record
-   ///   is not available or if `matchContract` is not null but doesn't match.
+   ///   is not available or if `matchService` is not null but doesn't match.
    template <typename V, typename Type>
    inline std::optional<V> getSequential(DbId                 db,
                                          uint64_t             id,
-                                         const AccountNumber* matchContract = nullptr,
-                                         const Type*          matchType     = nullptr,
-                                         AccountNumber*       contract      = nullptr,
-                                         Type*                type          = nullptr)
+                                         const AccountNumber* matchService = nullptr,
+                                         const Type*          matchType    = nullptr,
+                                         AccountNumber*       service      = nullptr,
+                                         Type*                type         = nullptr)
    {
       std::optional<V> result;
       auto             v = getSequentialRaw(db, id);
@@ -366,9 +366,9 @@ namespace psibase
 
       AccountNumber c;
       fracunpack(c, stream);
-      if (contract)
-         *contract = c;
-      if (matchContract && *matchContract != c)
+      if (service)
+         *service = c;
+      if (matchService && *matchService != c)
          return result;
 
       Type t;
@@ -422,7 +422,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGreaterEqual(const K& key, uint32_t matchKeySize)
    {
-      return kvGreaterEqual<V>(DbId::contract, key, matchKeySize);
+      return kvGreaterEqual<V>(DbId::service, key, matchKeySize);
    }
 
    /// Get the key-value pair immediately-before provided key
@@ -463,7 +463,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvLessThan(const K& key, uint32_t matchKeySize)
    {
-      return kvLessThan<V>(DbId::contract, key, matchKeySize);
+      return kvLessThan<V>(DbId::service, key, matchKeySize);
    }
 
    /// Get the maximum key-value pair which has key as a prefix
@@ -499,7 +499,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvMax(const K& key)
    {
-      return kvMax<V>(DbId::contract, key);
+      return kvMax<V>(DbId::service, key);
    }
 
    /// Write `message` to console

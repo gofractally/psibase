@@ -12,9 +12,9 @@
 static constexpr bool enable_print = false;
 
 using namespace psibase;
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
-namespace system_contract
+namespace SystemService
 {
    std::optional<HttpReply> RAccountSys::serveSys(HttpRequest request)
    {
@@ -32,7 +32,7 @@ namespace system_contract
          // TODO: replace with GraphQL
          // if (request.target.starts_with("/api/accounts"))
          // {
-         //    auto accountSysTables = AccountSys::Tables(AccountSys::contract);
+         //    auto accountSysTables = AccountSys::Tables(AccountSys::service);
          //    auto accountTable     = accountSysTables.open<AccountTable>();
          //    auto accountIndex     = accountTable.getIndex<0>();
 
@@ -41,6 +41,8 @@ namespace system_contract
          //       rows.push_back(*it);
          //    return to_json(rows);
          // }
+
+         // TODO: replace with GraphQL
          if (request.target == "/accounts")
          {
             auto accountSysTables = AccountSys::Tables(AccountSys::service);
@@ -68,6 +70,6 @@ namespace system_contract
                             Tables{getReceiver()});
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::RAccountSys)
+PSIBASE_DISPATCH(SystemService::RAccountSys)

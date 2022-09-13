@@ -1,4 +1,4 @@
-#include "test-cntr.hpp"
+#include "test-service.hpp"
 
 #include <stdio.h>
 #include <psibase/block.hpp>
@@ -11,31 +11,31 @@ using namespace test_cntr;
 
 struct startup
 {
-   startup() { printf("Starting up test-cntr\n"); }
+   startup() { printf("Starting up test-service\n"); }
 };
 startup s;
 
 extern "C" void __wasm_call_ctors();
-extern "C" void start(AccountNumber this_contract)
+extern "C" void start(AccountNumber this_service)
 {
    __wasm_call_ctors();
-   printf("This is contract %s\n", this_contract.str().c_str());
+   printf("This is service %s\n", this_service.str().c_str());
 }
 
-extern "C" void called(AccountNumber this_contract, AccountNumber sender)
+extern "C" void called(AccountNumber this_service, AccountNumber sender)
 {
-   // printf("called this_contract=%d, sender=%d\n", this_contract, sender);
+   // printf("called this_service=%d, sender=%d\n", this_service, sender);
    auto act = getCurrentAction();
    auto pl  = psio::convert_from_frac<payload>(act.rawData);
    printf("payload: %s\n", psio::convert_to_json(pl).c_str());
    if (pl.number)
    {
       auto r = psio::convert_from_frac<int>(call({
-          .sender   = this_contract,
-          .contract = this_contract,
-          .rawData  = psio::convert_to_frac(payload{
-               .number = pl.number - 1,
-               .memo   = pl.memo,
+          .sender  = this_service,
+          .service = this_service,
+          .rawData = psio::convert_to_frac(payload{
+              .number = pl.number - 1,
+              .memo   = pl.memo,
           }),
       }));
       printf("Child returned %d\n", r);

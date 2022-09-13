@@ -16,15 +16,15 @@ const useAccountsWithKeys = (addMsg: any, clearMsg: any) => {
     const [accounts, setAccounts] = useState([
         {
             accountNum: "alice",
-            authContract: "auth-any-sys",
+            authService: "auth-any-sys",
         },
         {
             accountNum: "bob",
-            authContract: "auth-any-sys",
+            authService: "auth-any-sys",
         },
         {
             accountNum: "carol",
-            authContract: "auth-any-sys",
+            authService: "auth-any-sys",
         },
     ]);
     return accounts;

@@ -4,13 +4,13 @@
 #include <psibase/serveContent.hpp>
 #include <psibase/serviceEntry.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    class RAuthEcSys : public psibase::Service<RAuthEcSys>
    {
      public:
       static constexpr auto service = psibase::AccountNumber("r-ath-ec-sys");
-      using Tables                  = psibase::ContractTables<psibase::WebContentTable>;
+      using Tables                  = psibase::ServiceTables<psibase::WebContentTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
@@ -21,4 +21,4 @@ namespace system_contract
    PSIO_REFLECT(RAuthEcSys,  //
                 method(serveSys, request),
                 method(storeSys, path, contentType, content))
-}  // namespace system_contract
+}  // namespace SystemService

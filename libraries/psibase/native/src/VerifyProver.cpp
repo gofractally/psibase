@@ -6,7 +6,7 @@
 
 std::vector<char> psibase::VerifyProver::prove(std::span<const char> data, const Claim& claim) const
 {
-   if (claim.contract == AccountNumber{})
+   if (claim.service == AccountNumber{})
    {
       return {};
    }

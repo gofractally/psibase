@@ -10,8 +10,8 @@ const { BrowserRouter, Route } = ReactRouterDOM;
 
 const appletPrefix = "/applet/";
 
-let contractName = "common-sys";
-let commonSys = new AppletId(contractName);
+let serviceName = "common-sys";
+let commonSys = new AppletId(serviceName);
 
 const AppletStates = {
     primary: 0,
@@ -181,31 +181,31 @@ function Applet(appletParams, handleMessage) {
 
 function Dashboard() {
 
-    let [contracts, setContracts] = useState([
+    let [services, setServices] = useState([
             {
                 title: "Account Creation",
                 description: "Create a new account. Only available on testnet.",
-                contract: "account-sys",
+                service: "account-sys",
                 color: "teal"
             },
             {
                 title: "Account Management",
                 description: "Used to manage your existing accounts.",
-                contract: "auth-ec-sys",
+                service: "auth-ec-sys",
                 color: "red",
             },
             {
                 title: "Block Explorer",
                 description:
                     "View the most recently produced blocks, all the way back to the beginning of the chain.",
-                contract: "explore-sys",
+                service: "explore-sys",
                 color: "green",
             },
             {
                 title: "Wallet",
                 description:
                     "View your balance, send/swap tokens, other standard wallet functionality.",
-                contract: "token-sys",
+                service: "token-sys",
                 color: "blue",
             },
         ]
@@ -220,14 +220,14 @@ function Dashboard() {
             <h1>psinet</h1>
             <h2>Featured Applications</h2>
             <div class="ui cards">
-                ${contracts.map((c, index) => {
+                ${services.map((c, index) => {
                     return html`
                         <div key=${index} class="${c.color} card">
                             <div class="content">
                                 <div class="header">${c.title}</div>
                                 <div class="description">${c.description}</div>
                             </div>
-                            <a href="${appletPrefix}${c.contract}">
+                            <a href="${appletPrefix}${c.service}">
                                 <div class="ui bottom attached button">
                                     <i
                                         class="arrow alternate circle right outline icon"
@@ -282,7 +282,7 @@ class ClientOps
 
 function makeAction(application, actionName, params, sender)
 {
-    return {contract: application, method: actionName, data: params, sender};
+    return {service: application, method: actionName, data: params, sender};
 }
 
 function OtherApplets({applets, handleMessage})

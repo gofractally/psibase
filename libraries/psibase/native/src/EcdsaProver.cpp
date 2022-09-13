@@ -11,9 +11,9 @@ namespace
    }
 }  // namespace
 
-psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber     contract,
+psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber     service,
                                                                 const PrivateKey& key)
-    : contract(contract)
+    : service(service)
 {
    const auto& k1key = std::get<0>(key.data);
    std::memcpy(privateKey, k1key.data(), sizeof(privateKey));
@@ -35,7 +35,7 @@ psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber   
 std::vector<char> psibase::EcdsaSecp256K1Sha256Prover::prove(std::span<const char> data,
                                                              const Claim&          claim) const
 {
-   if ((contract == AccountNumber() || claim.contract == contract) && claim.rawData == pubKey)
+   if ((service == AccountNumber() || claim.service == service) && claim.rawData == pubKey)
    {
       Checksum256 hash = sha256(data.data(), data.size());
       // sign compact

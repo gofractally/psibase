@@ -9,7 +9,7 @@
 #include "services/user/NftSys.hpp"
 #include "services/user/symbolTables.hpp"
 
-namespace UserContract
+namespace UserService
 {
    struct InfSettingsRecord
    {
@@ -133,4 +133,4 @@ namespace UserContract
    PSIO_REFLECT(TokenHolderRecord, account, config, lastHistoryEvent);
    using TokenHolderTable = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
 
-}  // namespace UserContract
+}  // namespace UserService

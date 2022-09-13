@@ -13,8 +13,8 @@ namespace psibase
          // Create the object that will collect all benchmark data
          auto d = std::make_shared<BenchmarkData>();
          
-         // Call actions that touch each of the contracts you're interested in without benchmarking
-         // The first time a test accesses a contract should be ignored
+         // Call actions that touch each of the services you're interested in without benchmarking
+         // The first time a test accesses a service should be ignored
          alice.action1();
          alice.action2();
 

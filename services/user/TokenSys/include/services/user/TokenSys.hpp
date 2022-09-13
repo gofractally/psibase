@@ -12,14 +12,14 @@
 #include <services/user/tokenTypes.hpp>
 #include "services/user/symbolTables.hpp"
 
-namespace UserContract
+namespace UserService
 {
 
    class TokenSys : public psibase::Service<TokenSys>
    {
      public:
       using Tables = psibase::
-          ContractTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
+          ServiceTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
       static constexpr auto service  = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken = TID{1};
 
@@ -159,4 +159,4 @@ namespace UserContract
    );
    // clang-format on
 
-}  // namespace UserContract
+}  // namespace UserService

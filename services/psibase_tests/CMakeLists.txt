@@ -8,7 +8,7 @@ function(service name suffix)
 endfunction()
 
 function(add suffix)
-    service(test-cntr "${suffix}" test-cntr.cpp)
+    service(test-service "${suffix}" test-service.cpp)
     service(test_kv "${suffix}" test_kv.cpp)
     service(test_table "${suffix}" test_table.cpp)
 

@@ -6,7 +6,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <psio/to_json.hpp>
 
-#include "test-cntr.hpp"
+#include "test-service.hpp"
 
 using namespace psibase;
 
@@ -23,34 +23,34 @@ static auto pub_key2 =
 TEST_CASE("ec")
 {
    DefaultTestChain t;
-   auto             test_contract = t.add_contract("test-cntr"_a, "test-cntr.wasm");
+   auto             test_service = t.addService("test-service"_a, "test-service.wasm");
 
-   transactor<system_contract::AuthEcSys> ecsys(system_contract::AuthEcSys::service,
-                                                system_contract::AuthEcSys::service);
+   transactor<SystemService::AuthEcSys> ecsys(SystemService::AuthEcSys::service,
+                                              SystemService::AuthEcSys::service);
 
    auto alice = t.from(t.add_account(AccountNumber("alice")));
    auto bob   = t.from(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
    auto sue   = t.add_ec_account("sue", pub_key1);
 
    expect(t.pushTransaction(t.makeTransaction({{
-              .sender   = bob,
-              .contract = test_contract,
+              .sender  = bob,
+              .service = test_service,
           }})),
           "sender does not have a public key");
    expect(t.pushTransaction(t.makeTransaction({{
-              .sender   = sue,
-              .contract = test_contract,
+              .sender  = sue,
+              .service = test_service,
           }})),
           "transaction is not signed with key");
 
    auto ec_trx = t.makeTransaction({{
-       .sender   = sue,
-       .contract = test_contract,
-       .rawData  = psio::convert_to_frac(test_cntr::payload{}),
+       .sender  = sue,
+       .service = test_service,
+       .rawData = psio::convert_to_frac(test_cntr::payload{}),
    }});
    ec_trx.claims.push_back({
-       .contract = system_contract::VerifyEcSys::service,
-       .rawData  = psio::convert_to_frac(pub_key1),
+       .service = SystemService::VerifyEcSys::service,
+       .rawData = psio::convert_to_frac(pub_key1),
    });
    expect(t.pushTransaction(ec_trx), "proofs and claims must have same size");
 
@@ -69,24 +69,24 @@ TEST_CASE("ec")
 
    t.startBlock();
    expect(t.pushTransaction(t.makeTransaction({{
-                                .sender   = sue,
-                                .contract = test_contract,
-                                .rawData  = psio::convert_to_frac(test_cntr::payload{}),
+                                .sender  = sue,
+                                .service = test_service,
+                                .rawData = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key1, priv_key1}}));
 
    expect(t.pushTransaction(t.makeTransaction({{
-                                .sender   = sue,
-                                .contract = test_contract,
-                                .rawData  = psio::convert_to_frac(test_cntr::payload{}),
+                                .sender  = sue,
+                                .service = test_service,
+                                .rawData = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key2, priv_key2}}),
           "transaction is not signed with key");
 
    expect(t.pushTransaction(t.makeTransaction({{
-                                .sender   = sue,
-                                .contract = test_contract,
-                                .rawData  = psio::convert_to_frac(test_cntr::payload{}),
+                                .sender  = sue,
+                                .service = test_service,
+                                .rawData = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key1, priv_key2}}),
           "incorrect signature");
@@ -95,9 +95,9 @@ TEST_CASE("ec")
                             {{pub_key1, priv_key1}}));
 
    expect(t.pushTransaction(t.makeTransaction({{
-                                .sender   = sue,
-                                .contract = test_contract,
-                                .rawData  = psio::convert_to_frac(test_cntr::payload{}),
+                                .sender  = sue,
+                                .service = test_service,
+                                .rawData = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key2, priv_key2}}));
 }  // ec

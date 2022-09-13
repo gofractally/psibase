@@ -44,7 +44,7 @@
                 <tbody>
                     <tr>
                         <th>Trx. #</th>
-                        <th>Contract</th>
+                        <th>Service</th>
                         <th>Sender</th>
                         <th>Method</th>
                     </tr>
@@ -52,7 +52,7 @@
                         {#each trx.actions as action}
                             <tr>
                                 <td>{index + 1}</td>
-                                <td>{action.contract}</td>
+                                <td>{action.service}</td>
                                 <td>{action.sender}</td>
                                 <td>{action.method}</td>
                             </tr>

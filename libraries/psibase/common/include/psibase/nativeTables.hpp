@@ -109,7 +109,7 @@ namespace psibase
       return std::tuple{codeByHashTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
    }
 
-   /// where code is actually stored, duplicate contracts are reused
+   /// where code is actually stored, duplicate services are reused
    struct CodeByHashRow
    {
       Checksum256 codeHash  = {};
@@ -138,7 +138,7 @@ namespace psibase
       uint64_t nextUIEventNumber      = 1;
       uint64_t nextMerkleEventNumber  = 1;
 
-      // This table is in nativeConstrained. The native code blocks contracts
+      // This table is in nativeConstrained. The native code blocks services
       // from writing to this since it could break backing stores.
       static constexpr auto db = psibase::DbId::nativeConstrained;
       static auto           key() { return databaseStatusKey(); }

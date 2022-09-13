@@ -31,7 +31,7 @@ namespace psio
       return s;
    }
 
-   std::string to_hex(const std::span<const char>& bytes)
+   inline std::string to_hex(const std::span<const char>& bytes)
    {
       std::string out;
       out.resize(bytes.size() * 2);
@@ -45,7 +45,8 @@ namespace psio
       }
       return out;
    }
-   bool from_hex(std::string_view h, std::vector<char>& bytes)
+
+   inline bool from_hex(std::string_view h, std::vector<char>& bytes)
    {
       bytes.resize(h.size() / 2);
       auto dest = bytes.begin();

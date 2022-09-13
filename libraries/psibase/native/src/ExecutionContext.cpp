@@ -37,7 +37,7 @@ namespace psibase
 
    // Only useful for genesis
    void setCode(Database&          database,
-                AccountNumber      contract,
+                AccountNumber      service,
                 uint8_t            vmType,
                 uint8_t            vmVersion,
                 psio::input_stream code)
@@ -45,8 +45,8 @@ namespace psibase
       check(code.remaining(), "native setCode can't clear code");
       auto codeHash = sha256(code.pos, code.remaining());
 
-      auto account = database.kvGet<CodeRow>(CodeRow::db, codeKey(contract));
-      check(account.has_value(), "setCode: unknown contract account");
+      auto account = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
+      check(account.has_value(), "setCode: unknown service account");
       check(account->codeHash == Checksum256{}, "native setCode can't replace code");
       account->codeHash  = codeHash;
       account->vmType    = vmType;
@@ -153,15 +153,15 @@ namespace psibase
       ExecutionContextImpl(TransactionContext& transactionContext,
                            const VMOptions&    vmOptions,
                            ExecutionMemory&    memory,
-                           AccountNumber       contract)
+                           AccountNumber       service)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
                             transactionContext.allowDbRead, transactionContext.allowDbWrite,
                             transactionContext.allowDbReadSubjective},
             vmOptions{vmOptions},
             wa{memory.impl->wa}
       {
-         auto ca = database.kvGet<CodeRow>(CodeRow::db, codeKey(contract));
-         check(ca.has_value(), "unknown contract account");
+         auto ca = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
+         check(ca.has_value(), "unknown service account");
          check(ca->codeHash != Checksum256{}, "account has no code");
          code   = std::move(*ca);
          auto c = database.kvGet<CodeByHashRow>(
@@ -193,7 +193,7 @@ namespace psibase
                 // auto startTime = std::chrono::steady_clock::now();
                 backend->set_wasm_allocator(&wa);
                 backend->initialize(this);
-                (*backend)(*this, "env", "start", currentActContext->action.contract.value);
+                (*backend)(*this, "env", "start", currentActContext->action.service.value);
                 initialized = true;
                 // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
                 //     std::chrono::steady_clock::now() - startTime);
@@ -226,10 +226,9 @@ namespace psibase
    ExecutionContext::ExecutionContext(TransactionContext& transactionContext,
                                       const VMOptions&    vmOptions,
                                       ExecutionMemory&    memory,
-                                      AccountNumber       contract)
+                                      AccountNumber       service)
    {
-      impl =
-          std::make_unique<ExecutionContextImpl>(transactionContext, vmOptions, memory, contract);
+      impl = std::make_unique<ExecutionContextImpl>(transactionContext, vmOptions, memory, service);
    }
 
    ExecutionContext::ExecutionContext(ExecutionContext&& src)
@@ -275,7 +274,7 @@ namespace psibase
       // Prevents a poison block
       if (!(impl->code.flags & CodeRow::isSubjective))
          check(!(callerFlags & CodeRow::isSubjective),
-               "subjective contracts may not call non-subjective ones");
+               "subjective services may not call non-subjective ones");
 
       auto& bc = impl->transactionContext.blockContext;
       if ((impl->code.flags & CodeRow::isSubjective) && !bc.isProducing)
@@ -287,7 +286,7 @@ namespace psibase
       }
 
       impl->exec(actionContext, [&] {  //
-         (*impl->backend)(*impl, "env", "called", actionContext.action.contract.value,
+         (*impl->backend)(*impl, "env", "called", actionContext.action.service.value,
                           actionContext.action.sender.value);
       });
 

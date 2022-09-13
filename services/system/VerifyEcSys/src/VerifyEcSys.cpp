@@ -6,7 +6,7 @@
 
 using namespace psibase;
 
-// TODO: move secp256k1 to another contract
+// TODO: move secp256k1 to another service
 char               pre[1024];
 secp256k1_context* context = nullptr;
 
@@ -58,10 +58,10 @@ extern "C" [[clang::export_name("verify")]] void verify()
          "incorrect signature");
 }
 
-extern "C" void called(AccountNumber this_contract, AccountNumber sender)
+extern "C" void called(AccountNumber thisService, AccountNumber sender)
 {
-   abortMessage("this contract has no actions");
+   abortMessage("this service has no actions");
 }
 
 // Caution! Don't replace with version in dispatcher!
-extern "C" void start(AccountNumber this_contract) {}
+extern "C" void start(AccountNumber thisService) {}

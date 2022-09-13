@@ -6,17 +6,17 @@
 
 using namespace psibase;
 
-namespace system_contract
+namespace SystemService
 {
    namespace
    {
       struct Query
       {
-         AccountNumber contract;
+         AccountNumber service;
 
          auto content() const
          {
-            return PsiSpaceSys::Tables{contract}.open<PsiSpaceContentTable>().getIndex<0>();
+            return PsiSpaceSys::Tables{service}.open<PsiSpaceContentTable>().getIndex<0>();
          }
       };
       PSIO_REFLECT(  //
@@ -89,6 +89,6 @@ namespace system_contract
       auto   table = tables.template open<PsiSpaceContentTable>();
       table.erase(PsiSpaceContentKey{getSender(), path});
    }
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::PsiSpaceSys)
+PSIBASE_DISPATCH(SystemService::PsiSpaceSys)

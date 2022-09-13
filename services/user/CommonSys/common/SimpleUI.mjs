@@ -5,7 +5,7 @@ await import('/common/react.production.min.js');
 await import('/common/react-dom.production.min.js');
 const html = htm.bind(React.createElement);
 
-const contract = await getJson('/common/thiscontract');
+const service = await getJson('/common/thisservice');
 const actionTemplates = await getJson('/action_templates');
 
 async function pushTransaction(transaction, keys, addMsg, clearMsg) {
@@ -56,8 +56,8 @@ function ActionButtons({ setTrx }) {
                     expiration: new Date(Date.now() + 10 * 60 * 1000),
                 },
                 actions: [{
-                    sender: contract,
-                    contract,
+                    sender: service,
+                    service,
                     method,
                     data,
                 }],
@@ -77,7 +77,7 @@ function App() {
             keys.split('\n').map(s => s.trim()).filter(s => s), addMsg, clearMsg
         );
     return html`<div>
-        <h1>${contract}</h1>
+        <h1>${service}</h1>
         <h2>Transaction</h2>
         <div><${ActionButtons} setTrx=${setTrx}/></div>
         <textarea rows=20 cols=80 value=${trx} onChange=${e => setTrx(e.target.value)}></textarea>

@@ -6,6 +6,7 @@
 #include <concepts>
 #include <cstdint>
 #include <functional>
+#include <psibase/blob.hpp>
 #include <psibase/nativeFunctions.hpp>
 #include <psio/to_key.hpp>
 #include <span>
@@ -18,12 +19,15 @@ namespace psibase
 {
    // Eventually replace uses with <=> once the standard library
    // catches up with C++20
+   // Maybe not; char is signed
+   // TODO: consider a global replace of vector<char> with vector<uint8_t>, including in psio
    template <typename T>
    std::weak_ordering compare_wknd(const T& lhs, const T& rhs)
    {
-      if (lhs < rhs)
+      auto cmp = compare_blob(lhs, rhs);
+      if (cmp < 0)
          return std::weak_ordering::less;
-      else if (rhs < lhs)
+      else if (cmp > 0)
          return std::weak_ordering::greater;
       else
          return std::weak_ordering::equivalent;
@@ -199,8 +203,8 @@ namespace psibase
       ///
       /// This moves the iterator backward.
       ///
-      /// The iterator has circular semantics. If you decrement an end iterator, then it
-      /// moves to the last item in the index, or back to end again if empty.
+      /// The iterator has circular semantics. If you decrement a begin iterator, then it
+      /// moves to end.
       KvIterator& operator--()
       {
          --base;
@@ -211,8 +215,8 @@ namespace psibase
       ///
       /// This moves the iterator backward.
       ///
-      /// The iterator has circular semantics. If you decrement an end iterator, then it
-      /// moves to the last item in the index, or back to end again if empty.
+      /// The iterator has circular semantics. If you decrement a begin iterator, then it
+      /// moves to end.
       ///
       /// Note: postincrement (`it++`) and postdecrement (`it--`) have higher
       /// overhead than preincrement (`++it`) and predecrement (`--it`).
@@ -238,7 +242,7 @@ namespace psibase
       /// Move iterator
       ///
       /// This moves the iterator to `k`. `k` does not include the prefix.
-      /// May be used for GraphQL cursors.
+      /// May be used for GraphQL cursors; see [keyWithoutPrefix].
       void moveTo(std::span<const char> k) { base.move_to(k); }
 
       /// Get serialized key without prefix
@@ -677,10 +681,10 @@ namespace psibase
 
    // TODO: allow tables to be forward declared.  The simplest method is:
    // struct xxx : Table<...> {};
-   /// Defines the set of tables in a contract
+   /// Defines the set of tables in a service
    ///
    /// Template arguments:
-   /// - `Tables`: one or more [Table] types; one for each table the contract supports.
+   /// - `Tables`: one or more [Table] types; one for each table the service supports.
    ///
    /// #### Modifying table set
    ///
@@ -692,32 +696,32 @@ namespace psibase
    ///
    /// #### Prefix format
    ///
-   /// `ContractTables` gives each table the following prefix. See [Data format](#data-format).
+   /// `ServiceTables` gives each table the following prefix. See [Data format](#data-format).
    ///
    /// | Field | Size | Description |
    /// | ----- | ---- | ----------- |
-   /// | account | 64 bits | Contract account |
-   /// | Table | 16 bits | Table number. First table is 0. |
+   /// | account | 64 bits | Service account |
+   /// | table | 16 bits | Table number. First table is 0. |
    template <typename... Tables>
-   struct ContractTables
+   struct ServiceTables
    {
       /// Constructor
       ///
-      /// `account` is the account the contract runs on.
-      explicit constexpr ContractTables(AccountNumber account) : account(account) {}
+      /// `account` is the account the service runs on.
+      explicit constexpr ServiceTables(AccountNumber account) : account(account) {}
 
       /// Open by table number
       ///
       /// This gets a table by number. The first table is 0.
       ///
-      /// e.g. `auto table = MyContractTables{myContractAccount}.open<2>();`
+      /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<2>();`
       ///
       /// Returns a [Table].
       template <std::uint16_t Table>
       auto open() const
       {
          std::vector<char> key_prefix = psio::convert_to_key(std::tuple(account, Table));
-         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(DbId::contract,
+         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(DbId::service,
                                                                              std::move(key_prefix));
       }
 
@@ -725,7 +729,7 @@ namespace psibase
       ///
       /// This gets a table by the table's type.
       ///
-      /// e.g. `auto table = MyContractTables{myContractAccount}.open<MyTable>();`
+      /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<MyTable>();`
       ///
       /// Returns a [Table].
       template <typename T>
@@ -734,6 +738,6 @@ namespace psibase
          return open<boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>::value>();
       }
 
-      AccountNumber account;  ///< the contract runs on this account
+      AccountNumber account;  ///< the service runs on this account
    };
 }  // namespace psibase

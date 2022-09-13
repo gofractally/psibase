@@ -263,10 +263,10 @@ namespace psibase
          }
       };
 
-      template <typename Contract>
-      struct ContractUser : public psio::reflect<Contract>::template proxy<PushTransactionProxy>
+      template <typename Service>
+      struct ServiceUser : public psio::reflect<Service>::template proxy<PushTransactionProxy>
       {
-         using base = typename psio::reflect<Contract>::template proxy<PushTransactionProxy>;
+         using base = typename psio::reflect<Service>::template proxy<PushTransactionProxy>;
          using base::base;
 
          auto* operator->() const { return this; }
@@ -281,7 +281,7 @@ namespace psibase
          template <typename Other>
          auto to() const
          {
-            return ContractUser<Other>(t, id, Other::service);
+            return ServiceUser<Other>(t, id, Other::service);
          }
 
          operator AccountNumber() { return id; }

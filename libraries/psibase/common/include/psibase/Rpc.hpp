@@ -17,12 +17,12 @@ namespace psibase
    // TODO: consider adding headers to this
    /// An HTTP Request
    ///
-   /// Most contracts receive this via their `serveSys` action.
-   /// [psibase::ProxySys] receives it via its `serve` exported function.
+   /// Most services receive this via their `serveSys` action.
+   /// [SystemService::ProxySys] receives it via its `serve` exported function.
    struct HttpRequest
    {
       std::string       host;         ///< Fully-qualified domain name
-      std::string       rootHost;     ///< host, but without contract subdomain
+      std::string       rootHost;     ///< host, but without service subdomain
       std::string       method;       ///< "GET" or "POST"
       std::string       target;       ///< Absolute path, e.g. "/index.js"
       std::string       contentType;  ///< "application/json", "text/html", ...
@@ -32,7 +32,7 @@ namespace psibase
 
    /// An HTTP reply
    ///
-   /// Contracts return this from their `serveSys` action.
+   /// Services return this from their `serveSys` action.
    struct HttpReply
    {
       std::string             contentType;  ///< "application/json", "text/html", ...

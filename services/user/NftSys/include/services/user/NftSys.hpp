@@ -5,12 +5,12 @@
 #include "nftErrors.hpp"
 #include "nftTables.hpp"
 
-namespace UserContract
+namespace UserService
 {
    class NftSys : public psibase::Service<NftSys>
    {
      public:
-      using tables = psibase::ContractTables<NftTable, NftHolderTable, CreditTable, InitTable>;
+      using tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;
 
       static constexpr auto service = psibase::AccountNumber("nft-sys");
 
@@ -97,4 +97,4 @@ namespace UserContract
    );
    // clang-format on
 
-}  // namespace UserContract
+}  // namespace UserService

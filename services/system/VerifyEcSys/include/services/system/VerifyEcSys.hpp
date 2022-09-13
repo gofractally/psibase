@@ -2,10 +2,10 @@
 
 #include <psibase/nativeFunctions.hpp>
 
-namespace system_contract
+namespace SystemService
 {
    namespace VerifyEcSys
    {
       static constexpr auto service = psibase::AccountNumber("verifyec-sys");
    }  // namespace VerifyEcSys
-}  // namespace system_contract
+}  // namespace SystemService

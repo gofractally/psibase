@@ -149,7 +149,7 @@ The [common-sys service](system-service/common-sys.md) provides services which s
 
 | Method | URL                              | Description                                                                                                              |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `GET`  | `/common/thiscontract`           | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-sys"` |
+| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-sys"` |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                    |
 | `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction-http)                                                                            |
 | `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-transaction-http)                                                                     |
@@ -273,14 +273,14 @@ claims and proofs.
 
 `/common/rpc.mjs` exports these functions for packing and pushing transactions.
 
-| Function                                       |       | Description                                                                                                                                                                                                                                                                                    |
-| ---------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packAction(baseUrl, action)`                  | async | Packs an action if needed. Returns a new action. An action is an object with fields `sender`, `contract`, `method`, and either `data` or `rawData`. If `rawData` is present then it's already packed. Otherwise this function uses [Packing actions (http)](#packing-actions-http) to pack it. |
-| `packActions(baseUrl, actions)`                | async | Packs an array of actions.                                                                                                                                                                                                                                                                     |
-| `packTransaction(baseUrl, trx)`                | async | Packs a transaction. Also packs any actions within it, if needed. Returns ArrayBuffer if ok or throws `RPCError`. See [Pack transaction (http)](#pack-transaction-http).                                                                                                                       |
-| `packSignedTransaction(baseUrl, trx)`          | async | Packs a signed transaction. Returns ArrayBuffer if ok or throws `RPCError`. See [Pack transaction (http)](#pack-transaction-http).                                                                                                                                                             |
-| `pushPackedSignedTransaction(baseUrl, packed)` | async | Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction (http)](#push-transaction-http).                                                                              |
-| `packAndPushSignedTransaction(baseUrl, trx)`   | async | Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                                                                                                                 |
+| Function                                       |       | Description                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packAction(baseUrl, action)`                  | async | Packs an action if needed. Returns a new action. An action is an object with fields `sender`, `service`, `method`, and either `data` or `rawData`. If `rawData` is present then it's already packed. Otherwise this function uses [Packing actions (http)](#packing-actions-http) to pack it. |
+| `packActions(baseUrl, actions)`                | async | Packs an array of actions.                                                                                                                                                                                                                                                                    |
+| `packTransaction(baseUrl, trx)`                | async | Packs a transaction. Also packs any actions within it, if needed. Returns ArrayBuffer if ok or throws `RPCError`. See [Pack transaction (http)](#pack-transaction-http).                                                                                                                      |
+| `packSignedTransaction(baseUrl, trx)`          | async | Packs a signed transaction. Returns ArrayBuffer if ok or throws `RPCError`. See [Pack transaction (http)](#pack-transaction-http).                                                                                                                                                            |
+| `pushPackedSignedTransaction(baseUrl, packed)` | async | Pushes a packed signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available. See [Push transaction (http)](#push-transaction-http).                                                                             |
+| `packAndPushSignedTransaction(baseUrl, trx)`   | async | Packs then pushes a signed transaction. If the transaction succeeds, then returns the trace. If it fails, throws `RPCError`, including the trace if available.                                                                                                                                |
 
 ### Signing (js)
 
@@ -314,7 +314,7 @@ or be empty or null; see [rootdomain and siblingUrl (js)](#rootdomain-and-siblin
 ```
 {
   sender: "...",    // The account name authorizing the action
-  contract: "...",  // The service name to receive the action
+  service: "...",   // The service name to receive the action
   method: "...",    // The method name of the action
 
   data: {...},      // Method's arguments. Not needed if `rawData` is present.

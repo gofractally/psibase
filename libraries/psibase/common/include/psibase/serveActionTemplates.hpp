@@ -68,19 +68,19 @@ namespace psibase
    /// Handle `/action_templates` request
    ///
    /// If `request` is a GET to `/action_templates`, then this returns a
-   /// JSON object containing a field for each action in `Contract`. The
+   /// JSON object containing a field for each action in `Service`. The
    /// field names match the action names. The field values are objects
    /// with the action arguments, each containing sample data.
    ///
    /// If `request` doesn't match the above, then this returns `std::nullopt`.
-   template <typename Contract>
+   template <typename Service>
    std::optional<HttpReply> serveActionTemplates(const HttpRequest& request)
    {
       if (request.method == "GET" && request.target == "/action_templates")
       {
          return HttpReply{
              .contentType = "application/json",
-             .body        = generateActionJsonTemplate<Contract>(),
+             .body        = generateActionJsonTemplate<Service>(),
          };
       }
       return std::nullopt;

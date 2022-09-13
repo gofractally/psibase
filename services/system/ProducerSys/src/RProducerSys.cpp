@@ -10,10 +10,10 @@
 
 #include <utility>
 
-using namespace system_contract;
+using namespace SystemService;
 using namespace psibase;
 
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 struct ProducerQuery
 {
@@ -48,4 +48,4 @@ void RProducerSys::storeSys(std::string path, std::string contentType, std::vect
    storeContent(move(path), move(contentType), move(content), Tables{getReceiver()});
 }
 
-PSIBASE_DISPATCH(system_contract::RProducerSys)
+PSIBASE_DISPATCH(SystemService::RProducerSys)

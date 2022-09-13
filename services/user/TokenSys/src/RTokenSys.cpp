@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
-using namespace UserContract;
+using namespace UserService;
 using namespace std;
 using namespace psibase;
 
-using Tables = psibase::ContractTables<psibase::WebContentTable>;
+using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace
 {
@@ -56,7 +56,7 @@ PSIO_REFLECT(TokenQuery,
 
 optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {
-   // if (auto result = to<system_contract::CommonSys>().serveCommon(request).unpack())
+   // if (auto result = to<SystemService::CommonSys>().serveCommon(request).unpack())
    //    return result;
 
    if (auto result = servePackAction<TokenSys>(request))
@@ -120,7 +120,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          TokenSys::Tables db{TokenSys::service};
          auto             idx = db.open<TokenTable>().getIndex<0>();
 
-         std::vector<UserContract::TokenRecord> allTokens;
+         std::vector<UserService::TokenRecord> allTokens;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)
          {
             allTokens.push_back(*itr);
@@ -166,4 +166,4 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
    return std::nullopt;
 }
 
-PSIBASE_DISPATCH(UserContract::RTokenSys)
+PSIBASE_DISPATCH(UserService::RTokenSys)

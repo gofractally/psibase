@@ -15,7 +15,7 @@ static constexpr bool enable_print = false;
 // TODO: remove this limit after billing accounts for the storage
 static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
 
-namespace system_contract
+namespace SystemService
 {
    void TransactionSys::startup()
    {
@@ -25,9 +25,9 @@ namespace system_contract
       check(!statusIdx.get(std::tuple{}), "already started");
       statusTable.put({.enforceAuth = true});
 
-      // TODO: Move these to a config contract
+      // TODO: Move these to a config service
       // TODO: Reduce numExecutionMemories on proofWasmConfigTable. Waiting for
-      //       a fix to SystemContract caching, to prevent frequent allocating
+      //       a fix to SystemContext caching, to prevent frequent allocating
       //       and freeing of ExecutionMemory instances.
       ConfigRow config;
       kvPut(config.db, config.key(), config);
@@ -81,8 +81,8 @@ namespace system_contract
    };
    boost::container::flat_map<RunAsKey, uint32_t> runAsMap;
 
-   std::vector<char> TransactionSys::runAs(psibase::Action             action,
-                                           std::vector<ContractMethod> allowedActions)
+   std::vector<char> TransactionSys::runAs(psibase::Action            action,
+                                           std::vector<ServiceMethod> allowedActions)
    {
       auto requester = getSender();
 
@@ -100,7 +100,7 @@ namespace system_contract
          if (!account)
             abortMessage("unknown sender \"" + action.sender.str() + "\"");
 
-         if (requester != account->authContract)
+         if (requester != account->authService)
          {
             uint32_t flags = 0;
             if (requester == action.sender)
@@ -112,7 +112,7 @@ namespace system_contract
                       it->first.sender == action.sender && it->first.authorizedSender == requester)
                {
                   if (it->second &&  //
-                      (!it->first.receiver.value || it->first.receiver == action.contract) &&
+                      (!it->first.receiver.value || it->first.receiver == action.service) &&
                       (!it->first.method.value || it->first.method == action.method))
                   {
                      if (allowedActions.empty())
@@ -127,18 +127,18 @@ namespace system_contract
                   flags = AuthInterface::runAsOtherReq;
             }
 
-            Actor<AuthInterface> auth(TransactionSys::service, account->authContract);
+            Actor<AuthInterface> auth(TransactionSys::service, account->authService);
             auth.checkAuthSys(flags, requester, action, allowedActions, std::vector<Claim>{});
-         }  // if (requester != account->authContract)
+         }  // if (requester != account->authService)
       }     // if(enforceAuth)
 
       for (auto& a : allowedActions)
-         ++runAsMap[{action.sender, action.contract, a.contract, a.method}];
+         ++runAsMap[{action.sender, action.service, a.service, a.method}];
 
       auto result = call(action);
 
       for (auto& a : allowedActions)
-         --runAsMap[{action.sender, action.contract, a.contract, a.method}];
+         --runAsMap[{action.sender, action.service, a.service, a.method}];
 
       return result;
    }  // TransactionSys::runAs
@@ -260,15 +260,15 @@ namespace system_contract
                abortMessage("unknown sender \"" + act.sender.str() + "\"");
 
             if constexpr (enable_print)
-               print("call checkAuthSys on ", account->authContract.str(), " for account ",
+               print("call checkAuthSys on ", account->authService.str(), " for account ",
                      act.sender.str(), "\n");
-            Actor<AuthInterface> auth(TransactionSys::service, account->authContract);
+            Actor<AuthInterface> auth(TransactionSys::service, account->authService);
             uint32_t             flags = AuthInterface::topActionReq;
             if (&act == &trx.actions[0])
                flags |= AuthInterface::firstAuthFlag;
             if (args.checkFirstAuthAndExit)
                flags |= AuthInterface::readOnlyFlag;
-            auth.checkAuthSys(flags, psibase::AccountNumber{}, act, std::vector<ContractMethod>{},
+            auth.checkAuthSys(flags, psibase::AccountNumber{}, act, std::vector<ServiceMethod>{},
                               trx.claims);
          }
          if (args.checkFirstAuthAndExit)
@@ -279,6 +279,6 @@ namespace system_contract
       }
    }
 
-}  // namespace system_contract
+}  // namespace SystemService
 
-PSIBASE_DISPATCH(system_contract::TransactionSys)
+PSIBASE_DISPATCH(SystemService::TransactionSys)
