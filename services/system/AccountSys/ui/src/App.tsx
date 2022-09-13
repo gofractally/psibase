@@ -174,7 +174,7 @@ function App() {
         try {
             setIsAccountLoading(true)
             setAccountError('')
-            const thisApplet = await getJson<string>("/common/thiscontract");
+            const thisApplet = await getJson<string>("/common/thisservice");
             const appletId = new AppletId(thisApplet)
 
             const newAccount: AccountWithAuth = {
