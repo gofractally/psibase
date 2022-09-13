@@ -19,9 +19,8 @@ Instead of trying to get type-safe JSON libraries to work around JavaScript's li
 
 `psio::to_json` (C++) does not place 64-bit numbers in quoted strings, but for a time `psio::from_json` will accept numbers in quoted strings for backwards compatibility. `serde_json` (Rust) does not place or accept numbers in quoted strings, unless you use customization. JavaScript needs a JSON library or will silently truncate values.
 
-Unfortunately this creates an inconsistency with GraphQL, which constrains its numeric types to be various subsets of JavaScript's number type. We have no choice but to quote 64-bit integers in GraphQL and declare them as strings in GraphQL schemas, unless we decide to break with the spec.
-
 - TODO: update `psio::to_json` to not quote numbers
+- TODO: Rethink GraphQL numeric handling. It currently relies on `to_json`.
 - TODO: update JavaScript code
 
 ## Strings
