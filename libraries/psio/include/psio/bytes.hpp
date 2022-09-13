@@ -6,7 +6,6 @@
 
 namespace psio
 {
-   // TODO: Discard this type? It's now redundant with vector<char>'s json format
    struct bytes
    {
       std::vector<char> data;
