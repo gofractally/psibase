@@ -82,6 +82,7 @@ export default defineConfig({
     ],
     build: {
         outDir: "../dist/default-profile",
+        emptyOutDir: true,
         rollupOptions: {
             input: {
                 main: path.resolve(root, "default-profile.html"),
