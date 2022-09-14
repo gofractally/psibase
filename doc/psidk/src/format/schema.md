@@ -169,6 +169,20 @@ A struct definition may have methods on it.
 
 If a method doesn't return a value, `returns` should be `{"builtinType": "void"}`.
 
+### Method Upgradeability
+
+The following changes maintain backwards binary and JSON compatibility:
+
+- Add a new method
+- Add an optional argument at the end of a method's existing arguments
+
+The following break backwards compatibility; if you do these, data will end up corrupted, or history unreadable:
+
+- Don't remove or rename methods; make them abort instead
+- Don't change the return type of a method
+- Don't add non-optional arguments to an existing method
+- Don't add arguments to the beginning or middle of an existing method's argument list
+
 ## Type References
 
 We used `{type reference}` to indicate a type reference in the definitions above. This can be one of the following:
@@ -184,7 +198,7 @@ Built-in types live in a separate namespace from user-defined types to minimize 
 
 ### Tuple Upgradeability
 
-The following change to a tuple maintain backwards binary and JSON compatibility:
+The following change to a tuple maintains backwards binary and JSON compatibility:
 
 - Add additional `std::optional` (C++) or `Option` (Rust) inner types to the end of the tuple
 
