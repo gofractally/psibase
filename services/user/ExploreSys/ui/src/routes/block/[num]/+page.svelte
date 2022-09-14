@@ -5,7 +5,7 @@
     import Error from "/src/components/Error.svelte";
     import LeftArrow from "/src/assets/icons/leftArrow.svg";
     import { loadBlockData } from "/src/lib/loadData.js";
-    import ResultsTable from "/src/components/ResultsTable.svelte";
+    import Blocks from "/src/components/Blocks.svelte";
     import Loader from "/src/components/Loader.svelte";
     let data = null;
     let blocks = [];
@@ -28,7 +28,7 @@
         <Loader />
     {:else if data.error}
         <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
-            Block explorer
+            Back
         </Button>
         <Error value={data.error} />
     {:else}
@@ -36,18 +36,20 @@
             <h1 class="text-6xl text-gray-600">Block Detail</h1>
         </div>
         <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
-            Block explorer
+            Back
         </Button>
-        <ResultsTable clickable={false} class="mb-6" {blocks} />
+        <Blocks clickable={false} class="mb-6" {blocks} />
         <div>
             <table class="w-full table-fixed">
-                <tbody>
+                <thead>
                     <tr>
                         <th>Trx. #</th>
                         <th>Service</th>
                         <th>Sender</th>
                         <th>Method</th>
                     </tr>
+                </thead>
+                <tbody>
                     {#each data.transactions as trx, index}
                         {#each trx.actions as action}
                             <tr>

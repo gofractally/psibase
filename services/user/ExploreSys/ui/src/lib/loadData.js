@@ -111,3 +111,32 @@ export async function loadBlockData(blockNum) {
         };
     }
 }
+
+function queryTransferHistory(holder) {
+  return(
+    `{
+      holderEvents(holder: "${holder}") {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        edges {
+          node {
+            event_id
+            event_type
+            event_all_content
+          }
+        }
+      }
+    }`);
+}
+
+export async function loadTransferHistory (user) {
+    const query = queryTransferHistory(user);
+    const host = window.location.host.replace("explore-sys.", "token-sys.");
+    const url = `${window.location.protocol}//${host}/graphql`;
+    console.log("loadTransferHistory POST",url);
+    const result = await useGraphQLQuery(url, query);
+    console.log("useTransferHistory", result);
+    return result;
+};

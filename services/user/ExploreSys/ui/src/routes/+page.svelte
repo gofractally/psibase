@@ -8,7 +8,7 @@
     import Dot from "/src/assets/icons/dot.svg";
     import ButtonSet from "/src/components/ButtonSet.svelte";
     import Button from "/src/components/Button.svelte";
-    import ResultsTable from "/src/components/ResultsTable.svelte";
+    import Blocks from "/src/components/Blocks.svelte";
     import Loader from "/src/components/Loader.svelte";
     import Error from "/src/components/Error.svelte";
 
@@ -111,7 +111,7 @@
                 Auto updating
             </Button>
         </ButtonSet>
-        <ResultsTable blocks={data.blocks} />
+        <Blocks blocks={data.blocks} />
     {/if}
 </div>
 
