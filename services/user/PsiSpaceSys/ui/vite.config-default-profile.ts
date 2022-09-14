@@ -74,17 +74,18 @@ const root = path.resolve(__dirname, "src");
 // https://vitejs.dev/config/
 export default defineConfig({
     root,
+    base: "/default-profile/",
     plugins: [
         react(),
         svgr({ exportAsDefault: true }),
         psibase("psispace-sys"),
     ],
     build: {
-        outDir: "../dist",
+        outDir: "../dist/default-profile",
         emptyOutDir: true,
         rollupOptions: {
             input: {
-                main: path.resolve(root, "index.html"),
+                main: path.resolve(root, "default-profile.html"),
             },
         },
     },

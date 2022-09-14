@@ -86,7 +86,7 @@ endif()
 
 set(JS_DIRS
     services/system/AccountSys/ui:AccountSys_js
-    # services/user/PsiSpaceSys/ui:PsiSpaceSys_js
+    services/user/PsiSpaceSys/ui:PsiSpaceSys_js
     services/user/CommonSys/ui:CommonSys_js
     services/user/TokenSys/ui:TokenSys_js
     services/user/ExploreSys/ui:ExploreSys_js
@@ -117,7 +117,7 @@ if(BUILD_RUST)
         CONFIGURE_COMMAND ""
         BUILD_COMMAND   rm -rf ${BOOT_IMAGE}
         COMMAND         mkdir -p ${BOOT_IMAGE}/AccountSys ${BOOT_IMAGE}/CommonSys ${BOOT_IMAGE}/ExploreSys
-        COMMAND         mkdir -p ${BOOT_IMAGE}/AuthEcSys ${BOOT_IMAGE}/TokenSys
+        COMMAND         mkdir -p ${BOOT_IMAGE}/AuthEcSys ${BOOT_IMAGE}/TokenSys ${BOOT_IMAGE}/PsiSpaceSys
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm                  ${BOOT_IMAGE}
@@ -144,6 +144,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/ui       ${BOOT_IMAGE}/CommonSys/ui
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui      ${BOOT_IMAGE}/ExploreSys/ui
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui        ${BOOT_IMAGE}/TokenSys/ui
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui     ${BOOT_IMAGE}/PsiSpaceSys/ui
 
         COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc || mkdir -p ${BOOT_IMAGE}/doc"
 

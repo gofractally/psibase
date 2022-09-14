@@ -1,8 +1,9 @@
 #include "services/user/PsiSpaceSys.hpp"
 
 #include <psibase/dispatch.hpp>
+#include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
-#include <psibase/serveSimpleUI.hpp>
+#include <psibase/servePackAction.hpp>
 
 using namespace psibase;
 
@@ -28,19 +29,23 @@ namespace SystemService
    {
       check(request.host.size() > request.rootHost.size(), "oops");
 
-      Tables           tables{getReceiver()};
       std::string_view accountName{request.host.data(),
                                    request.host.size() - request.rootHost.size() - 1};
       auto             account = AccountNumber(accountName);
 
       if (account == PsiSpaceSys::service)
       {
-         if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
+         if (auto result = psibase::serveActionTemplates<PsiSpaceSys>(request))
             return result;
-         if (auto result = serveSimpleUI<PsiSpaceSys, true>(request))
+
+         if (auto result = psibase::servePackAction<PsiSpaceSys>(request))
+            return result;
+
+         if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
             return result;
       }
 
+      Tables tables{getReceiver()};
       if (request.method == "GET")
       {
          auto index  = tables.open<PsiSpaceContentTable>().getIndex<0>();
@@ -55,6 +60,15 @@ namespace SystemService
                content = index.get(PsiSpaceContentKey{account, target + "index.html"});
             else
                content = index.get(PsiSpaceContentKey{account, target + "/index.html"});
+         }
+         if (!content && target == "/")
+         {
+            content = index.get(
+                PsiSpaceContentKey{getReceiver(), "/default-profile/default-profile.html"});
+         }
+         if (!content && target.starts_with("/default-profile/"))
+         {
+            content = index.get(PsiSpaceContentKey{getReceiver(), target});
          }
          if (content)
          {

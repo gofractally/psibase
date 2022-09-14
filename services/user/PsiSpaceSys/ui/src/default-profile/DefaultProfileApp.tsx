@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { siblingUrl, getJson } from "common/rpc.mjs";
 import wait from "waait";
 
-import "../App.css";
-
 import useEffectOnce from "../hooks/useEffectOnce";
 import { Heading } from "../components";
 import { capitalizeFirstLetter } from "../helpers";
@@ -61,7 +59,6 @@ function DefaultProfileApp() {
             wait(1).then(async () => {
                 try {
                     const tokens = await fetchTokens(account);
-                    console.info("tokens >>>", tokens);
                     setAccountTokens(tokens);
                 } catch (e) {
                     console.error("Fail to load account tokens", e);
