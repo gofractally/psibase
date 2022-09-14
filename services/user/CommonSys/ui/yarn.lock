@@ -2528,11 +2528,6 @@ vite@^3.0.7:
   optionalDependencies:
     fsevents "~2.3.2"
 
-waait@^1.0.5:
-  version "1.0.5"
-  resolved "https://registry.npmjs.org/waait/-/waait-1.0.5.tgz"
-  integrity sha512-wp+unA4CpqxvBUKHHv8D86fK4jWByHAWyhEXXVHfVUZfK+16ylpj7hjQ58Z8j9ntu8XNukRQT8Fi5qbyJ8rkyw==
-
 which-boxed-primitive@^1.0.2:
   version "1.0.2"
   resolved "https://registry.npmjs.org/which-boxed-primitive/-/which-boxed-primitive-1.0.2.tgz"

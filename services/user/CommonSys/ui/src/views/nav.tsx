@@ -5,7 +5,7 @@ import { siblingUrl as getSiblingUrl } from "common/rpc.mjs";
 import Ninebox from "../images/ninebox.svg";
 import PsibaseLogo from "../images/psibase.svg";
 import { Button } from "../components";
-import wait from "waait";
+import { wait } from "../helpers";
 
 export const Nav = ({ currentUser }: { currentUser: string }) => {
     const [commonSysUrl, setCommonSysUrl] = useState("");
