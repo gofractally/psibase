@@ -69,7 +69,7 @@ The following break backwards compatibility; if you do these, data will end up c
 
 - Don't reorder or drop fields
 - Don't add new fields at the beginning or middle
-- Don't add non-optional fields to the end
+- Don't add new non-optional fields to the end
 - Don't change anything if `definitionWillNotChange` (defaults to false) is true
 - Don't change `definitionWillNotChange`
 
@@ -102,7 +102,7 @@ enum MyEnumType {
     Example2(u64, u32),              // Type: tuple of u64, u32
     Example3((u64,)),                // Type: tuple of u64 (extra parenthesis required)
     Example4(()),                    // Type: empty tuple (extra parenthesis required)
-    Example5 { foo: u64, bar: u32 }, // Type: a struct named Example3
+    Example5 { foo: u64, bar: u32 }, // Type: a struct
 }
 ```
 
@@ -206,7 +206,7 @@ The following break backwards compatibility; if you do these, data will end up c
 
 - Don't reorder or drop fields from a tuple
 - Don't add new fields at the beginning or middle from a tuple
-- Don't add non-optional fields to the end from a tuple
+- Don't add new non-optional fields to the end of a tuple
 
 ## Built-in Types
 
@@ -221,10 +221,8 @@ The following break backwards compatibility; if you do these, data will end up c
 
 ## TODO
 
-- actions, args, return
 - events
 - tables
-- binary compatibility (rules derived from fracpack rules)
 
 ## Schema Schema
 
