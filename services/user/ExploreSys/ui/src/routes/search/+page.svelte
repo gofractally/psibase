@@ -45,9 +45,8 @@
     <form on:submit|preventDefault={search} class="mb-4 flex items-center">
         <TextInput
                 leftIconUrl={searchIconUrl}
-                class="mr-2 w-96"
+                class="mr-2 w-96 bg-white"
                 id="search_input"
-                placeholder="#block"
                 bind:value={searchTerm}
                 on:enter={search}
         />
