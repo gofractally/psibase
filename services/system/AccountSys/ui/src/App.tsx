@@ -91,8 +91,8 @@ const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (acco
             return [...withoutExisting, ...plainAccounts]
         });
 
-        const accountsWithPrivateKeys = newAccounts.filter(account => 'privateKey' in account);
-        if (accountsWithPrivateKeys.length > 0) {
+        const newAccountsWithPrivateKeys = newAccounts.filter(account => 'privateKey' in account);
+        if (newAccountsWithPrivateKeys.length > 0) {
             const newKeyPairs: KeyPair[] = newAccounts.map((account): KeyPair => ({ privateKey: account.privateKey, knownAccounts: [account.accountNum], publicKey: account.publicKey }));
             setKeyPairs([...keyPairs.filter(pair => !newKeyPairs.some(p => p.publicKey === pair.publicKey)), ...newKeyPairs])
         }
@@ -133,17 +133,22 @@ const useData = (loadingState: boolean = false) => {
     return { isLoading, error, setError, setIsLoading }
 }
 
+const useCurrentUser = (): [string, (newUser: string) => void] => {
+    const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
+    return [currentUser, setCurrentUser]
+}
+
 function App() {
     const [appInitialized, setAppInitialized] = useState(false);
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
 
 
     const [allAccounts, refreshAccounts] = useAccounts();
-    const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
+    const [currentUser, setCurrentUser] = useCurrentUser();
 
     const onLogout = (account: string) => {
-        const isLoggedIn = currentUser === account;
-        if (isLoggedIn) {
+        const isLoggingOutOfCurrentUser = currentUser === account;
+        if (isLoggingOutOfCurrentUser) {
             setCurrentUser(accountsWithKeys[0].accountNum);
         }
         dropAccount(account)
@@ -218,11 +223,13 @@ function App() {
             setImportError('');
 
             const res = await fetchAccountsByKey(acc.publicKey);
+            if (res.length == 0) throw new Error(`No accounts found with public key ${acc.publicKey}`);
+
             if (res.length > 0) {
                 const accounts = res.map((res): AccountWithKey => ({ accountNum: res.account, authService: 'auth-ec-sys', publicKey: res.pubkey, privateKey: acc.privateKey }));
-                addAccounts(accounts)
-            } else {
-                throw new Error(`No accounts found with public key ${acc.publicKey}`);
+                addAccounts(accounts);
+                const newAccountsFound = res.filter(account => !accountsWithKeys.some(a => a.accountNum == account.account && account.pubkey == a.publicKey));
+                if (newAccountsFound.length == 0) throw new Error("No new accounts found")
             }
         } catch (e) {
             setImportError(`${e}`)
