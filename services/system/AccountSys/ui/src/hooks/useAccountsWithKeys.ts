@@ -1,6 +1,6 @@
 import { useLocalStorage } from "common/useLocalStorage.mjs";
 import { useEffect, useState } from "react";
-import { AccountWithAuth, AccountWithKey, KeyPairWithAccounts } from "../App";
+import { AccountWithAuth, AccountWithKey, KeyPair, KeyPairWithAccounts } from "../App";
 import { fetchAccounts, fetchAccountsByKey } from "../helpers";
 
 
@@ -8,6 +8,20 @@ import { fetchAccounts, fetchAccountsByKey } from "../helpers";
 const toAccountWithAuth = ({ accountNum, authService, publicKey }: AccountWithKey): AccountWithAuth => ({ accountNum, authService, publicKey });
 const uniqueAccounts = (accounts: AccountWithAuth[]) => accounts.filter((account, index, arr) => arr.findIndex(a => a.accountNum === account.accountNum) == index);
 
+
+const partition = <T>(arr: T[], predicate: (item: T) => boolean): [T[], T[]] => {
+    const good: T[] = [];
+    const bad: T[] = [];
+    arr.forEach(item => {
+        if (predicate(item)) {
+            good.push(item)
+        } else {
+            bad.push(item)
+        }
+    })
+
+    return [good, bad]
+}
 
 
 export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (accounts: AccountWithKey[]) => void] => {
@@ -41,6 +55,7 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
         if (foundAccount) {
             const key = foundAccount.publicKey;
             setAccounts(accounts => accounts.filter(account => account.publicKey !== key));
+            console.log({ key, keyPairs })
             setKeyPairs(keyPairs.filter(keyPair => keyPair.publicKey !== key))
         } else {
             console.warn(`Failed to find account ${accountNum} to drop`)
@@ -57,9 +72,31 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
 
         const newAccountsWithPrivateKeys = newAccounts.filter(account => 'privateKey' in account);
         if (newAccountsWithPrivateKeys.length > 0) {
-            const newKeyPairs: KeyPairWithAccounts[] = newAccounts.map((account): KeyPairWithAccounts => ({ privateKey: account.privateKey, knownAccounts: [account.accountNum], publicKey: account.publicKey }));
-            setKeyPairs([...keyPairs.filter(pair => !newKeyPairs.some(p => p.publicKey === pair.publicKey)), ...newKeyPairs])
+
+            const incomingAccounts: KeyPairWithAccounts[] = newAccounts.map((account): KeyPairWithAccounts => ({ privateKey: account.privateKey, knownAccounts: [account.accountNum], publicKey: account.publicKey }));
+            const accountNumsCovered = incomingAccounts.flatMap(account => account.knownAccounts || []);
+
+            const easier = keyPairs.map((keyPair) => ({ ...keyPair, knownAccounts: (keyPair.knownAccounts || []) }))
+            const keypairsWithoutStaleAccounts = easier.map(keyPair => ({ ...keyPair, knownAccounts: keyPair.knownAccounts.filter(account => !accountNumsCovered.some(a => a == account)) }))
+            const [existingAccountsToRemain, accountsToDrop] = partition(keypairsWithoutStaleAccounts, (keyPair) => keyPair.knownAccounts.length > 0);
+
+            console.log({ existingAccountsToRemain, accountsToDrop })
+
+            const combined = [...existingAccountsToRemain, ...incomingAccounts];
+            const pureUniqueKeyPairs = combined.map(({ privateKey, publicKey }): KeyPair => ({ privateKey, publicKey })).filter((keyPair, index, arr) => arr.findIndex(kp => kp.publicKey === keyPair.publicKey) === index)
+
+            const fresh = pureUniqueKeyPairs.map((keyPair): KeyPairWithAccounts => {
+                return {
+                    ...keyPair,
+                    knownAccounts: combined.flatMap(kp => kp.publicKey === keyPair.publicKey ? (kp.knownAccounts || []) : [])
+                }
+            })
+
+            console.log({ fresh }, 'is to be set')
+
+            setKeyPairs(fresh)
         }
+
     };
     return [sortedAccounts, dropAccount, addAccount];
 };

@@ -15,7 +15,7 @@ import { useInitialized } from "./hooks/useInitialized";
 // needed for common files that won't necessarily use bundles
 window.React = React;
 
-interface KeyPair {
+export interface KeyPair {
     privateKey: string;
     publicKey: string;
 }
