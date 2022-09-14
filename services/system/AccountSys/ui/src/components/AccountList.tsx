@@ -42,15 +42,11 @@ export const AccountList = ({
                                     <input
                                         name="account"
                                         type="radio"
-                                        defaultChecked={selectedAccount == account.accountNum}
-                                        id={account.accountNum}
-                                        onClick={(e) => {
-                                            // @ts-ignore
-                                            if (e.target.id) {
-                                                // @ts-ignore
-                                                onSelectAccount(e.target.id)
-                                            }
+                                        onChange={(e) => {
+                                            onSelectAccount(e.target.id)
                                         }}
+                                        checked={selectedAccount == account.accountNum}
+                                        id={account.accountNum}
                                     />
                                 </div>
                             </td>

@@ -76,7 +76,8 @@ const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (acco
         const foundAccount = accounts.find(a => accountNum == a.accountNum);
         if (foundAccount) {
             const key = foundAccount.publicKey;
-            setAccounts(accounts => accounts.filter(account => account.publicKey !== key))
+            setAccounts(accounts => accounts.filter(account => account.publicKey !== key));
+            setKeyPairs(keyPairs.filter(keyPair => keyPair.publicKey !== key))
         } else {
             console.warn(`Failed to find account ${accountNum} to drop`)
         }
@@ -139,6 +140,14 @@ function App() {
 
     const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
+
+    const onLogout = (account: string) => {
+        const isLoggedIn = currentUser === account;
+        if (isLoggedIn) {
+            setCurrentUser(accountsWithKeys[0].accountNum);
+        }
+        dropAccount(account)
+    }
 
     const [name, setName] = useState("");
     const [pubKey, setPubKey] = useState("");
@@ -231,7 +240,7 @@ function App() {
             </div>
             <div className="bg-slate-50">
                 <AccountList
-                    onLogout={dropAccount}
+                    onLogout={onLogout}
                     selectedAccount={currentUser}
                     accounts={accountsWithKeys}
                     onSelectAccount={setCurrentUser}
