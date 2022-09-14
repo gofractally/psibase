@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 import { AppletEntry, appletPrefix, applets } from "../config";
-import { Heading, Text } from "../components";
+import { Heading } from "../components";
 
 export const Dashboard = ({ currentUser }: { currentUser: string }) => {
     useEffect(() => {
@@ -11,9 +11,8 @@ export const Dashboard = ({ currentUser }: { currentUser: string }) => {
     return (
         <div className="p-2 sm:px-8">
             <Heading tag="h1" className="text-gray-600">
-                Featured applications
+                Featured applets
             </Heading>
-            <Text size="base">Click an app below to open it.</Text>
             <div
                 className="justify-center py-6 sm:grid"
                 style={{ gridTemplateColumns: "repeat(auto-fill, 247px)" }}
