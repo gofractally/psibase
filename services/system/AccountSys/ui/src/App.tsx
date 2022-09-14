@@ -1,58 +1,42 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef } from "react";
 
 import appAccountIcon from "./components/assets/icons/app-account.svg";
 import { AccountsList, AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
-import { fetchAccounts, getLoggedInUser } from "./helpers";
-import { initAppFn } from "./appInit";
+import { getLoggedInUser } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
+
 import { useAccountsWithKeys } from "./hooks/useAccountsWithKeys";
 import { useCurrentUser } from "./hooks/useCurrentUser";
 import { useImportAccount } from "./hooks/useImportAccount";
 import { useCreateAccount } from "./hooks/useCreateAccount";
-
-
+import { useAccounts } from "./hooks/useAccounts";
+import { useInitialized } from "./hooks/useInitialized";
 
 // needed for common files that won't necessarily use bundles
 window.React = React;
 
-export interface KeyPair {
+interface KeyPair {
     privateKey: string;
     publicKey: string;
+}
+export interface KeyPairWithAccounts extends KeyPair {
     knownAccounts?: string[];
 }
 
 interface Account {
     accountNum: string;
-    publicKey: KeyPair['publicKey']
+    publicKey: KeyPairWithAccounts['publicKey']
 }
 export interface AccountWithAuth extends Account {
     authService: string;
 }
 export interface AccountWithKey extends AccountWithAuth {
-    privateKey: KeyPair['privateKey']
+    privateKey: KeyPairWithAccounts['privateKey']
 }
 
 
-const useAccounts = (): [AccountWithAuth[], () => void] => {
-    const [accounts, setAccounts] = useState<AccountWithAuth[]>([]);
-
-    const refreshAccounts = async () => {
-        const res = await fetchAccounts()
-        setAccounts(res);
-    }
-
-    useEffect(() => { refreshAccounts() }, []);
-
-    return [accounts, refreshAccounts];
-};
-
-
-
 function App() {
-    const [appInitialized, setAppInitialized] = useState(false);
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
-
-
     const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useCurrentUser();
 
@@ -65,29 +49,16 @@ function App() {
     }
 
 
-    useEffect(() => {
-        initAppFn(() => {
-            setAppInitialized(true);
-        });
-    }, []);
-    useEffect(() => {
-        if (!appInitialized) {
-            return;
+    useInitialized(async () => {
+        try {
+            setCurrentUser(await getLoggedInUser());
+        } catch (e: any) {
+            console.info(
+                "App.appInitialized.useEffect().error:",
+                e.message
+            );
         }
-        (async () => {
-            // initializeApplet();
-            try {
-                setCurrentUser(await getLoggedInUser());
-            } catch (e: any) {
-                console.info(
-                    "App.appInitialized.useEffect().error:",
-                    e.message
-                );
-            }
-        })();
-    }, [appInitialized]);
-
-
+    })
 
     const createAccountFormRef = useRef<{ resetForm: () => void }>(null);
 

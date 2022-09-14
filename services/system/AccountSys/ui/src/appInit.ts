@@ -10,7 +10,7 @@ import {
     AppletId,
     SignedTransaction,
 } from "common/rpc.mjs";
-import { KeyPair } from "./App";
+import { KeyPairWithAccounts } from "./App";
 
 interface execArgs {
     name?: any;
@@ -76,7 +76,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                     }
                     const isSecureAccount = sendingAccount.authService === "auth-ec-sys"
                     if (isSecureAccount) {
-                        const keys = JSON.parse(localStorage.getItem('keyPairs') || '[]') as KeyPair[]
+                        const keys = JSON.parse(localStorage.getItem('keyPairs') || '[]') as KeyPairWithAccounts[]
 
                         const foundKey = keys.find(key => {
                             if (key.knownAccounts) {

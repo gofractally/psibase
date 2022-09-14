@@ -1,6 +1,6 @@
 import { useLocalStorage } from "common/useLocalStorage.mjs";
 import { useEffect, useState } from "react";
-import { AccountWithAuth, AccountWithKey, KeyPair } from "../App";
+import { AccountWithAuth, AccountWithKey, KeyPairWithAccounts } from "../App";
 import { fetchAccounts, fetchAccountsByKey } from "../helpers";
 
 
@@ -12,7 +12,7 @@ const uniqueAccounts = (accounts: AccountWithAuth[]) => accounts.filter((account
 
 export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void, (accounts: AccountWithKey[]) => void] => {
     const [accounts, setAccounts] = useState<AccountWithAuth[]>([]);
-    const [keyPairs, setKeyPairs] = useLocalStorage<KeyPair[]>('keyPairs', [])
+    const [keyPairs, setKeyPairs] = useLocalStorage<KeyPairWithAccounts[]>('keyPairs', [])
 
     const sortedAccounts = accounts.slice().sort((a, b) => a.accountNum < b.accountNum ? -1 : 1);
 
@@ -27,7 +27,7 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
             const flatAccounts = responses.flat(1);
             setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authService: 'auth-ec-sys', publicKey: account.pubkey })), ...currentAccounts]))
             const currentKeyPairs = keyPairs;
-            const newKeyPairs = currentKeyPairs.map((keyPair): KeyPair => {
+            const newKeyPairs = currentKeyPairs.map((keyPair): KeyPairWithAccounts => {
                 const relevantAccounts = flatAccounts.filter(account => account.pubkey === keyPair.publicKey).map(account => account.account)
                 return relevantAccounts.length > 0 ? { ...keyPair, knownAccounts: relevantAccounts } : keyPair
             })
@@ -57,7 +57,7 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
 
         const newAccountsWithPrivateKeys = newAccounts.filter(account => 'privateKey' in account);
         if (newAccountsWithPrivateKeys.length > 0) {
-            const newKeyPairs: KeyPair[] = newAccounts.map((account): KeyPair => ({ privateKey: account.privateKey, knownAccounts: [account.accountNum], publicKey: account.publicKey }));
+            const newKeyPairs: KeyPairWithAccounts[] = newAccounts.map((account): KeyPairWithAccounts => ({ privateKey: account.privateKey, knownAccounts: [account.accountNum], publicKey: account.publicKey }));
             setKeyPairs([...keyPairs.filter(pair => !newKeyPairs.some(p => p.publicKey === pair.publicKey)), ...newKeyPairs])
         }
     };

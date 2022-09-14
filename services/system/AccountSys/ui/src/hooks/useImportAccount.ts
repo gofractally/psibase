@@ -1,8 +1,8 @@
-import { AccountWithKey, KeyPair } from "../App";
+import { AccountWithKey, KeyPairWithAccounts } from "../App";
 import { fetchAccountsByKey } from "../helpers";
 import { useData } from "./useData";
 
-export const useImportAccount = (onImportAccounts: (accounts: AccountWithKey[]) => void): [(keyPair: KeyPair) => void, boolean, string] => {
+export const useImportAccount = (onImportAccounts: (accounts: AccountWithKey[]) => void): [(keyPair: KeyPairWithAccounts) => void, boolean, string] => {
     const { isLoading, setIsLoading: setImportLoading, setError: setImportError, error } = useData()
 
     const addKeyPair = async (keyPair: { privateKey: string; publicKey: string }) => {
