@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-import { AppletId, query } from "common/rpc.mjs";
+import { AppletId, getJson, query, siblingUrl } from "common/rpc.mjs";
+import { AccountWithAuth } from "./App";
 export interface MsgProps {
     addMsg: any;
     clearMsg: any;
@@ -20,23 +21,28 @@ export const fetchQuery = <T>(
 };
 
 export const getLoggedInUser = async (): Promise<string> => {
-    const t: string = await query<any, string>(
+    return query<any, string>(
         new AppletId("account-sys", ""),
         "getLoggedInUser"
     );
-    return t;
 };
 
-export const useMsg = () => {
-    const [msg, setMsg] = useState("");
 
-    const clearMsg = () => {
-        setMsg("");
-    };
 
-    const addMsg = (msg: any) => {
-        setMsg((prevMsg: any) => prevMsg + msg + "\n");
-    };
+export const fetchAccountsByKey = async (publicKey: string) => {
+    if (!publicKey) throw new Error(`No public key found ${publicKey}`)
+    return getJson<{ account: string; pubkey: string }[]>(await siblingUrl(null, 'auth-ec-sys', "accwithkey/" + publicKey))
 
-    return { msg, addMsg, clearMsg };
-};
+}
+
+export const fetchAccounts = async () => {
+    try {
+        const accounts = await getJson<AccountWithAuth[]>("/accounts");
+        console.log('fetched:', accounts)
+        return accounts;
+    } catch (e) {
+        console.info("refreshAccounts().catch().e:");
+        console.info(e);
+        return []
+    }
+}
