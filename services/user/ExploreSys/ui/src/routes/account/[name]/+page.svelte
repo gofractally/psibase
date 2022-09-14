@@ -1,10 +1,10 @@
 <script>
-    import { action, AppletId, getJson, siblingUrl } from "common/rpc.mjs?client";
+    import { getJson, siblingUrl } from "common/rpc.mjs?client";
     import { page } from "$app/stores";
     import { onMount } from "svelte";
     import Button from "/src/components/Button.svelte";
     import Error from "/src/components/Error.svelte";
-    import LeftArrow from "/src/assets/icons/leftArrow.svg";
+    import { LeftArrowIcon } from "./leftArrow.svg";
     import { loadTransferHistory } from "/src/lib/loadData.js";
     import AccountHistory from "/src/components/AccountHistory.svelte";
     import Loader from "/src/components/Loader.svelte";
@@ -61,7 +61,7 @@
     {#if !data}
         <Loader />
     {:else if data.error}
-        <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
+        <Button on:click={() => history.back()} leftIcon={LeftArrowIcon} class="mb-2">
             Search
         </Button>
         <Error value={data.error} />
@@ -69,7 +69,7 @@
         <div class="mb-4">
             <h1 class="text-6xl text-gray-600">Account Details</h1>
         </div>
-        <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
+        <Button on:click={() => history.back()} leftIcon={LeftArrowIcon} class="mb-2">
             Search
         </Button>
         <h4 class="py-4">{data.account}</h4>

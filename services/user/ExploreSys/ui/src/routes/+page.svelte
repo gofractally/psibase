@@ -3,9 +3,7 @@
     import { onDestroy, onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { loadData } from "/src/lib/loadData.js";
-    import ExplorerIcon from "/src/assets/icons/app-explorer-icon.svg";
-    import SearchIcon from "/src/assets/icons/search.svg";
-    import Dot from "/src/assets/icons/dot.svg";
+    import { ExplorerIcon, SearchIcon, DotIcon } from "/src/assets/icons";
     import ButtonSet from "/src/components/ButtonSet.svelte";
     import Button from "/src/components/Button.svelte";
     import Blocks from "/src/components/Blocks.svelte";
@@ -103,7 +101,7 @@
             <Button
                 on:click={() => processPagingRequests(data.pagedResult.last)}
                 >Last</Button>
-            <Button class="AutoUpdatingButton" leftIcon={Dot}
+            <Button class="AutoUpdatingButton" leftIcon={DotIcon}
                     iconClass={autoUpdateMode
                         ? "text-green-500"
                         : "text-gray-500"}

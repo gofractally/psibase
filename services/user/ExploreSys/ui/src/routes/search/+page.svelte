@@ -25,7 +25,7 @@
             }
             account = null;
         } else {
-            goto(`/account/${searchTerm}`)
+            await goto(`/account/${searchTerm}`)
         }
     };
 </script>

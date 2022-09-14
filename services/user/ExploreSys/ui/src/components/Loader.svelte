@@ -1,9 +1,9 @@
 <script>
-    import Icon from "/src/assets/icons/loader.svg";
+    import { LoaderIcon } from "/src/assets/icons";
 </script>
 
 <div aria-modal="true">
-    <Icon style="width: 48px; height: 48px;" class="animate-spin" />
+    <LoaderIcon style="width: 48px; height: 48px;" class="animate-spin" />
 </div>
 
 <style>
