@@ -21,13 +21,13 @@ Type definitions live in the `userType` array:
 Each definition has at least these fields:
 
 - `"name"`: name of the type
-- Exactly one of the `"alias"`, `"structFields"`, or `"unionFields"` fields
+- Exactly one of the [`"alias"`](#alias-definitions), [`"structFields"`](#struct-definitions), or [`"unionFields"`](#union-definitions) fields
 
 A definition may also have these optional fields:
 
-- `"customJson"`, a boolean, indicates the type uses custom JSON serialization. We recommend against using this in most cases since it requires special handling in all serializers and deserializers. psibase uses it for public and private keys, signatures, [psibase::AccountNumber], and [psibase::MethodNumber].
-- `"definitionWillNotChange"`, a boolean, indicates the definition for this type will not change in the future. It opts into an alternative fracpack encoding which saves 2 bytes.
-- [methods](#method-definitions)
+- `"customJson"`, a boolean, indicates the type uses custom JSON serialization. We recommend against using this in most cases since it requires special handling in all serializers and deserializers. psibase uses it for public and private keys, signatures, [psibase::AccountNumber], and [psibase::MethodNumber]. The serialization libraries which communicate with psibase (e.g. the js library) support this set, but not additional ones. Only valid for structs.
+- `"definitionWillNotChange"`, a boolean, indicates the definition for this type will not change in the future. It opts into an alternative fracpack encoding which saves 2 bytes. Only valid for structs.
+- [`"methods"`](#method-definitions). Only valid for structs.
 
 ### Alias Definitions
 
@@ -59,6 +59,20 @@ A struct definition has this form:
 }
 ```
 
+### Struct Upgradeability
+
+The following change to a struct maintains backwards binary and JSON compatibility, but only if `definitionWillNotChange` isn't true:
+
+- Add additional `std::optional` (C++) or `Option` (Rust) fields to the end of the struct
+
+The following break backwards compatibility; if you do these, data will end up corrupted:
+
+- Don't reorder or drop fields
+- Don't add new fields at the beginning or middle
+- Don't add non-optional fields to the end
+- Don't change anything if `definitionWillNotChange` (defaults to false) is true
+- Don't change `definitionWillNotChange`
+
 ### Union Definitions
 
 A union definition describes an `std::variant` in C++ or an `enum` in Rust.
@@ -86,7 +100,9 @@ enum MyEnumType {
     Example0,                        // Type: TODO; need to define a C++ equivalent
     Example1(u64),                   // Type: u64
     Example2(u64, u32),              // Type: tuple of u64, u32
-    Example3 { foo: u64, bar: u32 }, // Type: a struct named Example3
+    Example3((u64,)),                // Type: tuple of u64 (extra parenthesis required)
+    Example4(()),                    // Type: empty tuple (extra parenthesis required)
+    Example5 { foo: u64, bar: u32 }, // Type: a struct named Example3
 }
 ```
 
@@ -100,6 +116,31 @@ enum DoesNotWork {
     y = 7,
 }
 ```
+
+### Union Upgradeability
+
+The following changes to a union maintain backwards binary and JSON compatibility:
+
+- Add additional alternatives at the end of the enum (Rust) or variant (C++)
+- Add additional `std::optional` (C++) or `Option` (Rust) items to the end of an alternative's tuple
+- Add additional `std::optional` (C++) or `Option` (Rust) fields to the end of an alternative's struct
+
+In addition, the following changes maintain backwards binary compatibility, but break JSON compatibility:
+
+- Switch an alternative's type from a struct to a tuple, maintaining the order and types of the fields
+- Switch an alternative's type from a tuple to struct, maintaining the order and types of the fields
+
+The following break backwards compatibility; if you do these, data will end up corrupted:
+
+- Don't drop alternatives from the enum (Rust) or variant (C++).
+- Don't reorder alternatives within the enum (Rust) or variant (C++).
+- Don't add additional alternatives to the beginning or middle of the enum (Rust) or variant (C++).
+- Don't reorder or drop fields from an alternative's struct or tuple.
+- Don't add new fields at the beginning or middle of an alternative's struct or tuple.
+- Don't add non-optional fields to the end of an alternative's struct or tuple.
+- Don't switch an alternative from a single type, e.g. `Example(u64)`, to a tuple, e.g. `Example((u64,))` or `Example(u64,u32)`, or to a struct, e.g. `Example{...}`
+- Don't switch an alternative from a tuple or a struct to a single type.
+- Don't switch an alternative from no data to one with data, or vice-versa. You may switch from an empty tuple, e.g. `Example(())`, to a non-empty one containing optionals, e.g. `Example(Option<u64>,Option<u32>)`.
 
 ### Method Definitions
 
@@ -140,6 +181,18 @@ We used `{type reference}` to indicate a type reference in the definitions above
 - `{"array": {inner type}, "size": 8}` - a fixed-size array of inner type
 
 Built-in types live in a separate namespace from user-defined types to minimize conflicts in the future if more built-in types are added.
+
+### Tuple Upgradeability
+
+The following change to a tuple maintain backwards binary and JSON compatibility:
+
+- Add additional `std::optional` (C++) or `Option` (Rust) inner types to the end of the tuple
+
+The following break backwards compatibility; if you do these, data will end up corrupted:
+
+- Don't reorder or drop fields from a tuple
+- Don't add new fields at the beginning or middle from a tuple
+- Don't add non-optional fields to the end from a tuple
 
 ## Built-in Types
 
