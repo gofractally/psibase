@@ -2,6 +2,10 @@ import { AppletId, getTaposForHeadBlock } from "common/rpc.mjs";
 
 import { appletPrefix } from "./config";
 
+export const wait = (ms: number) => {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
 export const getIframeId = (appletId: AppletId) => {
     // Do more than one iFrame of the same appletStr/subPath ever need to be opened simultaneously?
     //    If so, this method needs to change to add a refCount to the ID or something, to ensure the IDs

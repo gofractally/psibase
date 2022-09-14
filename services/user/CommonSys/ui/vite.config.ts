@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
+import svgr from "vite-plugin-svgr";
 
 const psibase = (appletContract: string) => {
     return [
@@ -70,5 +71,5 @@ const psibase = (appletContract: string) => {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react(), psibase("psibase")],
+    plugins: [react(), svgr({ exportAsDefault: true }), psibase("psibase")],
 });
