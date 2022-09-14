@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 
 import { AppletId, getJson, operation } from "common/rpc.mjs";
 import { genKeyPair, KeyType } from "common/keyConversions.mjs";
@@ -16,16 +16,25 @@ interface Props {
     isLoading: boolean,
     errorMessage: string,
     onCreateAccount: (pair: AccountPair) => void,
-    name: string;
-    pubKey: string;
-    privKey: string;
-    setName: (name: string) => void
-    setPubKey: (publicKey: string) => void
-    setPrivKey: (privateKey: string) => void
 }
 
-export const CreateAccountForm = ({ onCreateAccount, isLoading, errorMessage, setName, setPrivKey, setPubKey, name, pubKey, privKey }: Props) => {
+export const CreateAccountForm = forwardRef(({ onCreateAccount, isLoading, errorMessage }: Props, ref) => {
 
+
+
+
+    const [name, setName] = useState("");
+    const [pubKey, setPubKey] = useState("");
+    const [privKey, setPrivKey] = useState("");
+
+    useImperativeHandle(ref, () => ({
+        resetForm() {
+            console.log('child function 1 called');
+            setName('')
+            setPubKey('')
+            setPrivKey('')
+        },
+    }));
 
     const generateKeyPair = () => {
         const kp = genKeyPair(KeyType.k1);
@@ -94,4 +103,4 @@ export const CreateAccountForm = ({ onCreateAccount, isLoading, errorMessage, se
             </div>
         </div>
     );
-};
+})

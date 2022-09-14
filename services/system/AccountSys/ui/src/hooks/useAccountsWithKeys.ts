@@ -20,8 +20,6 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
 
         fetchAccounts().then(accounts => setAccounts(currentAccounts => {
             const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys')).filter(account => account.authService === 'auth-any-sys');
-            console.log({ currentAccounts, userAccounts, accounts })
-
             return uniqueAccounts([...currentAccounts, ...userAccounts])
         }));
 
