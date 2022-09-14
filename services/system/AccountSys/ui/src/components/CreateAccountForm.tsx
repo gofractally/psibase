@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle, useState } from "react";
 
 import { AppletId, getJson, operation } from "common/rpc.mjs";
-import { genKeyPair, KeyType } from "common/keyConversions.mjs";
+import { genKeyPair, KeyType, privateStringToKeyPair, publicKeyPairToString } from "common/keyConversions.mjs";
 
 import refresh from "./assets/icons/refresh.svg";
 import Button from "./Button";
@@ -17,6 +17,21 @@ interface Props {
     errorMessage: string,
     onCreateAccount: (pair: AccountPair) => void,
 }
+
+
+const getPublicKey = (key: string): { error: string, publicKey: string } => {
+    if (key == '') return {
+        error: '',
+        publicKey: ''
+    };
+    try {
+        const publicKey = publicKeyPairToString(privateStringToKeyPair(key))
+        return { error: '', publicKey }
+    } catch (e) {
+        return { error: `${e}`, publicKey: '' }
+    }
+}
+
 
 export const CreateAccountForm = forwardRef(({ onCreateAccount, isLoading, errorMessage }: Props, ref) => {
 
@@ -41,6 +56,14 @@ export const CreateAccountForm = forwardRef(({ onCreateAccount, isLoading, error
         setPubKey(kp.pub);
         setPrivKey(kp.priv);
     };
+
+    const updatePrivateKey = (key: string) => {
+        setPrivKey(key)
+        const { publicKey, error } = getPublicKey(key)
+        if (!error && publicKey) {
+            setPubKey(publicKey)
+        }
+    }
 
     const isValid = name !== ''
 
@@ -74,7 +97,7 @@ export const CreateAccountForm = forwardRef(({ onCreateAccount, isLoading, error
                     type="text"
                     className="w-full"
                     value={privKey}
-                    onChange={(e) => setPrivKey(e.target.value)}
+                    onChange={(e) => updatePrivateKey(e.target.value)}
                 ></input>
             </div>
             <div className="w-full sm:w-96">
