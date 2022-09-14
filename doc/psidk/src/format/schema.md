@@ -84,10 +84,10 @@ In Rust, the type varies depending on the Rust definition:
 ```rust
 #[derive(libpsibase::Schema)]
 enum MyEnumType {
-    Example0,                   // Type: TODO; need to define a C++ equivalent
-    Example1(u64),              // Type: u64
-    Example2(u64, u32),         // Type: tuple of u64, u32
-    Example3(foo:u64, bar:u32), // Type: a struct named Example3
+    Example0,                        // Type: TODO; need to define a C++ equivalent
+    Example1(u64),                   // Type: u64
+    Example2(u64, u32),              // Type: tuple of u64, u32
+    Example3 { foo: u64, bar: u32 }, // Type: a struct named Example3
 }
 ```
 

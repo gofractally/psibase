@@ -26,40 +26,38 @@
 ## Routing
 
 ```svgbob
-+---------+      +---------+      +-----------+
-| HTTP    |      |         |      | proxy-sys |
-| Request | ---> | psinode | ---> | service   |
-|         |      |         |      |           |
-+---------+      +---------+      +-----------+
-                                       |
-         +-----------------------------+
++-----------+      +---------+      +---------+
+| proxy-sys |      |         |      | HTTP    |
+| service   |<---- | psinode |<---- | Request |
+|           |      |         |      |         |
++-----------+      +---------+      +---------+
+         |
          |
          v
-  +--------------+          +----------------+
- /                \  no    /                  \
-/  target begins   \ ---> /  on a subdomain?   \
-\  with "/common?" /      \                    /
- \                /        \                  /
-  +--------------+          +----------------+
-         | yes                no |      | yes
-         |        +--------------+      |
-         |        |                     |
-         v        v                     v
-      +-----------------+     +------------+
-      | common-sys      |    /              \
-      | service's       |   /  registered?   \
-      | serveSys action |   \                /
-      +-----------------+    \              /
-                              +------------+
-                              no |      | yes
-                  +--------------+      |
-                  |                     |
-                  v                     v
-   +-----------------+     +-----------------+
-   | psispace-sys    |     | registered      |
-   | service's       |     | service's       |
-   | serveSys action |     | serveSys action |
-   +-----------------+     +-----------------+
+  +--------------+           +-----------------+
+ /                \  yes     | common-sys      |
+/  target begins   \ ------> | service's       |
+\  with "/common?" /         | serveSys action |
+ \                /          +-----------------+
+  +--------------+                    ^
+         | no                         |
+         |                +-----------+
+         v                |
+  +----------------+      |  +-----------------+
+ /                  \  no |  | psispace-sys    |
+/  on a subdomain?   \ ---+  | service's       |
+\                    /       | serveSys action |
+ \                  /        +-----------------+
+  +----------------+                  ^
+         | yes                        |
+         |           +----------------+
+         v           |
+  +------------+  no |       +-----------------+
+ /              \ ---+       | registered      |
+/  registered?   \           | service's       |
+\                / yes   +-->| serveSys action |
+ \              / -------+   +-----------------+
+  +------------+
 ```
 
 `psinode` passes most HTTP requests to the [SystemService::ProxySys] service, which then routes requests to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
