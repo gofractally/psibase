@@ -258,6 +258,7 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/index.js", js, readWholeFile(comDir + "/ui/dist/index.js")),
        rpcCommon.storeSys("/style.css", css, readWholeFile(comDir + "/ui/dist/style.css")),
        rpcCommon.storeSys("/ninebox.svg", svg, readWholeFile(comDir + "/ui/dist/ninebox.svg")),
+       rpcCommon.storeSys("/loader.svg", svg, readWholeFile(comDir + "/ui/dist/loader.svg")),
        rpcCommon.storeSys("/psibase.svg", svg, readWholeFile(comDir + "/ui/dist/psibase.svg")),
        rpcCommon.storeSys("/app-account-desktop.svg", svg,
                           readWholeFile(comDir + "/ui/dist/app-account-desktop.svg")),

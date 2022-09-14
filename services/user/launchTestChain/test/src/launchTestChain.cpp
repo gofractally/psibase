@@ -48,8 +48,6 @@ SCENARIO("Testing default psibase chain")
                         readWholeFile(rpcUiDir + "app-wallet-icon.svg"));
    tokenSysRpc.storeSys("/arrow-up-solid.svg", "image/svg+xml",
                         readWholeFile(rpcUiDir + "arrow-up-solid.svg"));
-   tokenSysRpc.storeSys("/incoming.svg", "image/svg+xml", readWholeFile(rpcUiDir + "incoming.svg"));
-   tokenSysRpc.storeSys("/outgoing.svg", "image/svg+xml", readWholeFile(rpcUiDir + "outgoing.svg"));
 
    auto alice = t.from(t.add_account("alice"_a));
    auto bob   = t.from(t.add_account("bob"_a));
