@@ -1,17 +1,31 @@
+import { isToday, isYesterday, format } from "date-fns";
+
 import { QueryResult } from "common/useGraphQLQuery.mjs";
 
-import { Heading, Icon, Loader, Text } from "../components";
-import { IconType } from "../components/icon";
+import { Heading, Loader, Text } from "../components";
 import { parseAmount } from "../helpers";
 import { TokenBalance, TransferResult } from "../types";
 
+const getDateTimeString = (datetime: string) => {
+    const d = new Date(datetime);
+    const time = format(d, "H:mm");
+
+    if (isToday(d)) {
+        return `Today ${time}`;
+    } else if (isYesterday(d)) {
+        return `Yesterday ${time}`;
+    } else {
+        return `${format(d, "P")} ${time}`;
+    }
+};
+
 const TransferHistoryTableHeader = () => (
     <div className="flex select-none border-b border-gray-900 py-1 font-bold">
-        {/* <div className="flex-1 px-2">
+        <div className="hidden w-44 px-2 sm:block">
             <Text size="base" span>
-                Date
+                Time
             </Text>
-        </div> */}
+        </div>
         <div className="w-32 px-2 md:hidden">
             <Text size="base" span>
                 To/From
@@ -42,7 +56,6 @@ interface Props {
     queryResult: QueryResult;
 }
 
-// TODO: datetime for event?
 export const TransferHistory = ({
     tokens,
     currentUser,
@@ -92,35 +105,38 @@ export const TransferHistory = ({
                         );
                     }
 
+                    let incoming = false;
                     let counterparty = "";
-                    let action: IconType | null = null;
                     if (transfer.receiver === currentUser) {
-                        action = "incoming";
+                        incoming = true;
                         counterparty = transfer.sender;
                     } else if (transfer.sender === currentUser) {
-                        action = "outgoing";
                         counterparty = transfer.receiver;
                     }
 
                     const symbol = token?.symbol?.toUpperCase();
+                    const date = getDateTimeString(transfer.time);
 
                     return (
                         <div
-                            className="flex py-1 font-mono text-sm hover:bg-gray-100 xs:text-base"
+                            className="flex items-center py-1 font-mono text-sm hover:bg-gray-100 xs:text-base"
                             key={transfer.event_id}
                         >
-                            {/* <div className="flex-1 px-2">
-                                [not yet supported]
-                            </div> */}
                             <div
-                                className="w-32 px-2 md:hidden"
-                                title={
-                                    action === "incoming"
-                                        ? "sender"
-                                        : "recipient"
-                                }
+                                className="hidden w-44 px-2 sm:block"
+                                title={transfer.time}
+                            >
+                                {date}
+                            </div>
+                            <div
+                                className="w-44 px-2 md:hidden"
+                                title={incoming ? "sender" : "recipient"}
                             >
                                 {counterparty}
+                                <span className="sm:hidden">
+                                    <br />
+                                    {date}
+                                </span>
                             </div>
                             <div className="hidden w-40 px-2 md:block">
                                 {transfer.sender}
@@ -129,12 +145,11 @@ export const TransferHistory = ({
                                 {transfer.receiver}
                             </div>
                             <div
-                                className="flex w-8 items-center justify-center md:w-auto md:flex-1"
-                                title={action ? action : undefined}
+                                className={`flex-1 whitespace-nowrap px-2 text-right ${
+                                    incoming ? "" : "text-red-600"
+                                }`}
                             >
-                                {action ? <Icon type={action} /> : null}
-                            </div>
-                            <div className="flex-1 whitespace-nowrap px-2 text-right">
+                                {incoming ? "+" : "-"}
                                 {parsedAmount} {symbol}
                             </div>
                         </div>
