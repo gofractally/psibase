@@ -98,6 +98,3 @@ td {
 th {
   @apply font-bold;
 }
-tr:hover {
-  @apply bg-gray-100;
-}

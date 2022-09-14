@@ -29,7 +29,7 @@
         const history = result.data.holderEvents.edges.map(
             (e) => e.node
         );
-        console.log("history", history);
+        // console.log("history", history);
 
         const tokenTypesRes = await fetchTokenTypes();
         console.log("tokenTypesRes", tokenTypesRes);

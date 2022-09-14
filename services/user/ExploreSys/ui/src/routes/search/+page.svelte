@@ -13,7 +13,6 @@
     let account = null;
 
     const search = async () => {
-        console.log("searchTerm--", searchTerm);
         if (searchTerm.match(/[0-9]+/)) {
             const data = await loadBlockData(searchTerm);
             if (data.block) {
@@ -41,18 +40,21 @@
         Block explorer
     </Button>
     <h4 class="my-2 text-gray-600">
-        Search <span class="text-gray-400">account / public key</span> / block
+        Search account / <span class="text-gray-400">public key</span> / block
     </h4>
-    <div class="mb-4 flex items-center">
+    <form on:submit|preventDefault={search} class="mb-4 flex items-center">
         <TextInput
                 leftIconUrl={searchIconUrl}
                 class="mr-2 w-96"
                 id="search_input"
                 placeholder="#block"
                 bind:value={searchTerm}
+                on:enter={search}
         />
         <Button on:click={search}>Search</Button>
-    </div>
-    <h5 class="mb-4 text-xl">Search results</h5>
+    </form>
+    {#if blocks.length > 0}
+        <h5 class="mb-4 text-xl">Search results</h5>
+    {/if}
     <Blocks {blocks}/>
 </div>

@@ -15,7 +15,7 @@
 </script>
 
 <table class={classNames($$props.class, "w-full table-fixed")}>
-    <tbody>
+    <thead>
         <tr class="border-b border-b-black">
             <th>Date</th>
             <th>From</th>
@@ -23,6 +23,8 @@
             <th>Action</th>
             <th>Amount</th>
         </tr>
+    </thead>
+    <tbody>
     {#each data.history as t}
         <tr>
             <td class="w-20">{t.time}</td>

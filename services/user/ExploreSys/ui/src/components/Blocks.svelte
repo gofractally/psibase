@@ -10,7 +10,7 @@
 </script>
 
 <table class={classNames($$props.class, "w-full table-fixed")}>
-    <tbody>
+    <thead>
         {#if blocks.length > 0}
             <tr class="border-b border-b-black">
                 <th class="w-20">Block<br />No.</th>
@@ -19,10 +19,12 @@
                 <th><br />Time</th>
             </tr>
         {/if}
+    </thead>
+    <tbody>
         {#each blocks as block}
             <tr
                 on:click={onClick(block)}
-                class={classNames({ "cursor-pointer": clickable })}
+                class={classNames({clickable})}
             >
                 <td class="w-20">{block.header.blockNum}</td>
                 <td class="w-16 whitespace-nowrap"
@@ -36,3 +38,10 @@
         {/each}
     </tbody>
 </table>
+
+<style>
+    tr.clickable:hover {
+        @apply bg-gray-100;
+        @apply cursor-pointer;
+    }
+</style>
