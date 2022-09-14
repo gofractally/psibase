@@ -11,9 +11,9 @@ Type definitions live in the `userType` array:
 ```json
 {
     "userType": [
-        {definition...},
-        {definition...},
-        {definition...}
+        {definition},
+        {definition},
+        ...
     ]
 }
 ```
@@ -27,6 +27,7 @@ A definition may also have these optional fields:
 
 - `"customJson"`, a boolean, indicates the type uses custom JSON serialization. We recommend against using this in most cases since it requires special handling in all serializers and deserializers. psibase uses it for public and private keys, signatures, [psibase::AccountNumber], and [psibase::MethodNumber].
 - `"definitionWillNotChange"`, a boolean, indicates the definition for this type will not change in the future. It opts into an alternative fracpack encoding which saves 2 bytes.
+- [methods](#method-definitions)
 
 ### Alias Definitions
 
@@ -53,8 +54,7 @@ A struct definition has this form:
             "name": "field1",
             "type": {type reference}
         },
-        {field...},
-        {field...}
+        ...
     ]
 }
 ```
@@ -71,8 +71,7 @@ A union definition describes an `std::variant` in C++ or an `enum` in Rust.
             "name": "alternative0",
             "type": {type reference}
         },
-        {field...},
-        {field...}
+        ...
     ]
 }
 ```
@@ -102,6 +101,33 @@ enum DoesNotWork {
 }
 ```
 
+### Method Definitions
+
+A struct definition may have methods on it.
+
+```json
+{
+    "name": "MyStruct",
+    "structFields": [...],
+    "methods": [
+        {
+            "name": "myMethod",
+            "returns": {type reference},
+            "args": [
+                {
+                    "name": "arg0",
+                    "type": {type reference}
+                },
+                ...
+            ]
+        },
+        ...
+    ]
+}
+```
+
+If a method doesn't return a value, `returns` should be `{"builtinType": "void"}`.
+
 ## Type References
 
 We used `{type reference}` to indicate a type reference in the definitions above. This can be one of the following:
@@ -110,7 +136,7 @@ We used `{type reference}` to indicate a type reference in the definitions above
 - `{"userType": "Foo"}` - a type defined in the [userType array](#type-definitions)
 - `{"vector": {inner type}}` - a vector of inner type
 - `{"optional": {inner type}}` - an optional of inner type
-- `{"tuple": [{inner type}, ...]}` - a tuple of inner type
+- `{"tuple": [{inner type}, ...]}` - a tuple of inner types
 - `{"array": {inner type}, "size": 8}` - a fixed-size array of inner type
 
 Built-in types live in a separate namespace from user-defined types to minimize conflicts in the future if more built-in types are added.
@@ -119,9 +145,10 @@ Built-in types live in a separate namespace from user-defined types to minimize 
 
 `{"builtinType":"..."}` can name one of the following built-in types:
 
+- `void`: only supported as a method return type
 - `bool`
-- `u8`, `u16`, `u32`, `u64`
-- `i8`, `i16`, `i32`, `i64`
+- `u8`, `u16`, `u32`, `u64`: unsigned integers
+- `i8`, `i16`, `i32`, `i64`: signed integers
 - `f32`, `f64`: floating-point types
 - `string`
 
