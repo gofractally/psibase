@@ -287,33 +287,37 @@ export function storePromise(resolve, reject) {
     return callbackId;
 }
 
-export function executeCallback(callbackId, response) {
-    let idx = queryCallbacks.findIndex(q => q.callbackId === callbackId);
+export function executeCallback(callbackId, response)
+{
+    const cb = queryCallbacks.find(q => q.callbackId === callbackId);
 
-    if (idx === -1) {
+    if (!cb)
+    {
         console.error("Callback with ID " + callbackId + " not found.");
         return false;
     }
 
-    try {
-        queryCallbacks[idx].callback(response);
+    try{
+        cb.callback(response);
     }
-    catch (e) {
-        console.error("Error calling callback with ID " + callbackId);
+    catch (e)
+    {
+        console.error("Error calling callback with ID " + callbackId, e);
     }
-    // Remove the callback now that it's been handled
-    queryCallbacks.splice(idx, 1);
+    // Remove the callback to flag it was executed
+    delete cb.callback;
     return true;
 }
 
-export function executePromise(callbackId, response, errors) {
-    let idx = promises.findIndex(q => q.callbackId === callbackId);
-    if (idx === -1) {
+export function executePromise(callbackId, response, errors)
+{
+    const promise = promises.find(q => q.callbackId === callbackId);
+    if (!promise)
+    {
         console.error("Promise with ID " + callbackId + " not found.");
         return false;
     }
 
-    let promise = promises.splice(idx, 1)[0];
     if (errors.length > 0)
         promise.reject(errors);
     else

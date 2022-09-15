@@ -79,6 +79,7 @@ const App = () => {
                 accountSys,
                 "getLoggedInUser"
             );
+            console.info("getLoggedInUser >>", response);
             setCurrentUser(response);
             return response;
         } catch (e) {
@@ -89,9 +90,8 @@ const App = () => {
     useEffect(() => {
         const getUserFn = async () => {
             await getCurrentUser();
-            // NOTE: 1000 ms wasn't enough...
         };
-        setInterval(getUserFn, 2000);
+        getUserFn();
     }, []);
 
     const getIndex = useCallback((appletId: AppletId) => {
