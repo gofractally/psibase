@@ -5,12 +5,14 @@
 #include <psibase/testUtils.hpp>
 #include <services/system/commonErrors.hpp>
 
+#include "services/system/ProducerSys.hpp"
 #include "services/user/RTokenSys.hpp"
 #include "services/user/SymbolSys.hpp"
 #include "services/user/TokenSys.hpp"
 
 using namespace psibase;
 using namespace psibase::benchmarking;
+using SystemService::ProducerSys;
 using UserService::TokenSys;
 using namespace UserService::Errors;
 using namespace UserService;
@@ -51,6 +53,7 @@ SCENARIO("Testing default psibase chain")
 
    auto alice = t.from(t.add_account("alice"_a));
    auto bob   = t.from(t.add_account("bob"_a));
+   t.from(t.add_account("testchain"_a));
 
    // Initialize user services
    alice.to<NftSys>().init();
@@ -71,6 +74,9 @@ SCENARIO("Testing default psibase chain")
 
    auto create = alice.to<TokenSys>().create(4, 1'000'000e4);
    alice.to<TokenSys>().mint(create.returnVal(), 100e4, memo);
+
+   std::vector<ProducerConfigRow> producerConfig = {{"testchain"_a, {}}};
+   alice.to<ProducerSys>().setProducers(producerConfig);
 
    t.startBlock();
 
