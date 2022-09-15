@@ -322,7 +322,13 @@ export function executePromise(callbackId, response, errors) {
     return true;
 }
 
+// push new observables to a ReplaySubject which will store observables, a bit like this buffering stuff
+// we're already doing  
+// 
+
 async function sendToParent(message) {
+
+    // replaySubject.next(message)
 
     let sendMessage = async () => {
         parentIFrame.sendMessage(message, await siblingUrl(null, null, null));
@@ -349,22 +355,14 @@ let redirectIfAccessedDirectly = async () => {
     }
 };
 
-export function verifyFields(obj, fieldNames) {
-    var missingField = false;
-
-    fieldNames.forEach((fieldName) => {
-        if (!obj.hasOwnProperty(fieldName)) {
-            missingField = true;
-        }
-    });
-
-    return !missingField;
+export function isKeysDefined(obj, keys) {
+    return keys.every(key => key in obj);
 };
 
 let handleErrorCode = (code) => {
     if (code === undefined) return false;
 
-    let recognizedError = ErrorMessages.some((err) => {
+    const recognizedError = ErrorMessages.some((err) => {
         if (err.code === code) {
             console.error(err.message);
             return true;
@@ -377,7 +375,8 @@ let handleErrorCode = (code) => {
     return true;
 };
 
-var contractName = '';
+let contractName = '';
+
 export async function getContractName() {
     if (contractName !== '') {
         return contractName;
@@ -397,7 +396,7 @@ let messageRouting = [
             let responsePayload = { callbackId, response: null, errors: [] };
             let contractName = await getContractName();
             let op = ops.find(o => o.id === identifier);
-            var errors = [];
+
             if (op === undefined) {
                 responsePayload.errors.push("Service " + contractName + " has no operation, \"" + identifier + "\"");
             }
@@ -449,18 +448,12 @@ let messageRouting = [
     {
         type: MessageTypes.QueryResponse,
         fields: ["callbackId", "response", "errors"],
-        route: (payload) => {
-            let { callbackId, response, errors } = payload;
-            return executePromise(callbackId, response, errors);
-        },
+        route: ({ callbackId, response, errors }) => executePromise(callbackId, response, errors)
     },
     {
         type: MessageTypes.OperationResponse,
         fields: ["callbackId", "response", "errors"],
-        route: (payload) => {
-            let { callbackId, response, errors } = payload;
-            return executePromise(callbackId, response, errors);
-        },
+        route: ({ callbackId, response, errors }) => executePromise(callbackId, response, errors)
     },
 ];
 
@@ -473,13 +466,12 @@ export async function initializeApplet(initializer = () => { }) {
     window.iFrameResizer = {
         targetOrigin: rootUrl,
         onReady: () => {
-            bufferedMessages.forEach(async (m) => await m());
+            bufferedMessages.forEach((m) => m());
             bufferedMessages = [];
         },
-        onMessage: (msg) => {
-            let { type, payload } = msg;
+        onMessage: ({ type, payload }) => {
             if (type === undefined || payload === undefined) {
-                console.error("Malformed message received from core");
+                console.error("Malformed message received from core", { type, payload });
                 return;
             }
 
@@ -489,7 +481,7 @@ export async function initializeApplet(initializer = () => { }) {
                 return;
             }
 
-            if (!verifyFields(payload, route.fields)) {
+            if (!isKeysDefined(payload, route.fields)) {
                 console.error("Message from core failed validation checks");
                 return;
             }
@@ -509,7 +501,7 @@ export async function initializeApplet(initializer = () => { }) {
 
 function set({ targetArray, newElements }, caller) {
     let valid = newElements.every(e => {
-        if (!verifyFields(e, ["id", "exec"])) {
+        if (!isKeysDefined(e, ["id", "exec"])) {
             return false;
         }
         return true;
@@ -523,12 +515,7 @@ function set({ targetArray, newElements }, caller) {
     if (targetArray.length === 0)
         targetArray.push(...newElements);
     else {
-        valid = newElements.every(e => {
-            if (targetArray.find(t => t.id === e.id))
-                return false;
-            else
-                return true;
-        });
+        valid = newElements.every(e => !targetArray.some(t => t.id === e.id));
         if (!valid) {
             console.error(caller + ": Same element defined twice.");
             return;

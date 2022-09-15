@@ -9,9 +9,11 @@ export const getIframeId = (appletId: AppletId) => {
     return "applet_" + appletId.name + "_" + appletId.subPath;
 };
 
+const minutesToMs = (minutes: number) => minutes * 60 * 1000;
+
 export const constructTransaction = async (actions: any) => {
-    let tenMinutes = 10 * 60 * 1000;
-    var trans = JSON.parse(
+    const tenMinutes = minutesToMs(10);
+    const transaction = JSON.parse(
         JSON.stringify(
             {
                 tapos: {
@@ -25,12 +27,12 @@ export const constructTransaction = async (actions: any) => {
         )
     );
 
-    return trans;
+    return transaction;
 };
 
 export function getAppletInURL() {
     const pathname = window.location.pathname;
-    var fullPath = pathname.substring(appletPrefix.length);
+    let fullPath = pathname.substring(appletPrefix.length);
     return AppletId.fromFullPath(fullPath);
 }
 
