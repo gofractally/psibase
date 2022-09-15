@@ -1,16 +1,18 @@
 import React, { useRef } from "react";
 
+import {
+    useAccountsWithKeys,
+    useCurrentUser,
+    useImportAccount,
+    useCreateAccount,
+    useAccounts,
+    useInitialized
+} from './hooks'
+
 import appAccountIcon from "./components/assets/icons/app-account.svg";
-import { AccountsList, AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
+import { AccountsList, AccountList, CreateAccountForm, Heading } from "./components";
 import { getLoggedInUser } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
-
-import { useAccountsWithKeys } from "./hooks/useAccountsWithKeys";
-import { useCurrentUser } from "./hooks/useCurrentUser";
-import { useImportAccount } from "./hooks/useImportAccount";
-import { useCreateAccount } from "./hooks/useCreateAccount";
-import { useAccounts } from "./hooks/useAccounts";
-import { useInitialized } from "./hooks/useInitialized";
 
 // needed for common files that won't necessarily use bundles
 window.React = React;
