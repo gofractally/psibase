@@ -91,7 +91,7 @@ uint8_t[fixed_size] fixed_data;     // Fixed-size objects or offsets to
 uint8_t[]           variable_data;  // Variable-size objects
 ```
 
-`fixed_size` indirectly encodes the size of the vector. If it's a vector of some type `T`, and that type is fixed size, then then vector length is `fixed_size / sizeof(T)`. If `T` is variable size, then the vector length is `fixed_size / sizeof(Offset Pointer)`. Note that `fixed_size` here is 32 bits instead of 16, which is used in structs.
+`fixed_size` indirectly encodes the size of the vector. If it's a vector of some type `T`, and that type is fixed size, then then vector length is `fixed_size / T's size`. If `T` is variable size, then the vector length is `fixed_size / 4`. Note that `fixed_size` here is 32 bits instead of 16, which is used in structs.
 
 ### Optionals
 
