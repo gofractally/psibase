@@ -128,6 +128,7 @@ function(add suffix)
             service/include
             tester/include
             ../../services/system/AccountSys/include
+            ../../services/system/ProducerSys/include
             ../../services/system/AuthEcSys/include
             ../../services/system/AuthAnySys/include
             ../../services/system/ProxySys/include
