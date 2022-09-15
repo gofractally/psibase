@@ -4,11 +4,7 @@
     import { goto } from "$app/navigation";
     import { loadData } from "/src/lib/loadData.js";
     import { ExplorerIcon, SearchIcon, DotIcon } from "/src/assets/icons";
-    import ButtonSet from "/src/components/ButtonSet.svelte";
-    import Button from "/src/components/Button.svelte";
-    import Blocks from "/src/components/Blocks.svelte";
-    import Loader from "/src/components/Loader.svelte";
-    import Error from "/src/components/Error.svelte";
+    import { Blocks, Button, ButtonSet, Error, Loader } from "/src/components";
 
     let apiInterval = null;
     let data = null;

@@ -1,12 +1,9 @@
 <script>
     import {goto} from "$app/navigation";
     import {loadBlockData} from "/src/lib/loadData.js";
-    import Logo from "/src/assets/icons/app-explorer-icon.svg";
-    import Button from "/src/components/Button.svelte";
-    import TextInput from "/src/components/TextInput.svelte";
-    import LeftArrow from "/src/assets/icons/leftArrow.svg";
+    import { ExplorerIcon, LeftArrowIcon } from "/src/assets/icons";
+    import { Blocks, Button, TextInput } from "/src/components";
     import searchIconUrl from "/src/assets/icons/search.svg?url";
-    import Blocks from "/src/components/Blocks.svelte";
 
     let searchTerm;
     let blocks = [];
@@ -32,11 +29,11 @@
 
 <div>
     <div class="mb-6 flex items-center gap-2">
-        <Logo/>
+        <ExplorerIcon />
         <h1 class="text-6xl text-gray-600">Block Explorer</h1>
         <div class="flex-grow"/>
     </div>
-    <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
+    <Button on:click={() => history.back()} leftIcon={LeftArrowIcon} class="mb-2">
         Block explorer
     </Button>
     <h4 class="my-2 text-gray-600">

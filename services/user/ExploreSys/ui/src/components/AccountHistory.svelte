@@ -1,7 +1,7 @@
 <script>
     import classNames from "classnames";
     import { IncomingIcon, OutgoingIcon } from "/src/assets/icons";
-    import Amount from "/src/components/Amount.svelte";
+    import { Amount } from "/src/components";
 
     export let data = null;
 

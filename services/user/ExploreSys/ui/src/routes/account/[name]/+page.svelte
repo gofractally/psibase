@@ -2,13 +2,9 @@
     import { getJson, siblingUrl } from "common/rpc.mjs?client";
     import { page } from "$app/stores";
     import { onMount } from "svelte";
-    import Button from "/src/components/Button.svelte";
-    import Error from "/src/components/Error.svelte";
-    import { LeftArrowIcon } from "./leftArrow.svg";
+    import { LeftArrowIcon } from "/src/assets/icons";
     import { loadTransferHistory } from "/src/lib/loadData.js";
-    import AccountHistory from "/src/components/AccountHistory.svelte";
-    import Loader from "/src/components/Loader.svelte";
-    import Amount from "/src/components/Amount.svelte";
+    import { AccountHistory, Amount, Button, Error, Loader } from "/src/components";
 
     let data = null;
 

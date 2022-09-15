@@ -1,12 +1,10 @@
 <script>
     import { page } from "$app/stores";
     import { onMount } from "svelte";
-    import Button from "/src/components/Button.svelte";
-    import Error from "/src/components/Error.svelte";
-    import { LeftArrowIcon } from "./leftArrow.svg";
+    import { LeftArrowIcon } from "/src/assets/icons";
     import { loadBlockData } from "/src/lib/loadData.js";
-    import Blocks from "/src/components/Blocks.svelte";
-    import Loader from "/src/components/Loader.svelte";
+    import { Blocks, Button, Error, Loader } from "/src/components";
+
     let data = null;
     let blocks = [];
 
