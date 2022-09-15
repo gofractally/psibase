@@ -125,5 +125,6 @@ Fracpack places additional requirements on packed data to enable quick safety ch
 - `variable_data` must be in the same order as `fixed_data`
 - Offset pointers must leave no gaps, except when unknown fields are skipped (e.g. extensible structs, tuples, and unknown enum entries)
 - Additional rules for [Optionals](#optionals)
+- Tagged Unions' `tag` field must be less than 128. This allows a potential extension in the future which will be signaled by the MSB.
 
 TODO: finish this list. Make sure both the C++ and Rust implementations' checkers enforce the rules.
