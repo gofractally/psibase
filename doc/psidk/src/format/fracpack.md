@@ -30,7 +30,9 @@ Numeric types are in twos-complement little-endian format. They are unaligned. T
 
 ### Non-Extensible Fixed-Size Structs
 
-A struct which is non-extensible (this is an opt-in flag) and which contains only fixed-sized subobjects is itself fixed size. Its subobjects are packed in order without padding. A struct is variable size if it is extensible (the default) or if it contains any variable-sized data within it. Variable-size structs have a [different encoding](#variable-size-structs).
+A non-extensible struct is one that will never gain new fields in the future. Non-extensibility requires an explicit opt-in; fracpack considers structs extensible by default. fracpack's extensibility mechanism is unrelated to inheritance; fracpack doesn't model inheritance and its C++ implementation doesn't understand it.
+
+A struct which is non-extensible and which contains only fixed-sized subobjects is itself fixed size. Its subobjects are packed in order without padding. A struct is variable size if it is extensible (the default) or if it contains any variable-sized data within it. Variable-size structs have a [different encoding](#variable-size-structs).
 
 ### Fixed-Length Arrays of Fixed-Size Objects
 
