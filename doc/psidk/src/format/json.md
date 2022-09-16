@@ -4,7 +4,7 @@ Both C++ and Rust services support typed JSON serialization. C++ services use `p
 
 ## Structs
 
-Both psio and serde represent structs-with-fields as JSON objects.
+Both psio and serde_json represent structs-with-fields as JSON objects.
 
 ## Numbers
 
@@ -13,7 +13,7 @@ Both psio and serde represent structs-with-fields as JSON objects.
 - JavaScript's number type can handle integers up to 53 bits unsigned, 54 signed. Extra precision is silently truncated. e.g. `10000000000000001 == 10000000000000000`.
 - JavaScript's BigInt type supports arbitrary precision, but JavaScript's built-in JSON conversions don't support it.
 
-The cleanest workaround seems to be to store 64-bit integers in quoted strings, but several widely-used JSON libraries in type-safe languages decided against that workaround, and reject incoming quoted numbers. serde used to support it (input only), but hit some [nasty conflicts](https://github.com/serde-rs/serde/pull/839) and had to remove it. serde provides customization (`serialize_with` and `deserialize_with`), but that gets cumbersome in nested types, e.g. `Option<Vec<u64>>`.
+The cleanest workaround seems to be to store 64-bit integers in quoted strings, but several widely-used JSON libraries in type-safe languages decided against that workaround, and reject incoming quoted numbers. serde_json used to support it (input only), but hit some [nasty conflicts](https://github.com/serde-rs/serde/pull/839) and had to remove it. serde_json provides customization (`serialize_with` and `deserialize_with`), but that gets cumbersome in nested types, e.g. `Option<Vec<u64>>`.
 
 Instead of trying to get type-safe JSON libraries to work around JavaScript's limitations, it's probably time we ask JavaScript to pull its own weight. JavaScript JSON Libraries exist which [handle BigInt](https://www.npmjs.com/package/json-bigint).
 
@@ -25,15 +25,15 @@ Instead of trying to get type-safe JSON libraries to work around JavaScript's li
 
 ## Strings
 
-`psio::to_json` and `psio::from_json` use JSON strings for `std::string`. serde uses JSON strings for rust's various string types.
+`psio::to_json` and `psio::from_json` use JSON strings for `std::string`. serde_json uses JSON strings for rust's various string types.
 
 ## Optional
 
-Both psio (`std::optional`) and serde (`Option`) represent the empty case as `null` and the non-empty case as the inner type.
+Both psio (`std::optional`) and serde_json (`Option`) represent the empty case as `null` and the non-empty case as the inner type.
 
 ## Vectors and Arrays
 
-Both psio and serde represent vectors (`std::Vector`, `Vec`) and arrays (`std::array`, `[]` (Rust)) as JSON arrays.
+Both psio and serde_json represent vectors (`std::Vector`, `Vec`) and arrays (`std::array`, `[]` (Rust)) as JSON arrays.
 
 ## Byte vectors and arrays
 
@@ -53,13 +53,12 @@ When should a vector or array use a hex representation? It's convenient to autom
 
 ## Tuples
 
-Both psio and serde represent tuples as JSON arrays.
+Both psio and serde_json represent tuples as JSON arrays. The empty tuple has a problem. `psio` renders `std::tuple<>{}` as you'd expect: `[]`. `serde_json`, however, renders `()`, the unit, as `null`.
 
 - TODO: psio json support for tuples
-- TODO: The serde doc kind of infers that it represents the empty tuple `()` as `null`. Verify and update this doc and psio to match.
 
 ## Variants / Enums
 
-There are probably as many ways to represent these in JSON as there are grains of sand on the beach. serde supports [4 approaches](https://serde.rs/enum-representations.html). Of these, only the [externally tagged](https://serde.rs/enum-representations.html#externally-tagged) and [adjacently tagged](https://serde.rs/enum-representations.html#adjacently-tagged) representations cover all situations unambiguously.
+There are probably as many ways to represent these in JSON as there are grains of sand on the beach. serde_json supports [4 approaches](https://serde.rs/enum-representations.html). Of these, only the [externally tagged](https://serde.rs/enum-representations.html#externally-tagged) and [adjacently tagged](https://serde.rs/enum-representations.html#adjacently-tagged) representations cover all situations unambiguously.
 
-- TODO: pick one. It will be easier on rust devs if we choose serde's default (externally tagged). It looks like I can take advantage of the syntax of the externally-tagged option to represent nested types in the schema without falling back on a DSL.
+- TODO: pick one. It will be easier on rust devs if we choose serde_json's default (externally tagged). It looks like I can take advantage of the syntax of the externally-tagged option to represent nested types in the schema without falling back on a DSL.

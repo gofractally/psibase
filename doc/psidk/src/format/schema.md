@@ -92,7 +92,7 @@ A union definition describes an `std::variant` in C++ or an `enum` in Rust.
 
 In C++, each type comes from the variant's type parameters. The names come from (TODO: variant name reflection support).
 
-In Rust, the type varies depending on the Rust definition:
+In Rust, both the names and the types come from the Rust definition:
 
 ```rust
 #[derive(libpsibase::Schema)]
@@ -101,12 +101,26 @@ enum MyEnumType {
     Example1(u64),                   // Type: u64
     Example2(u64, u32),              // Type: tuple of u64, u32
     Example3((u64,)),                // Type: tuple of u64 (extra parenthesis required)
-    Example4(()),                    // Type: empty tuple (extra parenthesis required)
-    Example5 { foo: u64, bar: u32 }, // Type: a struct
+    Example4 { foo: u64, bar: u32 }, // Type: a struct
+    Example5(),                      // Type: empty tuple
+    Example6(()),                    // Not supported
 }
 ```
 
-The schema format doesn't support discriminants in Rust or `enum` in C++.
+`serde_json` has an interesting gap. Tuples render as `[...]`, but `()`, the unit, renders as `null`. There is no true empty tuple in Rust; `()` comes closest, but fills multiple roles in Rust, which may explain why `serde_json` chose `null` for it. `Example5` opens up an opportunity since `serde_json` renders it as `{"Example5":[]}`. The schema treats it as an empty tuple because it renders like an empty tuple would, if `serde_json` supported empty tuples. Empty tuples are useful because the fracpack format for empty tuples supports adding new optional fields to them in a compatible way. e.g. the following definition is compatible with the above definition:
+
+```rust
+#[derive(libpsibase::Schema)]
+enum MyEnumType {
+    ...
+    Example5((Option<u64>, )),  // No longer empty, but still compatible
+    ...
+}
+```
+
+The schema format doesn't support `Example6` because `serde_json` renders it as `{"Example6":null}`.
+
+The schema format doesn't support discriminants in Rust since fracpack numbers alternatives starting at 0 with no gaps. The schema format also doesn't support `enum` in C++; use `std::variant` instead.
 
 ```rust
 // Not supported
