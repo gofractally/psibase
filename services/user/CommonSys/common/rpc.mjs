@@ -428,20 +428,30 @@ let messageRouting = [
         type: MessageTypes.Query,
         fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
-            let { identifier, params, callbackId } = payload;
-            let responsePayload = { callbackId, response: null, errors: [] };
-            let contractName = await getContractName();
-            let qu = qrs.find(q => q.id === identifier);
-            if (qu === undefined) {
-                responsePayload.errors.push("Service " + contractName + " has no query, \"" + identifier + "\"");
-            }
-            else {
-                try {
-                    responsePayload.response = await qu.exec(params);
+            let {identifier, params, callbackId} = payload;
+            let responsePayload = {callbackId, response: null, errors: []};
+
+            try {
+                let contractName = await getContractName();
+                let qu = qrs.find(q => q.id === identifier);
+                if (qu === undefined)
+                {
+                    responsePayload.errors.push("Service " + contractName + " has no query, \"" + identifier + "\"");
                 }
-                catch (e) {
-                    responsePayload.errors.push(e);
+                else
+                {
+                    try
+                    {
+                        responsePayload.response = await qu.exec(params);
+                    } 
+                    catch (e)
+                    {
+                        responsePayload.errors.push(e);
+                    }
                 }
+            } catch (e) {
+                console.error("fail to process query message", e)
+                responsePayload.errors.push(e);
             }
 
             sendToParent({
@@ -476,8 +486,8 @@ export async function initializeApplet(initializer = () => { }) {
     let rootUrl = await siblingUrl(null, null, null);
     window.iFrameResizer = {
         targetOrigin: rootUrl,
-        onReady: () => {
-            bufferedMessages.forEach(async (m) => await m());
+        onReady: async () => {
+            bufferedMessages.forEach((m) => m());
             bufferedMessages = [];
         },
         onMessage: (msg) => {

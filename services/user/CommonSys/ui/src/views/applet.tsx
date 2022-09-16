@@ -29,7 +29,7 @@ interface Props {
 }
 
 export const Applet = ({ applet, handleMessage }: Props) => {
-    const { appletId, state, onInit = () => {} } = applet;
+    const { appletId, state, onInit } = applet;
     const [appletSrc, setAppletSrc] = useState("");
 
     const iFrameId = getIframeId(appletId);
