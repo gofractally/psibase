@@ -1,14 +1,10 @@
 <script>
-    import { action, AppletId, getJson, siblingUrl } from "common/rpc.mjs?client";
+    import { getJson, siblingUrl } from "common/rpc.mjs?client";
     import { page } from "$app/stores";
     import { onMount } from "svelte";
-    import Button from "/src/components/Button.svelte";
-    import Error from "/src/components/Error.svelte";
-    import LeftArrow from "/src/assets/icons/leftArrow.svg";
+    import { LeftArrowIcon } from "/src/assets/icons";
     import { loadTransferHistory } from "/src/lib/loadData.js";
-    import AccountHistory from "/src/components/AccountHistory.svelte";
-    import Loader from "/src/components/Loader.svelte";
-    import Amount from "/src/components/Amount.svelte";
+    import { AccountHistory, Amount, Button, Error, Loader } from "/src/components";
 
     let data = null;
 
@@ -23,37 +19,40 @@
     }
 
     onMount(async () => {
-        const account = $page.params.name;
-        const result = await loadTransferHistory(account);
-        console.log(result.data.holderEvents.edges);
-        const history = result.data.holderEvents.edges.map(
-            (e) => e.node
-        );
-        // console.log("history", history);
-
-        const tokenTypesRes = await fetchTokenTypes();
-        console.log("tokenTypesRes", tokenTypesRes);
-        const tokenTypes = tokenTypesRes.reduce(
-            (prev, token) => {
-                prev[token.id] = {
-                    precision: token.precision.value,
-                    symbol: token.symbolId,
-                };
-                return prev;
-            },
-            {}
-        );
-        console.log("tokenTypes", tokenTypes);
-
-        const balances = await fetchBalances(account);
-        console.log("balances", balances);
-
-        data = {
-            tokenTypes,
-            account,
-            history,
-            balances,
-        };
+        try {
+            const account = $page.params.name;
+            const result = await loadTransferHistory(account);
+            console.log("loadTransferHistory", result);
+            const history = result.data.holderEvents.edges.map(
+                (e) => e.node
+            );
+            // console.log("history", history);
+            const tokenTypesRes = await fetchTokenTypes();
+            // console.log("tokenTypesRes", tokenTypesRes);
+            const tokenTypes = tokenTypesRes.reduce(
+                (prev, token) => {
+                    prev[token.id] = {
+                        precision: token.precision.value,
+                        symbol: token.symbolId,
+                    };
+                    return prev;
+                },
+                {}
+            );
+            // console.log("tokenTypes", tokenTypes);
+            const balances = await fetchBalances(account);
+            // console.log("balances", balances);
+            data = {
+                tokenTypes,
+                account,
+                history,
+                balances,
+            };
+        }
+        catch(error) {
+            console.log("eeerrror", error);
+            data = { error };
+        }
     });
 </script>
 
@@ -61,7 +60,7 @@
     {#if !data}
         <Loader />
     {:else if data.error}
-        <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
+        <Button on:click={() => history.back()} leftIcon={LeftArrowIcon} class="mb-2">
             Search
         </Button>
         <Error value={data.error} />
@@ -69,7 +68,7 @@
         <div class="mb-4">
             <h1 class="text-6xl text-gray-600">Account Details</h1>
         </div>
-        <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
+        <Button on:click={() => history.back()} leftIcon={LeftArrowIcon} class="mb-2">
             Search
         </Button>
         <h4 class="py-4">{data.account}</h4>
