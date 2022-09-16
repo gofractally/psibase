@@ -218,13 +218,13 @@ fn add_startup_trx(
         Action {
             sender: account!("account-sys"),
             contract: account!("account-sys"),
-            method: method!("startup"),
+            method: method!("init"),
             raw_data: Empty {}.packed_bytes(),
         },
         Action {
             sender: account!("transact-sys"),
             contract: account!("transact-sys"),
-            method: method!("startup"),
+            method: method!("init"),
             raw_data: Empty {}.packed_bytes(),
         },
         Action {

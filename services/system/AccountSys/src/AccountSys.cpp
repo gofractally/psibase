@@ -12,7 +12,7 @@ using namespace psibase;
 
 namespace SystemService
 {
-   void AccountSys::startup()
+   void AccountSys::init()
    {
       Tables tables{getReceiver()};
       auto   statusTable  = tables.open<AccountSysStatusTable>();

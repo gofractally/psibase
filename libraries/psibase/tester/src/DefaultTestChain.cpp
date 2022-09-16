@@ -137,7 +137,7 @@ void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
                                               SystemService::AccountSys::service};
    transactor<SystemService::TransactionSys> tsys{SystemService::TransactionSys::service,
                                                   SystemService::TransactionSys::service};
-   auto trace = pushTransaction(makeTransaction({asys.startup(), tsys.startup()}));
+   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }

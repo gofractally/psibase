@@ -17,7 +17,7 @@ static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
 
 namespace SystemService
 {
-   void TransactionSys::startup()
+   void TransactionSys::init()
    {
       auto tables      = TransactionSys::Tables(TransactionSys::service);
       auto statusTable = tables.open<TransactionSysStatusTable>();
