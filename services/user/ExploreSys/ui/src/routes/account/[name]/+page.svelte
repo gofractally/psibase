@@ -19,37 +19,40 @@
     }
 
     onMount(async () => {
-        const account = $page.params.name;
-        const result = await loadTransferHistory(account);
-        console.log(result.data.holderEvents.edges);
-        const history = result.data.holderEvents.edges.map(
-            (e) => e.node
-        );
-        // console.log("history", history);
-
-        const tokenTypesRes = await fetchTokenTypes();
-        console.log("tokenTypesRes", tokenTypesRes);
-        const tokenTypes = tokenTypesRes.reduce(
-            (prev, token) => {
-                prev[token.id] = {
-                    precision: token.precision.value,
-                    symbol: token.symbolId,
-                };
-                return prev;
-            },
-            {}
-        );
-        console.log("tokenTypes", tokenTypes);
-
-        const balances = await fetchBalances(account);
-        console.log("balances", balances);
-
-        data = {
-            tokenTypes,
-            account,
-            history,
-            balances,
-        };
+        try {
+            const account = $page.params.name;
+            const result = await loadTransferHistory(account);
+            console.log("loadTransferHistory", result);
+            const history = result.data.holderEvents.edges.map(
+                (e) => e.node
+            );
+            // console.log("history", history);
+            const tokenTypesRes = await fetchTokenTypes();
+            // console.log("tokenTypesRes", tokenTypesRes);
+            const tokenTypes = tokenTypesRes.reduce(
+                (prev, token) => {
+                    prev[token.id] = {
+                        precision: token.precision.value,
+                        symbol: token.symbolId,
+                    };
+                    return prev;
+                },
+                {}
+            );
+            // console.log("tokenTypes", tokenTypes);
+            const balances = await fetchBalances(account);
+            // console.log("balances", balances);
+            data = {
+                tokenTypes,
+                account,
+                history,
+                balances,
+            };
+        }
+        catch(error) {
+            console.log("eeerrror", error);
+            data = { error };
+        }
     });
 </script>
 

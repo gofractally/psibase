@@ -137,8 +137,6 @@ export async function loadTransferHistory(user) {
     const query = queryTransferHistory(user);
     const host = window.location.host.replace("explore-sys.", "token-sys.");
     const url = `${window.location.protocol}//${host}/graphql`;
-    console.log("loadTransferHistory POST", url);
     const result = await useGraphQLQuery(url, query);
-    console.log("useTransferHistory", result);
     return result;
 }

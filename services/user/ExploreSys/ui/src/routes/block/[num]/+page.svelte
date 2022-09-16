@@ -63,16 +63,3 @@
         </div>
     {/if}
 </div>
-
-<style>
-    th,
-    td {
-        @apply font-mono;
-        @apply text-sm;
-        @apply p-2;
-        @apply text-left;
-    }
-    th {
-        @apply font-bold;
-    }
-</style>
