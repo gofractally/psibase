@@ -62,6 +62,10 @@ pub trait Packable<'a>: Sized {
     }
 } // Packable
 
+pub trait TupleOfRefPackable<'a>: Sized {
+    fn pack_tuple_of_ref(&self, dest: &mut Vec<u8>);
+}
+
 fn read_u8_arr<const SIZE: usize>(src: &[u8], pos: &mut u32) -> Result<[u8; SIZE]> {
     let mut bytes: [u8; SIZE] = [0; SIZE];
     bytes.copy_from_slice(
@@ -923,6 +927,25 @@ macro_rules! tuple_impls {
                         return Err(Error::BadOffset);
                     }
                     <Self as Packable>::verify(src, heap_pos)
+                }
+            }
+
+            impl<'a, $($name: Packable<'a>),+> TupleOfRefPackable<'a> for ($(&$name,)+)
+            {
+                #[allow(non_snake_case)]
+                fn pack_tuple_of_ref(&self, dest: &mut Vec<u8>) {
+                    let heap: u32 = $($name::FIXED_SIZE +)+ 0;
+                    assert!(heap as u16 as u32 == heap); // TODO: return error
+                    (heap as u16).pack(dest);
+                    $(
+                        let $name = dest.len() as u32;
+                        self.$n.embedded_fixed_pack(dest);
+                    )+
+                    $(
+                        let heap_pos = dest.len() as u32;
+                        self.$n.embedded_fixed_repack($name, heap_pos, dest);
+                        self.$n.embedded_variable_pack(dest);
+                    )+
                 }
             }
         )+

@@ -1,7 +1,9 @@
 use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields};
+use syn::{
+    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, FieldsUnnamed,
+};
 
 /// Fracpack struct level options
 #[derive(Debug, Default, FromDeriveInput)]
@@ -10,17 +12,25 @@ pub struct Options {
     definition_will_not_change: bool,
 }
 
-struct FracpackField<'a> {
+struct StructField<'a> {
     name: &'a proc_macro2::Ident,
     ty: &'a syn::Type,
 }
 
-fn struct_fields(data: &DataStruct) -> Vec<FracpackField> {
+struct EnumField<'a> {
+    name: &'a proc_macro2::Ident,
+    as_type: proc_macro2::TokenStream,
+    selector: proc_macro2::TokenStream,
+    pack: proc_macro2::TokenStream,
+    unpack: proc_macro2::TokenStream,
+}
+
+fn struct_fields(data: &DataStruct) -> Vec<StructField> {
     match &data.fields {
         Fields::Named(named) => named
             .named
             .iter()
-            .map(|field| FracpackField {
+            .map(|field| StructField {
                 name: field.ident.as_ref().unwrap(),
                 ty: &field.ty,
             })
@@ -30,22 +40,201 @@ fn struct_fields(data: &DataStruct) -> Vec<FracpackField> {
     }
 }
 
-fn enum_fields(data: &DataEnum) -> Vec<FracpackField> {
-    data.variants
-        .iter()
-        .map(|var| match &var.fields {
-            Fields::Named(_) => unimplemented!("variants must have exactly 1 unnamed field"),
-            Fields::Unnamed(field) => {
-                assert!(
-                    field.unnamed.len() == 1,
-                    "variants must have exactly 1 unnamed field"
-                );
-                FracpackField {
-                    name: &var.ident,
-                    ty: &field.unnamed[0].ty,
+fn enum_named<'a>(
+    enum_name: &proc_macro2::Ident,
+    field_name: &'a proc_macro2::Ident,
+    field: &FieldsNamed,
+) -> EnumField<'a> {
+    let as_type = {
+        let types = field
+            .named
+            .iter()
+            .map(|x| {
+                let ty = &x.ty;
+                quote! {#ty}
+            })
+            .reduce(|acc, new| quote! {#acc,#new})
+            .unwrap_or_default();
+        quote! {(#types,)}
+    };
+    let as_tuple_of_ref = {
+        let types = field
+            .named
+            .iter()
+            .map(|x| {
+                let ty = &x.ty;
+                quote! {&#ty}
+            })
+            .reduce(|acc, new| quote! {#acc,#new})
+            .unwrap_or_default();
+        quote! {(#types,)}
+    };
+
+    EnumField {
+        name: field_name,
+        as_type: as_type.clone(),
+        selector: {
+            let numbered = field
+                .named
+                .iter()
+                .enumerate()
+                .map(|(i, f)| {
+                    let f = &f.ident;
+                    let n =
+                        syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
+                    quote! {#f:#n,}
+                })
+                .fold(quote! {}, |acc, new| quote! {#acc #new});
+            quote! {{#numbered}}
+        },
+        pack: {
+            let numbered = field
+                .named
+                .iter()
+                .enumerate()
+                .map(|(i, _)| {
+                    let f =
+                        syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
+                    quote! {#f,}
+                })
+                .fold(quote! {}, |acc, new| quote! {#acc #new});
+            quote! {<#as_tuple_of_ref as fracpack::TupleOfRefPackable>::pack_tuple_of_ref(&(#numbered), dest)}
+        },
+        unpack: {
+            let init = field
+                .named
+                .iter()
+                .enumerate()
+                .map(|(i, f)| {
+                    let i = syn::Index::from(i);
+                    let f = &f.ident;
+                    quote! {#f: data.#i,}
+                })
+                .fold(quote! {}, |acc, new| quote! {#acc #new});
+            quote! {
+                {
+                    let data = <#as_type as fracpack::Packable>::unpack(src, pos)?;
+                    #enum_name::#field_name{#init}
                 }
             }
-            Fields::Unit => unimplemented!("variants must have exactly 1 unnamed field"),
+        },
+    }
+}
+
+fn enum_single<'a>(
+    enum_name: &proc_macro2::Ident,
+    field_name: &'a proc_macro2::Ident,
+    field: &FieldsUnnamed,
+) -> EnumField<'a> {
+    let ty = &field.unnamed[0].ty;
+    EnumField {
+        name: field_name,
+        as_type: {
+            quote! {#ty}
+        },
+        selector: quote! {(field_0)},
+        pack: quote! {<#ty as fracpack::Packable>::pack(field_0, dest)},
+        unpack: quote! {
+            #enum_name::#field_name(<#ty as fracpack::Packable>::unpack(src, pos)?)
+        },
+    }
+}
+
+fn enum_tuple<'a>(
+    enum_name: &proc_macro2::Ident,
+    field_name: &'a proc_macro2::Ident,
+    field: &FieldsUnnamed,
+) -> EnumField<'a> {
+    let as_type = {
+        let types = field
+            .unnamed
+            .iter()
+            .map(|x| {
+                let ty = &x.ty;
+                quote! {#ty,}
+            })
+            .fold(quote! {}, |acc, new| quote! {#acc #new});
+        quote! {(#types)}
+    };
+    let as_tuple_of_ref = {
+        let types = field
+            .unnamed
+            .iter()
+            .map(|x| {
+                let ty = &x.ty;
+                quote! {&#ty,}
+            })
+            .fold(quote! {}, |acc, new| quote! {#acc #new});
+        quote! {(#types)}
+    };
+
+    EnumField {
+        name: field_name,
+        as_type: as_type.clone(),
+        selector: {
+            let numbered = field
+                .unnamed
+                .iter()
+                .enumerate()
+                .map(|(i, _)| {
+                    let f =
+                        syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
+                    quote! {#f,}
+                })
+                .fold(quote! {}, |acc, new| quote! {#acc #new});
+            quote! {(#numbered)}
+        },
+        pack: {
+            let numbered = field
+                .unnamed
+                .iter()
+                .enumerate()
+                .map(|(i, _)| {
+                    let f =
+                        syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
+                    quote! {#f,}
+                })
+                .fold(quote! {}, |acc, new| quote! {#acc #new});
+            quote! {<#as_tuple_of_ref as fracpack::TupleOfRefPackable>::pack_tuple_of_ref(&(#numbered), dest)}
+        },
+        unpack: {
+            let numbered = field
+                .unnamed
+                .iter()
+                .enumerate()
+                .map(|(i, _)| {
+                    let i = syn::Index::from(i);
+                    quote! {data.#i,}
+                })
+                .fold(quote! {}, |acc, new| quote! {#acc #new});
+            quote! {
+                {
+                    let data = <#as_type as fracpack::Packable>::unpack(src, pos)?;
+                    #enum_name::#field_name(#numbered)
+                }
+            }
+        },
+    }
+}
+
+fn enum_fields<'a>(enum_name: &proc_macro2::Ident, data: &'a DataEnum) -> Vec<EnumField<'a>> {
+    data.variants
+        .iter()
+        .map(|var| {
+            let field_name = &var.ident;
+
+            match &var.fields {
+                Fields::Named(field) => enum_named(enum_name, field_name, field),
+
+                Fields::Unnamed(field) => {
+                    if field.unnamed.len() == 1 {
+                        enum_single(enum_name, field_name, field)
+                    } else {
+                        enum_tuple(enum_name, field_name, field)
+                    }
+                }
+                Fields::Unit => unimplemented!("variants must have fields"), // TODO
+            }
         })
         .collect()
 }
@@ -296,7 +485,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
 fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
     let name = &input.ident;
     let generics = &input.generics;
-    let fields = enum_fields(data);
+    let fields = enum_fields(name, data);
     // TODO: 128? also check during verify and unpack
     assert!(fields.len() < 256);
     let pack_items = fields
@@ -305,12 +494,13 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
         .map(|(i, field)| {
             let index = i as u8;
             let field_name = &field.name;
-            let ty = &field.ty;
-            quote! {#name::#field_name(x) => {
+            let selector = &field.selector;
+            let pack = &field.pack;
+            quote! {#name::#field_name #selector => {
                 dest.push(#index);
                 size_pos = dest.len();
                 dest.extend_from_slice(&0_u32.to_le_bytes());
-                <#ty as fracpack::Packable>::pack(&x, dest);
+                #pack;
             }}
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -319,10 +509,9 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
         .enumerate()
         .map(|(i, field)| {
             let index = i as u8;
-            let field_name = &field.name;
-            let ty = &field.ty;
+            let unpack = &field.unpack;
             quote! {
-                #index => #name::#field_name(<#ty as fracpack::Packable>::unpack(src, pos)?),
+                #index => #unpack,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -331,9 +520,9 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
         .enumerate()
         .map(|(i, field)| {
             let index = i as u8;
-            let ty = &field.ty;
+            let as_type = &field.as_type;
             quote! {
-                #index => <#ty as fracpack::Packable>::verify(src, pos)?,
+                #index => <#as_type as fracpack::Packable>::verify(src, pos)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
