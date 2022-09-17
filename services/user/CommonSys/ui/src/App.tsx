@@ -68,7 +68,6 @@ const App = () => {
             appletId: activeApplet,
             state: AppletStates.primary,
             onInit: () => {
-                console.info(">>> setting active applet", activeApplet);
                 updateInitializedApplets(activeApplet);
             },
         },
@@ -80,7 +79,6 @@ const App = () => {
 
     const updateInitializedApplets = useCallback(
         (appletId: AppletId) => {
-            console.info(`>>> setting initialized applet ${appletId.fullPath}`);
             setInitializedApplets((initializedAppletsSet) => {
                 initializedAppletsSet.add(appletId.fullPath);
                 return initializedAppletsSet;
@@ -97,7 +95,6 @@ const App = () => {
                 accountSys,
                 "getLoggedInUser"
             );
-            console.info("getLoggedInUser >>", response);
             setCurrentUser(response);
             return response;
         } catch (e) {
@@ -106,10 +103,7 @@ const App = () => {
     };
 
     useEffect(() => {
-        const getUserFn = async () => {
-            await getCurrentUser();
-        };
-        getUserFn();
+        getCurrentUser();
     }, []);
 
     const getIndex = useCallback((appletId: AppletId) => {
@@ -147,18 +141,9 @@ const App = () => {
                             },
                         },
                     ]);
-                    console.info(
-                        ">>> set opened applet and ready >>>",
-                        appletId
-                    );
                 } else {
                     let attempts = 1;
                     while (!initializedApplets.has(appletId.fullPath)) {
-                        console.info(
-                            ">>> set ias",
-                            initializedApplets,
-                            appletId.fullPath
-                        );
                         if (attempts > 30) {
                             reject(
                                 new Error(
@@ -167,15 +152,11 @@ const App = () => {
                             );
                             return;
                         }
-                        console.info(
-                            `>>> set waiting for initialization of applet ${appletId.fullPath}...`
-                        );
                         await wait(50);
                         attempts += 1;
                     }
                     // Applet is already open, invoke callback immediately
                     resolve();
-                    console.info(">>> set skipped ready applet >>>", appletId);
                 }
             });
         },
@@ -192,7 +173,6 @@ const App = () => {
                 );
             }
 
-            console.info("opening applet >>>", appletId);
             await open(appletId);
 
             var iframe = document.getElementById(getIframeId(appletId));
@@ -274,26 +254,11 @@ const App = () => {
                         );
 
                         let restrictedTargetOrigin = await receiver.url();
-                        console.info(
-                            "sendMessageGetResponse >>>",
-                            sender,
-                            restrictedTargetOrigin,
-                            payload
-                        );
                         (iframe as any).iFrameResizer.sendMessage(
                             { type: messageType, payload },
                             restrictedTargetOrigin
                         );
                     } catch (e) {
-                        console.error(
-                            "sendMessageGetResponse failed >>>",
-                            e,
-                            messageType,
-                            sender,
-                            receiver,
-                            payload,
-                            shouldOpenReceiver
-                        );
                         reject(e);
                     }
                 }
@@ -309,13 +274,6 @@ const App = () => {
             name: string,
             params: any = {}
         ) => {
-            console.info(
-                ">>> preparing query s/r/n/p",
-                sender,
-                receiver,
-                name,
-                params
-            );
             return sendMessageGetResponse(
                 MessageTypes.Query,
                 sender,
@@ -422,20 +380,13 @@ const App = () => {
                 type: MessageTypes.Query,
                 fields: ["callbackId", "appletId", "name", "params"],
                 handle: async (sender: AppletId, payload: any) => {
-                    console.info(
-                        "handling query sender/payload >>>",
-                        sender,
-                        payload
-                    );
                     let { callbackId, appletId, name, params } = payload;
 
                     let receiver = AppletId.fromObject(appletId);
 
                     var reply: ReplyWithCallbackId = null;
                     try {
-                        console.info("querying... >>>");
                         reply = await query(sender, receiver, name, params);
-                        console.info("query reply >>>", reply);
                         reply.callbackId = callbackId;
                     } catch (e) {
                         let msg =
@@ -451,8 +402,6 @@ const App = () => {
                             errors: [e, msg],
                         };
                     }
-
-                    console.info("query reply", reply);
 
                     sendMessage(
                         MessageTypes.QueryResponse,
@@ -486,11 +435,6 @@ const App = () => {
                 type: MessageTypes.QueryResponse,
                 fields: ["callbackId", "response", "errors"],
                 handle: (sender: AppletId, payload: any) => {
-                    console.info(
-                        "handling query response sender/payload",
-                        sender,
-                        payload
-                    );
                     let { callbackId, response, errors } = payload;
                     executeCallback(callbackId, { sender, response, errors });
                 },
@@ -520,7 +464,6 @@ const App = () => {
 
     const handleMessage = useCallback(
         async (sender: AppletId, request: any) => {
-            console.info("handling message from/request", sender, request);
             let { type, payload } = request.message;
             if (type === undefined || payload === undefined) {
                 console.error("Received malformed message from applet");

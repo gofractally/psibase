@@ -487,7 +487,9 @@ export async function initializeApplet(initializer = () => { }) {
     window.iFrameResizer = {
         targetOrigin: rootUrl,
         onReady: async () => {
-            bufferedMessages.forEach((m) => m());
+            for (const bufferedMessage of bufferedMessages) {
+                await bufferedMessage();
+            }
             bufferedMessages = [];
         },
         onMessage: (msg) => {
