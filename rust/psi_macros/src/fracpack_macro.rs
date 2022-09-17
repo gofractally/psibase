@@ -427,27 +427,6 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                     Self::verify(src, fixed_pos)
                 }
             }
-            fn option_fixed_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
-                match opt {
-                    Some(x) => dest.extend_from_slice(&0_u32.to_le_bytes()),
-                    None => dest.extend_from_slice(&1u32.to_le_bytes()),
-                }
-            }
-            fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-                match opt {
-                    Some(x) => {
-                        dest[fixed_pos as usize..fixed_pos as usize + 4]
-                            .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
-                    }
-                    None => (),
-                }
-            }
-            fn option_variable_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
-                match opt {
-                    Some(x) => Self::pack(&x, dest),
-                    None => (),
-                }
-            }
             fn option_unpack(
                 src: &'a [u8],
                 fixed_pos: &mut u32,
@@ -603,26 +582,6 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
                     return Err(fracpack::Error::BadOffset);
                 }
                 <Self as fracpack::Packable>::verify(src, heap_pos)
-            }
-            fn option_fixed_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
-                match opt {
-                    Some(x) => <Self as fracpack::Packable>::embedded_fixed_pack(x, dest),
-                    None => dest.extend_from_slice(&1u32.to_le_bytes()),
-                }
-            }
-            fn option_fixed_repack(opt: &Option<Self>, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-                match opt {
-                    Some(x) => {
-                        <Self as fracpack::Packable>::embedded_fixed_repack(x, fixed_pos, heap_pos, dest)
-                    }
-                    None => (),
-                }
-            }
-            fn option_variable_pack(opt: &Option<Self>, dest: &mut Vec<u8>) {
-                match opt {
-                    Some(x) => <Self as fracpack::Packable>::embedded_variable_pack(x, dest),
-                    None => (),
-                }
             }
             fn option_unpack(
                 src: &'a [u8],
