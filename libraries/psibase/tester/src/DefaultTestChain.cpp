@@ -5,11 +5,9 @@
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/CommonSys.hpp>
-#include <services/system/ProducerSys.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/RAccountSys.hpp>
 #include <services/system/RAuthEcSys.hpp>
-#include <services/system/RProducerSys.hpp>
 #include <services/system/RProxySys.hpp>
 #include <services/system/SetCodeSys.hpp>
 #include <services/system/TransactionSys.hpp>
@@ -76,11 +74,6 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .code    = readWholeFile("AccountSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::ProducerSys::service,
-                                                .flags   = 0,
-                                                .code    = readWholeFile("ProducerSys.wasm"),
-                                            },
-                                            {
                                                 .service = ProxySys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("ProxySys.wasm"),
@@ -109,11 +102,6 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .service = RAccountSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("RAccountSys.wasm"),
-                                            },
-                                            {
-                                                .service = RProducerSys::service,
-                                                .flags   = 0,
-                                                .code    = readWholeFile("RProducerSys.wasm"),
                                             },
                                             {
                                                 .service = ExploreSys::service,
