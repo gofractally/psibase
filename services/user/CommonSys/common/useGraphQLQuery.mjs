@@ -1,4 +1,4 @@
-import { postGraphQLGetJson } from './rpc.mjs';
+import { postGraphQLGetJson } from "./rpc.mjs";
 
 // Returns: {
 //     isLoading,   // Is the query in progress?
@@ -14,7 +14,7 @@ export function useGraphQLQuery(url, query) {
     });
     const invalidateQuery = () => {
         setRefetch(true);
-    }
+    };
     const queryAndPackageResponse = async (url, query) => {
         setCachedQueryResult((prevState) => ({
             ...prevState,
@@ -67,14 +67,19 @@ interface PageInfo {
 export function useGraphQLPagedQuery(
     url,
     query,
-    opts, // opts = {
+    opts // opts = {
     // pageSize,
     // getPageInfo, // useGraphQLQuery's result => PageInfo or null
     // defaultArgs,
     // }
 ) {
-    const [args, setArgs] = React.useState(opts.defaultArgs || `first:${opts.pageSize}`);
-    const [result, invalidateQuery] = useGraphQLQuery(url, query.replace("@page@", args));
+    const [args, setArgs] = React.useState(
+        opts.defaultArgs || `first:${opts.pageSize}`
+    );
+    const [result, invalidateQuery] = useGraphQLQuery(
+        url,
+        query.replace("@page@", args)
+    );
 
     const pageInfo = opts.getPageInfo(result) || {
         hasPreviousPage: false,
