@@ -67,45 +67,54 @@ pub trait Packable<'a>: Sized {
         }
     }
 
+    fn embedded_unpack_variable(
+        src: &'a [u8],
+        fixed_pos: &mut u32,
+        heap_pos: &mut u32,
+    ) -> Result<Self> {
+        let orig_pos = *fixed_pos;
+        let offset = u32::unpack(src, fixed_pos)?;
+        if offset == 0 {
+            return Self::new_empty_container();
+        }
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+            return Err(Error::BadOffset);
+        }
+        Self::unpack(src, heap_pos)
+    }
+
     fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
         if Self::USE_HEAP {
-            let orig_pos = *fixed_pos;
-            let offset = u32::unpack(src, fixed_pos)?;
-            if offset == 0 {
-                return Self::new_empty_container();
-            }
-            if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                return Err(Error::BadOffset);
-            }
-            Self::unpack(src, heap_pos)
+            Self::embedded_unpack_variable(src, fixed_pos, heap_pos)
         } else {
             Self::unpack(src, fixed_pos)
         }
     }
 
+    fn embedded_verify_variable(
+        src: &'a [u8],
+        fixed_pos: &mut u32,
+        heap_pos: &mut u32,
+    ) -> Result<()> {
+        let orig_pos = *fixed_pos;
+        let offset = u32::unpack(src, fixed_pos)?;
+        if offset == 0 {
+            let _ = Self::new_empty_container();
+            return Ok(());
+        }
+        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+            return Err(Error::BadOffset);
+        }
+        Self::verify(src, heap_pos)
+    }
+
     fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
         if Self::USE_HEAP {
-            let orig_pos = *fixed_pos;
-            let offset = u32::unpack(src, fixed_pos)?;
-            if offset == 0 {
-                let _ = Self::new_empty_container();
-                return Ok(());
-            }
-            if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                return Err(Error::BadOffset);
-            }
-            Self::verify(src, heap_pos)
+            Self::embedded_verify_variable(src, fixed_pos, heap_pos)
         } else {
             Self::verify(src, fixed_pos)
         }
     }
-
-    fn option_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<Option<Self>>;
-    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()>;
 
     /// Helper method to create a new vector of "fracpacked" bytes, since it's a common operation
     fn packed_bytes(&self) -> Vec<u8> {
@@ -166,32 +175,6 @@ macro_rules! scalar_impl {
                     Ok(())
                 }
             }
-            fn option_unpack(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                heap_pos: &mut u32,
-            ) -> Result<Option<Self>> {
-                let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
-                if offset == 1 {
-                    return Ok(None);
-                }
-                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                    return Err(Error::BadOffset);
-                }
-                Ok(Some(Self::unpack(src, heap_pos)?))
-            }
-            fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-                let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
-                if offset == 1 {
-                    return Ok(());
-                }
-                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                    return Err(Error::BadOffset);
-                }
-                Self::verify(src, heap_pos)
-            }
         }
     };
 } // scalar_impl
@@ -230,7 +213,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
     fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
         let mut fixed_pos = *pos;
         *pos += 4;
-        T::option_verify(src, &mut fixed_pos, pos)
+        Self::embedded_verify(src, &mut fixed_pos, pos)
     }
 
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
@@ -264,39 +247,25 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
     }
 
     fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
-        T::option_unpack(src, fixed_pos, heap_pos)
-    }
-
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        T::option_verify(src, fixed_pos, heap_pos)
-    }
-
-    fn option_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<Option<Self>> {
         let orig_pos = *fixed_pos;
         let offset = u32::unpack(src, fixed_pos)?;
         if offset == 1 {
             return Ok(None);
         }
-        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-            return Err(Error::BadOffset);
-        }
-        Ok(Some(Self::unpack(src, heap_pos)?))
+        *fixed_pos = orig_pos;
+        Ok(Some(<T>::embedded_unpack_variable(
+            src, fixed_pos, heap_pos,
+        )?))
     }
 
-    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
         let orig_pos = *fixed_pos;
         let offset = u32::unpack(src, fixed_pos)?;
         if offset == 1 {
             return Ok(());
         }
-        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-            return Err(Error::BadOffset);
-        }
-        Self::verify(src, heap_pos)
+        *fixed_pos = orig_pos;
+        T::embedded_verify_variable(src, fixed_pos, heap_pos)
     }
 } // impl<T> Packable for Option<T>
 
@@ -381,28 +350,6 @@ macro_rules! bytes_impl {
             fn new_empty_container() -> Result<Self> {
                 Ok(Default::default())
             }
-
-            fn option_unpack(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                heap_pos: &mut u32,
-            ) -> Result<Option<Self>> {
-                let offset = u32::unpack(src, fixed_pos)?;
-                if offset == 1 {
-                    return Ok(None);
-                }
-                *fixed_pos -= 4;
-                Ok(Some(Self::embedded_unpack(src, fixed_pos, heap_pos)?))
-            }
-
-            fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-                let offset = u32::unpack(src, fixed_pos)?;
-                if offset == 1 {
-                    return Ok(());
-                }
-                *fixed_pos -= 4;
-                Self::embedded_verify(src, fixed_pos, heap_pos)
-            }
         } // impl Packable for $t
     };
 } // bytes_impl
@@ -476,28 +423,6 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
     fn new_empty_container() -> Result<Self> {
         Ok(Default::default())
     }
-
-    fn option_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<Option<Self>> {
-        let offset = u32::unpack(src, fixed_pos)?;
-        if offset == 1 {
-            return Ok(None);
-        }
-        *fixed_pos -= 4;
-        Ok(Some(Self::embedded_unpack(src, fixed_pos, heap_pos)?))
-    }
-
-    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        let offset = u32::unpack(src, fixed_pos)?;
-        if offset == 1 {
-            return Ok(());
-        }
-        *fixed_pos -= 4;
-        Self::embedded_verify(src, fixed_pos, heap_pos)
-    }
 } // impl<T> Packable for Vec<T>
 
 impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
@@ -555,35 +480,6 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
         *pos = heap_pos;
         Ok(())
     }
-
-    fn option_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<Option<Self>> {
-        let orig_pos = *fixed_pos;
-        let offset = u32::unpack(src, fixed_pos)?;
-        if offset == 1 {
-            return Ok(None);
-        }
-
-        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-            return Err(Error::BadOffset);
-        }
-        Ok(Some(Self::unpack(src, heap_pos)?))
-    }
-    fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        let orig_pos = *fixed_pos;
-        let offset = u32::unpack(src, fixed_pos)?;
-        if offset == 1 {
-            return Ok(());
-        }
-
-        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-            return Err(Error::BadOffset);
-        }
-        Self::verify(src, heap_pos)
-    }
 }
 
 macro_rules! tuple_impls {
@@ -635,35 +531,6 @@ macro_rules! tuple_impls {
                     )+
                     *pos = heap_pos;
                     Ok(())
-                }
-
-                fn option_unpack(
-                    src: &'a [u8],
-                    fixed_pos: &mut u32,
-                    heap_pos: &mut u32,
-                ) -> Result<Option<Self>> {
-                    let orig_pos = *fixed_pos;
-                    let offset = u32::unpack(src, fixed_pos)?;
-                    if offset == 1 {
-                        return Ok(None);
-                    }
-
-                    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                        return Err(Error::BadOffset);
-                    }
-                    Ok(Some(Self::unpack(src, heap_pos)?))
-                }
-                fn option_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-                    let orig_pos = *fixed_pos;
-                    let offset = u32::unpack(src, fixed_pos)?;
-                    if offset == 1 {
-                        return Ok(());
-                    }
-
-                    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                        return Err(Error::BadOffset);
-                    }
-                    Self::verify(src, heap_pos)
                 }
             }
 
