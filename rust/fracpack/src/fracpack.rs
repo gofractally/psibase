@@ -38,15 +38,67 @@ pub trait Packable<'a>: Sized {
         Ok(())
     }
 
-    fn empty_container(&self) -> bool {
+    fn is_empty_container(&self) -> bool {
         false
     }
 
-    fn embedded_fixed_pack(&self, dest: &mut Vec<u8>);
-    fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>);
-    fn embedded_variable_pack(&self, dest: &mut Vec<u8>);
-    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self>;
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()>;
+    fn new_empty_container() -> Result<Self> {
+        Err(Error::BadOffset)
+    }
+
+    fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
+        if Self::USE_HEAP {
+            dest.extend_from_slice(&0_u32.to_le_bytes());
+        } else {
+            Self::pack(self, dest);
+        }
+    }
+
+    fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+        if Self::USE_HEAP && !self.is_empty_container() {
+            dest[fixed_pos as usize..fixed_pos as usize + 4]
+                .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
+        }
+    }
+
+    fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
+        if Self::USE_HEAP && !self.is_empty_container() {
+            self.pack(dest);
+        }
+    }
+
+    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
+        if Self::USE_HEAP {
+            let orig_pos = *fixed_pos;
+            let offset = u32::unpack(src, fixed_pos)?;
+            if offset == 0 {
+                return Self::new_empty_container();
+            }
+            if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                return Err(Error::BadOffset);
+            }
+            Self::unpack(src, heap_pos)
+        } else {
+            Self::unpack(src, fixed_pos)
+        }
+    }
+
+    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+        if Self::USE_HEAP {
+            let orig_pos = *fixed_pos;
+            let offset = u32::unpack(src, fixed_pos)?;
+            if offset == 0 {
+                let _ = Self::new_empty_container();
+                return Ok(());
+            }
+            if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
+                return Err(Error::BadOffset);
+            }
+            Self::verify(src, heap_pos)
+        } else {
+            Self::verify(src, fixed_pos)
+        }
+    }
 
     fn option_unpack(
         src: &'a [u8],
@@ -113,25 +165,6 @@ macro_rules! scalar_impl {
                     *pos += Self::FIXED_SIZE;
                     Ok(())
                 }
-            }
-            fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-                Self::pack(self, dest)
-            }
-            fn embedded_fixed_repack(&self, _fixed_pos: u32, _heap_pos: u32, _dest: &mut Vec<u8>) {}
-            fn embedded_variable_pack(&self, _dest: &mut Vec<u8>) {}
-            fn embedded_unpack(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                _heap_pos: &mut u32,
-            ) -> Result<Self> {
-                Self::unpack(src, fixed_pos)
-            }
-            fn embedded_verify(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                _heap_pos: &mut u32,
-            ) -> Result<()> {
-                Self::verify(src, fixed_pos)
             }
             fn option_unpack(
                 src: &'a [u8],
@@ -224,7 +257,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
 
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
         if let Some(x) = self {
-            if !x.empty_container() {
+            if !x.is_empty_container() {
                 x.pack(dest)
             }
         }
@@ -268,11 +301,16 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
 } // impl<T> Packable for Option<T>
 
 trait BytesConversion<'a>: Sized {
+    fn fracpack_verify_if_str(bytes: &'a [u8]) -> Result<()>;
     fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self>;
     fn fracpack_as_bytes(&'a self) -> &'a [u8];
 }
 
 impl<'a> BytesConversion<'a> for String {
+    fn fracpack_verify_if_str(bytes: &'a [u8]) -> Result<()> {
+        std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
+        Ok(())
+    }
     fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self> {
         Self::from_utf8(bytes.to_vec()).or(Err(Error::BadUTF8))
     }
@@ -282,6 +320,10 @@ impl<'a> BytesConversion<'a> for String {
 }
 
 impl<'a> BytesConversion<'a> for &'a str {
+    fn fracpack_verify_if_str(bytes: &'a [u8]) -> Result<()> {
+        std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
+        Ok(())
+    }
     fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self> {
         std::str::from_utf8(bytes).or(Err(Error::BadUTF8))
     }
@@ -291,6 +333,9 @@ impl<'a> BytesConversion<'a> for &'a str {
 }
 
 impl<'a> BytesConversion<'a> for &'a [u8] {
+    fn fracpack_verify_if_str(_bytes: &'a [u8]) -> Result<()> {
+        Ok(())
+    }
     fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self> {
         Ok(bytes)
     }
@@ -325,80 +370,16 @@ macro_rules! bytes_impl {
                     .get(*pos as usize..(*pos + len) as usize)
                     .ok_or(Error::ReadPastEnd)?;
                 *pos += len;
-                std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
+                <$t>::fracpack_verify_if_str(bytes)?;
                 Ok(())
             }
 
-            fn empty_container(&self) -> bool {
+            fn is_empty_container(&self) -> bool {
                 self.is_empty()
             }
 
-            fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-                dest.extend_from_slice(&0_u32.to_le_bytes());
-            }
-
-            fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-                if self.is_empty() {
-                    return;
-                }
-                dest[fixed_pos as usize..fixed_pos as usize + 4]
-                    .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
-            }
-
-            fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-                if self.is_empty() {
-                    return;
-                }
-                Self::pack(self, dest)
-            }
-
-            fn embedded_unpack(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                heap_pos: &mut u32,
-            ) -> Result<Self> {
-                let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
-                if offset == 0 {
-                    return Ok(Default::default());
-                }
-                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                    return Err(Error::BadOffset);
-                }
-                let len = u32::unpack(src, heap_pos)?;
-                if len == 0 {
-                    return Err(Error::BadEmptyEncoding);
-                }
-                let bytes = src
-                    .get(*heap_pos as usize..(*heap_pos + len) as usize)
-                    .ok_or(Error::ReadPastEnd)?;
-                *heap_pos += len;
-                <$t>::fracpack_from_bytes(bytes)
-            }
-
-            fn embedded_verify(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                heap_pos: &mut u32,
-            ) -> Result<()> {
-                let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
-                if offset == 0 {
-                    return Ok(());
-                }
-                if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                    return Err(Error::BadOffset);
-                }
-                let len = u32::unpack(src, heap_pos)?;
-                if len == 0 {
-                    return Err(Error::BadEmptyEncoding);
-                }
-                let bytes = src
-                    .get(*heap_pos as usize..(*heap_pos + len) as usize)
-                    .ok_or(Error::ReadPastEnd)?;
-                std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
-                *heap_pos += len;
-                Ok(())
+            fn new_empty_container() -> Result<Self> {
+                Ok(Default::default())
             }
 
             fn option_unpack(
@@ -488,85 +469,12 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
         Ok(())
     }
 
-    fn empty_container(&self) -> bool {
+    fn is_empty_container(&self) -> bool {
         self.is_empty()
     }
 
-    fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-        dest.extend_from_slice(&0_u32.to_le_bytes());
-    }
-
-    fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-        if !self.is_empty() {
-            dest[fixed_pos as usize..fixed_pos as usize + 4]
-                .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
-        }
-    }
-
-    fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-        if !self.is_empty() {
-            Self::pack(self, dest);
-        }
-    }
-
-    // TODO: optimize scalar
-    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
-        let orig_pos = *fixed_pos;
-        let offset = u32::unpack(src, fixed_pos)?;
-        if offset == 0 {
-            return Ok(Self::new());
-        }
-        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-            return Err(Error::BadOffset);
-        }
-        let num_bytes = u32::unpack(src, heap_pos)?;
-        if num_bytes == 0 {
-            return Err(Error::BadEmptyEncoding);
-        }
-        if num_bytes % T::FIXED_SIZE != 0 {
-            return Err(Error::BadSize);
-        }
-        let mut inner_fixed_pos = *heap_pos;
-        let hp = *heap_pos as u64 + num_bytes as u64;
-        *heap_pos = hp as u32;
-        if *heap_pos as u64 != hp {
-            return Err(Error::ReadPastEnd);
-        }
-        let len = (num_bytes / T::FIXED_SIZE) as usize;
-        let mut result = Self::with_capacity(len);
-        for _ in 0..len {
-            result.push(T::embedded_unpack(src, &mut inner_fixed_pos, heap_pos)?);
-        }
-        Ok(result)
-    }
-
-    // TODO: optimize scalar
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        let orig_pos = *fixed_pos;
-        let offset = u32::unpack(src, fixed_pos)?;
-        if offset == 0 {
-            return Ok(());
-        }
-        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-            return Err(Error::BadOffset);
-        }
-        let num_bytes = u32::unpack(src, heap_pos)?;
-        if num_bytes == 0 {
-            return Err(Error::BadEmptyEncoding);
-        }
-        if num_bytes % T::FIXED_SIZE != 0 {
-            return Err(Error::BadSize);
-        }
-        let mut inner_fixed_pos = *heap_pos;
-        let hp = *heap_pos as u64 + num_bytes as u64;
-        *heap_pos = hp as u32;
-        if *heap_pos as u64 != hp {
-            return Err(Error::ReadPastEnd);
-        }
-        for _ in 0..num_bytes / T::FIXED_SIZE {
-            T::embedded_verify(src, &mut inner_fixed_pos, heap_pos)?;
-        }
-        Ok(())
+    fn new_empty_container() -> Result<Self> {
+        Ok(Default::default())
     }
 
     fn option_unpack(
@@ -648,51 +556,6 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
         Ok(())
     }
 
-    fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-        if Self::USE_HEAP {
-            dest.extend_from_slice(&0_u32.to_le_bytes());
-        } else {
-            Self::pack(self, dest);
-        }
-    }
-
-    fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-        if Self::USE_HEAP {
-            dest[fixed_pos as usize..fixed_pos as usize + 4]
-                .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
-        }
-    }
-
-    fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-        if Self::USE_HEAP {
-            Self::pack(self, dest);
-        }
-    }
-
-    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
-        if Self::USE_HEAP {
-            let orig_pos = *fixed_pos;
-            let offset = u32::unpack(src, fixed_pos)?;
-            if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                return Err(Error::BadOffset);
-            }
-            Self::unpack(src, heap_pos)
-        } else {
-            Self::unpack(src, fixed_pos)
-        }
-    }
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        if Self::USE_HEAP {
-            let orig_pos = *fixed_pos;
-            let offset = u32::unpack(src, fixed_pos)?;
-            if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                return Err(Error::BadOffset);
-            }
-            Self::verify(src, heap_pos)
-        } else {
-            Self::verify(src, fixed_pos)
-        }
-    }
     fn option_unpack(
         src: &'a [u8],
         fixed_pos: &mut u32,
@@ -774,35 +637,6 @@ macro_rules! tuple_impls {
                     Ok(())
                 }
 
-                fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-                    dest.extend_from_slice(&0_u32.to_le_bytes());
-                }
-
-                fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-                    dest[fixed_pos as usize..fixed_pos as usize + 4]
-                        .copy_from_slice(&(heap_pos - fixed_pos).to_le_bytes());
-                }
-
-                fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-                    Self::pack(&self, dest);
-                }
-
-                fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
-                    let orig_pos = *fixed_pos;
-                    let offset = u32::unpack(src, fixed_pos)?;
-                    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                        return Err(Error::BadOffset);
-                    }
-                    Self::unpack(src, heap_pos)
-                }
-                fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-                    let orig_pos = *fixed_pos;
-                    let offset = u32::unpack(src, fixed_pos)?;
-                    if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-                        return Err(Error::BadOffset);
-                    }
-                    Self::verify(src, heap_pos)
-                }
                 fn option_unpack(
                     src: &'a [u8],
                     fixed_pos: &mut u32,
