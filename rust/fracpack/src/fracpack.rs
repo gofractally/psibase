@@ -572,30 +572,30 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
 }
 
 macro_rules! tuple_impls {
-    ($($len:expr => ($($n:tt $name:ident)+))+) => {
+    ($($len:expr => ($($n:tt $name:ident)*))+) => {
         $(
-            impl<'a, $($name: Packable<'a>),+> Packable<'a> for ($($name,)+)
+            impl<'a, $($name: Packable<'a>),*> Packable<'a> for ($($name,)*)
             {
                 const VARIABLE_SIZE: bool = true;
                 const FIXED_SIZE: u32 = 4;
 
                 #[allow(non_snake_case)]
                 fn pack(&self, dest: &mut Vec<u8>) {
-                    let heap: u32 = $($name::FIXED_SIZE +)+ 0;
+                    let heap: u32 = $($name::FIXED_SIZE +)* 0;
                     assert!(heap as u16 as u32 == heap); // TODO: return error
                     (heap as u16).pack(dest);
                     $(
                         let $name = dest.len() as u32;
                         self.$n.embedded_fixed_pack(dest);
-                    )+
+                    )*
                     $(
                         let heap_pos = dest.len() as u32;
                         self.$n.embedded_fixed_repack($name, heap_pos, dest);
                         self.$n.embedded_variable_pack(dest);
-                    )+
+                    )*
                 }
 
-                #[allow(non_snake_case)]
+                #[allow(non_snake_case,unused_mut)]
                 fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
                     let heap_size = u16::unpack(src, pos)?;
                     let mut heap_pos = *pos + heap_size as u32;
@@ -604,11 +604,12 @@ macro_rules! tuple_impls {
                     }
                     $(
                         let $name = $name::embedded_unpack(src, pos, &mut heap_pos)?;
-                    )+
+                    )*
                     *pos = heap_pos;
-                    Ok(($($name,)+))
+                    Ok(($($name,)*))
                 }
 
+                #[allow(unused_mut)]
                 fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
                     let heap_size = u16::unpack(src, pos)?;
                     let mut heap_pos = *pos + heap_size as u32;
@@ -617,28 +618,28 @@ macro_rules! tuple_impls {
                     }
                     $(
                         $name::embedded_unpack(src, pos, &mut heap_pos)?;
-                    )+
+                    )*
                     *pos = heap_pos;
                     Ok(())
                 }
             }
 
-            impl<'a, $($name: Packable<'a>),+> TupleOfRefPackable<'a> for ($(&$name,)+)
+            impl<'a, $($name: Packable<'a>),*> TupleOfRefPackable<'a> for ($(&$name,)*)
             {
                 #[allow(non_snake_case)]
                 fn pack_tuple_of_ref(&self, dest: &mut Vec<u8>) {
-                    let heap: u32 = $($name::FIXED_SIZE +)+ 0;
+                    let heap: u32 = $($name::FIXED_SIZE +)* 0;
                     assert!(heap as u16 as u32 == heap); // TODO: return error
                     (heap as u16).pack(dest);
                     $(
                         let $name = dest.len() as u32;
                         self.$n.embedded_fixed_pack(dest);
-                    )+
+                    )*
                     $(
                         let heap_pos = dest.len() as u32;
                         self.$n.embedded_fixed_repack($name, heap_pos, dest);
                         self.$n.embedded_variable_pack(dest);
-                    )+
+                    )*
                 }
             }
         )+
@@ -646,6 +647,7 @@ macro_rules! tuple_impls {
 }
 
 tuple_impls! {
+    0 => ()
     1 => (0 T0)
     2 => (0 T0 1 T1)
     3 => (0 T0 1 T1 2 T2)

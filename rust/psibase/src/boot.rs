@@ -6,15 +6,10 @@ use anyhow::Context;
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
 use libpsibase::{
-    account, method, AccountNumber, Action, Claim, ExactAccountNumber, Fracpack, PublicKey,
+    account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
     SharedGenesisActionData, SharedGenesisContract, SignedTransaction,
 };
 use serde_json::Value;
-
-// TODO: support ().packed(). It should pack the same as
-// a struct with no fields.
-#[derive(Fracpack)]
-struct Empty {}
 
 const ACCOUNTS: [AccountNumber; 22] = [
     account!("account-sys"),
@@ -219,31 +214,31 @@ fn add_startup_trx(
             sender: account!("account-sys"),
             contract: account!("account-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed(),
+            raw_data: ().packed(),
         },
         Action {
             sender: account!("transact-sys"),
             contract: account!("transact-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed(),
+            raw_data: ().packed(),
         },
         Action {
             sender: account!("nft-sys"),
             contract: account!("nft-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed(),
+            raw_data: ().packed(),
         },
         Action {
             sender: account!("token-sys"),
             contract: account!("token-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed(),
+            raw_data: ().packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             contract: account!("symbol-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed(),
+            raw_data: ().packed(),
         },
     ];
 
