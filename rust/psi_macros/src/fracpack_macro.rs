@@ -277,7 +277,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             .iter()
             .map(|field| {
                 let ty = &field.ty;
-                quote! {<#ty as fracpack::Packable>::USE_HEAP}
+                quote! {<#ty as fracpack::Packable>::VARIABLE_SIZE}
             })
             .fold(quote! {false}, |acc, new| quote! {#acc || #new})
     };
@@ -346,8 +346,8 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
         .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
         impl<'a> fracpack::Packable<'a> for #name #generics {
-            const USE_HEAP: bool = #use_heap;
-            const FIXED_SIZE: u32 = if Self::USE_HEAP { 4 } else { #fixed_size };
+            const VARIABLE_SIZE: bool = #use_heap;
+            const FIXED_SIZE: u32 = if Self::VARIABLE_SIZE { 4 } else { #fixed_size };
             fn pack(&self, dest: &mut Vec<u8>) {
                 let heap = #fixed_size;
                 assert!(heap as u16 as u32 == heap); // TODO: return error
@@ -428,7 +428,7 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
     TokenStream::from(quote! {
         impl<'a> fracpack::Packable<'a> for #name #generics {
             const FIXED_SIZE: u32 = 4;
-            const USE_HEAP: bool = true;
+            const VARIABLE_SIZE: bool = true;
             fn pack(&self, dest: &mut Vec<u8>) {
                 let size_pos;
                 match &self {
