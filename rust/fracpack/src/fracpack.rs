@@ -3,6 +3,8 @@
 // TODO: rename misnamed "heap_size"
 // TODO: support packing references; replace TupleOfRefPackable
 
+//! Rust support for the [frackpack format](https://doc-sys.psibase.io/format/fracpack.html)
+
 use custom_error::custom_error;
 use std::mem;
 
@@ -20,15 +22,100 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub trait PackableOwned: for<'a> Packable<'a> {}
 impl<T> PackableOwned for T where T: for<'a> Packable<'a> {}
 
+/// Pack and unpack fracpack data
+///
+/// Use [`#[derive(Fracpack)]`](psi_macros::Fracpack) to implement
+/// this trait; manually implementing it is unsupported.
 pub trait Packable<'a>: Sized {
+    #[doc(hidden)]
     const FIXED_SIZE: u32;
+
+    #[doc(hidden)]
     const USE_HEAP: bool;
+
+    #[doc(hidden)]
     const IS_OPTIONAL: bool = false;
 
+    /// Convert to fracpack format
+    ///
+    /// This packs `self` into the end of `dest`.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use fracpack::Packable;
+    ///
+    /// fn convert(src: &(u32, String)) -> Vec<u8> {
+    ///     let mut bytes = Vec::new();
+    ///     src.pack(&mut bytes);
+    ///     bytes
+    /// }
+    /// ```
+    ///
+    /// See [Packable::packed], which is often more convenient.
     fn pack(&self, dest: &mut Vec<u8>);
+
+    /// Convert to fracpack format
+    ///
+    /// This packs `self` and returns the result.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use fracpack::Packable;
+    ///
+    /// fn packSomething(a: u32, b: &str) -> Vec<u8> {
+    ///     (a, b).packed()
+    /// }
+    /// ```
+    fn packed(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.pack(&mut bytes);
+        bytes
+    }
+
+    /// Convert from fracpack format. Also verifies the integrity of the data.
+    ///
+    /// This unpacks `Self` from `src` starting at position `pos`.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use fracpack::Packable;
+    ///
+    /// fn unpackSomething(src: &[u8]) -> String {
+    ///     let mut pos = 0;
+    ///     String::unpack(src, &mut pos).unwrap()
+    /// }
+    /// ```
+    ///
+    /// See [Packable::unpacked], which is often more convenient.
     fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self>;
+
+    /// Convert from fracpack format. Also verifies the integrity of the data.
+    ///
+    /// This unpacks `Self` from `src`.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use fracpack::Packable;
+    ///
+    /// fn unpackSomething(src: &[u8]) -> (String, String) {
+    ///     <(String, String)>::unpacked(src).unwrap()
+    /// }
+    /// ```
+    fn unpacked(src: &'a [u8]) -> Result<Self> {
+        let mut pos = 0;
+        Self::unpack(src, &mut pos)
+    }
+
+    /// Verify the integrity of fracpack data. You don't need to call this if
+    /// using [Packable::unpack] since it verifies integrity during unpack.
     fn verify(src: &'a [u8], pos: &mut u32) -> Result<()>;
 
+    /// Verify the integrity of fracpack data, plus make sure there is no
+    /// leftover data after it.
     fn verify_no_extra(src: &'a [u8]) -> Result<()> {
         let mut pos = 0;
         Self::verify(src, &mut pos)?;
@@ -38,14 +125,17 @@ pub trait Packable<'a>: Sized {
         Ok(())
     }
 
+    #[doc(hidden)]
     fn is_empty_container(&self) -> bool {
         false
     }
 
+    #[doc(hidden)]
     fn new_empty_container() -> Result<Self> {
         Err(Error::BadOffset)
     }
 
+    #[doc(hidden)]
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
         if Self::USE_HEAP {
             dest.extend_from_slice(&0_u32.to_le_bytes());
@@ -54,6 +144,7 @@ pub trait Packable<'a>: Sized {
         }
     }
 
+    #[doc(hidden)]
     fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
         if Self::USE_HEAP && !self.is_empty_container() {
             dest[fixed_pos as usize..fixed_pos as usize + 4]
@@ -61,12 +152,14 @@ pub trait Packable<'a>: Sized {
         }
     }
 
+    #[doc(hidden)]
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
         if Self::USE_HEAP && !self.is_empty_container() {
             self.pack(dest);
         }
     }
 
+    #[doc(hidden)]
     fn embedded_unpack_variable(
         src: &'a [u8],
         fixed_pos: &mut u32,
@@ -83,6 +176,7 @@ pub trait Packable<'a>: Sized {
         Self::unpack(src, heap_pos)
     }
 
+    #[doc(hidden)]
     fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
         if Self::USE_HEAP {
             Self::embedded_unpack_variable(src, fixed_pos, heap_pos)
@@ -91,6 +185,7 @@ pub trait Packable<'a>: Sized {
         }
     }
 
+    #[doc(hidden)]
     fn embedded_verify_variable(
         src: &'a [u8],
         fixed_pos: &mut u32,
@@ -108,19 +203,13 @@ pub trait Packable<'a>: Sized {
         Self::verify(src, heap_pos)
     }
 
+    #[doc(hidden)]
     fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
         if Self::USE_HEAP {
             Self::embedded_verify_variable(src, fixed_pos, heap_pos)
         } else {
             Self::verify(src, fixed_pos)
         }
-    }
-
-    /// Helper method to create a new vector of "fracpacked" bytes, since it's a common operation
-    fn packed_bytes(&self) -> Vec<u8> {
-        let mut bytes = vec![];
-        self.pack(&mut bytes);
-        bytes
     }
 } // Packable
 

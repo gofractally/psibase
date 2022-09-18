@@ -235,6 +235,6 @@ pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
 }
 
 pub fn set_retval<'a, T: Packable<'a>>(val: &'a T) {
-    let bytes = val.packed_bytes();
+    let bytes = val.packed();
     unsafe { raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
 }

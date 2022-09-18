@@ -11,7 +11,7 @@ use libpsibase::{
 };
 use serde_json::Value;
 
-// TODO: support ().packed_bytes(). It should pack the same as
+// TODO: support ().packed(). It should pack the same as
 // a struct with no fields.
 #[derive(Fracpack)]
 struct Empty {}
@@ -49,7 +49,7 @@ pub(super) async fn boot(
 ) -> Result<(), anyhow::Error> {
     let mut transactions = vec![boot_trx()];
     add_startup_trx(&mut transactions, key, producer);
-    push_boot(args, client, transactions.packed_bytes()).await?;
+    push_boot(args, client, transactions.packed()).await?;
     println!("Ok");
     Ok(())
 }
@@ -173,11 +173,11 @@ fn boot_trx() -> SignedTransaction {
         sender: AccountNumber { value: 0 },
         contract: AccountNumber { value: 0 },
         method: method!("boot"),
-        raw_data: genesis_action_data.packed_bytes(),
+        raw_data: genesis_action_data.packed(),
     }];
 
     SignedTransaction {
-        transaction: without_tapos(actions).packed_bytes(),
+        transaction: without_tapos(actions).packed(),
         proofs: vec![],
     }
 }
@@ -219,31 +219,31 @@ fn add_startup_trx(
             sender: account!("account-sys"),
             contract: account!("account-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed_bytes(),
+            raw_data: Empty {}.packed(),
         },
         Action {
             sender: account!("transact-sys"),
             contract: account!("transact-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed_bytes(),
+            raw_data: Empty {}.packed(),
         },
         Action {
             sender: account!("nft-sys"),
             contract: account!("nft-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed_bytes(),
+            raw_data: Empty {}.packed(),
         },
         Action {
             sender: account!("token-sys"),
             contract: account!("token-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed_bytes(),
+            raw_data: Empty {}.packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             contract: account!("symbol-sys"),
             method: method!("init"),
-            raw_data: Empty {}.packed_bytes(),
+            raw_data: Empty {}.packed(),
         },
     ];
 
@@ -376,25 +376,25 @@ fn add_startup_trx(
             sender: account!("symbol-sys"),
             contract: account!("token-sys"),
             method: method!("setTokenConf"),
-            raw_data: (1u32, method!("untradeable"), false).packed_bytes(),
+            raw_data: (1u32, method!("untradeable"), false).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             contract: account!("token-sys"),
             method: method!("mint"),
-            raw_data: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed_bytes(),
+            raw_data: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             contract: account!("token-sys"),
             method: method!("credit"),
-            raw_data: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed_bytes(),
+            raw_data: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             contract: account!("token-sys"),
             method: method!("credit"),
-            raw_data: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed_bytes(),
+            raw_data: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed(),
         },
     ];
 
@@ -439,7 +439,7 @@ fn add_startup_trx(
             n += 1;
         }
         transactions.push(SignedTransaction {
-            transaction: without_tapos(actions.drain(..n).collect()).packed_bytes(),
+            transaction: without_tapos(actions.drain(..n).collect()).packed(),
             proofs: vec![],
         });
     }

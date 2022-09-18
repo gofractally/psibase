@@ -534,6 +534,7 @@ name = "fracpack"
 version = "0.1.0"
 dependencies = [
  "custom_error",
+ "psi_macros",
 ]
 
 [[package]]
