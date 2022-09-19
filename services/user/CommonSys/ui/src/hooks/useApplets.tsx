@@ -312,6 +312,36 @@ export const useApplets = () => {
         setPendingTransactions([]);
     }, [pendingTransactions, signTransaction]);
 
+    const makeErroredReply = (
+        sender: AppletId,
+        receiver: AppletId,
+        payload: any,
+        error: any
+    ): ReplyWithCallbackId => {
+        const msg =
+            "Common-sys failed to route message: " +
+            sender.fullPath +
+            "@" +
+            receiver.fullPath +
+            ":" +
+            payload.name;
+        const exceptionMessage = error
+            ? (error as Error).message
+            : `Unknown error: ${error}`;
+        const reply = {
+            callbackId: payload.callbackId,
+            response: null,
+            errors: [exceptionMessage, msg],
+        };
+        console.error("Errored response >>>", {
+            sender,
+            receiver,
+            payload,
+            reply,
+        });
+        return reply;
+    };
+
     const handleOperation = useCallback(
         async (sender: AppletId, payload: any) => {
             const { callbackId, appletId, name, params } = payload;
@@ -326,18 +356,7 @@ export const useApplets = () => {
                 reply = await operation(sender, receiver, name, params);
                 reply.callbackId = callbackId;
             } catch (e) {
-                const msg =
-                    "Common-sys failed to route message: " +
-                    sender.fullPath +
-                    "@" +
-                    receiver.fullPath +
-                    ":" +
-                    name;
-                reply = {
-                    callbackId,
-                    response: null,
-                    errors: [e, msg],
-                };
+                reply = makeErroredReply(sender, receiver, payload, e);
             }
 
             sendMessage(
@@ -362,18 +381,7 @@ export const useApplets = () => {
                 reply = await query(sender, receiver, name, params);
                 reply.callbackId = callbackId;
             } catch (e) {
-                const msg =
-                    "Common-sys failed to route message: " +
-                    sender.fullPath +
-                    "@" +
-                    receiver.fullPath +
-                    ":" +
-                    name;
-                reply = {
-                    callbackId,
-                    response: null,
-                    errors: [e, msg],
-                };
+                reply = makeErroredReply(sender, receiver, payload, e);
             }
 
             sendMessage(
