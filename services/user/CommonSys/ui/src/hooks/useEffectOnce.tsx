@@ -9,7 +9,7 @@ import { useRef, EffectCallback, DependencyList, useEffect } from "react";
  */
 export default function useEffectOnce(
     effect: EffectCallback,
-    dependancies?: DependencyList
+    dependencies?: DependencyList
 ) {
     // Preserving the true by default as initial render cycle
     const initialRender = useRef(true);
@@ -38,5 +38,6 @@ export default function useEffectOnce(
         } else {
             return undefined;
         }
-    }, dependancies);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, dependencies);
 }

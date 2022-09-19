@@ -1,7 +1,7 @@
 import React from "react";
 
-import Loader from "./loader";
-import Text, { TextSize } from "./text";
+import { Loader } from "./loader";
+import { Text, TextSize } from "./text";
 
 export interface ButtonProps {
     children: React.ReactNode;
