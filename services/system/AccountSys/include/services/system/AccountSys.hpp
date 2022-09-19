@@ -49,7 +49,7 @@ namespace SystemService
 
       using Tables = psibase::ServiceTables<AccountSysStatusTable, AccountTable, CreatorTable>;
 
-      void startup();
+      void init();
       void newAccount(psibase::AccountNumber name,
                       psibase::AccountNumber authService,
                       bool                   requireNew);
@@ -73,7 +73,7 @@ namespace SystemService
    };
 
    PSIO_REFLECT(AccountSys,
-                method(startup, existing_accounts),
+                method(init),
                 method(newAccount, name, authService, requireNew),
                 method(setAuthCntr, authService),
                 method(exists, num),

@@ -8,7 +8,7 @@ export const getContentQuery = (account = "") => {
         return `
         {
           content(
-            ge: {account: "${account}", path: ""}, 
+            ge: {account: "${account}", path: "/"}, 
             le: {account: "${account}", path: "0"}
           ) {
             edges {

@@ -9,7 +9,7 @@ pub mod bridge;
 use psi_macros::Fracpack;
 
 // TODO: test reading variant with future index
-#[derive(Fracpack, PartialEq, Debug)]
+#[derive(Fracpack, PartialEq, Eq, Debug)]
 pub enum Variant {
     ItemU32(u32),
     ItemStr(String),
@@ -35,7 +35,7 @@ pub struct DefWontChangeInnerStruct {
     pub field_i32: i32,
 }
 
-#[derive(Fracpack, PartialEq, Debug)]
+#[derive(Fracpack, PartialEq, Eq, Debug)]
 pub struct InnerStruct {
     pub inner_u32: u32,
     pub var: Option<Variant>,
@@ -114,7 +114,7 @@ pub struct ParentStruct {
     pub s: String,
 }
 
-#[derive(Fracpack, Debug, PartialEq)]
+#[derive(Fracpack, Debug, PartialEq, Eq)]
 pub struct OuterSimpleArray {
     pub oa: u32,
     pub ob: u64,
@@ -143,7 +143,7 @@ pub struct UnextensibleWithOptions {
     pub opt_f: Option<f32>,
 }
 
-#[derive(Fracpack, Debug, PartialEq)]
+#[derive(Fracpack, Debug, PartialEq, Eq)]
 #[fracpack(definition_will_not_change)]
 pub struct ThreeElementsFixedStruct {
     pub element_1: i16,

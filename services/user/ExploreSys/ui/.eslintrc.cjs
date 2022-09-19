@@ -1,10 +1,15 @@
 module.exports = {
-  extends: ["plugin:prettier/recommended"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:prettier/recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
   parserOptions: {
     ecmaVersion: 2019,
     sourceType: "module",
   },
-  plugins: ["prettier", "svelte3"],
+  plugins: ["prettier", "svelte3", "@typescript-eslint"],
   overrides: [
     {
       files: ["*.svelte"],
@@ -17,20 +22,11 @@ module.exports = {
   },
   rules: {
     quotes: ["error", "double"],
-    "react/react-in-jsx-scope": "off",
     "no-unused-vars": "off",
-    "react/jsx-props-no-spreading": "off",
     "@typescript-eslint/no-unused-vars": [
       "warn",
       { argsIgnorePattern: "^_" },
     ],
-    "import/no-extraneous-dependencies": [
-      "error",
-      {
-        devDependencies: ["**/*.config.ts", "**/*.config.js"],
-      },
-    ],
     "no-nested-ternary": "off",
-    "react/no-unstable-nested-components": "off",
   },
 };

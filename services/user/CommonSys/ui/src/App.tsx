@@ -471,7 +471,11 @@ const App = () => {
             <Nav currentUser={currentUser} />
             <BrowserRouter>
                 <div>
-                    <Route path="/" exact component={Dashboard} />
+                    <Route
+                        path="/"
+                        exact
+                        render={() => <Dashboard currentUser={currentUser} />}
+                    />
                     <Route path={config.appletPrefix} component={urlApplet} />
                 </div>
             </BrowserRouter>

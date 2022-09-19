@@ -1,9 +1,10 @@
-import iconAccountDesktop from "./images/app-account-desktop.svg";
-import iconAccountMobile from "./images/app-account-mobile.svg";
-import iconExploreDesktop from "./images/app-explore-desktop.svg";
-import iconExploreMobile from "./images/app-explore-mobile.svg";
-import iconWalletDesktop from "./images/app-wallet-desktop.svg";
-import iconWalletMobile from "./images/app-wallet-mobile.svg";
+import { FC, SVGProps } from "react";
+import IconAccountDesktop from "./images/app-account-desktop.svg";
+import IconAccountMobile from "./images/app-account-mobile.svg";
+import IconExploreDesktop from "./images/app-explore-desktop.svg";
+import IconExploreMobile from "./images/app-explore-mobile.svg";
+import IconWalletDesktop from "./images/app-wallet-desktop.svg";
+import IconWalletMobile from "./images/app-wallet-mobile.svg";
 
 export const appletPrefix = "/applet/";
 
@@ -17,8 +18,9 @@ export type AppletEntry = {
     title: string;
     description: string;
     service: string;
-    mobileIcon: string;
-    desktopIcon: string;
+    MobileIcon: FC<SVGProps<SVGSVGElement>>;
+    DesktopIcon: FC<SVGProps<SVGSVGElement>>;
+    requiresUser: boolean;
 };
 
 export const applets: AppletEntry[] = [
@@ -26,24 +28,27 @@ export const applets: AppletEntry[] = [
         title: "Accounts",
         description: "Create and manage accounts.",
         service: "account-sys",
-        mobileIcon: iconAccountMobile,
-        desktopIcon: iconAccountDesktop,
+        MobileIcon: IconAccountMobile,
+        DesktopIcon: IconAccountDesktop,
+        requiresUser: false,
     },
     {
         title: "Block explorer",
         description:
             "View the most recently produced blocks, all the way back to the beginning of the chain.",
         service: "explore-sys",
-        mobileIcon: iconExploreMobile,
-        desktopIcon: iconExploreDesktop,
+        MobileIcon: IconExploreMobile,
+        DesktopIcon: IconExploreDesktop,
+        requiresUser: false,
     },
     {
         title: "Wallet",
         description:
             "View your balance, send/swap tokens, other standard wallet functionality.",
         service: "token-sys",
-        mobileIcon: iconWalletMobile,
-        desktopIcon: iconWalletDesktop,
+        MobileIcon: IconWalletMobile,
+        DesktopIcon: IconWalletDesktop,
+        requiresUser: true,
     },
 ];
 

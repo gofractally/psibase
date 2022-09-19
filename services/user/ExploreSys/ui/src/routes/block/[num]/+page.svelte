@@ -1,12 +1,10 @@
 <script>
     import { page } from "$app/stores";
     import { onMount } from "svelte";
-    import Button from "/src/components/Button.svelte";
-    import Error from "/src/components/Error.svelte";
-    import LeftArrow from "/src/assets/icons/leftArrow.svg";
+    import { LeftArrowIcon } from "/src/assets/icons";
     import { loadBlockData } from "/src/lib/loadData.js";
-    import ResultsTable from "/src/components/ResultsTable.svelte";
-    import Loader from "/src/components/Loader.svelte";
+    import { Blocks, Button, Error, Loader } from "/src/components";
+
     let data = null;
     let blocks = [];
 
@@ -27,27 +25,29 @@
     {#if !data}
         <Loader />
     {:else if data.error}
-        <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
-            Block explorer
+        <Button on:click={() => history.back()} leftIcon={LeftArrowIcon} class="mb-2">
+            Back
         </Button>
         <Error value={data.error} />
     {:else}
         <div class="mb-4">
             <h1 class="text-6xl text-gray-600">Block Detail</h1>
         </div>
-        <Button on:click={() => history.back()} leftIcon={LeftArrow} class="mb-2">
-            Block explorer
+        <Button on:click={() => history.back()} leftIcon={LeftArrowIcon} class="mb-2">
+            Back
         </Button>
-        <ResultsTable clickable={false} class="mb-6" {blocks} />
+        <Blocks clickable={false} class="mb-6" {blocks} />
         <div>
             <table class="w-full table-fixed">
-                <tbody>
+                <thead>
                     <tr>
                         <th>Trx. #</th>
                         <th>Service</th>
                         <th>Sender</th>
                         <th>Method</th>
                     </tr>
+                </thead>
+                <tbody>
                     {#each data.transactions as trx, index}
                         {#each trx.actions as action}
                             <tr>
@@ -63,16 +63,3 @@
         </div>
     {/if}
 </div>
-
-<style>
-    th,
-    td {
-        @apply font-mono;
-        @apply text-sm;
-        @apply p-2;
-        @apply text-left;
-    }
-    th {
-        @apply font-bold;
-    }
-</style>

@@ -3,14 +3,8 @@
     import { onDestroy, onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { loadData } from "/src/lib/loadData.js";
-    import ExplorerIcon from "/src/assets/icons/app-explorer-icon.svg";
-    import SearchIcon from "/src/assets/icons/search.svg";
-    import Dot from "/src/assets/icons/dot.svg";
-    import ButtonSet from "/src/components/ButtonSet.svelte";
-    import Button from "/src/components/Button.svelte";
-    import ResultsTable from "/src/components/ResultsTable.svelte";
-    import Loader from "/src/components/Loader.svelte";
-    import Error from "/src/components/Error.svelte";
+    import { ExplorerIcon, SearchIcon, DotIcon } from "/src/assets/icons";
+    import { Blocks, Button, ButtonSet, Error, Loader } from "/src/components";
 
     let apiInterval = null;
     let data = null;
@@ -103,7 +97,7 @@
             <Button
                 on:click={() => processPagingRequests(data.pagedResult.last)}
                 >Last</Button>
-            <Button class="AutoUpdatingButton" leftIcon={Dot}
+            <Button class="AutoUpdatingButton" leftIcon={DotIcon}
                     iconClass={autoUpdateMode
                         ? "text-green-500"
                         : "text-gray-500"}
@@ -111,7 +105,7 @@
                 Auto updating
             </Button>
         </ButtonSet>
-        <ResultsTable blocks={data.blocks} />
+        <Blocks blocks={data.blocks} />
     {/if}
 </div>
 

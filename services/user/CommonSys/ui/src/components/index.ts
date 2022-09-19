@@ -1,2 +1,5 @@
-export { Heading } from "./heading";
-export { Text } from "./text";
+export * from "./button";
+export * from "./loader";
+export * from "./icon";
+export * from "./heading";
+export * from "./text";

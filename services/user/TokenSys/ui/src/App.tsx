@@ -40,7 +40,7 @@ function App() {
     useEffect(() => {
         (async () => {
             try {
-                await wait(2000); // TODO: Why?
+                await wait(4000); // TODO: Why?
                 const userName = await getLoggedInUser();
                 if (!userName) {
                     // TODO: This never fires because query() swallows failures and never returns.

@@ -87,3 +87,14 @@ body {
     font-weight: 640;
   }
 }
+
+th,
+td {
+  @apply font-mono;
+  @apply text-sm;
+  @apply p-2;
+  @apply text-left;
+}
+th {
+  @apply font-bold;
+}

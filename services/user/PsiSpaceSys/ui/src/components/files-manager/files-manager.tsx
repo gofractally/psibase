@@ -145,9 +145,10 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
     const handleFileClick = (file: NamedAccountFile) => {
         console.info(file);
         let fileUrl =
-            `//${account}.${window.location.host}${file.accountFile.path}`
-                // todo: check the need of this replace
-                .replace("psispace-sys.", "");
+            `//${account}.${window.location.host}${file.accountFile.path}`.replace(
+                "psispace-sys.", // Replaces `psispace-sys.` subdomain when it's in DEV mode
+                ""
+            );
         console.info("opening file", fileUrl, "...");
         window.open(fileUrl, "_blank");
     };

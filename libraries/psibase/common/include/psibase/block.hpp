@@ -111,6 +111,14 @@ namespace psibase
 
    using TermNum = uint32_t;
 
+   struct Producer
+   {
+      AccountNumber name;
+      Claim         auth;
+      friend bool   operator==(const Producer&, const Producer&) = default;
+   };
+   PSIO_REFLECT(Producer, name, auth);
+
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Producer & Rotation
    // TODO: Consensus fields
@@ -124,8 +132,17 @@ namespace psibase
       TimePointSec  time;          // TODO: switch to microseconds
       AccountNumber producer;
       TermNum       term;
+      BlockNum      commitNum;
+
+      // If newProducers is set, activates joint consensus when
+      // this block becomes irreversible.  If joint consensus
+      // was already active, replaces newProducers instead.
+      // Joint consensus exits when either the most recent
+      // block to change producers becomes irreversible or
+      // the newProducers are set to the existing producers.
+      std::optional<std::vector<Producer>> newProducers;
    };
-   PSIO_REFLECT(BlockHeader, previous, blockNum, time, producer, term)
+   PSIO_REFLECT(BlockHeader, previous, blockNum, time, producer, term, commitNum, newProducers)
 
    // TODO: switch fields to shared_view_ptr?
    struct Block

@@ -70,7 +70,6 @@ const psibase = (appletContract: string) => {
 };
 
 const root = path.resolve(__dirname, "src");
-const outDir = path.resolve(__dirname, "dist");
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -81,11 +80,11 @@ export default defineConfig({
         psibase("psispace-sys"),
     ],
     build: {
-        outDir,
+        outDir: "../dist",
+        emptyOutDir: true,
         rollupOptions: {
             input: {
                 main: path.resolve(root, "index.html"),
-                defaultProfile: path.resolve(root, "default-profile.html"),
             },
         },
     },

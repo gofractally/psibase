@@ -193,7 +193,7 @@ namespace SystemService
       /// allows all transactions to execute without auth checks. After this point,
       /// `TransactionSys` uses [AuthInterface::checkAuthSys] to authenticate
       /// top-level actions and uses of [runAs].
-      void startup();
+      void init();
 
       /// Called by native code at the beginning of each block
       void startBlock();
@@ -241,7 +241,7 @@ namespace SystemService
       psibase::TimePointSec headBlockTime() const;
    };
    PSIO_REFLECT(TransactionSys,
-                method(startup),
+                method(init),
                 method(startBlock),
                 method(runAs, action, allowedActions),
                 method(getTransaction),

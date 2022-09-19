@@ -137,7 +137,7 @@ void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
                                               SystemService::AccountSys::service};
    transactor<SystemService::TransactionSys> tsys{SystemService::TransactionSys::service,
                                                   SystemService::TransactionSys::service};
-   auto trace = pushTransaction(makeTransaction({asys.startup(), tsys.startup()}));
+   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
@@ -236,12 +236,14 @@ void DefaultTestChain::registerSysRpc()
    transactor<RAccountSys> rpcAccount(RAccountSys::service, RAccountSys::service);
    transactor<ExploreSys>  rpcExplore(ExploreSys::service, ExploreSys::service);
    transactor<RAuthEcSys>  rpcAuthEc(RAuthEcSys::service, RAuthEcSys::service);
+   transactor<PsiSpaceSys> rpcPsiSpace(PsiSpaceSys::service, PsiSpaceSys::service);
 
    // Store UI files
    std::string cdir      = "../services";
    std::string comDir    = cdir + "/user/CommonSys";
    std::string accDir    = cdir + "/system/AccountSys";
    std::string expDir    = cdir + "/user/ExploreSys";
+   std::string psiSpDir  = cdir + "/user/PsiSpaceSys";
    std::string authEcDir = cdir + "/system/AuthEcSys";
    std::string thirdPty  = comDir + "/common/thirdParty/src";
 
@@ -256,6 +258,7 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/index.js", js, readWholeFile(comDir + "/ui/dist/index.js")),
        rpcCommon.storeSys("/style.css", css, readWholeFile(comDir + "/ui/dist/style.css")),
        rpcCommon.storeSys("/ninebox.svg", svg, readWholeFile(comDir + "/ui/dist/ninebox.svg")),
+       rpcCommon.storeSys("/loader.svg", svg, readWholeFile(comDir + "/ui/dist/loader.svg")),
        rpcCommon.storeSys("/psibase.svg", svg, readWholeFile(comDir + "/ui/dist/psibase.svg")),
        rpcCommon.storeSys("/app-account-desktop.svg", svg,
                           readWholeFile(comDir + "/ui/dist/app-account-desktop.svg")),
@@ -331,6 +334,21 @@ void DefaultTestChain::registerSysRpc()
 
        // ExploreSys
        //    rpcExplore.storeSys("/ui/index.js", js, readWholeFile(expDir + "/ui/index.js"))
+
+       // PsiSpaceSys Fancy UI
+       rpcPsiSpace.storeSys("/index.html", html, readWholeFile(psiSpDir + "/ui/dist/index.html")),
+       rpcPsiSpace.storeSys("/index.js", js, readWholeFile(psiSpDir + "/ui/dist/index.js")),
+       rpcPsiSpace.storeSys("/loader.svg", svg, readWholeFile(psiSpDir + "/ui/dist/loader.svg")),
+       rpcPsiSpace.storeSys("/style.css", css, readWholeFile(psiSpDir + "/ui/dist/style.css")),
+       rpcPsiSpace.storeSys(
+           "/default-profile/default-profile.html", html,
+           readWholeFile(psiSpDir + "/ui/dist/default-profile/default-profile.html")),
+       rpcPsiSpace.storeSys("/default-profile/index.js", js,
+                            readWholeFile(psiSpDir + "/ui/dist/default-profile/index.js")),
+       rpcPsiSpace.storeSys("/default-profile/loader.svg", svg,
+                            readWholeFile(psiSpDir + "/ui/dist/default-profile/loader.svg")),
+       rpcPsiSpace.storeSys("/default-profile/style.css", css,
+                            readWholeFile(psiSpDir + "/ui/dist/default-profile/style.css")),
    };
 
    trace = pushTransaction(makeTransaction(std::move(b)));
