@@ -191,7 +191,7 @@ struct test_chain
       psibase::TimePointSec skippedTime{blockContext->getHeadBlockTime().seconds + 1 +
                                         skipAdditional};
 
-      blockContext->start(skippedTime);
+      blockContext->start(skippedTime, psibase::AccountNumber{"testchain"});
       blockContext->callStartBlock();
    }
 

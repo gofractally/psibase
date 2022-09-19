@@ -49,7 +49,7 @@ export class TokenContract extends Contract {
         amount: string | number;
         memo: string;
     }) {
-        const value = String(Number(amount) * Math.pow(10, 8));
+        const value = Number(amount).toFixed(8).replace(/\./g, "");
         await action(await tokenContract.getAppletName(), "credit", {
             tokenId,
             receiver,
