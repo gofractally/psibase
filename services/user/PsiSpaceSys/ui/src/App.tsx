@@ -24,12 +24,7 @@ function App() {
     useEffectOnce(() => {
         initializeApplet(async () => {
             setOperations(operations);
-        });
-
-        wait(2500).then(async () => {
-            console.info("fetching logged user...");
             const loggedInUser = await getLoggedInUser();
-            console.log("getLoggedInUser:", loggedInUser);
             setCurrentUser(loggedInUser);
         });
     }, []);

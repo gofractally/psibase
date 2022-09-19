@@ -54,9 +54,6 @@ declare module "common/rpc.mjs" {
 
   function getTaposForHeadBlock(baseUrl?: string): Promise<any>;
 
-
-  interface SignedTransaction { transaction: string; proofs: any[] }
-
   function packAndPushSignedTransaction(
     baseUrl: any,
     signedTransaction: any
@@ -73,7 +70,7 @@ declare module "common/rpc.mjs" {
     baseUrl: string,
     transaction: any,
     privateKeys?: string[] // TODO: remove optional once we're done with fake-auth
-  ): Promise<SignedTransaction>;
+  ): Promise<any>;
   function verifyFields(obj: any, fieldNames: any): boolean;
 
   function postGraphQLGetJson<GqlResponse>(
