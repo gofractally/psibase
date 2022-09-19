@@ -226,7 +226,11 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
             })
         )
     );
-    return { transaction: uint8ArrayToHex(transaction), proofs };
+    const signedTransaction = uint8ArrayToHex(transaction);
+    console.log('should not be null', signedTransaction);
+    const result = { transaction: signedTransaction, proofs }
+    console.log('result is', result)
+    return result
 }
 
 /**
@@ -236,15 +240,24 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
  * @param {Object} transaction - A JSON object that follows the transaction schema to define a collection of actions to execute
  * @param {Array} privateKeys - An array of strings that represent private keys used to sign this transaction
  */
-export async function signAndPushTransaction(
-    baseUrl,
-    transaction,
-    privateKeys
-) {
-    return await packAndPushSignedTransaction(
-        baseUrl,
-        await signTransaction(baseUrl, transaction, privateKeys)
-    );
+export async function signAndPushTransaction(baseUrl, transaction, privateKeys) {
+    try {
+        console.log('Signing transaction...', { baseUrl, transaction, privateKeys });
+        const signedTransaction = await signTransaction(baseUrl, transaction, privateKeys);
+        console.log('Successfully signed transaction', { signedTransaction });
+
+        try {
+            console.log('Pushing transaction...')
+            const pushedTransaction = await packAndPushSignedTransaction(baseUrl, signedTransaction);
+            console.log('Transaction pushed!', { pushedTransaction })
+        } catch (e) {
+            console.error('Failed pushing transaction', e)
+            throw new Error(e)
+        }
+    } catch (e) {
+        console.error('Failed signing transaction', e)
+        throw new Error(e)
+    }
 }
 
 export function uint8ArrayToHex(data) {
@@ -460,10 +473,10 @@ let messageRouting = [
             if (op === undefined) {
                 responsePayload.errors.push(
                     "Service " +
-                        contractName +
-                        ' has no operation, "' +
-                        identifier +
-                        '"'
+                    contractName +
+                    ' has no operation, "' +
+                    identifier +
+                    '"'
                 );
             } else {
                 try {
@@ -495,10 +508,10 @@ let messageRouting = [
                 if (qu === undefined) {
                     responsePayload.errors.push(
                         "Service " +
-                            contractName +
-                            ' has no query, "' +
-                            identifier +
-                            '"'
+                        contractName +
+                        ' has no query, "' +
+                        identifier +
+                        '"'
                     );
                 } else {
                     try {
@@ -538,7 +551,7 @@ let messageRouting = [
 
 let bufferedMessages = [];
 
-export async function initializeApplet(initializer = () => {}) {
+export async function initializeApplet(initializer = () => { }) {
     await redirectIfAccessedDirectly();
 
     let rootUrl = await siblingUrl(null, null, null);

@@ -304,7 +304,10 @@ const App = () => {
     );
 
     const executeTransaction = useCallback(async () => {
-        if (pendingTransaction.length === 0) return;
+        if (pendingTransaction.length === 0) {
+            console.log('returning now as there is no pendingTransaction?')
+            return;
+        }
 
         try {
             let accountSys = new AppletId("account-sys");
@@ -316,12 +319,17 @@ const App = () => {
             let transaction = await constructTransaction(
                 injectSender(pendingTransaction, user)
             );
-            let { response: signedTransaction } = await query(
+            console.log('query params', { commonSys, accountSys, transaction })
+            let { errors, response: signedTransaction } = await query(
                 commonSys,
                 accountSys,
                 "getAuthedTransaction",
                 { transaction }
             );
+            if (!signedTransaction) {
+                console.error('there is no signed transaction?', { signedTransaction, errors })
+                throw new Error('No signed transaction returned')
+            }
             let baseUrl = ""; // default
             let trace = await packAndPushSignedTransaction(
                 baseUrl,

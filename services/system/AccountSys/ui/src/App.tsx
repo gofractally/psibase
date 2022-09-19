@@ -1,89 +1,76 @@
-import React, { useEffect, useState } from "react";
+import React, { useRef } from "react";
 
-import { getJson } from "common/rpc.mjs";
-import { useLocalStorage } from "common/useLocalStorage.mjs";
+import {
+    useAccountsWithKeys,
+    useCurrentUser,
+    useImportAccount,
+    useCreateAccount,
+    useAccounts,
+    useInitialized
+} from './hooks'
 
 import appAccountIcon from "./components/assets/icons/app-account.svg";
-
-import { AccountList, CreateAccountForm, Heading, SetAuth } from "./components";
-import { getLoggedInUser, useMsg } from "./helpers";
-import { initAppFn } from "./appInit";
+import { AccountsList, AccountList, CreateAccountForm, Heading } from "./components";
+import { getLoggedInUser } from "./helpers";
+import { ImportAccountForm } from "./components/ImportAccountForm";
 
 // needed for common files that won't necessarily use bundles
 window.React = React;
 
-const useAccountsWithKeys = (addMsg: any, clearMsg: any) => {
-    const [accounts, setAccounts] = useState([
-        {
-            accountNum: "alice",
-            authService: "auth-any-sys",
-        },
-        {
-            accountNum: "bob",
-            authService: "auth-any-sys",
-        },
-        {
-            accountNum: "carol",
-            authService: "auth-any-sys",
-        },
-    ]);
-    return accounts;
-};
-const useAccounts = (addMsg: any, clearMsg: any) => {
-    const [accounts, setAccounts] = useState([]);
+export interface KeyPair {
+    privateKey: string;
+    publicKey: string;
+}
+export interface KeyPairWithAccounts extends KeyPair {
+    knownAccounts?: string[];
+}
 
-    const refreshAccounts = () => {
-        addMsg("Fetching accounts...");
-        (async () => {
-            try {
-                setAccounts(await getJson("/accounts"));
-            } catch (e) {
-                console.info("refreshAccounts().catch().e:");
-                console.info(e);
-                clearMsg();
-                addMsg(e);
-            }
-        })();
-    };
+interface Account {
+    accountNum: string;
+    publicKey: KeyPairWithAccounts['publicKey']
+}
+export interface AccountWithAuth extends Account {
+    authService: string;
+}
+export interface AccountWithKey extends AccountWithAuth {
+    privateKey: KeyPairWithAccounts['privateKey']
+}
 
-    useEffect(refreshAccounts, []);
-
-    return accounts;
-};
 
 function App() {
-    const [appInitialized, setAppInitialized] = useState(false);
-    const { msg, addMsg, clearMsg } = useMsg();
-    const accountsWithKeys = useAccountsWithKeys(addMsg, clearMsg);
-    const allAccounts = useAccounts(addMsg, clearMsg);
-    const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
-    useEffect(() => {
-        initAppFn(() => {
-            setAppInitialized(true);
-        });
-    }, []);
-    useEffect(() => {
-        if (!appInitialized) {
-            return;
-        }
-        (async () => {
-            // initializeApplet();
-            try {
-                setCurrentUser(await getLoggedInUser());
-            } catch (e: any) {
-                console.info(
-                    "App.appInitialized.useEffect().error:",
-                    e.message
-                );
-            }
-        })();
-    }, [appInitialized]);
+    const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
+    const [allAccounts, refreshAccounts] = useAccounts();
+    const [currentUser, setCurrentUser] = useCurrentUser();
 
-    const onSelectAccount = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.id) {
-            setCurrentUser(e.target.id);
+    const onLogout = (account: string) => {
+        const isLoggingOutOfCurrentUser = currentUser === account;
+        if (isLoggingOutOfCurrentUser) {
+            setCurrentUser(accountsWithKeys[0].accountNum);
         }
-    };
+        dropAccount(account)
+    }
+
+
+    useInitialized(async () => {
+        try {
+            setCurrentUser(await getLoggedInUser());
+        } catch (e: any) {
+            console.info(
+                "App.appInitialized.useEffect().error:",
+                e.message
+            );
+        }
+    })
+
+    const createAccountFormRef = useRef<{ resetForm: () => void }>(null);
+
+    const [onCreateAccount, isAccountLoading, accountError] = useCreateAccount((newAccount, privateKey) => {
+        createAccountFormRef.current!.resetForm()
+        addAccounts([{ ...newAccount, privateKey }]);
+        refreshAccounts();
+    })
+    const [searchKeyPair, isImportLoading, importError] = useImportAccount(addAccounts);
+
 
     return (
         <div className="ui container p-4">
@@ -94,38 +81,23 @@ function App() {
                 </Heading>
             </div>
             <div className="bg-slate-50">
-                <h2 className="pt-6">Available accounts</h2>
-                <div>Choose and account below to make it active.</div>
-                <div className="flex w-full flex-nowrap place-content-between">
-                    <div className="w-20 text-center">Active</div>
-                    <div className="w-32">Accounts</div>
-                    <div className="grow">Pubkey</div>
-                    <div className="w-20">Action</div>
-                </div>
                 <AccountList
+                    onLogout={onLogout}
+                    selectedAccount={currentUser}
                     accounts={accountsWithKeys}
-                    onSelectAccount={onSelectAccount}
-                    addMsg={addMsg}
-                    clearMsg={clearMsg}
+                    onSelectAccount={setCurrentUser}
                 />
             </div>
-            <div className="bg-slate-50 mt-4">
-                <CreateAccountForm addMsg={addMsg} clearMsg={clearMsg} />
+            <div className="bg-slate-50 mt-4 flex justify-between">
+                <CreateAccountForm errorMessage={accountError} isLoading={isAccountLoading} onCreateAccount={onCreateAccount} ref={createAccountFormRef} />
+                <ImportAccountForm errorMessage={importError} isLoading={isImportLoading} onImport={searchKeyPair} />
             </div>
-            <SetAuth />
-            <hr />
-            <h2>Available accounts</h2>
-            <div>Choose and account below to make it active.</div>
-            <AccountList
+            {/* <SetAuth /> */}
+            <AccountsList
                 accounts={allAccounts}
-                addMsg={addMsg}
-                clearMsg={clearMsg}
             />
-            <hr />
-            <h2>Messages</h2>
-            <pre style={{ border: "1px solid" }}>
-                <code>{msg}</code>
-            </pre>
+
+
         </div>
     );
 }

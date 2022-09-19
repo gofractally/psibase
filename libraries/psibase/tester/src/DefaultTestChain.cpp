@@ -322,6 +322,8 @@ void DefaultTestChain::registerSysRpc()
                            readWholeFile(accDir + "/ui/dist/app-account.svg")),
        rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/dist/index.html")),
        rpcAccount.storeSys("/index.js", js, readWholeFile(accDir + "/ui/dist/index.js")),
+       rpcAccount.storeSys("/lock-closed.svg", svg, readWholeFile(accDir + "/ui/dist/lock-closed.svg")),
+       rpcAccount.storeSys("/lock-open.svg", svg, readWholeFile(accDir + "/ui/dist/lock-open.svg")),
        rpcAccount.storeSys("/logout.svg", svg, readWholeFile(accDir + "/ui/dist/logout.svg")),
        rpcAccount.storeSys("/refresh.svg", svg, readWholeFile(accDir + "/ui/dist/refresh.svg")),
        rpcAccount.storeSys("/style.css", css, readWholeFile(accDir + "/ui/dist/style.css")),

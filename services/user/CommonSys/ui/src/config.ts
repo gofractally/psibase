@@ -25,19 +25,11 @@ export type AppletEntry = {
 
 export const applets: AppletEntry[] = [
     {
-        title: "Account creation",
-        description: "Create a new account. Only available on testnet.",
+        title: "Accounts",
+        description: "Create and manage accounts.",
         service: "account-sys",
         MobileIcon: IconAccountMobile,
         DesktopIcon: IconAccountDesktop,
-        requiresUser: false,
-    },
-    {
-        title: "Account management",
-        description: "Used to manage your existing accounts.",
-        service: "auth-ec-sys",
-        MobileIcon: IconExploreMobile,
-        DesktopIcon: IconExploreDesktop,
         requiresUser: false,
     },
     {
