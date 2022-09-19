@@ -41,10 +41,13 @@ export const Heading = ({
 }: HeadingProps) => {
     let styledAsClass = "";
     if (styledAs) styledAsClass = HEADING_STYLES[styledAs];
-    return React.createElement(tag, {
-        className: `${styledAsClass} ${className}`,
-        children,
-    });
+    return React.createElement(
+        tag,
+        {
+            className: `${styledAsClass} ${className}`,
+        },
+        children
+    );
 };
 
 export default Heading;

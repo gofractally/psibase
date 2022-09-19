@@ -310,6 +310,10 @@ export class AppletId {
         this.subPath = subPath;
     }
 
+    toString() {
+        return this.fullPath;
+    }
+
     get fullPath() {
         let suffix = this.subPath !== "" ? "/" + this.subPath : "";
         return this.name + suffix;
@@ -319,8 +323,8 @@ export class AppletId {
         return this.name === appletId.name && this.subPath === appletId.subPath;
     }
 
-    async url() {
-        return await siblingUrl(null, this.name, this.subPath);
+    url() {
+        return siblingUrl(null, this.name, this.subPath);
     }
 
     static fromFullPath(fullPath) {
@@ -421,7 +425,7 @@ let redirectIfAccessedDirectly = async () => {
 };
 
 export function verifyFields(obj, fieldNames) {
-    var missingField = false;
+    let missingField = false;
 
     fieldNames.forEach((fieldName) => {
         if (!obj.hasOwnProperty(fieldName)) {
