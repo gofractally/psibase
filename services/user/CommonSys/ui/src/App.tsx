@@ -28,29 +28,6 @@ import {
 } from "./helpers";
 import { Applet, Dashboard, Nav } from "./views";
 
-function OtherApplets({
-    applets,
-    handleMessage,
-}: {
-    applets: NewAppletState[];
-    handleMessage: HandleMessage;
-}) {
-    const nonPrimaryApplets = applets.filter(
-        (a) => a.state !== AppletStates.primary
-    );
-    return (
-        <>
-            {nonPrimaryApplets.map((a) => (
-                <Applet
-                    applet={a}
-                    handleMessage={handleMessage}
-                    key={a.appletId.name}
-                />
-            ))}
-        </>
-    );
-}
-
 let serviceName = "common-sys";
 let commonSys = new AppletId(serviceName);
 
@@ -494,7 +471,7 @@ const App = () => {
         [messageRouting]
     );
 
-    const primaryApplet = applets[0];
+    const [primaryApplet, ...subApplets] = applets;
 
     return (
         <div className="mx-auto max-w-screen-xl">
@@ -512,9 +489,13 @@ const App = () => {
                     </Route>
                 </div>
             </BrowserRouter>
-            <div>
-                <OtherApplets applets={applets} handleMessage={handleMessage} />
-            </div>
+            {subApplets.map((subApplet) => (
+                <Applet
+                    applet={subApplet}
+                    handleMessage={handleMessage}
+                    key={subApplet.appletId.name}
+                />
+            ))}
         </div>
     );
 };
