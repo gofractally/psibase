@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     AppletId,
     executeCallback,
@@ -7,6 +7,7 @@ import {
     storeCallback,
     verifyFields,
 } from "common/rpc.mjs";
+
 import {
     ClientOps,
     constructTransaction,
@@ -23,27 +24,31 @@ import {
 } from "../types";
 import { AppletStates } from "../config";
 
-const serviceName = "common-sys";
-const commonSys = new AppletId(serviceName);
+const SERVICE_NAME = "common-sys";
+const ACCOUNT_SYS = new AppletId("account-sys", "");
+const COMMON_SYS = new AppletId(SERVICE_NAME);
+const ACTIVE_APPLET = getAppletInURL();
+
+type AppletsMap = {
+    [appletPath: string]: NewAppletState;
+};
 
 /**
  * Handles Inter-Applets Comms
  */
 export const useApplets = () => {
-    const activeApplet = getAppletInURL();
-
     const [currentUser, setCurrentUser] = useState("");
     const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
 
-    const [applets, setApplets] = useState<NewAppletState[]>([
-        {
-            appletId: activeApplet,
+    const [applets, setApplets] = useState<AppletsMap>({
+        [ACTIVE_APPLET.fullPath]: {
+            appletId: ACTIVE_APPLET,
             state: AppletStates.primary,
             onInit: () => {
-                updateInitializedApplets(activeApplet);
+                updateInitializedApplets(ACTIVE_APPLET);
             },
         },
-    ]);
+    });
 
     const [initializedApplets, setInitializedApplets] = useState<Set<string>>(
         new Set()
@@ -57,33 +62,22 @@ export const useApplets = () => {
 
     const [operationCountdown, setOperationCountdown] = useState(false);
 
-    const appletsRef = useRef<NewAppletState[]>(applets);
-    appletsRef.current = applets;
-
-    const getIndex = useCallback(
-        (appletId: AppletId) =>
-            appletsRef.current.findIndex((a) => {
-                return a.appletId.equals(appletId);
-            }),
-        []
-    );
-
     const open = useCallback(
         (appletId: AppletId) => {
             return new Promise<void>(async (resolve, reject) => {
                 // Opens an applet if it's not already open
-                const appletIndex = getIndex(appletId);
-                if (appletIndex === -1) {
-                    setApplets([
-                        ...appletsRef.current,
-                        {
+                const appletPath = appletId.fullPath;
+                if (!applets[appletPath]) {
+                    setApplets({
+                        ...applets,
+                        [appletPath]: {
                             appletId,
                             state: AppletStates.headless,
                             onInit: () => {
                                 updateInitializedApplets(appletId);
                             },
                         },
-                    ]);
+                    });
                 }
 
                 // Await for applet initialization for 10 seconds
@@ -103,12 +97,12 @@ export const useApplets = () => {
                 resolve();
             });
         },
-        [getIndex, initializedApplets]
+        [initializedApplets, applets]
     );
 
     const getIframe = useCallback(
         async (appletId: AppletId, shouldOpen: boolean) => {
-            if (!shouldOpen && getIndex(appletId) === -1) {
+            if (!shouldOpen && !applets[appletId.fullPath]) {
                 throw (
                     "Applet [" +
                     appletId.fullPath +
@@ -129,7 +123,7 @@ export const useApplets = () => {
 
             return iframe;
         },
-        [open, getIndex]
+        [open, applets]
     );
 
     const sendMessage = useCallback(
@@ -248,10 +242,9 @@ export const useApplets = () => {
 
     const getCurrentUser = useCallback(async () => {
         try {
-            const accountSys = new AppletId("account-sys", "");
             const { response } = await query(
-                commonSys,
-                accountSys,
+                COMMON_SYS,
+                ACCOUNT_SYS,
                 "getLoggedInUser"
             );
             setCurrentUser(response);
@@ -263,8 +256,6 @@ export const useApplets = () => {
 
     const signTransaction = useCallback(
         async (transactions: any[]) => {
-            const accountSys = new AppletId("account-sys");
-
             // refreshes the current logged in user, just to guarantee it's the same
             const currentUser = await getCurrentUser();
 
@@ -273,14 +264,14 @@ export const useApplets = () => {
             );
 
             console.log("getAuthed query params >>>", {
-                commonSys,
-                accountSys,
+                commonSys: COMMON_SYS,
+                accountSys: ACCOUNT_SYS,
                 transaction,
             });
 
             const { errors, response: signedTransaction } = await query(
-                commonSys,
-                accountSys,
+                COMMON_SYS,
+                ACCOUNT_SYS,
                 "getAuthedTransaction",
                 { transaction }
             );
@@ -499,8 +490,19 @@ export const useApplets = () => {
         // TODO: Cleanup
     }, [operationCountdown, executeTransaction]);
 
+    const [primaryApplet, subApplets] = useMemo(() => {
+        const primaryPath = ACTIVE_APPLET.fullPath;
+        const primaryApplet = applets[primaryPath];
+        const subApplets = Object.keys(applets)
+            .filter((key) => key !== primaryPath)
+            .map((key) => applets[key]);
+        return [primaryApplet, subApplets];
+    }, [applets]);
+
     return {
         applets,
+        primaryApplet,
+        subApplets,
         currentUser,
         messageRouting,
         handleMessage,

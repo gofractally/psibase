@@ -5,9 +5,8 @@ import { Applet, Dashboard, Nav } from "./views";
 import { useApplets } from "./hooks/useApplets";
 
 const App = () => {
-    const { applets, currentUser, handleMessage } = useApplets();
-
-    const [primaryApplet, ...subApplets] = applets;
+    const { primaryApplet, subApplets, currentUser, handleMessage } =
+        useApplets();
 
     return (
         <div className="mx-auto max-w-screen-xl">
