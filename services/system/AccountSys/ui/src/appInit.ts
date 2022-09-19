@@ -8,7 +8,6 @@ import {
     signTransaction,
     getJson,
     AppletId,
-    SignedTransaction,
 } from "common/rpc.mjs";
 import { KeyPairWithAccounts } from "./App";
 
@@ -66,7 +65,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
             },
             {
                 id: "getAuthedTransaction",
-                exec: async ({ transaction }: execArgs): Promise<SignedTransaction> => {
+                exec: async ({ transaction }: execArgs): Promise<any> => {
                     const [user, accounts] = await Promise.all([query<null, string>(accountSysApplet, "getLoggedInUser"), getJson<{ accountNum: string; authService: string }[]>("/accounts")]);
 
                     const sendingAccount = accounts.find(account => account.accountNum === user);
