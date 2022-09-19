@@ -287,33 +287,37 @@ export function storePromise(resolve, reject) {
     return callbackId;
 }
 
-export function executeCallback(callbackId, response) {
-    let idx = queryCallbacks.findIndex(q => q.callbackId === callbackId);
+export function executeCallback(callbackId, response)
+{
+    const cb = queryCallbacks.find(q => q.callbackId === callbackId);
 
-    if (idx === -1) {
+    if (!cb)
+    {
         console.error("Callback with ID " + callbackId + " not found.");
         return false;
     }
 
-    try {
-        queryCallbacks[idx].callback(response);
+    try{
+        cb.callback(response);
     }
-    catch (e) {
-        console.error("Error calling callback with ID " + callbackId);
+    catch (e)
+    {
+        console.error("Error calling callback with ID " + callbackId, e);
     }
-    // Remove the callback now that it's been handled
-    queryCallbacks.splice(idx, 1);
+    // Remove the callback to flag it was executed
+    delete cb.callback;
     return true;
 }
 
-export function executePromise(callbackId, response, errors) {
-    let idx = promises.findIndex(q => q.callbackId === callbackId);
-    if (idx === -1) {
+export function executePromise(callbackId, response, errors)
+{
+    const promise = promises.find(q => q.callbackId === callbackId);
+    if (!promise)
+    {
         console.error("Promise with ID " + callbackId + " not found.");
         return false;
     }
 
-    let promise = promises.splice(idx, 1)[0];
     if (errors.length > 0)
         promise.reject(errors);
     else
@@ -424,20 +428,30 @@ let messageRouting = [
         type: MessageTypes.Query,
         fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
-            let { identifier, params, callbackId } = payload;
-            let responsePayload = { callbackId, response: null, errors: [] };
-            let contractName = await getContractName();
-            let qu = qrs.find(q => q.id === identifier);
-            if (qu === undefined) {
-                responsePayload.errors.push("Service " + contractName + " has no query, \"" + identifier + "\"");
-            }
-            else {
-                try {
-                    responsePayload.response = await qu.exec(params);
+            let {identifier, params, callbackId} = payload;
+            let responsePayload = {callbackId, response: null, errors: []};
+
+            try {
+                let contractName = await getContractName();
+                let qu = qrs.find(q => q.id === identifier);
+                if (qu === undefined)
+                {
+                    responsePayload.errors.push("Service " + contractName + " has no query, \"" + identifier + "\"");
                 }
-                catch (e) {
-                    responsePayload.errors.push(e);
+                else
+                {
+                    try
+                    {
+                        responsePayload.response = await qu.exec(params);
+                    } 
+                    catch (e)
+                    {
+                        responsePayload.errors.push(e);
+                    }
                 }
+            } catch (e) {
+                console.error("fail to process query message", e)
+                responsePayload.errors.push(e);
             }
 
             sendToParent({
@@ -472,8 +486,10 @@ export async function initializeApplet(initializer = () => { }) {
     let rootUrl = await siblingUrl(null, null, null);
     window.iFrameResizer = {
         targetOrigin: rootUrl,
-        onReady: () => {
-            bufferedMessages.forEach(async (m) => await m());
+        onReady: async () => {
+            for (const bufferedMessage of bufferedMessages) {
+                await bufferedMessage();
+            }
             bufferedMessages = [];
         },
         onMessage: (msg) => {

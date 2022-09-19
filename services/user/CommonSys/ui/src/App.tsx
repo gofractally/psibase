@@ -24,6 +24,7 @@ import {
     getIframeId,
     injectSender,
     makeAction,
+    wait,
 } from "./helpers";
 import { Applet, Dashboard, Nav } from "./views";
 
@@ -59,17 +60,32 @@ let pendingTransaction: any[] = [];
 const App = () => {
     const activeApplet = getAppletInURL();
     const [currentUser, setCurrentUser] = useState("");
+    const [initializedApplets, setInitializedApplets] = useState<Set<string>>(
+        new Set()
+    );
     const [applets, setApplets] = useState<NewAppletState[]>([
         {
             appletId: activeApplet,
             state: AppletStates.primary,
-            onInit: () => {},
+            onInit: () => {
+                updateInitializedApplets(activeApplet);
+            },
         },
     ]);
     const [operationCountdown, setOperationCountdown] = useState(false);
 
     const appletsRef = useRef<NewAppletState[]>(applets);
     appletsRef.current = applets;
+
+    const updateInitializedApplets = useCallback(
+        (appletId: AppletId) => {
+            setInitializedApplets((initializedAppletsSet) => {
+                initializedAppletsSet.add(appletId.fullPath);
+                return initializedAppletsSet;
+            });
+        },
+        [setInitializedApplets]
+    );
 
     const getCurrentUser = async () => {
         try {
@@ -87,11 +103,7 @@ const App = () => {
     };
 
     useEffect(() => {
-        const getUserFn = async () => {
-            await getCurrentUser();
-            // NOTE: 1000 ms wasn't enough...
-        };
-        setInterval(getUserFn, 2000);
+        getCurrentUser();
     }, []);
 
     const getIndex = useCallback((appletId: AppletId) => {
@@ -114,7 +126,7 @@ const App = () => {
 
     const open = useCallback(
         (appletId: AppletId) => {
-            return new Promise<void>((resolve) => {
+            return new Promise<void>(async (resolve, reject) => {
                 // Opens an applet if it's not already open
                 let index = getIndex(appletId);
                 if (index === -1) {
@@ -123,24 +135,33 @@ const App = () => {
                         {
                             appletId,
                             state: AppletStates.headless,
-                            onInit: resolve,
+                            onInit: () => {
+                                updateInitializedApplets(appletId);
+                                resolve();
+                            },
                         },
                     ]);
                 } else {
+                    let attempts = 1;
+                    while (!initializedApplets.has(appletId.fullPath)) {
+                        if (attempts > 30) {
+                            reject(
+                                new Error(
+                                    `initialization of applet ${appletId.fullPath} timed out`
+                                )
+                            );
+                            return;
+                        }
+                        await wait(50);
+                        attempts += 1;
+                    }
                     // Applet is already open, invoke callback immediately
                     resolve();
                 }
             });
         },
-        [getIndex]
+        [getIndex, updateInitializedApplets]
     );
-
-    const urlApplet = useCallback(() => {
-        return Applet({
-            applet: { appletId: activeApplet, state: AppletStates.primary },
-            handleMessage,
-        });
-    }, []);
 
     const getIframe = useCallback(
         async (appletId: AppletId, shouldOpen: boolean) => {
@@ -207,32 +228,39 @@ const App = () => {
             // TODO: Could check that sender isn't on a blacklist before making the IPC call.
             // TODO: handle timeout if I never get a response from an applet
             return new Promise<{ response: any; errors: any }>(
-                async (resolve) => {
-                    let iframe = await getIframe(receiver, shouldOpenReceiver);
+                async (resolve, reject) => {
+                    try {
+                        let iframe = await getIframe(
+                            receiver,
+                            shouldOpenReceiver
+                        );
 
-                    payload.callbackId = storeCallback(
-                        ({
-                            sender: responseApplet,
-                            response,
-                            errors,
-                        }: {
-                            sender: AppletId;
-                            response: any;
-                            errors: any;
-                        }) => {
-                            if (!responseApplet.equals(receiver)) {
-                                return;
+                        payload.callbackId = storeCallback(
+                            ({
+                                sender: responseApplet,
+                                response,
+                                errors,
+                            }: {
+                                sender: AppletId;
+                                response: any;
+                                errors: any;
+                            }) => {
+                                if (!responseApplet.equals(receiver)) {
+                                    return;
+                                }
+                                resolve({ response, errors });
+                                // TODO: Consider creating a QueryResponse object with these two fields
                             }
-                            resolve({ response, errors });
-                            // TODO: Consider creating a QueryResponse object with these two fields
-                        }
-                    );
+                        );
 
-                    let restrictedTargetOrigin = await receiver.url();
-                    (iframe as any).iFrameResizer.sendMessage(
-                        { type: messageType, payload },
-                        restrictedTargetOrigin
-                    );
+                        let restrictedTargetOrigin = await receiver.url();
+                        (iframe as any).iFrameResizer.sendMessage(
+                            { type: messageType, payload },
+                            restrictedTargetOrigin
+                        );
+                    } catch (e) {
+                        reject(e);
+                    }
                 }
             );
         },
@@ -240,13 +268,13 @@ const App = () => {
     );
 
     const query = useCallback(
-        async (
+        (
             sender: AppletId,
             receiver: AppletId,
             name: string,
             params: any = {}
         ) => {
-            return await sendMessageGetResponse(
+            return sendMessageGetResponse(
                 MessageTypes.Query,
                 sender,
                 receiver,
@@ -258,13 +286,13 @@ const App = () => {
     );
 
     const operation = useCallback(
-        async (
+        (
             sender: AppletId,
             receiver: AppletId,
             name: string,
             params: any = {}
         ) => {
-            return await sendMessageGetResponse(
+            return sendMessageGetResponse(
                 MessageTypes.Operation,
                 sender,
                 receiver,
@@ -458,17 +486,22 @@ const App = () => {
         [messageRouting]
     );
 
+    const primaryApplet = applets[0];
+
     return (
         <div className="mx-auto max-w-screen-xl">
             <Nav currentUser={currentUser} />
             <BrowserRouter>
                 <div>
-                    <Route
-                        path="/"
-                        exact
-                        render={() => <Dashboard currentUser={currentUser} />}
-                    />
-                    <Route path={config.appletPrefix} component={urlApplet} />
+                    <Route path="/" exact>
+                        <Dashboard currentUser={currentUser} />
+                    </Route>
+                    <Route path={config.appletPrefix}>
+                        <Applet
+                            applet={primaryApplet}
+                            handleMessage={handleMessage}
+                        />
+                    </Route>
                 </div>
             </BrowserRouter>
             <div>

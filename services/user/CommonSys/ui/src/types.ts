@@ -36,7 +36,7 @@ export interface NewAppletMeta {
 }
 
 export interface NewAppletState extends NewAppletMeta {
-    onInit?: () => void;
+    onInit: () => void;
 }
 
 export type MessageTypeValue = typeof MessageTypes[keyof typeof MessageTypes];
