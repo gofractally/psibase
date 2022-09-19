@@ -272,12 +272,25 @@ export const useApplets = () => {
                 injectSender(transactions, currentUser)
             );
 
-            const { response: signedTransaction } = await query(
+            console.log("getAuthed query params >>>", {
+                commonSys,
+                accountSys,
+                transaction,
+            });
+
+            const { errors, response: signedTransaction } = await query(
                 commonSys,
                 accountSys,
                 "getAuthedTransaction",
                 { transaction }
             );
+            if (!signedTransaction) {
+                console.error("There is no signed transaction", {
+                    signedTransaction,
+                    errors,
+                });
+                throw new Error(`No signed transaction returned: ${errors}`);
+            }
 
             return signedTransaction;
         },
@@ -285,7 +298,10 @@ export const useApplets = () => {
     );
 
     const executeTransaction = useCallback(async () => {
-        if (pendingTransactions.length === 0) return;
+        if (pendingTransactions.length === 0) {
+            console.log("returning now as there is no pendingTransaction?");
+            return;
+        }
 
         try {
             const signedTransaction = await signTransaction(
