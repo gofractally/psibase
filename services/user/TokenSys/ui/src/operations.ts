@@ -53,5 +53,5 @@ export const operations = [CREDIT];
 
 export const executeCredit = async (payload: CreditOperationPayload) => {
     const appletId = await tokenContract.getAppletId();
-    operation(appletId, "credit", payload);
+    return operation(appletId, "credit", payload);
 };

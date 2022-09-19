@@ -42,7 +42,6 @@ function App() {
             try {
                 const userName = await getLoggedInUser();
                 if (!userName) {
-                    // TODO: This never fires because query() swallows failures and never returns.
                     throw new Error("Unable to fetch logged-in user.");
                 }
                 setUserName(userName);
@@ -90,7 +89,7 @@ function App() {
     const transfer = async ({ amount, to, token: symbol }: TransferInputs) => {
         if (!symbol) throw new Error("No token selected.");
         // TODO: Errors getting swallowed by CommonSys::executeTransaction(). Fix.
-        executeCredit({
+        await executeCredit({
             symbol,
             receiver: to,
             amount,
