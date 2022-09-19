@@ -144,7 +144,7 @@ const App = () => {
                 } else {
                     let attempts = 1;
                     while (!initializedApplets.has(appletId.fullPath)) {
-                        if (attempts > 30) {
+                        if (attempts > 100) {
                             reject(
                                 new Error(
                                     `initialization of applet ${appletId.fullPath} timed out`
@@ -152,7 +152,7 @@ const App = () => {
                             );
                             return;
                         }
-                        await wait(50);
+                        await wait(100);
                         attempts += 1;
                     }
                     // Applet is already open, invoke callback immediately
