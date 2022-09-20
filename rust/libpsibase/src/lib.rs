@@ -3,8 +3,8 @@ mod block;
 mod crypto;
 mod db;
 mod from_bin;
-mod intrinsic;
 mod method_number;
+mod native_functions;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod time;
@@ -15,8 +15,8 @@ pub use block::*;
 pub use crypto::*;
 pub use db::*;
 pub use from_bin::*;
-pub use intrinsic::*;
 pub use method_number::*;
+pub use native_functions::*;
 pub use psi_macros::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;

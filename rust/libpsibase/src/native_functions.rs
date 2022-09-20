@@ -2,18 +2,22 @@ use fracpack::Packable;
 
 pub mod raw {
     extern "C" {
-        /// Copy `min(destSize, resultSize - offset)` bytes from
+        /// Copy `min(dest_size, resultSize - offset)` bytes from
         /// `result + offset` into `dest` and return `resultSize`
         ///
         /// If `offset >= resultSize`, then skip the copy.
         ///
-        /// Other functions set result.
+        /// Other functions set or clear result. `getResult`, [getKey], and
+        /// [writeConsole] are the only raw functions which leave the current
+        /// result and key intact.
         pub fn getResult(dest: *mut u8, dest_size: u32, offset: u32) -> u32;
 
-        /// Copy `min(destSize, key_size)` bytes of the most-recent key into
+        /// Copy `min(dest_size, key_size)` bytes of the most-recent key into
         /// dest and return `key_size`
         ///
-        /// Other functions set the key.
+        /// Other functions set or clear the key. [getResult], `getKey`, and
+        /// [writeConsole] are the only raw functions which leave the current
+        /// result and key intact.
         pub fn getKey(dest: *mut u8, dest_size: u32) -> u32;
 
         /// Write `message` to console
@@ -30,15 +34,15 @@ pub mod raw {
         ///
         /// The result contains a fracpacked [Action]; use [getResult] to get it.
         ///
-        /// If the contract, while handling action A, calls itself with action B:
+        /// If the service, while handling action A, calls itself with action B:
         /// * Before the call to B, `getCurrentAction()` returns A.
         /// * After the call to B, `getCurrentAction()` returns B.
         /// * After B returns, `getCurrentAction()` returns A.
         ///
-        /// Note: The above only applies if the contract uses [call]. [Actor] uses [call].
+        /// Note: The above only applies if the service uses [call]. [Actor] uses [call].
         pub fn getCurrentAction() -> u32;
 
-        /// Call a contract, store the return value into result, and return the result size
+        /// Call a service, store the return value into result, and return the result size
         ///
         /// `action` must contain a fracpacked [Action].
         ///
@@ -82,7 +86,7 @@ pub mod raw {
         /// Get the first key-value pair which is greater than or equal to the provided
         /// key
         ///
-        /// If one is found, and the first `matchKeySize` bytes of the found key
+        /// If one is found, and the first `match_key_size` bytes of the found key
         /// matches the provided key, then sets result to value and returns size. Also
         /// sets key. Otherwise returns `-1` and clears result. Use [getResult] to get
         /// result and [getKey] to get found key.
@@ -95,7 +99,7 @@ pub mod raw {
 
         /// Get the key-value pair immediately-before provided key
         ///
-        /// If one is found, and the first `matchKeySize` bytes of the found key
+        /// If one is found, and the first `match_key_size` bytes of the found key
         /// matches the provided key, then sets result to value and returns size.
         /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult]
         /// to get result and [getKey] to get found key.
