@@ -9,4 +9,4 @@ path = "src/fracpack.rs"
 
 [dependencies]
 custom_error = "1.9.2"
-psi_macros = { version = "0.1.0", path = "../psi_macros" }
+psibase_macros = { version = "0.1.0", path = "../psibase_macros" }

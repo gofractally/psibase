@@ -19,7 +19,7 @@ pub use db::*;
 pub use from_bin::*;
 pub use method_number::*;
 pub use native_functions::*;
-pub use psi_macros::*;
+pub use psibase_macros::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use tester::*;

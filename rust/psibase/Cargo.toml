@@ -13,9 +13,9 @@ fracpack = { version = "0.1.0", path = "../fracpack" }
 futures = "0.3"
 include_dir = "0.7"
 indicatif = "0.17"
-libpsibase_names = { version = "0.1.0", path = "../libpsibase_names" }
 mime_guess = "2.0"
-psi_macros = { version = "0.1.0", path = "../psi_macros" }
+psibase_macros = { version = "0.1.0", path = "../psibase_macros" }
+psibase_names = { version = "0.1.0", path = "../psibase_names" }
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
 ripemd = "0.1"
 secp256k1 = { version="0.22", features = ["global-context", "bitcoin_hashes"] }

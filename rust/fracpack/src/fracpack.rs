@@ -24,7 +24,7 @@ impl<T> PackableOwned for T where T: for<'a> Packable<'a> {}
 
 /// Pack and unpack fracpack data
 ///
-/// Use [`#[derive(Fracpack)]`](psi_macros::Fracpack) to implement
+/// Use [`#[derive(Fracpack)]`](psibase_macros::Fracpack) to implement
 /// this trait; manually implementing it is unsupported.
 pub trait Packable<'a>: Sized {
     #[doc(hidden)]
