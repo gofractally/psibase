@@ -76,7 +76,9 @@ SCENARIO("Testing default psibase chain")
    alice.to<TokenSys>().mint(create.returnVal(), 100e4, memo);
 
    std::vector<ProducerConfigRow> producerConfig = {{"testchain"_a, {}}};
-   alice.to<ProducerSys>().setProducers(producerConfig);
+   auto                           setProds =
+       t.from(SystemService::ProducerSys::service).to<ProducerSys>().setProducers(producerConfig);
+   CHECK(setProds.succeeded());
 
    t.startBlock();
 
