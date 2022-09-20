@@ -3,6 +3,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/db.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 
@@ -154,7 +155,7 @@ struct test_chain
       sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
-   test_chain(const test_chain&) = delete;
+   test_chain(const test_chain&)            = delete;
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
@@ -191,7 +192,24 @@ struct test_chain
       psibase::TimePointSec skippedTime{blockContext->getHeadBlockTime().seconds + 1 +
                                         skipAdditional};
 
-      blockContext->start(skippedTime);
+      auto producer = psibase::AccountNumber("firstproducer");
+      auto status =
+          blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+      if (status.has_value() && status->current.blockNum > 3)
+      {
+         // TODO: Figure out why block #3 can't see the producers, even though they are set in block #2 (genesis block)
+         auto       smallestAcc = psibase::AccountNumber{0};
+         const auto key         = psio::convert_to_key(psibase::producerConfigKey(smallestAcc));
+         size_t     keySize     = sizeof(psibase::NativeTableNum);
+         auto       prodCfg =
+             blockContext->db.kvGreaterEqualRaw(psibase::DbId::nativeConstrained, key, keySize);
+
+         psibase::check(prodCfg.has_value(), "producer has not been set");
+         auto row = psio::convert_from_frac<psibase::ProducerConfigRow>(prodCfg->value);
+         producer = row.producerName;
+      }
+
+      blockContext->start(skippedTime, producer);
       blockContext->callStartBlock();
    }
 

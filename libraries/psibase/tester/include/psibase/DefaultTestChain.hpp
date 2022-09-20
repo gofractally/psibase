@@ -20,6 +20,8 @@ namespace psibase
 
       void deploySystemServices(bool show = false);
 
+      void setBlockProducers(bool show = false);
+
       void createSysServiceAccounts(bool show = false);
 
       AccountNumber addService(const char* acc, const char* filename, bool show = false);

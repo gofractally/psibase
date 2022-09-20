@@ -33,6 +33,7 @@ DefaultTestChain::DefaultTestChain(
 {
    startBlock();
    deploySystemServices();
+   setBlockProducers();
    startBlock();
    createSysServiceAccounts();
    registerSysRpc();
@@ -77,7 +78,7 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                             },
                                             {
                                                 .service = SystemService::ProducerSys::service,
-                                                .flags   = 0,
+                                                .flags   = SystemService::ProducerSys::serviceFlags,
                                                 .code    = readWholeFile("ProducerSys.wasm"),
                                             },
                                             {
@@ -141,6 +142,15 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                {});
 
    check(psibase::show(show, trace) == "", "Failed to deploy genesis services");
+}
+
+void DefaultTestChain::setBlockProducers(bool show /* = false*/)
+{
+   transactor<SystemService::ProducerSys> psys{SystemService::ProducerSys::service,
+                                               SystemService::ProducerSys::service};
+   std::vector<ProducerConfigRow>         producerConfig = {{"testchain"_a, {}}};
+   auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
+   check(psibase::show(true, trace) == "", "Failed to set producers");
 }
 
 void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
