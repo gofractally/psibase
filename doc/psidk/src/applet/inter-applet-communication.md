@@ -103,7 +103,7 @@ catch (e)
 
 It is possible that the user may be using an applet to construct a transaction, rather than wanting to construct it and immediately push it to chain (for example if trying to propose a multisignature transaction).
 
-This means that an applet should not be written to expect a callback when an operation is executed. Instead, Psibase blockchains use an event-sourcing model, where an applet should subscribe to the on-chain events that it cares about, and it will be automatically notified when those events are emitted. 
+This means that an applet should not be written to expect a callback when an operation is executed. Instead, psibase blockchains use an event-sourcing model, where an applet should subscribe to the on-chain events that it cares about, and it will be automatically notified when those events are emitted. 
 
 ## Message routing
 

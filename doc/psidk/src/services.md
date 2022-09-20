@@ -8,4 +8,4 @@ A service is like a smart contract on other chains, but has these differences:
 - Most psibase functionality comes from services instead of from native functions.
 - The term "service" is common in computer systems and doesn't imply a legal or business relationship.
 
-psibase services are WASM. psidk supports writing services in [C++](cpp-service/basic/README.md), Rust (TODO), and AssemblyScript (TODO).
+Psibase services are WASM. psidk supports writing services in [C++](cpp-service/basic/README.md), Rust (TODO), and AssemblyScript (TODO).

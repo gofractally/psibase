@@ -1,6 +1,6 @@
 # Schema Format
 
-psibase has a schema format which describes the fracpack-format data and JSON-format data it uses for action arguments, event content, and database content.
+Psibase has a schema format which describes the fracpack-format data and JSON-format data it uses for action arguments, event content, and database content.
 
 TODO: implement schema
 
@@ -25,7 +25,7 @@ Each definition has at least these fields:
 
 A definition may also have these optional fields:
 
-- `"customJson"`, a boolean, indicates the type uses custom JSON serialization. We recommend against using this in most cases since it requires special handling in all serializers and deserializers. psibase uses it for public and private keys, signatures, [psibase::AccountNumber], and [psibase::MethodNumber]. The serialization libraries which communicate with psibase (e.g. the js library) support this set, but not additional ones. Only valid for structs.
+- `"customJson"`, a boolean, indicates the type uses custom JSON serialization. We recommend against using this in most cases since it requires special handling in all serializers and deserializers. Psibase uses it for public and private keys, signatures, [psibase::AccountNumber], and [psibase::MethodNumber]. The serialization libraries which communicate with psibase (e.g. the js library) support this set, but not additional ones. Only valid for structs.
 - `"definitionWillNotChange"`, a boolean, indicates the definition for this type will not change in the future. It opts into an alternative fracpack encoding which saves 2 bytes. Only valid for structs.
 - [`"methods"`](#method-definitions). Only valid for structs.
 

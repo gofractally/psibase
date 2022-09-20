@@ -1,6 +1,6 @@
 # fracpack
 
-psibase uses a new binary format, `fracpack`, which has the following goals:
+Psibase uses a new binary format, `fracpack`, which has the following goals:
 
 - Quickly pack and unpack data, making it suitable for service-to-service communication, node-to-node communication, blockchain-to-outside communication, and database storage.
 - Forwards and backwards compatibility; it supports adding new optional fields to the end of structs and tuples, even when they are embedded in variable-length vectors, fixed-length arrays, optional, and other structs and tuples.
@@ -8,7 +8,7 @@ psibase uses a new binary format, `fracpack`, which has the following goals:
 - Doesn't require a code generator to support either C++ or Rust; macros and metaprogramming handle it.
 - Efficient compression when combined with the compression algorithm from Cap 'n' Proto. Note: psibase doesn't currently use this.
 
-psibase uses fracpack for all of its message formats and uses it for database storage. Wherever psibase uses binary data, it's in fracpack format. There is one slight deviation: cryptographic types, even though they are normally stored in fracpack format, use a different binary format when encoded as a string (e.g. `PUB_K1_898DAWuc...`). Encoders and decoders take care of the extra conversion. e.g. when converting action arguments from json to binary, they decode the base-58 string, verify the checksum, then convert the resulting binary into fracpack format.
+Psibase uses fracpack for all of its message formats and uses it for database storage. Wherever psibase uses binary data, it's in fracpack format. There is one slight deviation: cryptographic types, even though they are normally stored in fracpack format, use a different binary format when encoded as a string (e.g. `PUB_K1_898DAWuc...`). Encoders and decoders take care of the extra conversion. e.g. when converting action arguments from json to binary, they decode the base-58 string, verify the checksum, then convert the resulting binary into fracpack format.
 
 This document describes fracpack's binary format; it does not describe either C++'s or Rust's reflection, encoding, and decoding facilities.
 
