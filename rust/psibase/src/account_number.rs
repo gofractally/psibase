@@ -19,7 +19,7 @@ custom_error! { pub AccountNumberError
 /// You can create an `AccountNumber` from [a literal string][`&str`] with [`AccountNumber::from`]:
 ///
 /// ```
-/// use libpsibase::AccountNumber;
+/// use psibase::AccountNumber;
 /// let hello = AccountNumber::from("hello");
 /// ```
 #[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, Serialize, Deserialize)]

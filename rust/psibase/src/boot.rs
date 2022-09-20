@@ -5,7 +5,7 @@ use crate::{
 use anyhow::Context;
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
-use libpsibase::{
+use psibase::{
     account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
     SharedGenesisActionData, SharedGenesisContract, SignedTransaction,
 };

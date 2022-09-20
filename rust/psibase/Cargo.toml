@@ -13,13 +13,12 @@ fracpack = { version = "0.1.0", path = "../fracpack" }
 futures = "0.3"
 include_dir = "0.7"
 indicatif = "0.17"
-libpsibase = { version = "0.1.0", path = "../libpsibase" }
+libpsibase_names = { version = "0.1.0", path = "../libpsibase_names" }
 mime_guess = "2.0"
+psi_macros = { version = "0.1.0", path = "../psi_macros" }
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
-secp256k1 = "0.22"
+ripemd = "0.1"
+secp256k1 = { version="0.22", features = ["global-context", "bitcoin_hashes"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
-
-[build-dependencies]
-cxx-build = "1.0"

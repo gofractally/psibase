@@ -27,6 +27,6 @@ pub use time::*;
 pub use to_bin::*;
 pub use trace::*;
 
-mod libpsibase {
+mod psibase {
     pub use crate::*;
 }

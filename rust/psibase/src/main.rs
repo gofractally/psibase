@@ -5,7 +5,7 @@ use custom_error::custom_error;
 use fracpack::Packable;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
-use libpsibase::{
+use psibase::{
     account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
     Claim, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction, Tapos,
     TaposRefBlock, TimePointSec, Transaction,
