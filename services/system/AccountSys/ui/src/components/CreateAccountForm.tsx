@@ -35,9 +35,6 @@ const getPublicKey = (key: string): { error: string, publicKey: string } => {
 
 export const CreateAccountForm = forwardRef(({ onCreateAccount, isLoading, errorMessage }: Props, ref) => {
 
-
-
-
     const [name, setName] = useState("");
     const [pubKey, setPubKey] = useState("");
     const [privKey, setPrivKey] = useState("");
@@ -71,8 +68,7 @@ export const CreateAccountForm = forwardRef(({ onCreateAccount, isLoading, error
 
     return (
         <div>
-            <h2>Add an account</h2>
-            <div>Input your own private key, or generate a new one.</div>
+            <h2>Create an account</h2>
             <div>
                 <div>Name</div>
                 <input

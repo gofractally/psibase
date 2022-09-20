@@ -55,8 +55,10 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
         if (foundAccount) {
             const key = foundAccount.publicKey;
             setAccounts(accounts => accounts.filter(account => account.publicKey !== key));
-            console.log({ key, keyPairs })
-            setKeyPairs(keyPairs.filter(keyPair => keyPair.publicKey !== key))
+            setKeyPairs(keyPairs.filter(keyPair => {
+                if ('knownAccounts' in keyPair && keyPair.knownAccounts!.includes(accountNum)) return false
+                return keyPair.publicKey !== key
+            }))
         } else {
             console.warn(`Failed to find account ${accountNum} to drop`)
         }

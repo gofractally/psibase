@@ -40,12 +40,14 @@ export interface AccountWithKey extends AccountWithAuth {
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
     const [allAccounts, refreshAccounts] = useAccounts();
-    const [currentUser, setCurrentUser] = useCurrentUser();
+    const [currentUser, setCurrentUser, isAuthenticated] = useCurrentUser();
 
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
         if (isLoggingOutOfCurrentUser) {
-            setCurrentUser(accountsWithKeys[0].accountNum);
+            const nextAccount = accountsWithKeys.find(acc => acc.accountNum !== account && acc.authService !== 'auth-any-sys');
+            const newUser = typeof nextAccount === 'undefined' ? '' : nextAccount.accountNum
+            setCurrentUser(newUser);
         }
         dropAccount(account)
     }
@@ -89,7 +91,7 @@ function App() {
                 />
             </div>
             <div className="bg-slate-50 mt-4 flex justify-between">
-                <CreateAccountForm errorMessage={accountError} isLoading={isAccountLoading} onCreateAccount={onCreateAccount} ref={createAccountFormRef} />
+                {isAuthenticated && <CreateAccountForm errorMessage={accountError} isLoading={isAccountLoading} onCreateAccount={onCreateAccount} ref={createAccountFormRef} />}
                 <ImportAccountForm errorMessage={importError} isLoading={isImportLoading} onImport={searchKeyPair} />
             </div>
             {/* <SetAuth /> */}

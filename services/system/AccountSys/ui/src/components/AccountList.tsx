@@ -14,8 +14,8 @@ export const AccountList = ({
 
     return (
         <div>
-            <h2 className="pt-6">Available accounts</h2>
-            <div>{isAccountsAvailable ? `Choose an account below to make it active.` : 'No accounts available.'}</div>
+            <h2 className="pt-6">My accounts</h2>
+            <div>{isAccountsAvailable ? `Select an account below to make it active.` : 'Not logged in.'}</div>
 
             {isAccountsAvailable && <table className="min-w-full table-fixed">
                 <thead className="text-slate-900">
