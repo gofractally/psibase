@@ -1,5 +1,8 @@
 use fracpack::Packable;
 
+/// This is the set of raw native functions (wasm imports). They are
+/// available for services to use directly, but we recommend using
+/// the [Other Crate Functions](crate#functions) instead.
 pub mod raw {
     extern "C" {
         /// Copy `min(dest_size, resultSize - offset)` bytes from
