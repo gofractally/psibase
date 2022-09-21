@@ -28,10 +28,8 @@ fn main() {
             .status()
             .unwrap();
 
-        let mut module = Module::read(
-            &read(target_dir.clone() + "/wasm32-wasi/release/" + name + ".wasm").unwrap(),
-        )
-        .unwrap();
+        let code = read(target_dir + "/wasm32-wasi/release/" + name + ".wasm").unwrap();
+        let mut module = Module::read(&code).unwrap();
         module.optimize(&CodegenConfig {
             shrink_level: 1,
             optimization_level: 2,
