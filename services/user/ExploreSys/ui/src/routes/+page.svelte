@@ -35,13 +35,15 @@
 
     const startAutoUpdates = () => {
         apiInterval = setInterval(async () => {
-            // console.log("---", data.blocks[0].header.blockNum);
-            const lastBlock = data.blocks[0].header.blockNum;
-            const newData = await loadData("?last=5");
+            const lastBlock = data.blocks[0].header;
+            const query = `?last=50&&after="${lastBlock.previous.substr(0,8)}"`;
+            const newData = await loadData(query);
             const newBlocks = newData.blocks
-                .reverse()
-                .filter((b) => b.header.blockNum > lastBlock);
-            data.blocks = [...newBlocks, ...data.blocks];
+                 .filter((b) => b.header.blockNum > lastBlock.blockNum)
+                 .sort((a, b) => b > a);
+            const newLength = newBlocks.length + data.blocks.length;
+            const oldBlocks = newLength > 50 ? data.blocks.slice(0, 50 - newLength) : data.blocks;
+            data.blocks = [...newBlocks, ...oldBlocks];
         }, 1000);
         autoUpdateMode = true;
     };
