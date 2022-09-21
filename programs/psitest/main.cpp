@@ -3,7 +3,6 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
-#include <psibase/db.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 
