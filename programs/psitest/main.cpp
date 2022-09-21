@@ -197,7 +197,8 @@ struct test_chain
           blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
       if (status.has_value() && status->current.blockNum > 3)
       {
-         // TODO: Figure out why block #3 can't see the producers, even though they are set in block #2 (genesis block)
+         // TODO - remove the requirement that blockNum > 3 once block producers can be set in the
+         //  genesis block in DefaultTestChain
          auto       smallestAcc = psibase::AccountNumber{0};
          const auto key         = psio::convert_to_key(psibase::producerConfigKey(smallestAcc));
          size_t     keySize     = sizeof(psibase::NativeTableNum);

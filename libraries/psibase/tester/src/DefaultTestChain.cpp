@@ -33,9 +33,12 @@ DefaultTestChain::DefaultTestChain(
 {
    startBlock();
    deploySystemServices();
+   startBlock();  // TODO: Why is this startBlock necessary? Without it,
+                  //   all subsequent transactions will silently fail.
+
+   createSysServiceAccounts();
    setBlockProducers();
    startBlock();
-   createSysServiceAccounts();
    registerSysRpc();
 
    for (const auto& c : additionalServices)
@@ -150,7 +153,7 @@ void DefaultTestChain::setBlockProducers(bool show /* = false*/)
                                                SystemService::ProducerSys::service};
    std::vector<ProducerConfigRow>         producerConfig = {{"testchain"_a, {}}};
    auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
-   check(psibase::show(true, trace) == "", "Failed to set producers");
+   check(psibase::show(show, trace) == "", "Failed to set producers");
 }
 
 void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
@@ -159,6 +162,7 @@ void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
                                               SystemService::AccountSys::service};
    transactor<SystemService::TransactionSys> tsys{SystemService::TransactionSys::service,
                                                   SystemService::TransactionSys::service};
+
    auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
@@ -344,7 +348,8 @@ void DefaultTestChain::registerSysRpc()
                            readWholeFile(accDir + "/ui/dist/app-account.svg")),
        rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/dist/index.html")),
        rpcAccount.storeSys("/index.js", js, readWholeFile(accDir + "/ui/dist/index.js")),
-       rpcAccount.storeSys("/lock-closed.svg", svg, readWholeFile(accDir + "/ui/dist/lock-closed.svg")),
+       rpcAccount.storeSys("/lock-closed.svg", svg,
+                           readWholeFile(accDir + "/ui/dist/lock-closed.svg")),
        rpcAccount.storeSys("/lock-open.svg", svg, readWholeFile(accDir + "/ui/dist/lock-open.svg")),
        rpcAccount.storeSys("/logout.svg", svg, readWholeFile(accDir + "/ui/dist/logout.svg")),
        rpcAccount.storeSys("/refresh.svg", svg, readWholeFile(accDir + "/ui/dist/refresh.svg")),
