@@ -11,6 +11,9 @@ namespace SystemService
    class ProducerSys : public psibase::Service<ProducerSys>
    {
      public:
+      static constexpr auto service      = psibase::AccountNumber("producer-sys");
+      static constexpr auto serviceFlags = psibase::CodeRow::allowWriteNative;
+
       void setProducers(std::vector<psibase::ProducerConfigRow> prods);
 
       // Allows this service to be used as an auth service.
