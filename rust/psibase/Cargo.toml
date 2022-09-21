@@ -3,23 +3,26 @@ name = "psibase"
 version = "0.1.0"
 edition = "2021"
 publish = false
+description = "Library and command-line tool for interacting with psibase blockchains"
+license = "MIT"
 
 [dependencies]
 anyhow = "1.0"
 chrono = "0.4"
-clap = {version = "3.1", features = ["derive"]}
 custom_error = "1.9"
 fracpack = { version = "0.1.0", path = "../fracpack" }
-futures = "0.3"
 include_dir = "0.7"
-indicatif = "0.17"
-libpsibase = { version = "0.1.0", path = "../libpsibase" }
 mime_guess = "2.0"
-reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
-secp256k1 = "0.22"
+psibase_macros = { version = "0.1.0", path = "../psibase_macros" }
+psibase_names = { version = "0.1.0", path = "../psibase_names" }
+ripemd = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1", features = ["full"] }
 
-[build-dependencies]
-cxx-build = "1.0"
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+clap = {version = "3.1", features = ["derive"]}
+futures = "0.3"
+indicatif = "0.17"
+reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
+secp256k1 = { version="0.22", features = ["global-context", "bitcoin_hashes"] }
+tokio = { version = "1", features = ["full"] }

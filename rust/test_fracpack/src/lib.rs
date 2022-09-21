@@ -6,7 +6,7 @@
 
 pub mod bridge;
 
-use psi_macros::Fracpack;
+use psibase_macros::Fracpack;
 
 // TODO: test reading variant with future index
 #[derive(Fracpack, PartialEq, Eq, Debug)]

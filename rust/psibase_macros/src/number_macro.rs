@@ -1,6 +1,6 @@
-use libpsibase_names::{account_number_from_str, account_number_to_string, method_number_from_str};
 use proc_macro::TokenStream;
 use proc_macro_error::emit_error;
+use psibase_names::{account_number_from_str, account_number_to_string, method_number_from_str};
 use quote::quote;
 use syn::{parse_macro_input, LitStr};
 
@@ -10,7 +10,7 @@ pub fn account_macro_impl(item: TokenStream) -> TokenStream {
     if account_number_to_string(n) != item.value() {
         emit_error!(item, "{} is not a valid AccountNumber", item.value());
     }
-    TokenStream::from(quote! {libpsibase::AccountNumber::new(#n)})
+    TokenStream::from(quote! {psibase::AccountNumber::new(#n)})
 }
 
 pub fn method_macro_impl(item: TokenStream) -> TokenStream {
@@ -19,5 +19,5 @@ pub fn method_macro_impl(item: TokenStream) -> TokenStream {
     if n == 0 && item.value() != "" {
         emit_error!(item, "{} is not a valid MethodNumber", item.value());
     }
-    TokenStream::from(quote! {libpsibase::MethodNumber::new(#n)})
+    TokenStream::from(quote! {psibase::MethodNumber::new(#n)})
 }

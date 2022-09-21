@@ -1,15 +1,17 @@
 [package]
-name = "psi_macros"
+name = "psibase_macros"
 version = "0.1.0"
 edition = "2021"
 publish = false
+description = "Macros to support psibase development"
+license = "MIT"
 
 [lib]
 proc-macro = true
 
 [dependencies]
 darling = "0.14"
-libpsibase_names = { version = "0.1.0", path = "../libpsibase_names" }
+psibase_names = { version = "0.1.0", path = "../psibase_names" }
 proc-macro-error = "1.0.4"
 proc-macro2 = "1.0.36"
 quote = "1.0.15"

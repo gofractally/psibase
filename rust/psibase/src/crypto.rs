@@ -1,7 +1,10 @@
-use crate::{account, Fracpack};
+use crate::Fracpack;
 use custom_error::custom_error;
 use ripemd::{Digest, Ripemd160};
 use std::{fmt, str::FromStr};
+
+#[cfg(not(target_family = "wasm"))]
+use crate::account;
 
 custom_error! {
     #[allow(clippy::enum_variant_names)] pub Error
@@ -273,7 +276,7 @@ pub fn sign_transaction(
     mut trx: crate::Transaction,
     keys: &[PrivateKey],
 ) -> Result<crate::SignedTransaction, K1Error> {
-    use crate::libpsibase;
+    use crate::psibase;
     let keys = keys
         .iter()
         .map(|k| k.into_k1())

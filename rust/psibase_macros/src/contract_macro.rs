@@ -71,7 +71,7 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
     } else {
         abort!(
             impl_mod,
-            "#[libpsibase::contract] module must have inline contents"
+            "#[psibase::contract] module must have inline contents"
         )
     }
     let item_mod_stream = impl_mod.to_token_stream();
@@ -160,7 +160,7 @@ fn process_action_args(
     let fn_name = &f.sig.ident;
     *new_items = quote! {
         #new_items
-        #[derive(libpsibase::Fracpack)]
+        #[derive(psibase::Fracpack)]
         pub struct #fn_name {
             #struct_members
         }

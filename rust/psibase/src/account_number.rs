@@ -1,6 +1,6 @@
 use crate::Fracpack;
 use custom_error::custom_error;
-use libpsibase_names::{account_number_from_str, account_number_to_string};
+use psibase_names::{account_number_from_str, account_number_to_string};
 use serde::{Deserialize, Serialize};
 use std::{num::ParseIntError, str::FromStr};
 
@@ -19,7 +19,7 @@ custom_error! { pub AccountNumberError
 /// You can create an `AccountNumber` from [a literal string][`&str`] with [`AccountNumber::from`]:
 ///
 /// ```
-/// use libpsibase::AccountNumber;
+/// use psibase::AccountNumber;
 /// let hello = AccountNumber::from("hello");
 /// ```
 #[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, Serialize, Deserialize)]

@@ -173,6 +173,8 @@ struct test_chain
       boost::filesystem::remove_all(dir);
    }
 
+   // TODO: replace `skip_milliseconds` with a time stamp
+   // TODO: Support sub-second block times
    void startBlock(int64_t skip_miliseconds = 0)
    {
       // TODO: undo control
@@ -680,6 +682,7 @@ struct callbacks
       }
    }
 
+   // TODO: may not be useful anymore; remove?
    void testerShutdownChain(uint32_t chain)
    {
       auto& c = assert_chain(chain);
@@ -695,6 +698,8 @@ struct callbacks
       return c.dir.size();
    }
 
+   // TODO: replace `skip_milliseconds` with a time stamp
+   // TODO: Support sub-second block times
    void testerStartBlock(uint32_t chain_index, int64_t skip_miliseconds)
    {
       assert_chain(chain_index).startBlock(skip_miliseconds);
