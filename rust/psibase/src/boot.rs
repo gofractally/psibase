@@ -312,8 +312,8 @@ fn add_startup_trx(
     );
 
     let mut auth_ec_sys_files = vec![
-        store!("r-ath-ec-sys", "/", html, "AuthEcSys/ui/index.html"),
-        store!("r-ath-ec-sys", "/ui/index.js", js, "AuthEcSys/ui/index.js"),
+        // store!("r-ath-ec-sys", "/", html, "AuthEcSys/ui/index.html"),
+        // store!("r-ath-ec-sys", "/ui/index.js", js, "AuthEcSys/ui/index.js"),
     ];
 
     let mut explore_sys_files = vec![
