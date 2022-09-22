@@ -78,8 +78,8 @@ RUN cd /root \
  && cd boost_1_78_0 \
  && ./bootstrap.sh \
  && ./b2 --prefix=/usr/local --build-dir=build variant=release --with-chrono --with-date_time \
-         --with-filesystem --with-iostreams --with-program_options --with-system --with-test \
-         -sNO_ZSTD=1 install \
+         --with-filesystem --with-iostreams --with-log --with-program_options --with-system \
+         --with-test -sNO_ZSTD=1 install \
  && cd /root \
  && rm -rf boost*
 

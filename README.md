@@ -66,7 +66,7 @@ tar xf boost_1_78_0.tar.gz
 cd boost_1_78_0
 ./bootstrap.sh
 sudo ./b2 --prefix=/usr/local --build-dir=build variant=release --with-chrono --with-date_time \
-     --with-filesystem --with-iostreams --with-program_options --with-system --with-test install
+     --with-filesystem --with-iostreams --with-log --with-program_options --with-system --with-test install
 
 cd ~/work
 wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz
