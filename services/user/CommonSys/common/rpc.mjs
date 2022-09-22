@@ -5,7 +5,20 @@ import {
 } from "/common/keyConversions.mjs";
 import hashJs from "https://cdn.skypack.dev/hash.js";
 
+/** Global Values */
 let rootDomain = "";
+let contractName = "";
+
+// Operations and Queries defined by an applet
+const registeredOperations = [];
+const registeredQueries = [];
+
+const bufferedMessages = [];
+
+// Callbacks automatically generated for responding to queries and ops
+// Initialized with an anchor element on pos 0, to initialize ids at 1 and ease comparisons
+const callbacks = [null];
+const promises = [null];
 
 export async function getRootDomain() {
     if (rootDomain) {
@@ -19,9 +32,8 @@ export async function getRootDomain() {
 export async function siblingUrl(baseUrl, service, path) {
     const rootDomain = await getRootDomain();
 
-    let loc;
-    if (!baseUrl) loc = location;
-    else loc = new URL(baseUrl);
+    const loc = !baseUrl ? location : new URL(baseUrl);
+
     return (
         loc.protocol +
         "//" +
@@ -41,26 +53,29 @@ export class RPCError extends Error {
 }
 
 export async function throwIfError(response) {
-    if (!response.ok) throw new RPCError(await response.text());
+    if (!response.ok) {
+        throw new RPCError(await response.text());
+    }
     return response;
 }
 
 export async function get(url, options = {}) {
-    return await throwIfError(await fetch(url, { ...options, method: "GET" }));
+    const res = await fetch(url, { ...options, method: "GET" });
+    return throwIfError(res);
 }
 
 export async function getText(url) {
-    return await (await get(url)).text();
+    const res = await get(url);
+    return res.text();
 }
 
 export async function getJson(url) {
-    return await (
-        await get(url, { headers: { Accept: "application/json" } })
-    ).json();
+    const res = await get(url, { headers: { Accept: "application/json" } });
+    return res.json();
 }
 
 export async function postText(url, text) {
-    return await throwIfError(
+    return throwIfError(
         await fetch(url, {
             method: "POST",
             headers: {
@@ -72,7 +87,7 @@ export async function postText(url, text) {
 }
 
 export async function postGraphQL(url, graphql) {
-    return await throwIfError(
+    return throwIfError(
         await fetch(url, {
             method: "POST",
             headers: {
@@ -84,7 +99,7 @@ export async function postGraphQL(url, graphql) {
 }
 
 export async function postJson(url, json) {
-    return await throwIfError(
+    return throwIfError(
         await fetch(url, {
             method: "POST",
             headers: {
@@ -96,7 +111,7 @@ export async function postJson(url, json) {
 }
 
 export async function postArrayBuffer(url, arrayBuffer) {
-    return await throwIfError(
+    return throwIfError(
         await fetch(url, {
             method: "POST",
             headers: {
@@ -108,31 +123,38 @@ export async function postArrayBuffer(url, arrayBuffer) {
 }
 
 export async function postTextGetJson(url, text) {
-    return await (await postText(url, text)).json();
+    const res = await postText(url, text);
+    return res.json();
 }
 
 export async function postGraphQLGetJson(url, graphQL) {
-    return await (await postGraphQL(url, graphQL)).json();
+    const res = await postGraphQL(url, graphQL);
+    return res.json();
 }
 
 export async function postJsonGetJson(url, json) {
-    return await (await postJson(url, json)).json();
+    const res = await postJson(url, json);
+    return res.json();
 }
 
 export async function postJsonGetText(url, json) {
-    return await (await postJson(url, json)).text();
+    const res = await postJson(url, json);
+    return res.text();
 }
 
 export async function postJsonGetArrayBuffer(url, json) {
-    return await (await postJson(url, json)).arrayBuffer();
+    const res = await postJson(url, json);
+    return res.arrayBuffer();
 }
 
 export async function postArrayBufferGetJson(url, arrayBuffer) {
-    return await (await postArrayBuffer(url, arrayBuffer)).json();
+    const res = await postArrayBuffer(url, arrayBuffer);
+    return res.json();
 }
 
 export async function getTaposForHeadBlock(baseUrl = "") {
-    return await getJson(baseUrl.replace(/\/+$/, "") + "/common/tapos/head");
+    const url = baseUrl.replace(/\/+$/, "") + "/common/tapos/head";
+    return getJson(url);
 }
 
 export async function packAction(baseUrl, action) {
@@ -227,10 +249,8 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
         )
     );
     const signedTransaction = uint8ArrayToHex(transaction);
-    console.log('should not be null', signedTransaction);
-    const result = { transaction: signedTransaction, proofs }
-    console.log('result is', result)
-    return result
+    const result = { transaction: signedTransaction, proofs };
+    return result;
 }
 
 /**
@@ -240,23 +260,38 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
  * @param {Object} transaction - A JSON object that follows the transaction schema to define a collection of actions to execute
  * @param {Array} privateKeys - An array of strings that represent private keys used to sign this transaction
  */
-export async function signAndPushTransaction(baseUrl, transaction, privateKeys) {
+export async function signAndPushTransaction(
+    baseUrl,
+    transaction,
+    privateKeys
+) {
     try {
-        console.log('Signing transaction...', { baseUrl, transaction, privateKeys });
-        const signedTransaction = await signTransaction(baseUrl, transaction, privateKeys);
-        console.log('Successfully signed transaction', { signedTransaction });
+        console.log("Signing transaction...", {
+            baseUrl,
+            transaction,
+            privateKeys,
+        });
+        const signedTransaction = await signTransaction(
+            baseUrl,
+            transaction,
+            privateKeys
+        );
+        console.log("Successfully signed transaction", { signedTransaction });
 
         try {
-            console.log('Pushing transaction...')
-            const pushedTransaction = await packAndPushSignedTransaction(baseUrl, signedTransaction);
-            console.log('Transaction pushed!', { pushedTransaction })
+            console.log("Pushing transaction...");
+            const pushedTransaction = await packAndPushSignedTransaction(
+                baseUrl,
+                signedTransaction
+            );
+            console.log("Transaction pushed!", { pushedTransaction });
         } catch (e) {
-            console.error('Failed pushing transaction', e)
-            throw new Error(e)
+            console.error("Failed pushing transaction", e);
+            throw new Error(e);
         }
     } catch (e) {
-        console.error('Failed signing transaction', e)
-        throw new Error(e)
+        console.error("Failed signing transaction", e);
+        throw new Error(e);
     }
 }
 
@@ -315,7 +350,7 @@ export class AppletId {
     }
 
     get fullPath() {
-        let suffix = this.subPath !== "" ? "/" + this.subPath : "";
+        const suffix = this.subPath !== "" ? "/" + this.subPath : "";
         return this.name + suffix;
     }
 
@@ -329,9 +364,9 @@ export class AppletId {
 
     static fromFullPath(fullPath) {
         const startOfSubpath = fullPath.indexOf("/");
-        let subPath =
+        const subPath =
             startOfSubpath !== -1 ? fullPath.substring(startOfSubpath) : "";
-        let applet =
+        const applet =
             startOfSubpath !== -1
                 ? fullPath.substring(0, startOfSubpath)
                 : fullPath;
@@ -343,27 +378,20 @@ export class AppletId {
     }
 }
 
-var ops = []; // Operations defined by an applet
-
-var qrs = []; // Queries defined by an applet
-
-var queryCallbacks = []; // Callbacks automatically generated for responding to queries
-
 export function storeCallback(callback) {
-    let callbackId = queryCallbacks.length;
-    queryCallbacks.push({ callbackId, callback });
+    const callbackId = callbacks.length;
+    callbacks.push({ callbackId, callback });
     return callbackId;
 }
 
-var promises = [];
 export function storePromise(resolve, reject) {
-    let callbackId = promises.length;
+    const callbackId = promises.length;
     promises.push({ callbackId, resolve, reject });
     return callbackId;
 }
 
 export function executeCallback(callbackId, response) {
-    const cb = queryCallbacks.find((q) => q.callbackId === callbackId);
+    const cb = callbacks[callbackId]; // .find((q) => q.callbackId === callbackId);
 
     if (!cb) {
         console.error("Callback with ID " + callbackId + " not found.");
@@ -381,20 +409,25 @@ export function executeCallback(callbackId, response) {
 }
 
 export function executePromise(callbackId, response, errors) {
-    const promise = promises.find((q) => q.callbackId === callbackId);
+    const promise = promises[callbackId]; // .find((q) => q.callbackId === callbackId);
     if (!promise) {
         console.error("Promise with ID " + callbackId + " not found.");
         return false;
     }
 
-    if (errors.length > 0) promise.reject(errors);
-    else promise.resolve(response);
-
+    if (errors && errors.length > 0) {
+        promise.reject(errors);
+    } else {
+        promise.resolve(response);
+    }
+    // Remove the promise fns to flag it was executed
+    delete promise.resolve;
+    delete promise.reject;
     return true;
 }
 
 async function sendToParent(message) {
-    let sendMessage = async () => {
+    const sendMessage = async () => {
         parentIFrame.sendMessage(message, await siblingUrl(null, null, null));
     };
 
@@ -406,7 +439,7 @@ async function sendToParent(message) {
     }
 }
 
-let redirectIfAccessedDirectly = async () => {
+const redirectIfAccessedDirectly = async () => {
     try {
         if (window.self === window.top) {
             // We are the top window. Redirect needed.
@@ -436,7 +469,7 @@ export function verifyFields(obj, fieldNames) {
     return !missingField;
 }
 
-let handleErrorCode = (code) => {
+const handleErrorCode = (code) => {
     if (code === undefined) return false;
 
     let recognizedError = ErrorMessages.some((err) => {
@@ -454,9 +487,8 @@ let handleErrorCode = (code) => {
     return true;
 };
 
-var contractName = "";
 export async function getContractName() {
-    if (contractName !== "") {
+    if (contractName) {
         return contractName;
     } else {
         contractName = await getJson("/common/thisservice");
@@ -464,31 +496,32 @@ export async function getContractName() {
     }
 }
 
-let messageRouting = [
+const messageRouting = [
     {
         type: MessageTypes.Operation,
         fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
-            let { identifier, params, callbackId } = payload;
-            let responsePayload = { callbackId, response: null, errors: [] };
-            let contractName = await getContractName();
-            let op = ops.find((o) => o.id === identifier);
-            var errors = [];
-            if (op === undefined) {
-                responsePayload.errors.push(
-                    "Service " +
-                    contractName +
-                    ' has no operation, "' +
-                    identifier +
-                    '"'
-                );
-            } else {
+            console.info(">>> routing op...");
+            const { identifier, params, callbackId } = payload;
+            const responsePayload = { callbackId, response: null, errors: [] };
+            const contractName = await getContractName();
+            const op = registeredOperations.find((o) => o.id === identifier);
+            if (op) {
                 try {
-                    let res = await op.exec(params);
+                    const res = await op.exec(params);
+                    console.info(">>> op executed!", payload);
                     if (res !== undefined) responsePayload.response = res;
                 } catch (e) {
                     responsePayload.errors.push(e);
                 }
+            } else {
+                responsePayload.errors.push(
+                    "Service " +
+                        contractName +
+                        ' has no operation, "' +
+                        identifier +
+                        '"'
+                );
             }
 
             sendToParent({
@@ -503,26 +536,28 @@ let messageRouting = [
         type: MessageTypes.Query,
         fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
-            let { identifier, params, callbackId } = payload;
-            let responsePayload = { callbackId, response: null, errors: [] };
+            const { identifier, params, callbackId } = payload;
+            const responsePayload = { callbackId, response: null, errors: [] };
 
             try {
-                let contractName = await getContractName();
-                let qu = qrs.find((q) => q.id === identifier);
-                if (qu === undefined) {
-                    responsePayload.errors.push(
-                        "Service " +
-                        contractName +
-                        ' has no query, "' +
-                        identifier +
-                        '"'
-                    );
-                } else {
+                const contractName = await getContractName();
+                const query = registeredQueries.find(
+                    (q) => q.id === identifier
+                );
+                if (query) {
                     try {
-                        responsePayload.response = await qu.exec(params);
+                        responsePayload.response = await query.exec(params);
                     } catch (e) {
                         responsePayload.errors.push(e);
                     }
+                } else {
+                    responsePayload.errors.push(
+                        "Service " +
+                            contractName +
+                            ' has no query, "' +
+                            identifier +
+                            '"'
+                    );
                 }
             } catch (e) {
                 console.error("fail to process query message", e);
@@ -539,7 +574,7 @@ let messageRouting = [
         type: MessageTypes.QueryResponse,
         fields: ["callbackId", "response", "errors"],
         route: (payload) => {
-            let { callbackId, response, errors } = payload;
+            const { callbackId, response, errors } = payload;
             return executePromise(callbackId, response, errors);
         },
     },
@@ -547,35 +582,41 @@ let messageRouting = [
         type: MessageTypes.OperationResponse,
         fields: ["callbackId", "response", "errors"],
         route: (payload) => {
-            let { callbackId, response, errors } = payload;
+            const { callbackId, response, errors } = payload;
             return executePromise(callbackId, response, errors);
         },
     },
 ];
 
-let bufferedMessages = [];
-
-export async function initializeApplet(initializer = () => { }) {
+export async function initializeApplet(initializer = () => {}) {
     await redirectIfAccessedDirectly();
 
-    let rootUrl = await siblingUrl(null, null, null);
+    const rootUrl = await siblingUrl(null, null, null);
     window.iFrameResizer = {
         targetOrigin: rootUrl,
         onReady: async () => {
             for (const bufferedMessage of bufferedMessages) {
                 await bufferedMessage();
             }
-            bufferedMessages = [];
+            bufferedMessages.splice(0, bufferedMessages.length);
         },
         onMessage: (msg) => {
+            console.info(">>> rpc.mjs onMessage:", {
+                contractName,
+                registeredQueries,
+                registeredOperations,
+                callbacks,
+                promises,
+                msg,
+            });
             let { type, payload } = msg;
             if (type === undefined || payload === undefined) {
                 console.error("Malformed message received from core");
                 return;
             }
 
-            let route = messageRouting.find((m) => m.type === type);
-            if (route === undefined) {
+            const route = messageRouting.find((m) => m.type === type);
+            if (!route) {
                 console.error("Message from core specifies unknown route.");
                 return;
             }
@@ -597,7 +638,7 @@ export async function initializeApplet(initializer = () => { }) {
 }
 
 function set({ targetArray, newElements }, caller) {
-    let valid = newElements.every((e) => {
+    const valid = newElements.every((e) => {
         if (!verifyFields(e, ["id", "exec"])) {
             return false;
         }
@@ -630,7 +671,10 @@ function set({ targetArray, newElements }, caller) {
  * Call this from within the initialization function provided to initializeApplet.
  */
 export function setOperations(operations) {
-    set({ targetArray: ops, newElements: operations }, "setOperations");
+    set(
+        { targetArray: registeredOperations, newElements: operations },
+        "setOperations"
+    );
 }
 
 /**
@@ -638,7 +682,7 @@ export function setOperations(operations) {
  * Call this from within the initialization function provided to initializeApplet.
  */
 export function setQueries(queries) {
-    set({ targetArray: qrs, newElements: queries }, "setQueries");
+    set({ targetArray: registeredQueries, newElements: queries }, "setQueries");
 }
 
 /**
@@ -649,9 +693,10 @@ export function setQueries(queries) {
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
 export function operation(appletId, name, params = {}) {
+    console.info(">>> initializing op", appletId, name, params);
     const operationPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
-        let callbackId = storePromise(resolve, reject);
+        const callbackId = storePromise(resolve, reject);
 
         sendToParent({
             type: MessageTypes.Operation,
@@ -687,9 +732,10 @@ export function action(application, actionName, params, sender = null) {
  * @param {Object} params - The object containing all parameters expected by the query handler.
  */
 export function query(appletId, name, params = {}) {
+    console.info(">>> initializing query", appletId, name, params);
     const queryPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
-        let callbackId = storePromise(resolve, reject);
+        const callbackId = storePromise(resolve, reject);
 
         sendToParent({
             type: MessageTypes.Query,

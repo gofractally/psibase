@@ -1,82 +1,93 @@
 declare module "common/rpc.mjs" {
-  function getRootDomain(): Promise<string>;
+    function getRootDomain(): Promise<string>;
 
-  function siblingUrl(
-    baseUrl?: string | null,
-    service?: string,
-    path?: string
-  ): Promise<string>;
+    function siblingUrl(
+        baseUrl?: string | null,
+        service?: string,
+        path?: string
+    ): Promise<string>;
 
-  function initializeApplet(fn: (data: any) => Promise<void>): void;
+    function initializeApplet(fn: (data: any) => Promise<void>): void;
 
-  function getJson<T = any>(url: string): Promise<T>;
+    function getJson<T = any>(url: string): Promise<T>;
 
-  const MessageTypes = {
-    Action: "Action",
-    Query: "Query",
-    Operation: "Operation",
-    QueryResponse: "QueryResponse",
-    OperationResponse: "OperationResponse",
-  };
+    const MessageTypes = {
+        Action: "Action",
+        Query: "Query",
+        Operation: "Operation",
+        QueryResponse: "QueryResponse",
+        OperationResponse: "OperationResponse",
+    };
 
-  declare class AppletId {
-    constructor(appletName: string, subPath?: string);
+    declare class AppletId {
+        constructor(appletName: string, subPath?: string);
 
-    name: string;
-    subPath: string;
-    fullPath: string;
+        name: string;
+        subPath: string;
+        fullPath: string;
 
-    equals: (appletId: AppletId) => boolean;
-    url: () => Promise<string>;
-    static fromFullPath: (fullPath: string) => AppletId;
-    static fromObject: (obj: string) => AppletId;
-  }
+        equals: (appletId: AppletId) => boolean;
+        url: () => Promise<string>;
+        static fromFullPath: (fullPath: string) => AppletId;
+        static fromObject: (obj: string) => AppletId;
+    }
 
-  function getCurrentApplet(): Promise<string>;
-  function query<Params, Response>(
-    appletId: AppletId,
-    queryName: string,
-    params?: Params
-  ): Promise<Response>;
+    function getCurrentApplet(): Promise<string>;
+    function query<Params, Response>(
+        appletId: AppletId,
+        queryName: string,
+        params?: Params
+    ): Promise<Response>;
 
-  function action<ActionParams>(
-    application: string,
-    actionName: string,
-    params: ActionParams,
-    sender?: string
-  ): void;
+    function action<ActionParams>(
+        application: string,
+        actionName: string,
+        params: ActionParams,
+        sender?: string
+    ): void;
 
-  type Operation = { id: string; exec: (params: any) => Promise<void> };
+    type Operation = { id: string; exec: (params: any) => Promise<void> };
 
-  function storeCallback(callback: any): number;
+    type CallbackResponse = {
+        sender: AppletId;
+        response: any;
+        errors: any;
+    };
 
-  function executeCallback(callbackId: any, response: any): boolean;
+    function storeCallback(
+        callback: (res: CallbackResponse) => unknown
+    ): number;
 
-  function getTaposForHeadBlock(baseUrl?: string): Promise<any>;
+    function executeCallback(
+        callbackId: any,
+        response: CallbackResponse
+    ): boolean;
 
-  function packAndPushSignedTransaction(
-    baseUrl: any,
-    signedTransaction: any
-  ): Promise<any>;
+    function getTaposForHeadBlock(baseUrl?: string): Promise<any>;
 
-  function setOperations(operations: Operation[]): void;
-  function setQueries(queries: Query[]): void;
-  function operation<Params>(
-    appletId: AppletId,
-    name: string,
-    params?: Params
-  ): Promise<any>;
-  function signTransaction(
-    baseUrl: string,
-    transaction: any,
-    privateKeys?: string[] // TODO: remove optional once we're done with fake-auth
-  ): Promise<any>;
-  function verifyFields(obj: any, fieldNames: any): boolean;
+    function packAndPushSignedTransaction(
+        baseUrl: any,
+        signedTransaction: any
+    ): Promise<any>;
 
-  function postGraphQLGetJson<GqlResponse>(
-    url: string,
-    query: string
-  ): Promise<GqlResponse>;
+    function setOperations(operations: Operation[]): void;
+    function setQueries(queries: Query[]): void;
+    function operation<Params>(
+        appletId: AppletId,
+        name: string,
+        params?: Params
+    ): Promise<any>;
+    function signTransaction(
+        baseUrl: string,
+        transaction: any,
+        privateKeys?: string[] // TODO: remove optional once we're done with fake-auth
+    ): Promise<any>;
+    function verifyFields(obj: any, fieldNames: any): boolean;
 
-  function uint8ArrayToHex(data: Uint8Array): string;
+    function postGraphQLGetJson<GqlResponse>(
+        url: string,
+        query: string
+    ): Promise<GqlResponse>;
+
+    function uint8ArrayToHex(data: Uint8Array): string;
 }

@@ -31,7 +31,7 @@ window.React = React;
 
 function App() {
     const [userName, setUserName] = useState("");
-    const [transferError, setTransferError] = useState(false);
+    const [transferError, setTransferError] = useState("");
     const [tokens, setTokens] = useState<TokenBalance[]>();
     const [formSubmitted, setFormSubmitted] = useState(false);
     const [transferHistoryResult, invalidateTransferHistoryQuery] =
@@ -70,15 +70,15 @@ function App() {
     const onSubmit: SubmitHandler<TransferInputs> = async (
         data: TransferInputs
     ) => {
-        setTransferError(false);
+        setTransferError("");
         setFormSubmitted(true);
         try {
             await transfer(data);
+            reset();
         } catch (e) {
-            console.error("TRANSFER ERROR");
-            setTransferError(true);
+            console.error("TRANSFER ERROR", e);
+            setTransferError(`${e}`);
         }
-        reset();
         invalidateTransferHistoryQuery();
         setFormSubmitted(false);
     };
@@ -104,7 +104,6 @@ function App() {
             memo: "Working",
         });
 
-        await wait(2000); // TODO: Would be great if the credit operation returned a value
         const updatedTokens = await pollForBalanceChange(userName, token);
         setTokens(updatedTokens);
     };
@@ -196,24 +195,21 @@ function App() {
                     </div>
                 </div>
                 <div className="mt-7">
-                    {transferError ? (
+                    {transferError && (
                         <Text className="font-medium text-red-600">
-                            There was an error. Your transfer may not have been
-                            successful. Refresh the page to check your balance
-                            and try again if necessary.
+                            {transferError}
                         </Text>
-                    ) : (
-                        <Button
-                            type="outline"
-                            size="lg"
-                            isSubmit
-                            isLoading={formSubmitted}
-                            disabled={formSubmitted}
-                            className="w-48"
-                        >
-                            Send
-                        </Button>
                     )}
+                    <Button
+                        type="outline"
+                        size="lg"
+                        isSubmit
+                        isLoading={formSubmitted}
+                        disabled={formSubmitted}
+                        className="w-48"
+                    >
+                        Send
+                    </Button>
                 </div>
             </form>
             <TransferHistory
