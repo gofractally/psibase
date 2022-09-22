@@ -12,13 +12,13 @@
 
 In most blockchains, every function called on an on-chain smart-contract is called a "transaction." In some other blockchains, calling a function on chain requires one "action," and a "transaction" may be comprised of one or many such actions. On these chains, a transaction can be viewed as a kind of "script" with one very basic functionality: execute an ordered list of actions.
 
-In Psibase, this concept of a script has been further generalized, and is known as an "Action Script". Transactions in psibase blockchains may contain a list of actions, but some actions may themselves be scripts written to execute an ordered list of other actions. Such scripts are called Action Scripts. What differentiates Action Scripts from regular actions? Action scripts enable intelegent, dynamic transactions that act from the perspective of the user rather than the perspective of an application. Regular actions may only execute inline actions as the running application, whereas an action called from an Action Script appears to originate from the user.
+In psibase, this concept of a script has been further generalized, and is known as an "Action Script". Transactions in psibase blockchains may contain a list of actions, but some actions may themselves be scripts written to execute an ordered list of other actions. Such scripts are called Action Scripts. What differentiates Action Scripts from regular actions? Action scripts enable intelegent, dynamic transactions that act from the perspective of the user rather than the perspective of an application. Regular actions may only execute inline actions as the running application, whereas an action called from an Action Script appears to originate from the user.
 
 ## Use case
 
 An applet may pack several actions into a single transaction to execute one overall user-initiated operation. But consider the case where the intermediate value of one action is required as a parameter for a subsequent action. Without Action Scripts, it would be required that the execution of this operation be split into two separate transactions, and the client would need to read the intermediate state from the chain before submitting the second transaction.
 
-In Psibase blockchains, an Action Script may be written to bundle all the actions together as inline-actions. Intermediate state or return values of prior actions can be read and fed into subsequent actions within the Action Script, and all inline actions executed may run as the user, as though they were submitted as part of an overall transaction.
+In psibase blockchains, an Action Script may be written to bundle all the actions together as inline-actions. Intermediate state or return values of prior actions can be read and fed into subsequent actions within the Action Script, and all inline actions executed may run as the user, as though they were submitted as part of an overall transaction.
 
 ### Example
 
@@ -80,7 +80,7 @@ Action Scripts are able to run inline actions as the user. In order to prevent A
 
 What applications is the user allowed to specify when calling an Action Scripts? If a user could specify anything, then malicious front-ends may be able to trick users into signing an Action Script that acts on their behalf in ways that the user didn't expect (and wouldn't permit).
 
-But if an Action Script could only run actions in its own Application, then its usefulness would be severely limited. To address this, Psibase blockchains have a capability similar to that provided in [other operating systems](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_security_application-groups), called "Application Groups." 
+But if an Action Script could only run actions in its own Application, then its usefulness would be severely limited. To address this, psibase blockchains have a capability similar to that provided in [other operating systems](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_security_application-groups), called "Application Groups." 
 
 If two or more applications each identify as part of the same application group, then these applications can be trusted by each other, as though they were all part of a single larger application. An Action Script is therefore not only permitted to operate on its own application, but also on any application with whom it shares an application group, as long as the user explicitly specifies each of the required applications when constructing the Action Script.
 

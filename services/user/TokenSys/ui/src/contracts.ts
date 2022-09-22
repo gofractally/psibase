@@ -49,11 +49,10 @@ export class TokenContract extends Contract {
         amount: string | number;
         memo: string;
     }) {
-        const value = String(Number(amount) * Math.pow(10, 8));
         await action(await tokenContract.getAppletName(), "credit", {
             tokenId,
             receiver,
-            amount: { value },
+            amount: { value: String(amount) },
             memo: { contents: memo },
         });
     }

@@ -11,7 +11,7 @@ Both psio and serde_json represent structs-with-fields as JSON objects.
 64-bit Numbers are incredibly tricky in JSON, thanks in part to JavaScript, and thanks in part to common JSON libraries in type-safe languages.
 
 - JavaScript's number type can handle integers up to 53 bits unsigned, 54 signed. Extra precision is silently truncated. e.g. `10000000000000001 == 10000000000000000`.
-- JavaScript's BigInt type supports arbitrary precision, but JavaScript's built-in JSON conversions don't support it.
+- JavaScript's [BigInt type](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) supports arbitrary precision, but JavaScript's built-in JSON conversions don't support it.
 
 The cleanest workaround seems to be to store 64-bit integers in quoted strings, but several widely-used JSON libraries in type-safe languages decided against that workaround, and reject incoming quoted numbers. serde_json used to support it (input only), but hit some [nasty conflicts](https://github.com/serde-rs/serde/pull/839) and had to remove it. serde_json provides customization (`serialize_with` and `deserialize_with`), but that gets cumbersome in nested types, e.g. `Option<Vec<u64>>`.
 

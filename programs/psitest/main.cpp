@@ -154,7 +154,7 @@ struct test_chain
       sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
    }
 
-   test_chain(const test_chain&) = delete;
+   test_chain(const test_chain&)            = delete;
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
@@ -172,6 +172,8 @@ struct test_chain
       boost::filesystem::remove_all(dir);
    }
 
+   // TODO: replace `skip_milliseconds` with a time stamp
+   // TODO: Support sub-second block times
    void startBlock(int64_t skip_miliseconds = 0)
    {
       // TODO: undo control
@@ -191,7 +193,25 @@ struct test_chain
       psibase::TimePointSec skippedTime{blockContext->getHeadBlockTime().seconds + 1 +
                                         skipAdditional};
 
-      blockContext->start(skippedTime);
+      auto producer = psibase::AccountNumber("firstproducer");
+      auto status =
+          blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+      if (status.has_value() && status->current.blockNum > 3)
+      {
+         // TODO - remove the requirement that blockNum > 3 once block producers can be set in the
+         //  genesis block in DefaultTestChain
+         auto       smallestAcc = psibase::AccountNumber{0};
+         const auto key         = psio::convert_to_key(psibase::producerConfigKey(smallestAcc));
+         size_t     keySize     = sizeof(psibase::NativeTableNum);
+         auto       prodCfg =
+             blockContext->db.kvGreaterEqualRaw(psibase::DbId::nativeConstrained, key, keySize);
+
+         psibase::check(prodCfg.has_value(), "producer has not been set");
+         auto row = psio::convert_from_frac<psibase::ProducerConfigRow>(prodCfg->value);
+         producer = row.producerName;
+      }
+
+      blockContext->start(skippedTime, producer);
       blockContext->callStartBlock();
    }
 
@@ -661,6 +681,7 @@ struct callbacks
       }
    }
 
+   // TODO: may not be useful anymore; remove?
    void testerShutdownChain(uint32_t chain)
    {
       auto& c = assert_chain(chain);
@@ -676,6 +697,8 @@ struct callbacks
       return c.dir.size();
    }
 
+   // TODO: replace `skip_milliseconds` with a time stamp
+   // TODO: Support sub-second block times
    void testerStartBlock(uint32_t chain_index, int64_t skip_miliseconds)
    {
       assert_chain(chain_index).startBlock(skip_miliseconds);

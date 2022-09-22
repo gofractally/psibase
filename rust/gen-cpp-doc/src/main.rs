@@ -7,6 +7,7 @@ use regex::{Captures, Regex};
 use std::cmp::max;
 use std::collections::BTreeMap;
 use std::env;
+use std::fmt::Write as FmtWrite;
 use std::io;
 
 #[derive(Parser, Debug)]
@@ -198,7 +199,7 @@ fn convert_doc_str(comment: &Option<Comment>) -> String {
                 for line in lines {
                     if let CommentChild::Text(text) = line {
                         let mut text = text.as_str();
-                        if !text.is_empty() && *text.as_bytes().get(0).unwrap() == b' ' {
+                        if !text.is_empty() && *text.as_bytes().first().unwrap() == b' ' {
                             text = &text[1..];
                             if need_nl {
                                 result.push('\n');
@@ -423,7 +424,8 @@ fn document_enum(items: &[Item], index: usize, path: &str, result: &mut String) 
         let name = c.get_display_name().unwrap();
         let val = c.get_enum_constant_value().unwrap().0.to_string();
         def.push_str("\n    ");
-        def.push_str(&format!(
+        let _ = write!(
+            def,
             "<a href=\"{3}\">{1}{0:2$} = {4}, // {5}</a>",
             "",
             name,
@@ -431,27 +433,29 @@ fn document_enum(items: &[Item], index: usize, path: &str, result: &mut String) 
             local_link(&(path[2..].to_owned() + &name)),
             val,
             c.get_comment_brief().unwrap()
-        ));
+        );
     }
     def.push_str("\n};\n");
     def.push_str("</code></pre>\n");
-    result.push_str(&format!(
+    let _ = write!(
+        result,
         "### {}\n\n{}\n{}\n",
         &path[2..],
         def,
         replace_bracket_links(&item.doc_str, items, index)
-    ));
+    );
 
     for c in constants.iter() {
         let doc_str = convert_doc_str(&c.get_parsed_comment());
         // eprintln!("---\n{}\n---\n", fill_all_links(&doc_str, items, index));
         if !doc_str.is_empty() {
-            result.push_str(&format!(
+            let _ = write!(
+                result,
                 "### {}::{}\n\n{}\n",
                 &path[2..],
                 c.get_name().unwrap(),
                 replace_bracket_links(&doc_str, items, index)
-            ));
+            );
         }
     }
 } // document_enum
@@ -487,8 +491,9 @@ fn document_struct(items: &[Item], index: usize, path: &str, result: &mut String
     for field in fields.iter() {
         let ty = field.get_type().unwrap().get_display_name();
         let name = field.get_name().unwrap();
-        def.push_str(&format!(
-            "    {1}{0:2$} <span class=\"hljs-variable\">{3}</span>;{0:4$} {5}\n",
+        let _ = writeln!(
+            def,
+            "    {1}{0:2$} <span class=\"hljs-variable\">{3}</span>;{0:4$} {5}",
             "",
             style_type(&escape_and_add_links(&ty, items, index)),
             type_size - ty.len(),
@@ -500,7 +505,7 @@ fn document_struct(items: &[Item], index: usize, path: &str, result: &mut String
                     .map(|c| String::from("// ") + &c)
                     .unwrap_or_default()
             ),
-        ));
+        );
     }
 
     let methods: Vec<(String, Entity)> = filter_children(&item.entity, |entity| {
@@ -529,8 +534,9 @@ fn document_struct(items: &[Item], index: usize, path: &str, result: &mut String
         name_size = max(name_size, name.len());
     }
     for (name, method) in methods.iter() {
-        def.push_str(&format!(
-            "    <a href=\"{4}\">{1}(...);{0:2$} {3}</a>\n",
+        let _ = writeln!(
+            def,
+            "    <a href=\"{4}\">{1}(...);{0:2$} {3}</a>",
             "",
             style_fn(name),
             name_size - name.len(),
@@ -541,16 +547,17 @@ fn document_struct(items: &[Item], index: usize, path: &str, result: &mut String
                     .unwrap_or_default()
             ),
             local_link(&(path[2..].to_owned() + name)),
-        ));
+        );
     }
 
     def.push_str("};\n</code></pre>\n");
-    result.push_str(&format!(
+    let _ = write!(
+        result,
         "### {}\n\n{}\n{}\n",
         &path[2..],
         def,
         replace_bracket_links(&item.doc_str, items, index)
-    ));
+    );
 
     for (i, (name, _ty)) in methods.iter().enumerate() {
         if i > 0 && &methods[i - 1].0 == name {
@@ -597,13 +604,14 @@ fn document_function(items: &[Item], index: usize, path: &str, result: &mut Stri
             def.push(',');
         }
         def.push_str("\n    ");
-        def.push_str(&format!(
+        let _ = write!(
+            def,
             "{1}{0:2$}{3}",
             "",
             style_type(&escape_and_add_links(&ty, items, index)),
             type_size - ty.len() + 1,
             arg.get_name().unwrap_or_default()
-        ));
+        );
         let pretty = arg.get_pretty_printer().print();
         if let Some(pos) = pretty.find(" = ") {
             def.push_str(&escape_html(&pretty[pos..]));
@@ -619,12 +627,13 @@ fn document_function(items: &[Item], index: usize, path: &str, result: &mut Stri
     }
     def.push_str(";\n</code></pre>\n");
 
-    result.push_str(&format!(
+    let _ = write!(
+        result,
         "### {}\n\n{}\n{}\n",
         &path[2..],
         def,
         replace_bracket_links(&item.doc_str, items, index)
-    ));
+    );
 } // document_function
 
 fn document_template_args(item: &Item, def: &mut String) {
@@ -639,10 +648,11 @@ fn document_template_args(item: &Item, def: &mut String) {
             if need_comma {
                 def.push_str(", ");
             }
-            def.push_str(&format!(
+            let _ = write!(
+                def,
                 r#"<span class="hljs-title">{}</span>"#,
                 escape_html(&arg.get_pretty_printer().print())
-            ));
+            );
             need_comma = true;
         }
         def.push_str("&gt;\n");

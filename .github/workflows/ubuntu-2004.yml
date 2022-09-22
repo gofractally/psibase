@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:236c80fe1e0945b9c985088d4ff6b4aba2f51c1e"
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2004-builder:d94408aae368d515707853372dccf057d1ba5e7a"
 
 jobs:
   ubuntu-2004-build:

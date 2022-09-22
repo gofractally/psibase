@@ -1,6 +1,6 @@
 # Native Functions
 
-Native functions give services the ability to print debugging messages, abort transactions on errors, access databases and event logs, and synchronously call other services. There aren't many native functions since services implement most Psibase functionality.
+Native functions give services the ability to print debugging messages, abort transactions on errors, access databases and event logs, and synchronously call other services. There aren't many native functions since services implement most psibase functionality.
 
 - [Types For Native Functions](#types-for-native-functions)
 - [Wrapped Native Functions](#wrapped-native-functions)

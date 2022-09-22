@@ -39,11 +39,11 @@ namespace psibase
       /// Tables used by native code
       ///
       /// This database enforces constraints during write. Only
-      /// writable by priviledged services, but readable by all
+      /// writable by privileged services, but readable by all
       /// services.
       ///
       /// Some writes to this database indicate chain upgrades. If a
-      /// priviledged service writes to a table that an older
+      /// privileged service writes to a table that an older
       /// node version doesn't know about, or writes new fields
       /// to an existing table that an older node doesn't know about,
       /// then that node will reject the write. If the producers
@@ -54,7 +54,7 @@ namespace psibase
       /// Tables used by native code
       ///
       /// This database doesn't enforce constraints during write.
-      /// Only writable by priviledged services, but readable by all
+      /// Only writable by privileged services, but readable by all
       /// services.
       nativeUnconstrained,
 

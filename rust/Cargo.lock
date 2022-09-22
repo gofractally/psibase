@@ -7,7 +7,7 @@ name = "account_sys"
 version = "0.1.0"
 dependencies = [
  "fracpack",
- "libpsibase",
+ "psibase",
  "serde",
  "serde_json",
 ]
@@ -534,6 +534,7 @@ name = "fracpack"
 version = "0.1.0"
 dependencies = [
  "custom_error",
+ "psibase_macros",
 ]
 
 [[package]]
@@ -1102,29 +1103,6 @@ name = "libm"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33a33a362ce288760ec6a508b94caaec573ae7d3bbbd91b87aa0bad4456839db"
-
-[[package]]
-name = "libpsibase"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "custom_error",
- "fracpack",
- "libpsibase_names",
- "psi_macros",
- "reqwest",
- "ripemd",
- "secp256k1",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "libpsibase_names"
-version = "0.1.0"
-dependencies = [
- "seahash",
-]
 
 [[package]]
 name = "link-cplusplus"
@@ -1720,18 +1698,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "psi_macros"
-version = "0.1.0"
-dependencies = [
- "darling",
- "libpsibase_names",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "psibase"
 version = "0.1.0"
 dependencies = [
@@ -1739,18 +1705,38 @@ dependencies = [
  "chrono",
  "clap",
  "custom_error",
- "cxx-build",
  "fracpack",
  "futures",
  "include_dir",
  "indicatif",
- "libpsibase",
  "mime_guess",
+ "psibase_macros",
+ "psibase_names",
  "reqwest",
+ "ripemd",
  "secp256k1",
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "psibase_macros"
+version = "0.1.0"
+dependencies = [
+ "darling",
+ "proc-macro-error",
+ "proc-macro2",
+ "psibase_names",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "psibase_names"
+version = "0.1.0"
+dependencies = [
+ "seahash",
 ]
 
 [[package]]
@@ -2321,7 +2307,7 @@ name = "test_contract"
 version = "0.1.0"
 dependencies = [
  "fracpack",
- "libpsibase",
+ "psibase",
 ]
 
 [[package]]
@@ -2332,7 +2318,7 @@ dependencies = [
  "cxx-build",
  "fracpack",
  "hex",
- "psi_macros",
+ "psibase_macros",
 ]
 
 [[package]]

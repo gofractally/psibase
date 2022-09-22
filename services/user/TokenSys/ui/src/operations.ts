@@ -33,8 +33,7 @@ const CREDIT = {
             );
 
             if (!token) {
-                console.error("No token with symbol " + symbol);
-                return;
+                throw new Error("No token with symbol " + symbol);
             }
 
             await tokenContract.actionCredit({
@@ -53,5 +52,5 @@ export const operations = [CREDIT];
 
 export const executeCredit = async (payload: CreditOperationPayload) => {
     const appletId = await tokenContract.getAppletId();
-    operation(appletId, "credit", payload);
+    return operation(appletId, "credit", payload);
 };

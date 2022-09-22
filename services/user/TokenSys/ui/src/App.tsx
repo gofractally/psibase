@@ -40,10 +40,8 @@ function App() {
     useEffect(() => {
         (async () => {
             try {
-                await wait(4000); // TODO: Why?
                 const userName = await getLoggedInUser();
                 if (!userName) {
-                    // TODO: This never fires because query() swallows failures and never returns.
                     throw new Error("Unable to fetch logged-in user.");
                 }
                 setUserName(userName);
@@ -90,18 +88,23 @@ function App() {
 
     const transfer = async ({ amount, to, token: symbol }: TransferInputs) => {
         if (!symbol) throw new Error("No token selected.");
+
+        const token = tokens?.find((t) => t.symbol === symbol);
+        if (!token) throw new Error("Token for transfer cannot be found.");
+
+        const amountSegments = amount.split(".");
+        const decimal = (amountSegments[1] ?? "0").padEnd(token.precision, "0");
+        const parsedAmount = `${amountSegments[0]}${decimal}`;
+
         // TODO: Errors getting swallowed by CommonSys::executeTransaction(). Fix.
-        executeCredit({
+        await executeCredit({
             symbol,
             receiver: to,
-            amount,
+            amount: parsedAmount,
             memo: "Working",
         });
 
         await wait(2000); // TODO: Would be great if the credit operation returned a value
-
-        const token = tokens?.find((t) => t.symbol === symbol);
-        if (!token) throw new Error("Token for transfer cannot be found.");
         const updatedTokens = await pollForBalanceChange(userName, token);
         setTokens(updatedTokens);
     };

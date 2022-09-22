@@ -3,9 +3,12 @@ name = "fracpack"
 version = "0.1.0"
 edition = "2021"
 publish = false
+description = "Convert to and from the fracpack format"
+license = "MIT"
 
 [lib]
 path = "src/fracpack.rs"
 
 [dependencies]
 custom_error = "1.9.2"
+psibase_macros = { version = "0.1.0", path = "../psibase_macros" }

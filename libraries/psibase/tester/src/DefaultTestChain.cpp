@@ -5,9 +5,11 @@
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/CommonSys.hpp>
+#include <services/system/ProducerSys.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/RAccountSys.hpp>
 #include <services/system/RAuthEcSys.hpp>
+#include <services/system/RProducerSys.hpp>
 #include <services/system/RProxySys.hpp>
 #include <services/system/SetCodeSys.hpp>
 #include <services/system/TransactionSys.hpp>
@@ -31,8 +33,11 @@ DefaultTestChain::DefaultTestChain(
 {
    startBlock();
    deploySystemServices();
-   startBlock();
+   startBlock();  // TODO: Why is this startBlock necessary? Without it,
+                  //   all subsequent transactions will silently fail.
+
    createSysServiceAccounts();
+   setBlockProducers();
    registerSysRpc();
 
    for (const auto& c : additionalServices)
@@ -74,6 +79,11 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .code    = readWholeFile("AccountSys.wasm"),
                                             },
                                             {
+                                                .service = SystemService::ProducerSys::service,
+                                                .flags   = SystemService::ProducerSys::serviceFlags,
+                                                .code    = readWholeFile("ProducerSys.wasm"),
+                                            },
+                                            {
                                                 .service = ProxySys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("ProxySys.wasm"),
@@ -104,6 +114,11 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .code    = readWholeFile("RAccountSys.wasm"),
                                             },
                                             {
+                                                .service = RProducerSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("RProducerSys.wasm"),
+                                            },
+                                            {
                                                 .service = ExploreSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("ExploreSys.wasm"),
@@ -131,13 +146,22 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
    check(psibase::show(show, trace) == "", "Failed to deploy genesis services");
 }
 
+void DefaultTestChain::setBlockProducers(bool show /* = false*/)
+{
+   transactor<SystemService::ProducerSys> psys{SystemService::ProducerSys::service,
+                                               SystemService::ProducerSys::service};
+   std::vector<ProducerConfigRow>         producerConfig = {{"testchain"_a, {}}};
+   auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
+   check(psibase::show(show, trace) == "", "Failed to set producers");
+}
+
 void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
 {
    transactor<SystemService::AccountSys>     asys{SystemService::TransactionSys::service,
                                               SystemService::AccountSys::service};
    transactor<SystemService::TransactionSys> tsys{SystemService::TransactionSys::service,
                                                   SystemService::TransactionSys::service};
-   auto trace = pushTransaction(makeTransaction({asys.startup(), tsys.startup()}));
+   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
@@ -322,6 +346,9 @@ void DefaultTestChain::registerSysRpc()
                            readWholeFile(accDir + "/ui/dist/app-account.svg")),
        rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/dist/index.html")),
        rpcAccount.storeSys("/index.js", js, readWholeFile(accDir + "/ui/dist/index.js")),
+       rpcAccount.storeSys("/lock-closed.svg", svg,
+                           readWholeFile(accDir + "/ui/dist/lock-closed.svg")),
+       rpcAccount.storeSys("/lock-open.svg", svg, readWholeFile(accDir + "/ui/dist/lock-open.svg")),
        rpcAccount.storeSys("/logout.svg", svg, readWholeFile(accDir + "/ui/dist/logout.svg")),
        rpcAccount.storeSys("/refresh.svg", svg, readWholeFile(accDir + "/ui/dist/refresh.svg")),
        rpcAccount.storeSys("/style.css", css, readWholeFile(accDir + "/ui/dist/style.css")),

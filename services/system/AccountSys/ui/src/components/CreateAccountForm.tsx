@@ -1,43 +1,73 @@
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 
 import { AppletId, getJson, operation } from "common/rpc.mjs";
-import { genKeyPair, KeyType } from "common/keyConversions.mjs";
+import { genKeyPair, KeyType, privateStringToKeyPair, publicKeyPairToString } from "common/keyConversions.mjs";
 
 import refresh from "./assets/icons/refresh.svg";
-import { MsgProps } from "../helpers";
 import Button from "./Button";
 
-const onCreateAccount = async (
-    name: any,
-    pubKey: any,
-    addMsg: any,
-    clearMsg: any
-) => {
-    const thisApplet = await getJson("/common/thisservice");
+export interface AccountPair {
+    privateKey: string;
+    publicKey: string;
+    account: string;
+}
+
+interface Props {
+    isLoading: boolean,
+    errorMessage: string,
+    onCreateAccount: (pair: AccountPair) => void,
+}
+
+
+const getPublicKey = (key: string): { error: string, publicKey: string } => {
+    if (key == '') return {
+        error: '',
+        publicKey: ''
+    };
     try {
-        clearMsg();
-        addMsg("Pushing transaction...");
-        await operation(new AppletId(thisApplet, ""), "newAcc", {
-            name,
-            pubKey,
-        });
-    } catch (e: any) {
-        console.error(e);
-        addMsg(e.message);
-        if (!e.trace) return;
-        addMsg("trace: " + JSON.stringify(e.trace, null, 4));
+        const publicKey = publicKeyPairToString(privateStringToKeyPair(key))
+        return { error: '', publicKey }
+    } catch (e) {
+        return { error: `${e}`, publicKey: '' }
     }
-};
-export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
+}
+
+
+export const CreateAccountForm = forwardRef(({ onCreateAccount, isLoading, errorMessage }: Props, ref) => {
+
+
+
+
     const [name, setName] = useState("");
     const [pubKey, setPubKey] = useState("");
     const [privKey, setPrivKey] = useState("");
+
+    useImperativeHandle(ref, () => ({
+        resetForm() {
+            console.log('child function 1 called');
+            setName('')
+            setPubKey('')
+            setPrivKey('')
+        },
+    }));
 
     const generateKeyPair = () => {
         const kp = genKeyPair(KeyType.k1);
         setPubKey(kp.pub);
         setPrivKey(kp.priv);
     };
+
+    const updatePrivateKey = (key: string) => {
+        setPrivKey(key)
+        const { publicKey, error } = getPublicKey(key)
+        if (!error && publicKey) {
+            setPubKey(publicKey)
+        }
+    }
+
+    const isValid = name !== ''
+
+    const isDisabled = isLoading || !isValid
 
     return (
         <div>
@@ -67,7 +97,7 @@ export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
                     type="text"
                     className="w-full"
                     value={privKey}
-                    onChange={(e) => setPrivKey(e.target.value)}
+                    onChange={(e) => updatePrivateKey(e.target.value)}
                 ></input>
             </div>
             <div className="w-full sm:w-96">
@@ -80,16 +110,20 @@ export const CreateAccountForm = ({ addMsg, clearMsg }: MsgProps) => {
                     onChange={(e) => setPubKey(e.target.value)}
                 ></input>
             </div>
-            <div>
+            <div className="mt-4">
                 <Button
                     type="primary"
+                    disabled={isDisabled}
                     onClick={(e) =>
-                        onCreateAccount(name, pubKey, addMsg, clearMsg)
+                        onCreateAccount({ account: name, publicKey: pubKey, privateKey: privKey })
                     }
                 >
-                    Create Account
+                    {isLoading ? 'Loading..' : 'Create Account'}
                 </Button>
+            </div>
+            <div className="mt-4 h-8 text-red-700">
+                {errorMessage}
             </div>
         </div>
     );
-};
+})

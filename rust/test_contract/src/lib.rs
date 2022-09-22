@@ -1,10 +1,10 @@
-use libpsibase::*;
+use psibase::*;
 
 #[contract(example)]
 mod example_contract {
     #[action]
     pub fn hi() {
-        libpsibase::write_console("hello!!!");
+        psibase::write_console("hello!!!");
     }
 
     #[action]

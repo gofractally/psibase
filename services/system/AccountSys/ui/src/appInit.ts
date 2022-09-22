@@ -9,14 +9,16 @@ import {
     getJson,
     AppletId,
 } from "common/rpc.mjs";
+import { KeyPairWithAccounts } from "./App";
+
+interface execArgs {
+    name?: any;
+    pubKey?: any;
+    transaction?: any;
+}
 
 export const initAppFn = (setAppInitialized: () => void) =>
     initializeApplet(async () => {
-        interface execArgs {
-            name?: any;
-            pubKey?: any;
-            transaction?: any;
-        }
 
         const thisApplet = await getJson<string>("/common/thisservice");
         const accountSysApplet = new AppletId(thisApplet, "");
@@ -31,7 +33,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                         requireNew: true,
                     });
 
-                    if (pubKey !== "") {
+                    if (pubKey && pubKey !== "") {
                         operation(accountSysApplet, "setKey", { name, pubKey });
                     }
                 },
@@ -63,16 +65,35 @@ export const initAppFn = (setAppInitialized: () => void) =>
             },
             {
                 id: "getAuthedTransaction",
-                exec: async ({ transaction }: execArgs) => {
-                    let user = await query(accountSysApplet, "getLoggedInUser");
-                    let accounts = await getJson("/accounts");
-                    let u = accounts.find((a: any) => a.accountNum === user);
-                    if (u.authService === "auth-ec-sys") {
-                        // Todo: Should sign with the private key mapped to the logged-in user stored in localstorage
-                        return await signTransaction("", transaction, [
-                            "PVT_K1_22vrGgActn3X4H1wwvy2KH4hxGke7cGy6ypy2njMjnyZBZyU7h",
-                        ]);
-                    } else return await signTransaction("", transaction);
+                exec: async ({ transaction }: execArgs): Promise<any> => {
+                    const [user, accounts] = await Promise.all([query<null, string>(accountSysApplet, "getLoggedInUser"), getJson<{ accountNum: string; authService: string }[]>("/accounts")]);
+
+                    const sendingAccount = accounts.find(account => account.accountNum === user);
+                    if (!sendingAccount) {
+                        console.error('No sending account', sendingAccount, { loggedInUser: user, sending: transaction.actions[0].sender })
+                        throw new Error('No sending account found');
+                    }
+                    const isSecureAccount = sendingAccount.authService === "auth-ec-sys"
+                    if (isSecureAccount) {
+                        const keys = JSON.parse(localStorage.getItem('keyPairs') || '[]') as KeyPairWithAccounts[]
+
+                        const foundKey = keys.find(key => {
+                            if (key.knownAccounts) {
+                                return key.knownAccounts.includes(user)
+                            }
+                        });
+
+                        if (foundKey) {
+                            const signingPrivateKey = foundKey.privateKey;
+                            return signTransaction("", transaction, [signingPrivateKey]);
+                        } else {
+                            console.error(`Failed to find the key pair for sender ${user}`);
+                            throw new Error(`Failed to find the key pair for sender ${user}`);
+                        }
+
+                    } else {
+                        return signTransaction("", transaction);
+                    }
                 },
             },
         ]);

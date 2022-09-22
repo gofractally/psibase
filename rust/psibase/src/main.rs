@@ -5,7 +5,7 @@ use custom_error::custom_error;
 use fracpack::Packable;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
-use libpsibase::{
+use psibase::{
     account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
     Claim, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction, Tapos,
     TaposRefBlock, TimePointSec, Transaction,
@@ -198,7 +198,7 @@ fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
         sender,
         contract: account!("account-sys"),
         method: method!("newAccount"),
-        raw_data: new_account_action.packed_bytes(),
+        raw_data: new_account_action.packed(),
     }
 }
 
@@ -207,7 +207,7 @@ fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
         sender: account,
         contract: account!("auth-ec-sys"),
         method: method!("setKey"),
-        raw_data: (key.clone(),).packed_bytes(),
+        raw_data: (key.clone(),).packed(),
     }
 }
 
@@ -216,7 +216,7 @@ fn set_auth_contract_action(account: AccountNumber, auth_contract: AccountNumber
         sender: account,
         contract: account!("account-sys"),
         method: method!("setAuthCntr"),
-        raw_data: (auth_contract,).packed_bytes(),
+        raw_data: (auth_contract,).packed(),
     }
 }
 
@@ -239,7 +239,7 @@ fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
         sender: account,
         contract: account!("setcode-sys"),
         method: method!("setCode"),
-        raw_data: set_code_action.packed_bytes(),
+        raw_data: set_code_action.packed(),
     }
 }
 
@@ -252,7 +252,7 @@ pub struct ProducerConfigRow {
 fn to_claim(key: &PublicKey) -> Claim {
     Claim {
         contract: account!("verifyec-sys"),
-        raw_data: key.packed_bytes(),
+        raw_data: key.packed(),
     }
 }
 
@@ -266,7 +266,7 @@ fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
         sender: account!("producer-sys"),
         contract: account!("producer-sys"),
         method: method!("setProducers"),
-        raw_data: set_producers_action.packed_bytes(),
+        raw_data: set_producers_action.packed(),
     }
 }
 
@@ -278,7 +278,7 @@ fn reg_server(contract: AccountNumber, server_contract: AccountNumber) -> Action
         sender: contract,
         contract: account!("proxy-sys"),
         method: method!("registerServer"),
-        raw_data: data.packed_bytes(),
+        raw_data: data.packed(),
     }
 }
 
@@ -294,7 +294,7 @@ fn store_sys(
         sender,
         contract,
         method: method!("storeSys"),
-        raw_data: data.packed_bytes(),
+        raw_data: data.packed(),
     }
 }
 
@@ -369,7 +369,7 @@ async fn create(
     push_transaction(
         &args.api,
         client,
-        sign_transaction(trx, &args.sign)?.packed_bytes(),
+        sign_transaction(trx, &args.sign)?.packed(),
     )
     .await?;
     println!("Ok");
@@ -414,7 +414,7 @@ async fn modify(
     push_transaction(
         &args.api,
         client,
-        sign_transaction(trx, &args.sign)?.packed_bytes(),
+        sign_transaction(trx, &args.sign)?.packed(),
     )
     .await?;
     println!("Ok");
@@ -471,7 +471,7 @@ async fn deploy(
     push_transaction(
         &args.api,
         client,
-        sign_transaction(trx, &args.sign)?.packed_bytes(),
+        sign_transaction(trx, &args.sign)?.packed(),
     )
     .await?;
     println!("Ok");
@@ -508,7 +508,7 @@ async fn upload(
     push_transaction(
         &args.api,
         client,
-        sign_transaction(trx, &args.sign)?.packed_bytes(),
+        sign_transaction(trx, &args.sign)?.packed(),
     )
     .await?;
     println!("Ok");
@@ -558,7 +558,7 @@ async fn monitor_trx(
     progress: ProgressBar,
     n: u64,
 ) -> Result<(), anyhow::Error> {
-    let result = push_transaction(&args.api, client.clone(), trx.packed_bytes()).await;
+    let result = push_transaction(&args.api, client.clone(), trx.packed()).await;
     if let Err(err) = result {
         progress.suspend(|| {
             println!("=====\n{:?}", err);

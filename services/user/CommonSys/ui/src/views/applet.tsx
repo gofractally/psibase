@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { HandleMessage, NewAppletState } from "../types";
 import { AppletStates } from "../config";
@@ -29,55 +29,60 @@ interface Props {
 }
 
 export const Applet = ({ applet, handleMessage }: Props) => {
-    const { appletId, state, onInit = () => {} } = applet;
     const [appletSrc, setAppletSrc] = useState("");
 
-    const iFrameId = getIframeId(appletId);
+    const { appletId, state, onInit } = applet;
+
+    const iFrameId = useMemo(() => getIframeId(appletId), [appletId]);
 
     useEffect(() => {
-        let doSetAppletSrc = async () => {
+        const doSetAppletSrc = async () => {
             setAppletSrc(await appletId.url());
         };
         doSetAppletSrc();
-    }, []);
+    }, [appletId]);
 
     useEffect(() => {
         // Set document title
         if (appletId && state === AppletStates.primary) {
             window.document.title = appletId.name;
         }
-    }, []);
+    }, [appletId, state]);
 
-    let doHandleMessage = useCallback((request: any) => {
-        handleMessage(appletId, request);
-    }, []);
+    const doHandleMessage = useCallback(
+        (request: any) => {
+            handleMessage(appletId, request);
+        },
+        [appletId, handleMessage]
+    );
 
     useEffect(() => {
-        // Configure iFrameResizer
-        let iFrame = document.getElementById(iFrameId);
-        if (iFrame) {
-            // TODO - Fix error: Failed to execute 'postMessage' on 'DOMWindow'
-            //        https://github.com/gofractally/psibase/issues/107
-            (window as any).iFrameResize(
-                {
-                    // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
-                    // log: true,
-                    checkOrigin: true,
-                    heightCalculationMethod: "lowestElement",
-                    onMessage: doHandleMessage,
-                    onInit,
-                    minHeight:
-                        document.documentElement.scrollHeight -
-                        iFrame.getBoundingClientRect().top,
-                },
-                "#" + iFrameId
-            )[0].iFrameResizer;
+        if (appletSrc && appletId) {
+            console.info(`Initializing applet ${appletId}: ${appletSrc}`);
+            // Configure iFrameResizer
+            const iFrame = document.getElementById(iFrameId);
+            if (iFrame) {
+                // TODO - Fix error: Failed to execute 'postMessage' on 'DOMWindow'
+                //        https://github.com/gofractally/psibase/issues/107
+                (window as any).iFrameResize(
+                    {
+                        // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
+                        // log: true,
+                        checkOrigin: true,
+                        heightCalculationMethod: "lowestElement",
+                        onMessage: doHandleMessage,
+                        onInit,
+                        minHeight:
+                            document.documentElement.scrollHeight -
+                            iFrame.getBoundingClientRect().top,
+                    },
+                    "#" + iFrameId
+                )[0].iFrameResizer;
+            }
         }
-    }, [appletSrc]);
+    }, [appletSrc, appletId, onInit, iFrameId, doHandleMessage]);
 
-    if (!appletId || !appletSrc) return null;
-
-    return (
+    return appletId && appletSrc ? (
         <iframe
             id={iFrameId}
             style={appletStyles[state!]}
@@ -86,7 +91,7 @@ export const Applet = ({ applet, handleMessage }: Props) => {
             title={appletId.name}
             frameBorder="0"
         />
-    );
+    ) : null;
 };
 
 export default Applet;

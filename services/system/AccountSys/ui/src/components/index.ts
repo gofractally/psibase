@@ -1,3 +1,4 @@
+export { AccountsList } from "./AccountsList";
 export { AccountList } from "./AccountList";
 export { Button } from "./Button";
 export { CreateAccountForm } from "./CreateAccountForm";

@@ -1,4 +1,4 @@
-use libpsibase::*;
+use psibase::*;
 use serde_json::json;
 
 #[contract(example_iface)]
