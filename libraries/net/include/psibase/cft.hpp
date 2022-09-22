@@ -19,9 +19,12 @@
 namespace psibase::net
 {
 #ifndef PSIO_REFLECT_INLINE
-#define PSIO_REFLECT_INLINE(name, ...) \
-   PSIO_REFLECT(name, __VA_ARGS__)     \
-   friend reflect_impl_##name get_reflect_impl(const name&) { return {}; }
+#define PSIO_REFLECT_INLINE(name, ...)                      \
+   PSIO_REFLECT(name, __VA_ARGS__)                          \
+   friend reflect_impl_##name get_reflect_impl(const name&) \
+   {                                                        \
+      return {};                                            \
+   }
 #endif
 
    // round tp to the nearest multiple of d towards negative infinity
@@ -36,18 +39,6 @@ namespace psibase::net
          rem += d1;
       }
       return tp - rem;
-   }
-
-   std::string to_string(const Checksum256& c)
-   {
-      std::string result;
-      for (auto ch : c)
-      {
-         static const char xdigits[] = "0123456789ABCDEF";
-         result += xdigits[(ch >> 4) & 0xF];
-         result += xdigits[ch & 0xF];
-      }
-      return result;
    }
 
    // This protocol is based on RAFT, with some simplifications.
@@ -65,6 +56,7 @@ namespace psibase::net
 
       enum class producer_state : std::uint8_t
       {
+         unknown,
          follower,
          candidate,
          leader,
@@ -77,7 +69,8 @@ namespace psibase::net
          ExtendedBlockId           xid;
          std::string               to_string() const
          {
-            return "hello: id=" + net::to_string(xid.id()) + " num=" + std::to_string(xid.num());
+            return "hello: id=" + loggers::to_string(xid.id()) +
+                   " num=" + std::to_string(xid.num());
          }
          PSIO_REFLECT_INLINE(hello_request, xid)
       };
@@ -112,6 +105,8 @@ namespace psibase::net
       template <typename ExecutionContext>
       explicit basic_cft_consensus(ExecutionContext& ctx) : _election_timer(ctx), _block_timer(ctx)
       {
+         logger.add_attribute("Channel",
+                              boost::log::attributes::constant(std::string("consensus")));
       }
 
       producer_id                  self = null_producer;
@@ -122,7 +117,7 @@ namespace psibase::net
 
       block_num last_applied = 0;
 
-      producer_state            _state = producer_state::nonvoting;
+      producer_state            _state = producer_state::unknown;
       basic_random_timer<Timer> _election_timer;
       Timer                     _block_timer;
       std::chrono::milliseconds _timeout        = std::chrono::seconds(3);
@@ -130,6 +125,8 @@ namespace psibase::net
 
       std::vector<block_num>                        match_index[2];
       std::vector<std::unique_ptr<peer_connection>> _peers;
+
+      loggers::common_logger logger;
 
       struct append_entries_request
       {
@@ -142,7 +139,7 @@ namespace psibase::net
             return "append_entries: term=" +
                    std::to_string(term_id{block->block()->header()->term()}) +
                    " leader=" + AccountNumber{block->block()->header()->producer()}.str() +
-                   " id=" + net::to_string(info.blockId) +
+                   " id=" + loggers::to_string(info.blockId) +
                    " blocknum=" + std::to_string(BlockNum{block->block()->header()->blockNum()}) +
                    " irreversible=" +
                    std::to_string(BlockNum{block->block()->header()->commitNum()});
@@ -378,8 +375,9 @@ namespace psibase::net
          active_producers[1] = std::move(prods.second);
          if (is_producer())
          {
-            if (_state == producer_state::nonvoting)
+            if (_state == producer_state::nonvoting || _state == producer_state::unknown)
             {
+               PSIBASE_LOG(logger, info) << "Node is active producer";
                _state = producer_state::follower;
                randomize_timer();
             }
@@ -388,6 +386,7 @@ namespace psibase::net
          {
             if (_state != producer_state::nonvoting)
             {
+               PSIBASE_LOG(logger, info) << "Node is non-voting";
                _election_timer.cancel();
                stop_leader();
             }
@@ -470,6 +469,7 @@ namespace psibase::net
              {
                 if (ec)
                 {
+                   PSIBASE_LOG(logger, info) << "Stopping block production";
                    chain().abort_block();
                 }
                 else if (_state == producer_state::leader)
@@ -653,6 +653,8 @@ namespace psibase::net
                match_index[1].clear();
                match_index[1].resize(active_producers[1]->size());
             }
+            PSIBASE_LOG(logger, info)
+                << "Starting block production for term " << current_term << " as " << self.str();
             start_leader();
          }
       }
@@ -676,6 +678,8 @@ namespace psibase::net
                    if (!ec &&
                        (_state == producer_state::follower || _state == producer_state::candidate))
                    {
+                      PSIBASE_LOG(logger, info)
+                          << "Timeout: Starting leader election for term " << (current_term + 1);
                       request_vote();
                    }
                 });

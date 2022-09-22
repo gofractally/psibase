@@ -1,7 +1,10 @@
 #pragma once
 
+#include <psibase/log.hpp>
+
 #include <boost/asio/dispatch.hpp>
 #include <boost/asio/io_context.hpp>
+#include <boost/log/attributes/constant.hpp>
 #include <functional>
 #include <map>
 #include <memory>
@@ -14,6 +17,10 @@ namespace psibase::net
 
    struct connection_base
    {
+      connection_base()
+      {
+         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
+      }
       using read_handler  = std::function<void(const std::error_code&, std::vector<char>&&)>;
       using write_handler = std::function<void(const std::error_code&)>;
       virtual void async_write(std::vector<char>&&, write_handler) = 0;
@@ -22,16 +29,24 @@ namespace psibase::net
       virtual void close()                                         = 0;
       // Information for display
       virtual std::string endpoint() const { return ""; }
+      //
+      loggers::common_logger logger;
    };
 
    template <typename Derived>
    struct peer_manager
    {
       auto& network() { return static_cast<Derived*>(this)->network(); }
-      explicit peer_manager(boost::asio::io_context& ctx) : _ctx(ctx) {}
+      explicit peer_manager(boost::asio::io_context& ctx) : _ctx(ctx)
+      {
+         default_logger.add_attribute("Channel",
+                                      boost::log::attributes::constant(std::string("p2p")));
+      }
       void add_connection(std::shared_ptr<connection_base> conn)
       {
-         auto id               = next_peer_id++;
+         auto id = next_peer_id++;
+         conn->logger.add_attribute("PeerId", boost::log::attributes::constant(id));
+         PSIBASE_LOG(conn->logger, info) << "Connected";
          auto [iter, inserted] = _connections.try_emplace(id, conn);
          assert(inserted);
          async_recv(id, std::move(conn));
@@ -88,11 +103,26 @@ namespace psibase::net
          return false;
       }
 
+      loggers::common_logger& logger(peer_id id)
+      {
+         auto iter = _connections.find(id);
+         if (iter != _connections.end())
+         {
+            return iter->second->logger;
+         }
+         else
+         {
+            return default_logger;
+         }
+      }
+
       const auto& connections() const { return _connections; }
 
       peer_id                                             next_peer_id = 0;
       boost::asio::io_context&                            _ctx;
       std::map<peer_id, std::shared_ptr<connection_base>> _connections;
+
+      loggers::common_logger default_logger;
    };
 
 }  // namespace psibase::net

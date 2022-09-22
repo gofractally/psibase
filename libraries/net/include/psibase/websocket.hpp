@@ -9,6 +9,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <deque>
+#include <psibase/log.hpp>
 #include <psibase/peer_manager.hpp>
 #include <sstream>
 #include <string>
@@ -24,18 +25,28 @@ namespace psibase::net
           boost::beast::websocket::stream<boost::beast::tcp_stream>&& stream)
           : stream(std::move(stream))
       {
+         logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(endpoint()));
       }
+      ~websocket_connection() { PSIBASE_LOG(logger, info) << "Connection closed"; }
       explicit websocket_connection(boost::asio::io_context& ctx) : stream(ctx) {}
       void async_read(read_handler f) override
       {
          inbox.clear();
          buffer.emplace(inbox);
-         stream.async_read(*buffer, [this, f = std::move(f)](const std::error_code& ec, std::size_t)
-                           { f(ec, std::move(inbox)); });
+         stream.async_read(*buffer,
+                           [this, f = std::move(f)](const std::error_code& ec, std::size_t)
+                           {
+                              if (ec)
+                              {
+                                 PSIBASE_LOG(logger, warning) << ec.message();
+                              }
+                              f(ec, std::move(inbox));
+                           });
       }
       void async_write(std::vector<char>&& data, write_handler f) override
       {
-         outbox.emplace_back(psibase::net::websocket_connection::message{std::move(data), std::move(f)});
+         outbox.emplace_back(
+             psibase::net::websocket_connection::message{std::move(data), std::move(f)});
          if (outbox.size() == 1)
          {
             async_write_loop();
@@ -58,6 +69,7 @@ namespace psibase::net
                                }
                                else
                                {
+                                  PSIBASE_LOG(logger, warning) << ec.message();
                                   for (auto& m : outbox)
                                   {
                                      m.callback(ec);
@@ -102,6 +114,8 @@ namespace psibase::net
                       F&&                                     f)
    {
       conn->host = host;
+      conn->logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(
+                                                       conn->host + ":" + std::string(service)));
       resolver.async_resolve(
           host, service,
           [conn = std::move(conn), f = std::forward<F>(f)](const std::error_code& ec,
@@ -117,11 +131,10 @@ namespace psibase::net
                     {
                        if (ec)
                        {
-                          std::cout << "Failed connecting" << std::endl;
+                          PSIBASE_LOG(conn->logger, warning) << ec.message();
                        }
                        else
                        {
-                          std::cout << "Connected to: " << e << std::endl;
                           auto* p = conn.get();
                           p->stream.async_handshake(p->host, "/native/p2p",
                                                     [conn = std::move(conn), f = std::move(f)](
@@ -129,8 +142,8 @@ namespace psibase::net
                                                     {
                                                        if (ec)
                                                        {
-                                                          std::cout << "Websocket handshake failed"
-                                                                    << std::endl;
+                                                          PSIBASE_LOG(conn->logger, warning)
+                                                              << ec.message();
                                                        }
                                                        else
                                                        {
@@ -142,7 +155,7 @@ namespace psibase::net
              }
              else
              {
-                std::cout << "resolve failed: " << ec.message() << std::endl;
+                PSIBASE_LOG(conn->logger, warning) << ec.message();
              }
           });
    }

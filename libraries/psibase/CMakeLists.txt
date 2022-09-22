@@ -148,9 +148,10 @@ function(add suffix)
     endif()
 
     if(DEFINED IS_NATIVE)
-        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem)
+        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem log)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 ${Boost_LIBRARIES})
+        # FindBoost.cmake gets the library order wrong for Boost.Log
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 -Wl,--start-group ${Boost_LIBRARIES} -Wl,--end-group)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
@@ -158,6 +159,7 @@ function(add suffix)
             native/src/BlockContext.cpp
             native/src/EcdsaProver.cpp
             native/src/ExecutionContext.cpp
+            native/src/log.cpp
             native/src/NativeFunctions.cpp
             native/src/Prover.cpp
             native/src/SystemContext.cpp

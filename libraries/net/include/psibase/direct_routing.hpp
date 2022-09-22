@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <psibase/SignedMessage.hpp>
+#include <psibase/log.hpp>
 #include <psibase/net_base.hpp>
 #include <psio/fracpack.hpp>
 #include <queue>
@@ -16,9 +17,12 @@
 namespace psibase::net
 {
 #ifndef PSIO_REFLECT_INLINE
-#define PSIO_REFLECT_INLINE(name, ...) \
-   PSIO_REFLECT(name, __VA_ARGS__)     \
-   friend reflect_impl_##name get_reflect_impl(const name&) { return {}; }
+#define PSIO_REFLECT_INLINE(name, ...)                      \
+   PSIO_REFLECT(name, __VA_ARGS__)                          \
+   friend reflect_impl_##name get_reflect_impl(const name&) \
+   {                                                        \
+      return {};                                            \
+   }
 #endif
 
    // This requires all producers to be peers
@@ -169,12 +173,7 @@ namespace psibase::net
          }
          catch (std::exception& e)
          {
-            std::cout << "peer " << peer << ": " << e.what() << std::endl;
-            peers().disconnect(peer);
-         }
-         catch (...)
-         {
-            std::cout << "invalid message from peer " << peer << std::endl;
+            PSIBASE_LOG(peers().logger(peer), warning) << e.what();
             peers().disconnect(peer);
          }
       }
@@ -206,12 +205,13 @@ namespace psibase::net
       {
          auto  raw   = serialize_unsigned_message(msg.data);
          Claim claim = msg.data.signer();
+         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.data.to_string();
          chain().verify({raw.data(), raw.size()}, claim, msg.signature);
          static_cast<Derived*>(this)->consensus().recv(peer, msg.data);
       }
       void recv(peer_id peer, const auto& msg)
       {
-         //std::cout << "recv " << msg.to_string() << std::endl;
+         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
          static_cast<Derived*>(this)->consensus().recv(peer, msg);
       }
       std::multimap<producer_id, peer_id> producers;

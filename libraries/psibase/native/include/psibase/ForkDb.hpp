@@ -1,12 +1,14 @@
 #pragma once
 
 #include <boost/container/flat_map.hpp>
+#include <boost/log/attributes/constant.hpp>
 #include <iostream>
 #include <psibase/BlockContext.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/VerifyProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
+#include <psibase/log.hpp>
 
 namespace psibase
 {
@@ -328,7 +330,8 @@ namespace psibase
                   // TODO: verify block id here?
                   // TODO: handle other errors and blacklist the block and its descendants
                   next_state->revision = newRevision;
-                  std::cout << psio::convert_to_json(ctx.current.header) << "\n";
+
+                  PSIBASE_LOG_BLOCK(blockLogger, info, ctx.current.header, id) << "Accepted block";
                }
                systemContext->sharedDatabase.setHead(*writer, next_state->revision);
                state = next_state;
@@ -503,14 +506,15 @@ namespace psibase
             byOrderIndex.insert({state_iter->second.order(), id});
             head = &state_iter->second;
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
-            std::cout << psio::convert_to_json(blockContext->current.header) << "\n";
+            PSIBASE_LOG_BLOCK(blockLogger, info, blockContext->current.header, id)
+                << "Produced block";
             blockContext.reset();
             return head;
          }
          catch (std::exception& e)
          {
             blockContext.reset();
-            std::cout << e.what() << std::endl;
+            PSIBASE_LOG(logger, error) << e.what() << std::endl;
             return nullptr;
          }
       }
@@ -546,10 +550,15 @@ namespace psibase
 
       bool isProducing() const { return !!blockContext; }
 
+      auto& getLogger() { return logger; }
+
       explicit ForkDb(SystemContext*          sc,
                       std::shared_ptr<Prover> prover = std::make_shared<CompoundProver>())
           : prover{std::move(prover)}
       {
+         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("chain")));
+         blockLogger.add_attribute("Channel",
+                                   boost::log::attributes::constant(std::string("block")));
          systemContext = sc;
          writer        = sc->sharedDatabase.createWriter();
 
@@ -647,5 +656,8 @@ namespace psibase
 
       std::map<decltype(std::declval<BlockHeaderState>().order()), Checksum256> byOrderIndex;
       std::map<BlockNum, Checksum256>                                           byBlocknumIndex;
+
+      loggers::common_logger logger;
+      loggers::common_logger blockLogger;
    };
 }  // namespace psibase

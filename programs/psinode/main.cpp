@@ -3,6 +3,7 @@
 #include <psibase/cft.hpp>
 #include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
+#include <psibase/log.hpp>
 #include <psibase/node.hpp>
 #include <psibase/peer_manager.hpp>
 #include <psibase/serviceEntry.hpp>
@@ -425,7 +426,7 @@ void run(const std::string&              db_path,
 
    if (!replay_blocks.empty())
    {
-      std::cout << "Replaying blocks from " << replay_blocks << "\n";
+      PSIBASE_LOG(node.chain().getLogger(), info) << "Replaying blocks from " << replay_blocks;
       std::fstream file(replay_blocks, std::ios_base::binary | std::ios_base::in);
       if (!file.is_open())
          throw std::runtime_error("failed to open " + replay_blocks);
@@ -456,15 +457,15 @@ void run(const std::string&              db_path,
          {
             if (!skipping)
             {
-               std::cout << "Skipping existing blocks\n";
+               PSIBASE_LOG(node.chain().getLogger(), info) << "Skipping existing blocks";
                skipping = info.header.blockNum;
             }
             continue;
          }
          if (skipping)
          {
-            std::cout << "Skipped existing blocks " << *skipping << "-" << info.header.blockNum - 1
-                      << "\n";
+            PSIBASE_LOG(node.chain().getLogger(), info) << "Skipped existing blocks " << *skipping
+                                                        << "-" << info.header.blockNum - 1 << "\n";
             skipping = std::nullopt;
          }
 
@@ -496,7 +497,7 @@ void run(const std::string&              db_path,
 
    if (!save_blocks.empty())
    {
-      std::cout << "Saving blocks to " << save_blocks << "\n";
+      PSIBASE_LOG(node.chain().getLogger(), info) << "Saving blocks to " << save_blocks;
       std::fstream file(save_blocks,
                         std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
       if (!file.is_open())
@@ -509,14 +510,16 @@ void run(const std::string&              db_path,
       while (auto block = db.kvGetRaw(DbId::blockLog, psio::convert_to_key(num)))
       {
          if (num == 2 || !(num % 10000))
-            std::cout << "writing block " << num << " to " << save_blocks << "\n";
+            PSIBASE_LOG(node.chain().getLogger(), info)
+                << "writing block " << num << " to " << save_blocks;
          uint64_t size = block->remaining();
          file.write((char*)&size, sizeof(size));
          file.write(block->pos, block->remaining());
          ++num;
          ++numWritten;
       }
-      std::cout << "wrote " << numWritten << " blocks to " << save_blocks << "\n";
+      PSIBASE_LOG(node.chain().getLogger(), info)
+          << "wrote " << numWritten << " blocks to " << save_blocks;
    }
 
    timer_type timer(chainContext);
@@ -548,7 +551,8 @@ void run(const std::string&              db_path,
          {
             if (!showedBootMsg)
             {
-               std::cout << "Need genesis block; use 'psibase boot' to boot chain\n";
+               PSIBASE_LOG(node.chain().getLogger(), notice)
+                   << "Need genesis block; use 'psibase boot' to boot chain";
                showedBootMsg = true;
             }
             //continue;
@@ -621,29 +625,30 @@ int main(int argc, char* argv[])
    p.add("database", 1);
 
    po::variables_map vm;
-   po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
    try
    {
+      po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
       po::notify(vm);
    }
    catch (std::exception& e)
    {
       if (!vm.count("help"))
       {
-         std::cout << e.what() << "\n";
+         std::cerr << e.what() << "\n";
          return 1;
       }
    }
 
    if (vm.count("help"))
    {
-      std::cout << usage << "\n\n";
-      std::cout << desc << "\n";
+      std::cerr << usage << "\n\n";
+      std::cerr << desc << "\n";
       return 1;
    }
 
    try
    {
+      psibase::loggers::configure();
       auto prover = std::make_shared<CompoundProver>();
       for (const auto& key : keys)
       {
@@ -656,7 +661,7 @@ int main(int argc, char* argv[])
    }
    catch (std::exception& e)
    {
-      std::cout << "std::exception: " << e.what() << "\n";
+      PSIBASE_LOG(psibase::loggers::generic::get(), error) << e.what();
    }
    return 1;
 }

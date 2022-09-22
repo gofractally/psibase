@@ -7,6 +7,7 @@
 
 #include "psibase/http.hpp"
 #include "psibase/TransactionContext.hpp"
+#include "psibase/log.hpp"
 #include "psibase/serviceEntry.hpp"
 
 #include <boost/asio/bind_executor.hpp>
@@ -85,6 +86,76 @@ namespace psibase::http
          threads.clear();
       }
    };  // server_impl
+
+   // Reads log records from the queue and writes them to a websocket
+   template <typename StreamType>
+   class websocket_log_session
+   {
+     public:
+      explicit websocket_log_session(StreamType&& stream)
+          : reader(stream.get_executor()), stream(std::move(stream))
+      {
+      }
+      static void write(std::shared_ptr<websocket_log_session>&& self)
+      {
+         auto p = self.get();
+         p->reader.async_read(
+             [self = std::move(self)](const std::error_code& ec, std::span<const char> data) mutable
+             {
+                if (!ec)
+                {
+                   auto p = self.get();
+                   p->stream.async_write(
+                       boost::asio::buffer(data.data(), data.size()),
+                       [self = std::move(self)](const std::error_code& ec, std::size_t) mutable
+                       {
+                          if (!ec)
+                          {
+                             auto p = self.get();
+                             write(std::move(self));
+                          }
+                       });
+                }
+             });
+      }
+      static void read(std::shared_ptr<websocket_log_session>&& self)
+      {
+         auto p = self.get();
+         p->buffer.clear();
+         p->stream.async_read(
+             p->buffer,
+             [self = std::move(self)](const std::error_code& ec, std::size_t) mutable
+             {
+                if (!ec)
+                {
+                   auto data = self->buffer.cdata();
+                   try
+                   {
+                      self->reader.config({static_cast<const char*>(data.data()), data.size()});
+                   }
+                   catch (std::exception& e)
+                   {
+                      self->reader.cancel();
+                      auto p = self.get();
+                      p->stream.async_close({websocket::close_code::bad_payload, e.what()},
+                                            [self = std::move(self)](const std::error_code&) {});
+                      return;
+                   }
+                   read(std::move(self));
+                }
+             });
+      }
+      static void run(std::shared_ptr<websocket_log_session>&& self)
+      {
+         read(std::shared_ptr(self));
+         write(std::move(self));
+      }
+
+     private:
+      psibase::loggers::LogReader reader;
+      StreamType                  stream;
+      beast::flat_buffer          buffer;
+   };
 
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
@@ -342,7 +413,7 @@ namespace psibase::http
          {
             // Stop reading HTTP requests
             send.pause_read = true;
-            send(websocket_upgrade{}, std::move(req));
+            send(websocket_upgrade{}, std::move(req), server.http_config->accept_p2p_websocket);
             return;
          }
          else if (req.target() == "/native/admin/peers" && req.method() == bhttp::verb::get &&
@@ -430,6 +501,30 @@ namespace psibase::http
                        });
                 });
             return;
+         }
+         else if (req.target() == "/native/admin/log" && websocket::is_upgrade(req))
+         {
+            send.pause_read = true;
+            send(websocket_upgrade{}, std::move(req),
+                 [&server](auto&& stream)
+                 {
+                    using stream_type = std::decay_t<decltype(stream)>;
+                    auto session =
+                        std::make_shared<websocket_log_session<stream_type>>(std::move(stream));
+                    websocket_log_session<stream_type>::run(std::move(session));
+                 });
+         }
+         else if (req.target() == "/native/admin/loggers" && req.method() == bhttp::verb::get)
+         {
+            auto result = psibase::loggers::get_config();
+            return send(ok(std::vector<char>(result.begin(), result.end()), "application/json"));
+         }
+         else if (req.target() == "/native/admin/loggers" && req.method() == bhttp::verb::put &&
+                  req[bhttp::field::content_type] == "application/json")
+         {
+            const auto& body = req.body();
+            psibase::loggers::configure({body.data(), body.size()});
+            return send(ok_no_content());
          }
          else
          {
@@ -531,34 +626,40 @@ namespace psibase::http
             if (items.size() == 1)
                (*items.front())();
          }
-         template <class Msg>
-         void operator()(websocket_upgrade, Msg&& msg)
+         template <class Msg, typename F>
+         void operator()(websocket_upgrade, Msg&& msg, F&& f)
          {
             struct work_impl : work
             {
-               http_session& self;
-               Msg           request;
+               http_session&   self;
+               Msg             request;
+               std::decay_t<F> next;
 
-               work_impl(http_session& self, Msg&& msg) : self(self), request(std::move(msg)) {}
+               work_impl(http_session& self, Msg&& msg, F&& f)
+                   : self(self), request(std::move(msg)), next(std::move(f))
+               {
+               }
                void operator()()
                {
                   struct op
                   {
                      Msg                                                        request;
                      websocket::stream<decltype(self.derived_session().stream)> stream;
+                     std::decay_t<F>                                            next;
                   };
 
                   auto ptr = std::make_shared<op>(
                       op{std::move(request),
                          websocket::stream<decltype(self.derived_session().stream)>{
-                             std::move(self.derived_session().stream)}});
+                             std::move(self.derived_session().stream)},
+                         std::move(next)});
 
                   auto p = ptr.get();
                   // Capture server, not self, because after returning, there is
                   // no longer anything keeping the session alive
                   p->stream.async_accept(
                       p->request,
-                      [ptr = std::move(ptr), &server = self.server](const std::error_code& ec)
+                      [ptr = std::move(ptr)](const std::error_code& ec)
                       {
                          if (!ec)
                          {
@@ -566,7 +667,7 @@ namespace psibase::http
                             if constexpr (std::is_same_v<decltype(self.derived_session().stream),
                                                          beast::tcp_stream>)
                             {
-                               server.http_config->accept_p2p_websocket(std::move(ptr->stream));
+                               ptr->next(std::move(ptr->stream));
                             }
                          }
                       });
@@ -574,7 +675,8 @@ namespace psibase::http
             };
 
             // Allocate and store the work
-            items.push_back(boost::make_unique<work_impl>(self, std::move(msg)));
+            items.push_back(
+                boost::make_unique<work_impl>(self, std::move(msg), std::forward<F>(f)));
 
             // If there was no previous work, start this one
             if (items.size() == 1)
