@@ -25,6 +25,7 @@ cargo = "0.64"
 clap = {version = "3.1", features = ["derive"]}
 futures = "0.3"
 indicatif = "0.17"
+parity-wasm = "0.45"
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
 secp256k1 = { version="0.22", features = ["global-context", "bitcoin_hashes"] }
 tokio = { version = "1", features = ["full"] }
