@@ -352,6 +352,14 @@ fn add_startup_trx(
         account!("r-tok-sys"),
     );
 
+    let mut psispace_sys_files = vec![];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/PsiSpaceSys/ui/dist"),
+        &mut psispace_sys_files,
+        account!("psispace-sys"),
+        account!("psispace-sys"),
+    );
+
     let mut doc_actions = vec![
         new_account_action(account!("account-sys"), account!("doc-sys")), //
     ];
@@ -402,6 +410,7 @@ fn add_startup_trx(
     actions.append(&mut auth_ec_sys_files);
     actions.append(&mut explore_sys_files);
     actions.append(&mut token_sys_files);
+    actions.append(&mut psispace_sys_files);
     actions.append(&mut doc_actions);
     actions.append(&mut create_and_fund_example_users);
 
