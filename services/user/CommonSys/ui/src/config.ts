@@ -50,6 +50,16 @@ export const applets: AppletEntry[] = [
         DesktopIcon: IconWalletDesktop,
         requiresUser: true,
     },
+    {
+        title: "PsiSpace",
+        description:
+            "Upload files to your PsiSpace. Host static webpages! On the blockchain!",
+        service: "psispace-sys",
+        // TODO: requires a proper icon
+        MobileIcon: IconWalletMobile,
+        DesktopIcon: IconWalletDesktop,
+        requiresUser: true,
+    },
 ];
 
 export default { appletPrefix, applets, AppletStates };
