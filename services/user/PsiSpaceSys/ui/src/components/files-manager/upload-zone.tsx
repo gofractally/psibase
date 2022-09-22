@@ -25,16 +25,6 @@ export const UploadZone = ({
     const [isUploading, setIsUploading] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
-    const [pageInfo, setPageInfo] = useState<any>({});
-
-    // TODO: extract to a proper global hook/context
-    useEffectOnce(() => {
-        if (window.parentIFrame) {
-            window.parentIFrame.getPageInfo((info: any) => {
-                setPageInfo(info);
-            });
-        }
-    }, []);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         setSuccessMessage("");
@@ -83,18 +73,9 @@ export const UploadZone = ({
 
     const dropZoneHeight = 60;
     const filesBoxHeight = 430;
-    const bottomPadding = 28;
-
-    const top = pageInfo.clientHeight
-        ? pageInfo.clientHeight +
-          pageInfo.scrollTop -
-          pageInfo.offsetTop -
-          (displayControls ? filesBoxHeight : dropZoneHeight) -
-          bottomPadding
-        : 240;
 
     return (
-        <div className="absolute right-2 bg-white" style={{ top }}>
+        <div className="fixed right-2 bottom-8 bg-white">
             {!displayControls ? (
                 <div style={{ height: dropZoneHeight }} {...getRootProps()}>
                     <input {...getInputProps()} />
