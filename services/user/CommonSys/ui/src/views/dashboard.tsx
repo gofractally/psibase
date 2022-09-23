@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 import { AppletEntry, appletPrefix, applets } from "../config";
-import { Heading } from "../components";
+import { Heading, Text } from "../components";
 
 export const Dashboard = ({ currentUser }: { currentUser: string }) => {
     useEffect(() => {
@@ -10,7 +10,19 @@ export const Dashboard = ({ currentUser }: { currentUser: string }) => {
 
     return (
         <div className="mx-auto max-w-screen-xl p-2 sm:px-8">
-            <Heading tag="h1" className="text-gray-600">
+            <section className="mb-4 select-none rounded bg-gray-100 px-5 pt-4 pb-5">
+                <Heading tag="h2" styledAs="h5" className="text-gray-600">
+                    <span className="hidden md:inline">Welcome to the </span>
+                    Psibase Technical Preview
+                </Heading>
+                <p className="mb-0 text-sm leading-snug sm:text-base">
+                    This interface and all the applets below are hosted on and
+                    served directly from the Psibase Technical Preview
+                    blockchain. This is a prototype under active development and
+                    will change as we continue adding and improving features.
+                </p>
+            </section>
+            <Heading tag="h1" className="select-none text-gray-600">
                 Featured applets
             </Heading>
             <div
