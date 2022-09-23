@@ -73,7 +73,7 @@ function App() {
 
 
     return (
-        <div className="ui container p-4">
+        <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
             <div className="flex gap-2">
                 <img src={appAccountIcon} />
                 <Heading tag="h1" className="text-gray-600">
