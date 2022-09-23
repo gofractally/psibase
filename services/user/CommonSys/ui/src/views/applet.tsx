@@ -69,10 +69,14 @@ export const Applet = ({ applet, handleMessage }: Props) => {
                         // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
                         // log: true,
                         checkOrigin: true,
-                        heightCalculationMethod: "lowestElement",
+                        autoResize: false,
+                        scrolling: true,
                         onMessage: doHandleMessage,
                         onInit,
                         minHeight:
+                            document.documentElement.scrollHeight -
+                            iFrame.getBoundingClientRect().top,
+                        maxHeight:
                             document.documentElement.scrollHeight -
                             iFrame.getBoundingClientRect().top,
                     },
