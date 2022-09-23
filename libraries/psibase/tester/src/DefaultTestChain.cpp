@@ -296,6 +296,10 @@ void DefaultTestChain::registerSysRpc()
                           readWholeFile(comDir + "/ui/dist/app-wallet-desktop.svg")),
        rpcCommon.storeSys("/app-wallet-mobile.svg", svg,
                           readWholeFile(comDir + "/ui/dist/app-wallet-mobile.svg")),
+       rpcCommon.storeSys("/app-psispace-mobile.svg", svg,
+                          readWholeFile(comDir + "/ui/dist/app-psispace-mobile.svg")),
+       rpcCommon.storeSys("/app-psispace-mobile.svg", svg,
+                          readWholeFile(comDir + "/ui/dist/app-psispace-mobile.svg")),
 
        // CommonSys Basic UI
        //    rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/vanilla/index.html")),
