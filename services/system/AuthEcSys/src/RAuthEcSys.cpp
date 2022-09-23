@@ -74,20 +74,20 @@ namespace SystemService
 
             return to_json(auths);
          }
-      }
 
-      if (request.target.starts_with("/account"))
-      {
-         auto accountParam = request.target.substr(string("/account/").size());
+         if (request.target.starts_with("/account"))
+         {
+            auto accountParam = request.target.substr(string("/account/").size());
 
-         check(accountParam.find('/') == string::npos, "invalid account name: " + accountParam);
+            check(accountParam.find('/') == string::npos, "invalid account name: " + accountParam);
 
-         psibase::AccountNumber acc{accountParam};
+            psibase::AccountNumber acc{accountParam};
 
-         AuthEcSys::Tables db{AuthEcSys::service};
-         auto account = db.open<AuthEcSys::AuthTable>().getIndex<0>().get(acc);
+            AuthEcSys::Tables db{AuthEcSys::service};
+            auto account = db.open<AuthEcSys::AuthTable>().getIndex<0>().get(acc);
 
-         return to_json(account.value_or(SystemService::AuthRecord()));
+            return to_json(account.value_or(SystemService::AuthRecord()));
+         }
       }
 
       return std::nullopt;
