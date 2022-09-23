@@ -489,7 +489,7 @@ namespace psibase::loggers
          {
             throw std::system_error{errno, std::generic_category()};
          }
-         hostname[HOST_NAME_MAX + 1] = '\0';
+         hostname[HOST_NAME_MAX] = '\0';
          core->add_global_attribute("Host",
                                     boost::log::attributes::constant(std::string(hostname)));
 

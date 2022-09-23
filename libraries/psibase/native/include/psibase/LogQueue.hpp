@@ -37,6 +37,7 @@ namespace psibase::loggers
       void async_read(F&& f)
       {
          std::unique_lock l{mutex};
+         assert(!data.empty());
          data.pop_front();
          if (!data.empty())
          {
@@ -47,8 +48,6 @@ namespace psibase::loggers
                 [this, f = std::move(f), &current]()
                 {
                    f(std::error_code(), std::span<const char>{current.data(), current.size()});
-                   std::lock_guard l{mutex};
-                   data.pop_front();
                 });
          }
          else
