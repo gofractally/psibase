@@ -5,6 +5,8 @@ import IconExploreDesktop from "./images/app-explore-desktop.svg";
 import IconExploreMobile from "./images/app-explore-mobile.svg";
 import IconWalletDesktop from "./images/app-wallet-desktop.svg";
 import IconWalletMobile from "./images/app-wallet-mobile.svg";
+import IconPsispaceDesktop from "./images/app-psispace-desktop.svg";
+import IconPsispaceMobile from "./images/app-psispace-mobile.svg";
 
 export const appletPrefix = "/applet/";
 
@@ -48,6 +50,15 @@ export const applets: AppletEntry[] = [
         service: "token-sys",
         MobileIcon: IconWalletMobile,
         DesktopIcon: IconWalletDesktop,
+        requiresUser: true,
+    },
+    {
+        title: "PsiSpace",
+        description:
+            "Upload files to your PsiSpace. Host static webpages! On the blockchain!",
+        service: "psispace-sys",
+        MobileIcon: IconPsispaceMobile,
+        DesktopIcon: IconPsispaceDesktop,
         requiresUser: true,
     },
 ];
