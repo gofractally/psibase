@@ -9,7 +9,7 @@ export const Dashboard = ({ currentUser }: { currentUser: string }) => {
     }, []);
 
     return (
-        <div className="p-2 sm:px-8">
+        <div className="mx-auto max-w-screen-xl p-2 sm:px-8">
             <Heading tag="h1" className="text-gray-600">
                 Featured applets
             </Heading>

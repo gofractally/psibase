@@ -9,7 +9,7 @@ const App = () => {
         useApplets();
 
     return (
-        <div className="mx-auto max-w-screen-xl">
+        <div>
             <Nav currentUser={currentUser} />
             <BrowserRouter>
                 <div>

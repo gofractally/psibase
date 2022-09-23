@@ -110,7 +110,7 @@ function App() {
     };
 
     return (
-        <div className="space-y-4 p-2 sm:px-8">
+        <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
             <div className="flex items-center gap-2">
                 <WalletIcon />
                 <Heading tag="h1" className="select-none text-gray-600">

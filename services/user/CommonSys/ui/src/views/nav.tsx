@@ -25,7 +25,7 @@ export const Nav = ({ currentUser }: { currentUser: string }) => {
     }, []);
 
     return (
-        <header className="flex items-center justify-between p-2 sm:px-8">
+        <header className="mx-auto flex max-w-screen-xl items-center justify-between p-2 sm:px-8">
             <a href={commonSysUrl}>
                 <PsibaseLogo />
             </a>
