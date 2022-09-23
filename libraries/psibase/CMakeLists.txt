@@ -149,7 +149,7 @@ function(add suffix)
     endif()
 
     if(DEFINED IS_NATIVE)
-        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem log)
+        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem log_setup log)
 
         # FindBoost.cmake gets the library order wrong for Boost.Log
         target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 -Wl,--start-group ${Boost_LIBRARIES} -Wl,--end-group)
