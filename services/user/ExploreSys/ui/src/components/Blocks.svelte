@@ -24,7 +24,10 @@
         {#each blocks as block}
             <tr
                 on:click={onClick(block)}
-                class={classNames({clickable})}
+                class={classNames(
+                    {clickable},
+                    {"text-gray-400": block.transactions.length === 0 && blocks.length > 1}
+                )}
             >
                 <td class="w-20">{block.header.blockNum}</td>
                 <td class="w-16 whitespace-nowrap"

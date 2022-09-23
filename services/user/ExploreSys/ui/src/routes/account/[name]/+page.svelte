@@ -22,7 +22,6 @@
         try {
             const account = $page.params.name;
             const result = await loadTransferHistory(account);
-            console.log("loadTransferHistory", result);
             const history = result.data.holderEvents.edges.map(
                 (e) => e.node
             );
@@ -50,7 +49,6 @@
             };
         }
         catch(error) {
-            console.log("eeerrror", error);
             data = { error };
         }
     });

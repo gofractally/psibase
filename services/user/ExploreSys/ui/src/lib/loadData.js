@@ -1,3 +1,4 @@
+import { getJson } from "/common/rpc.mjs?client";
 import {
     useGraphQLPagedQuery,
     useGraphQLQuery,
@@ -139,4 +140,21 @@ export async function loadTransferHistory(user) {
     const url = `${window.location.protocol}//${host}/graphql`;
     const result = await useGraphQLQuery(url, query);
     return result;
+}
+
+export async function getAccountsByKey(pubKey) {
+    try {
+        const host = window.location.host.replace(
+            "explore-sys.",
+            "auth-ec-sys."
+        );
+        const url = `${window.location.protocol}//${host}/accwithkey/${pubKey}`;
+        const result = await getJson(url);
+        return result;
+    } catch (error) {
+        console.error("Error in getAccountsByKey :", error);
+        return {
+            error,
+        };
+    }
 }
