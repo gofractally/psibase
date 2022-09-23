@@ -26,7 +26,7 @@
                 on:click={onClick(block)}
                 class={classNames(
                     {clickable},
-                    {"text-gray-400": block.transactions.length === 0 && blocks.length > 1}
+                    {"text-gray-500": block.transactions.length === 0 && blocks.length > 1}
                 )}
             >
                 <td class="w-20">{block.header.blockNum}</td>
