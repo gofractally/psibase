@@ -116,9 +116,9 @@ export async function loadBlockData(blockNum) {
     }
 }
 
-function queryTransferHistory(holder) {
+function queryTransferHistory(account) {
     return `{
-      holderEvents(holder: "${holder}") {
+      holderEvents(holder: "${account}") {
         pageInfo {
           hasNextPage
           endCursor
@@ -134,8 +134,8 @@ function queryTransferHistory(holder) {
     }`;
 }
 
-export async function loadTransferHistory(user) {
-    const query = queryTransferHistory(user);
+export async function loadTransferHistory(account) {
+    const query = queryTransferHistory(account);
     const host = window.location.host.replace("explore-sys.", "token-sys.");
     const url = `${window.location.protocol}//${host}/graphql`;
     const result = await useGraphQLQuery(url, query);
@@ -153,6 +153,23 @@ export async function getAccountsByKey(pubKey) {
         return result;
     } catch (error) {
         console.error("Error in getAccountsByKey :", error);
+        return {
+            error,
+        };
+    }
+}
+
+export async function getPubKeyByAccountName(account) {
+    try {
+        const host = window.location.host.replace(
+            "explore-sys.",
+            "auth-ec-sys."
+        );
+        const url = `${window.location.protocol}//${host}/account/${account}`;
+        const result = await getJson(url);
+        return result;
+    } catch (error) {
+        console.error("Error in getPubKeyByAccountName :", error);
         return {
             error,
         };
