@@ -1,0 +1,13 @@
+[package]
+name = "cargo-psibase"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+binaryen = "0.12"
+cargo = "0.64"
+parity-wasm = "0.45"
+
+[build-dependencies]
+binaryen = "0.12"
