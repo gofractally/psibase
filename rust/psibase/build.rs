@@ -2,7 +2,7 @@ use binaryen::{CodegenConfig, Module};
 use std::{
     env,
     fs::{read, write},
-    process::Command,
+    process::{exit, Command},
 };
 
 fn main() {
@@ -15,18 +15,22 @@ fn main() {
     }
 
     let build = |name| {
+        println!("cargo:rerun-if-changed={}", name);
+
         let target_dir = out_dir.clone() + "/" + name + "-target";
-        Command::new(&cargo)
-            .arg("build")
-            .arg("--target")
-            .arg("wasm32-wasi")
-            .arg("--target-dir")
-            .arg(&target_dir)
-            .arg("--manifest-path")
-            .arg(name.to_owned() + "/Cargo.toml")
-            .arg("--release")
+        if !Command::new(&cargo)
+            .args(["build"])
+            .args(["--color", "always"])
+            .args(["--target", "wasm32-wasi"])
+            .args(["--target-dir", &target_dir])
+            .args(["--manifest-path", &(name.to_owned() + "/Cargo.toml")])
+            .args(["--release"])
             .status()
-            .unwrap();
+            .unwrap()
+            .success()
+        {
+            exit(1);
+        }
 
         let code = read(target_dir + "/wasm32-wasi/release/" + name + ".wasm").unwrap();
         let mut module = Module::read(&code).unwrap();
