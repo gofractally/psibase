@@ -1,26 +1,17 @@
 use anyhow::{anyhow, Context};
 use binaryen::{CodegenConfig, Module};
-use cargo::{
-    core::{
-        compiler::{CompileKind, CompileTarget},
-        Workspace,
-    },
-    ops::{compile, CompileOptions},
-    util::{command_prelude::CompileMode, interning::InternedString},
-    Config,
+use cargo::core::compiler::{CompileKind, CompileTarget};
+use cargo::core::Workspace;
+use cargo::ops::{compile, CompileOptions};
+use cargo::util::{command_prelude::CompileMode, interning::InternedString};
+use cargo::Config;
+use parity_wasm::deserialize_buffer;
+use parity_wasm::elements::{
+    External, Func, FuncBody, ImportEntry, Instruction, Internal, Section, TableElementType, Type,
 };
-use parity_wasm::{
-    deserialize_buffer,
-    elements::{
-        External, Func, FuncBody, ImportEntry, Instruction, Internal, Section, TableElementType,
-        Type,
-    },
-};
-use std::{
-    collections::HashMap,
-    fs::{canonicalize, read, write},
-    path::Path,
-};
+use std::collections::HashMap;
+use std::fs::{canonicalize, read, write};
+use std::path::Path;
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
@@ -387,8 +378,6 @@ fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow
         &mut new_functions,
         &mut new_bodies,
     )?;
-
-    old_to_new_fn.len(); // !!!
 
     // Remove all custom sections; psibase doesn't need them
     // and this is easier than translating them.
