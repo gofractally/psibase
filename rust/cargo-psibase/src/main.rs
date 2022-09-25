@@ -312,7 +312,6 @@ fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow
     )?;
 
     let mut poly_old_to_new_fn = vec![None; poly_num_functions];
-    let mut poly_old_to_new_type = HashMap::new();
     for item in old_to_new_fn.iter_mut().flatten() {
         if let OldToNewFn::Import(import) = item {
             if import.module == "wasi_snapshot_preview1" {
@@ -326,7 +325,7 @@ fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow
                                 &mut poly_old_to_new_fn,
                                 &poly_old_types,
                                 &mut new_types,
-                                &mut poly_old_to_new_type,
+                                &mut type_map,
                                 *export_fn as usize,
                             )?;
                             *item = poly_old_to_new_fn[*export_fn as usize].clone().unwrap();
@@ -486,9 +485,13 @@ fn main() -> Result<(), anyhow::Error> {
     let mut options = CompileOptions::new(&config, CompileMode::Build)?;
     options.build_config.requested_kinds =
         vec![CompileKind::Target(CompileTarget::new("wasm32-wasi")?)];
+    // options.build_config.mode = CompileMode::Test;
     options.build_config.requested_profile = InternedString::new("release");
     let compilation = compile(&workspace, &options)?;
     println!();
+    for output in compilation.tests.iter() {
+        process(&output.path, TESTER_POLYFILL)?
+    }
     for output in compilation.binaries.iter() {
         process(&output.path, TESTER_POLYFILL)?
     }
