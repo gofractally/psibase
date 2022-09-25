@@ -4,21 +4,21 @@
 #include <psibase/Service.hpp>
 #include <string_view>
 
-namespace ExchangeSys
+namespace __contract__
 {
-   class ExchangeService : public psibase::Service<ExchangeService>
+   class __contract__Service : public psibase::Service<__contract__Service>
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("exchange-sys");
+      static constexpr auto service = psibase::AccountNumber("__contract__(kebabCase)");
 
       // This action allows the storage_payer account to create an account owner with zero token balance at the expense of ram_payer for specified token ID
       void stub();
    };
 
    // clang-format off
-   PSIO_REFLECT(ExchangeService, 
+   PSIO_REFLECT(__contract__Service, 
       method(stub)
    );
    // clang-format on
 
-}  // namespace ExchangeSys
+}  // namespace __contract__

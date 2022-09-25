@@ -12,7 +12,7 @@ generateTemplateFiles([
             path: '../services/user/__contract__/ui',
             pathAndFileNameDefaultCase: '(pascalCase)',
         },
-        onComplete: console.log
+        onComplete: (data) => { console.log(`Success! \nTo get started.. \n \ncd ${data.output.path}`) }
     },
     {
         option: "Contract",
@@ -25,6 +25,6 @@ generateTemplateFiles([
             path: '../services/user/__contract__',
             pathAndFileNameDefaultCase: '(pascalCase)',
         },
-        onComplete: console.log
+        onComplete: (data) => { console.log(`Success! \nTo get started.. \n \ncd ${data.output.path}`) }
     }
 ])

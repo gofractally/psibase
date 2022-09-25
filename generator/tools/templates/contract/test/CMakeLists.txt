@@ -1,3 +1,3 @@
-add_user_test_debug(ExchangeSys src/ExchangeSys-test.cpp)
+add_user_test_debug(__contract__ src/__contract__-test.cpp)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
