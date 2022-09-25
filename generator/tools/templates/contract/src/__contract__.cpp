@@ -1,5 +1,5 @@
 #include <psibase/dispatch.hpp>
-#include <services/user/__contract__.hpp>
+#include "../include/services/user/__contract__.hpp"
 
 using namespace __contract__;
 using namespace psibase;
