@@ -9,3 +9,9 @@ members = [
     "test_contract",
     "test_fracpack",
 ]
+
+[workspace.package]
+version = "0.1.0"
+rust-version = "1.64"
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"

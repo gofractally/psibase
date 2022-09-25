@@ -1,6 +1,9 @@
 [package]
 name = "cargo-psibase"
-version = "0.1.0"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition = "2021"
 
 [dependencies]
