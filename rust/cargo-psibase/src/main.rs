@@ -86,24 +86,22 @@ fn mark_function(
     } else {
         let adj_index = index - imported_fns.len();
         let functions = module.function_section().unwrap().entries();
-        if adj_index >= functions.len() {
+        let code = module.code_section().unwrap().bodies();
+        if adj_index >= functions.len() || adj_index >= code.len() {
             return Err(anyhow!("Function index out of bounds"));
         }
-        let code = module.code_section().unwrap().bodies();
         let ty = &old_types[functions[adj_index].type_ref() as usize];
+        let body = &code[adj_index];
 
         old_to_new_fn[index] = Some(OldToNewFn::Fn {
             ty: ty.clone(),
-            body: code[adj_index].clone(),
+            body: body.clone(),
             new_index: *num_new_functions,
         });
         *num_new_functions += 1;
 
         mark_type(new_types, type_map, ty);
-        if adj_index >= code.len() {
-            return Err(anyhow!("Function index out of bounds"));
-        }
-        for instruction in code[adj_index].code().elements() {
+        for instruction in body.code().elements() {
             if let Instruction::Call(index) = instruction {
                 mark_function(
                     module,
@@ -177,6 +175,7 @@ fn mark_functions(
 
 fn fill_functions(
     is_poly: bool,
+    old_types: &[Type],
     type_map: &HashMap<Type, usize>,
     old_to_new_fn: &[Option<OldToNewFn>],
     new_imports: &[ImportEntry],
@@ -203,10 +202,11 @@ fn fill_functions(
                         OldToNewFn::Import(_) => panic!("unresolved import"),
                         OldToNewFn::ResolvedImport(i) => *f = *i as u32,
                     },
-                    Instruction::CallIndirect(_, _) => {
+                    Instruction::CallIndirect(ty, _) => {
                         if is_poly {
                             return Err(anyhow!("polyfill has an indirect call"));
                         }
+                        *ty = *type_map.get(&old_types[*ty as usize]).unwrap() as u32;
                     }
                     Instruction::GetGlobal(_) => {
                         if is_poly {
@@ -364,6 +364,7 @@ fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow
     let mut new_bodies = vec![None; num_new_functions];
     fill_functions(
         false,
+        &old_types,
         &type_map,
         &old_to_new_fn,
         &new_imports,
@@ -372,12 +373,27 @@ fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow
     )?;
     fill_functions(
         true,
+        &poly_old_types,
         &type_map,
         &poly_old_to_new_fn,
         &new_imports,
         &mut new_functions,
         &mut new_bodies,
     )?;
+
+    // for (i, item) in old_to_new_fn.iter().enumerate() {
+    //     if let Some(item) = item {
+    //         match item {
+    //             OldToNewFn::Fn {
+    //                 ty: _,
+    //                 body: _,
+    //                 new_index,
+    //             } => println!("func {} -> {}", i, new_imports.len() + new_index),
+    //             OldToNewFn::Import(_) => todo!(),
+    //             OldToNewFn::ResolvedImport(f) => println!("imp  {} -> {}", i, f),
+    //         }
+    //     }
+    // }
 
     // Remove all custom sections; psibase doesn't need them
     // and this is easier than translating them.
@@ -442,20 +458,21 @@ fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow
 }
 
 fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    println!("optimizing {}", filename.to_string_lossy());
+    // println!("optimizing {}", filename.to_string_lossy());
     let mut module = Module::read(code)
         .map_err(|_| anyhow!("Binaryen failed to parse {}", filename.to_string_lossy()))?;
-    println!("before optimize: {}", module.write().len());
+    // println!("before optimize: {}", module.write().len());
     module.optimize(&CodegenConfig {
         shrink_level: 1,
         optimization_level: 2,
         debug_info: false,
     });
-    println!("after optimize: {}", module.write().len());
+    // println!("after optimize: {}", module.write().len());
     Ok(module.write())
 }
 
 fn process(filename: &Path, polyfill: &[u8]) -> Result<(), anyhow::Error> {
+    println!("{}", filename.to_string_lossy());
     let code = &read(filename)
         .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
     let code = link(filename, code, polyfill)?;
@@ -471,6 +488,7 @@ fn main() -> Result<(), anyhow::Error> {
         vec![CompileKind::Target(CompileTarget::new("wasm32-wasi")?)];
     options.build_config.requested_profile = InternedString::new("release");
     let compilation = compile(&workspace, &options)?;
+    println!();
     for output in compilation.binaries.iter() {
         process(&output.path, TESTER_POLYFILL)?
     }
