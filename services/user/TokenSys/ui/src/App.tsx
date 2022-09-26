@@ -109,6 +109,20 @@ function App() {
         setTokens(updatedTokens);
     };
 
+    const tokensOptions = 
+        tokens && tokens.length > 0 ?
+            tokens?.map((t) => (
+                <option value={t.symbol} key={t.symbol}>
+                    {String(t.symbol || t.token).toUpperCase()}{" "}
+                    - balance: {getParsedBalanceFromToken(t)}
+                </option>
+            ))
+        : (
+                <option key="no-tokens" disabled>
+                    No tokens
+                </option>
+        );
+
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
             <div className="flex items-center gap-2">
@@ -141,12 +155,7 @@ function App() {
                             })}
                             errorText={errors.token?.message}
                         >
-                            {tokens?.map((t) => (
-                                <option value={t.symbol} key={t.symbol}>
-                                    {String(t.symbol || t.token).toUpperCase()}{" "}
-                                    - balance: {getParsedBalanceFromToken(t)}
-                                </option>
-                            ))}
+                            {tokensOptions}
                         </Form.Select>
                     </div>
                     <div className="flex-1">
