@@ -1,13 +1,16 @@
 [package]
-name = "psibase_names"
+name = "cargo-psibase"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 edition = "2021"
-publish = false
-description = "Psibase name conversion functions"
-license = "MIT"
 
 [dependencies]
-seahash = "2.0.0"
+anyhow = "1.0"
+binaryen = "0.12"
+cargo = "0.65"
+parity-wasm = "0.45"
+
+[build-dependencies]
+binaryen = "0.12"

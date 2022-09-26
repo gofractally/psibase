@@ -111,12 +111,9 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
         }
 
         #[no_mangle]
-        pub extern "C" fn start(this_contract: u64) {
-            unsafe {
-                __wasm_call_ctors();
-            }
+        pub unsafe extern "C" fn start(this_contract: u64) {
+            __wasm_call_ctors();
         }
-
     } // quote!
     .into()
 } // process_mod
