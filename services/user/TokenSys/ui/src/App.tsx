@@ -122,8 +122,6 @@ function App() {
                     No tokens
                 </option>
         );
-   
-    console.log("tokens:", tokens);
 
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
