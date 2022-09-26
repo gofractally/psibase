@@ -1,5 +1,8 @@
 use std::ptr::null_mut;
-use wasi::{Ciovec, Exitcode, Fd, Fdflags, Iovec, Lookupflags, Oflags, Rights, Size, ERRNO_BADF};
+use wasi::{
+    Ciovec, Exitcode, Fd, Fdflags, Filedelta, Filesize, Filestat, Iovec, Lookupflags, Oflags,
+    Prestat, Rights, Size, ERRNO_BADF, ERRNO_INVAL, PREOPENTYPE_DIR,
+};
 
 type Errno = u16;
 
@@ -7,8 +10,8 @@ const POLYFILL_ROOT_DIR_FD: u32 = 3;
 
 extern "C" {
     fn testerExit(rval: u32) -> !;
-    fn testerGetArgCounts(argc: *mut Size, argv_buf_size: *mut Size) -> Errno;
-    fn testerGetArgs(argv: *mut *mut u8, argv_buf: *mut u8) -> Errno;
+    fn testerGetArgCounts(argc: *mut Size, argv_buf_size: *mut Size);
+    fn testerGetArgs(argv: *mut *mut u8, argv_buf: *mut u8);
     fn testerClockTimeGet(id: u32, precision: u64, time: *mut u64) -> Errno;
     fn testerOpenFile(
         path: *const u8,
@@ -20,11 +23,17 @@ extern "C" {
     ) -> Errno;
     fn testerReadFile(fd: u32, data: *mut u8, size: Size, bytes_read: *mut Size) -> Errno;
     fn testerWriteFile(fd: u32, content: *const u8, content_len: Size) -> Errno;
+    fn testerCloseFile(fd: Fd) -> Errno;
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn proc_exit(rval: Exitcode) -> ! {
     testerExit(rval)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn sched_yield() -> Errno {
+    0
 }
 
 #[no_mangle]
@@ -41,17 +50,56 @@ pub unsafe extern "C" fn environ_get(_environ: *mut *mut u8, _environ_buf: *mut 
 
 #[no_mangle]
 pub unsafe extern "C" fn args_sizes_get(argc: *mut Size, argv_buf_size: *mut Size) -> Errno {
-    testerGetArgCounts(argc, argv_buf_size)
+    testerGetArgCounts(argc, argv_buf_size);
+    0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn args_get(argv: *mut *mut u8, argv_buf: *mut u8) -> Errno {
-    testerGetArgs(argv, argv_buf)
+    testerGetArgs(argv, argv_buf);
+    0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn clock_time_get(id: u32, precision: u64, time: *mut u64) -> Errno {
     testerClockTimeGet(id, precision, time)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn random_get(buf: *mut u8, buf_len: Size) -> Errno {
+    ERRNO_INVAL.raw()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_prestat_get(fd: Fd, buf: *mut Prestat) -> Errno {
+    if fd == POLYFILL_ROOT_DIR_FD {
+        (*buf).tag = PREOPENTYPE_DIR.raw();
+        (*buf).u.dir.pr_name_len = 1; // strlen("/")
+        return 0;
+    }
+    ERRNO_BADF.raw()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_prestat_dir_name(fd: Fd, path: *mut u8, path_len: Size) -> Errno {
+    if fd == POLYFILL_ROOT_DIR_FD {
+        if path_len > 0 {
+            *path = b'/';
+        }
+        return 0;
+    }
+    ERRNO_BADF.raw()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn path_filestat_get(
+    fd: Fd,
+    flags: Lookupflags,
+    path: *const u8,
+    path_len: Size,
+    ret: *mut Filestat,
+) -> Errno {
+    ERRNO_INVAL.raw()
 }
 
 #[no_mangle]
@@ -70,6 +118,21 @@ pub unsafe extern "C" fn path_open(
         return ERRNO_BADF.raw();
     }
     testerOpenFile(path, path_len, oflags, fs_rights_base, fdflags, opened_fd)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_filestat_get(fd: Fd, retptr0: *mut Filestat) -> Errno {
+    ERRNO_INVAL.raw()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_seek(
+    fd: Fd,
+    offset: Filedelta,
+    whence: u8,
+    newoffset: *mut Filesize,
+) -> Errno {
+    ERRNO_INVAL.raw()
 }
 
 #[no_mangle]
@@ -129,4 +192,9 @@ pub unsafe extern "C" fn fd_write(
         iovs_len -= 1;
     }
     0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_close(fd: Fd) -> Errno {
+    testerCloseFile(fd)
 }

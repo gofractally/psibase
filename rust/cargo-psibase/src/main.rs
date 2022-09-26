@@ -328,7 +328,25 @@ fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow
                                 &mut type_map,
                                 *export_fn as usize,
                             )?;
-                            *item = poly_old_to_new_fn[*export_fn as usize].clone().unwrap();
+                            let new_item = poly_old_to_new_fn[*export_fn as usize].clone().unwrap();
+                            let new_ty = match &new_item {
+                                OldToNewFn::Fn {
+                                    ty,
+                                    body: _,
+                                    new_index: _,
+                                } => ty,
+                                OldToNewFn::Import(f) => &f.ty,
+                                OldToNewFn::ResolvedImport(_) => unimplemented!(),
+                            };
+                            if new_ty != &import.ty {
+                                return Err(anyhow!(
+                                    "mismatched polyfill type; {} {:?} {:?}",
+                                    import.field,
+                                    import.ty,
+                                    new_ty
+                                ));
+                            }
+                            *item = new_item;
                             break;
                         }
                     }
