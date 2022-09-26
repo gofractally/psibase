@@ -74,12 +74,15 @@ if(BUILD_DOC)
         BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
         INSTALL_COMMAND     ""
     )
+    configure_file(doc/psidk/book.toml.in doc/psidk/book.toml)
+    configure_file(doc/psidk/mermaid.min.js doc/psidk/mermaid.min.js COPYONLY)
+    configure_file(doc/psidk/mermaid-init.js doc/psidk/mermaid-init.js COPYONLY)
     ExternalProject_Add(
         ${DOC_DEP}
         DEPENDS             gen-cpp-doc
         SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk
         CONFIGURE_COMMAND   ""
-        BUILD_COMMAND       cd ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk && rm -rf ${CMAKE_CURRENT_BINARY_DIR}/book && mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book
+        BUILD_COMMAND       export WASI_SDK_PREFIX=${WASI_SDK_PREFIX} && cd ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk && rm -rf ${CMAKE_CURRENT_BINARY_DIR}/book && mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk
         INSTALL_COMMAND     ""
     )
 endif()

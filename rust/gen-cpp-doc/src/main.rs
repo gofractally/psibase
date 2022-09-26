@@ -13,6 +13,10 @@ use std::io;
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    #[clap(short = 's', long, value_name = "PATH")]
+    srcdir: Option<String>,
+    #[clap(short = 'b', long, value_name = "PATH")]
+    builddir: Option<String>,
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -694,6 +698,7 @@ fn dump(entity: &Entity, indent: usize) {
 fn parse<'tu>(
     index: &'tu clang::Index<'tu>,
     repo_path: &str,
+    build_path: &str,
 ) -> Result<TranslationUnit<'tu>, anyhow::Error> {
     let mut parser = index.parser(repo_path.to_owned() + "/doc/psidk/src/doc-root.cpp");
     let wasi_sdk_prefix = env::var("WASI_SDK_PREFIX")?;
@@ -712,8 +717,8 @@ fn parse<'tu>(
         &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include/c++/v1"),
         &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include"),
         &("-I".to_owned() + &wasi_sdk_prefix + "/lib/clang/13.0.0/include"),
-        &("-I".to_owned() + repo_path + "/build/wasm/boost"),
-        &("-I".to_owned() + repo_path + "/build/wasm/deps/include"),
+        &("-I".to_owned() + build_path + "/wasm/boost"),
+        &("-I".to_owned() + build_path + "/wasm/deps/include"),
         &("-I".to_owned() + repo_path + "/services/system/ProxySys/include"),
         &("-I".to_owned() + repo_path + "/services/system/TransactionSys/include"),
         &("-I".to_owned() + repo_path + "/services/user/CommonSys/include"),
@@ -785,11 +790,18 @@ fn main() -> Result<(), anyhow::Error> {
     let (ctx, mut book) = CmdPreprocessor::parse_input(io::stdin())?;
     let mut path = ctx.root;
     path.push("../..");
-    let repo_path = path.to_str().unwrap();
+    let repo_path = match args.srcdir {
+        Some(p) => p,
+        None => path.to_str().unwrap().to_owned(),
+    };
+    let build_path = match args.builddir {
+        Some(p) => p,
+        None => repo_path.to_owned() + "/build",
+    };
 
     let clang = clang::Clang::new().unwrap();
     let index = clang::Index::new(&clang, false, true);
-    let tu = parse(&index, repo_path)?;
+    let tu = parse(&index, &repo_path, &build_path)?;
     // dump(&tu.get_entity(), 0);
     let items = get_items(&tu);
     modify_book(&mut book, items);
