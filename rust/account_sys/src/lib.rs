@@ -1,7 +1,7 @@
 use psibase::*;
 use serde_json::json;
 
-#[contract(example_iface)]
+#[service]
 mod example_impl {
     use crate::*;
 

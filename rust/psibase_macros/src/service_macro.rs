@@ -3,19 +3,19 @@ use proc_macro2::Ident;
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
 use syn::{
-    parse, parse_macro_input, AttrStyle, Attribute, FnArg, Item, ItemFn, ItemMod, Pat, ReturnType,
-    Visibility,
+    parse_macro_input, parse_quote, AttrStyle, Attribute, FnArg, Item, ItemFn, ItemMod, Pat,
+    ReturnType, Visibility,
 };
 
-pub fn contract_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let iface_mod_name: Ident = parse(attr).unwrap_or_else(|_| {
-        panic!("missing interface module name. Try #[contract(contract_name)]")
-    });
+pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
+    if !attr.is_empty() {
+        panic!("service attribute should have no arguments")
+    }
     let item = parse_macro_input!(item as Item);
     match item {
-        Item::Mod(impl_mod) => process_mod(iface_mod_name, impl_mod),
+        Item::Mod(impl_mod) => process_mod(impl_mod),
         _ => {
-            abort!(item, "contract attribute may only be used on a module")
+            abort!(item, "service attribute may only be used on a module")
         }
     }
 }
@@ -30,14 +30,8 @@ fn is_action_attr(attr: &Attribute) -> bool {
 }
 
 // TODO: don't auto number actions
-fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
+fn process_mod(mut impl_mod: ItemMod) -> TokenStream {
     let impl_mod_name = &impl_mod.ident;
-    if iface_mod_name == *impl_mod_name {
-        abort!(
-            iface_mod_name,
-            "interface module name is same as implementation module name"
-        );
-    }
     let mut iface_use = proc_macro2::TokenStream::new();
     let mut action_structs = proc_macro2::TokenStream::new();
     let mut dispatch_body = proc_macro2::TokenStream::new();
@@ -68,6 +62,23 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
             }
         }
         add_unknown_action_check_to_dispatch_body(&mut dispatch_body);
+        items.push(parse_quote! {
+            #[automatically_derived]
+            #[allow(non_snake_case)]
+            #[allow(non_camel_case_types)]
+            #[allow(non_upper_case_globals)]
+            pub mod action_structs {
+                #iface_use
+                #action_structs
+            }
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            pub fn dispatch(act: psibase::SharedAction) -> fracpack::Result<()> {
+                #dispatch_body
+                Ok(())
+            }
+        });
     } else {
         abort!(
             impl_mod,
@@ -77,32 +88,12 @@ fn process_mod(iface_mod_name: Ident, mut impl_mod: ItemMod) -> TokenStream {
     let item_mod_stream = impl_mod.to_token_stream();
     quote! {
         #item_mod_stream
-        #[automatically_derived]
-        #[allow(non_snake_case)]
-        #[allow(non_camel_case_types)]
-        #[allow(non_upper_case_globals)]
-        pub mod #iface_mod_name {
-            use super::*;
-
-            pub mod actions {
-                #iface_use
-                use super::super::#impl_mod_name::*;
-                #action_structs
-            }
-
-            pub fn dispatch(act: SharedAction) -> fracpack::Result<()> {
-                // TODO: view instead of unpack
-                // TODO: sender
-                #dispatch_body
-                Ok(())
-            }
-        }
 
         #[no_mangle]
         pub extern "C" fn called(_this_contract: u64, _sender: u64) {
-            with_current_action(|act| {
-                #iface_mod_name::dispatch(act)
-                    .unwrap_or_else(|_| abort_message("unpack action data failed"));
+            psibase::with_current_action(|act| {
+                #impl_mod_name::dispatch(act)
+                    .unwrap_or_else(|_| psibase::abort_message("unpack action data failed"));
             });
         }
 
@@ -173,7 +164,7 @@ fn process_dispatch_body(
     let name = &f.sig.ident;
 
     let args_unpacking = if !invoke_args.is_empty() {
-        quote! { let args = <actions::#name as fracpack::Packable>::unpack(&act.raw_data, &mut 0)?; }
+        quote! { let args = <action_structs::#name as fracpack::Packable>::unpack(&act.raw_data, &mut 0)?; }
     } else {
         quote! {}
     };
@@ -185,11 +176,11 @@ fn process_dispatch_body(
     } else {
         quote! {
             let val = super::#impl_mod_name::#name(#invoke_args);
-            set_retval(&val);
+            psibase::set_retval(&val);
         }
     };
 
-    let method_comparison = quote! { act.method == MethodNumber::from(stringify!(#name)) };
+    let method_comparison = quote! { act.method == psibase::MethodNumber::from(stringify!(#name)) };
 
     let if_block = if dispatch_body.is_empty() {
         quote! { if }
@@ -211,7 +202,7 @@ fn add_unknown_action_check_to_dispatch_body(dispatch_body: &mut proc_macro2::To
         *dispatch_body = quote! {
             #dispatch_body
             else {
-                abort_message(&format!(
+                psibase::abort_message(&format!(
                     "unknown contract action: {}",
                     act.method.to_string()
                 ));

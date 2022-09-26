@@ -33,8 +33,8 @@ You don't need to manually make any changes to `Cargo.toml` to follow the exampl
 Replace the content of `lib.rs` with the following. This is our initial service:
 
 ```rust
-#[psibase::service(example)]
-mod example {
+#[psibase::service]
+pub mod service {
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {
         a + b
