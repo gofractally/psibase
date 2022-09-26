@@ -21,28 +21,28 @@
     onMount(async () => {
         try {
             const account = $page.params.name;
-            const result = await loadTransferHistory(account);
-            const history = result.data.holderEvents.edges.map(
-                (e) => e.node
-            );
-            // console.log("history", history);
-            const tokenTypesRes = await fetchTokenTypes();
-            // console.log("tokenTypesRes", tokenTypesRes);
-            const tokenTypes = tokenTypesRes.reduce(
-                (prev, token) => {
-                    prev[token.id] = {
-                        precision: token.precision.value,
-                        symbol: token.symbolId,
-                    };
-                    return prev;
-                },
-                {}
-            );
+            // const result = await loadTransferHistory(account);
+            // const history = result.data.holderEvents.edges.map(
+            //     (e) => e.node
+            // );
+            // // console.log("history", history);
+            // const tokenTypesRes = await fetchTokenTypes();
+            // // console.log("tokenTypesRes", tokenTypesRes);
+            // const tokenTypes = tokenTypesRes.reduce(
+            //     (prev, token) => {
+            //         prev[token.id] = {
+            //             precision: token.precision.value,
+            //             symbol: token.symbolId,
+            //         };
+            //         return prev;
+            //     },
+            //     {}
+            // );
             // console.log("tokenTypes", tokenTypes);
             const balances = await fetchBalances(account);
             // console.log("balances", balances);
             data = {
-                tokenTypes,
+                // tokenTypes,
                 account,
                 history,
                 balances,
@@ -77,7 +77,11 @@
         <h4 class="py-4">{data.account}</h4>
         <div class="flex gap-12 place-content-between">
             <div>
-                <h6>Balances</h6>
+                {#if data.balances.length > 0}
+                    <h6>Balances</h6>
+                {:else}
+                    <p>No token balances</p>
+                {/if}
                 {#each data.balances as b}
                     <div class="pb-4">
                         <Amount value={b.balance} precision={b.precision} symbol={b.symbol} />
@@ -87,10 +91,10 @@
             {#if data.pubkey}
                 <div class="justify-self-center">
                     <h6 class="text-right">Public Key</h6>
-                    <p>{data.pubkey}</p>
+                    <p class="font-mono text-gray-600">{data.pubkey}</p>
                 </div>
             {/if}
         </div>
-        <AccountHistory data={data} />
+        <!-- <AccountHistory data={data} />-->
     {/if}
 </div>
