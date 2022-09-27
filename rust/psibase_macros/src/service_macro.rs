@@ -1,5 +1,4 @@
 use proc_macro::TokenStream;
-use proc_macro2::Ident;
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
 use syn::{
@@ -31,7 +30,6 @@ fn is_action_attr(attr: &Attribute) -> bool {
 
 // TODO: don't auto number actions
 fn process_mod(mut impl_mod: ItemMod) -> TokenStream {
-    let impl_mod_name = &impl_mod.ident;
     let mut iface_use = proc_macro2::TokenStream::new();
     let mut action_structs = proc_macro2::TokenStream::new();
     let mut dispatch_body = proc_macro2::TokenStream::new();
@@ -55,7 +53,7 @@ fn process_mod(mut impl_mod: ItemMod) -> TokenStream {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 process_action_args(f, &mut action_structs, &mut invoke_args);
-                process_dispatch_body(f, &mut dispatch_body, impl_mod_name, invoke_args);
+                process_dispatch_body(f, &mut dispatch_body, invoke_args);
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
                     f.attrs.remove(i);
                 }
@@ -74,9 +72,28 @@ fn process_mod(mut impl_mod: ItemMod) -> TokenStream {
         });
         items.push(parse_quote! {
             #[automatically_derived]
-            pub fn dispatch(act: psibase::SharedAction) -> fracpack::Result<()> {
-                #dispatch_body
-                Ok(())
+            pub mod wasm_interface {
+                pub fn dispatch(act: psibase::SharedAction) -> psibase::fracpack::Result<()> {
+                    #dispatch_body
+                    Ok(())
+                }
+
+                #[no_mangle]
+                pub extern "C" fn called(_this_contract: u64, _sender: u64) {
+                    psibase::with_current_action(|act| {
+                        dispatch(act)
+                            .unwrap_or_else(|_| psibase::abort_message("unpack action data failed"));
+                    });
+                }
+
+                extern "C" {
+                    fn __wasm_call_ctors();
+                }
+
+                #[no_mangle]
+                pub unsafe extern "C" fn start(this_contract: u64) {
+                    __wasm_call_ctors();
+                }
             }
         });
     } else {
@@ -85,28 +102,7 @@ fn process_mod(mut impl_mod: ItemMod) -> TokenStream {
             "#[psibase::contract] module must have inline contents"
         )
     }
-    let item_mod_stream = impl_mod.to_token_stream();
-    quote! {
-        #item_mod_stream
-
-        #[no_mangle]
-        pub extern "C" fn called(_this_contract: u64, _sender: u64) {
-            psibase::with_current_action(|act| {
-                #impl_mod_name::dispatch(act)
-                    .unwrap_or_else(|_| psibase::abort_message("unpack action data failed"));
-            });
-        }
-
-        extern "C" {
-            fn __wasm_call_ctors();
-        }
-
-        #[no_mangle]
-        pub unsafe extern "C" fn start(this_contract: u64) {
-            __wasm_call_ctors();
-        }
-    } // quote!
-    .into()
+    impl_mod.to_token_stream().into()
 } // process_mod
 
 fn process_action_args(
@@ -158,24 +154,23 @@ fn process_action_args(
 fn process_dispatch_body(
     f: &ItemFn,
     dispatch_body: &mut proc_macro2::TokenStream,
-    impl_mod_name: &Ident,
     invoke_args: proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
 
     let args_unpacking = if !invoke_args.is_empty() {
-        quote! { let args = <action_structs::#name as fracpack::Packable>::unpack(&act.raw_data, &mut 0)?; }
+        quote! { let args = <super::action_structs::#name as psibase::fracpack::Packable>::unpack(&act.raw_data, &mut 0)?; }
     } else {
         quote! {}
     };
 
     let action_invoking = if f.sig.output == ReturnType::Default {
         quote! {
-            super::#impl_mod_name::#name(#invoke_args);
+            super::#name(#invoke_args);
         }
     } else {
         quote! {
-            let val = super::#impl_mod_name::#name(#invoke_args);
+            let val = super::#name(#invoke_args);
             psibase::set_retval(&val);
         }
     };
