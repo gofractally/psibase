@@ -58,6 +58,7 @@ function App() {
         register,
         handleSubmit,
         formState: { errors },
+        setError,
         reset,
     } = useForm<TransferInputs>({
         defaultValues: {
@@ -76,8 +77,16 @@ function App() {
             await transfer(data);
             reset();
         } catch (e) {
-            console.error("TRANSFER ERROR", e);
-            setTransferError(`${e}`);
+            if (
+                Array.isArray(e) &&
+                typeof e[0] === "string" &&
+                e[0].includes("Invalid account")
+            ) {
+                setError("to", { message: "Invalid account" });
+            } else {
+                console.error("TRANSFER ERROR", e);
+                setTransferError(`${e}`);
+            }
         }
         invalidateTransferHistoryQuery();
         setFormSubmitted(false);
@@ -96,7 +105,6 @@ function App() {
         const decimal = (amountSegments[1] ?? "0").padEnd(token.precision, "0");
         const parsedAmount = `${amountSegments[0]}${decimal}`;
 
-        // TODO: Errors getting swallowed by CommonSys::executeTransaction(). Fix.
         await executeCredit({
             symbol,
             receiver: to,
@@ -195,21 +203,24 @@ function App() {
                     </div>
                 </div>
                 <div className="mt-7">
-                    {transferError && (
+                    {transferError ? (
                         <Text className="font-medium text-red-600">
-                            {transferError}
+                            There was an error. Your transfer may not have been
+                            successful. Refresh the page to check your balance
+                            and try again if necessary.
                         </Text>
+                    ) : (
+                        <Button
+                            type="outline"
+                            size="lg"
+                            isSubmit
+                            isLoading={formSubmitted}
+                            disabled={formSubmitted}
+                            className="w-48"
+                        >
+                            Send
+                        </Button>
                     )}
-                    <Button
-                        type="outline"
-                        size="lg"
-                        isSubmit
-                        isLoading={formSubmitted}
-                        disabled={formSubmitted}
-                        className="w-48"
-                    >
-                        Send
-                    </Button>
                 </div>
             </form>
             <TransferHistory

@@ -19,6 +19,7 @@ const bufferedMessages = [];
 // Initialized with an anchor element on pos 0, to initialize ids at 1 and ease comparisons
 const callbacks = [null];
 const promises = [null];
+const transactions = {};
 
 export async function getRootDomain() {
     if (rootDomain) {
@@ -337,6 +338,7 @@ export const MessageTypes = {
     Operation: "Operation", // A procedure which can include multiple other queries, actions, and operations
     QueryResponse: "QueryResponse", // A response to a prior query
     OperationResponse: "OperationResponse",
+    TransactionReceipt: "TransactionReceipt",
 };
 
 export class AppletId {
@@ -391,7 +393,7 @@ export function storePromise(resolve, reject) {
 }
 
 export function executeCallback(callbackId, response) {
-    const cb = callbacks[callbackId]; // .find((q) => q.callbackId === callbackId);
+    const cb = callbacks[callbackId];
 
     if (!cb) {
         console.error("Callback with ID " + callbackId + " not found.");
@@ -409,7 +411,7 @@ export function executeCallback(callbackId, response) {
 }
 
 export function executePromise(callbackId, response, errors) {
-    const promise = promises[callbackId]; // .find((q) => q.callbackId === callbackId);
+    const promise = promises[callbackId];
     if (!promise) {
         console.error("Promise with ID " + callbackId + " not found.");
         return false;
@@ -586,6 +588,22 @@ const messageRouting = [
             return executePromise(callbackId, response, errors);
         },
     },
+    {
+        type: MessageTypes.TransactionReceipt,
+        fields: ["transactionId", "trace", "errors"],
+        route: (payload) => {
+            const { transactionId, trace, errors } = payload;
+            const callbackId = transactions[transactionId];
+            console.info("processing trxreceipt >>>", {
+                transactionId,
+                callbackId,
+                payload,
+            });
+            return callbackId
+                ? executePromise(callbackId, trace, errors)
+                : false;
+        },
+    },
 ];
 
 export async function initializeApplet(initializer = () => {}) {
@@ -705,6 +723,17 @@ export function operation(appletId, name, params = {}) {
     });
 
     return operationPromise;
+}
+
+export async function operationWithTrxReceipt(appletId, name, params) {
+    const operationRes = await operation(appletId, name, params);
+
+    const transactionSubmittedPromise = new Promise((resolve, reject) => {
+        const callbackId = storePromise(resolve, reject);
+        transactions[operationRes.transactionId] = callbackId;
+        console.info(">>> trxSubmittedPromise", { transactions, callbackId });
+    });
+    return transactionSubmittedPromise;
 }
 
 /**

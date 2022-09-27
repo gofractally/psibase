@@ -17,6 +17,7 @@ declare module "common/rpc.mjs" {
         Operation: "Operation",
         QueryResponse: "QueryResponse",
         OperationResponse: "OperationResponse",
+        TransactionReceipt: "TransactionReceipt",
     };
 
     declare class AppletId {
@@ -73,6 +74,11 @@ declare module "common/rpc.mjs" {
     function setOperations(operations: Operation[]): void;
     function setQueries(queries: Query[]): void;
     function operation<Params>(
+        appletId: AppletId,
+        name: string,
+        params?: Params
+    ): Promise<any>;
+    function operationWithTrxReceipt<Params>(
         appletId: AppletId,
         name: string,
         params?: Params

@@ -1,4 +1,4 @@
-import { operation } from "common/rpc.mjs";
+import { operationWithTrxReceipt } from "common/rpc.mjs";
 import { tokenContract } from "./contracts";
 
 export interface CreditOperationPayload {
@@ -52,5 +52,5 @@ export const operations = [CREDIT];
 
 export const executeCredit = async (payload: CreditOperationPayload) => {
     const appletId = await tokenContract.getAppletId();
-    return operation(appletId, "credit", payload);
+    return operationWithTrxReceipt(appletId, "credit", payload);
 };
