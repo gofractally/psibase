@@ -210,7 +210,7 @@ pub fn get_current_action_bytes() -> Vec<u8> {
 
 /// Get the currently-executing action.
 ///
-/// This version creates an extra copy of [crate::Action::rawData];
+/// This version creates an extra copy of [crate::Action::raw_data];
 /// consider using [with_current_action] instead.
 ///
 /// If the contract, while handling action A, calls itself with action B:
@@ -227,7 +227,7 @@ pub fn get_current_action() -> crate::Action {
 /// Get the currently-executing action and pass it to `f`.
 ///
 /// This is more efficient than [get_current_action] since it avoids
-/// creating an extra copy of [crate::Action::rawData].
+/// creating an extra copy of [crate::Action::raw_data].
 ///
 /// If the contract, while handling action A, calls itself with action B:
 ///    * Before the call to B, [get_current_action] returns A.
