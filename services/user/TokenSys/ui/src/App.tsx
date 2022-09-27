@@ -31,7 +31,7 @@ window.React = React;
 
 function App() {
     const [userName, setUserName] = useState("");
-    const [transferError, setTransferError] = useState(false);
+    const [transferError, setTransferError] = useState("");
     const [tokens, setTokens] = useState<TokenBalance[]>();
     const [formSubmitted, setFormSubmitted] = useState(false);
     const [transferHistoryResult, invalidateTransferHistoryQuery] =
@@ -58,6 +58,7 @@ function App() {
         register,
         handleSubmit,
         formState: { errors },
+        setError,
         reset,
     } = useForm<TransferInputs>({
         defaultValues: {
@@ -70,15 +71,23 @@ function App() {
     const onSubmit: SubmitHandler<TransferInputs> = async (
         data: TransferInputs
     ) => {
-        setTransferError(false);
+        setTransferError("");
         setFormSubmitted(true);
         try {
             await transfer(data);
+            reset();
         } catch (e) {
-            console.error("TRANSFER ERROR");
-            setTransferError(true);
+            if (
+                Array.isArray(e) &&
+                typeof e[0] === "string" &&
+                e[0].includes("Invalid account")
+            ) {
+                setError("to", { message: "Invalid account" });
+            } else {
+                console.error("TRANSFER ERROR", e);
+                setTransferError(`${e}`);
+            }
         }
-        reset();
         invalidateTransferHistoryQuery();
         setFormSubmitted(false);
     };
@@ -96,7 +105,6 @@ function App() {
         const decimal = (amountSegments[1] ?? "0").padEnd(token.precision, "0");
         const parsedAmount = `${amountSegments[0]}${decimal}`;
 
-        // TODO: Errors getting swallowed by CommonSys::executeTransaction(). Fix.
         await executeCredit({
             symbol,
             receiver: to,
@@ -104,7 +112,6 @@ function App() {
             memo: "Working",
         });
 
-        await wait(2000); // TODO: Would be great if the credit operation returned a value
         const updatedTokens = await pollForBalanceChange(userName, token);
         setTokens(updatedTokens);
     };

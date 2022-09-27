@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AppletId,
     executeCallback,
@@ -33,12 +33,34 @@ type AppletsMap = {
     [appletPath: string]: NewAppletState;
 };
 
+type TransactionReceipt = {
+    trace: any;
+    errors: string[];
+};
+
+type PendingTransaction = {
+    id: number;
+    actions: any[];
+    applets: Set<AppletId>;
+    transactionReceipt?: TransactionReceipt;
+};
+
 /**
  * Handles Inter-Applets Comms
  */
 export const useApplets = () => {
     const [currentUser, setCurrentUser] = useState("");
-    const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
+
+    // Group of pending transactions, for every new transaction a new object is created,
+    // this way children applets can access transactions that happened before, if needed.
+    const pendingTransactions = useRef<PendingTransaction[]>([
+        { id: 0, actions: [], applets: new Set() },
+    ]);
+
+    // Current pending transaction id: for every new submitted operation it will bump the
+    // transaction Id, which signalizes that a trx is happening and create a new pendingTransaction
+    // object; When the operation and it nested operations are complete, it will be reset to zero
+    const pendingTransactionId = useRef(0);
 
     const [applets, setApplets] = useState<AppletsMap>({
         [ACTIVE_APPLET.fullPath]: {
@@ -60,48 +82,40 @@ export const useApplets = () => {
             return initializedAppletsSet;
         });
 
-    const [operationCountdown, setOperationCountdown] = useState(false);
-
+    // Opens an applet if it's not already open
     const open = useCallback(
-        (appletId: AppletId) => {
-            return new Promise<void>(async (resolve, reject) => {
-                // Opens an applet if it's not already open
-                const appletPath = appletId.fullPath;
-                if (!applets[appletPath]) {
-                    setApplets({
-                        ...applets,
-                        [appletPath]: {
-                            appletId,
-                            state: AppletStates.headless,
-                            onInit: () => {
-                                updateInitializedApplets(appletId);
-                            },
+        async (appletId: AppletId) => {
+            const appletPath = appletId.fullPath;
+            if (!applets[appletPath]) {
+                setApplets({
+                    ...applets,
+                    [appletPath]: {
+                        appletId,
+                        state: AppletStates.headless,
+                        onInit: () => {
+                            updateInitializedApplets(appletId);
                         },
-                    });
-                }
+                    },
+                });
+            }
 
-                // Await for applet initialization for 10 seconds
-                let attempts = 1;
-                while (!initializedApplets.has(appletId.fullPath)) {
-                    if (attempts > 100) {
-                        reject(
-                            new Error(
-                                `initialization of applet ${appletId.fullPath} timed out`
-                            )
-                        );
-                        return;
-                    }
-                    await wait(100);
-                    attempts += 1;
+            // Await for applet initialization for 10 seconds
+            let attempts = 1;
+            while (!initializedApplets.has(appletId.fullPath)) {
+                if (attempts > 100) {
+                    throw new Error(
+                        `initialization of applet ${appletId.fullPath} timed out`
+                    );
                 }
-                resolve();
-            });
+                await wait(100);
+                attempts += 1;
+            }
         },
         [initializedApplets, applets]
     );
 
     const getIframe = useCallback(
-        async (appletId: AppletId, shouldOpen: boolean) => {
+        async (appletId: AppletId, shouldOpen?: boolean) => {
             if (!shouldOpen && !applets[appletId.fullPath]) {
                 throw (
                     "Applet [" +
@@ -132,56 +146,18 @@ export const useApplets = () => {
             sender: AppletId,
             receiver: AppletId,
             payload: any,
-            shouldOpenReceiver: boolean
-        ) => {
-            let iframe;
-            try {
-                iframe = await getIframe(receiver, shouldOpenReceiver);
-            } catch (e) {
-                // Did the initiator applet navigate to a different page before getting a response?
-                console.error(e);
-            }
-
-            // TODO: Could check that sender isn't on a blacklist before
-            //       making the IPC call.
-
+            shouldOpenReceiver?: boolean
+        ): Promise<ReplyWithCallbackId> => {
+            const iframe = await getIframe(receiver, shouldOpenReceiver);
             const restrictedTargetOrigin = await receiver.url();
-            (iframe as any).iFrameResizer.sendMessage(
-                { type: messageType, payload },
-                restrictedTargetOrigin
-            );
-        },
-        [getIframe]
-    );
 
-    const sendMessageGetResponse = useCallback(
-        async (
-            messageType: MessageTypeValue,
-            sender: AppletId,
-            receiver: AppletId,
-            payload: any,
-            shouldOpenReceiver: boolean
-        ) => {
             // TODO: Could check that sender isn't on a blacklist before making the IPC call.
             // TODO: handle timeout if I never get a response from an applet
-            return new Promise<{ response: any; errors: any }>(
-                async (resolve, reject) => {
-                    try {
-                        const iframe = await getIframe(
-                            receiver,
-                            shouldOpenReceiver
-                        );
-
+            return new Promise<ReplyWithCallbackId>((resolve, reject) => {
+                try {
+                    if (!payload.callbackId) {
                         payload.callbackId = storeCallback(
-                            ({
-                                sender: responseApplet,
-                                response,
-                                errors,
-                            }: {
-                                sender: AppletId;
-                                response: any;
-                                errors: any;
-                            }) => {
+                            ({ sender: responseApplet, response, errors }) => {
                                 if (!responseApplet.equals(receiver)) {
                                     return;
                                 }
@@ -189,60 +165,41 @@ export const useApplets = () => {
                                 // TODO: Consider creating a QueryResponse object with these two fields
                             }
                         );
-
-                        const restrictedTargetOrigin = await receiver.url();
-                        (iframe as any).iFrameResizer.sendMessage(
-                            { type: messageType, payload },
-                            restrictedTargetOrigin
-                        );
-                    } catch (e) {
-                        reject(e);
                     }
+
+                    (iframe as any).iFrameResizer.sendMessage(
+                        { type: messageType, payload },
+                        restrictedTargetOrigin
+                    );
+                } catch (e) {
+                    reject(e);
                 }
-            );
+            });
         },
         [getIframe]
     );
 
-    const query = useCallback(
+    const sendQuery = useCallback(
         (
             sender: AppletId,
             receiver: AppletId,
-            name: string,
+            identifier: string,
             params: any = {}
         ) => {
-            return sendMessageGetResponse(
+            return sendMessage(
                 MessageTypes.Query,
                 sender,
                 receiver,
-                { identifier: name, params },
+                { identifier, params },
                 true
             );
         },
-        [sendMessageGetResponse]
-    );
-
-    const operation = useCallback(
-        (
-            sender: AppletId,
-            receiver: AppletId,
-            name: string,
-            params: any = {}
-        ) => {
-            return sendMessageGetResponse(
-                MessageTypes.Operation,
-                sender,
-                receiver,
-                { identifier: name, params },
-                true
-            );
-        },
-        [sendMessageGetResponse]
+        [sendMessage]
     );
 
     const getCurrentUser = useCallback(async () => {
         try {
-            const { response } = await query(
+            const { response } = await sendQuery(
                 COMMON_SYS,
                 ACCOUNT_SYS,
                 "getLoggedInUser"
@@ -252,7 +209,7 @@ export const useApplets = () => {
         } catch (e) {
             console.error("ERROR FETCHING CURRENT USER:", e);
         }
-    }, [query]);
+    }, [sendQuery]);
 
     const signTransaction = useCallback(
         async (transactions: any[]) => {
@@ -263,13 +220,7 @@ export const useApplets = () => {
                 injectSender(transactions, currentUser)
             );
 
-            console.log("getAuthed query params >>>", {
-                commonSys: COMMON_SYS,
-                accountSys: ACCOUNT_SYS,
-                transaction,
-            });
-
-            const { errors, response: signedTransaction } = await query(
+            const { errors, response: signedTransaction } = await sendQuery(
                 COMMON_SYS,
                 ACCOUNT_SYS,
                 "getAuthedTransaction",
@@ -285,32 +236,55 @@ export const useApplets = () => {
 
             return signedTransaction;
         },
-        [query, getCurrentUser]
+        [sendQuery, getCurrentUser]
     );
 
     const executeTransaction = useCallback(async () => {
-        if (pendingTransactions.length === 0) {
-            console.log("returning now as there is no pendingTransaction?");
+        if (pendingTransactionId.current === 0) {
+            console.error(
+                "returning now as there is no pending transaction happening"
+            );
             return;
         }
 
+        const pendingTransaction =
+            pendingTransactions.current[pendingTransactionId.current];
+
+        const transactionReceipt: TransactionReceipt = {
+            trace: {},
+            errors: [],
+        };
         try {
-            const signedTransaction = await signTransaction(
-                pendingTransactions
-            );
+            const { actions } = pendingTransaction;
+            const signedTransaction = await signTransaction(actions);
 
             const trace = await packAndPushSignedTransaction(
                 "",
                 signedTransaction
             );
-            console.info("Pushed Trx Trace >>>", trace);
+            transactionReceipt.trace = trace;
         } catch (e) {
-            // TODO: Don't swallow transaction errors!
-            console.error(e);
+            const exceptionMessage = e
+                ? (e as Error).message
+                : `Unknown error: ${e}`;
+            console.error("Failure when pushing trx:", exceptionMessage, e);
+            transactionReceipt.errors.push(exceptionMessage);
         }
 
-        setPendingTransactions([]);
-    }, [pendingTransactions, signTransaction]);
+        pendingTransaction.transactionReceipt = transactionReceipt;
+
+        // Broadcast trx receipts to all involved Applets
+        pendingTransaction.applets.forEach((applet) => {
+            sendMessage(MessageTypes.TransactionReceipt, COMMON_SYS, applet, {
+                ...transactionReceipt,
+                transactionId: pendingTransaction.id,
+            });
+        });
+
+        // TODO: broadcast globally all events, properly parsed from the receipt
+
+        pendingTransactionId.current = 0;
+    }, [sendMessage, signTransaction]);
 
     const makeErroredReply = (
         sender: AppletId,
@@ -330,7 +304,7 @@ export const useApplets = () => {
             : `Unknown error: ${error}`;
         const reply = {
             callbackId: payload.callbackId,
-            response: null,
+            response: {},
             errors: [exceptionMessage, msg],
         };
         console.error("Errored response >>>", {
@@ -344,20 +318,37 @@ export const useApplets = () => {
 
     const handleOperation = useCallback(
         async (sender: AppletId, payload: any) => {
-            const { callbackId, appletId, name, params } = payload;
+            let transactionId = pendingTransactionId.current;
+            if (transactionId === 0) {
+                transactionId = pendingTransactions.current.length;
+                pendingTransactionId.current = transactionId;
+                pendingTransactions.current.push({
+                    id: transactionId,
+                    actions: [],
+                    applets: new Set(),
+                });
+            }
 
-            setOperationCountdown(false);
+            const { callbackId, appletId, name, params } = payload;
 
             const receiver = AppletId.fromObject(appletId);
             ClientOps.add(receiver);
 
-            let reply: ReplyWithCallbackId = null;
+            let reply: ReplyWithCallbackId;
             try {
-                reply = await operation(sender, receiver, name, params);
+                reply = await sendMessage(
+                    MessageTypes.Operation,
+                    sender,
+                    receiver,
+                    { identifier: name, params },
+                    true
+                );
+                reply.response = reply.response ?? {};
                 reply.callbackId = callbackId;
             } catch (e) {
                 reply = makeErroredReply(sender, receiver, payload, e);
             }
+            reply.response.transactionId = transactionId;
 
             sendMessage(
                 MessageTypes.OperationResponse,
@@ -367,7 +358,7 @@ export const useApplets = () => {
                 false
             );
         },
-        [operation, sendMessage]
+        [sendMessage]
     );
 
     const handleQuery = useCallback(
@@ -376,9 +367,9 @@ export const useApplets = () => {
 
             const receiver = AppletId.fromObject(appletId);
 
-            let reply: ReplyWithCallbackId = null;
+            let reply: ReplyWithCallbackId;
             try {
-                reply = await query(sender, receiver, name, params);
+                reply = await sendQuery(sender, receiver, name, params);
                 reply.callbackId = callbackId;
             } catch (e) {
                 reply = makeErroredReply(sender, receiver, payload, e);
@@ -392,17 +383,20 @@ export const useApplets = () => {
                 false
             );
         },
-        [query, sendMessage]
+        [sendQuery, sendMessage]
     );
 
-    const handleAction = async (sender: AppletId, payload: any) => {
+    const handleAction = (sender: AppletId, payload: any) => {
         // Todo: change Action payload to use "user" rather than sender.
         //       Sender is always the applet, user is the person
         const { application, actionName, params, sender: user } = payload;
-        setPendingTransactions((pendingTransactions) => [
-            ...pendingTransactions,
-            makeAction(application, actionName, params, user),
-        ]);
+        const action = makeAction(application, actionName, params, user);
+
+        const pendingTransaction =
+            pendingTransactions.current[pendingTransactionId.current];
+        pendingTransaction.applets.add(sender);
+        pendingTransaction.actions.push(action);
+
         // TODO: If no operation is currently being executed, execute the transaction.
     };
 
@@ -415,16 +409,17 @@ export const useApplets = () => {
     );
 
     const handleOperationResponse = useCallback(
-        (sender: AppletId, payload: any) => {
+        async (sender: AppletId, payload: any) => {
             const { callbackId, response, errors } = payload;
-            executeCallback(callbackId, { sender, response, errors });
+
+            await executeCallback(callbackId, { sender, response, errors });
 
             ClientOps.opReturned(sender);
             if (ClientOps.allCompleted()) {
-                setOperationCountdown(true);
+                executeTransaction();
             }
         },
-        []
+        [executeTransaction]
     );
 
     const messageRouting = useMemo(
@@ -485,18 +480,6 @@ export const useApplets = () => {
     useEffect(() => {
         getCurrentUser();
     }, [getCurrentUser]);
-
-    useEffect(() => {
-        let timer;
-        if (operationCountdown) {
-            // Eventually we may not want to execute the transaction when the operation ends.
-            // (Send the transaction to the msig applet or something)
-            timer = setTimeout(executeTransaction, 100);
-        } else {
-            clearTimeout(timer);
-        }
-        // TODO: Cleanup
-    }, [operationCountdown, executeTransaction]);
 
     const [primaryApplet, subApplets] = useMemo(() => {
         const primaryPath = ACTIVE_APPLET.fullPath;
