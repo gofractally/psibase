@@ -198,7 +198,7 @@ fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
         sender,
         service: account!("account-sys"),
         method: method!("newAccount"),
-        raw_data: new_account_action.packed(),
+        rawData: new_account_action.packed(),
     }
 }
 
@@ -207,7 +207,7 @@ fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
         sender: account,
         service: account!("auth-ec-sys"),
         method: method!("setKey"),
-        raw_data: (key.clone(),).packed(),
+        rawData: (key.clone(),).packed(),
     }
 }
 
@@ -216,7 +216,7 @@ fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) 
         sender: account,
         service: account!("account-sys"),
         method: method!("setAuthCntr"),
-        raw_data: (auth_service,).packed(),
+        rawData: (auth_service,).packed(),
     }
 }
 
@@ -239,7 +239,7 @@ fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
         sender: account,
         service: account!("setcode-sys"),
         method: method!("setCode"),
-        raw_data: set_code_action.packed(),
+        rawData: set_code_action.packed(),
     }
 }
 
@@ -252,7 +252,7 @@ pub struct ProducerConfigRow {
 fn to_claim(key: &PublicKey) -> Claim {
     Claim {
         service: account!("verifyec-sys"),
-        raw_data: key.packed(),
+        rawData: key.packed(),
     }
 }
 
@@ -266,7 +266,7 @@ fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
         sender: account!("producer-sys"),
         service: account!("producer-sys"),
         method: method!("setProducers"),
-        raw_data: set_producers_action.packed(),
+        rawData: set_producers_action.packed(),
     }
 }
 
@@ -278,7 +278,7 @@ fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
         sender: service,
         service: account!("proxy-sys"),
         method: method!("registerServer"),
-        raw_data: data.packed(),
+        rawData: data.packed(),
     }
 }
 
@@ -294,7 +294,7 @@ fn store_sys(
         sender,
         service,
         method: method!("storeSys"),
-        raw_data: data.packed(),
+        rawData: data.packed(),
     }
 }
 
@@ -306,9 +306,9 @@ pub fn without_tapos(actions: Vec<Action>) -> Transaction {
     Transaction {
         tapos: Tapos {
             expiration,
-            ref_block_suffix: 0,
+            refBlockSuffix: 0,
             flags: 0,
-            ref_block_index: 0,
+            refBlockIndex: 0,
         },
         actions,
         claims: vec![],
@@ -323,9 +323,9 @@ pub fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
     Transaction {
         tapos: Tapos {
             expiration,
-            ref_block_suffix: tapos.ref_block_suffix,
+            refBlockSuffix: tapos.ref_block_suffix,
             flags: 0,
-            ref_block_index: tapos.ref_block_index,
+            refBlockIndex: tapos.ref_block_index,
         },
         actions,
         claims: vec![],
@@ -605,7 +605,7 @@ async fn upload_tree(
         let mut n = 0;
         let mut size = 0;
         while n < actions.len() && n < 10 && size < 64 * 1024 {
-            size += actions[n].1.raw_data.len();
+            size += actions[n].1.rawData.len();
             n += 1;
         }
 

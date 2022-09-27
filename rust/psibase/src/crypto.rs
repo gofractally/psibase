@@ -284,7 +284,7 @@ pub fn sign_transaction(
         .iter()
         .map(|k| crate::Claim {
             service: account!("verifyec-sys"),
-            raw_data: fracpack::Packable::packed(&PublicKey::from(
+            rawData: fracpack::Packable::packed(&PublicKey::from(
                 &secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, k),
             )),
         })

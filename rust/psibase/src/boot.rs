@@ -95,8 +95,8 @@ macro_rules! sgc {
         SharedGenesisService {
             service: account!($acc),
             flags: $flags,
-            vm_type: 0,
-            vm_version: 0,
+            vmType: 0,
+            vmVersion: 0,
             code: include_bytes!(concat!("../boot-image/", $wasm)),
         }
     };
@@ -168,7 +168,7 @@ fn boot_trx() -> SignedTransaction {
         sender: AccountNumber { value: 0 },
         service: AccountNumber { value: 0 },
         method: method!("boot"),
-        raw_data: genesis_action_data.packed(),
+        rawData: genesis_action_data.packed(),
     }];
 
     SignedTransaction {
@@ -214,31 +214,31 @@ fn add_startup_trx(
             sender: account!("account-sys"),
             service: account!("account-sys"),
             method: method!("init"),
-            raw_data: ().packed(),
+            rawData: ().packed(),
         },
         Action {
             sender: account!("transact-sys"),
             service: account!("transact-sys"),
             method: method!("init"),
-            raw_data: ().packed(),
+            rawData: ().packed(),
         },
         Action {
             sender: account!("nft-sys"),
             service: account!("nft-sys"),
             method: method!("init"),
-            raw_data: ().packed(),
+            rawData: ().packed(),
         },
         Action {
             sender: account!("token-sys"),
             service: account!("token-sys"),
             method: method!("init"),
-            raw_data: ().packed(),
+            rawData: ().packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             service: account!("symbol-sys"),
             method: method!("init"),
-            raw_data: ().packed(),
+            rawData: ().packed(),
         },
     ];
 
@@ -379,25 +379,25 @@ fn add_startup_trx(
             sender: account!("symbol-sys"),
             service: account!("token-sys"),
             method: method!("setTokenConf"),
-            raw_data: (1u32, method!("untradeable"), false).packed(),
+            rawData: (1u32, method!("untradeable"), false).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             service: account!("token-sys"),
             method: method!("mint"),
-            raw_data: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed(),
+            rawData: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             service: account!("token-sys"),
             method: method!("credit"),
-            raw_data: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed(),
+            rawData: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
             service: account!("token-sys"),
             method: method!("credit"),
-            raw_data: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed(),
+            rawData: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed(),
         },
     ];
 
@@ -423,7 +423,7 @@ fn add_startup_trx(
             Some(k) => to_claim(k),
             None => Claim {
                 service: AccountNumber::new(0),
-                raw_data: vec![],
+                rawData: vec![],
             },
         },
     ));
@@ -439,7 +439,7 @@ fn add_startup_trx(
         let mut n = 0;
         let mut size = 0;
         while n < actions.len() && size < 1024 * 1024 {
-            size += actions[n].raw_data.len();
+            size += actions[n].rawData.len();
             n += 1;
         }
         transactions.push(SignedTransaction {

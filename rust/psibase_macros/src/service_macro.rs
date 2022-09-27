@@ -159,7 +159,7 @@ fn process_dispatch_body(
     let name = &f.sig.ident;
 
     let args_unpacking = if !invoke_args.is_empty() {
-        quote! { let args = <super::action_structs::#name as psibase::fracpack::Packable>::unpack(&act.raw_data, &mut 0)?; }
+        quote! { let args = <super::action_structs::#name as psibase::fracpack::Packable>::unpack(&act.rawData, &mut 0)?; }
     } else {
         quote! {}
     };
