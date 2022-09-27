@@ -1,0 +1,21 @@
+[package]
+name = "tester_wasi_polyfill"
+version = "0.1.0"
+rust-version = "1.64"
+edition = "2021"
+
+# This lib produces a wasm which gets embedded; don't publish directly
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasi = "0.11.0"
+
+# Only built by build.rs
+[workspace]
+
+[profile.release]
+lto = true
+opt-level = 's'

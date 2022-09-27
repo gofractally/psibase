@@ -1,7 +1,7 @@
 // TODO: Add missing types after they stabilize
 // TODO: Attributes to set case correctly on JSON field names
 
-use crate::{AccountNumber, Fracpack, MethodNumber, TimePointSec};
+use crate::{psibase, AccountNumber, Fracpack, MethodNumber, TimePointSec};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]

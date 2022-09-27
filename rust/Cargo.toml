@@ -1,2 +1,17 @@
 [workspace]
-members = ["account_sys", "fracpack", "test_fracpack", "test_contract", "psibase", "psibase_macros", "gen-cpp-doc"]
+members = [
+    "account_sys",
+    "cargo-psibase",
+    "fracpack",
+    "gen-cpp-doc",
+    "psibase_macros",
+    "psibase",
+    "test_contract",
+    "test_fracpack",
+]
+
+[workspace.package]
+version = "0.1.0"
+rust-version = "1.64"
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"

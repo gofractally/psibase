@@ -1,11 +1,11 @@
 [book]
 language = "en"
 multilingual = false
-src = "src"
+src = "${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src"
 title = "psidk"
 
 [preprocessor.gen-cpp-doc]
-command = "../../build/rust/release/gen-cpp-doc"
+command = "${CMAKE_CURRENT_BINARY_DIR}/rust/release/gen-cpp-doc --srcdir '${CMAKE_CURRENT_SOURCE_DIR}' --builddir '${CMAKE_CURRENT_BINARY_DIR}'"
 # command = "../../rust/target/debug/gen-cpp-doc"
 after = ["links","index"]
 
