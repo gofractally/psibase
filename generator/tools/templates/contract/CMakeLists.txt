@@ -1,6 +1,6 @@
 # All cmake projects need these
 cmake_minimum_required(VERSION 3.16)
-project(examplea)
+project(__contract__)
 
 # Generate compile_commands.json to aid vscode and other editors
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
@@ -13,8 +13,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(psidk REQUIRED)
 
 # Build example.wasm service
-add_executable(examplea src/__contract__.cpp)
-target_link_libraries(examplea psibase-service-simple-malloc)
+add_executable(__contract__ src/__contract__.cpp)
+target_link_libraries(__contract__ psibase-service-simple-malloc)
 
 # These symlinks help vscode
 execute_process(COMMAND ln -sfT ${psidk_DIR} ${CMAKE_CURRENT_BINARY_DIR}/psidk)
