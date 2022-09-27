@@ -14,7 +14,6 @@ html {
 body {
   @apply text-gray-900;
   font-weight: 400;
-  @apply bg-gray-50;
 }
 
 #root {
