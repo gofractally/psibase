@@ -5,6 +5,7 @@ mod db;
 mod from_bin;
 mod method_number;
 mod native_functions;
+mod native_tables;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod tester;
@@ -21,6 +22,7 @@ pub use db::*;
 pub use from_bin::*;
 pub use method_number::*;
 pub use native_functions::*;
+pub use native_tables::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use tester::*;

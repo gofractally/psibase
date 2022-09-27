@@ -4,9 +4,9 @@ use crate::{AccountNumber, Fracpack, MethodNumber, TimePointSec};
 use serde::{Deserialize, Serialize};
 
 // TODO: move
-type Checksum256 = [u8; 32];
+pub type Checksum256 = [u8; 32];
 
-type BlockNum = u32;
+pub type BlockNum = u32;
 
 /// A synchronous call
 ///
@@ -86,9 +86,6 @@ pub struct Claim {
     pub rawData: Vec<u8>,
 }
 
-pub const TAPOS_DO_NOT_BROADCAST_FLAG: u16 = 1 << 0;
-pub const TAPOS_VALID_FLAGS: u16 = 0x0001;
-
 /// Rules for TAPOS:
 /// * Reference block's number must be either:
 ///    * One of the most-recent 128 blocks. For this case, refBlockIndex = blockNum & 0x7f
@@ -118,6 +115,11 @@ pub struct Tapos {
     pub refBlockSuffix: u32,
     pub flags: u16,
     pub refBlockIndex: u8,
+}
+
+impl Tapos {
+    pub const DO_NOT_BROADCAST_FLAG: u16 = 1 << 0;
+    pub const VALID_FLAGS: u16 = 0x0001;
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
