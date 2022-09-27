@@ -8,6 +8,7 @@ mod native_functions;
 mod native_tables;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
+mod service;
 mod tester;
 mod time;
 mod to_bin;
@@ -25,6 +26,7 @@ pub use native_functions::*;
 pub use native_tables::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
+pub use service::*;
 pub use tester::*;
 pub use time::*;
 pub use to_bin::*;

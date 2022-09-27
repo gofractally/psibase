@@ -13,8 +13,11 @@ To get started with Rust service development, install the following:
 - Rust's wasi support: see the commands below.
 - `cargo-psibase`: see the commands below.
 
+TODO: remove `rustup update beta` after 1.65 is stable and update the version above.
+
 ```
 rustup update
+rustup update beta
 rustup target add wasm32-wasi
 cargo install cargo-psibase
 ```
