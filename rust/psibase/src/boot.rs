@@ -1,5 +1,5 @@
 use crate::{
-    new_account_action, reg_server, set_auth_contract_action, set_key_action, set_producers_action,
+    new_account_action, reg_server, set_auth_service_action, set_key_action, set_producers_action,
     store_sys, to_claim, without_tapos, Args, Error,
 };
 use anyhow::Context;
@@ -7,7 +7,7 @@ use fracpack::Packable;
 use include_dir::{include_dir, Dir};
 use psibase::{
     account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
-    SharedGenesisActionData, SharedGenesisContract, SignedTransaction,
+    SharedGenesisActionData, SharedGenesisService, SignedTransaction,
 };
 use serde_json::Value;
 
@@ -92,8 +92,8 @@ async fn push_boot(
 
 macro_rules! sgc {
     ($acc:literal, $flags:expr, $wasm:literal) => {
-        SharedGenesisContract {
-            contract: account!($acc),
+        SharedGenesisService {
+            service: account!($acc),
             flags: $flags,
             vm_type: 0,
             vm_version: 0,
@@ -137,7 +137,7 @@ macro_rules! store_third_party {
 }
 
 fn boot_trx() -> SignedTransaction {
-    let contracts = vec![
+    let services = vec![
         sgc!("account-sys", 0, "AccountSys.wasm"),
         sgc!("auth-ec-sys", 0, "AuthEcSys.wasm"),
         sgc!("auth-any-sys", 0, "AuthAnySys.wasm"),
@@ -161,12 +161,12 @@ fn boot_trx() -> SignedTransaction {
 
     let genesis_action_data = SharedGenesisActionData {
         memo: "".to_string(),
-        contracts,
+        services,
     };
 
     let actions = vec![Action {
         sender: AccountNumber { value: 0 },
-        contract: AccountNumber { value: 0 },
+        service: AccountNumber { value: 0 },
         method: method!("boot"),
         raw_data: genesis_action_data.packed(),
     }];
@@ -177,22 +177,22 @@ fn boot_trx() -> SignedTransaction {
     }
 }
 
-fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, contract: AccountNumber) {
+fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service: AccountNumber) {
     for e in dir.entries() {
         match e {
-            include_dir::DirEntry::Dir(d) => fill_dir(d, actions, sender, contract),
+            include_dir::DirEntry::Dir(d) => fill_dir(d, actions, sender, service),
             include_dir::DirEntry::File(e) => {
                 let path = e.path().to_str().unwrap();
                 if let Some(t) = mime_guess::from_path(path).first() {
                     // println!(
                     //     "{} {} {} {}",
                     //     sender,
-                    //     contract,
+                    //     service,
                     //     &("/".to_owned() + path),
                     //     t.essence_str()
                     // );
                     actions.push(store_sys(
-                        contract,
+                        service,
                         sender,
                         &("/".to_owned() + path),
                         t.essence_str(),
@@ -212,31 +212,31 @@ fn add_startup_trx(
     let mut init_actions = vec![
         Action {
             sender: account!("account-sys"),
-            contract: account!("account-sys"),
+            service: account!("account-sys"),
             method: method!("init"),
             raw_data: ().packed(),
         },
         Action {
             sender: account!("transact-sys"),
-            contract: account!("transact-sys"),
+            service: account!("transact-sys"),
             method: method!("init"),
             raw_data: ().packed(),
         },
         Action {
             sender: account!("nft-sys"),
-            contract: account!("nft-sys"),
+            service: account!("nft-sys"),
             method: method!("init"),
             raw_data: ().packed(),
         },
         Action {
             sender: account!("token-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("init"),
             raw_data: ().packed(),
         },
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("symbol-sys"),
+            service: account!("symbol-sys"),
             method: method!("init"),
             raw_data: ().packed(),
         },
@@ -377,25 +377,25 @@ fn add_startup_trx(
         new_account_action(account!("account-sys"), account!("bob")),
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("setTokenConf"),
             raw_data: (1u32, method!("untradeable"), false).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("mint"),
             raw_data: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("credit"),
             raw_data: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("credit"),
             raw_data: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed(),
         },
@@ -422,7 +422,7 @@ fn add_startup_trx(
         match key {
             Some(k) => to_claim(k),
             None => Claim {
-                contract: AccountNumber::new(0),
+                service: AccountNumber::new(0),
                 raw_data: vec![],
             },
         },
@@ -431,7 +431,7 @@ fn add_startup_trx(
     if let Some(k) = key {
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
-            actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+            actions.push(set_auth_service_action(account, account!("auth-ec-sys")));
         }
     }
 

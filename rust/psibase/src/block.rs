@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
 pub struct Action {
     pub sender: AccountNumber,
-    pub contract: AccountNumber,
+    pub service: AccountNumber,
     pub method: MethodNumber,
     pub raw_data: Vec<u8>,
 }
@@ -15,7 +15,7 @@ pub struct Action {
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
 pub struct SharedAction<'a> {
     pub sender: AccountNumber,
-    pub contract: AccountNumber,
+    pub service: AccountNumber,
     pub method: MethodNumber,
     pub raw_data: &'a [u8],
 }
@@ -26,20 +26,20 @@ pub struct SharedAction<'a> {
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
 pub struct GenesisActionData {
     pub memo: String,
-    pub contracts: Vec<GenesisContract>,
+    pub services: Vec<GenesisService>,
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
 pub struct SharedGenesisActionData<'a> {
     pub memo: String,
     #[serde(borrow)]
-    pub contracts: Vec<SharedGenesisContract<'a>>,
+    pub services: Vec<SharedGenesisService<'a>>,
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
-pub struct GenesisContract {
-    pub contract: AccountNumber,
-    pub auth_contract: AccountNumber,
+pub struct GenesisService {
+    pub service: AccountNumber,
+    pub auth_service: AccountNumber,
     pub flags: u64,
     pub vm_type: u8,
     pub vm_version: u8,
@@ -47,8 +47,8 @@ pub struct GenesisContract {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
-pub struct SharedGenesisContract<'a> {
-    pub contract: AccountNumber,
+pub struct SharedGenesisService<'a> {
+    pub service: AccountNumber,
     pub flags: u64,
     pub vm_type: u8,
     pub vm_version: u8,
@@ -57,7 +57,7 @@ pub struct SharedGenesisContract<'a> {
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
 pub struct Claim {
-    pub contract: AccountNumber,
+    pub service: AccountNumber,
     pub raw_data: Vec<u8>,
 }
 

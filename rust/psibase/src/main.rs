@@ -100,12 +100,12 @@ enum Commands {
         insecure: bool,
     },
 
-    /// Deploy a contract
+    /// Deploy a service
     Deploy {
-        /// Account to deploy contract on
+        /// Account to deploy service on
         account: ExactAccountNumber,
 
-        /// Filename containing the contract
+        /// Filename containing the service
         filename: String,
 
         /// Create the account if it doesn't exist. Also set the account to
@@ -119,7 +119,7 @@ enum Commands {
         #[clap(short = 'i', long)]
         create_insecure_account: bool,
 
-        /// Register the contract with ProxySys. This allows the contract to host a
+        /// Register the service with ProxySys. This allows the service to host a
         /// website, serve RPC requests, and serve GraphQL requests.
         #[clap(short = 'p', long)]
         register_proxy: bool,
@@ -134,12 +134,12 @@ enum Commands {
         sender: ExactAccountNumber,
     },
 
-    /// Upload a file to a contract
+    /// Upload a file to a service
     Upload {
-        /// Contract to upload to
-        contract: ExactAccountNumber,
+        /// Service to upload to
+        service: ExactAccountNumber,
 
-        /// Destination file within contract
+        /// Destination file within service
         dest: String,
 
         /// MIME content type of file
@@ -148,23 +148,23 @@ enum Commands {
         /// Source filename to upload
         source: String,
 
-        /// Sender to use; defaults to <CONTRACT>
+        /// Sender to use; defaults to <SERVICE>
         #[clap(short = 'S', long, value_name = "SENDER")]
         sender: Option<ExactAccountNumber>,
     },
 
-    /// Upload a directory tree to a contract
+    /// Upload a directory tree to a service
     UploadTree {
-        /// Contract to upload to
-        contract: ExactAccountNumber,
+        /// Service to upload to
+        service: ExactAccountNumber,
 
-        /// Destination directory within contract
+        /// Destination directory within service
         dest: String,
 
         /// Source directory to upload
         source: String,
 
-        /// Sender to use; defaults to <CONTRACT>
+        /// Sender to use; defaults to <SERVICE>
         #[clap(short = 'S', long, value_name = "SENDER")]
         sender: Option<ExactAccountNumber>,
     },
@@ -184,19 +184,19 @@ fn to_hex(bytes: &[u8]) -> String {
 #[derive(Serialize, Deserialize, Fracpack)]
 pub struct NewAccountAction {
     pub account: AccountNumber,
-    pub auth_contract: AccountNumber,
+    pub auth_service: AccountNumber,
     pub require_new: bool,
 }
 
 fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
     let new_account_action = NewAccountAction {
         account,
-        auth_contract: account!("auth-any-sys"),
+        auth_service: account!("auth-any-sys"),
         require_new: false,
     };
     Action {
         sender,
-        contract: account!("account-sys"),
+        service: account!("account-sys"),
         method: method!("newAccount"),
         raw_data: new_account_action.packed(),
     }
@@ -205,24 +205,24 @@ fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
 fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
     Action {
         sender: account,
-        contract: account!("auth-ec-sys"),
+        service: account!("auth-ec-sys"),
         method: method!("setKey"),
         raw_data: (key.clone(),).packed(),
     }
 }
 
-fn set_auth_contract_action(account: AccountNumber, auth_contract: AccountNumber) -> Action {
+fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
     Action {
         sender: account,
-        contract: account!("account-sys"),
+        service: account!("account-sys"),
         method: method!("setAuthCntr"),
-        raw_data: (auth_contract,).packed(),
+        raw_data: (auth_service,).packed(),
     }
 }
 
 #[derive(Serialize, Deserialize, Fracpack)]
 pub struct SetCodeAction {
-    pub contract: AccountNumber,
+    pub service: AccountNumber,
     pub vm_type: i8,
     pub vm_version: i8,
     pub code: Vec<u8>,
@@ -230,14 +230,14 @@ pub struct SetCodeAction {
 
 fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
     let set_code_action = SetCodeAction {
-        contract: account,
+        service: account,
         vm_type: 0,
         vm_version: 0,
         code: wasm,
     };
     Action {
         sender: account,
-        contract: account!("setcode-sys"),
+        service: account!("setcode-sys"),
         method: method!("setCode"),
         raw_data: set_code_action.packed(),
     }
@@ -251,7 +251,7 @@ pub struct ProducerConfigRow {
 
 fn to_claim(key: &PublicKey) -> Claim {
     Claim {
-        contract: account!("verifyec-sys"),
+        service: account!("verifyec-sys"),
         raw_data: key.packed(),
     }
 }
@@ -264,26 +264,26 @@ fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
     let set_producers_action = (vec![prod],);
     Action {
         sender: account!("producer-sys"),
-        contract: account!("producer-sys"),
+        service: account!("producer-sys"),
         method: method!("setProducers"),
         raw_data: set_producers_action.packed(),
     }
 }
 
-fn reg_server(contract: AccountNumber, server_contract: AccountNumber) -> Action {
+fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
     // todo: should we convert this action data to a proper struct?
-    let data = (server_contract,);
+    let data = (server_service,);
 
     Action {
-        sender: contract,
-        contract: account!("proxy-sys"),
+        sender: service,
+        service: account!("proxy-sys"),
         method: method!("registerServer"),
         raw_data: data.packed(),
     }
 }
 
 fn store_sys(
-    contract: AccountNumber,
+    service: AccountNumber,
     sender: AccountNumber,
     path: &str,
     content_type: &str,
@@ -292,7 +292,7 @@ fn store_sys(
     let data = (path.to_string(), content_type.to_string(), content.to_vec());
     Action {
         sender,
-        contract,
+        service,
         method: method!("storeSys"),
         raw_data: data.packed(),
     }
@@ -359,7 +359,7 @@ async fn create(
 
     if let Some(key) = key {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+        actions.push(set_auth_service_action(account, account!("auth-ec-sys")));
     }
 
     let trx = with_tapos(
@@ -400,11 +400,11 @@ async fn modify(
 
     if let Some(key) = key {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+        actions.push(set_auth_service_action(account, account!("auth-ec-sys")));
     }
 
     if insecure {
-        actions.push(set_auth_contract_action(account, account!("auth-any-sys")));
+        actions.push(set_auth_service_action(account, account!("auth-any-sys")));
     }
 
     let trx = with_tapos(
@@ -455,7 +455,7 @@ async fn deploy(
     // if the user doesn't have it.
     if let Some(key) = create_account {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+        actions.push(set_auth_service_action(account, account!("auth-ec-sys")));
     }
 
     actions.push(set_code_action(account, wasm));
@@ -481,7 +481,7 @@ async fn deploy(
 async fn upload(
     args: &Args,
     client: reqwest::Client,
-    contract: AccountNumber,
+    service: AccountNumber,
     sender: Option<ExactAccountNumber>,
     dest: &str,
     content_type: &str,
@@ -490,11 +490,11 @@ async fn upload(
     let sender = if let Some(s) = sender {
         s.into()
     } else {
-        contract
+        service
     };
 
     let actions = vec![store_sys(
-        contract,
+        service,
         sender,
         dest,
         content_type,
@@ -516,7 +516,7 @@ async fn upload(
 }
 
 fn fill_tree(
-    contract: AccountNumber,
+    service: AccountNumber,
     sender: AccountNumber,
     actions: &mut Vec<(String, Action)>,
     dest: &str,
@@ -530,7 +530,7 @@ fn fill_tree(
             actions.push((
                 dest.to_owned(),
                 store_sys(
-                    contract,
+                    service,
                     sender,
                     dest,
                     t.essence_str(),
@@ -544,7 +544,7 @@ fn fill_tree(
         for path in read_dir(source)? {
             let path = path?;
             let d = dest.to_owned() + "/" + path.file_name().to_str().unwrap();
-            fill_tree(contract, sender, actions, &d, path.path().to_str().unwrap())?;
+            fill_tree(service, sender, actions, &d, path.path().to_str().unwrap())?;
         }
     }
     Ok(())
@@ -577,7 +577,7 @@ async fn monitor_trx(
 async fn upload_tree(
     args: &Args,
     client: reqwest::Client,
-    contract: AccountNumber,
+    service: AccountNumber,
     sender: Option<ExactAccountNumber>,
     mut dest: &str,
     source: &str,
@@ -585,7 +585,7 @@ async fn upload_tree(
     let sender = if let Some(s) = sender {
         s.into()
     } else {
-        contract
+        service
     };
 
     while !dest.is_empty() && dest.ends_with('/') {
@@ -593,7 +593,7 @@ async fn upload_tree(
     }
 
     let mut actions = Vec::new();
-    fill_tree(contract, sender, &mut actions, dest, source)?;
+    fill_tree(service, sender, &mut actions, dest, source)?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
     let mut running = Vec::new();
@@ -689,7 +689,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .await?
         }
         Commands::Upload {
-            contract,
+            service,
             dest,
             content_type,
             source,
@@ -698,7 +698,7 @@ async fn main() -> Result<(), anyhow::Error> {
             upload(
                 &args,
                 client,
-                (*contract).into(),
+                (*service).into(),
                 *sender,
                 dest,
                 content_type,
@@ -707,11 +707,11 @@ async fn main() -> Result<(), anyhow::Error> {
             .await?
         }
         Commands::UploadTree {
-            contract,
+            service,
             dest,
             source,
             sender,
-        } => upload_tree(&args, client, (*contract).into(), *sender, dest, source).await?,
+        } => upload_tree(&args, client, (*service).into(), *sender, dest, source).await?,
     }
 
     Ok(())
