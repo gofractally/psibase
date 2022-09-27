@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{psibase, AccountNumber, Fracpack, MethodNumber, TimePointSec};
+use crate::{AccountNumber, Fracpack, MethodNumber, TimePointSec};
 use serde::{Deserialize, Serialize};
 
 // TODO: move
@@ -17,6 +17,7 @@ type BlockNum = u32;
 /// Transactions also contains actions requested by the
 /// transaction authorizers.
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct Action {
     /// Account sending the action
     pub sender: AccountNumber,
@@ -32,6 +33,7 @@ pub struct Action {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct SharedAction<'a> {
     pub sender: AccountNumber,
     pub service: AccountNumber,
@@ -43,12 +45,14 @@ pub struct SharedAction<'a> {
 /// the first block. The action struct's fields are ignored, except
 /// rawData, which contains this struct.
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct GenesisActionData {
     pub memo: String,
     pub services: Vec<GenesisService>,
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct SharedGenesisActionData<'a> {
     pub memo: String,
     #[serde(borrow)]
@@ -56,6 +60,7 @@ pub struct SharedGenesisActionData<'a> {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct GenesisService {
     pub service: AccountNumber,
     pub flags: u64,
@@ -65,6 +70,7 @@ pub struct GenesisService {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct SharedGenesisService<'a> {
     pub service: AccountNumber,
     pub flags: u64,
@@ -74,6 +80,7 @@ pub struct SharedGenesisService<'a> {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct Claim {
     pub service: AccountNumber,
     pub rawData: Vec<u8>,
@@ -105,7 +112,7 @@ pub const TAPOS_VALID_FLAGS: u16 = 0x0001;
 ///   is too old. For best results, use the most-recent irreversible block which
 ///   meets the criteria.
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
-#[fracpack(definition_will_not_change)]
+#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 pub struct Tapos {
     pub expiration: TimePointSec,
     pub refBlockSuffix: u32,
@@ -114,6 +121,7 @@ pub struct Tapos {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct Transaction {
     pub tapos: Tapos,
     pub actions: Vec<Action>,
@@ -121,6 +129,7 @@ pub struct Transaction {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct SignedTransaction {
     // Contains a packed `Transaction`. TODO: shared_view_ptr
     pub transaction: Vec<u8>,
@@ -130,12 +139,14 @@ pub struct SignedTransaction {
 type TermNum = u32;
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct Producer {
     pub name: AccountNumber,
     pub auth: Claim,
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
@@ -154,6 +165,7 @@ pub struct BlockHeader {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
@@ -161,12 +173,14 @@ pub struct Block {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct BlockInfo {
     pub header: BlockHeader,
     pub blockId: Checksum256,
