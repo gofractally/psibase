@@ -1,4 +1,4 @@
-use crate::Fracpack;
+use crate::{psibase, Fracpack};
 use custom_error::custom_error;
 use psibase_names::{account_number_from_str, account_number_to_string};
 use serde::{Deserialize, Serialize};

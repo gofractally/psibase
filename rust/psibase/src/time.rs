@@ -1,4 +1,4 @@
-use crate::Fracpack;
+use crate::{psibase, Fracpack};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
