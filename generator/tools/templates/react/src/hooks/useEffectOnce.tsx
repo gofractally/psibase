@@ -4,10 +4,10 @@ import { useRef, EffectCallback, DependencyList, useEffect } from "react";
  *
  * @param effect
  * @param dependencies
- * @description Hook to prevent running the useEffect beyond the first render
+ * @description Hook to prevent running the useEffect beyond the first render which sometimes occurs in Vite where hot reload causes the useEffect to run several times despite an empty depedency
  *
  */
-export default function useEffectOnce(
+export default function useEffectHmr(
     effect: EffectCallback,
     dependancies?: DependencyList
 ) {
@@ -15,7 +15,7 @@ export default function useEffectOnce(
     const initialRender = useRef(true);
 
     useEffect(() => {
-        let effectReturns: void | (() => void) = () => {};
+        let effectReturns: void | (() => void) = () => { };
 
         /**
          * Updating the ref to false on the first render, causing

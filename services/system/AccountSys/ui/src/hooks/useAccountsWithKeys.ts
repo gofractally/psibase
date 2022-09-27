@@ -37,7 +37,7 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
             return uniqueAccounts([...currentAccounts, ...userAccounts])
         }));
 
-        Promise.all(keyPairs.map(keyPair => fetchAccountsByKey(keyPair.publicKey))).then(responses => {
+        Promise.all(keyPairs.filter(keyPair => keyPair.publicKey).map(keyPair => fetchAccountsByKey(keyPair.publicKey))).then(responses => {
             const flatAccounts = responses.flat(1);
             setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authService: 'auth-ec-sys', publicKey: account.pubkey })), ...currentAccounts]))
             const currentKeyPairs = keyPairs;
