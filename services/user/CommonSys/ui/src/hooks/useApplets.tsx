@@ -220,12 +220,6 @@ export const useApplets = () => {
                 injectSender(transactions, currentUser)
             );
 
-            console.log("getAuthed query params >>>", {
-                commonSys: COMMON_SYS,
-                accountSys: ACCOUNT_SYS,
-                transaction,
-            });
-
             const { errors, response: signedTransaction } = await sendQuery(
                 COMMON_SYS,
                 ACCOUNT_SYS,
@@ -461,8 +455,6 @@ export const useApplets = () => {
 
     const handleMessage = useCallback(
         async (sender: AppletId, request: any) => {
-            console.info(">>> appletHandleMessage ", sender, request);
-
             const { type, payload } = request.message;
             if (!type || !payload) {
                 console.error("Received malformed message from applet");

@@ -503,7 +503,6 @@ const messageRouting = [
         type: MessageTypes.Operation,
         fields: ["identifier", "params", "callbackId"],
         route: async (payload) => {
-            console.info(">>> routing op...");
             const { identifier, params, callbackId } = payload;
             const responsePayload = { callbackId, response: null, errors: [] };
             const contractName = await getContractName();
@@ -511,7 +510,6 @@ const messageRouting = [
             if (op) {
                 try {
                     const res = await op.exec(params);
-                    console.info(">>> op executed!", payload);
                     if (res !== undefined) responsePayload.response = res;
                 } catch (e) {
                     responsePayload.errors.push(e);
@@ -594,11 +592,6 @@ const messageRouting = [
         route: (payload) => {
             const { transactionId, trace, errors } = payload;
             const callbackId = transactions[transactionId];
-            console.info("processing trxreceipt >>>", {
-                transactionId,
-                callbackId,
-                payload,
-            });
             return callbackId
                 ? executePromise(callbackId, trace, errors)
                 : false;
@@ -619,14 +612,6 @@ export async function initializeApplet(initializer = () => {}) {
             bufferedMessages.splice(0, bufferedMessages.length);
         },
         onMessage: (msg) => {
-            console.info(">>> rpc.mjs onMessage:", {
-                contractName,
-                registeredQueries,
-                registeredOperations,
-                callbacks,
-                promises,
-                msg,
-            });
             let { type, payload } = msg;
             if (type === undefined || payload === undefined) {
                 console.error("Malformed message received from core");
@@ -711,7 +696,6 @@ export function setQueries(queries) {
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
 export function operation(appletId, name, params = {}) {
-    console.info(">>> initializing op", appletId, name, params);
     const operationPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
         const callbackId = storePromise(resolve, reject);
@@ -731,7 +715,6 @@ export async function operationWithTrxReceipt(appletId, name, params) {
     const transactionSubmittedPromise = new Promise((resolve, reject) => {
         const callbackId = storePromise(resolve, reject);
         transactions[operationRes.transactionId] = callbackId;
-        console.info(">>> trxSubmittedPromise", { transactions, callbackId });
     });
     return transactionSubmittedPromise;
 }
@@ -761,7 +744,6 @@ export function action(application, actionName, params, sender = null) {
  * @param {Object} params - The object containing all parameters expected by the query handler.
  */
 export function query(appletId, name, params = {}) {
-    console.info(">>> initializing query", appletId, name, params);
     const queryPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
         const callbackId = storePromise(resolve, reject);
