@@ -2,28 +2,34 @@ import { useState } from "react";
 import "./App.css";
 import {
     initializeApplet,
-    action,
-    operation,
-    siblingUrl,
-    getJson,
-    setOperations,
 } from "common/rpc.mjs";
 import useEffectHmr from "./hooks/useEffectOnce";
 import { getLoggedInUser } from "./helpers";
 
 
 function App() {
-    const [currentUser, setCurrentUser] = useState("Not authenticated");
+    const [currentUser, setCurrentUser] = useState("Not logged in");
+    const [error, setError] = useState('')
+
+    const fetchCurrentUser = async () => {
+        setError('')
+        try {
+            const res = await getLoggedInUser();
+            setCurrentUser(res)
+        } catch (e) {
+            setError(`Error loading logged in user ${e}`)
+        }
+    }
 
     useEffectHmr(() => {
-
-        getLoggedInUser().then(setCurrentUser);
+        initializeApplet();
+        fetchCurrentUser()
     }, []);
 
     return (
-        <div>
-            <h1>Sample app</h1>
-            <h2>Welcome {currentUser}</h2>
+        <div className="p-4">
+            <h1>Hello world!</h1>
+            <h2>{error ? error : `Welcome ${currentUser}`}</h2>
         </div>
     );
 }

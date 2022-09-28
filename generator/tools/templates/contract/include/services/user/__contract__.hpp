@@ -3,21 +3,42 @@
 #include <compare>
 #include <psibase/Service.hpp>
 #include <string_view>
+#include <psibase/Rpc.hpp>
+#include <optional>
+#include <string>
+#include <vector>
+#include <psibase/Table.hpp>
+#include <psibase/serveContent.hpp>
+
 
 namespace __contract__
 {
-   class __contract__Service : public psibase::Service<__contract__Service>
+
+   struct CounterRow
+   {
+      psibase::AccountNumber account;
+      uint32_t               counter;
+   };
+   PSIO_REFLECT(CounterRow, account, counter);
+
+   using CounterTable = psibase::Table<CounterRow, &CounterRow::account>;
+   using Tables = psibase::ServiceTables<psibase::WebContentTable, CounterTable>;
+
+   class __contract__Service
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("__contract__(kebabCase)");
+      auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
+      void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
-      // This action allows the storage_payer account to create an account owner with zero token balance at the expense of ram_payer for specified token ID
-      void stub();
+      void increment(uint32_t num);
    };
 
    // clang-format off
-   PSIO_REFLECT(__contract__Service, 
-      method(stub)
+   PSIO_REFLECT(
+      __contract__Service, 
+      method(increment, num),
+      method(serveSys, request), 
+      method(storeSys, path, contentType, content)
    );
    // clang-format on
 
