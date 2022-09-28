@@ -71,11 +71,15 @@ fn process_mod(
     psibase_mod: &proc_macro2::TokenStream,
     mut impl_mod: ItemMod,
 ) -> TokenStream {
-    let name_str = options.name.to_string();
+    let mod_name = &impl_mod.ident;
+    let service_account = &options.name;
     let mut iface_use = proc_macro2::TokenStream::new();
     let mut action_structs = proc_macro2::TokenStream::new();
     let mut action_callers = proc_macro2::TokenStream::new();
     let mut dispatch_body = proc_macro2::TokenStream::new();
+    let actions_name = proc_macro2::TokenStream::from_str(&options.actions_name).unwrap();
+    let wrapper_name = proc_macro2::TokenStream::from_str(&options.wrapper_name).unwrap();
+
     if let Some((_, items)) = &mut impl_mod.content {
         let mut action_fns: Vec<usize> = Vec::new();
         for (item_index, item) in items.iter_mut().enumerate() {
@@ -113,7 +117,7 @@ fn process_mod(
         add_unknown_action_check_to_dispatch_body(psibase_mod, &mut dispatch_body);
         items.push(parse_quote! {
             pub const SERVICE: #psibase_mod::AccountNumber =
-                #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#name_str));
+                #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
         });
         items.push(parse_quote! {
             #[automatically_derived]
@@ -123,6 +127,76 @@ fn process_mod(
             pub mod action_structs {
                 #iface_use
                 #action_structs
+            }
+        });
+        items.push(parse_quote! {
+            #[derive(Clone)]
+            #[automatically_derived]
+            pub struct #actions_name <T: #psibase_mod::Caller> {
+                pub caller: T,
+            }
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            #[allow(non_snake_case)]
+            #[allow(non_camel_case_types)]
+            #[allow(non_upper_case_globals)]
+            impl<T: #psibase_mod::Caller> #actions_name<T> {
+                #action_callers
+            }
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            impl<T: #psibase_mod::Caller> From<T> for #actions_name<T> {
+                fn from(caller: T) -> Self {
+                    Self{caller}
+                }
+            }
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            #[derive(Copy, Clone)]
+            pub struct #wrapper_name;
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            impl #wrapper_name {
+                const SERVICE: #psibase_mod::AccountNumber =
+                    #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
+
+                pub fn pack() -> #actions_name<#psibase_mod::ActionPacker> {
+                    #psibase_mod::ActionPacker {
+                        sender: Self::SERVICE,
+                        service: Self::SERVICE,
+                    }
+                    .into()
+                }
+
+                pub fn pack_to(service: #psibase_mod::AccountNumber)
+                -> #actions_name<#psibase_mod::ActionPacker>
+                {
+                    #psibase_mod::ActionPacker {
+                        sender: Self::SERVICE,
+                        service,
+                    }
+                    .into()
+                }
+
+                pub fn pack_from(sender: #psibase_mod::AccountNumber)
+                -> #actions_name<#psibase_mod::ActionPacker>
+                {
+                    #psibase_mod::ActionPacker {
+                        sender,
+                        service: Self::SERVICE,
+                    }
+                    .into()
+                }
+
+                pub fn pack_from_to(sender: #psibase_mod::AccountNumber, service: #psibase_mod::AccountNumber)
+                -> #actions_name<#psibase_mod::ActionPacker>
+                {
+                    #psibase_mod::ActionPacker { sender, service }.into()
+                }
             }
         });
         if options.dispatch {
@@ -159,73 +233,10 @@ fn process_mod(
             "#[psibase::service] module must have inline contents"
         )
     }
-    let actions_name = proc_macro2::TokenStream::from_str(&options.actions_name).unwrap();
-    let wrapper_name = proc_macro2::TokenStream::from_str(&options.wrapper_name).unwrap();
     quote! {
         #impl_mod
-
-        #[derive(Clone)]
-        #[automatically_derived]
-        pub struct #actions_name <T: #psibase_mod::Caller> {
-            pub caller: T,
-        }
-
-        #[automatically_derived]
-        #[allow(non_snake_case)]
-        impl<T: #psibase_mod::Caller> #actions_name<T> {
-            #action_callers
-        }
-
-        #[automatically_derived]
-        impl<T: #psibase_mod::Caller> From<T> for #actions_name<T> {
-            fn from(caller: T) -> Self {
-                Self{caller}
-            }
-        }
-
-        #[automatically_derived]
-        #[derive(Copy, Clone)]
-        pub struct #wrapper_name;
-
-        #[automatically_derived]
-        impl #wrapper_name {
-            const SERVICE: #psibase_mod::AccountNumber =
-                #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#name_str));
-
-            pub fn pack() -> #actions_name<#psibase_mod::ActionPacker> {
-                #psibase_mod::ActionPacker {
-                    sender: Self::SERVICE,
-                    service: Self::SERVICE,
-                }
-                .into()
-            }
-
-            pub fn pack_to(service: #psibase_mod::AccountNumber)
-            -> #actions_name<#psibase_mod::ActionPacker>
-            {
-                #psibase_mod::ActionPacker {
-                    sender: Self::SERVICE,
-                    service,
-                }
-                .into()
-            }
-
-            pub fn pack_from(sender: #psibase_mod::AccountNumber)
-            -> #actions_name<#psibase_mod::ActionPacker>
-            {
-                #psibase_mod::ActionPacker {
-                    sender,
-                    service: Self::SERVICE,
-                }
-                .into()
-            }
-
-            pub fn pack_from_to(sender: #psibase_mod::AccountNumber, service: #psibase_mod::AccountNumber)
-            -> #actions_name<#psibase_mod::ActionPacker>
-            {
-                #psibase_mod::ActionPacker { sender, service }.into()
-            }
-        }
+        pub use #mod_name::#actions_name;
+        pub use #mod_name::#wrapper_name;
     }
     .into()
 } // process_mod
