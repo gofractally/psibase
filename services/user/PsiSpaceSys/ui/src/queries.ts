@@ -1,7 +1,7 @@
 import { postGraphQLGetJson } from "common/rpc.mjs";
 import { useEffect, useMemo, useState } from "react";
-import wait from "waait";
-import { useGraphQLQuery } from "./helpers";
+
+import { useGraphQLQuery, wait } from "./helpers";
 
 export const getContentQuery = (account = "") => {
     if (account) {

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import wait from "waait";
-import useEffectOnce from "../../hooks/useEffectOnce";
+
+import { wait } from "../../helpers";
 import Button from "../button";
 import Text from "../text";
 

@@ -5,7 +5,7 @@ import { initializeApplet, setOperations } from "common/rpc.mjs";
 
 import { TransferHistory } from "./views";
 import { Button, Form, Heading, Icon, Text } from "./components";
-import { getParsedBalanceFromToken, wait } from "./helpers";
+import { getParsedBalanceFromToken } from "./helpers";
 import { executeCredit, operations } from "./operations";
 import {
     getLoggedInUser,
@@ -116,18 +116,18 @@ function App() {
         setTokens(updatedTokens);
     };
 
-    const tokensOptions = 
-        tokens && tokens.length > 0 ?
+    const tokensOptions =
+        tokens && tokens.length > 0 ? (
             tokens?.map((t) => (
                 <option value={t.symbol} key={t.symbol}>
-                    {String(t.symbol || t.token).toUpperCase()}{" "}
-                    - balance: {getParsedBalanceFromToken(t)}
+                    {String(t.symbol || t.token).toUpperCase()} - balance:{" "}
+                    {getParsedBalanceFromToken(t)}
                 </option>
             ))
-        : (
-                <option key="no-tokens" disabled>
-                    No tokens
-                </option>
+        ) : (
+            <option key="no-tokens" disabled>
+                No tokens
+            </option>
         );
 
     return (
