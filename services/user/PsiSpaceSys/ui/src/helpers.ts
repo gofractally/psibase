@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 export const getThisApplet = async (): Promise<string> =>
     (await getJson("/common/thisservice")) as string;
 
+export const wait = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
 // Returns: {
 //     isLoading,   // Is the query in progress?
 //     isError,     // Has an error happened?
