@@ -5,7 +5,7 @@ use custom_error::custom_error;
 use fracpack::Packable;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{producer_sys, setcode_sys};
+use psibase::services::{account_sys, producer_sys, setcode_sys};
 use psibase::{
     account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
     Claim, ExactAccountNumber, Fracpack, PrivateKey, ProducerConfigRow, PublicKey,
@@ -190,17 +190,7 @@ pub struct NewAccountAction {
 }
 
 fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
-    let new_account_action = NewAccountAction {
-        account,
-        auth_service: account!("auth-any-sys"),
-        require_new: false,
-    };
-    Action {
-        sender,
-        service: account!("account-sys"),
-        method: method!("newAccount"),
-        rawData: new_account_action.packed(),
-    }
+    account_sys::Wrapper::pack_from(sender).newAccount(account, account!("auth-any-sys"), false)
 }
 
 fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
@@ -213,12 +203,7 @@ fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
 }
 
 fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
-    Action {
-        sender: account,
-        service: account!("account-sys"),
-        method: method!("setAuthCntr"),
-        rawData: (auth_service,).packed(),
-    }
+    account_sys::Wrapper::pack_from(account).setAuthCntr(auth_service)
 }
 
 #[derive(Serialize, Deserialize, Fracpack)]

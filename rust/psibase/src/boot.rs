@@ -5,7 +5,7 @@ use crate::{
 use anyhow::Context;
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
-use psibase::services::{producer_sys, setcode_sys, transaction_sys};
+use psibase::services::{account_sys, producer_sys, setcode_sys, transaction_sys};
 use psibase::{
     account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
     SharedGenesisActionData, SharedGenesisService, SignedTransaction,
@@ -13,7 +13,7 @@ use psibase::{
 use serde_json::Value;
 
 const ACCOUNTS: [AccountNumber; 22] = [
-    account!("account-sys"),
+    account_sys::service::SERVICE,
     account!("alice"),
     account!("auth-ec-sys"),
     account!("auth-any-sys"),
@@ -211,12 +211,7 @@ fn add_startup_trx(
     producer: &Option<ExactAccountNumber>,
 ) {
     let mut init_actions = vec![
-        Action {
-            sender: account!("account-sys"),
-            service: account!("account-sys"),
-            method: method!("init"),
-            rawData: ().packed(),
-        },
+        account_sys::Wrapper::pack().init(),
         transaction_sys::Wrapper::pack().init(),
         Action {
             sender: account!("nft-sys"),
@@ -242,7 +237,7 @@ fn add_startup_trx(
     let js = "text/javascript";
 
     let mut reg_actions = vec![
-        reg_server(account!("account-sys"), account!("r-account-sys")),
+        reg_server(account_sys::service::SERVICE, account!("r-account-sys")),
         reg_server(account!("auth-ec-sys"), account!("r-ath-ec-sys")),
         reg_server(account!("common-sys"), account!("common-sys")),
         reg_server(account!("explore-sys"), account!("explore-sys")),
@@ -357,7 +352,7 @@ fn add_startup_trx(
     );
 
     let mut doc_actions = vec![
-        new_account_action(account!("account-sys"), account!("doc-sys")), //
+        new_account_action(account_sys::service::SERVICE, account!("doc-sys")), //
     ];
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
@@ -369,8 +364,8 @@ fn add_startup_trx(
     // TODO: make this optional
     #[allow(clippy::inconsistent_digit_grouping)]
     let mut create_and_fund_example_users = vec![
-        new_account_action(account!("account-sys"), account!("alice")),
-        new_account_action(account!("account-sys"), account!("bob")),
+        new_account_action(account_sys::service::SERVICE, account!("alice")),
+        new_account_action(account_sys::service::SERVICE, account!("bob")),
         Action {
             sender: account!("symbol-sys"),
             service: account!("token-sys"),
