@@ -5,10 +5,11 @@ use custom_error::custom_error;
 use fracpack::Packable;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
+use psibase::services::{producer_sys, setcode_sys};
 use psibase::{
     account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
-    Claim, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction, Tapos,
-    TaposRefBlock, TimePointSec, Transaction,
+    Claim, ExactAccountNumber, Fracpack, PrivateKey, ProducerConfigRow, PublicKey,
+    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -229,24 +230,7 @@ pub struct SetCodeAction {
 }
 
 fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
-    let set_code_action = SetCodeAction {
-        service: account,
-        vm_type: 0,
-        vm_version: 0,
-        code: wasm,
-    };
-    Action {
-        sender: account,
-        service: account!("setcode-sys"),
-        method: method!("setCode"),
-        rawData: set_code_action.packed(),
-    }
-}
-
-#[derive(Serialize, Deserialize, Fracpack)]
-pub struct ProducerConfigRow {
-    pub producer_name: AccountNumber,
-    pub producer_auth: Claim,
+    setcode_sys::Wrapper::pack_from(account).setCode(account, 0, 0, wasm)
 }
 
 fn to_claim(key: &PublicKey) -> Claim {
@@ -257,17 +241,10 @@ fn to_claim(key: &PublicKey) -> Claim {
 }
 
 fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
-    let prod = ProducerConfigRow {
-        producer_name: name,
-        producer_auth: key,
-    };
-    let set_producers_action = (vec![prod],);
-    Action {
-        sender: account!("producer-sys"),
-        service: account!("producer-sys"),
-        method: method!("setProducers"),
-        rawData: set_producers_action.packed(),
-    }
+    producer_sys::Wrapper::pack().setProducers(vec![ProducerConfigRow {
+        producerName: name,
+        producerAuth: key,
+    }])
 }
 
 fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {

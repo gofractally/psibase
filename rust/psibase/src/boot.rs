@@ -5,6 +5,7 @@ use crate::{
 use anyhow::Context;
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
+use psibase::services::{producer_sys, setcode_sys, transaction_sys};
 use psibase::{
     account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
     SharedGenesisActionData, SharedGenesisService, SignedTransaction,
@@ -21,7 +22,7 @@ const ACCOUNTS: [AccountNumber; 22] = [
     account!("doc-sys"),
     account!("explore-sys"),
     account!("nft-sys"),
-    account!("producer-sys"),
+    producer_sys::service::SERVICE,
     account!("proxy-sys"),
     account!("psispace-sys"),
     account!("r-account-sys"),
@@ -29,10 +30,10 @@ const ACCOUNTS: [AccountNumber; 22] = [
     account!("r-prod-sys"),
     account!("r-proxy-sys"),
     account!("r-tok-sys"),
-    account!("setcode-sys"),
+    setcode_sys::service::SERVICE,
     account!("symbol-sys"),
     account!("token-sys"),
-    account!("transact-sys"),
+    transaction_sys::service::SERVICE,
     account!("verifyec-sys"),
 ];
 
@@ -216,12 +217,7 @@ fn add_startup_trx(
             method: method!("init"),
             rawData: ().packed(),
         },
-        Action {
-            sender: account!("transact-sys"),
-            service: account!("transact-sys"),
-            method: method!("init"),
-            rawData: ().packed(),
-        },
+        transaction_sys::Wrapper::pack().init(),
         Action {
             sender: account!("nft-sys"),
             service: account!("nft-sys"),
@@ -250,7 +246,7 @@ fn add_startup_trx(
         reg_server(account!("auth-ec-sys"), account!("r-ath-ec-sys")),
         reg_server(account!("common-sys"), account!("common-sys")),
         reg_server(account!("explore-sys"), account!("explore-sys")),
-        reg_server(account!("producer-sys"), account!("r-prod-sys")),
+        reg_server(producer_sys::service::SERVICE, account!("r-prod-sys")),
         reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
         reg_server(account!("psispace-sys"), account!("psispace-sys")),
     ];

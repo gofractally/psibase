@@ -27,7 +27,13 @@ pub struct ServiceMethod {
 ///
 /// Auth services shouldn't inherit from this struct. Instead,
 /// they should define methods with matching signatures.
-#[crate::service(dispatch = false, psibase_mod = "crate")]
+#[crate::service(
+    name = "example-auth",
+    actions_name = "AuthActions",
+    wrapper_name = "AuthWrapper",
+    dispatch = false,
+    psibase_mod = "crate"
+)]
 #[allow(non_snake_case, unused_variables, dead_code)]
 pub mod auth_interface {
     /// The database is in read-only mode. This flag is only
@@ -103,7 +109,7 @@ pub mod auth_interface {
     /// * `claims`:         Claims in transaction (e.g. public keys).
     ///                     Empty if `runAs`
     #[action]
-    pub fn checkAuthSys(
+    fn checkAuthSys(
         flags: u32,
         requester: crate::AccountNumber,
         action: crate::Action,
@@ -125,12 +131,9 @@ pub mod auth_interface {
 /// using other accounts' authorities via [runAs].
 // TODO: tables
 // TODO: service flags
-#[crate::service(dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "transact-sys", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables, dead_code)]
 pub mod service {
-    pub const SERVICE: crate::AccountNumber =
-        crate::AccountNumber::new(crate::account_raw!("transact-sys"));
-
     /// Only called once during chain initialization
     ///
     /// This enables the auth checking system. Before this point, `TransactionSys`
@@ -138,13 +141,13 @@ pub mod service {
     /// `TransactionSys` uses [AuthInterface::checkAuthSys] to authenticate
     /// top-level actions and uses of [runAs].
     #[action]
-    pub fn init() {
+    fn init() {
         unimplemented!()
     }
 
     /// Called by native code at the beginning of each block
     #[action]
-    pub fn startBlock() {
+    fn startBlock() {
         unimplemented!()
     }
 
@@ -171,7 +174,7 @@ pub mod service {
     /// * All other cases, requires `action.sender's authService`
     ///   to approve with flag `AuthInterface::runAsOtherReq` (normally fails).
     #[action]
-    pub fn runAs(
+    fn runAs(
         action: crate::Action,
         allowedActions: Vec<crate::services::transaction_sys::ServiceMethod>,
     ) -> Vec<u8> {
@@ -180,13 +183,13 @@ pub mod service {
 
     /// Get the currently executing transaction
     #[action]
-    pub fn getTransaction() -> crate::Transaction {
+    fn getTransaction() -> crate::Transaction {
         unimplemented!()
     }
 
     /// Get the current block header
     #[action]
-    pub fn currentBlock() -> crate::BlockHeader {
+    fn currentBlock() -> crate::BlockHeader {
         unimplemented!()
     }
 
@@ -195,7 +198,7 @@ pub mod service {
     /// This is *not* the currently executing block.
     /// See [currentBlock].
     #[action]
-    pub fn headBlock() -> crate::BlockHeader {
+    fn headBlock() -> crate::BlockHeader {
         unimplemented!()
     }
 
@@ -204,7 +207,7 @@ pub mod service {
     /// This is *not* the currently executing block time.
     /// TODO: remove
     #[action]
-    pub fn headBlockTime() -> crate::TimePointSec {
+    fn headBlockTime() -> crate::TimePointSec {
         unimplemented!()
     }
 }
