@@ -8,6 +8,8 @@ const appletStyles: { [key: number]: React.CSSProperties } = {
     [AppletStates.primary]: {
         margin: 0,
         padding: 0,
+        width: "100vw",
+        flex: 1,
     },
     [AppletStates.headless]: {
         display: "none",
@@ -73,12 +75,6 @@ export const Applet = ({ applet, handleMessage }: Props) => {
                         scrolling: true,
                         onMessage: doHandleMessage,
                         onInit,
-                        minHeight:
-                            document.documentElement.scrollHeight -
-                            iFrame.getBoundingClientRect().top,
-                        maxHeight:
-                            document.documentElement.scrollHeight -
-                            iFrame.getBoundingClientRect().top,
                     },
                     "#" + iFrameId
                 )[0].iFrameResizer;
