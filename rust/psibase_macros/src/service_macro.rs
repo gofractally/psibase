@@ -235,23 +235,13 @@ fn process_action_callers(
         ReturnType::Type(_, ty) => ty.to_token_stream(),
     };
 
-    // TODO: Bump the minimum required to 1.65 after it's stable and drop 1.64 support
-    #[rustversion::since(1.65)]
-    fn cr(fn_ret: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-        quote! {T::ReturnType::<#fn_ret>}
-    }
-    #[rustversion::before(1.65)]
-    fn cr(_: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-        quote! {T::ReturnType}
-    }
-
     let caller_ret;
     let call;
     if fn_ret.to_string() == "()" {
         caller_ret = quote! {T::ReturnsNothing};
         call = quote! {call_returns_nothing};
     } else {
-        caller_ret = cr(&fn_ret);
+        caller_ret = quote! {T::ReturnType::<#fn_ret>};
         call = quote! {call::<#fn_ret, _>};
     }
 

@@ -18,5 +18,4 @@ proc-macro-error = "1.0.4"
 proc-macro2 = "1.0.36"
 psibase_names = { version = "0.1.0", path = "../psibase_names" }
 quote = "1.0.15"
-rustversion = "1.0.9"
 syn = {version = "1.0.86", features = ["full"] }

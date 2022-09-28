@@ -2243,7 +2243,6 @@ dependencies = [
  "psibase_names",
  "reqwest",
  "ripemd",
- "rustversion",
  "secp256k1",
  "serde",
  "serde_json",
@@ -2259,7 +2258,6 @@ dependencies = [
  "proc-macro2",
  "psibase_names",
  "quote",
- "rustversion",
  "syn",
 ]
 
@@ -2484,12 +2482,6 @@ checksum = "0864aeff53f8c05aa08d86e5ef839d3dfcf07aeba2db32f12db0ef716e87bd55"
 dependencies = [
  "base64",
 ]
-
-[[package]]
-name = "rustversion"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97477e48b4cf8603ad5f7aaf897467cf42ab4218a38ef76fb14c2d6773a6d6a8"
 
 [[package]]
 name = "ryu"
