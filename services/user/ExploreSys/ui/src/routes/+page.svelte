@@ -36,13 +36,19 @@
     const startAutoUpdates = () => {
         apiInterval = setInterval(async () => {
             const lastBlock = data.blocks[0].header;
-            const query = `?last=50&&after="${lastBlock.previous.substr(0,8)}"`;
+            const query = `?last=50&&after="${lastBlock.previous.substr(
+                0,
+                8
+            )}"`;
             const newData = await loadData(query);
             const newBlocks = newData.blocks
-                 .filter((b) => b.header.blockNum > lastBlock.blockNum)
-                 .sort((a, b) => b > a);
+                .filter((b) => b.header.blockNum > lastBlock.blockNum)
+                .sort((a, b) => b > a);
             const newLength = newBlocks.length + data.blocks.length;
-            const oldBlocks = newLength > 50 ? data.blocks.slice(0, 50 - newLength) : data.blocks;
+            const oldBlocks =
+                newLength > 50
+                    ? data.blocks.slice(0, 50 - newLength)
+                    : data.blocks;
             data.blocks = [...newBlocks, ...oldBlocks];
         }, 1000);
         autoUpdateMode = true;
@@ -75,44 +81,55 @@
     {:else if data.error}
         <Error value={data.error} />
     {:else}
-        <div class="mb-6 flex items-center gap-2">
-            <ExplorerIcon />
-            <h1 class="text-6xl text-gray-600">Block Explorer</h1>
-            <div class="flex-grow" />
-            <Button on:click={() => goto("/search")} rightIcon={SearchIcon}
-                >Search</Button>
+        <div class="mb-6 flex justify-between items-center select-none">
+            <div class="flex gap-2 items-center">
+                <ExplorerIcon />
+                <h1 class="text-5xl sm:text-6xl text-gray-600">
+                    Block explorer
+                </h1>
+            </div>
+            <div class="flex-shrink-0">
+                <Button on:click={() => goto("/search")} rightIcon={SearchIcon}
+                    >Search</Button>
+            </div>
         </div>
 
-        <ButtonSet>
-            <Button
-                on:click={() => processPagingRequests(data.pagedResult.first)}
-                >First</Button>
-            <Button
-                disabled={!data.pagedResult.hasPreviousPage}
-                on:click={() =>
-                    processPagingRequests(data.pagedResult.previous)}
-                >Previous</Button>
-            <Button
-                disabled={!data.pagedResult.hasNextPage}
-                on:click={() => processPagingRequests(data.pagedResult.next)}
-                >Next</Button>
-            <Button
-                on:click={() => processPagingRequests(data.pagedResult.last)}
-                >Last</Button>
-            <Button class="AutoUpdatingButton" leftIcon={DotIcon}
-                    iconClass={autoUpdateMode
+        <div class="flex items-center mb-6 gap-2.5 select-none">
+            <ButtonSet>
+                <Button
+                    on:click={() =>
+                        processPagingRequests(data.pagedResult.first)}
+                    class="text-sm">First</Button>
+                <Button
+                    class="text-sm"
+                    disabled={!data.pagedResult.hasPreviousPage}
+                    on:click={() =>
+                        processPagingRequests(data.pagedResult.previous)}
+                    >Previous</Button>
+                <Button
+                    class="text-sm"
+                    disabled={!data.pagedResult.hasNextPage}
+                    on:click={() =>
+                        processPagingRequests(data.pagedResult.next)}
+                    >Next</Button>
+                <Button
+                    class="text-sm"
+                    on:click={() =>
+                        processPagingRequests(data.pagedResult.last)}
+                    >Last</Button>
+            </ButtonSet>
+            <button
+                class="flex gap-1.5 items-center w-24"
+                on:click={toggleAutoUpdateMode}>
+                <DotIcon
+                    class={autoUpdateMode
                         ? "text-green-500"
-                        : "text-gray-500"}
-                    on:click={toggleAutoUpdateMode}>
-                Auto updating
-            </Button>
-        </ButtonSet>
+                        : "text-gray-500"} />
+                <span
+                    class="block text-xs font-semibold text-gray-500 leading-none text-left"
+                    >Auto updating</span>
+            </button>
+        </div>
         <Blocks blocks={data.blocks} />
     {/if}
 </div>
-
-<style>
-    :global(.AutoUpdatingButton) {
-        border-width: 0 0 0 1px !important;
-    }
-</style>
