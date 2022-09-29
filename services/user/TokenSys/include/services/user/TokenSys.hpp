@@ -4,7 +4,6 @@
 #include <psibase/Service.hpp>
 #include <psibase/String.hpp>
 #include <psibase/check.hpp>
-#include <psibase/serveContent.hpp>
 #include <string>
 
 #include <services/user/tokenErrors.hpp>

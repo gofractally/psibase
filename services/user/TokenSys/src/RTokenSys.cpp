@@ -1,7 +1,6 @@
-#include <psibase/serveGraphQL.hpp>
-
 #include <psibase/dispatch.hpp>
 #include <psibase/print.hpp>
+#include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <services/system/CommonSys.hpp>
@@ -15,8 +14,6 @@ using namespace UserService;
 using namespace std;
 using namespace psibase;
 
-using Tables = psibase::ServiceTables<psibase::WebContentTable>;
-
 namespace
 {
    auto simplePage = [](std::string str)
@@ -27,30 +24,96 @@ namespace
    };
 }
 
-struct TokenQuery
+template <typename Tables>
+struct StateQuery
 {
-   auto balances() const
+   AccountNumber service;
+
+   template <typename TableType, int Idx>
+   auto index()
    {
-      return TokenSys::Tables{TokenSys::service}.open<BalanceTable>().getIndex<0>();
+      return Tables{service}.template open<TableType>().template getIndex<Idx>();
+   }
+};
+
+template <typename Service, typename TableType>
+struct EventLink
+{
+   using Tables         = typename Service::Tables;
+   using RecordType     = typename TableType::value_type;
+   using PrimaryKeyType = typename TableType::key_type;
+   using HistoryEvents  = typename Service::Events::History;
+
+   psibase::AccountNumber serviceName;
+   uint64_t RecordType::*eventHead;
+   string_view           previousEventFieldName;
+
+   EventLink(psibase::AccountNumber serviceName,
+             uint64_t RecordType::*eventHead,
+             string_view           previousEventFieldName)
+       : serviceName(serviceName),
+         eventHead(eventHead),
+         previousEventFieldName(previousEventFieldName)
+   {
    }
 
-   auto events() const { return EventQuery<TokenSys::Events>{TokenSys::service}; }
-
-   auto holderEvents(AccountNumber                     holder,
-                     std::optional<uint32_t>           first,
-                     const std::optional<std::string>& after) const
+   uint64_t getEventHead(PrimaryKeyType key)
    {
-      TokenSys::Tables tables{TokenSys::service};
-      auto             holders = tables.open<TokenHolderTable>().getIndex<0>();
-      uint64_t         eventId = 0;
-      if (auto record = holders.get(holder))
-         eventId = record->lastHistoryEvent;
-      return psibase::makeEventConnection<TokenSys::Events::History>(
-          DbId::historyEvent, eventId, TokenSys::service, "prevEvent", first, after);
+      auto idx = StateQuery<Tables>{serviceName}.template index<TableType, 0>();
+
+      uint64_t eventId = 0;
+      if (auto record = idx.get(key))
+      {
+         eventId = (*record).*eventHead;
+      }
+
+      return eventId;
+   }
+
+   auto makeConnection(PrimaryKeyType key, auto first, auto after)
+   {
+      auto eventId = getEventHead(key);
+
+      return makeEventConnection<HistoryEvents>(DbId::historyEvent, eventId, serviceName,
+                                                previousEventFieldName, first, after);
+   }
+};
+
+EventLink<TokenSys, TokenHolderTable> transactionEvents(getReceiver(),
+                                                        &TokenHolderRecord::lastHistoryEvent,
+                                                        "prevEvent");
+
+struct TokenQuery
+{
+   static constexpr auto stateQuery = []() { return StateQuery<TokenSys::Tables>{getReceiver()}; };
+   static constexpr auto eventQuery = []() { return EventQuery<TokenSys::Events>{getReceiver()}; };
+
+   auto balances() const
+   {  //
+
+      return stateQuery().index<BalanceTable, 0>();
+   }
+
+   auto sharedBalances() const
+   {  //
+      return stateQuery().index<SharedBalanceTable, 0>();
+   }
+
+   auto events() const
+   {  //
+      return eventQuery();
+   }
+
+   auto holderEvents(AccountNumber           holder,
+                     optional<uint32_t>      first,
+                     const optional<string>& after) const
+   {
+      return transactionEvents.makeConnection(holder, first, after);
    }
 };
 PSIO_REFLECT(TokenQuery,
              method(balances),
+             method(sharedBalances),
              method(events),
              method(holderEvents, holder, first, after))
 
@@ -62,7 +125,7 @@ optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
    if (auto result = servePackAction<TokenSys>(request))
       return result;
 
-   if (auto result = serveContent(request, Tables{getReceiver()}))
+   if (auto result = serveContent(request, ServiceTables<WebContentTable>{getReceiver()}))
       return result;
 
    if (auto result = _serveRestEndpoints(request))
@@ -77,7 +140,8 @@ optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 void RTokenSys::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content), Tables{getReceiver()});
+   storeContent(move(path), move(contentType), move(content),
+                ServiceTables<WebContentTable>{getReceiver()});
 }
 
 struct AccountBalance
@@ -117,7 +181,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          auto parameters = request.target.substr(string("/api/getTokenTypes").size());
          check(parameters.find('/') == string::npos, "invalid request");
 
-         TokenSys::Tables db{TokenSys::service};
+         TokenSys::Tables db{getReceiver()};
          auto             idx = db.open<TokenTable>().getIndex<0>();
 
          std::vector<UserService::TokenRecord> allTokens;
@@ -133,7 +197,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          check(user.find('/') == string::npos, "invalid user " + user);
          psibase::AccountNumber acc(string_view{user});
 
-         TokenSys::Tables db{TokenSys::service};
+         TokenSys::Tables db{getReceiver()};
          auto             idx = db.open<TokenTable>().getIndex<0>();
          check(idx.begin() != idx.end(), "No tokens");
 

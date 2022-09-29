@@ -1,6 +1,4 @@
 #include <psibase/dispatch.hpp>
-#include <psibase/serveContent.hpp>
-#include <psibase/serveGraphQL.hpp>
 #include <services/system/AccountSys.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/TransactionSys.hpp>
@@ -140,6 +138,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
    balance.balance += amount.value;
    db.open<TokenTable>().put(token);
    db.open<BalanceTable>().put(balance);
+   
 }
 
 void TokenSys::burn(TID tokenId, Quantity amount)
