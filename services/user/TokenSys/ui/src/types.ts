@@ -45,3 +45,14 @@ export type TransferResult = {
     sender: string;
     tokenId: number;
 };
+
+export type SharedBalanceKey = {
+    creditor: string;
+    debitor: string;
+    tokenId: number;
+}
+
+export type SharedBalance = {
+    balance: string;
+    key: SharedBalanceKey;
+};

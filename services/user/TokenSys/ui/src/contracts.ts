@@ -1,17 +1,32 @@
 import { getJson, siblingUrl, Service, Op, Action, Qry } from "common/rpc.mjs";
-
 import { FungibleToken, TokenBalance } from "./types";
 
-export interface CreditOperationPayload {
+interface FundOperationPayload {
     symbol: string;
-    receiver: string;
-    amount: string | number;
     memo: string;
 }
 
+export interface CreditOperationPayload extends FundOperationPayload {
+    receiver: string;
+    amount: string | number;
+}
+
+export interface UncreditOperationPayload extends FundOperationPayload {
+    receiver: string;
+    maxAmount: string | number;
+}
+
+export interface DebitOperationPayload extends FundOperationPayload {
+    sender: string;
+    amount: string | number;
+}
+
+export interface SetUserConfPayload {
+    flag: string;
+    enable: boolean;
+}
 
 export class TokenContract extends Service {
-
     @Qry()
     public async fetchBalances(user: string) {
         const url = await siblingUrl(null, "token-sys", `api/balances/${user}`);
@@ -25,14 +40,30 @@ export class TokenContract extends Service {
         return getJson<FungibleToken[]>(url);
     }
 
+    @Qry()
+    public async getUserConf({ user, flag }: { user: string; flag: string }) {
+        const url = await siblingUrl(
+            null,
+            "token-sys",
+            `api/getUserConf/${user}/${flag}`
+        );
+        console.log("getUserConf", url);
+        return getJson<TokenBalance[]>(url);
+    }
+
     @Action
-    credit(tokenId: number, receiver: string, amount: string | number, memo: string) {
+    public async credit(
+        tokenId: number,
+        receiver: string,
+        amount: string | number,
+        memo: string
+    ) {
         return {
             tokenId,
             receiver,
             amount: { value: String(amount) },
             memo: { contents: memo },
-        }
+        };
     }
 
     @Op()
@@ -42,27 +73,110 @@ export class TokenContract extends Service {
         amount,
         memo,
     }: CreditOperationPayload) {
-
         try {
             const allTokens = await this.fetchTokenTypes();
             const token = allTokens.find(
                 (t) => t.symbolId === symbol.toLowerCase()
             );
-
             if (!token) {
                 throw new Error("No token with symbol " + symbol);
             }
-
-            await this.credit(token.id, receiver, amount, memo)
-
+            await this.credit(token.id, receiver, amount, memo);
         } catch (e) {
             console.error("Credit operation failed:", e);
         }
+    }
 
+    @Action
+    public async uncredit(
+        tokenId: number,
+        receiver: string,
+        maxAmount: string | number,
+        memo: string
+    ) {
+        return {
+            tokenId,
+            receiver,
+            maxAmount: { value: String(maxAmount) },
+            memo: { contents: memo },
+        };
+    }
+
+    @Op()
+    public async unCreditOp({
+        symbol,
+        receiver,
+        maxAmount,
+        memo,
+    }: UncreditOperationPayload) {
+        try {
+            const allTokens = await this.fetchTokenTypes();
+            const token = allTokens.find(
+                (t) => t.symbolId === symbol.toLowerCase()
+            );
+            if (!token) {
+                throw new Error("No token with symbol " + symbol);
+            }
+            await this.uncredit(token.id, receiver, maxAmount, memo);
+        } catch (e) {
+            console.error("Uncredit operation failed:", e);
+        }
+    }
+
+    @Action
+    public async debit(
+        tokenId: number,
+        sender: string,
+        amount: string | number,
+        memo: string
+    ) {
+        return {
+            tokenId,
+            sender,
+            amount: { value: String(amount) },
+            memo: { contents: memo },
+        };
+    }
+
+    @Op()
+    public async debitOp({
+        symbol,
+        sender,
+        amount,
+        memo,
+    }: DebitOperationPayload) {
+        try {
+            const allTokens = await tokenContract.fetchTokenTypes();
+            const token = allTokens.find(
+                (t) => t.symbolId === symbol.toLowerCase()
+            );
+            if (!token) {
+                throw new Error("No token with symbol " + symbol);
+            }
+            await this.debit(token.id, sender, amount, memo);
+        } catch (e) {
+            console.error("Debit operation failed:", e);
+        }
+    }
+
+    @Action
+    public async setUserConf(flag: string, enable: boolean) {
+        console.log("setUserConf Action", flag, enable);
+        return {
+            flag,
+            enable,
+        };
+    }
+
+    @Op()
+    public async setUserConfOp({ flag, enable }: SetUserConfPayload) {
+        console.log("TokenSys Operation: setUserConf", flag, enable);
+        try {
+            await this.setUserConf(flag, enable);
+        } catch (e) {
+            console.error("setUserConf operation failed:", e);
+        }
     }
 }
 
-
-
-
-export const tokenContract = new TokenContract()
+export const tokenContract = new TokenContract();

@@ -15,6 +15,10 @@ export const getTokens = async (user: string) => {
     return tokenContract.fetchBalances(user);
 };
 
+export const getUserConf = async (user: string, flag: string) => {
+    return tokenContract.getUserConf({ user, flag });
+};
+
 export const pollForBalanceChange = async (
     user: string,
     prevToken: TokenBalance,
@@ -59,5 +63,29 @@ const queryTransferHistory = (holder: string) => `{
 
 export const useTransferHistory = (user?: string) => {
     const query = user && queryTransferHistory(user);
+    return useGraphQLQuery("/graphql", query);
+};
+
+const querySharedBalances = () => `{
+  sharedBalances(last:1000) {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    edges {
+      node {
+        balance
+        key {
+          creditor
+          debitor
+          tokenId
+        }
+      }
+    }
+  }
+}`;
+
+export const useSharedBalances = (user?: string) => {
+    const query = querySharedBalances();
     return useGraphQLQuery("/graphql", query);
 };
