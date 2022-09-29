@@ -34,6 +34,11 @@ struct TokenQuery
       return TokenSys::Tables{TokenSys::service}.open<BalanceTable>().getIndex<0>();
    }
 
+   auto sharedBalances() const
+   {
+      return TokenSys::Tables{TokenSys::service}.open<SharedBalanceTable>().getIndex<0>();
+   }
+
    auto events() const { return EventQuery<TokenSys::Events>{TokenSys::service}; }
 
    auto holderEvents(AccountNumber                     holder,
@@ -51,6 +56,7 @@ struct TokenQuery
 };
 PSIO_REFLECT(TokenQuery,
              method(balances),
+             method(sharedBalances),
              method(events),
              method(holderEvents, holder, first, after))
 
