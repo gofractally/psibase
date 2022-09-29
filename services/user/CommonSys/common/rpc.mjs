@@ -641,7 +641,7 @@ export async function initializeApplet(initializer = () => {}) {
 }
 
 function set({ targetArray, newElements }, caller) {
-    const valid = newElements.every((e) => {
+    let valid = newElements.every((e) => {
         if (!verifyFields(e, ["id", "exec"])) {
             return false;
         }
