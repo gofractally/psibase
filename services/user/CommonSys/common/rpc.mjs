@@ -695,7 +695,7 @@ export function setQueries(queries) {
  * @param {String} name - The name of the operation to run.
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
-export function operation(appletId, name, params = {}) {
+export async function operation(appletId, name, params = {}) {
     const operationPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
         const callbackId = storePromise(resolve, reject);
@@ -706,17 +706,17 @@ export function operation(appletId, name, params = {}) {
         });
     });
 
-    return operationPromise;
-}
+    const operationRes = await operationPromise;
 
-export async function operationWithTrxReceipt(appletId, name, params) {
-    const operationRes = await operation(appletId, name, params);
+    let transactionSubmittedPromise;
+    if (operationRes.transactionId) {
+        transactionSubmittedPromise = new Promise((resolve, reject) => {
+            const callbackId = storePromise(resolve, reject);
+            transactions[operationRes.transactionId] = callbackId;
+        });
+    }
 
-    const transactionSubmittedPromise = new Promise((resolve, reject) => {
-        const callbackId = storePromise(resolve, reject);
-        transactions[operationRes.transactionId] = callbackId;
-    });
-    return transactionSubmittedPromise;
+    return { ...operationRes, transactionSubmittedPromise };
 }
 
 /**
