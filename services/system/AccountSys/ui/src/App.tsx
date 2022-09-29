@@ -6,11 +6,16 @@ import {
     useImportAccount,
     useCreateAccount,
     useAccounts,
-    useInitialized
-} from './hooks'
+    useInitialized,
+} from "./hooks";
 
-import appAccountIcon from "./components/assets/icons/app-account.svg";
-import { AccountsList, AccountList, CreateAccountForm, Heading } from "./components";
+import AccountIcon from "./components/assets/icons/app-account.svg";
+import {
+    AccountsList,
+    AccountList,
+    CreateAccountForm,
+    Heading,
+} from "./components";
 import { getLoggedInUser } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
 
@@ -27,15 +32,14 @@ export interface KeyPairWithAccounts extends KeyPair {
 
 interface Account {
     accountNum: string;
-    publicKey: KeyPairWithAccounts['publicKey']
+    publicKey: KeyPairWithAccounts["publicKey"];
 }
 export interface AccountWithAuth extends Account {
     authService: string;
 }
 export interface AccountWithKey extends AccountWithAuth {
-    privateKey: KeyPairWithAccounts['privateKey']
+    privateKey: KeyPairWithAccounts["privateKey"];
 }
-
 
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
@@ -47,36 +51,34 @@ function App() {
         if (isLoggingOutOfCurrentUser) {
             setCurrentUser(accountsWithKeys[0].accountNum);
         }
-        dropAccount(account)
-    }
-
+        dropAccount(account);
+    };
 
     useInitialized(async () => {
         try {
             setCurrentUser(await getLoggedInUser());
         } catch (e: any) {
-            console.info(
-                "App.appInitialized.useEffect().error:",
-                e.message
-            );
+            console.info("App.appInitialized.useEffect().error:", e.message);
         }
-    })
+    });
 
     const createAccountFormRef = useRef<{ resetForm: () => void }>(null);
 
-    const [onCreateAccount, isAccountLoading, accountError] = useCreateAccount((newAccount, privateKey) => {
-        createAccountFormRef.current!.resetForm()
-        addAccounts([{ ...newAccount, privateKey }]);
-        refreshAccounts();
-    })
-    const [searchKeyPair, isImportLoading, importError] = useImportAccount(addAccounts);
-
+    const [onCreateAccount, isAccountLoading, accountError] = useCreateAccount(
+        (newAccount, privateKey) => {
+            createAccountFormRef.current!.resetForm();
+            addAccounts([{ ...newAccount, privateKey }]);
+            refreshAccounts();
+        }
+    );
+    const [searchKeyPair, isImportLoading, importError] =
+        useImportAccount(addAccounts);
 
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
-            <div className="flex gap-2">
-                <img src={appAccountIcon} />
-                <Heading tag="h1" className="text-gray-600">
+            <div className="flex items-center gap-2">
+                <AccountIcon />
+                <Heading tag="h1" className="select-none text-gray-600">
                     Accounts
                 </Heading>
             </div>
@@ -89,15 +91,20 @@ function App() {
                 />
             </div>
             <div className="bg-slate-50 mt-4 flex justify-between">
-                <CreateAccountForm errorMessage={accountError} isLoading={isAccountLoading} onCreateAccount={onCreateAccount} ref={createAccountFormRef} />
-                <ImportAccountForm errorMessage={importError} isLoading={isImportLoading} onImport={searchKeyPair} />
+                <CreateAccountForm
+                    errorMessage={accountError}
+                    isLoading={isAccountLoading}
+                    onCreateAccount={onCreateAccount}
+                    ref={createAccountFormRef}
+                />
+                <ImportAccountForm
+                    errorMessage={importError}
+                    isLoading={isImportLoading}
+                    onImport={searchKeyPair}
+                />
             </div>
             {/* <SetAuth /> */}
-            <AccountsList
-                accounts={allAccounts}
-            />
-
-
+            <AccountsList accounts={allAccounts} />
         </div>
     );
 }
