@@ -2,6 +2,8 @@ import LogoutIcon from "./assets/icons/logout.svg";
 import { AccountWithAuth } from "../App";
 import ClosedIcon from "./assets/icons/lock-closed.svg";
 import OpenIcon from "./assets/icons/lock-open.svg";
+import Heading from "./Heading";
+import Text from "./Text";
 
 export const AccountList = ({
     accounts,
@@ -17,49 +19,36 @@ export const AccountList = ({
     const isAccountsAvailable = accounts.length > 0;
 
     return (
-        <div>
-            <h2 className="pt-6">Available accounts</h2>
-            <div>
+        <section>
+            <Heading tag="h2" className="font-medium text-gray-600">
+                Available accounts
+            </Heading>
+            <Text className="font-medium">
                 {isAccountsAvailable
-                    ? `Choose an account below to make it active.`
+                    ? "Choose an account below to make it active."
                     : "No accounts available."}
-            </div>
+            </Text>
 
             {isAccountsAvailable && (
                 <table className="min-w-full table-fixed">
-                    <thead className="text-slate-900">
+                    <thead className="text-slate-900 border-b border-gray-900 text-base font-bold text-gray-900">
                         <tr>
-                            <th
-                                scope="col"
-                                className="w-32 py-3.5 text-left text-sm font-semibold text-gray-900"
-                            >
+                            <th scope="col" className="w-32 text-left">
                                 Active
                             </th>
-                            <th
-                                scope="col"
-                                className="w-32 py-3.5 text-left text-sm font-semibold text-gray-900"
-                            >
+                            <th scope="col" className="w-32 text-left">
                                 Account
                             </th>
-                            <th
-                                scope="col"
-                                className="py-3.5 text-left text-sm font-semibold text-gray-900"
-                            >
-                                Security
-                            </th>
-                            <th
-                                scope="col"
-                                className="py-3.5 text-right text-sm font-semibold text-gray-900"
-                            >
+                            <th scope="col" className="pr-2.5 text-right">
                                 Action
                             </th>
                         </tr>
                     </thead>
                     <tbody>
                         {accounts.map((account) => (
-                            <tr key={account.accountNum} className="w-8">
+                            <tr key={account.accountNum}>
                                 <td>
-                                    <div className="w-20">
+                                    <div className="flex h-[60px] w-14 items-center justify-center">
                                         <input
                                             name="account"
                                             type="radio"
@@ -71,42 +60,35 @@ export const AccountList = ({
                                                 account.accountNum
                                             }
                                             id={account.accountNum}
+                                            className="text-gray-700 focus-within:text-gray-900 focus-within:outline-gray-900"
                                         />
                                     </div>
                                 </td>
-                                <td>
-                                    <div className="w-32 text-lg">
+                                <td className="w-32 text-lg">
+                                    <div className="flex h-[60px] items-center">
                                         {account.accountNum}
                                     </div>
                                 </td>
-                                <td className="">
-                                    <div className="h-10 w-8">
-                                        {account.authService ==
-                                        "auth-any-sys" ? (
-                                            <OpenIcon />
-                                        ) : (
-                                            <ClosedIcon />
-                                        )}
+                                <td>
+                                    <div className="flex h-[60px] items-center justify-end">
+                                        <button
+                                            className="flex items-center gap-1 p-2 hover:text-gray-600"
+                                            onClick={() =>
+                                                onLogout(account.accountNum)
+                                            }
+                                        >
+                                            <span className="hidden text-xs font-semibold underline sm:inline">
+                                                Logout
+                                            </span>
+                                            <LogoutIcon />
+                                        </button>
                                     </div>
-                                </td>
-                                <td className="flex flex-row-reverse">
-                                    <button
-                                        className="ml-auto flex items-center gap-2"
-                                        onClick={() =>
-                                            onLogout(account.accountNum)
-                                        }
-                                    >
-                                        <span className="hidden underline sm:inline">
-                                            Logout
-                                        </span>
-                                        <LogoutIcon />
-                                    </button>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             )}
-        </div>
+        </section>
     );
 };

@@ -1,4 +1,5 @@
-import { forwardRef, useImperativeHandle, useState } from "react";
+import { forwardRef, useState } from "react";
+import { useForm, SubmitHandler } from "react-hook-form";
 
 import {
     genKeyPair,
@@ -7,8 +8,12 @@ import {
     publicKeyPairToString,
 } from "common/keyConversions.mjs";
 
-import Refresh from "./assets/icons/refresh.svg";
+import { AccountWithKey } from "../App";
 import Button from "./Button";
+import Heading from "./Heading";
+import Text from "./Text";
+import Form from "./Form";
+import { createAccount } from "../operations";
 
 export interface AccountPair {
     privateKey: string;
@@ -17,9 +22,8 @@ export interface AccountPair {
 }
 
 interface Props {
-    isLoading: boolean;
-    errorMessage: string;
-    onCreateAccount: (pair: AccountPair) => void;
+    refreshAccounts: () => void;
+    addAccounts: (accounts: AccountWithKey[]) => void;
 }
 
 const getPublicKey = (key: string): { error: string; publicKey: string } => {
@@ -36,97 +40,121 @@ const getPublicKey = (key: string): { error: string; publicKey: string } => {
     }
 };
 
-export const CreateAccountForm = forwardRef(
-    ({ onCreateAccount, isLoading, errorMessage }: Props, ref) => {
-        const [name, setName] = useState("");
-        const [pubKey, setPubKey] = useState("");
-        const [privKey, setPrivKey] = useState("");
+interface Inputs {
+    name: string;
+    key: string;
+}
 
-        useImperativeHandle(ref, () => ({
-            resetForm() {
-                console.log("child function 1 called");
-                setName("");
-                setPubKey("");
-                setPrivKey("");
+export const CreateAccountForm = forwardRef(
+    ({ refreshAccounts, addAccounts }: Props, ref) => {
+        const [pubKey, setPubKey] = useState("");
+        const [error, setError] = useState("");
+        const [formSubmitted, setFormSubmitted] = useState(false);
+
+        const {
+            register,
+            handleSubmit,
+            formState: { errors },
+            reset,
+            setValue,
+        } = useForm<Inputs>({
+            defaultValues: {
+                name: "",
+                key: "",
             },
-        }));
+        });
+
+        const onSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
+            setFormSubmitted(true);
+            setError("");
+            try {
+                const newAccount = await createAccount({
+                    account: data.name,
+                    publicKey: pubKey,
+                    privateKey: data.key,
+                });
+                addAccounts([{ ...newAccount, privateKey: data.key }]);
+                refreshAccounts();
+                updatePublicKey("");
+                reset();
+            } catch (e: any) {
+                setError(e.message);
+                console.log(e);
+            }
+            setFormSubmitted(false);
+        };
 
         const generateKeyPair = () => {
             const kp = genKeyPair(KeyType.k1);
             setPubKey(kp.pub);
-            setPrivKey(kp.priv);
+            setValue("key", kp.priv);
         };
 
-        const updatePrivateKey = (key: string) => {
-            setPrivKey(key);
+        const updatePublicKey = (key: string) => {
             const { publicKey, error } = getPublicKey(key);
             if (!error && publicKey) {
                 setPubKey(publicKey);
+            } else {
+                setPubKey("");
             }
         };
 
-        const isValid = name !== "";
-
-        const isDisabled = isLoading || !isValid;
-
         return (
-            <div>
-                <h2>Add an account</h2>
-                <div>Input your own private key, or generate a new one.</div>
-                <div>
-                    <div>Name</div>
-                    <input
-                        type="text"
-                        value={name}
-                        className="w-full xs:w-64"
-                        onChange={(e) => setName(e.target.value)}
-                    ></input>
-                </div>
-                <div className="w-full sm:w-96">
-                    <div className="flex w-full justify-between">
-                        <span className="my-2">Private key</span>
-                        <button
-                            onClick={generateKeyPair}
-                            className="m-1 flex cursor-pointer items-center justify-between gap-2 bg-gray-200 py-1 px-3 text-center text-gray-700 no-underline ring-gray-100 hover:bg-gray-300 focus:ring-4"
-                        >
-                            <Refresh />
-                            Generate new key
-                        </button>
+            <section className="mb-4 rounded bg-gray-100 px-5 pt-4 pb-5">
+                <Heading
+                    tag="h3"
+                    className="select-none font-medium text-gray-600"
+                >
+                    Create an account
+                </Heading>
+                <Text size="base">
+                    Input your own private key or generate a new one.
+                </Text>
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+                    <Form.Input
+                        label="Name"
+                        placeholder="Account name"
+                        {...register("name", {
+                            required: "This field is required",
+                        })}
+                        errorText={errors.name?.message}
+                    />
+                    <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                            <Form.Input
+                                label="Private key"
+                                placeholder="Private key"
+                                {...register("key", {
+                                    required: "This field is required",
+                                    onChange: (e) =>
+                                        updatePublicKey(e.target.value),
+                                })}
+                                errorText={errors.key?.message}
+                                helperText={
+                                    pubKey ? `Public key: ${pubKey}` : ""
+                                }
+                                rightIcon="refresh"
+                                onClickRightIcon={generateKeyPair}
+                            />
+                        </div>
                     </div>
-                    <input
-                        type="text"
-                        className="w-full"
-                        value={privKey}
-                        onChange={(e) => updatePrivateKey(e.target.value)}
-                    ></input>
-                </div>
-                <div className="w-full sm:w-96">
-                    <div>Public Key</div>
-                    <input
-                        type="text"
-                        value={pubKey}
-                        className="w-full"
-                        disabled={true}
-                        onChange={(e) => setPubKey(e.target.value)}
-                    ></input>
-                </div>
-                <div className="mt-4">
                     <Button
-                        type="primary"
-                        disabled={isDisabled}
-                        onClick={(e) =>
-                            onCreateAccount({
-                                account: name,
-                                publicKey: pubKey,
-                                privateKey: privKey,
-                            })
-                        }
+                        type="outline"
+                        size="lg"
+                        isSubmit
+                        isLoading={formSubmitted}
+                        disabled={formSubmitted}
+                        className="w-48"
                     >
-                        {isLoading ? "Loading.." : "Create Account"}
+                        Create account
                     </Button>
-                </div>
-                <div className="mt-4 h-8 text-red-700">{errorMessage}</div>
-            </div>
+                </form>
+                {error && (
+                    <div className="mt-4 h-8 font-semibold text-red-600">
+                        {error}
+                    </div>
+                )}
+            </section>
         );
     }
 );

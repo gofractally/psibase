@@ -1,10 +1,9 @@
-import React, { useRef } from "react";
+import React from "react";
 
 import {
     useAccountsWithKeys,
     useCurrentUser,
     useImportAccount,
-    useCreateAccount,
     useAccounts,
     useInitialized,
 } from "./hooks";
@@ -62,15 +61,6 @@ function App() {
         }
     });
 
-    const createAccountFormRef = useRef<{ resetForm: () => void }>(null);
-
-    const [onCreateAccount, isAccountLoading, accountError] = useCreateAccount(
-        (newAccount, privateKey) => {
-            createAccountFormRef.current!.resetForm();
-            addAccounts([{ ...newAccount, privateKey }]);
-            refreshAccounts();
-        }
-    );
     const [searchKeyPair, isImportLoading, importError] =
         useImportAccount(addAccounts);
 
@@ -82,27 +72,21 @@ function App() {
                     Accounts
                 </Heading>
             </div>
-            <div className="bg-slate-50">
-                <AccountList
-                    onLogout={onLogout}
-                    selectedAccount={currentUser}
-                    accounts={accountsWithKeys}
-                    onSelectAccount={setCurrentUser}
-                />
-            </div>
-            <div className="bg-slate-50 mt-4 flex justify-between">
-                <CreateAccountForm
-                    errorMessage={accountError}
-                    isLoading={isAccountLoading}
-                    onCreateAccount={onCreateAccount}
-                    ref={createAccountFormRef}
-                />
-                <ImportAccountForm
-                    errorMessage={importError}
-                    isLoading={isImportLoading}
-                    onImport={searchKeyPair}
-                />
-            </div>
+            <AccountList
+                onLogout={onLogout}
+                selectedAccount={currentUser}
+                accounts={accountsWithKeys}
+                onSelectAccount={setCurrentUser}
+            />
+            <CreateAccountForm
+                addAccounts={addAccounts}
+                refreshAccounts={refreshAccounts}
+            />
+            <ImportAccountForm
+                errorMessage={importError}
+                isLoading={isImportLoading}
+                onImport={searchKeyPair}
+            />
             {/* <SetAuth /> */}
             <AccountsList accounts={allAccounts} />
         </div>
