@@ -1,8 +1,8 @@
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_key_action, set_producers_action,
-    store_sys, to_claim, without_tapos, Args, Error,
+    store_sys, to_claim, without_tapos, Args,
 };
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
 use psibase::services::{account_sys, producer_sys, setcode_sys, transaction_sys};
@@ -64,9 +64,7 @@ async fn push_boot_impl(
         response = response.error_for_status()?;
     }
     if response.status().is_server_error() {
-        return Err(anyhow::Error::new(Error::Msg {
-            s: response.text().await?,
-        }));
+        return Err(anyhow!("{}", response.text().await?));
     }
     let text = response.text().await?;
     let json: Value = serde_json::de::from_str(&text)?;
@@ -74,7 +72,7 @@ async fn push_boot_impl(
     let err = json.get("error").and_then(|v| v.as_str());
     if let Some(e) = err {
         if !e.is_empty() {
-            return Err(Error::Msg { s: e.to_string() }.into());
+            return Err(anyhow!("{}", e));
         }
     }
     Ok(())

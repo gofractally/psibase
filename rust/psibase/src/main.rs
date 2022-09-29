@@ -1,7 +1,6 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
-use custom_error::custom_error;
 use fracpack::Packable;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -16,11 +15,6 @@ use serde::{Deserialize, Serialize};
 use std::fs::{metadata, read_dir};
 
 mod boot;
-
-custom_error! { Error
-    Msg{s:String}               = "{s}",
-    StaticMsg{s:&'static str}   = "{s}",
-}
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
@@ -41,11 +35,11 @@ struct Args {
     sign: Vec<PrivateKey>,
 
     #[clap(subcommand)]
-    command: Commands,
+    command: Command,
 }
 
 #[derive(Subcommand, Debug)]
-enum Commands {
+enum Command {
     /// Boot a development chain
     Boot {
         /// Set all accounts to authenticate using this key
@@ -305,16 +299,10 @@ async fn create(
     let mut actions: Vec<Action> = Vec::new();
 
     if key.is_some() && insecure {
-        return Err(Error::StaticMsg {
-            s: "--key and --insecure cannot be used together",
-        }
-        .into());
+        return Err(anyhow!("--key and --insecure cannot be used together"));
     }
     if key.is_none() && !insecure {
-        return Err(Error::StaticMsg {
-            s: "either --key or --insecure must be used",
-        }
-        .into());
+        return Err(anyhow!("either --key or --insecure must be used"));
     }
 
     actions.push(new_account_action(sender, account));
@@ -348,16 +336,10 @@ async fn modify(
     let mut actions: Vec<Action> = Vec::new();
 
     if key.is_some() && insecure {
-        return Err(Error::StaticMsg {
-            s: "--key and --insecure cannot be used together",
-        }
-        .into());
+        return Err(anyhow!("--key and --insecure cannot be used together"));
     }
     if key.is_none() && !insecure {
-        return Err(Error::StaticMsg {
-            s: "either --key or --insecure must be used",
-        }
-        .into());
+        return Err(anyhow!("either --key or --insecure must be used"));
     }
 
     if let Some(key) = key {
@@ -399,10 +381,9 @@ async fn deploy(
     let mut actions: Vec<Action> = Vec::new();
 
     if create_account.is_some() && create_insecure_account {
-        return Err(Error::StaticMsg {
-            s: "--create-account and --create-insecure-account cannot be used together",
-        }
-        .into());
+        return Err(anyhow!(
+            "--create-account and --create-insecure-account cannot be used together"
+        ));
     }
 
     if create_account.is_some() || create_insecure_account {
@@ -591,10 +572,7 @@ async fn upload_tree(
         .count();
     if num_failed > 0 {
         progress.abandon();
-        return Err(Error::Msg {
-            s: format!("{}/{} failed transactions", num_failed, num_trx),
-        }
-        .into());
+        return Err(anyhow!("{}/{} failed transactions", num_failed, num_trx));
     }
 
     println!("Ok");
@@ -606,10 +584,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Commands::Boot { key, producer } => {
-            boot::boot(&args, client, key, &Some(*producer)).await?
-        }
-        Commands::Create {
+        Command::Boot { key, producer } => boot::boot(&args, client, key, &Some(*producer)).await?,
+        Command::Create {
             account,
             key,
             insecure,
@@ -625,12 +601,12 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .await?
         }
-        Commands::Modify {
+        Command::Modify {
             account,
             key,
             insecure,
         } => modify(&args, client, (*account).into(), key, *insecure).await?,
-        Commands::Deploy {
+        Command::Deploy {
             account,
             filename,
             create_account,
@@ -650,7 +626,7 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .await?
         }
-        Commands::Upload {
+        Command::Upload {
             service,
             dest,
             content_type,
@@ -668,7 +644,7 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .await?
         }
-        Commands::UploadTree {
+        Command::UploadTree {
             service,
             dest,
             source,
