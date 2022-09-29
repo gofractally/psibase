@@ -410,7 +410,7 @@ Each peer has the following fields:
 ### Logging
 
 - [Console Logger](#console-logger)
-- File Logger (TODO)
+- [File Logger](#file-logger)
 - Syslog Logger (TODO)
 - [Websocket Logger](#websocket-logger)
 - [Filters](#log-filters)
@@ -418,31 +418,72 @@ Each peer has the following fields:
 
 `/native/admin/loggers` provides `GET` and `PUT` access to the server's logging configuration.
 
-The body is a JSON object which has a field for each logger.
+The body is a JSON object which has a field for each logger.  The name of the logger is only significant to identify the logger. When the log configuration is changed, if the new configuration has a logger with the same name and type as one in the old configuration, the old logger will be updated to the new configuration without dropping any log records.
 
 ```
 {
-   "console": {
-       "type": "console"
-       "filter": "%Severity% >= info"
-       "format": "[%TimeStamp%] [%Severity%]: %Message%"
-   }
+    "console": {
+        "type": "console"
+        "filter": "%Severity% >= info"
+        "format": "[%TimeStamp%] [%Severity%]: %Message%"
+    }
 }
 ```
 
 All loggers must have the following fields:
 
-| Field  | Type             | Description                                             |
-|--------|------------------|---------------------------------------------------------|
-| type   | String           | The type of the logger: [`"console"`](#console-logger)  |
-| filter | String           | The [filter](#log-filters) for the logger               |
-| format | String or Object | Determines the [format](#log-fomatters) of log messages |
+| Field    | Type             | Description                                                                        |
+|----------|------------------|------------------------------------------------------------------------------------|
+| `type`   | String           | The type of the logger: [`"console"`](#console-logger) or [`"file"`](#file-logger) |
+| `filter` | String           | The [filter](#log-filters) for the logger                                          |
+| `format` | String or Object | Determines the [format](#log-fomatters) of log messages                            |
 
 Additional fields are determined by the logger type.
 
 ### Console logger
 
 The console logger writes to the server's `stderr`.  It does not use any addition configuration.  There should not be more than one console logger.
+
+### File logger
+
+The file logger writes to a named file and optionally provides log rotation and deletion.  Multiple file loggers are supported as long as they do not write to the same files.
+
+| Field          | Type    | Description                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+|----------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `filename`     | String  | The name of the log file                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `target`       | String  | The pattern for renaming the current log file when rotating logs. If no target is specified, the log file will simply be closed and a new one opened.                                                                                                                                                                                                                                                                                                     |
+| `rotationSize` | Number  | The file size in bytes when logs will be rotated                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `rotationTime` | String  | The time when logs are rotated. If it is a duration such as `"P8H"` or `"P1W"`, the log file will be rotated based on the elapsed time since it was opened. If it is a time, such as `"12:00:00Z"` or `"01-01T00:00:00Z"`, logs will be rotated at the the specified time, daily, monthly, or annually. Finally, a repeating time interval of the form `R/2020-01-01T00:00:00Z/P1W` (start and duration) gives precise control of the rotation schedule. |
+| `maxSize`      | Number  | The maximum total size of all log files.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `maxFiles`     | Number  | The maximum number of log files.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `flush`        | Boolean | If set to true every log record will be written immediately.  Otherwise, log records will be buffered.                                                                                                                                                                                                                                                                                                                                                    |
+
+`filename` and `target` can contain patterns which will be used to generate multiple file names. The paths are relative to the server's root directory.
+
+| Placeholder                           | Description                                                   |
+|---------------------------------------|---------------------------------------------------------------|
+| `%N`                                  | A counter that increments every time a new log file is opened |
+| `%y` `%Y` `%m` `%d`, `%H`, `%M`, `%S` | `strftime` format for the current time                        |
+
+Both rotation and log deletion trigger when any condition is reached.
+
+When log files are deleted, the oldest logs will be deleted first. All files that match the target pattern are assumed to be log files and may be deleted.
+
+Example:
+```
+{
+    "psibase.log": {
+        "type": "file",
+        "filter": "%Severity >= info%",
+        "format": "[%TimeStamp%]: %Message%",
+        "filename": "psibase.log",
+        "target": "psibase-%Y%m%d-%N.log",
+        "rotationTime": "00:00:00Z",
+        "rotationSize": 16777216
+        "maxSize": 1073741824
+    }
+}
+```
 
 ### Websocket logger
 
