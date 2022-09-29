@@ -184,6 +184,7 @@ async fn build() -> Result<Vec<PathBuf>, anyhow::Error> {
         .arg("--target=wasm32-wasi")
         .arg("--crate-type=cdylib")
         .arg("--message-format=json-diagnostic-rendered-ansi")
+        .arg("--color=always")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -204,7 +205,6 @@ async fn build() -> Result<Vec<PathBuf>, anyhow::Error> {
         process(f, SERVICE_POLYFILL)?
     }
 
-    pretty("Done", "");
     Ok(files)
 }
 
@@ -237,5 +237,7 @@ async fn main() -> Result<(), anyhow::Error> {
             todo!()
         }
     };
+
+    pretty("Done", "");
     Ok(())
 }
