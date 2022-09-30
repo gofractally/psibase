@@ -1,3 +1,3 @@
 # Introduction
 
-- [Psibase](https://psibase.psibase.io)
+- [About Psibase](https://about.psibase.io)
