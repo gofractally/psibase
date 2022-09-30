@@ -1,4 +1,4 @@
-# Basic Service
+# Basic C++ Service
 
 Here is a basic service definition. Place `example.cpp` and `CMakeLists.txt` in an empty folder.
 

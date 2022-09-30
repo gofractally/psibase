@@ -368,6 +368,8 @@ void DefaultTestChain::registerSysRpc()
        rpcPsiSpace.storeSys("/index.html", html, readWholeFile(psiSpDir + "/ui/dist/index.html")),
        rpcPsiSpace.storeSys("/index.js", js, readWholeFile(psiSpDir + "/ui/dist/index.js")),
        rpcPsiSpace.storeSys("/loader.svg", svg, readWholeFile(psiSpDir + "/ui/dist/loader.svg")),
+       rpcPsiSpace.storeSys("/app-psispace-icon.svg", svg,
+                            readWholeFile(psiSpDir + "/ui/dist/app-psispace-icon.svg")),
        rpcPsiSpace.storeSys("/style.css", css, readWholeFile(psiSpDir + "/ui/dist/style.css")),
        rpcPsiSpace.storeSys(
            "/default-profile/default-profile.html", html,

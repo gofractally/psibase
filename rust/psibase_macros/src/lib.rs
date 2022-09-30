@@ -1,12 +1,12 @@
-use contract_macro::contract_macro_impl;
 use fracpack_macro::fracpack_macro_impl;
 use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
+use service_macro::service_macro_impl;
 
-mod contract_macro;
 mod fracpack_macro;
 mod number_macro;
+mod service_macro;
 
 #[proc_macro_derive(Fracpack, attributes(fracpack))]
 pub fn derive_fracpack(input: TokenStream) -> TokenStream {
@@ -15,18 +15,30 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn contract(attr: TokenStream, item: TokenStream) -> TokenStream {
-    contract_macro_impl(attr, item)
+pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
+    service_macro_impl(attr, item)
 }
 
 #[proc_macro_error]
 #[proc_macro]
 pub fn account(item: TokenStream) -> TokenStream {
-    account_macro_impl(item)
+    account_macro_impl(true, item)
+}
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn account_raw(item: TokenStream) -> TokenStream {
+    account_macro_impl(false, item)
 }
 
 #[proc_macro_error]
 #[proc_macro]
 pub fn method(item: TokenStream) -> TokenStream {
-    method_macro_impl(item)
+    method_macro_impl(true, item)
+}
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn method_raw(item: TokenStream) -> TokenStream {
+    method_macro_impl(false, item)
 }

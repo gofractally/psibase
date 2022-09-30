@@ -1,15 +1,26 @@
 use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::quote;
+use std::str::FromStr;
 use syn::{
     parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, FieldsUnnamed,
 };
 
 /// Fracpack struct level options
-#[derive(Debug, Default, FromDeriveInput)]
+#[derive(Debug, FromDeriveInput)]
 #[darling(default, attributes(fracpack))]
 pub struct Options {
     definition_will_not_change: bool,
+    fracpack_mod: String,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            definition_will_not_change: false,
+            fracpack_mod: "psibase::fracpack".into(),
+        }
+    }
 }
 
 struct StructField<'a> {
@@ -41,6 +52,7 @@ fn struct_fields(data: &DataStruct) -> Vec<StructField> {
 }
 
 fn enum_named<'a>(
+    frackpack_mod: &proc_macro2::TokenStream,
     enum_name: &proc_macro2::Ident,
     field_name: &'a proc_macro2::Ident,
     field: &FieldsNamed,
@@ -98,7 +110,7 @@ fn enum_named<'a>(
                     quote! {#f,}
                 })
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
-            quote! {<#as_tuple_of_ref as fracpack::TupleOfRefPackable>::pack_tuple_of_ref(&(#numbered), dest)}
+            quote! {<#as_tuple_of_ref as #frackpack_mod::TupleOfRefPackable>::pack_tuple_of_ref(&(#numbered), dest)}
         },
         unpack: {
             let init = field
@@ -113,7 +125,7 @@ fn enum_named<'a>(
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
             quote! {
                 {
-                    let data = <#as_type as fracpack::Packable>::unpack(src, pos)?;
+                    let data = <#as_type as #frackpack_mod::Packable>::unpack(src, pos)?;
                     #enum_name::#field_name{#init}
                 }
             }
@@ -122,6 +134,7 @@ fn enum_named<'a>(
 }
 
 fn enum_single<'a>(
+    frackpack_mod: &proc_macro2::TokenStream,
     enum_name: &proc_macro2::Ident,
     field_name: &'a proc_macro2::Ident,
     field: &FieldsUnnamed,
@@ -133,14 +146,15 @@ fn enum_single<'a>(
             quote! {#ty}
         },
         selector: quote! {(field_0)},
-        pack: quote! {<#ty as fracpack::Packable>::pack(field_0, dest)},
+        pack: quote! {<#ty as #frackpack_mod::Packable>::pack(field_0, dest)},
         unpack: quote! {
-            #enum_name::#field_name(<#ty as fracpack::Packable>::unpack(src, pos)?)
+            #enum_name::#field_name(<#ty as #frackpack_mod::Packable>::unpack(src, pos)?)
         },
     }
 }
 
 fn enum_tuple<'a>(
+    frackpack_mod: &proc_macro2::TokenStream,
     enum_name: &proc_macro2::Ident,
     field_name: &'a proc_macro2::Ident,
     field: &FieldsUnnamed,
@@ -195,7 +209,7 @@ fn enum_tuple<'a>(
                     quote! {#f,}
                 })
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
-            quote! {<#as_tuple_of_ref as fracpack::TupleOfRefPackable>::pack_tuple_of_ref(&(#numbered), dest)}
+            quote! {<#as_tuple_of_ref as #frackpack_mod::TupleOfRefPackable>::pack_tuple_of_ref(&(#numbered), dest)}
         },
         unpack: {
             let numbered = field
@@ -209,7 +223,7 @@ fn enum_tuple<'a>(
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
             quote! {
                 {
-                    let data = <#as_type as fracpack::Packable>::unpack(src, pos)?;
+                    let data = <#as_type as #frackpack_mod::Packable>::unpack(src, pos)?;
                     #enum_name::#field_name(#numbered)
                 }
             }
@@ -217,20 +231,24 @@ fn enum_tuple<'a>(
     }
 }
 
-fn enum_fields<'a>(enum_name: &proc_macro2::Ident, data: &'a DataEnum) -> Vec<EnumField<'a>> {
+fn enum_fields<'a>(
+    frackpack_mod: &proc_macro2::TokenStream,
+    enum_name: &proc_macro2::Ident,
+    data: &'a DataEnum,
+) -> Vec<EnumField<'a>> {
     data.variants
         .iter()
         .map(|var| {
             let field_name = &var.ident;
 
             match &var.fields {
-                Fields::Named(field) => enum_named(enum_name, field_name, field),
+                Fields::Named(field) => enum_named(frackpack_mod, enum_name, field_name, field),
 
                 Fields::Unnamed(field) => {
                     if field.unnamed.len() == 1 {
-                        enum_single(enum_name, field_name, field)
+                        enum_single(frackpack_mod, enum_name, field_name, field)
                     } else {
-                        enum_tuple(enum_name, field_name, field)
+                        enum_tuple(frackpack_mod, enum_name, field_name, field)
                     }
                 }
                 Fields::Unit => unimplemented!("variants must have fields"), // TODO
@@ -242,24 +260,29 @@ fn enum_fields<'a>(enum_name: &proc_macro2::Ident, data: &'a DataEnum) -> Vec<En
 pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    // parse fracpack macro options
     let opts = match Options::from_derive_input(&input) {
         Ok(val) => val,
         Err(err) => {
             return err.write_errors().into();
         }
     };
+    let frackpack_mod = proc_macro2::TokenStream::from_str(&opts.fracpack_mod).unwrap();
 
     match &input.data {
-        Data::Struct(data) => process_struct(&input, data, &opts),
-        Data::Enum(data) => process_enum(&input, data),
+        Data::Struct(data) => process_struct(&frackpack_mod, &input, data, &opts),
+        Data::Enum(data) => process_enum(&frackpack_mod, &input, data),
         Data::Union(_) => unimplemented!("fracpack does not support union"),
     }
 }
 
 // TODO: compile time: verify no non-optionals are after an optional
 // TODO: unpack: check optionals not in heap
-fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> TokenStream {
+fn process_struct(
+    frackpack_mod: &proc_macro2::TokenStream,
+    input: &DeriveInput,
+    data: &DataStruct,
+    opts: &Options,
+) -> TokenStream {
     let name = &input.ident;
     let generics = &input.generics;
     let fields = struct_fields(data);
@@ -267,7 +290,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
         .iter()
         .map(|field| {
             let ty = &field.ty;
-            quote! {<#ty as fracpack::Packable>::FIXED_SIZE}
+            quote! {<#ty as #frackpack_mod::Packable>::FIXED_SIZE}
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
     let use_heap = if !opts.definition_will_not_change {
@@ -277,7 +300,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             .iter()
             .map(|field| {
                 let ty = &field.ty;
-                quote! {<#ty as fracpack::Packable>::VARIABLE_SIZE}
+                quote! {<#ty as #frackpack_mod::Packable>::VARIABLE_SIZE}
             })
             .fold(quote! {false}, |acc, new| quote! {#acc || #new})
     };
@@ -290,12 +313,12 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
         })
         .collect();
     let pack_heap = if !opts.definition_will_not_change {
-        quote! { <u16 as fracpack::Packable>::pack(&(heap as u16), dest); }
+        quote! { <u16 as #frackpack_mod::Packable>::pack(&(heap as u16), dest); }
     } else {
         quote! {}
     };
     let unpack_heap_size = if !opts.definition_will_not_change {
-        quote! { let heap_size = <u16 as fracpack::Packable>::unpack(src, pos)?; }
+        quote! { let heap_size = <u16 as #frackpack_mod::Packable>::unpack(src, pos)?; }
     } else {
         quote! { let heap_size = #fixed_size; }
     };
@@ -308,7 +331,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             let pos = &positions[i];
             quote! {
                 let #pos = dest.len() as u32;
-                <#ty as fracpack::Packable>::embedded_fixed_pack(&self.#name, dest);
+                <#ty as #frackpack_mod::Packable>::embedded_fixed_pack(&self.#name, dest);
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -320,8 +343,8 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             let ty = &field.ty;
             let pos = &positions[i];
             quote! {
-                <#ty as fracpack::Packable>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
-                <#ty as fracpack::Packable>::embedded_variable_pack(&self.#name, dest);
+                <#ty as #frackpack_mod::Packable>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
+                <#ty as #frackpack_mod::Packable>::embedded_variable_pack(&self.#name, dest);
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -331,7 +354,7 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
             let name = &field.name;
             let ty = &field.ty;
             quote! {
-                #name: <#ty as fracpack::Packable>::embedded_unpack(src, pos, &mut heap_pos)?,
+                #name: <#ty as #frackpack_mod::Packable>::embedded_unpack(src, pos, &mut heap_pos)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -341,11 +364,11 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
         .iter()
         .map(|field| {
             let ty = &field.ty;
-            quote! { <#ty as fracpack::Packable>::embedded_verify(src, pos, &mut heap_pos)?; }
+            quote! { <#ty as #frackpack_mod::Packable>::embedded_verify(src, pos, &mut heap_pos)?; }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
-        impl<'a> fracpack::Packable<'a> for #name #generics {
+        impl<'a> #frackpack_mod::Packable<'a> for #name #generics {
             const VARIABLE_SIZE: bool = #use_heap;
             const FIXED_SIZE: u32 = if Self::VARIABLE_SIZE { 4 } else { #fixed_size };
             fn pack(&self, dest: &mut Vec<u8>) {
@@ -355,11 +378,11 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 #pack_fixed_members
                 #pack_variable_members
             }
-            fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
+            fn unpack(src: &'a [u8], pos: &mut u32) -> #frackpack_mod::Result<Self> {
                 #unpack_heap_size
                 let mut heap_pos = *pos + heap_size as u32;
                 if heap_pos < *pos {
-                    return Err(fracpack::Error::BadOffset);
+                    return Err(#frackpack_mod::Error::BadOffset);
                 }
                 let result = Self {
                     #unpack
@@ -367,11 +390,11 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
                 *pos = heap_pos;
                 Ok(result)
             }
-            fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
+            fn verify(src: &'a [u8], pos: &mut u32) -> #frackpack_mod::Result<()> {
                 #unpack_heap_size
                 let mut heap_pos = *pos + heap_size as u32;
                 if heap_pos < *pos {
-                    return Err(fracpack::Error::BadOffset);
+                    return Err(#frackpack_mod::Error::BadOffset);
                 }
                 #verify
                 *pos = heap_pos;
@@ -381,10 +404,14 @@ fn process_struct(input: &DeriveInput, data: &DataStruct, opts: &Options) -> Tok
     })
 } // process_struct
 
-fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
+fn process_enum(
+    frackpack_mod: &proc_macro2::TokenStream,
+    input: &DeriveInput,
+    data: &DataEnum,
+) -> TokenStream {
     let name = &input.ident;
     let generics = &input.generics;
-    let fields = enum_fields(name, data);
+    let fields = enum_fields(frackpack_mod, name, data);
     // TODO: 128? also check during verify and unpack
     assert!(fields.len() < 256);
     let pack_items = fields
@@ -421,12 +448,12 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
             let index = i as u8;
             let as_type = &field.as_type;
             quote! {
-                #index => <#as_type as fracpack::Packable>::verify(src, pos)?,
+                #index => <#as_type as #frackpack_mod::Packable>::verify(src, pos)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
-        impl<'a> fracpack::Packable<'a> for #name #generics {
+        impl<'a> #frackpack_mod::Packable<'a> for #name #generics {
             const FIXED_SIZE: u32 = 4;
             const VARIABLE_SIZE: bool = true;
             fn pack(&self, dest: &mut Vec<u8>) {
@@ -437,24 +464,24 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
                 let size = (dest.len() - size_pos - 4) as u32;
                 dest[size_pos..size_pos + 4].copy_from_slice(&size.to_le_bytes());
             }
-            fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-                let index = <u8 as fracpack::Packable>::unpack(src, pos)?;
+            fn unpack(src: &'a [u8], pos: &mut u32) -> #frackpack_mod::Result<Self> {
+                let index = <u8 as #frackpack_mod::Packable>::unpack(src, pos)?;
                 let size_pos = *pos;
-                let size = <u32 as fracpack::Packable>::unpack(src, pos)?;
+                let size = <u32 as #frackpack_mod::Packable>::unpack(src, pos)?;
                 let result = match index {
                     #unpack_items
-                    _ => return Err(fracpack::Error::BadEnumIndex),
+                    _ => return Err(#frackpack_mod::Error::BadEnumIndex),
                 };
                 if *pos != size_pos + 4 + size {
-                    return Err(fracpack::Error::BadSize);
+                    return Err(#frackpack_mod::Error::BadSize);
                 }
                 Ok(result)
             }
             // TODO: option to error on unknown index
-            fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-                let index = <u8 as fracpack::Packable>::unpack(src, pos)?;
+            fn verify(src: &'a [u8], pos: &mut u32) -> #frackpack_mod::Result<()> {
+                let index = <u8 as #frackpack_mod::Packable>::unpack(src, pos)?;
                 let size_pos = *pos;
-                let size = <u32 as fracpack::Packable>::unpack(src, pos)?;
+                let size = <u32 as #frackpack_mod::Packable>::unpack(src, pos)?;
                 match index {
                     #verify_items
                     _ => {
@@ -463,7 +490,7 @@ fn process_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
                     }
                 }
                 if *pos != size_pos + 4 + size {
-                    return Err(fracpack::Error::BadSize);
+                    return Err(#frackpack_mod::Error::BadSize);
                 }
                 Ok(())
             }

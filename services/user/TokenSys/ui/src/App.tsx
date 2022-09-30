@@ -5,7 +5,7 @@ import { initializeApplet, setOperations } from "common/rpc.mjs";
 
 import { TransferHistory } from "./views";
 import { Button, Form, Heading, Icon, Text } from "./components";
-import { getParsedBalanceFromToken, wait } from "./helpers";
+import { getParsedBalanceFromToken } from "./helpers";
 import { executeCredit, operations } from "./operations";
 import {
     getLoggedInUser,
@@ -31,7 +31,7 @@ window.React = React;
 
 function App() {
     const [userName, setUserName] = useState("");
-    const [transferError, setTransferError] = useState(false);
+    const [transferError, setTransferError] = useState("");
     const [tokens, setTokens] = useState<TokenBalance[]>();
     const [formSubmitted, setFormSubmitted] = useState(false);
     const [transferHistoryResult, invalidateTransferHistoryQuery] =
@@ -58,6 +58,7 @@ function App() {
         register,
         handleSubmit,
         formState: { errors },
+        setError,
         reset,
     } = useForm<TransferInputs>({
         defaultValues: {
@@ -70,15 +71,23 @@ function App() {
     const onSubmit: SubmitHandler<TransferInputs> = async (
         data: TransferInputs
     ) => {
-        setTransferError(false);
+        setTransferError("");
         setFormSubmitted(true);
         try {
             await transfer(data);
+            reset();
         } catch (e) {
-            console.error("TRANSFER ERROR");
-            setTransferError(true);
+            if (
+                Array.isArray(e) &&
+                typeof e[0] === "string" &&
+                e[0].includes("Invalid account")
+            ) {
+                setError("to", { message: "Invalid account" });
+            } else {
+                console.error("TRANSFER ERROR", e);
+                setTransferError(`${e}`);
+            }
         }
-        reset();
         invalidateTransferHistoryQuery();
         setFormSubmitted(false);
     };
@@ -96,7 +105,6 @@ function App() {
         const decimal = (amountSegments[1] ?? "0").padEnd(token.precision, "0");
         const parsedAmount = `${amountSegments[0]}${decimal}`;
 
-        // TODO: Errors getting swallowed by CommonSys::executeTransaction(). Fix.
         await executeCredit({
             symbol,
             receiver: to,
@@ -104,10 +112,23 @@ function App() {
             memo: "Working",
         });
 
-        await wait(2000); // TODO: Would be great if the credit operation returned a value
         const updatedTokens = await pollForBalanceChange(userName, token);
         setTokens(updatedTokens);
     };
+
+    const tokensOptions =
+        tokens && tokens.length > 0 ? (
+            tokens?.map((t) => (
+                <option value={t.symbol} key={t.symbol}>
+                    {String(t.symbol || t.token).toUpperCase()} - balance:{" "}
+                    {getParsedBalanceFromToken(t)}
+                </option>
+            ))
+        ) : (
+            <option key="no-tokens" disabled>
+                No tokens
+            </option>
+        );
 
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
@@ -141,12 +162,7 @@ function App() {
                             })}
                             errorText={errors.token?.message}
                         >
-                            {tokens?.map((t) => (
-                                <option value={t.symbol} key={t.symbol}>
-                                    {String(t.symbol || t.token).toUpperCase()}{" "}
-                                    - balance: {getParsedBalanceFromToken(t)}
-                                </option>
-                            ))}
+                            {tokensOptions}
                         </Form.Select>
                     </div>
                     <div className="flex-1">

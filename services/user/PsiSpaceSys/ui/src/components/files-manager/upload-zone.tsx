@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import wait from "waait";
-import useEffectOnce from "../../hooks/useEffectOnce";
+
+import { wait } from "../../helpers";
 import Button from "../button";
 import Text from "../text";
 
@@ -75,7 +75,7 @@ export const UploadZone = ({
     const filesBoxHeight = 430;
 
     return (
-        <div className="fixed right-2 bottom-8 bg-white">
+        <div className="fixed right-8 bottom-8 bg-white">
             {!displayControls ? (
                 <div style={{ height: dropZoneHeight }} {...getRootProps()}>
                     <input {...getInputProps()} />

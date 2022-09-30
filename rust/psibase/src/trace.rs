@@ -2,6 +2,7 @@ use crate::{Action, Fracpack};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct ActionTrace {
     pub action: Action,
@@ -11,6 +12,7 @@ pub struct ActionTrace {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct EventTrace {
     pub name: String,
@@ -18,12 +20,14 @@ pub struct EventTrace {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleTrace {
     pub console: String,
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub enum InnerTraceEnum {
     ConsoleTrace(ConsoleTrace),
     EventTrace(EventTrace),
@@ -31,12 +35,14 @@ pub enum InnerTraceEnum {
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct InnerTrace {
     pub inner: InnerTraceEnum,
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {
     pub action_traces: Vec<ActionTrace>,

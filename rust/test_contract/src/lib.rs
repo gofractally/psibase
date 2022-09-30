@@ -1,12 +1,5 @@
-use psibase::*;
-
-#[contract(example)]
-mod example_contract {
-    #[action]
-    pub fn hi() {
-        psibase::write_console("hello!!!");
-    }
-
+#[psibase::service]
+pub mod service {
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {
         a + b

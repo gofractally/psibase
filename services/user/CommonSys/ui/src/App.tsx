@@ -9,20 +9,18 @@ const App = () => {
         useApplets();
 
     return (
-        <div>
+        <div className="flex h-screen w-screen flex-col">
             <Nav currentUser={currentUser} />
             <BrowserRouter>
-                <div>
-                    <Route path="/" exact>
-                        <Dashboard currentUser={currentUser} />
-                    </Route>
-                    <Route path={appletPrefix}>
-                        <Applet
-                            applet={primaryApplet}
-                            handleMessage={handleMessage}
-                        />
-                    </Route>
-                </div>
+                <Route path="/" exact>
+                    <Dashboard currentUser={currentUser} />
+                </Route>
+                <Route path={appletPrefix}>
+                    <Applet
+                        applet={primaryApplet}
+                        handleMessage={handleMessage}
+                    />
+                </Route>
             </BrowserRouter>
             {subApplets.map((subApplet) => (
                 <Applet

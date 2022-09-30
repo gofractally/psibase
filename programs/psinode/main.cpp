@@ -648,6 +648,7 @@ int main(int argc, char* argv[])
 
    try
    {
+      psibase::loggers::set_path(db_path);
       psibase::loggers::configure();
       auto prover = std::make_shared<CompoundProver>();
       for (const auto& key : keys)

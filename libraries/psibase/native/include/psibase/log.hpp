@@ -53,6 +53,11 @@ namespace psibase
          BOOST_LOG_ATTRIBUTE_KEYWORD(BlockId, "BlockId", Checksum256)
       }  // namespace keyword
 
+      // Sets the root path for file loggers.  If this is
+      // not set, it defaults to the current working directory.
+      // This should be called before configure, as it does not
+      // affect existing loggers.
+      void        set_path(std::string_view p);
       void        configure();
       void        configure(std::string_view json);
       std::string get_config();
