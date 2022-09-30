@@ -70,5 +70,11 @@ const psibase = (appletContract: string) => {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react(), psibase("__contract__(kebabCase)")],
+    plugins: [react({
+        babel: {
+            parserOpts: {
+                plugins: ['decorators-legacy']
+            }
+        }
+    }), psibase("__contract__(kebabCase)")],
 });

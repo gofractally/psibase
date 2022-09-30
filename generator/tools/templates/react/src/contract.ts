@@ -1,4 +1,4 @@
-import { action, AppletId, getJson, operation, Operation, setOperations } from "common/rpc.mjs";
+import { action, AppletId, getJson, operation, Operation } from "common/rpc.mjs";
 
 export class Service {
     protected cachedApplet?: string;
