@@ -1,4 +1,5 @@
 import React, { forwardRef, HTMLProps } from "react";
+import classNames from "classnames";
 
 import { Text } from ".";
 import "../styles/inputs.css";
@@ -67,7 +68,10 @@ const FieldSet = ({
                     <Text
                         span
                         size="sm"
-                        className={`font-semibold ${subTextColor}`}
+                        className={classNames([
+                            subTextColor,
+                            "break-all font-semibold",
+                        ])}
                     >
                         {subText}
                     </Text>
@@ -110,7 +114,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps & SubText>(
             >
                 <input
                     name={props.id}
-                    className={`Input w-full border bg-white px-3 py-4 text-lg text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500 ${borderColor}`}
+                    className={classNames([
+                        "Input",
+                        "w-full border bg-white px-3 py-4 text-lg text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500",
+                        borderColor,
+                        { "pr-12": !!rightIcon },
+                    ])}
                     ref={ref}
                     {...inputProps}
                 />
