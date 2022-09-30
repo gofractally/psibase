@@ -1,6 +1,8 @@
 import { AppletId, getJson, operationWithTrxReceipt } from "common/rpc.mjs";
-import { AccountWithAuth } from "./App";
+
+import { AccountWithAuth, AccountWithKey } from "./App";
 import { AccountPair } from "./components/CreateAccountForm";
+import { fetchAccountsByKey } from "./helpers";
 
 export const createAccount = async (account: AccountPair) => {
     const thisApplet = await getJson<string>("/common/thisservice");
@@ -18,4 +20,25 @@ export const createAccount = async (account: AccountPair) => {
     });
 
     return newAccount;
+};
+
+export const importAccount = async (keyPair: {
+    privateKey: string;
+    publicKey: string;
+}) => {
+    const res = await fetchAccountsByKey(keyPair.publicKey);
+
+    if (res.length == 0) {
+        throw new Error("No accounts found");
+    } else {
+        const accounts = res.map(
+            (res): AccountWithKey => ({
+                accountNum: res.account,
+                authService: "auth-ec-sys",
+                publicKey: res.pubkey,
+                privateKey: keyPair.privateKey,
+            })
+        );
+        return accounts;
+    }
 };

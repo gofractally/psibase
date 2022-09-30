@@ -3,7 +3,6 @@ import React from "react";
 import {
     useAccountsWithKeys,
     useCurrentUser,
-    useImportAccount,
     useAccounts,
     useInitialized,
 } from "./hooks";
@@ -61,9 +60,6 @@ function App() {
         }
     });
 
-    const [searchKeyPair, isImportLoading, importError] =
-        useImportAccount(addAccounts);
-
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
             <div className="flex items-center gap-2">
@@ -82,11 +78,7 @@ function App() {
                 addAccounts={addAccounts}
                 refreshAccounts={refreshAccounts}
             />
-            <ImportAccountForm
-                errorMessage={importError}
-                isLoading={isImportLoading}
-                onImport={searchKeyPair}
-            />
+            <ImportAccountForm addAccounts={addAccounts} />
             {/* <SetAuth /> */}
             <AccountsList accounts={allAccounts} />
         </div>

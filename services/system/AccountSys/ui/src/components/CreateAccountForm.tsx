@@ -86,11 +86,10 @@ export const CreateAccountForm = forwardRef(
                 updatePublicKey("");
                 reset();
             } catch (e: any) {
+                console.error("ACCOUNT CREATE ERROR", e);
                 if (!Array.isArray(e)) {
-                    console.error("ACCOUNT CREATE ERROR", e);
                     setGeneralError(`${e}`);
                 } else if (typeof e[0] !== "string") {
-                    console.error("ACCOUNT CREATE ERROR", e);
                     setGeneralError(
                         "There was an error creating your account. Please try again."
                     );
@@ -103,7 +102,6 @@ export const CreateAccountForm = forwardRef(
                         message: "Invalid account name",
                     });
                 } else {
-                    console.error("ACCOUNT CREATE ERROR", e);
                     setGeneralError(e[0]);
                 }
             }
@@ -147,6 +145,7 @@ export const CreateAccountForm = forwardRef(
                             required: "This field is required",
                         })}
                         errorText={errors.name?.message}
+                        autoComplete="off"
                     />
                     <div className="flex items-center gap-4">
                         <div className="flex-1">
@@ -164,6 +163,7 @@ export const CreateAccountForm = forwardRef(
                                 }
                                 rightIcon="refresh"
                                 onClickRightIcon={generateKeyPair}
+                                autoComplete="off"
                             />
                         </div>
                     </div>

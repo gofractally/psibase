@@ -8,6 +8,8 @@ import {
 import Button from "./Button";
 import Heading from "./Heading";
 import Form from "./Form";
+import { AccountWithKey } from "../App";
+import { importAccount } from "../operations";
 
 export interface AccountPair {
     privateKey: string;
@@ -18,9 +20,7 @@ interface Inputs {
     key: string;
 }
 interface Props {
-    isLoading: boolean;
-    errorMessage: string;
-    onImport: (pair: AccountPair) => void;
+    addAccounts: (accounts: AccountWithKey[]) => void;
 }
 
 const getPublicKey = (key: string): { error: string; publicKey: string } => {
@@ -37,12 +37,7 @@ const getPublicKey = (key: string): { error: string; publicKey: string } => {
     }
 };
 
-export const ImportAccountForm = ({
-    onImport,
-    isLoading,
-    errorMessage,
-}: Props) => {
-    // PVT_K1_2BoUt7jA7V9DZu3io5RUWHCZj8c7th47K7cJ1m8yeqJCqYJdy1
+export const ImportAccountForm = ({ addAccounts }: Props) => {
     const [publicKey, setPublicKey] = useState("");
     const [formSubmitted, setFormSubmitted] = useState(false);
     const [generalError, setGeneralError] = useState("");
@@ -70,29 +65,21 @@ export const ImportAccountForm = ({
         }
 
         try {
-            onImport({ privateKey: data.key, publicKey });
+            const accounts = await importAccount({
+                privateKey: data.key,
+                publicKey,
+            });
+            addAccounts(accounts);
             updatePublicKey("");
             reset();
         } catch (e: any) {
-            if (!Array.isArray(e)) {
-                console.error("ACCOUNT CREATE ERROR", e);
-                setGeneralError(`${e}`);
-            } else if (typeof e[0] !== "string") {
-                console.error("ACCOUNT CREATE ERROR", e);
+            console.error("ACCOUNT IMPORT ERROR", e);
+            if (typeof e.message !== "string") {
                 setGeneralError(
-                    "There was an error creating your account. Please try again."
+                    "There was an error importing your account. Please try again."
                 );
-            } else if (e[0].includes("account already exists")) {
-                setError("key", {
-                    message: "Account with name already exists",
-                });
-            } else if (e[0].includes("invalid account name")) {
-                setError("key", {
-                    message: "Invalid account name",
-                });
             } else {
-                console.error("ACCOUNT CREATE ERROR", e);
-                setGeneralError(e[0]);
+                setError("key", { message: e.message });
             }
         }
         setFormSubmitted(false);
@@ -129,51 +116,19 @@ export const ImportAccountForm = ({
                     })}
                     errorText={errors.key?.message}
                     helperText={publicKey ? `Public key: ${publicKey}` : ""}
+                    autoComplete="off"
                 />
                 <Button
                     type="outline"
                     size="lg"
                     isSubmit
-                    isLoading={formSubmitted || isLoading}
-                    disabled={formSubmitted || isLoading}
+                    isLoading={formSubmitted}
+                    disabled={formSubmitted}
                     className="w-48"
                 >
                     Import account
                 </Button>
             </form>
-            {/* <div className="w-full sm:w-96">
-                <div className="flex w-full justify-between">
-                    <span className="my-2">Private key</span>
-                </div>
-                <input
-                    type="text"
-                    className="w-full"
-                    value={privateKey}
-                    onChange={(e) => setPrivateKey(e.target.value)}
-                ></input>
-            </div>
-            <div className="w-full sm:w-96">
-                <div>Public Key</div>
-                <input
-                    type="text"
-                    value={publicKey}
-                    className="w-full"
-                    disabled={true}
-                ></input>
-                {error && <div className="font-bold text-red-500">{error}</div>}
-            </div>
-            <div className="mt-4">
-                <Button
-                    type="primary"
-                    disabled={isDisabled}
-                    onClick={(e) => {
-                        onImport({ privateKey, publicKey });
-                        setPrivateKey("");
-                    }}
-                >
-                    {isLoading ? "Loading.." : "Import Account"}
-                </Button>
-            </div> */}
             {generalError && (
                 <div className="mt-4 h-8 font-semibold text-red-600">
                     {generalError}
