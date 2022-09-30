@@ -36,7 +36,8 @@ export function Action(target: any, key: string, descriptor: any) {
     const originalMethod = descriptor.value;
     descriptor.value = function (...args: any[]) {
         const result = originalMethod.apply(this, args);
-        return action('violet', key, result)
+        const parent = Object.getPrototypeOf(this);
+        return (parent.getAppletName() as Promise<string>).then(appletName => action(appletName, key, result))
     }
 };
 
@@ -56,7 +57,8 @@ export function Op(name?: string) {
         }
 
         descriptor.value = function (...args: any[]) {
-            return operation(new AppletId('violet'), id, ...args)
+            const parent = Object.getPrototypeOf(Object.getPrototypeOf(this));
+            return (parent.getAppletId() as Promise<AppletId>).then(appletId => operation(appletId, id, ...args))
         }
     };
 }
