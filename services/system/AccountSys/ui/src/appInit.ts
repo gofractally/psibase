@@ -19,7 +19,6 @@ interface execArgs {
 
 export const initAppFn = (setAppInitialized: () => void) =>
     initializeApplet(async () => {
-
         const thisApplet = await getJson<string>("/common/thisservice");
         const accountSysApplet = new AppletId(thisApplet, "");
 
@@ -27,7 +26,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
             {
                 id: "newAcc",
                 exec: async ({ name, pubKey }: execArgs) => {
-                    action(thisApplet, "newAccount", {
+                    await action(thisApplet, "newAccount", {
                         name,
                         authService: "auth-any-sys",
                         requireNew: true,
@@ -66,31 +65,52 @@ export const initAppFn = (setAppInitialized: () => void) =>
             {
                 id: "getAuthedTransaction",
                 exec: async ({ transaction }: execArgs): Promise<any> => {
-                    const [user, accounts] = await Promise.all([query<null, string>(accountSysApplet, "getLoggedInUser"), getJson<{ accountNum: string; authService: string }[]>("/accounts")]);
+                    const [user, accounts] = await Promise.all([
+                        query<null, string>(
+                            accountSysApplet,
+                            "getLoggedInUser"
+                        ),
+                        getJson<{ accountNum: string; authService: string }[]>(
+                            "/accounts"
+                        ),
+                    ]);
 
-                    const sendingAccount = accounts.find(account => account.accountNum === user);
+                    const sendingAccount = accounts.find(
+                        (account) => account.accountNum === user
+                    );
                     if (!sendingAccount) {
-                        console.error('No sending account', sendingAccount, { loggedInUser: user, sending: transaction.actions[0].sender })
-                        throw new Error('No sending account found');
+                        console.error("No sending account", sendingAccount, {
+                            loggedInUser: user,
+                            sending: transaction.actions[0].sender,
+                        });
+                        throw new Error("No sending account found");
                     }
-                    const isSecureAccount = sendingAccount.authService === "auth-ec-sys"
+                    const isSecureAccount =
+                        sendingAccount.authService === "auth-ec-sys";
                     if (isSecureAccount) {
-                        const keys = JSON.parse(localStorage.getItem('keyPairs') || '[]') as KeyPairWithAccounts[]
+                        const keys = JSON.parse(
+                            localStorage.getItem("keyPairs") || "[]"
+                        ) as KeyPairWithAccounts[];
 
-                        const foundKey = keys.find(key => {
+                        const foundKey = keys.find((key) => {
                             if (key.knownAccounts) {
-                                return key.knownAccounts.includes(user)
+                                return key.knownAccounts.includes(user);
                             }
                         });
 
                         if (foundKey) {
                             const signingPrivateKey = foundKey.privateKey;
-                            return signTransaction("", transaction, [signingPrivateKey]);
+                            return signTransaction("", transaction, [
+                                signingPrivateKey,
+                            ]);
                         } else {
-                            console.error(`Failed to find the key pair for sender ${user}`);
-                            throw new Error(`Failed to find the key pair for sender ${user}`);
+                            console.error(
+                                `Failed to find the key pair for sender ${user}`
+                            );
+                            throw new Error(
+                                `Failed to find the key pair for sender ${user}`
+                            );
                         }
-
                     } else {
                         return signTransaction("", transaction);
                     }

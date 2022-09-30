@@ -48,7 +48,7 @@ interface Inputs {
 export const CreateAccountForm = forwardRef(
     ({ refreshAccounts, addAccounts }: Props, ref) => {
         const [pubKey, setPubKey] = useState("");
-        const [error, setError] = useState("");
+        const [generalError, setGeneralError] = useState("");
         const [formSubmitted, setFormSubmitted] = useState(false);
 
         const {
@@ -56,6 +56,7 @@ export const CreateAccountForm = forwardRef(
             handleSubmit,
             formState: { errors },
             reset,
+            setError,
             setValue,
         } = useForm<Inputs>({
             defaultValues: {
@@ -66,7 +67,7 @@ export const CreateAccountForm = forwardRef(
 
         const onSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
             setFormSubmitted(true);
-            setError("");
+            setGeneralError("");
             try {
                 const newAccount = await createAccount({
                     account: data.name,
@@ -78,8 +79,26 @@ export const CreateAccountForm = forwardRef(
                 updatePublicKey("");
                 reset();
             } catch (e: any) {
-                setError(e.message);
-                console.log(e);
+                if (!Array.isArray(e)) {
+                    console.error("ACCOUNT CREATE ERROR", e);
+                    setGeneralError(`${e}`);
+                } else if (typeof e[0] !== "string") {
+                    console.error("ACCOUNT CREATE ERROR", e);
+                    setGeneralError(
+                        "There was an error creating your account. Please try again."
+                    );
+                } else if (e[0].includes("account already exists")) {
+                    setError("name", {
+                        message: "Account with name already exists",
+                    });
+                } else if (e[0].includes("invalid account name")) {
+                    setError("name", {
+                        message: "Invalid account name",
+                    });
+                } else {
+                    console.error("ACCOUNT CREATE ERROR", e);
+                    setGeneralError(e[0]);
+                }
             }
             setFormSubmitted(false);
         };
@@ -110,7 +129,10 @@ export const CreateAccountForm = forwardRef(
                 <Text size="base">
                     Input your own private key or generate a new one.
                 </Text>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+                <form
+                    onSubmit={handleSubmit(onSubmit)}
+                    className="max-w-2xl space-y-2"
+                >
                     <Form.Input
                         label="Name"
                         placeholder="Account name"
@@ -149,9 +171,9 @@ export const CreateAccountForm = forwardRef(
                         Create account
                     </Button>
                 </form>
-                {error && (
+                {generalError && (
                     <div className="mt-4 h-8 font-semibold text-red-600">
-                        {error}
+                        {generalError}
                     </div>
                 )}
             </section>
