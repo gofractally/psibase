@@ -11,7 +11,6 @@ export class Service {
         if (this.cachedApplet) return this.cachedApplet;
         const appletName = await getJson<string>("/common/thisservice");
         this.cachedApplet = appletName;
-        console.log(appletName, 'is this applet')
         return appletName;
     }
 
