@@ -1,4 +1,3 @@
 # Introduction
 
-- [Psibase](https://psibase.olivegarden.fractally.dev)
-- [Psinet](https://psinet.olivegarden.fractally.dev)
+- [Psibase](https://psibase.psibase.io)
