@@ -68,6 +68,13 @@ export const CreateAccountForm = forwardRef(
         const onSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
             setFormSubmitted(true);
             setGeneralError("");
+
+            if (!pubKey) {
+                setError("key", { message: "Invalid private key" });
+                setFormSubmitted(false);
+                return;
+            }
+
             try {
                 const newAccount = await createAccount({
                     account: data.name,
