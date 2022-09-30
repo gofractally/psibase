@@ -78,11 +78,6 @@ declare module "common/rpc.mjs" {
         name: string,
         params?: Params
     ): Promise<any>;
-    function operationWithTrxReceipt<Params>(
-        appletId: AppletId,
-        name: string,
-        params?: Params
-    ): Promise<any>;
     function signTransaction(
         baseUrl: string,
         transaction: any,
