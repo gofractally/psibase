@@ -14,16 +14,6 @@ using namespace UserService;
 using namespace std;
 using namespace psibase;
 
-namespace
-{
-   auto simplePage = [](std::string str)
-   {
-      auto d = string("<html><div>" + str + "</div></html>");
-
-      return HttpReply{.contentType = "text/html", .body = std::vector<char>{d.begin(), d.end()}};
-   };
-}
-
 template <typename Tables>
 struct StateQuery
 {
@@ -156,7 +146,7 @@ PSIO_REFLECT(AccountBalance, account, token, symbol, precision, balance);
 
 std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
 {
-   auto to_json = [](const auto& obj)
+   auto to_json_reply = [](const auto& obj)
    {
       auto json = psio::convert_to_json(obj);
       return HttpReply{
@@ -189,7 +179,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          {
             allTokens.push_back(*itr);
          }
-         return to_json(allTokens);
+         return to_json_reply(allTokens);
       }
       if (request.target.starts_with("/api/balances/"))
       {
@@ -223,7 +213,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
             ++tokenId;
          }
 
-         return to_json(balances);
+         return to_json_reply(balances);
       }
    }
 
