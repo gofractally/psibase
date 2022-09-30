@@ -67,7 +67,7 @@ export const applets: AppletEntry[] = [
     {
         title: "About",
         description: "About psibase.",
-        href: `about.${window.location.host}`,
+        href: `${window.location.protocol}//about.${window.location.host}`,
         service: "psibase-landing",
         MobileIcon: IconPsibaseMobile,
         DesktopIcon: IconPsibaseDesktop,
