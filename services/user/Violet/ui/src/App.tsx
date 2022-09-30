@@ -94,7 +94,7 @@ function App() {
             <div className="p-8">
 
                 <h1>Count: {count}</h1>
-                <input type="number" onChange={(e) => setNum(e.target.value)} />
+                <input type="number" onChange={(e) => setNum(Number(e.target.value))} />
                 <button className="py-2 rounded-lg text-white bg-blue-500 hover:bg-blue-600 px-4" onClick={() => { pump() }}>Pump buddy!</button>
             </div>
         </div>

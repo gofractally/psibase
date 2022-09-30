@@ -7,7 +7,7 @@ declare module "common/rpc.mjs" {
     path?: string
   ): Promise<string>;
 
-  function initializeApplet(fn: (data: any) => Promise<void>): void;
+  function initializeApplet(fn?: (data: any) => Promise<void>): void;
 
   function getJson<T = any>(url: string): Promise<T>;
 
