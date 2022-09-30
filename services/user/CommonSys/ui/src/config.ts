@@ -7,6 +7,8 @@ import IconWalletDesktop from "./images/app-wallet-desktop.svg";
 import IconWalletMobile from "./images/app-wallet-mobile.svg";
 import IconPsispaceDesktop from "./images/app-psispace-desktop.svg";
 import IconPsispaceMobile from "./images/app-psispace-mobile.svg";
+import IconPsibaseDesktop from "./images/app-psibase-desktop.svg";
+import IconPsibaseMobile from "./images/app-psibase-mobile.svg";
 
 export const appletPrefix = "/applet/";
 
@@ -19,6 +21,7 @@ export const AppletStates = {
 export type AppletEntry = {
     title: string;
     description: string;
+    href?: string;
     service: string;
     MobileIcon: FC<SVGProps<SVGSVGElement>>;
     DesktopIcon: FC<SVGProps<SVGSVGElement>>;
@@ -60,6 +63,15 @@ export const applets: AppletEntry[] = [
         MobileIcon: IconPsispaceMobile,
         DesktopIcon: IconPsispaceDesktop,
         requiresUser: true,
+    },
+    {
+        title: "About",
+        description: "About psibase.",
+        href: `about.${window.location.host}`,
+        service: "psibase-landing",
+        MobileIcon: IconPsibaseMobile,
+        DesktopIcon: IconPsibaseDesktop,
+        requiresUser: false,
     },
 ];
 
