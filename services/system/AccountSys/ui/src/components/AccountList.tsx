@@ -1,7 +1,5 @@
 import LogoutIcon from "./assets/icons/logout.svg";
 import { AccountWithAuth } from "../App";
-import ClosedIcon from "./assets/icons/lock-closed.svg";
-import OpenIcon from "./assets/icons/lock-open.svg";
 import Heading from "./Heading";
 import Text from "./Text";
 

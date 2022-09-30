@@ -1,11 +1,14 @@
 import { AccountWithAuth } from "../App";
 import ClosedIcon from "./assets/icons/lock-closed.svg";
 import OpenIcon from "./assets/icons/lock-open.svg";
+import Heading from "./Heading";
 
 export const AccountsList = ({ accounts }: { accounts: AccountWithAuth[] }) => {
     return (
-        <div>
-            <h2 className="pt-6">Existing accounts</h2>
+        <section>
+            <Heading tag="h2" className="font-medium text-gray-600">
+                All accounts
+            </Heading>
             <table className="min-w-full table-fixed">
                 <thead className="text-slate-900">
                     <tr>
@@ -44,6 +47,6 @@ export const AccountsList = ({ accounts }: { accounts: AccountWithAuth[] }) => {
                     ))}
                 </tbody>
             </table>
-        </div>
+        </section>
     );
 };
