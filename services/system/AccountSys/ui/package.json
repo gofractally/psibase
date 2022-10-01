@@ -12,8 +12,10 @@
         "@heroicons/react": "v1",
         "@rollup/plugin-alias": "^3.1.9",
         "@types/node": "^18.7.7",
+        "classnames": "^2.3.2",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "react-hook-form": "^7.36.1",
         "react-router-dom": "^6.3.0"
     },
     "devDependencies": {
