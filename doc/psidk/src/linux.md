@@ -17,7 +17,7 @@ wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-
 tar xf wasi-sdk-14.0-linux.tar.gz
 
 cd ~/work
-wget https://github.com/gofractally/psibase/releases/download/testrel/psidk-linux.tar.gz    # TODO: update
+wget https://github.com/gofractally/psibase/releases/download/pre-0.1.0/psidk-linux.tar.gz
 tar xf psidk-linux.tar.gz
 ```
 

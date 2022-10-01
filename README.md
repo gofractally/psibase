@@ -9,7 +9,7 @@ This repo contains the sources to
 
 ## Binary Release
 
-If you want to operate a node, build services, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the documentation for installation instructions.
+If you want to operate a node, build services, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the [installation instructions](https://doc-sys.psibase.io/linux.html).
 
 ## Documentation
 
