@@ -154,7 +154,6 @@ function App() {
                     Wallet
                 </Heading>
             </div>
-<<<<<<< HEAD
             <div>
                 <div className="mb-2 flex items-baseline gap-1 font-semibold">
                     <Text size="sm" span className="select-none">
@@ -179,28 +178,6 @@ function App() {
                             accepted or rejected.
                         </div>
                     </div>
-                </div>
-=======
-            <div className="flex items-baseline gap-1 pb-3 font-semibold">
-                <Text size="sm" span className="select-none">
-                    Account:
-                </Text>
-                <Text size="lg" span>
-                    {userName}
-                </Text>
-                <div className="flex-grow"></div>
-                <Button
-                    type="outline"
-                    onClick={manualDebitModeClick}
-                    disabled={manualDebitMode}
-                >
-                    Manual debit mode
-                </Button>
->>>>>>> 79cea19f (Add Switch component. WIP..)
-            </div>
-            <div className="pb-3 border-b border-gray-400">
-                <div className="bg-gray-100">
-                    <Switch label="Manual Debit" />
                 </div>
             </div>
             <form className="bg-gray-100 p-3" onSubmit={handleSubmit(onSubmit)}>
