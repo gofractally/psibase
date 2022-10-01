@@ -7,13 +7,13 @@ This repo contains the sources to
 - psibase services
 - `psidk`, the service development kit
 
+## About Page, Documentation, and Demo
+
+The [Demonstration Chain](https://psibase.io/) hosts both the [About Page](https://about.psibase.io/) and the [Documentation](https://doc-sys.psibase.io/).
+
 ## Binary Release
 
 If you want to operate a node, build services, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the [installation instructions](https://doc-sys.psibase.io/linux.html).
-
-## Documentation
-
-Documentation is at (TODO: add link). This covers installing the binary packages, starting a local test chain, and developing services.
 
 ## Building this repo from source
 
