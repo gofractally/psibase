@@ -33,7 +33,10 @@ export const initAppFn = (setAppInitialized: () => void) =>
                     });
 
                     if (pubKey && pubKey !== "") {
-                        operation(accountSysApplet, "setKey", { name, pubKey });
+                        await operation(accountSysApplet, "setKey", {
+                            name,
+                            pubKey,
+                        });
                     }
                 },
             },
@@ -41,8 +44,13 @@ export const initAppFn = (setAppInitialized: () => void) =>
                 id: "setKey",
                 exec: async ({ name, pubKey }: execArgs) => {
                     if (pubKey !== "") {
-                        action("auth-ec-sys", "setKey", { key: pubKey }, name);
-                        action(
+                        await action(
+                            "auth-ec-sys",
+                            "setKey",
+                            { key: pubKey },
+                            name
+                        );
+                        await action(
                             thisApplet,
                             "setAuthCntr",
                             { authService: "auth-ec-sys" },

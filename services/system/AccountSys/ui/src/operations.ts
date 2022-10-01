@@ -1,4 +1,4 @@
-import { AppletId, getJson, operationWithTrxReceipt } from "common/rpc.mjs";
+import { AppletId, getJson, operation } from "common/rpc.mjs";
 
 import { AccountWithAuth, AccountWithKey } from "./App";
 import { AccountPair } from "./components/CreateAccountForm";
@@ -14,10 +14,12 @@ export const createAccount = async (account: AccountPair) => {
         publicKey: account.publicKey,
     };
 
-    await operationWithTrxReceipt(appletId, "newAcc", {
+    const opRes = await operation(appletId, "newAcc", {
         name: newAccount.accountNum,
         ...(account.publicKey && { pubKey: account.publicKey }),
     });
+
+    await opRes.transactionSubmittedPromise;
 
     return newAccount;
 };

@@ -124,7 +124,7 @@ export const CreateAccountForm = forwardRef(
         };
 
         return (
-            <section className="mb-4 rounded bg-gray-100 px-5 pt-4 pb-5">
+            <section className="-mx-2 mb-4 bg-gray-100 px-5 pt-4 pb-5 sm:mx-0 sm:rounded">
                 <Heading
                     tag="h3"
                     className="select-none font-medium text-gray-600"
