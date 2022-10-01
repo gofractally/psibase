@@ -5,7 +5,10 @@ use crate::{
 use anyhow::{anyhow, Context};
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
-use psibase::services::{account_sys, producer_sys, psispace_sys, setcode_sys, transaction_sys};
+use psibase::services::{
+    account_sys, auth_ec_sys, common_sys, nft_sys, producer_sys, proxy_sys, psispace_sys,
+    setcode_sys, transaction_sys,
+};
 use psibase::{
     account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
     SharedGenesisActionData, SharedGenesisService, SignedTransaction,
@@ -15,15 +18,15 @@ use serde_json::Value;
 const ACCOUNTS: [AccountNumber; 22] = [
     account_sys::service::SERVICE,
     account!("alice"),
-    account!("auth-ec-sys"),
+    auth_ec_sys::service::SERVICE,
     account!("auth-any-sys"),
     account!("bob"),
-    account!("common-sys"),
+    common_sys::service::SERVICE,
     account!("doc-sys"),
     account!("explore-sys"),
-    account!("nft-sys"),
+    nft_sys::service::SERVICE,
     producer_sys::service::SERVICE,
-    account!("proxy-sys"),
+    proxy_sys::service::SERVICE,
     psispace_sys::service::SERVICE,
     account!("r-account-sys"),
     account!("r-ath-ec-sys"),
@@ -211,12 +214,7 @@ fn add_startup_trx(
     let mut init_actions = vec![
         account_sys::Wrapper::pack().init(),
         transaction_sys::Wrapper::pack().init(),
-        Action {
-            sender: account!("nft-sys"),
-            service: account!("nft-sys"),
-            method: method!("init"),
-            rawData: ().packed(),
-        },
+        nft_sys::Wrapper::pack().init(),
         Action {
             sender: account!("token-sys"),
             service: account!("token-sys"),
@@ -236,11 +234,11 @@ fn add_startup_trx(
 
     let mut reg_actions = vec![
         reg_server(account_sys::service::SERVICE, account!("r-account-sys")),
-        reg_server(account!("auth-ec-sys"), account!("r-ath-ec-sys")),
-        reg_server(account!("common-sys"), account!("common-sys")),
+        reg_server(auth_ec_sys::service::SERVICE, account!("r-ath-ec-sys")),
+        reg_server(common_sys::service::SERVICE, common_sys::service::SERVICE),
         reg_server(account!("explore-sys"), account!("explore-sys")),
         reg_server(producer_sys::service::SERVICE, account!("r-prod-sys")),
-        reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
+        reg_server(proxy_sys::service::SERVICE, account!("r-proxy-sys")),
         reg_server(
             psispace_sys::service::SERVICE,
             psispace_sys::service::SERVICE,
@@ -265,8 +263,8 @@ fn add_startup_trx(
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/CommonSys/ui/dist"),
         &mut common_sys_files,
-        account!("common-sys"),
-        account!("common-sys"),
+        common_sys::service::SERVICE,
+        common_sys::service::SERVICE,
     );
 
     let mut common_sys_3rd_party_files = vec![
@@ -423,7 +421,10 @@ fn add_startup_trx(
     if let Some(k) = key {
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
-            actions.push(set_auth_service_action(account, account!("auth-ec-sys")));
+            actions.push(set_auth_service_action(
+                account,
+                auth_ec_sys::service::SERVICE,
+            ));
         }
     }
 
