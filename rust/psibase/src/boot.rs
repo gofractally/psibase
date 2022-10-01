@@ -5,7 +5,7 @@ use crate::{
 use anyhow::{anyhow, Context};
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
-use psibase::services::{account_sys, producer_sys, setcode_sys, transaction_sys};
+use psibase::services::{account_sys, producer_sys, psispace_sys, setcode_sys, transaction_sys};
 use psibase::{
     account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
     SharedGenesisActionData, SharedGenesisService, SignedTransaction,
@@ -24,7 +24,7 @@ const ACCOUNTS: [AccountNumber; 22] = [
     account!("nft-sys"),
     producer_sys::service::SERVICE,
     account!("proxy-sys"),
-    account!("psispace-sys"),
+    psispace_sys::service::SERVICE,
     account!("r-account-sys"),
     account!("r-ath-ec-sys"),
     account!("r-prod-sys"),
@@ -241,7 +241,10 @@ fn add_startup_trx(
         reg_server(account!("explore-sys"), account!("explore-sys")),
         reg_server(producer_sys::service::SERVICE, account!("r-prod-sys")),
         reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
-        reg_server(account!("psispace-sys"), account!("psispace-sys")),
+        reg_server(
+            psispace_sys::service::SERVICE,
+            psispace_sys::service::SERVICE,
+        ),
     ];
 
     let mut common_sys_files = vec![
@@ -345,8 +348,8 @@ fn add_startup_trx(
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/PsiSpaceSys/ui/dist"),
         &mut psispace_sys_files,
-        account!("psispace-sys"),
-        account!("psispace-sys"),
+        psispace_sys::service::SERVICE,
+        psispace_sys::service::SERVICE,
     );
 
     let mut doc_actions = vec![
@@ -356,7 +359,7 @@ fn add_startup_trx(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
         &mut doc_actions,
         account!("doc-sys"),
-        account!("psispace-sys"),
+        psispace_sys::service::SERVICE,
     );
 
     // TODO: make this optional

@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use fracpack::Packable;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{account_sys, producer_sys, setcode_sys};
+use psibase::services::{account_sys, producer_sys, psispace_sys, setcode_sys};
 use psibase::{
     account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
     Claim, ExactAccountNumber, Fracpack, PrivateKey, ProducerConfigRow, PublicKey,
@@ -245,13 +245,11 @@ fn store_sys(
     content_type: &str,
     content: &[u8],
 ) -> Action {
-    let data = (path.to_string(), content_type.to_string(), content.to_vec());
-    Action {
-        sender,
-        service,
-        method: method!("storeSys"),
-        rawData: data.packed(),
-    }
+    psispace_sys::Wrapper::pack_from_to(sender, service).storeSys(
+        path.to_string(),
+        content_type.to_string(),
+        content.to_vec(),
+    )
 }
 
 pub fn without_tapos(actions: Vec<Action>) -> Transaction {
