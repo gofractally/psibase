@@ -3,6 +3,7 @@ mod block;
 mod crypto;
 mod db;
 mod from_bin;
+mod http;
 mod method_number;
 mod native_functions;
 mod native_tables;

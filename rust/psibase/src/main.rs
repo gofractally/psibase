@@ -4,11 +4,13 @@ use clap::{Parser, Subcommand};
 use fracpack::Packable;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{account_sys, producer_sys, setcode_sys};
+use psibase::services::{
+    account_sys, auth_ec_sys, producer_sys, proxy_sys, psispace_sys, setcode_sys,
+};
 use psibase::{
-    account, get_tapos_for_head, method, push_transaction, sign_transaction, AccountNumber, Action,
-    Claim, ExactAccountNumber, Fracpack, PrivateKey, ProducerConfigRow, PublicKey,
-    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
+    account, get_tapos_for_head, push_transaction, sign_transaction, AccountNumber, Action, Claim,
+    ExactAccountNumber, Fracpack, PrivateKey, ProducerConfigRow, PublicKey, SignedTransaction,
+    Tapos, TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -188,12 +190,7 @@ fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
 }
 
 fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
-    Action {
-        sender: account,
-        service: account!("auth-ec-sys"),
-        method: method!("setKey"),
-        rawData: (key.clone(),).packed(),
-    }
+    auth_ec_sys::Wrapper::pack_from(account).setKey(key.clone())
 }
 
 fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
@@ -227,15 +224,7 @@ fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
 }
 
 fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
-    // todo: should we convert this action data to a proper struct?
-    let data = (server_service,);
-
-    Action {
-        sender: service,
-        service: account!("proxy-sys"),
-        method: method!("registerServer"),
-        rawData: data.packed(),
-    }
+    proxy_sys::Wrapper::pack_from(service).registerServer(server_service)
 }
 
 fn store_sys(
@@ -245,13 +234,11 @@ fn store_sys(
     content_type: &str,
     content: &[u8],
 ) -> Action {
-    let data = (path.to_string(), content_type.to_string(), content.to_vec());
-    Action {
-        sender,
-        service,
-        method: method!("storeSys"),
-        rawData: data.packed(),
-    }
+    psispace_sys::Wrapper::pack_from_to(sender, service).storeSys(
+        path.to_string(),
+        content_type.to_string(),
+        content.to_vec(),
+    )
 }
 
 pub fn without_tapos(actions: Vec<Action>) -> Transaction {
@@ -309,7 +296,10 @@ async fn create(
 
     if let Some(key) = key {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, account!("auth-ec-sys")));
+        actions.push(set_auth_service_action(
+            account,
+            auth_ec_sys::service::SERVICE,
+        ));
     }
 
     let trx = with_tapos(
@@ -344,7 +334,10 @@ async fn modify(
 
     if let Some(key) = key {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, account!("auth-ec-sys")));
+        actions.push(set_auth_service_action(
+            account,
+            auth_ec_sys::service::SERVICE,
+        ));
     }
 
     if insecure {
@@ -398,7 +391,10 @@ async fn deploy(
     // if the user doesn't have it.
     if let Some(key) = create_account {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, account!("auth-ec-sys")));
+        actions.push(set_auth_service_action(
+            account,
+            auth_ec_sys::service::SERVICE,
+        ));
     }
 
     actions.push(set_code_action(account, wasm));

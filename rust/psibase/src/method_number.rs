@@ -30,6 +30,8 @@ pub struct MethodNumber {
     pub value: u64,
 }
 
+pub type NamedBit = MethodNumber;
+
 impl MethodNumber {
     pub fn new(value: u64) -> Self {
         MethodNumber { value }
