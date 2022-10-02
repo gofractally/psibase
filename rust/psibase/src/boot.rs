@@ -1,19 +1,28 @@
-use crate::{
-    new_account_action, reg_server, set_auth_service_action, set_key_action, set_producers_action,
-    store_sys, to_claim, without_tapos, Args,
-};
-use anyhow::{anyhow, Context};
-use fracpack::Packable;
-use include_dir::{include_dir, Dir};
-use psibase::services::{
+use crate::services::{
     account_sys, auth_ec_sys, common_sys, nft_sys, producer_sys, proxy_sys, psispace_sys,
     setcode_sys, transaction_sys,
 };
-use psibase::{
-    account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
-    SharedGenesisActionData, SharedGenesisService, SignedTransaction,
+use crate::{
+    method_raw, AccountNumber, Action, Claim, MethodNumber, ProducerConfigRow, PublicKey,
+    SharedGenesisActionData, SharedGenesisService, SignedTransaction, Tapos, TimePointSec,
+    Transaction,
 };
-use serde_json::Value;
+use chrono::{Duration, Utc};
+use fracpack::Packable;
+use include_dir::{include_dir, Dir};
+use psibase_macros::account_raw;
+
+macro_rules! account {
+    ($name:expr) => {
+        AccountNumber::new(account_raw!($name))
+    };
+}
+
+macro_rules! method {
+    ($name:expr) => {
+        MethodNumber::new(method_raw!($name))
+    };
+}
 
 const ACCOUNTS: [AccountNumber; 22] = [
     account_sys::service::SERVICE,
@@ -39,58 +48,6 @@ const ACCOUNTS: [AccountNumber; 22] = [
     transaction_sys::service::SERVICE,
     account!("verifyec-sys"),
 ];
-
-pub(super) async fn boot(
-    args: &Args,
-    client: reqwest::Client,
-    key: &Option<PublicKey>,
-    producer: &Option<ExactAccountNumber>,
-) -> Result<(), anyhow::Error> {
-    let mut transactions = vec![boot_trx()];
-    add_startup_trx(&mut transactions, key, producer);
-    push_boot(args, client, transactions.packed()).await?;
-    println!("Ok");
-    Ok(())
-}
-
-async fn push_boot_impl(
-    args: &Args,
-    client: reqwest::Client,
-    packed: Vec<u8>,
-) -> Result<(), anyhow::Error> {
-    let mut response = client
-        .post(args.api.join("native/push_boot")?)
-        .body(packed)
-        .send()
-        .await?;
-    if response.status().is_client_error() {
-        response = response.error_for_status()?;
-    }
-    if response.status().is_server_error() {
-        return Err(anyhow!("{}", response.text().await?));
-    }
-    let text = response.text().await?;
-    let json: Value = serde_json::de::from_str(&text)?;
-    // println!("{:#?}", json);
-    let err = json.get("error").and_then(|v| v.as_str());
-    if let Some(e) = err {
-        if !e.is_empty() {
-            return Err(anyhow!("{}", e));
-        }
-    }
-    Ok(())
-}
-
-async fn push_boot(
-    args: &Args,
-    client: reqwest::Client,
-    packed: Vec<u8>,
-) -> Result<(), anyhow::Error> {
-    push_boot_impl(args, client, packed)
-        .await
-        .context("Failed to boot")?;
-    Ok(())
-}
 
 macro_rules! sgc {
     ($acc:literal, $flags:expr, $wasm:literal) => {
@@ -138,7 +95,68 @@ macro_rules! store_third_party {
     };
 }
 
-fn boot_trx() -> SignedTransaction {
+fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
+    producer_sys::Wrapper::pack().setProducers(vec![ProducerConfigRow {
+        producerName: name,
+        producerAuth: key,
+    }])
+}
+
+fn to_claim(key: &PublicKey) -> Claim {
+    Claim {
+        service: account!("verifyec-sys"),
+        rawData: key.packed(),
+    }
+}
+
+fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
+    account_sys::Wrapper::pack_from(sender).newAccount(account, account!("auth-any-sys"), false)
+}
+
+fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
+    auth_ec_sys::Wrapper::pack_from(account).setKey(key.clone())
+}
+
+fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
+    account_sys::Wrapper::pack_from(account).setAuthCntr(auth_service)
+}
+
+fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
+    proxy_sys::Wrapper::pack_from(service).registerServer(server_service)
+}
+
+fn store_sys(
+    service: AccountNumber,
+    sender: AccountNumber,
+    path: &str,
+    content_type: &str,
+    content: &[u8],
+) -> Action {
+    psispace_sys::Wrapper::pack_from_to(sender, service).storeSys(
+        path.to_string(),
+        content_type.to_string(),
+        content.to_vec(),
+    )
+}
+
+fn without_tapos(actions: Vec<Action>) -> Transaction {
+    let now_plus_10secs = Utc::now() + Duration::seconds(10);
+    let expiration = TimePointSec {
+        seconds: now_plus_10secs.timestamp() as u32,
+    };
+    Transaction {
+        tapos: Tapos {
+            expiration,
+            refBlockSuffix: 0,
+            flags: 0,
+            refBlockIndex: 0,
+        },
+        actions,
+        claims: vec![],
+    }
+}
+
+fn genesis_transaction() -> SignedTransaction {
     let services = vec![
         sgc!("account-sys", 0, "AccountSys.wasm"),
         sgc!("auth-ec-sys", 0, "AuthEcSys.wasm"),
@@ -206,11 +224,32 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service
     }
 }
 
-fn add_startup_trx(
-    transactions: &mut Vec<SignedTransaction>,
-    key: &Option<PublicKey>,
-    producer: &Option<ExactAccountNumber>,
-) {
+/// Create boot transactions
+///
+/// This returns a set of transactions which boot a blockchain.
+/// The first transaction, the genesis transaction, installs
+/// a set of service WASMs. The remainder initialize the services
+/// and install apps and documentation. All of these transactions
+/// should go into the first block.
+///
+/// If `initial_key` is set, then this initializes all accounts to use
+/// that key and sets the key the initial producer signs blocks with.
+/// If it is not set, then this initializes all accounts to use
+/// `auth-any-sys` (no keys required) and sets it up so producers
+/// don't need to sign blocks.
+///
+/// The first block should contain this entire set of transactions.
+/// You may optionally add additional transactions after the ones this
+/// function returns.
+///
+/// The interface to this function doesn't support customization.
+/// If you want a custom boot, then use `boot.rs` as a guide to
+/// create your own.
+pub fn create_boot_transactions(
+    initial_key: &Option<PublicKey>,
+    initial_producer: AccountNumber,
+) -> Vec<SignedTransaction> {
+    let mut transactions = vec![genesis_transaction()];
     let mut init_actions = vec![
         account_sys::Wrapper::pack().init(),
         transaction_sys::Wrapper::pack().init(),
@@ -405,11 +444,8 @@ fn add_startup_trx(
     actions.append(&mut create_and_fund_example_users);
 
     actions.push(set_producers_action(
-        match producer {
-            Some(p) => AccountNumber::from(*p),
-            None => account!("psibase"),
-        },
-        match key {
+        initial_producer,
+        match initial_key {
             Some(k) => to_claim(k),
             None => Claim {
                 service: AccountNumber::new(0),
@@ -418,7 +454,7 @@ fn add_startup_trx(
         },
     ));
 
-    if let Some(k) = key {
+    if let Some(k) = initial_key {
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
             actions.push(set_auth_service_action(
@@ -440,4 +476,5 @@ fn add_startup_trx(
             proofs: vec![],
         });
     }
+    transactions
 }

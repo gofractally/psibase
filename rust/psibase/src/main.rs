@@ -4,19 +4,16 @@ use clap::{Parser, Subcommand};
 use fracpack::Packable;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{
-    account_sys, auth_ec_sys, producer_sys, proxy_sys, psispace_sys, setcode_sys,
-};
+use psibase::services::{account_sys, auth_ec_sys, proxy_sys, psispace_sys, setcode_sys};
 use psibase::{
-    account, get_tapos_for_head, push_transaction, sign_transaction, AccountNumber, Action, Claim,
-    ExactAccountNumber, Fracpack, PrivateKey, ProducerConfigRow, PublicKey, SignedTransaction,
+    account, create_boot_transactions, get_tapos_for_head, push_transaction, sign_transaction,
+    AccountNumber, Action, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction,
     Tapos, TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fs::{metadata, read_dir};
-
-mod boot;
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
@@ -179,10 +176,10 @@ fn to_hex(bytes: &[u8]) -> String {
 }
 
 #[derive(Serialize, Deserialize, Fracpack)]
-pub struct NewAccountAction {
-    pub account: AccountNumber,
-    pub auth_service: AccountNumber,
-    pub require_new: bool,
+struct NewAccountAction {
+    account: AccountNumber,
+    auth_service: AccountNumber,
+    require_new: bool,
 }
 
 fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
@@ -198,29 +195,15 @@ fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) 
 }
 
 #[derive(Serialize, Deserialize, Fracpack)]
-pub struct SetCodeAction {
-    pub service: AccountNumber,
-    pub vm_type: i8,
-    pub vm_version: i8,
-    pub code: Vec<u8>,
+struct SetCodeAction {
+    service: AccountNumber,
+    vm_type: i8,
+    vm_version: i8,
+    code: Vec<u8>,
 }
 
 fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
     setcode_sys::Wrapper::pack_from(account).setCode(account, 0, 0, wasm)
-}
-
-fn to_claim(key: &PublicKey) -> Claim {
-    Claim {
-        service: account!("verifyec-sys"),
-        rawData: key.packed(),
-    }
-}
-
-fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
-    producer_sys::Wrapper::pack().setProducers(vec![ProducerConfigRow {
-        producerName: name,
-        producerAuth: key,
-    }])
 }
 
 fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
@@ -241,24 +224,7 @@ fn store_sys(
     )
 }
 
-pub fn without_tapos(actions: Vec<Action>) -> Transaction {
-    let now_plus_10secs = Utc::now() + Duration::seconds(10);
-    let expiration = TimePointSec {
-        seconds: now_plus_10secs.timestamp() as u32,
-    };
-    Transaction {
-        tapos: Tapos {
-            expiration,
-            refBlockSuffix: 0,
-            flags: 0,
-            refBlockIndex: 0,
-        },
-        actions,
-        claims: vec![],
-    }
-}
-
-pub fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
+fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec {
         seconds: now_plus_10secs.timestamp() as u32,
@@ -513,6 +479,57 @@ async fn monitor_trx(
     Ok(())
 }
 
+async fn boot(
+    args: &Args,
+    client: reqwest::Client,
+    key: &Option<PublicKey>,
+    producer: ExactAccountNumber,
+) -> Result<(), anyhow::Error> {
+    let transactions = create_boot_transactions(key, producer.into());
+    push_boot(args, client, transactions.packed()).await?;
+    println!("Ok");
+    Ok(())
+}
+
+async fn push_boot_impl(
+    args: &Args,
+    client: reqwest::Client,
+    packed: Vec<u8>,
+) -> Result<(), anyhow::Error> {
+    let mut response = client
+        .post(args.api.join("native/push_boot")?)
+        .body(packed)
+        .send()
+        .await?;
+    if response.status().is_client_error() {
+        response = response.error_for_status()?;
+    }
+    if response.status().is_server_error() {
+        return Err(anyhow!("{}", response.text().await?));
+    }
+    let text = response.text().await?;
+    let json: Value = serde_json::de::from_str(&text)?;
+    // println!("{:#?}", json);
+    let err = json.get("error").and_then(|v| v.as_str());
+    if let Some(e) = err {
+        if !e.is_empty() {
+            return Err(anyhow!("{}", e));
+        }
+    }
+    Ok(())
+}
+
+async fn push_boot(
+    args: &Args,
+    client: reqwest::Client,
+    packed: Vec<u8>,
+) -> Result<(), anyhow::Error> {
+    push_boot_impl(args, client, packed)
+        .await
+        .context("Failed to boot")?;
+    Ok(())
+}
+
 async fn upload_tree(
     args: &Args,
     client: reqwest::Client,
@@ -580,7 +597,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Command::Boot { key, producer } => boot::boot(&args, client, key, &Some(*producer)).await?,
+        Command::Boot { key, producer } => boot(&args, client, key, *producer).await?,
         Command::Create {
             account,
             key,

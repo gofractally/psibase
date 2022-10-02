@@ -1,5 +1,6 @@
 mod account_number;
 mod block;
+mod boot;
 mod crypto;
 mod db;
 mod from_bin;
@@ -19,6 +20,7 @@ pub mod services;
 
 pub use account_number::*;
 pub use block::*;
+pub use boot::*;
 pub use crypto::*;
 pub use db::*;
 pub use from_bin::*;
