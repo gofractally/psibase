@@ -6,7 +6,6 @@ import { initializeApplet, setOperations } from "common/rpc.mjs";
 import { TransferHistory } from "./views";
 import { Button, Form, Heading, Icon, Text } from "./components";
 import { getParsedBalanceFromToken, wait } from "./helpers";
-import { executeCredit, operations } from "./operations";
 import {
     getLoggedInUser,
     getTokens,
@@ -15,9 +14,10 @@ import {
 } from "./queries";
 import { TokenBalance } from "./types";
 import WalletIcon from "./assets/app-wallet-icon.svg";
+import { tokenContract } from "./contracts";
 
 initializeApplet(async () => {
-    setOperations(operations);
+    setOperations(tokenContract.ops);
 });
 
 type TransferInputs = {
@@ -97,7 +97,7 @@ function App() {
         const parsedAmount = `${amountSegments[0]}${decimal}`;
 
         // TODO: Errors getting swallowed by CommonSys::executeTransaction(). Fix.
-        await executeCredit({
+        await tokenContract.creditOp({
             symbol,
             receiver: to,
             amount: parsedAmount,

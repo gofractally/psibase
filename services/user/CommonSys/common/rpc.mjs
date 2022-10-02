@@ -699,3 +699,63 @@ export function query(appletId, name, params = {}) {
 
     return queryPromise;
 }
+
+export class Service {
+    cachedApplet = '';
+
+    constructor() {
+        this.applet();
+    }
+
+    async applet() {
+        if (this.cachedApplet) return this.cachedApplet;
+        const appletName = await getJson("/common/thisservice");
+        this.cachedApplet = appletName;
+        return appletName;
+    }
+
+    async getAppletName() {
+        return this.applet();
+    }
+
+    async getAppletId() {
+        const appletName = await this.getAppletName();
+        return new AppletId(appletName);
+    }
+
+    get ops() {
+        return this.operations || []
+    }
+
+}
+
+export function Action(target, key, descriptor) {
+    const originalMethod = descriptor.value;
+    descriptor.value = function (...args) {
+        const result = originalMethod.apply(this, args);
+        const parent = Object.getPrototypeOf(this);
+        return (parent.getAppletName()).then(appletName => action(appletName, key, result))
+    }
+};
+
+
+export function Op(name) {
+    return function (target, key, descriptor) {
+        const id = name ? name : key;
+        const op = {
+            exec: descriptor.value.bind(target),
+            id
+        };
+        const isExistingArray = 'operations' in target;
+        if (isExistingArray) {
+            target['operations'].push(op)
+        } else {
+            target['operations'] = [op]
+        }
+
+        descriptor.value = function (...args) {
+            const parent = 'getAppletId' in Object.getPrototypeOf(this) ? Object.getPrototypeOf(this) : Object.getPrototypeOf(Object.getPrototypeOf(this))
+            return parent.getAppletId().then(appletId => operation(appletId, id, ...args))
+        }
+    };
+}

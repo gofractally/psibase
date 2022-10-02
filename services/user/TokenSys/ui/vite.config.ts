@@ -76,5 +76,11 @@ const psibase = (appletContract: string) => {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react(), svgr({ exportAsDefault: true }), psibase("token-sys")],
+    plugins: [react({
+        babel: {
+            parserOpts: {
+                plugins: ['decorators-legacy']
+            }
+        }
+    }), svgr({ exportAsDefault: true }), psibase("token-sys")],
 });
