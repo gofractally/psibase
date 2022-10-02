@@ -22,6 +22,7 @@ pub use block::*;
 pub use crypto::*;
 pub use db::*;
 pub use from_bin::*;
+pub use http::*;
 pub use method_number::*;
 pub use native_functions::*;
 pub use native_tables::*;
