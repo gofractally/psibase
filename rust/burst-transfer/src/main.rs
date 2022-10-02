@@ -107,6 +107,18 @@ async fn lookup_token(
     Ok(None)
 }
 
+// Interface to the action we need
+mod token_sys {
+    #[psibase::service(name = "token-sys", dispatch = false)]
+    #[allow(non_snake_case, unused_variables, dead_code)]
+    mod service {
+        #[action]
+        fn credit(tokenId: u32, receiver: psibase::AccountNumber, amount: (u64,), memo: (String,)) {
+            unimplemented!()
+        }
+    }
+}
+
 // Randomly transfer
 async fn transfer_impl(
     client: reqwest::Client,
@@ -133,12 +145,12 @@ async fn transfer_impl(
             flags: 0,
             refBlockIndex: ref_block.ref_block_index,
         },
-        actions: vec![psibase::Action {
-            sender: from.into(),
-            service: psibase::account!("token-sys"),
-            method: psibase::method!("credit"),
-            rawData: (token_id, to, (1u64,), (memo,)).packed(),
-        }],
+        actions: vec![token_sys::Wrapper::pack_from(from.into()).credit(
+            token_id,
+            to.into(),
+            (1u64,),
+            (memo,),
+        )],
         claims: vec![],
     };
     psibase::push_transaction(
