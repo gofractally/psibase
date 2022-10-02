@@ -27,7 +27,7 @@ struct Args {
     accounts: Vec<psibase::ExactAccountNumber>,
 
     /// Number of transfers in each burst
-    #[clap(short = 'b', default_value_t = 10)]
+    #[clap(short = 'b', default_value_t = 1)]
     burst_size: u32,
 
     /// Delay in milliseconds between each burst
