@@ -22,7 +22,7 @@ class __contract__Service extends Service {
 
 }
 
-const violetService = new __contract__Service()
+const __contract__(lowerCase)Service = new __contract__Service()
 
 
 function App() {
@@ -42,7 +42,7 @@ function App() {
 
     useEffectHmr(() => {
         initializeApplet(async () => {
-            setOperations(violetService.ops)
+            setOperations(__contract__(lowerCase)Service.ops)
         });
         fetchCurrentUser()
         fetchTable().then(setCount)
@@ -55,7 +55,7 @@ function App() {
 
     const pushAddNumber = async () => {
         const previousCount = count;
-        await violetService.addNum(num)
+        await __contract__(lowerCase)Service.addNum(num)
         const newCount = await fetchTable(previousCount)
         setCount(newCount)
     }
@@ -69,6 +69,7 @@ function App() {
             <div className="p-8">
 
                 <h1>Count: {count}</h1>
+                <p>Enter a number greater than 100.</p>
                 <input type="number" onChange={(e) => setNum(Number(e.target.value))} />
                 <button className="py-2 rounded-lg text-white bg-blue-500 hover:bg-blue-600 px-4" onClick={() => { pushAddNumber() }}>Increment number!</button>
             </div>
