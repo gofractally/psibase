@@ -53,7 +53,7 @@ const CREDIT = {
     },
 };
 
-const USERCONF = {
+const SETUSERCONF = {
     id: "setUserConf",
     exec: async ({flag, enable}: SetUserConfPayload) => {
         console.log("TokenSys Operation: setUserConf", flag, enable);
@@ -66,7 +66,7 @@ const USERCONF = {
 };
 
 
-export const operations = [CREDIT, USERCONF];
+export const operations = [CREDIT, SETUSERCONF];
 
 export const executeCredit = async (payload: CreditOperationPayload) => {
     const appletId = await tokenContract.getAppletId();
@@ -76,5 +76,6 @@ export const executeCredit = async (payload: CreditOperationPayload) => {
 
 export const executeSetUserConf = async (payload: SetUserConfPayload) => {
     const appletId = await tokenContract.getAppletId();
-    return operationWithTrxReceipt(appletId, "setUserConf", payload);
+    const opRes = await operation(appletId, "setUserConf", payload);
+    return opRes.transactionSubmittedPromise;
 };
