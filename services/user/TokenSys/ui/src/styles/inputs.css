@@ -64,3 +64,24 @@ input[type="search"]::-webkit-search-results-decoration {
         border: 3.4px solid #0f172a;
     }
 }
+/* Switch */
+.Switch {
+    input[type="checkbox"] {
+        border: none;
+        @apply bg-gray-400;
+    }
+
+    input[type="checkbox"]:checked {
+        @apply bg-white;
+    }
+
+    input[type="checkbox"]:active,
+    input[type="checkbox"]:focus,
+    input[type="checkbox"]:hover,
+    input[type="checkbox"]:checked:focus,
+    input[type="checkbox"]:checked:hover {
+        outline: none;
+        box-shadow: none;
+        background-image: none;
+    }
+}
