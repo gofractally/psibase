@@ -153,6 +153,7 @@ void loop(Timer& timer, F&& f)
 void pushTransaction(psibase::SharedState&                  sharedState,
                      const std::shared_ptr<const Revision>& revisionAtBlockStart,
                      BlockContext&                          bc,
+                     SystemContext&                         proofSystem,
                      transaction_queue::entry&              entry,
                      std::chrono::microseconds              firstAuthWatchdogLimit,
                      std::chrono::microseconds              proofWatchdogLimit,
@@ -188,8 +189,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
             // TODO: If the first proof and the first auth pass, but the transaction
             //       fails (including other proof failures), then charge the first
             //       authorizer
-            auto         proofSystem = sharedState.getSystemContext();
-            BlockContext proofBC{*proofSystem, revisionAtBlockStart};
+            BlockContext proofBC{proofSystem, revisionAtBlockStart};
             proofBC.start(bc.current.header.time);
             for (size_t i = 0; i < trx.proofs.size(); ++i)
             {
@@ -309,8 +309,9 @@ void run(const std::string&              db_path,
    // TODO: configurable WasmCache size
    auto sharedState =
        std::make_shared<psibase::SharedState>(SharedDatabase{db_path, allow_slow}, WasmCache{128});
-   auto system = sharedState->getSystemContext();
-   auto queue  = std::make_shared<transaction_queue>();
+   auto system      = sharedState->getSystemContext();
+   auto proofSystem = sharedState->getSystemContext();
+   auto queue       = std::make_shared<transaction_queue>();
 
    boost::asio::io_context chainContext;
 
@@ -540,7 +541,7 @@ void run(const std::string&              db_path,
             if (entry.is_boot)
                push_boot(*bc, entry);
             else
-               pushTransaction(*sharedState, revisionAtBlockStart, *bc, entry,
+               pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
                                std::chrono::microseconds(leeway_us),  // TODO
                                std::chrono::microseconds(leeway_us),  // TODO
                                std::chrono::microseconds(leeway_us));
