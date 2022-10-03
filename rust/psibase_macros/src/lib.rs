@@ -1,3 +1,6 @@
+//! This defines macros for the [fracpack crate](https://docs.rs/fracpack) and
+//! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
+
 use fracpack_macro::fracpack_macro_impl;
 use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
