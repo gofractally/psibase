@@ -413,18 +413,16 @@ Each peer has the following fields:
 - [File Logger](#file-logger)
 - Syslog Logger (TODO)
 - [Websocket Logger](#websocket-logger)
-- [Filters](#log-filters)
-- [Formatters](#log-formatters)
 
 `/native/admin/loggers` provides `GET` and `PUT` access to the server's logging configuration.
 
-The body is a JSON object which has a field for each logger.  The name of the logger is only significant to identify the logger. When the log configuration is changed, if the new configuration has a logger with the same name and type as one in the old configuration, the old logger will be updated to the new configuration without dropping or duplicating any log records.
+The body is a JSON object which has a field for each logger. The name of the logger is only significant to identify the logger. When the log configuration is changed, if the new configuration has a logger with the same name and type as one in the old configuration, the old logger will be updated to the new configuration without dropping or duplicating any log records.
 
-```
+```json
 {
     "console": {
-        "type": "console"
-        "filter": "%Severity% >= info"
+        "type": "console",
+        "filter": "%Severity% >= info",
         "format": "[%TimeStamp%] [%Severity%]: %Message%"
     }
 }
@@ -435,8 +433,8 @@ All loggers must have the following fields:
 | Field    | Type             | Description                                                                        |
 |----------|------------------|------------------------------------------------------------------------------------|
 | `type`   | String           | The type of the logger: [`"console"`](#console-logger) or [`"file"`](#file-logger) |
-| `filter` | String           | The [filter](#log-filters) for the logger                                          |
-| `format` | String or Object | Determines the [format](#log-fomatters) of log messages                            |
+| `filter` | String           | The [filter](psibase/logging.md#log-filters) for the logger                        |
+| `format` | String or Object | Determines the [format](psibase/logging.md#log-fomatters) of log messages          |
 
 Additional fields are determined by the logger type.
 
@@ -470,16 +468,16 @@ Both rotation and log deletion trigger when any condition is reached.
 When log files are deleted, the oldest logs will be deleted first. All files that match the target pattern are assumed to be log files and are subject to deletion.
 
 Example:
-```
+```json
 {
-    "psibase.log": {
+    "file-log": {
         "type": "file",
         "filter": "%Severity >= info%",
         "format": "[%TimeStamp%]: %Message%",
         "filename": "psibase.log",
         "target": "psibase-%Y%m%d-%N.log",
         "rotationTime": "00:00:00Z",
-        "rotationSize": 16777216
+        "rotationSize": 16777216,
         "maxSize": 1073741824
     }
 }
@@ -489,57 +487,9 @@ Example:
 
 `/native/admin/log` is a websocket endpoint that provides access to server logs as they are generated. Each message from the server contains one log record. Messages sent to the server should be JSON objects representing the desired logger configuration for the connection.
 
-| Field  | Type             | Description                                                                                                                |
-|--------|------------------|----------------------------------------------------------------------------------------------------------------------------|
-| filter | String           | The [filter](#log-filters) for this websocket. If no filter is provided, the default is to send all possible log messages. |
-| format | String or Object | The [format](#log-formatters) for log messages. If no format is provided, the default is JSON.                             |
+| Field  | Type             | Description                                                                                                                                  |
+|--------|------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| filter | String           | The [filter](psibase/logging.md#log-filters) for this websocket. If no filter is provided, the default is to send all possible log messages. |
+| format | String or Object | The [format](psibase/logging.md#log-formatters) for log messages. If no format is provided, the default is JSON.                             |
 
 The server begins sending log messages after it receives the first logger configuration from the client. The client can change the configuration at any time.  The configuration change is asynchronous, so the server will continue to send messages using the old configuration for a short period after client sends the update but before the server processes it.
-
-### Log Filters
-
-Every logger has an associated filter. Filters determine whether to output any particular log record. The filter `"%Attribute%"` tests whether an attribute is present. `"%Attribute% op value"` tests that an attribute is present and meets a specific condition. Filters can be grouped using parentheses or combined using the boolean operators `and`, `or`, and `not`.
-
-Examples:
-- Everything except debug messages: `"%Severity% >= info"`
-- Everything about a specific peer: `%PeerId% = 42`
-- Warnings, errors, and blocks: `"%Severity% >= warning or %Channel% = block"`
-
-| Attribute          | Availability                                                                     | Predicates                      | Notes                                                                |
-|--------------------|----------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------------|
-| `%BlockId%`        | Log records related to blocks                                                    | `=`, `!=`                       |                                                                      |
-| `%Channel%`        | All records                                                                      | `=`, `!=`                       | Possible values are `p2p`, `chain`, `block`, and `consensus`         |
-| `%Host%`           | All records                                                                      | `=`, `!=`                       | The server's hostname.                                               |
-| `%PeerId%`         | Log records related to p2p connections                                           | `=`, `!=`, `<`, `>`, `<=`, `>=` |                                                                      |
-| `%RemoteEndpoint%` | Log records related to HTTP requests, websocket connections, and p2p connections | `=`, `!=`                       |                                                                      |
-| `%Severity%`       | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
-| `%TimeStamp%`      | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                             |
-
-### Log Formatters
-
-Formatters specify how a log record is formatted. A formatter can be either a template string or an object. If the formatter is an object the keys should be channel names or `"default"`.
-
-Examples:
-- ```"[%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%"```
-- ```
-  {
-    "default": "[%TimeStamp%] [%Severity%]: %Message%",
-    "p2p": "[%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%",
-    "block": "[%TimeStamp%] [%Severity%]: %Message% %BlockId%"
-  }
-  ```
-
-Formatters have several attributes that are not available for filters.
-
-| Attribute          | Availability                                                                     | Notes                                                                |
-|--------------------|----------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| `%BlockHeader%`    | Log records related to blocks                                                    |                                                                      |
-| `%BlockId%`        | Log records related to blocks                                                    |                                                                      |
-| `%Channel%`        | All records                                                                      | Possible values are `p2p`, `chain`, `block`, and `consensus`         |
-| `%Host%`           | All records                                                                      | The server's hostname                                                |
-| `%Json%`           |                                                                                  | Formats the entire log record as JSON                                |
-| `%Message%`        |                                                                                  | The log message                                                      |
-| `%PeerId%`         | Log records related to p2p connections                                           |                                                                      |
-| `%RemoteEndpoint%` | Log records related to HTTP requests, websocket connections, and p2p connections |                                                                      |
-| `%Severity%`       | All records                                                                      | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
-| `%TimeStamp%`      | All records                                                                      | ISO 8601 extended format                                             |
