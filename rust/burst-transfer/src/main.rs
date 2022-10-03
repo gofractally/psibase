@@ -1,3 +1,5 @@
+use std::sync::atomic::AtomicI32;
+
 use anyhow::{anyhow, Context};
 use psibase::fracpack::Packable;
 
@@ -26,12 +28,17 @@ struct Args {
     #[clap(required = true)]
     accounts: Vec<psibase::ExactAccountNumber>,
 
-    /// Number of transfers in each burst
-    #[clap(short = 'b', default_value_t = 1)]
+    /// Number of transactions in each burst
+    #[clap(short = 'b', long, default_value_t = 1)]
     burst_size: u32,
 
-    /// Delay in milliseconds between each burst
-    #[clap(short = 'd', default_value_t = 1000)]
+    /// Number of transfer actions in each transaction
+    #[clap(short = 'A', long, default_value_t = 1)]
+    actions: u32,
+
+    /// Delay in milliseconds between each burst. If this is 0, then
+    /// maintain <BURST_SIZE> transactions in flight.
+    #[clap(short = 'd', long, default_value_t = 1000)]
     delay: u32,
 }
 
@@ -82,12 +89,11 @@ struct TokenRecord {
 
 // Look up token ID
 async fn lookup_token(
-    client: reqwest::Client,
     api: &url::Url,
     symbol_id: &str,
 ) -> Result<Option<TokenRecord>, anyhow::Error> {
     let records = as_json::<Vec<TokenRecord>>(
-        client
+        reqwest::Client::new()
             .get(get_url(
                 api,
                 psibase::account!("token-sys"),
@@ -121,23 +127,34 @@ mod token_sys {
 
 // Randomly transfer
 async fn transfer_impl(
-    client: reqwest::Client,
     args: &Args,
     token_id: u32,
-    counter: i32,
+    counter: &AtomicI32,
+    ref_block: &psibase::TaposRefBlock,
 ) -> Result<(), anyhow::Error> {
     let from = args.accounts[rand::random::<usize>() % args.accounts.len()];
     let mut to = from;
     while to == from {
         to = args.accounts[rand::random::<usize>() % args.accounts.len()];
     }
-    let ref_block = psibase::get_tapos_for_head(&args.api, client.clone()).await?;
     let now_plus_10secs = chrono::Utc::now() + chrono::Duration::seconds(10);
     let expiration = psibase::TimePointSec {
         seconds: now_plus_10secs.timestamp() as u32,
     };
-    let memo = format!("memo {}", counter);
-    println!("{} -> {} {}", from, to, memo);
+    let mut actions = Vec::new();
+    for _ in 0..args.actions {
+        let memo = format!(
+            "memo {}",
+            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1
+        );
+        // println!("{} -> {} {}", from, to, memo);
+        actions.push(token_sys::Wrapper::pack_from(from.into()).credit(
+            token_id,
+            to.into(),
+            (1u64,),
+            (memo,),
+        ));
+    }
     let trx = psibase::Transaction {
         tapos: psibase::Tapos {
             expiration,
@@ -145,30 +162,37 @@ async fn transfer_impl(
             flags: 0,
             refBlockIndex: ref_block.ref_block_index,
         },
-        actions: vec![token_sys::Wrapper::pack_from(from.into()).credit(
-            token_id,
-            to.into(),
-            (1u64,),
-            (memo,),
-        )],
+        actions,
         claims: vec![],
     };
     psibase::push_transaction(
         &args.api,
-        client,
+        reqwest::Client::new(),
         psibase::sign_transaction(trx, &args.sign)?.packed(),
     )
-    .await
+    .await?;
+    Ok(())
 }
 
 // Print any errors, but continue execution
-async fn transfer(client: reqwest::Client, args: &Args, token_id: u32, counter: i32) {
-    if let Err(e) = transfer_impl(client, args, token_id, counter)
-        .await
-        .context("Failed to push transaction")
-    {
-        println!("\n{:?}", e);
-    };
+async fn transfer(
+    args: &Args,
+    token_id: u32,
+    counter: &AtomicI32,
+    ref_block: &psibase::TaposRefBlock,
+    repeat: bool,
+) {
+    loop {
+        if let Err(e) = transfer_impl(args, token_id, counter, ref_block)
+            .await
+            .context("Failed to push transaction")
+        {
+            println!("\n{:?}", e);
+        };
+        if !repeat {
+            return;
+        }
+    }
 }
 
 #[tokio::main]
@@ -178,7 +202,7 @@ async fn main() -> Result<(), anyhow::Error> {
         return Err(anyhow!("Need at least 2 accounts"));
     }
 
-    let tok = match lookup_token(reqwest::Client::new(), &args.api, &args.symbol.to_string())
+    let tok = match lookup_token(&args.api, &args.symbol.to_string())
         .await
         .context("Failed to look up tokens")?
     {
@@ -186,15 +210,33 @@ async fn main() -> Result<(), anyhow::Error> {
         None => return Err(anyhow!("Can not find tokens with symbol {}", args.symbol)),
     };
 
-    let mut counter = 0;
+    let counter = AtomicI32::new(0);
     loop {
-        let mut transfers = Vec::new();
-        for _ in 0..args.burst_size {
-            transfers.push(transfer(reqwest::Client::new(), &args, tok.id, counter));
-            counter += 1;
+        println!("get tapos");
+        let ref_block = psibase::get_tapos_for_head(&args.api, reqwest::Client::new())
+            .await
+            .context("Failed to push transaction");
+        println!("got tapos");
+        match ref_block {
+            Err(e) => println!("\n{:?}", e),
+            Ok(ref_block) => {
+                let mut transfers = Vec::new();
+                for _ in 0..args.burst_size {
+                    transfers.push(transfer(
+                        &args,
+                        tok.id,
+                        &counter,
+                        &ref_block,
+                        args.delay == 0,
+                    ));
+                }
+                futures::future::join_all(transfers).await;
+            }
         }
-        futures::future::join_all(transfers).await;
-        println!();
-        tokio::time::sleep(tokio::time::Duration::from_millis(args.delay.into())).await;
+        if args.delay > 0 {
+            println!("sleep...");
+            tokio::time::sleep(tokio::time::Duration::from_millis(args.delay.into())).await;
+        }
+        println!("ready");
     }
 }
