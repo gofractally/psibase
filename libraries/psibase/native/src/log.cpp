@@ -1057,6 +1057,88 @@ namespace psibase::loggers
          throw std::runtime_error("Unkown sink type: " + cfg.type);
       }
 
+      std::string translate_size(std::string_view s)
+      {
+         std::uintmax_t v;
+         auto           err = std::from_chars(s.begin(), s.end(), v);
+         if (err.ec != std::errc())
+         {
+            throw std::runtime_error("Expected number");
+         }
+         s = {err.ptr, s.end()};
+         s = s.substr(std::min(s.find_first_not_of(" \t"), s.size()));
+         if (s.empty() || s == "B")
+         {
+         }
+         else if (s == "KiB")
+         {
+            v <<= 10;
+         }
+         else if (s == "MiB")
+         {
+            v <<= 20;
+         }
+         else if (s == "GiB")
+         {
+            v <<= 30;
+         }
+         else if (s == "TiB")
+         {
+            v <<= 40;
+         }
+         else if (s == "PiB")
+         {
+            v <<= 50;
+         }
+         else if (s == "EiB")
+         {
+            v <<= 60;
+         }
+         // larger values don't fit in 64 bits
+         else if (s == "KB")
+         {
+            v *= 1000;
+         }
+         else if (s == "MB")
+         {
+            v *= 1'000'000;
+         }
+         else if (s == "GB")
+         {
+            v *= 1'000'000'000;
+         }
+         else if (s == "TB")
+         {
+            v *= 1'000'000'000'000;
+         }
+         else if (s == "PB")
+         {
+            v *= 1'000'000'000'000'000;
+         }
+         else if (s == "EB")
+         {
+            v *= 1'000'000'000'000'000'000;
+         }
+         else
+         {
+            throw std::runtime_error("Unknown units: " + std::string(s));
+         }
+         return std::to_string(v);
+      }
+
+      bool translate_bool(std::string_view value)
+      {
+         if (value == "true" || value == "yes" || value == "on" || value == "1" || value == "")
+         {
+            return true;
+         }
+         else if (value == "false" || value == "no" || value == "off" || value == "0")
+         {
+            return false;
+         }
+         throw std::runtime_error("Expected a boolean value: " + std::string(value));
+      }
+
       void update_sink(boost::shared_ptr<boost::log::sinks::sink>& sink,
                        sink_config&                                old_cfg,
                        sink_config&&                               new_cfg)
@@ -1130,6 +1212,136 @@ namespace psibase::loggers
                   std::pair<sink_config, boost::shared_ptr<boost::log::sinks::sink>>,
                   std::less<>>
               sinks;
+         void init(const boost::program_options::variables_map& variables)
+         {
+            auto split_name = [](std::string_view name)
+            {
+               auto pos = name.find('.');
+               if (pos == std::string::npos)
+               {
+                  throw std::runtime_error("Unknown option: logger." + std::string(name));
+               }
+               return std::pair{name.substr(0, pos), name.substr(pos + 1)};
+            };
+
+            auto                  core = boost::log::core::get();
+            std::string_view      current_name;
+            sink_config           current_config;
+            sink_args_type        current_args;
+            per_channel_formatter current_formatter;
+            bool                  has_channel_formatter = false;
+            auto                  push_sink             = [&]()
+            {
+               if (has_channel_formatter)
+               {
+                  current_config.format_str += '}';
+                  current_config.format = std::move(current_formatter);
+               }
+               if (current_config.type == "file")
+               {
+                  current_config.backend.emplace<FileSinkConfig>(current_args);
+               }
+               auto sink = make_sink(current_config);
+               sinks.try_emplace(std::string(current_name), std::move(current_config), sink);
+               core->add_sink(sink);
+            };
+            // loggers.sink.var
+            for (const auto& [name, v] : variables)
+            {
+               if (!name.starts_with("logger."))
+               {
+                  continue;
+               }
+               auto [logger_name, var_name] = split_name(std::string_view(name).substr(7));
+               // If this logger was already configured, ignore this configuration
+               if (sinks.find(logger_name) != sinks.end())
+               {
+                  continue;
+               }
+               if (logger_name != current_name)
+               {
+                  if (!current_name.empty())
+                  {
+                     push_sink();
+                  }
+                  current_name          = logger_name;
+                  current_config        = sink_config();
+                  current_args          = sink_args_type();
+                  current_formatter     = per_channel_formatter();
+                  has_channel_formatter = false;
+               }
+               std::string_view value = v.as<std::string>();
+               if (var_name == "type")
+               {
+                  current_config.type = value;
+               }
+               else if (var_name == "filter")
+               {
+                  current_config.filter_str = value;
+                  current_config.filter     = boost::log::parse_filter(value.begin(), value.end());
+               }
+               else if (var_name == "format")
+               {
+                  current_config.format_str = psio::convert_to_json(value);
+                  current_config.format = boost::log::parse_formatter(value.begin(), value.end());
+               }
+               else if (var_name.starts_with("format."))
+               {
+                  if (!has_channel_formatter)
+                  {
+                     if (!current_config.format_str.empty())
+                     {
+                        current_formatter.default_ = std::move(current_config.format);
+                        current_config.format_str =
+                            "{\"default\":" + current_config.format_str + ',';
+                     }
+                     else
+                     {
+                        current_config.format_str = "{";
+                     }
+                     has_channel_formatter = true;
+                  }
+                  else
+                  {
+                     current_config.format_str += ',';
+                  }
+                  var_name = var_name.substr(7);
+                  current_config.format_str += psio::convert_to_json(var_name);
+                  current_config.format_str += ':';
+                  current_config.format_str += psio::convert_to_json(value);
+                  if (var_name == "default")
+                  {
+                     current_formatter.default_ =
+                         boost::log::parse_formatter(value.begin(), value.end());
+                  }
+                  else
+                  {
+                     current_formatter.formatters.try_emplace(
+                         std::string(var_name),
+                         boost::log::parse_formatter(value.begin(), value.end()));
+                  }
+               }
+               else
+               {
+                  if (var_name == "flush")
+                  {
+                     current_args.try_emplace(std::string(var_name), translate_bool(value));
+                  }
+                  else if (var_name == "maxSize" || var_name == "rotationSize")
+                  {
+                     current_args.try_emplace(std::string(var_name), translate_size(value));
+                  }
+                  else
+                  {
+                     current_args.try_emplace(std::string(var_name), std::string(value));
+                  }
+               }
+            }
+            if (!current_name.empty())
+            {
+               push_sink();
+            }
+         }
          void set(auto& stream)
          {
             auto                          core = boost::log::core::get();
@@ -1228,6 +1440,17 @@ namespace psibase::loggers
             }
          }
       })");
+   }
+   void configure(const boost::program_options::variables_map& map)
+   {
+      log_config::instance().init(map);
+   }
+   void configure_default()
+   {
+      if (log_config::instance().sinks.empty())
+      {
+         configure();
+      }
    }
    std::string get_config()
    {
