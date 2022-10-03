@@ -41,7 +41,7 @@
 //! ```
 //!
 //! Note: `#[fracpack(fracpack_mod = "fracpack")]` is only needed when using the `fracpack`
-//! library directly instead of through the [psibase crate](https://docs.rs/crate/psibase).
+//! library directly instead of through the [psibase crate](https://docs.rs/psibase).
 
 use custom_error::custom_error;
 use std::mem;

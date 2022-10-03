@@ -11,8 +11,8 @@ pub type BlockNum = u32;
 /// A synchronous call
 ///
 /// An Action represents a synchronous call between services.
-/// It is the argument to [call] and can be fetched using
-/// [getCurrentAction].
+/// It is the argument to [crate::native_raw::call] and can be fetched
+/// using [crate::native_raw::getCurrentAction].
 ///
 /// Transactions also contains actions requested by the
 /// transaction authorizers.
