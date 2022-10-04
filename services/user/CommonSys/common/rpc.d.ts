@@ -39,12 +39,14 @@ declare module "common/rpc.mjs" {
     getAppletName(): Promise<string>;
     getAppletId(): Promise<AppletId>;
 
-    public get ops(): Operation[]
+    public get operations(): Operation[]
+    public get queries(): Operation[]
 
   }
 
   function Action(target: any, key: string, descriptor: any): void
   function Op(name?: string): (target: any, key: string, descriptor: any) => void
+  function Qry(name?: string): (target: any, key: string, descriptor: any) => void
 
 
   function getCurrentApplet(): Promise<string>;

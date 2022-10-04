@@ -515,13 +515,7 @@ const messageRouting = [
                     responsePayload.errors.push(e);
                 }
             } else {
-                responsePayload.errors.push(
-                    "Service " +
-                        contractName +
-                        ' has no operation, "' +
-                        identifier +
-                        '"'
-                );
+                responsePayload.errors.push(`Service ${contractName} has no operation "${identifier}"`);
             }
 
             sendToParent({
@@ -551,13 +545,7 @@ const messageRouting = [
                         responsePayload.errors.push(e);
                     }
                 } else {
-                    responsePayload.errors.push(
-                        "Service " +
-                            contractName +
-                            ' has no query, "' +
-                            identifier +
-                            '"'
-                    );
+                    responsePayload.errors.push(`Service ${contractName} has no query "${identifier}"`);
                 }
             } catch (e) {
                 console.error("fail to process query message", e);
@@ -599,7 +587,7 @@ const messageRouting = [
     },
 ];
 
-export async function initializeApplet(initializer = () => {}) {
+export async function initializeApplet(initializer = () => { }) {
     await redirectIfAccessedDirectly();
 
     const rootUrl = await siblingUrl(null, null, null);
@@ -757,6 +745,9 @@ export function query(appletId, name, params = {}) {
     return queryPromise;
 }
 
+const OPERATIONS_KEY = 'OPERATIONS_KEY'
+const QUERIES_KEY = 'QUERIES_KEY'
+
 export class Service {
     cachedApplet = '';
 
@@ -780,8 +771,12 @@ export class Service {
         return new AppletId(appletName);
     }
 
-    get ops() {
-        return this.operations || []
+    get operations() {
+        return this[OPERATIONS_KEY] || []
+    }
+
+    get queries() {
+        return this[QUERIES_KEY] || []
     }
 
 }
@@ -803,16 +798,37 @@ export function Op(name) {
             exec: descriptor.value.bind(target),
             id
         };
-        const isExistingArray = 'operations' in target;
+        const isExistingArray = OPERATIONS_KEY in target;
         if (isExistingArray) {
-            target['operations'].push(op)
+            target[OPERATIONS_KEY].push(op)
         } else {
-            target['operations'] = [op]
+            target[OPERATIONS_KEY] = [op]
         }
 
         descriptor.value = function (...args) {
             const parent = 'getAppletId' in Object.getPrototypeOf(this) ? Object.getPrototypeOf(this) : Object.getPrototypeOf(Object.getPrototypeOf(this))
             return parent.getAppletId().then(appletId => operation(appletId, id, ...args))
+        }
+    };
+}
+
+export function Qry(name) {
+    return function (target, key, descriptor) {
+        const id = name ? name : key;
+        const op = {
+            exec: descriptor.value.bind(target),
+            id
+        };
+        const isExistingArray = QUERIES_KEY in target;
+        if (isExistingArray) {
+            target[QUERIES_KEY].push(op)
+        } else {
+            target[QUERIES_KEY] = [op]
+        }
+
+        descriptor.value = function (...args) {
+            const parent = 'getAppletId' in Object.getPrototypeOf(this) ? Object.getPrototypeOf(this) : Object.getPrototypeOf(Object.getPrototypeOf(this))
+            return parent.getAppletId().then(appletId => query(appletId, id, ...args))
         }
     };
 }

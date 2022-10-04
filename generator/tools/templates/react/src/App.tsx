@@ -44,7 +44,7 @@ function App() {
 
     useEffectHmr(() => {
         initializeApplet(async () => {
-            setOperations(__contract__(lowerCase)Service.ops)
+            setOperations(__contract__(lowerCase)Service.operations)
         });
         fetchCurrentUser()
         fetchTable().then(setCount)

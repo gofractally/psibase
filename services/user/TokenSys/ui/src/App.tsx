@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 
-import { initializeApplet, setOperations } from "common/rpc.mjs";
+import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
 
 import { TransferHistory } from "./views";
 import { Button, Form, Heading, Icon, Text } from "./components";
@@ -17,8 +17,8 @@ import WalletIcon from "./assets/app-wallet-icon.svg";
 import { tokenContract } from "./contracts";
 
 initializeApplet(async () => {
-
-    setOperations(tokenContract.ops);
+    setOperations(tokenContract.operations);
+    setQueries(tokenContract.queries);
 });
 
 type TransferInputs = {

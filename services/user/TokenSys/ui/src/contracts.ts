@@ -1,4 +1,4 @@
-import { action, AppletId, getJson, siblingUrl, Service, Op, Action } from "common/rpc.mjs";
+import { action, AppletId, getJson, siblingUrl, Service, Op, Action, Qry } from "common/rpc.mjs";
 
 import { FungibleToken, TokenBalance } from "./types";
 
@@ -11,17 +11,18 @@ export interface CreditOperationPayload {
 
 
 export class TokenContract extends Service {
-    public async fetchTokenTypes() {
-        const contractName = await this.applet();
-        const url = await siblingUrl(null, contractName, "api/getTokenTypes");
-        return getJson<FungibleToken[]>(url);
-    }
 
     public async fetchBalances(user: string) {
         const url = await siblingUrl(null, "token-sys", `api/balances/${user}`);
         return getJson<TokenBalance[]>(url);
     }
 
+    @Qry()
+    public async fetchTokenTypes() {
+        const contractName = await this.applet();
+        const url = await siblingUrl(null, contractName, "api/getTokenTypes");
+        return getJson<FungibleToken[]>(url);
+    }
 
     @Action
     credit(tokenId: number, receiver: string, amount: string | number, memo: string) {
