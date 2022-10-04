@@ -179,8 +179,8 @@ fn process_mod(
             `pack` returns an object which has [methods]({actions}#implementations)
             (one per action) which pack the action's arguments using [fracpack] and
             return a [psibase::Action]({psibase}::Action). The `pack_*` series of
-            functions is mainly useful to Rust applications which communicate
-            with blockchains.
+            functions is mainly useful to applications which push transactions
+            to blockchains.
 
             ",
             psibase = options.psibase_mod,
@@ -201,7 +201,8 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             impl #wrapper {
-                const SERVICE: #psibase_mod::AccountNumber =
+                #[doc = #constant_doc]
+                pub const SERVICE: #psibase_mod::AccountNumber =
                     #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
 
                 #[doc = #pack_doc]
