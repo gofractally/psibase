@@ -7,7 +7,7 @@ import {
     Op,
     Service
 } from "common/rpc.mjs";
-import useEffectHmr from "./hooks/useEffectOnce";
+import useEffectHmr from "./hooks/useEffectHmr";
 import { fetchTable, getLoggedInUser } from "./helpers";
 
 class __contract__Service extends Service {
