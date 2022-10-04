@@ -29,9 +29,11 @@ pub struct ServiceMethod {
 /// they should define methods with matching signatures.
 #[crate::service(
     name = "example-auth",
-    actions_name = "AuthActions",
-    wrapper_name = "AuthWrapper",
+    actions = "AuthActions",
+    wrapper = "AuthWrapper",
+    structs = "auth_action_structs",
     dispatch = false,
+    pub_constant = false,
     psibase_mod = "crate"
 )]
 #[allow(non_snake_case, unused_variables, dead_code)]
