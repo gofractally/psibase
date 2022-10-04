@@ -49,7 +49,6 @@ export const fetchAccountsByKey = async (publicKey: string) => {
 export const fetchAccounts = async () => {
     try {
         const accounts = await getJson<AccountWithAuth[]>("/accounts");
-        console.log("fetched:", accounts);
         return accounts;
     } catch (e) {
         console.info("refreshAccounts().catch().e:");

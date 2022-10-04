@@ -466,7 +466,6 @@ export const useApplets = () => {
             handleOperationResponse,
             handleQuery,
             handleQueryResponse,
-            handleAction,
             handleSetActiveUser,
         ]
     );
