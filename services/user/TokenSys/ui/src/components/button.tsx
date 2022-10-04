@@ -88,7 +88,7 @@ export const Button = ({
     title,
     dataTestId,
 }: ButtonProps) => {
-    const baseClass = "inline-block text-center no-underline";
+    const baseClass = "inline-block text-center no-underline hover:border-gray-400 transition";
     const widthClass = fullWidth ? "w-full" : "";
     const typeClass = TYPE_CLASS[type][disabled ? "disabled" : "enabled"];
     const cursorClass = disabled ? "cursor-not-allowed" : "cursor-pointer";
