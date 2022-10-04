@@ -339,6 +339,7 @@ export const MessageTypes = {
     QueryResponse: "QueryResponse", // A response to a prior query
     OperationResponse: "OperationResponse",
     TransactionReceipt: "TransactionReceipt",
+    SetActiveAccount: "SetActiveAccount",
 };
 
 export class AppletId {
@@ -428,7 +429,7 @@ export function executePromise(callbackId, response, errors) {
     return true;
 }
 
-async function sendToParent(message) {
+function sendToParent(message) {
     const sendMessage = async () => {
         parentIFrame.sendMessage(message, await siblingUrl(null, null, null));
     };
@@ -755,4 +756,17 @@ export function query(appletId, name, params = {}) {
     });
 
     return queryPromise;
+}
+
+/**
+ * Description: Notifies CommonSys of a change in active account. Callable only by AccountSys.
+ * TODO: AccountSys should emit an event once we have a proper event system. Remove setActiveAccount then.
+ *
+ * @param {String} account - The name of the active account.
+ */
+export function setActiveAccount(account) {
+    sendToParent({
+        type: MessageTypes.SetActiveAccount,
+        payload: { account },
+    });
 }

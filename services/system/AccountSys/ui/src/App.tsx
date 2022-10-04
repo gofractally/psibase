@@ -14,7 +14,7 @@ import {
     CreateAccountForm,
     Heading,
 } from "./components";
-import { getLoggedInUser } from "./helpers";
+import { getLoggedInUser, updateAccountInCommonNav } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
 
 // needed for common files that won't necessarily use bundles
@@ -47,8 +47,15 @@ function App() {
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
         if (isLoggingOutOfCurrentUser) {
-            const nextAccount = accountsWithKeys.find(acc => acc.accountNum !== account && acc.authService !== 'auth-any-sys');
-            const newUser = typeof nextAccount === 'undefined' ? '' : nextAccount.accountNum
+            const nextAccount = accountsWithKeys.find(
+                (acc) =>
+                    acc.accountNum !== account &&
+                    acc.authService !== "auth-any-sys"
+            );
+            const newUser =
+                typeof nextAccount === "undefined"
+                    ? ""
+                    : nextAccount.accountNum;
             setCurrentUser(newUser);
         }
         dropAccount(account);
@@ -62,6 +69,11 @@ function App() {
         }
     });
 
+    const onSelectAccount = (account: string) => {
+        setCurrentUser(account);
+        updateAccountInCommonNav(account);
+    };
+
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
             <div className="flex items-center gap-2">
@@ -74,12 +86,14 @@ function App() {
                 onLogout={onLogout}
                 selectedAccount={currentUser}
                 accounts={accountsWithKeys}
-                onSelectAccount={setCurrentUser}
+                onSelectAccount={onSelectAccount}
             />
-            {currentUser && <CreateAccountForm
-                addAccounts={addAccounts}
-                refreshAccounts={refreshAccounts}
-            />}
+            {currentUser && (
+                <CreateAccountForm
+                    addAccounts={addAccounts}
+                    refreshAccounts={refreshAccounts}
+                />
+            )}
             <ImportAccountForm addAccounts={addAccounts} />
             {/* <SetAuth /> */}
             <AccountsList accounts={allAccounts} />

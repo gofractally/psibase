@@ -34,11 +34,13 @@ export const Nav = ({ currentUser }: { currentUser: string }) => {
                     <Ninebox />
                 </a>
                 {currentUser ? (
-                    <div className="flex h-10 w-10 select-none items-center justify-center rounded-full bg-gray-500 text-white">
-                        <span className="text-3xl font-bold">
-                            {(currentUser[0] ?? "").toUpperCase()}
-                        </span>
-                    </div>
+                    <a href="/applet/account-sys" className="no-underline">
+                        <div className="flex h-10 w-10 select-none items-center justify-center rounded-full bg-gray-500 text-white">
+                            <span className="text-3xl font-bold">
+                                {(currentUser[0] ?? "").toUpperCase()}
+                            </span>
+                        </div>
+                    </a>
                 ) : (
                     <Button
                         href="/applet/account-sys"
