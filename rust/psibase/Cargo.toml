@@ -1,6 +1,6 @@
 [package]
 name = "psibase"
-version.workspace = true
+version = "0.1.1"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -10,8 +10,8 @@ license = "MIT"
 
 [dependencies]
 custom_error = "1.9"
-fracpack = { version = "0.1.0", path = "../fracpack" }
-psibase_macros = { version = "0.1.1", path = "../psibase_macros" }
+fracpack = { version = "0.1.2", path = "../fracpack" }
+psibase_macros = { version = "0.1.2", path = "../psibase_macros" }
 psibase_names = { version = "0.1.3", path = "../psibase_names" }
 ripemd = "0.1"
 serde = { version = "1.0", features = ["derive"] }
