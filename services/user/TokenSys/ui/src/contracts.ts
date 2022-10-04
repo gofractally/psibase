@@ -1,4 +1,4 @@
-import { action, AppletId, getJson, siblingUrl, Service, Op, Action, Qry } from "common/rpc.mjs";
+import { getJson, siblingUrl, Service, Op, Action, Qry } from "common/rpc.mjs";
 
 import { FungibleToken, TokenBalance } from "./types";
 
@@ -12,6 +12,7 @@ export interface CreditOperationPayload {
 
 export class TokenContract extends Service {
 
+    @Qry()
     public async fetchBalances(user: string) {
         const url = await siblingUrl(null, "token-sys", `api/balances/${user}`);
         return getJson<TokenBalance[]>(url);
