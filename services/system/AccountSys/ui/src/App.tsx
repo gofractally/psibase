@@ -47,7 +47,9 @@ function App() {
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
         if (isLoggingOutOfCurrentUser) {
-            setCurrentUser(accountsWithKeys[0].accountNum);
+            const nextAccount = accountsWithKeys.find(acc => acc.accountNum !== account && acc.authService !== 'auth-any-sys');
+            const newUser = typeof nextAccount === 'undefined' ? '' : nextAccount.accountNum
+            setCurrentUser(newUser);
         }
         dropAccount(account);
     };
@@ -74,10 +76,10 @@ function App() {
                 accounts={accountsWithKeys}
                 onSelectAccount={setCurrentUser}
             />
-            <CreateAccountForm
+            {currentUser && <CreateAccountForm
                 addAccounts={addAccounts}
                 refreshAccounts={refreshAccounts}
-            />
+            />}
             <ImportAccountForm addAccounts={addAccounts} />
             {/* <SetAuth /> */}
             <AccountsList accounts={allAccounts} />
