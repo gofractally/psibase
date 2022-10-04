@@ -14,7 +14,7 @@ import {
     CreateAccountForm,
     Heading,
 } from "./components";
-import { getLoggedInUser, updateLoggedInAccount } from "./helpers";
+import { getLoggedInUser, updateAccountInCommonNav } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
 
 // needed for common files that won't necessarily use bundles
@@ -71,7 +71,7 @@ function App() {
 
     const onSelectAccount = (account: string) => {
         setCurrentUser(account);
-        updateLoggedInAccount(account);
+        updateAccountInCommonNav(account);
     };
 
     return (

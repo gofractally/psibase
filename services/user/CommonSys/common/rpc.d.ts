@@ -18,7 +18,7 @@ declare module "common/rpc.mjs" {
         QueryResponse: "QueryResponse",
         OperationResponse: "OperationResponse",
         TransactionReceipt: "TransactionReceipt",
-        UpdateUserInCommonSys: "UpdateUserInCommonSys",
+        SetActiveAccount: "SetActiveAccount",
     };
 
     declare class AppletId {
@@ -36,8 +36,6 @@ declare module "common/rpc.mjs" {
 
     function getCurrentApplet(): Promise<string>;
 
-    function sendToParent(message: any): Promise<void>;
-
     function query<Params, Response>(
         appletId: AppletId,
         queryName: string,
@@ -50,6 +48,8 @@ declare module "common/rpc.mjs" {
         params: ActionParams,
         sender?: string
     ): void;
+
+    function setActiveAccount(account: string): void;
 
     type Operation = { id: string; exec: (params: any) => Promise<void> };
 

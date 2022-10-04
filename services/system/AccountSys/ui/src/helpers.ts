@@ -2,9 +2,8 @@ import {
     AppletId,
     getJson,
     query,
-    sendToParent,
     siblingUrl,
-    MessageTypes,
+    setActiveAccount,
 } from "common/rpc.mjs";
 import { AccountWithAuth } from "./App";
 export interface MsgProps {
@@ -36,11 +35,8 @@ export const getLoggedInUser = async (): Promise<string> => {
     );
 };
 
-export const updateLoggedInAccount = (account: string) => {
-    sendToParent({
-        type: MessageTypes.UpdateUserInCommonSys,
-        payload: { account },
-    });
+export const updateAccountInCommonNav = (account: string) => {
+    setActiveAccount(account);
 };
 
 export const fetchAccountsByKey = async (publicKey: string) => {
