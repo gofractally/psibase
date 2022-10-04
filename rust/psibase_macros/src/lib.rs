@@ -31,13 +31,11 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 /// /// This is where a detailed description would go.
 /// #[psibase::service]
 /// mod service {
-///     use psibase::*;
-///
 ///     /// Add two numbers together.
 ///     ///
 ///     /// See also [Self::multiply].
 ///     #[action]
-///     fn add(a: i32, b: i32, _n: AccountNumber) -> i32 {
+///     fn add(a: i32, b: i32) -> i32 {
 ///         a + b
 ///     }
 ///
