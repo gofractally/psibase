@@ -1,18 +1,24 @@
 import { operation } from "common/rpc.mjs";
 import { tokenContract } from "./contracts";
 
-interface CreditUncreditOperationPayload {
+interface FundOperationPayload {
     symbol: string;
-    receiver: string;
     memo: string;
 }
 
-export interface CreditOperationPayload extends CreditUncreditOperationPayload {
+export interface CreditOperationPayload extends FundOperationPayload {
+    receiver: string;
     amount: string | number;
 }
 
-export interface UncreditOperationPayload extends CreditUncreditOperationPayload {
+export interface UncreditOperationPayload extends FundOperationPayload {
+    receiver: string;
     maxAmount: string | number;
+}
+
+export interface DebitOperationPayload extends FundOperationPayload {
+    sender: string;
+    amount: string | number;
 }
 
 export interface SetUserConfPayload {
@@ -100,6 +106,46 @@ const UNCREDIT = {
     },
 };
 
+const DEBIT = {
+    id: "debit",
+    exec: async ({
+                     symbol,
+                     sender,
+                     amount,
+                     memo,
+                 }: DebitOperationPayload) => {
+        console.log("TokenSys Operation: debit");
+
+        console.log({
+            symbol,
+            sender,
+            amount,
+            memo,
+        });
+
+        // TODO: let tokenId = query(symbolSys, "getTokenId", { symbol });
+        try {
+            const allTokens = await tokenContract.fetchTokenTypes();
+            const token = allTokens.find(
+                (t) => t.symbolId === symbol.toLowerCase()
+            );
+
+            if (!token) {
+                throw new Error("No token with symbol " + symbol);
+            }
+
+            await tokenContract.actionDebit({
+                tokenId: token.id,
+                sender,
+                amount,
+                memo,
+            });
+        } catch (e) {
+            console.error("Debit operation failed:", e);
+        }
+    },
+};
+
 const SETUSERCONF = {
     id: "setUserConf",
     exec: async ({flag, enable}: SetUserConfPayload) => {
@@ -113,7 +159,7 @@ const SETUSERCONF = {
 };
 
 
-export const operations = [CREDIT, UNCREDIT, SETUSERCONF];
+export const operations = [CREDIT, UNCREDIT, DEBIT, SETUSERCONF];
 
 export const executeCredit = async (payload: CreditOperationPayload) => {
     const appletId = await tokenContract.getAppletId();
@@ -124,6 +170,12 @@ export const executeCredit = async (payload: CreditOperationPayload) => {
 export const executeUncredit = async (payload: UncreditOperationPayload) => {
     const appletId = await tokenContract.getAppletId();
     const opRes = await operation(appletId, "uncredit", payload);
+    return opRes.transactionSubmittedPromise;
+};
+
+export const executeDebit = async (payload: DebitOperationPayload) => {
+    const appletId = await tokenContract.getAppletId();
+    const opRes = await operation(appletId, "debit", payload);
     return opRes.transactionSubmittedPromise;
 };
 
