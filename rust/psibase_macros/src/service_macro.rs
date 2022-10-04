@@ -174,14 +174,16 @@ fn process_mod(
         });
         let pack_from_to_doc = format!(
             "
-            Pack actions into [psibase::Action].
+            Pack actions into [psibase::Action]({psibase}::Action).
 
-            `pack` returns an object which has [methods]({actions}#implementations) (one per action)
-            which pack the action's arguments using [fracpack] and return a [psibase::Action]. The
-            `pack_*` series of functions is mainly useful to Rust applications which communicate
+            `pack` returns an object which has [methods]({actions}#implementations)
+            (one per action) which pack the action's arguments using [fracpack] and
+            return a [psibase::Action]({psibase}::Action). The `pack_*` series of
+            functions is mainly useful to Rust applications which communicate
             with blockchains.
 
             ",
+            psibase = options.psibase_mod,
             actions = options.actions
         );
         let pack_doc = format!(
