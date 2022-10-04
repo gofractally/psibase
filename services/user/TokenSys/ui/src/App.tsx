@@ -17,6 +17,7 @@ import WalletIcon from "./assets/app-wallet-icon.svg";
 import { tokenContract } from "./contracts";
 
 initializeApplet(async () => {
+
     setOperations(tokenContract.ops);
 });
 
@@ -105,13 +106,12 @@ function App() {
         const decimal = (amountSegments[1] ?? "0").padEnd(token.precision, "0");
         const parsedAmount = `${amountSegments[0]}${decimal}`;
 
-        // TODO: Errors getting swallowed by CommonSys::executeTransaction(). Fix.
         await tokenContract.creditOp({
             symbol,
             receiver: to,
             amount: parsedAmount,
             memo: "Working",
-        });
+        })
 
         const updatedTokens = await pollForBalanceChange(userName, token);
         setTokens(updatedTokens);
