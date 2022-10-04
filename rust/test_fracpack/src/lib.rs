@@ -10,6 +10,7 @@ use psibase_macros::Fracpack;
 
 // TODO: test reading variant with future index
 #[derive(Fracpack, PartialEq, Eq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub enum Variant {
     ItemU32(u32),
     ItemStr(String),
@@ -17,6 +18,7 @@ pub enum Variant {
 }
 
 #[derive(Fracpack, PartialEq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct DefWontChangeInnerStruct {
     pub field_bool: bool,
@@ -36,6 +38,7 @@ pub struct DefWontChangeInnerStruct {
 }
 
 #[derive(Fracpack, PartialEq, Eq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct InnerStruct {
     pub inner_u32: u32,
     pub var: Option<Variant>,
@@ -46,6 +49,7 @@ pub struct InnerStruct {
 }
 
 #[derive(Fracpack, PartialEq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct OuterStruct {
     pub field_u8: u8,
     pub field_u16: u16,
@@ -83,6 +87,7 @@ pub struct OuterStruct {
 }
 
 #[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct SimpleWithNoString {
     pub a: u32,
@@ -92,6 +97,7 @@ pub struct SimpleWithNoString {
 }
 
 #[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct SimpleWithString {
     pub a: u32,
@@ -102,6 +108,7 @@ pub struct SimpleWithString {
 }
 
 #[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct ParentStruct {
     pub oa: u32,
     pub ob: u64,
@@ -115,6 +122,7 @@ pub struct ParentStruct {
 }
 
 #[derive(Fracpack, Debug, PartialEq, Eq)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct OuterSimpleArray {
     pub oa: u32,
     pub ob: u64,
@@ -129,6 +137,7 @@ pub struct OuterSimpleArray {
 // TODO: check arrays, tuples, bool, char,
 
 #[derive(Fracpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct UnextensibleWithOptions {
     pub a: u32,
@@ -144,6 +153,7 @@ pub struct UnextensibleWithOptions {
 }
 
 #[derive(Fracpack, Debug, PartialEq, Eq)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct ThreeElementsFixedStruct {
     pub element_1: i16,

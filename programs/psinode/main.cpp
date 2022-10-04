@@ -19,6 +19,7 @@
 #include <boost/asio/system_timer.hpp>
 
 #include <charconv>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <mutex>
@@ -153,6 +154,7 @@ void loop(Timer& timer, F&& f)
 void pushTransaction(psibase::SharedState&                  sharedState,
                      const std::shared_ptr<const Revision>& revisionAtBlockStart,
                      BlockContext&                          bc,
+                     SystemContext&                         proofSystem,
                      transaction_queue::entry&              entry,
                      std::chrono::microseconds              firstAuthWatchdogLimit,
                      std::chrono::microseconds              proofWatchdogLimit,
@@ -188,8 +190,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
             // TODO: If the first proof and the first auth pass, but the transaction
             //       fails (including other proof failures), then charge the first
             //       authorizer
-            auto         proofSystem = sharedState.getSystemContext();
-            BlockContext proofBC{*proofSystem, revisionAtBlockStart};
+            BlockContext proofBC{proofSystem, revisionAtBlockStart};
             proofBC.start(bc.current.header.time);
             for (size_t i = 0; i < trx.proofs.size(); ++i)
             {
@@ -291,6 +292,24 @@ using timer_type = boost::asio::system_timer;
 template <typename Derived>
 using cft_consensus = basic_cft_consensus<Derived, timer_type>;
 
+const char default_config[] = R"(# psinode configuration
+
+slow     = no
+p2p      = off
+# producer = psibase
+# sign     = <private key>
+# host     = 127.0.0.1.sslip.io
+# port     = 8080
+# peer     = localhost:8080
+
+[logger.stderr]
+type         = console
+filter       = %Severity% >= info
+format       = [%TimeStamp%] [%Severity%]: %Message%
+format.p2p   = [%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%
+format.block = [%TimeStamp%] [%Severity%]: %Message% %BlockId%
+)";
+
 void run(const std::string&              db_path,
          AccountNumber                   producer,
          std::shared_ptr<Prover>         prover,
@@ -309,8 +328,19 @@ void run(const std::string&              db_path,
    // TODO: configurable WasmCache size
    auto sharedState =
        std::make_shared<psibase::SharedState>(SharedDatabase{db_path, allow_slow}, WasmCache{128});
-   auto system = sharedState->getSystemContext();
-   auto queue  = std::make_shared<transaction_queue>();
+   auto system      = sharedState->getSystemContext();
+   auto proofSystem = sharedState->getSystemContext();
+   auto queue       = std::make_shared<transaction_queue>();
+
+   // If the server's config file doesn't exist yet, create it
+   {
+      auto config_path = std::filesystem::path(db_path) / "config";
+      if (!std::filesystem::exists(config_path))
+      {
+         std::ofstream out(config_path);
+         out << default_config;
+      }
+   }
 
    boost::asio::io_context chainContext;
 
@@ -540,7 +570,7 @@ void run(const std::string&              db_path,
             if (entry.is_boot)
                push_boot(*bc, entry);
             else
-               pushTransaction(*sharedState, revisionAtBlockStart, *bc, entry,
+               pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
                                std::chrono::microseconds(leeway_us),  // TODO
                                std::chrono::microseconds(leeway_us),  // TODO
                                std::chrono::microseconds(leeway_us));
@@ -599,9 +629,8 @@ int main(int argc, char* argv[])
    namespace po = boost::program_options;
 
    po::options_description desc("psinode");
-   auto                    opt = desc.add_options();
-   opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
-       "Path to database");
+   po::options_description common_opts("psinode");
+   auto                    opt = common_opts.add_options();
    opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
    opt("sign,s", po::value(&keys), "Sign with this key");
    opt("peer", po::value(&peers), "Peer endpoint");
@@ -615,6 +644,11 @@ int main(int argc, char* argv[])
    opt("slow", po::bool_switch(&allow_slow),
        "Don't complain if unable to lock memory for database. This will still attempt to lock "
        "memory, but if it fails it will continue to run, but more slowly.");
+   desc.add(common_opts);
+   opt = desc.add_options();
+   // Options that can only be specified on the command line
+   opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
+       "Path to database");
    opt("replay-blocks", po::value<std::string>(&replay_blocks)->value_name("file"),
        "Replay blocks from file");
    opt("save-blocks", po::value<std::string>(&save_blocks)->value_name("file"),
@@ -624,10 +658,24 @@ int main(int argc, char* argv[])
    po::positional_options_description p;
    p.add("database", 1);
 
+   // Options that are only allowed in the config file
+   po::options_description cfg_opts("psinode");
+   cfg_opts.add(common_opts);
+   cfg_opts.add_options()("logger.*", po::value<std::string>(), "Log configuration");
+
    po::variables_map vm;
    try
    {
       po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+      if (vm.count("database"))
+      {
+         auto config_path = std::filesystem::path(vm["database"].as<std::string>()) / "config";
+         if (std::filesystem::is_regular_file(config_path))
+         {
+            std::ifstream in(config_path);
+            po::store(po::parse_config_file(in, cfg_opts), vm);
+         }
+      }
       po::notify(vm);
    }
    catch (std::exception& e)
@@ -648,7 +696,9 @@ int main(int argc, char* argv[])
 
    try
    {
-      psibase::loggers::configure();
+      psibase::loggers::set_path(db_path);
+      psibase::loggers::configure(vm);
+      psibase::loggers::configure_default();
       auto prover = std::make_shared<CompoundProver>();
       for (const auto& key : keys)
       {

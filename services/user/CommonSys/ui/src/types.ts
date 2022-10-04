@@ -45,4 +45,4 @@ export type ReplyWithCallbackId = {
     response: any;
     errors: any[];
     callbackId?: number;
-} | null;
+};

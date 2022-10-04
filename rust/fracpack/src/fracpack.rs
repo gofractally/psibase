@@ -3,10 +3,50 @@
 // TODO: rename misnamed "heap_size"
 // TODO: support packing references; replace TupleOfRefPackable
 
-//! Rust support for the [frackpack format](https://doc-sys.psibase.io/format/fracpack.html)
+//! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
+//!
+//! [Psibase](https://about.psibase.io) uses a new binary format, `fracpack`, which has the following goals:
+//!
+//! - Quickly pack and unpack data, making it suitable for service-to-service communication, node-to-node communication, blockchain-to-outside communication, and database storage.
+//! - Forwards and backwards compatibility; it supports adding new optional fields to the end of structs and tuples, even when they are embedded in variable-length vectors, fixed-length arrays, optional, and other structs and tuples.
+//! - Option to read without unpacking (almost zero-copy); helps to efficiently handle large data. TODO: this library doesn't implement this feature yet.
+//! - Doesn't require a code generator to support either C++ or Rust; macros and metaprogramming handle it.
+//! - Efficient compression when combined with the compression algorithm from Cap 'n' Proto.
+//!
+//! # Example use
+//!
+//! ```
+//! use fracpack::{Fracpack, Packable, Result};
+//!
+//! #[derive(Fracpack, PartialEq, Debug)]
+//! #[fracpack(fracpack_mod = "fracpack")]
+//! struct Example {
+//!     a_string: String,
+//!     a_tuple: (u32, String),
+//! }
+//!
+//! let orig = Example {
+//!     a_string: "content".into(),
+//!     a_tuple: (1234, "5678".into()),
+//! };
+//!
+//! // Convert to fracpack format
+//! let packed: Vec<u8> = orig.packed();
+//!
+//! // Convert from fracpack format
+//! let unpacked = Example::unpacked(&packed)?;
+//!
+//! assert_eq!(orig, unpacked);
+//! # Ok::<(), fracpack::Error>(())
+//! ```
+//!
+//! Note: `#[fracpack(fracpack_mod = "fracpack")]` is only needed when using the `fracpack`
+//! library directly instead of through the [psibase crate](https://docs.rs/psibase).
 
 use custom_error::custom_error;
 use std::mem;
+
+pub use psibase_macros::Fracpack;
 
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
@@ -19,6 +59,16 @@ custom_error! {pub Error
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Use this trait instead of [Packable] when the deserialized
+/// data is owned instead of borrowed.
+///
+/// ```
+/// use fracpack::{PackableOwned, Result};
+///
+/// pub fn get_unpacked<T: PackableOwned>(packed: &[u8]) -> Result<T> {
+///     T::unpacked(packed)
+/// }
+/// ```
 pub trait PackableOwned: for<'a> Packable<'a> {}
 impl<T> PackableOwned for T where T: for<'a> Packable<'a> {}
 
@@ -213,6 +263,7 @@ pub trait Packable<'a>: Sized {
     }
 } // Packable
 
+#[doc(hidden)]
 pub trait TupleOfRefPackable<'a>: Sized {
     fn pack_tuple_of_ref(&self, dest: &mut Vec<u8>);
 }

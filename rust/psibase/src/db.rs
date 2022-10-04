@@ -73,8 +73,8 @@ pub enum DbId {
     /// * 64 bit: service
     ///
     /// Only usable with these native functions:
-    /// * [putSequential]
-    /// * [getSequential]
+    /// * [crate::native_raw::putSequential]
+    /// * [crate::native_raw::getSequential]
     ///
     /// TODO: right now the value must begin with the service. Revisit
     /// whether beginning with the block number is useful.
@@ -96,8 +96,8 @@ pub enum DbId {
     /// * 64 bit: service
     ///
     /// Only usable with these native functions:
-    /// * [putSequential]
-    /// * [getSequential]
+    /// * [crate::native_raw::putSequential]
+    /// * [crate::native_raw::getSequential]
     ///
     /// TODO: right now the value must begin with the service. Revisit
     /// whether beginning with the block number is useful.
@@ -118,8 +118,8 @@ pub enum DbId {
     /// * 64 bit: service
     ///
     /// Only usable with these native functions:
-    /// * [putSequential]
-    /// * [getSequential]
+    /// * [crate::native_raw::putSequential]
+    /// * [crate::native_raw::getSequential]
     ///
     /// TODO: right now the value must begin with the service. Revisit
     /// whether beginning with the block number is useful.

@@ -53,10 +53,21 @@ const AppletIcon = ({
     const { MobileIcon, DesktopIcon } = applet;
     const opacity = disabled ? "opacity-50" : "";
     const cursor = disabled ? "cursor-not-allowed" : "";
+
+    let href: string | undefined = `${appletPrefix}${applet.service}`;
+    let target = "_self";
+    if (disabled) {
+        href = undefined;
+    } else if (applet.href) {
+        href = applet.href;
+        target = "_blank";
+    }
+
     return (
         <a
-            href={disabled ? undefined : `${appletPrefix}${applet.service}`}
+            href={href}
             className={`select-none no-underline hover:text-gray-900 ${cursor}`}
+            target={target}
         >
             <div
                 className={`-mx-2 flex items-center gap-2 p-4 hover:bg-gray-100 sm:h-[184px] sm:w-[247px] sm:flex-col sm:justify-center sm:gap-3 ${opacity}`}

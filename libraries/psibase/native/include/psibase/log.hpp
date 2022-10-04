@@ -7,6 +7,7 @@
 #include <boost/log/sources/severity_channel_logger.hpp>
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/utility/manipulators/add_value.hpp>
+#include <boost/program_options/variables_map.hpp>
 
 #include <psibase/block.hpp>
 
@@ -53,8 +54,15 @@ namespace psibase
          BOOST_LOG_ATTRIBUTE_KEYWORD(BlockId, "BlockId", Checksum256)
       }  // namespace keyword
 
+      // Sets the root path for file loggers.  If this is
+      // not set, it defaults to the current working directory.
+      // This should be called before configure, as it does not
+      // affect existing loggers.
+      void        set_path(std::string_view p);
       void        configure();
       void        configure(std::string_view json);
+      void        configure(const boost::program_options::variables_map&);
+      void        configure_default();
       std::string get_config();
    }  // namespace loggers
 

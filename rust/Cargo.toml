@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "account_sys",
+    "burst-transfer",
     "cargo-psibase",
     "fracpack",
     "gen-cpp-doc",

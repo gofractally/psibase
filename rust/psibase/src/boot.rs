@@ -1,102 +1,61 @@
-use crate::{
-    new_account_action, reg_server, set_auth_contract_action, set_key_action, set_producers_action,
-    store_sys, to_claim, without_tapos, Args, Error,
+use crate::services::{
+    account_sys, auth_ec_sys, common_sys, nft_sys, producer_sys, proxy_sys, psispace_sys,
+    setcode_sys, transaction_sys,
 };
-use anyhow::Context;
+use crate::{
+    method_raw, AccountNumber, Action, Claim, MethodNumber, ProducerConfigRow, PublicKey,
+    SharedGenesisActionData, SharedGenesisService, SignedTransaction, Tapos, TimePointSec,
+    Transaction,
+};
+use chrono::{Duration, Utc};
 use fracpack::Packable;
 use include_dir::{include_dir, Dir};
-use psibase::{
-    account, method, AccountNumber, Action, Claim, ExactAccountNumber, PublicKey,
-    SharedGenesisActionData, SharedGenesisContract, SignedTransaction,
-};
-use serde_json::Value;
+use psibase_macros::account_raw;
+
+macro_rules! account {
+    ($name:expr) => {
+        AccountNumber::new(account_raw!($name))
+    };
+}
+
+macro_rules! method {
+    ($name:expr) => {
+        MethodNumber::new(method_raw!($name))
+    };
+}
 
 const ACCOUNTS: [AccountNumber; 22] = [
-    account!("account-sys"),
+    account_sys::service::SERVICE,
     account!("alice"),
-    account!("auth-ec-sys"),
+    auth_ec_sys::service::SERVICE,
     account!("auth-any-sys"),
     account!("bob"),
-    account!("common-sys"),
+    common_sys::service::SERVICE,
     account!("doc-sys"),
     account!("explore-sys"),
-    account!("nft-sys"),
-    account!("producer-sys"),
-    account!("proxy-sys"),
-    account!("psispace-sys"),
+    nft_sys::service::SERVICE,
+    producer_sys::service::SERVICE,
+    proxy_sys::service::SERVICE,
+    psispace_sys::service::SERVICE,
     account!("r-account-sys"),
     account!("r-ath-ec-sys"),
     account!("r-prod-sys"),
     account!("r-proxy-sys"),
     account!("r-tok-sys"),
-    account!("setcode-sys"),
+    setcode_sys::service::SERVICE,
     account!("symbol-sys"),
     account!("token-sys"),
-    account!("transact-sys"),
+    transaction_sys::service::SERVICE,
     account!("verifyec-sys"),
 ];
 
-pub(super) async fn boot(
-    args: &Args,
-    client: reqwest::Client,
-    key: &Option<PublicKey>,
-    producer: &Option<ExactAccountNumber>,
-) -> Result<(), anyhow::Error> {
-    let mut transactions = vec![boot_trx()];
-    add_startup_trx(&mut transactions, key, producer);
-    push_boot(args, client, transactions.packed()).await?;
-    println!("Ok");
-    Ok(())
-}
-
-async fn push_boot_impl(
-    args: &Args,
-    client: reqwest::Client,
-    packed: Vec<u8>,
-) -> Result<(), anyhow::Error> {
-    let mut response = client
-        .post(args.api.join("native/push_boot")?)
-        .body(packed)
-        .send()
-        .await?;
-    if response.status().is_client_error() {
-        response = response.error_for_status()?;
-    }
-    if response.status().is_server_error() {
-        return Err(anyhow::Error::new(Error::Msg {
-            s: response.text().await?,
-        }));
-    }
-    let text = response.text().await?;
-    let json: Value = serde_json::de::from_str(&text)?;
-    // println!("{:#?}", json);
-    let err = json.get("error").and_then(|v| v.as_str());
-    if let Some(e) = err {
-        if !e.is_empty() {
-            return Err(Error::Msg { s: e.to_string() }.into());
-        }
-    }
-    Ok(())
-}
-
-async fn push_boot(
-    args: &Args,
-    client: reqwest::Client,
-    packed: Vec<u8>,
-) -> Result<(), anyhow::Error> {
-    push_boot_impl(args, client, packed)
-        .await
-        .context("Failed to boot")?;
-    Ok(())
-}
-
 macro_rules! sgc {
     ($acc:literal, $flags:expr, $wasm:literal) => {
-        SharedGenesisContract {
-            contract: account!($acc),
+        SharedGenesisService {
+            service: account!($acc),
             flags: $flags,
-            vm_type: 0,
-            vm_version: 0,
+            vmType: 0,
+            vmVersion: 0,
             code: include_bytes!(concat!("../boot-image/", $wasm)),
         }
     };
@@ -136,8 +95,69 @@ macro_rules! store_third_party {
     };
 }
 
-fn boot_trx() -> SignedTransaction {
-    let contracts = vec![
+fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
+    producer_sys::Wrapper::pack().setProducers(vec![ProducerConfigRow {
+        producerName: name,
+        producerAuth: key,
+    }])
+}
+
+fn to_claim(key: &PublicKey) -> Claim {
+    Claim {
+        service: account!("verifyec-sys"),
+        rawData: key.packed(),
+    }
+}
+
+fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
+    account_sys::Wrapper::pack_from(sender).newAccount(account, account!("auth-any-sys"), false)
+}
+
+fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
+    auth_ec_sys::Wrapper::pack_from(account).setKey(key.clone())
+}
+
+fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
+    account_sys::Wrapper::pack_from(account).setAuthCntr(auth_service)
+}
+
+fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
+    proxy_sys::Wrapper::pack_from(service).registerServer(server_service)
+}
+
+fn store_sys(
+    service: AccountNumber,
+    sender: AccountNumber,
+    path: &str,
+    content_type: &str,
+    content: &[u8],
+) -> Action {
+    psispace_sys::Wrapper::pack_from_to(sender, service).storeSys(
+        path.to_string(),
+        content_type.to_string(),
+        content.to_vec(),
+    )
+}
+
+fn without_tapos(actions: Vec<Action>) -> Transaction {
+    let now_plus_10secs = Utc::now() + Duration::seconds(10);
+    let expiration = TimePointSec {
+        seconds: now_plus_10secs.timestamp() as u32,
+    };
+    Transaction {
+        tapos: Tapos {
+            expiration,
+            refBlockSuffix: 0,
+            flags: 0,
+            refBlockIndex: 0,
+        },
+        actions,
+        claims: vec![],
+    }
+}
+
+fn genesis_transaction() -> SignedTransaction {
+    let services = vec![
         sgc!("account-sys", 0, "AccountSys.wasm"),
         sgc!("auth-ec-sys", 0, "AuthEcSys.wasm"),
         sgc!("auth-any-sys", 0, "AuthAnySys.wasm"),
@@ -161,14 +181,14 @@ fn boot_trx() -> SignedTransaction {
 
     let genesis_action_data = SharedGenesisActionData {
         memo: "".to_string(),
-        contracts,
+        services,
     };
 
     let actions = vec![Action {
         sender: AccountNumber { value: 0 },
-        contract: AccountNumber { value: 0 },
+        service: AccountNumber { value: 0 },
         method: method!("boot"),
-        raw_data: genesis_action_data.packed(),
+        rawData: genesis_action_data.packed(),
     }];
 
     SignedTransaction {
@@ -177,22 +197,22 @@ fn boot_trx() -> SignedTransaction {
     }
 }
 
-fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, contract: AccountNumber) {
+fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service: AccountNumber) {
     for e in dir.entries() {
         match e {
-            include_dir::DirEntry::Dir(d) => fill_dir(d, actions, sender, contract),
+            include_dir::DirEntry::Dir(d) => fill_dir(d, actions, sender, service),
             include_dir::DirEntry::File(e) => {
                 let path = e.path().to_str().unwrap();
                 if let Some(t) = mime_guess::from_path(path).first() {
                     // println!(
                     //     "{} {} {} {}",
                     //     sender,
-                    //     contract,
+                    //     service,
                     //     &("/".to_owned() + path),
                     //     t.essence_str()
                     // );
                     actions.push(store_sys(
-                        contract,
+                        service,
                         sender,
                         &("/".to_owned() + path),
                         t.essence_str(),
@@ -204,41 +224,47 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, contrac
     }
 }
 
-fn add_startup_trx(
-    transactions: &mut Vec<SignedTransaction>,
-    key: &Option<PublicKey>,
-    producer: &Option<ExactAccountNumber>,
-) {
+/// Create boot transactions
+///
+/// This returns a set of transactions which boot a blockchain.
+/// The first transaction, the genesis transaction, installs
+/// a set of service WASMs. The remainder initialize the services
+/// and install apps and documentation. All of these transactions
+/// should go into the first block.
+///
+/// If `initial_key` is set, then this initializes all accounts to use
+/// that key and sets the key the initial producer signs blocks with.
+/// If it is not set, then this initializes all accounts to use
+/// `auth-any-sys` (no keys required) and sets it up so producers
+/// don't need to sign blocks.
+///
+/// The first block should contain this entire set of transactions.
+/// You may optionally add additional transactions after the ones this
+/// function returns.
+///
+/// The interface to this function doesn't support customization.
+/// If you want a custom boot, then use `boot.rs` as a guide to
+/// create your own.
+pub fn create_boot_transactions(
+    initial_key: &Option<PublicKey>,
+    initial_producer: AccountNumber,
+) -> Vec<SignedTransaction> {
+    let mut transactions = vec![genesis_transaction()];
     let mut init_actions = vec![
-        Action {
-            sender: account!("account-sys"),
-            contract: account!("account-sys"),
-            method: method!("init"),
-            raw_data: ().packed(),
-        },
-        Action {
-            sender: account!("transact-sys"),
-            contract: account!("transact-sys"),
-            method: method!("init"),
-            raw_data: ().packed(),
-        },
-        Action {
-            sender: account!("nft-sys"),
-            contract: account!("nft-sys"),
-            method: method!("init"),
-            raw_data: ().packed(),
-        },
+        account_sys::Wrapper::pack().init(),
+        transaction_sys::Wrapper::pack().init(),
+        nft_sys::Wrapper::pack().init(),
         Action {
             sender: account!("token-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("init"),
-            raw_data: ().packed(),
+            rawData: ().packed(),
         },
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("symbol-sys"),
+            service: account!("symbol-sys"),
             method: method!("init"),
-            raw_data: ().packed(),
+            rawData: ().packed(),
         },
     ];
 
@@ -246,13 +272,16 @@ fn add_startup_trx(
     let js = "text/javascript";
 
     let mut reg_actions = vec![
-        reg_server(account!("account-sys"), account!("r-account-sys")),
-        reg_server(account!("auth-ec-sys"), account!("r-ath-ec-sys")),
-        reg_server(account!("common-sys"), account!("common-sys")),
+        reg_server(account_sys::service::SERVICE, account!("r-account-sys")),
+        reg_server(auth_ec_sys::service::SERVICE, account!("r-ath-ec-sys")),
+        reg_server(common_sys::service::SERVICE, common_sys::service::SERVICE),
         reg_server(account!("explore-sys"), account!("explore-sys")),
-        reg_server(account!("producer-sys"), account!("r-prod-sys")),
-        reg_server(account!("proxy-sys"), account!("r-proxy-sys")),
-        reg_server(account!("psispace-sys"), account!("psispace-sys")),
+        reg_server(producer_sys::service::SERVICE, account!("r-prod-sys")),
+        reg_server(proxy_sys::service::SERVICE, account!("r-proxy-sys")),
+        reg_server(
+            psispace_sys::service::SERVICE,
+            psispace_sys::service::SERVICE,
+        ),
     ];
 
     let mut common_sys_files = vec![
@@ -273,8 +302,8 @@ fn add_startup_trx(
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/CommonSys/ui/dist"),
         &mut common_sys_files,
-        account!("common-sys"),
-        account!("common-sys"),
+        common_sys::service::SERVICE,
+        common_sys::service::SERVICE,
     );
 
     let mut common_sys_3rd_party_files = vec![
@@ -356,48 +385,48 @@ fn add_startup_trx(
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/PsiSpaceSys/ui/dist"),
         &mut psispace_sys_files,
-        account!("psispace-sys"),
-        account!("psispace-sys"),
+        psispace_sys::service::SERVICE,
+        psispace_sys::service::SERVICE,
     );
 
     let mut doc_actions = vec![
-        new_account_action(account!("account-sys"), account!("doc-sys")), //
+        new_account_action(account_sys::service::SERVICE, account!("doc-sys")), //
     ];
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
         &mut doc_actions,
         account!("doc-sys"),
-        account!("psispace-sys"),
+        psispace_sys::service::SERVICE,
     );
 
     // TODO: make this optional
     #[allow(clippy::inconsistent_digit_grouping)]
     let mut create_and_fund_example_users = vec![
-        new_account_action(account!("account-sys"), account!("alice")),
-        new_account_action(account!("account-sys"), account!("bob")),
+        new_account_action(account_sys::service::SERVICE, account!("alice")),
+        new_account_action(account_sys::service::SERVICE, account!("bob")),
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("setTokenConf"),
-            raw_data: (1u32, method!("untradeable"), false).packed(),
+            rawData: (1u32, method!("untradeable"), false).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("mint"),
-            raw_data: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed(),
+            rawData: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("credit"),
-            raw_data: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed(),
+            rawData: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed(),
         },
         Action {
             sender: account!("symbol-sys"),
-            contract: account!("token-sys"),
+            service: account!("token-sys"),
             method: method!("credit"),
-            raw_data: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed(),
+            rawData: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed(),
         },
     ];
 
@@ -415,23 +444,23 @@ fn add_startup_trx(
     actions.append(&mut create_and_fund_example_users);
 
     actions.push(set_producers_action(
-        match producer {
-            Some(p) => AccountNumber::from(*p),
-            None => account!("psibase"),
-        },
-        match key {
+        initial_producer,
+        match initial_key {
             Some(k) => to_claim(k),
             None => Claim {
-                contract: AccountNumber::new(0),
-                raw_data: vec![],
+                service: AccountNumber::new(0),
+                rawData: vec![],
             },
         },
     ));
 
-    if let Some(k) = key {
+    if let Some(k) = initial_key {
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
-            actions.push(set_auth_contract_action(account, account!("auth-ec-sys")));
+            actions.push(set_auth_service_action(
+                account,
+                auth_ec_sys::service::SERVICE,
+            ));
         }
     }
 
@@ -439,7 +468,7 @@ fn add_startup_trx(
         let mut n = 0;
         let mut size = 0;
         while n < actions.len() && size < 1024 * 1024 {
-            size += actions[n].raw_data.len();
+            size += actions[n].rawData.len();
             n += 1;
         }
         transactions.push(SignedTransaction {
@@ -447,4 +476,5 @@ fn add_startup_trx(
             proofs: vec![],
         });
     }
+    transactions
 }

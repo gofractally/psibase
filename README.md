@@ -7,13 +7,13 @@ This repo contains the sources to
 - psibase services
 - `psidk`, the service development kit
 
+## About Page, Documentation, and Demo
+
+The [Demonstration Chain](https://psibase.io/) hosts both the [About Page](https://about.psibase.io/) and the [Documentation](https://doc-sys.psibase.io/).
+
 ## Binary Release
 
-If you want to operate a node, build services, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the documentation for installation instructions.
-
-## Documentation
-
-Documentation is at (TODO: add link). This covers installing the binary packages, starting a local test chain, and developing services.
+If you want to operate a node, build services, or explore psibase's command-line utility, we recommend installing a [Binary Release](https://github.com/gofractally/psibase/releases). We provide a single binary package which should run on most recent Linux distributions. See the [installation instructions](https://doc-sys.psibase.io/linux.html).
 
 ## Building this repo from source
 
@@ -76,8 +76,11 @@ wget https://nodejs.org/dist/v16.17.0/node-v16.17.0-linux-x64.tar.xz
 tar xf node-v16.17.0-linux-x64.tar.xz
 npm i -g npm yarn
 
+# TODO: switch back to release after 1.65 is stable
 cd ~/work
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup toolchain install beta \
+rustup default beta \
 rustup target add wasm32-wasi
 cargo install mdbook mdbook-linkcheck mdbook-mermaid
 ```

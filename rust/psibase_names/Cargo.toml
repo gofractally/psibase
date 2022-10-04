@@ -1,11 +1,10 @@
 [package]
 name = "psibase_names"
-version.workspace = true
+version = "0.1.3"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 edition = "2021"
-publish = false
 description = "Psibase name conversion functions"
 license = "MIT"
 

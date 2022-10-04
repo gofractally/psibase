@@ -1,0 +1,38 @@
+# Example configuration file for psinode suitable for local development.
+#
+# To use this configuration copy it to the root directory of the node.
+# The command `psinode db` will find this file in db/config.
+
+slow     = yes
+p2p      = off
+producer = psibase
+# sign     = <private key>
+host     = 127.0.0.1.sslip.io
+port     = 8080
+# peer     = localhost:8080
+
+# Default logger writes to stderr
+[logger.stderr]
+
+type         = console
+filter       = %Severity% >= info
+format       = [%TimeStamp%] [%Severity%]: %Message%
+format.p2p   = [%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%
+format.block = [%TimeStamp%] [%Severity%]: %Message% %BlockId%
+
+# File logger
+# [logger.file]
+#
+# type         = file
+# filter       = %Severity% >= info
+# format       = [%TimeStamp%] [%Severity%]: %Message%
+# format.p2p   = [%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%
+# format.block = [%TimeStamp%] [%Severity%]: %Message% %BlockId%
+#
+# filename     = psibase.log
+# target       = psibase-%3N.log
+# rotationSize = 64 MiB
+# rotationTime = R/2022-10-01T00:00:00Z/P1D
+# maxFiles     = 90
+# maxSize      = 4 GiB
+# flush        = off

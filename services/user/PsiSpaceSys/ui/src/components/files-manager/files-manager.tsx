@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import wait from "waait";
 
+import { wait } from "../../helpers";
 import { executeRemove, executeUpload } from "../../operations";
 import {
     pollForRemovedFiles,

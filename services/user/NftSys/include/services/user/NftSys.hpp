@@ -75,7 +75,7 @@ namespace UserService
 
       method(getNft, nftId),
       method(getNftHolder, account),
-      method(getCredRecord, nftid),
+      method(getCredRecord, nftId),
       method(exists, nftId),
       method(getUserConf, account, flag)
    );

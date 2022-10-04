@@ -1,15 +1,26 @@
 use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::quote;
+use std::str::FromStr;
 use syn::{
     parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, FieldsUnnamed,
 };
 
 /// Fracpack struct level options
-#[derive(Debug, Default, FromDeriveInput)]
+#[derive(Debug, FromDeriveInput)]
 #[darling(default, attributes(fracpack))]
 pub struct Options {
     definition_will_not_change: bool,
+    fracpack_mod: String,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            definition_will_not_change: false,
+            fracpack_mod: "psibase::fracpack".into(),
+        }
+    }
 }
 
 struct StructField<'a> {
@@ -246,23 +257,20 @@ fn enum_fields<'a>(
         .collect()
 }
 
-pub fn fracpack_macro_impl(
-    frackpack_mod: &proc_macro2::TokenStream,
-    input: TokenStream,
-) -> TokenStream {
+pub fn fracpack_macro_impl(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    // parse fracpack macro options
     let opts = match Options::from_derive_input(&input) {
         Ok(val) => val,
         Err(err) => {
             return err.write_errors().into();
         }
     };
+    let frackpack_mod = proc_macro2::TokenStream::from_str(&opts.fracpack_mod).unwrap();
 
     match &input.data {
-        Data::Struct(data) => process_struct(frackpack_mod, &input, data, &opts),
-        Data::Enum(data) => process_enum(frackpack_mod, &input, data),
+        Data::Struct(data) => process_struct(&frackpack_mod, &input, data, &opts),
+        Data::Enum(data) => process_enum(&frackpack_mod, &input, data),
         Data::Union(_) => unimplemented!("fracpack does not support union"),
     }
 }

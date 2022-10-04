@@ -1,11 +1,10 @@
 [package]
 name = "psibase_macros"
-version.workspace = true
+version = "0.1.1"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 edition = "2021"
-publish = false
 description = "Macros to support psibase development"
 license = "MIT"
 
@@ -14,8 +13,8 @@ proc-macro = true
 
 [dependencies]
 darling = "0.14"
-psibase_names = { version = "0.1.0", path = "../psibase_names" }
 proc-macro-error = "1.0.4"
 proc-macro2 = "1.0.36"
+psibase_names = { version = "0.1.3", path = "../psibase_names" }
 quote = "1.0.15"
 syn = {version = "1.0.86", features = ["full"] }
