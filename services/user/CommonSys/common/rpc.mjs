@@ -339,6 +339,7 @@ export const MessageTypes = {
     QueryResponse: "QueryResponse", // A response to a prior query
     OperationResponse: "OperationResponse",
     TransactionReceipt: "TransactionReceipt",
+    SetActiveAccount: "SetActiveAccount",
 };
 
 export class AppletId {
@@ -428,7 +429,7 @@ export function executePromise(callbackId, response, errors) {
     return true;
 }
 
-async function sendToParent(message) {
+function sendToParent(message) {
     const sendMessage = async () => {
         parentIFrame.sendMessage(message, await siblingUrl(null, null, null));
     };

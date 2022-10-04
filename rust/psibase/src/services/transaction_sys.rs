@@ -4,8 +4,8 @@
 #[derive(crate::Fracpack)]
 #[fracpack(fracpack_mod = "crate::fracpack")]
 pub struct ServiceMethod {
-    service: crate::AccountNumber,
-    method: crate::MethodNumber,
+    pub service: crate::AccountNumber,
+    pub method: crate::MethodNumber,
 }
 
 /// Authenticate actions
@@ -29,9 +29,11 @@ pub struct ServiceMethod {
 /// they should define methods with matching signatures.
 #[crate::service(
     name = "example-auth",
-    actions_name = "AuthActions",
-    wrapper_name = "AuthWrapper",
+    actions = "AuthActions",
+    wrapper = "AuthWrapper",
+    structs = "auth_action_structs",
     dispatch = false,
+    pub_constant = false,
     psibase_mod = "crate"
 )]
 #[allow(non_snake_case, unused_variables, dead_code)]
@@ -133,7 +135,7 @@ pub mod auth_interface {
 // TODO: service flags
 #[crate::service(name = "transact-sys", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables, dead_code)]
-pub mod service {
+mod service {
     /// Only called once during chain initialization
     ///
     /// This enables the auth checking system. Before this point, `TransactionSys`

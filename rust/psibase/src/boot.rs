@@ -25,27 +25,27 @@ macro_rules! method {
 }
 
 const ACCOUNTS: [AccountNumber; 22] = [
-    account_sys::service::SERVICE,
+    account_sys::SERVICE,
     account!("alice"),
-    auth_ec_sys::service::SERVICE,
+    auth_ec_sys::SERVICE,
     account!("auth-any-sys"),
     account!("bob"),
-    common_sys::service::SERVICE,
+    common_sys::SERVICE,
     account!("doc-sys"),
     account!("explore-sys"),
-    nft_sys::service::SERVICE,
-    producer_sys::service::SERVICE,
-    proxy_sys::service::SERVICE,
-    psispace_sys::service::SERVICE,
+    nft_sys::SERVICE,
+    producer_sys::SERVICE,
+    proxy_sys::SERVICE,
+    psispace_sys::SERVICE,
     account!("r-account-sys"),
     account!("r-ath-ec-sys"),
     account!("r-prod-sys"),
     account!("r-proxy-sys"),
     account!("r-tok-sys"),
-    setcode_sys::service::SERVICE,
+    setcode_sys::SERVICE,
     account!("symbol-sys"),
     account!("token-sys"),
-    transaction_sys::service::SERVICE,
+    transaction_sys::SERVICE,
     account!("verifyec-sys"),
 ];
 
@@ -272,16 +272,13 @@ pub fn create_boot_transactions(
     let js = "text/javascript";
 
     let mut reg_actions = vec![
-        reg_server(account_sys::service::SERVICE, account!("r-account-sys")),
-        reg_server(auth_ec_sys::service::SERVICE, account!("r-ath-ec-sys")),
-        reg_server(common_sys::service::SERVICE, common_sys::service::SERVICE),
+        reg_server(account_sys::SERVICE, account!("r-account-sys")),
+        reg_server(auth_ec_sys::SERVICE, account!("r-ath-ec-sys")),
+        reg_server(common_sys::SERVICE, common_sys::SERVICE),
         reg_server(account!("explore-sys"), account!("explore-sys")),
-        reg_server(producer_sys::service::SERVICE, account!("r-prod-sys")),
-        reg_server(proxy_sys::service::SERVICE, account!("r-proxy-sys")),
-        reg_server(
-            psispace_sys::service::SERVICE,
-            psispace_sys::service::SERVICE,
-        ),
+        reg_server(producer_sys::SERVICE, account!("r-prod-sys")),
+        reg_server(proxy_sys::SERVICE, account!("r-proxy-sys")),
+        reg_server(psispace_sys::SERVICE, psispace_sys::SERVICE),
     ];
 
     let mut common_sys_files = vec![
@@ -302,8 +299,8 @@ pub fn create_boot_transactions(
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/CommonSys/ui/dist"),
         &mut common_sys_files,
-        common_sys::service::SERVICE,
-        common_sys::service::SERVICE,
+        common_sys::SERVICE,
+        common_sys::SERVICE,
     );
 
     let mut common_sys_3rd_party_files = vec![
@@ -385,25 +382,25 @@ pub fn create_boot_transactions(
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/PsiSpaceSys/ui/dist"),
         &mut psispace_sys_files,
-        psispace_sys::service::SERVICE,
-        psispace_sys::service::SERVICE,
+        psispace_sys::SERVICE,
+        psispace_sys::SERVICE,
     );
 
     let mut doc_actions = vec![
-        new_account_action(account_sys::service::SERVICE, account!("doc-sys")), //
+        new_account_action(account_sys::SERVICE, account!("doc-sys")), //
     ];
     fill_dir(
         &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
         &mut doc_actions,
         account!("doc-sys"),
-        psispace_sys::service::SERVICE,
+        psispace_sys::SERVICE,
     );
 
     // TODO: make this optional
     #[allow(clippy::inconsistent_digit_grouping)]
     let mut create_and_fund_example_users = vec![
-        new_account_action(account_sys::service::SERVICE, account!("alice")),
-        new_account_action(account_sys::service::SERVICE, account!("bob")),
+        new_account_action(account_sys::SERVICE, account!("alice")),
+        new_account_action(account_sys::SERVICE, account!("bob")),
         Action {
             sender: account!("symbol-sys"),
             service: account!("token-sys"),
@@ -457,10 +454,7 @@ pub fn create_boot_transactions(
     if let Some(k) = initial_key {
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
-            actions.push(set_auth_service_action(
-                account,
-                auth_ec_sys::service::SERVICE,
-            ));
+            actions.push(set_auth_service_action(account, auth_ec_sys::SERVICE));
         }
     }
 

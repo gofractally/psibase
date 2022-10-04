@@ -7,7 +7,7 @@ declare module "common/rpc.mjs" {
     path?: string
   ): Promise<string>;
 
-  function initializeApplet(fn?: (data: any) => Promise<void>): void;
+  function initializeApplet(fn: (data: any) => Promise<void>): void;
 
   function getJson<T = any>(url: string): Promise<T>;
 
@@ -17,6 +17,8 @@ declare module "common/rpc.mjs" {
     Operation: "Operation",
     QueryResponse: "QueryResponse",
     OperationResponse: "OperationResponse",
+    TransactionReceipt: "TransactionReceipt",
+    SetActiveAccount: "SetActiveAccount",
   };
 
   declare class AppletId {
@@ -50,6 +52,7 @@ declare module "common/rpc.mjs" {
 
 
   function getCurrentApplet(): Promise<string>;
+
   function query<Params, Response>(
     appletId: AppletId,
     queryName: string,
@@ -63,11 +66,24 @@ declare module "common/rpc.mjs" {
     sender?: string
   ): void;
 
+  function setActiveAccount(account: string): void;
+
   type Operation = { id: string; exec: (params: any) => Promise<void> };
 
-  function storeCallback(callback: any): number;
+  type CallbackResponse = {
+    sender: AppletId;
+    response: any;
+    errors: any;
+  };
 
-  function executeCallback(callbackId: any, response: any): boolean;
+  function storeCallback(
+    callback: (res: CallbackResponse) => unknown
+  ): number;
+
+  function executeCallback(
+    callbackId: any,
+    response: CallbackResponse
+  ): boolean;
 
   function getTaposForHeadBlock(baseUrl?: string): Promise<any>;
 

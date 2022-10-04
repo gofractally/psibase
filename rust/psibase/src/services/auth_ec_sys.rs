@@ -2,7 +2,7 @@
 
 #[crate::service(name = "auth-ec-sys", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables, dead_code)]
-pub mod service {
+mod service {
     use crate::{
         services::transaction_sys::ServiceMethod, AccountNumber, Action, Claim, PublicKey,
     };

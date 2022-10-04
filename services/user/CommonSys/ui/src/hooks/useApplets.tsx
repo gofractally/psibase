@@ -424,6 +424,18 @@ export const useApplets = () => {
         [executeTransaction]
     );
 
+    const handleSetActiveUser = useCallback(
+        (applet: AppletId, payload: any) => {
+            if (applet.name === "account-sys") {
+                return setCurrentUser(payload.account);
+            }
+            console.error(
+                "Not authorized: only AccountSys may set the active account in CommonSys."
+            );
+        },
+        [setCurrentUser]
+    );
+
     const messageRouting = useMemo(
         () => ({
             [MessageTypes.Operation]: {
@@ -446,12 +458,17 @@ export const useApplets = () => {
                 fields: ["callbackId", "response", "errors"],
                 handle: handleOperationResponse,
             },
+            [MessageTypes.SetActiveAccount]: {
+                fields: ["account"],
+                handle: handleSetActiveUser,
+            },
         }),
         [
             handleOperation,
             handleOperationResponse,
             handleQuery,
             handleQueryResponse,
+            handleSetActiveUser,
         ]
     );
 
