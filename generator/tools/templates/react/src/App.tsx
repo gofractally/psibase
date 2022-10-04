@@ -2,11 +2,13 @@ import { useState } from "react";
 import "./App.css";
 import {
     initializeApplet,
-    setOperations
+    setOperations,
+    Action,
+    Op,
+    Service
 } from "common/rpc.mjs";
 import useEffectHmr from "./hooks/useEffectOnce";
 import { fetchTable, getLoggedInUser } from "./helpers";
-import { Action, Op, Service } from "./contract";
 
 class __contract__Service extends Service {
 
