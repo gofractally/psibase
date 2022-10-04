@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 import {
     initializeApplet,
@@ -7,7 +7,6 @@ import {
     Op,
     Service
 } from "common/rpc.mjs";
-import useEffectHmr from "./hooks/useEffectHmr";
 import { fetchTable, getLoggedInUser } from "./helpers";
 
 class __contract__Service extends Service {
@@ -42,7 +41,7 @@ function App() {
     }
 
 
-    useEffectHmr(() => {
+    useEffect(() => {
         initializeApplet(async () => {
             setOperations(__contract__(lowerCase)Service.operations)
         });
