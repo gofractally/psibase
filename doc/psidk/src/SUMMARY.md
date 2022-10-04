@@ -1,6 +1,7 @@
 # psidk
 
-- [Introduction](README.md)
+- [Quick Start]()
+  - [Dependencies]()
 - [Installation]()
   - [Linux](linux.md)
   - [Rust](rust.md)
