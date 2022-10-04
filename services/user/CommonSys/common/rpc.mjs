@@ -749,6 +749,9 @@ export function query(appletId, name, params = {}) {
 const OPERATIONS_KEY = 'OPERATIONS_KEY'
 const QUERIES_KEY = 'QUERIES_KEY'
 
+/**
+ * Description: Class to blueprint the applets contract + operations.
+ */
 export class Service {
     cachedApplet = '';
 
@@ -791,7 +794,12 @@ export function Action(target, key, descriptor) {
     }
 };
 
-
+/**
+ * Description: @Op Operation decorator which helps build { id: .., exec: () => ..}
+ * 
+ *
+ * @param {String} name - The optional id of the operation, will otherwise default to the method name.
+ */
 export function Op(name) {
     return function (target, key, descriptor) {
         const id = name ? name : key;
@@ -813,6 +821,13 @@ export function Op(name) {
     };
 }
 
+
+/**
+ * Description: @Qry Query decorator which helps build { id: .., exec: () => ..}
+ * 
+ *
+ * @param {String} name - The optional id of the query, will otherwise default to the method name.
+ */
 export function Qry(name) {
     return function (target, key, descriptor) {
         const id = name ? name : key;
@@ -832,4 +847,17 @@ export function Qry(name) {
             return parent.getAppletId().then(appletId => query(appletId, id, ...args))
         }
     };
+}
+
+/**
+ * Description: Notifies CommonSys of a change in active account. Callable only by AccountSys.
+ * TODO: AccountSys should emit an event once we have a proper event system. Remove setActiveAccount then.
+ *
+ * @param {String} account - The name of the active account.
+ */
+export function setActiveAccount(account) {
+    sendToParent({
+        type: MessageTypes.SetActiveAccount,
+        payload: { account },
+    });
 }
