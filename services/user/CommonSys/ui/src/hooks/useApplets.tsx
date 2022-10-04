@@ -157,6 +157,7 @@ export const useApplets = () => {
                 try {
                     if (!payload.callbackId) {
                         payload.callbackId = storeCallback(
+                            // @ts-ignore
                             ({ sender: responseApplet, response, errors }) => {
                                 if (!responseApplet.equals(receiver)) {
                                     return;
@@ -275,6 +276,7 @@ export const useApplets = () => {
 
         // Broadcast trx receipts to all involved Applets
         pendingTransaction.applets.forEach((applet) => {
+            // @ts-ignore
             sendMessage(MessageTypes.TransactionReceipt, COMMON_SYS, applet, {
                 ...transactionReceipt,
                 transactionId: pendingTransaction.id,
