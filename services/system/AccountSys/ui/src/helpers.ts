@@ -1,12 +1,21 @@
-import { useState } from "react";
-
-import { AppletId, getJson, query, siblingUrl } from "common/rpc.mjs";
+import {
+    AppletId,
+    getJson,
+    query,
+    sendToParent,
+    siblingUrl,
+    MessageTypes,
+} from "common/rpc.mjs";
 import { AccountWithAuth } from "./App";
 export interface MsgProps {
     addMsg: any;
     clearMsg: any;
     isLoading: boolean;
-    onAccountCreation: (account: { publicKey: string, privateKey: string, account: string }) => void
+    onAccountCreation: (account: {
+        publicKey: string;
+        privateKey: string;
+        account: string;
+    }) => void;
 }
 
 export const fetchQuery = <T>(
@@ -27,22 +36,28 @@ export const getLoggedInUser = async (): Promise<string> => {
     );
 };
 
-
+export const updateLoggedInAccount = (account: string) => {
+    sendToParent({
+        type: MessageTypes.UpdateUserInCommonSys,
+        payload: { account },
+    });
+};
 
 export const fetchAccountsByKey = async (publicKey: string) => {
-    if (!publicKey) throw new Error(`No public key found ${publicKey}`)
-    return getJson<{ account: string; pubkey: string }[]>(await siblingUrl(null, 'auth-ec-sys', "accwithkey/" + publicKey))
-
-}
+    if (!publicKey) throw new Error(`No public key found ${publicKey}`);
+    return getJson<{ account: string; pubkey: string }[]>(
+        await siblingUrl(null, "auth-ec-sys", "accwithkey/" + publicKey)
+    );
+};
 
 export const fetchAccounts = async () => {
     try {
         const accounts = await getJson<AccountWithAuth[]>("/accounts");
-        console.log('fetched:', accounts)
+        console.log("fetched:", accounts);
         return accounts;
     } catch (e) {
         console.info("refreshAccounts().catch().e:");
         console.info(e);
-        return []
+        return [];
     }
-}
+};

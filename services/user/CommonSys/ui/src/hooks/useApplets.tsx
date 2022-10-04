@@ -444,6 +444,11 @@ export const useApplets = () => {
                 fields: ["callbackId", "response", "errors"],
                 handle: handleOperationResponse,
             },
+            [MessageTypes.UpdateUserInCommonSys]: {
+                fields: ["account"],
+                handle: (_: AppletId, payload: any) =>
+                    setCurrentUser(payload.account),
+            },
         }),
         [
             handleOperation,

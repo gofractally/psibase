@@ -339,6 +339,8 @@ export const MessageTypes = {
     QueryResponse: "QueryResponse", // A response to a prior query
     OperationResponse: "OperationResponse",
     TransactionReceipt: "TransactionReceipt",
+    // TODO: AccountSys should emit an event instead once we have a proper event system. Remove UpdateUserInCommonSys at that point.
+    UpdateUserInCommonSys: "UpdateUserInCommonSys",
 };
 
 export class AppletId {
@@ -428,7 +430,7 @@ export function executePromise(callbackId, response, errors) {
     return true;
 }
 
-async function sendToParent(message) {
+export function sendToParent(message) {
     const sendMessage = async () => {
         parentIFrame.sendMessage(message, await siblingUrl(null, null, null));
     };

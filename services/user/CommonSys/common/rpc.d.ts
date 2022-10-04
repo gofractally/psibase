@@ -18,6 +18,7 @@ declare module "common/rpc.mjs" {
         QueryResponse: "QueryResponse",
         OperationResponse: "OperationResponse",
         TransactionReceipt: "TransactionReceipt",
+        UpdateUserInCommonSys: "UpdateUserInCommonSys",
     };
 
     declare class AppletId {
@@ -34,6 +35,9 @@ declare module "common/rpc.mjs" {
     }
 
     function getCurrentApplet(): Promise<string>;
+
+    function sendToParent(message: any): Promise<void>;
+
     function query<Params, Response>(
         appletId: AppletId,
         queryName: string,
