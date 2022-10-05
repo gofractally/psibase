@@ -34,6 +34,23 @@ declare module "common/rpc.mjs" {
         static fromObject: (obj: string) => AppletId;
     }
 
+    declare class Service {
+        protected cachedApplet?: string;
+
+        applet(): Promise<string>;
+        getAppletName(): Promise<string>;
+        getAppletId(): Promise<AppletId>;
+
+        public get operations(): Operation[]
+        public get queries(): Operation[]
+
+    }
+
+    function Action(target: any, key: string, descriptor: any): void
+    function Op(name?: string): (target: any, key: string, descriptor: any) => void
+    function Qry(name?: string): (target: any, key: string, descriptor: any) => void
+
+
     function getCurrentApplet(): Promise<string>;
 
     function query<Params, Response>(

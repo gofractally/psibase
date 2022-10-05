@@ -1,61 +1,68 @@
-import { action, AppletId, getJson, siblingUrl } from "common/rpc.mjs";
+import { getJson, siblingUrl, Service, Op, Action, Qry } from "common/rpc.mjs";
 
 import { FungibleToken, TokenBalance } from "./types";
 
-class Contract {
-    protected cachedApplet?: string;
-
-    constructor() {
-        this.applet();
-    }
-
-    protected async applet(): Promise<string> {
-        if (this.cachedApplet) return this.cachedApplet;
-        const appletName = await getJson<string>("/common/thisservice");
-        this.cachedApplet = appletName;
-        return appletName;
-    }
-
-    public async getAppletName(): Promise<string> {
-        return this.applet();
-    }
-
-    public async getAppletId(): Promise<AppletId> {
-        const appletName = await this.getAppletName();
-        return new AppletId(appletName);
-    }
+export interface CreditOperationPayload {
+    symbol: string;
+    receiver: string;
+    amount: string | number;
+    memo: string;
 }
 
-export class TokenContract extends Contract {
+
+export class TokenContract extends Service {
+
+    @Qry()
+    public async fetchBalances(user: string) {
+        const url = await siblingUrl(null, "token-sys", `api/balances/${user}`);
+        return getJson<TokenBalance[]>(url);
+    }
+
+    @Qry()
     public async fetchTokenTypes() {
         const contractName = await this.applet();
         const url = await siblingUrl(null, contractName, "api/getTokenTypes");
         return getJson<FungibleToken[]>(url);
     }
 
-    public async fetchBalances(user: string) {
-        const url = await siblingUrl(null, "token-sys", `api/balances/${user}`);
-        return getJson<TokenBalance[]>(url);
-    }
-
-    public async actionCredit({
-        tokenId,
-        receiver,
-        amount,
-        memo,
-    }: {
-        tokenId: number;
-        receiver: string;
-        amount: string | number;
-        memo: string;
-    }) {
-        await action(await tokenContract.getAppletName(), "credit", {
+    @Action
+    credit(tokenId: number, receiver: string, amount: string | number, memo: string) {
+        return {
             tokenId,
             receiver,
             amount: { value: String(amount) },
             memo: { contents: memo },
-        });
+        }
+    }
+
+    @Op()
+    public async creditOp({
+        symbol,
+        receiver,
+        amount,
+        memo,
+    }: CreditOperationPayload) {
+
+        try {
+            const allTokens = await this.fetchTokenTypes();
+            const token = allTokens.find(
+                (t) => t.symbolId === symbol.toLowerCase()
+            );
+
+            if (!token) {
+                throw new Error("No token with symbol " + symbol);
+            }
+
+            await this.credit(token.id, receiver, amount, memo)
+
+        } catch (e) {
+            console.error("Credit operation failed:", e);
+        }
+
     }
 }
 
-export const tokenContract = new TokenContract();
+
+
+
+export const tokenContract = new TokenContract()

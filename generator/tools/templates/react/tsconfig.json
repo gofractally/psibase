@@ -2,8 +2,8 @@
     "compilerOptions": {
         "target": "ESNext",
         "useDefineForClassFields": true,
-        "experimentalDecorators": true,
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "experimentalDecorators": true,
         "allowJs": false,
         "paths": {
             "/common": ["../../CommonSys/common"]
@@ -20,11 +20,7 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": [
-        "src",
-        "../../CommonSys/common/rpc.d.ts",
-        "../../CommonSys/common/useGraphQLQuery.d.ts"
-    ],
+    "include": ["src", "../../CommonSys/common/rpc.d.ts"],
     "references": [
         {
             "path": "./tsconfig.node.json"

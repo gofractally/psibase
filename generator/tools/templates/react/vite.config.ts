@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
-import svgr from "vite-plugin-svgr";
 
 const psibase = (appletContract: string) => {
     return [
@@ -17,7 +16,6 @@ const psibase = (appletContract: string) => {
                             external: [
                                 "/common/rootdomain.mjs",
                                 "/common/rpc.mjs",
-                                "/common/useGraphQLQuery.mjs",
                                 "/common/iframeResizer.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
@@ -40,7 +38,7 @@ const psibase = (appletContract: string) => {
                                         subdomain === appletContract &&
                                         req.method !== "POST" &&
                                         req.headers.accept !==
-                                            "application/json" &&
+                                        "application/json" &&
                                         !req.url.startsWith("/common") &&
                                         !req.url.startsWith("/api")
                                     ) {
@@ -65,10 +63,6 @@ const psibase = (appletContract: string) => {
         alias({
             entries: [
                 { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
-                {
-                    find: "common/useGraphQLQuery.mjs",
-                    replacement: "/common/useGraphQLQuery.mjs",
-                },
             ],
         }),
     ];
@@ -82,5 +76,5 @@ export default defineConfig({
                 plugins: ['decorators-legacy']
             }
         }
-    }), svgr({ exportAsDefault: true }), psibase("token-sys")],
+    }), psibase("__contract__(kebabCase)")],
 });
