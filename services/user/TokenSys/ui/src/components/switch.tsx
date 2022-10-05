@@ -9,8 +9,10 @@ export interface SwitchProps extends HTMLProps<HTMLInputElement> {
 
 export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
     (props, ref) => {
-        const checkedClassContainer = props.checked ? 'bg-gray-700 border-gray-700' : 'bg-transparent border-gray-400';
-        const checkedClassInput = props.checked ? 'translate-x-6' : '';
+        const checkedClassContainer = props.checked
+            ? "bg-gray-700 border-gray-700"
+            : "bg-transparent border-gray-400";
+        const checkedClassInput = props.checked ? "translate-x-6" : "";
 
         return (
             <label
@@ -19,11 +21,11 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
             >
                 <div className="flex-0">{props.label}</div>
                 <div
-                    className={`w-14 h-7 flex items-center border-2 rounded-full p-1 cursor-pointer ${checkedClassContainer}`}
+                    className={`flex h-7 w-14 cursor-pointer items-center rounded-full border-2 p-1 ${checkedClassContainer}`}
                 >
                     <input
                         type="checkbox"
-                        className={`h-5 w-5 rounded-full transform ${checkedClassInput}`}
+                        className={`h-5 w-5 transform rounded-full ${checkedClassInput}`}
                         {...props}
                     />
                 </div>

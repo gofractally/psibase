@@ -69,11 +69,11 @@ const CREDIT = {
 const UNCREDIT = {
     id: "uncredit",
     exec: async ({
-                     symbol,
-                     receiver,
-                     maxAmount,
-                     memo,
-                 }: UncreditOperationPayload) => {
+        symbol,
+        receiver,
+        maxAmount,
+        memo,
+    }: UncreditOperationPayload) => {
         console.log("TokenSys Operation: uncredit");
 
         console.log({
@@ -108,12 +108,7 @@ const UNCREDIT = {
 
 const DEBIT = {
     id: "debit",
-    exec: async ({
-                     symbol,
-                     sender,
-                     amount,
-                     memo,
-                 }: DebitOperationPayload) => {
+    exec: async ({ symbol, sender, amount, memo }: DebitOperationPayload) => {
         console.log("TokenSys Operation: debit");
 
         console.log({
@@ -148,16 +143,15 @@ const DEBIT = {
 
 const SETUSERCONF = {
     id: "setUserConf",
-    exec: async ({flag, enable}: SetUserConfPayload) => {
+    exec: async ({ flag, enable }: SetUserConfPayload) => {
         console.log("TokenSys Operation: setUserConf", flag, enable);
         try {
-            await tokenContract.actionSetUserConf({flag, enable});
+            await tokenContract.actionSetUserConf({ flag, enable });
         } catch (e) {
             console.error("setUserConf operation failed:", e);
         }
     },
 };
-
 
 export const operations = [CREDIT, UNCREDIT, DEBIT, SETUSERCONF];
 
