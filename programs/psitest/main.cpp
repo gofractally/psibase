@@ -172,26 +172,14 @@ struct test_chain
       boost::filesystem::remove_all(dir);
    }
 
-   // TODO: replace `skip_milliseconds` with a time stamp
    // TODO: Support sub-second block times
-   void startBlock(int64_t skip_miliseconds = 0)
+   void startBlock(std::optional<psibase::TimePointSec> time = std::nullopt)
    {
       // TODO: undo control
       finishBlock();
       revisionAtBlockStart = db.getHead();
       blockContext =
           std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
-
-      uint32_t skipAdditional = 0;
-      if (skip_miliseconds != 0)
-      {
-         uint64_t skipSeconds = skip_miliseconds / 1000;
-         psibase::check(skipSeconds <= std::numeric_limits<uint32_t>::max(),
-                        "time skipped in seconds must fit in 32 bits");
-         skipAdditional = static_cast<uint32_t>(skipSeconds);
-      }
-      psibase::TimePointSec skippedTime{blockContext->getHeadBlockTime().seconds + 1 +
-                                        skipAdditional};
 
       auto producer = psibase::AccountNumber("firstproducer");
       auto status =
@@ -211,7 +199,7 @@ struct test_chain
          producer = row.producerName;
       }
 
-      blockContext->start(skippedTime, producer);
+      blockContext->start(time, producer);
       blockContext->callStartBlock();
    }
 
@@ -242,6 +230,8 @@ struct test_chain
       static const psibase::Action            dummyAction;
       if (!nativeFunctions)
       {
+         if (!blockContext)
+            throw std::runtime_error("no block context to read database from");
          nativeFunctionsTrace = std::make_unique<psibase::TransactionTrace>();
          nativeFunctionsTrace->actionTraces.resize(1);
          nativeFunctionsTransactionContext = std::make_unique<psibase::TransactionContext>(
@@ -697,11 +687,12 @@ struct callbacks
       return c.dir.size();
    }
 
-   // TODO: replace `skip_milliseconds` with a time stamp
    // TODO: Support sub-second block times
-   void testerStartBlock(uint32_t chain_index, int64_t skip_miliseconds)
+   void testerStartBlock(uint32_t chain_index, uint32_t time_seconds)
    {
-      assert_chain(chain_index).startBlock(skip_miliseconds);
+      assert_chain(chain_index)
+          .startBlock(time_seconds ? std::optional{psibase::TimePointSec{time_seconds}}
+                                   : std::nullopt);
    }
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
