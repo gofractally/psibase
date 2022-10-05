@@ -116,7 +116,7 @@ async fn lookup_token(
 // Interface to the action we need
 mod token_sys {
     #[psibase::service(name = "token-sys", dispatch = false)]
-    #[allow(non_snake_case, unused_variables, dead_code)]
+    #[allow(non_snake_case, unused_variables)]
     mod service {
         #[action]
         fn credit(tokenId: u32, receiver: psibase::AccountNumber, amount: (u64,), memo: (String,)) {

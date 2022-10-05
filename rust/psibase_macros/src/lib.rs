@@ -143,21 +143,38 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 /// this WASM. `called` deserializes action data, calls into the appropriate
 /// action function, and serializes the return value.
 ///
+/// # Dead code warnings
+///
+/// When the [dispatch option](#options) is false, there is usually no code
+/// remaining which calls the actions. The service macro adds `#[allow(dead_code)]`
+/// to the service module when the dispatch option is false to prevent the
+/// compiler from warning about it.
+///
 /// # Options
 ///
 /// The service attribute has the following options. The defaults are shown:
 ///
 /// ```ignore
 /// #[psibase::service(
-///     name = "package-name",      // Account service is normally installed on
+///     name = see_blow,            // Account service is normally installed on
 ///     constant = "SERVICE",       // Name of generated constant
 ///     actions = "Actions",        // Name of generated struct
 ///     wrapper = "Wrapper",        // Name of generated struct
 ///     structs = "action_structs", // Name of generated module
-///     dispatch = true,            // Create service_wasm_interface?
+///     dispatch = see_below,       // Create service_wasm_interface?
 ///     pub_constant = true,        // Make constant public and reexport it?
 /// )]
 /// ```
+///
+/// `name` defaults to the package name.
+///
+/// `dispatch` defaults to true if the `CARGO_PRIMARY_PACKAGE` environment
+/// variable is set, and false otherwise. Cargo sets this variable automatically.
+/// For example, assume you have two services, A and B. B brings in A as a
+/// dependency so it can use A's wrappers to call it. When cargo builds A,
+/// `dispatch` will default to true in A's service definition. When cargo builds
+/// B, `dispatch` will default to true in B's service definition but false
+/// in A's. This prevents B from accidentally including A's dispatch.
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {

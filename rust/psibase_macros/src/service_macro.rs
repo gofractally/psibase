@@ -16,7 +16,7 @@ pub struct Options {
     actions: String,
     wrapper: String,
     structs: String,
-    dispatch: bool,
+    dispatch: Option<bool>,
     pub_constant: bool,
     psibase_mod: String,
 }
@@ -29,7 +29,7 @@ impl Default for Options {
             actions: "Actions".into(),
             wrapper: "Wrapper".into(),
             structs: "action_structs".into(),
-            dispatch: true,
+            dispatch: None,
             pub_constant: true,
             psibase_mod: "psibase".into(),
         }
@@ -46,6 +46,9 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
     if options.name.is_empty() {
         options.name = std::env::var("CARGO_PKG_NAME").unwrap().replace('_', "-");
+    }
+    if options.dispatch.is_none() {
+        options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
     }
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
     let item = parse_macro_input!(item as Item);
@@ -244,7 +247,7 @@ fn process_mod(
                 }
             }
         });
-        if options.dispatch {
+        if options.dispatch.unwrap() {
             items.push(parse_quote! {
                 #[automatically_derived]
                 mod service_wasm_interface {
@@ -286,7 +289,13 @@ fn process_mod(
     } else {
         quote! {}
     };
+    let silence = if options.dispatch.unwrap() {
+        quote! {}
+    } else {
+        quote! {#[allow(dead_code)]}
+    };
     quote! {
+        #silence
         #impl_mod
         #reexport_constant
 

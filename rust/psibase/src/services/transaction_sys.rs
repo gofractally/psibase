@@ -36,7 +36,7 @@ pub struct ServiceMethod {
     pub_constant = false,
     psibase_mod = "crate"
 )]
-#[allow(non_snake_case, unused_variables, dead_code)]
+#[allow(non_snake_case, unused_variables)]
 pub mod auth_interface {
     /// The database is in read-only mode. This flag is only
     /// used for `topActionReq`.
@@ -134,7 +134,7 @@ pub mod auth_interface {
 // TODO: tables
 // TODO: service flags
 #[crate::service(name = "transact-sys", dispatch = false, psibase_mod = "crate")]
-#[allow(non_snake_case, unused_variables, dead_code)]
+#[allow(non_snake_case, unused_variables)]
 mod service {
     /// Only called once during chain initialization
     ///
