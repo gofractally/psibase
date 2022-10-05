@@ -57,6 +57,35 @@ pub struct TransactionTrace {
     pub error: Option<String>,
 }
 
+impl TransactionTrace {
+    pub fn ok(self) -> Result<TransactionTrace, anyhow::Error> {
+        if let Some(e) = self.error {
+            Err(anyhow::anyhow!("{}", e))
+        } else {
+            Ok(self)
+        }
+    }
+
+    pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
+        if let Some(e) = &self.error {
+            if e.contains(msg) {
+                Ok(self)
+            } else {
+                Err(anyhow::anyhow!(
+                    "Transaction was expected to fail with \"{}\", but failed with \"{}\"",
+                    msg,
+                    e
+                ))
+            }
+        } else {
+            Err(anyhow::anyhow!(
+                "Transaction was expected to fail with \"{}\", but succeeded",
+                msg,
+            ))
+        }
+    }
+}
+
 impl fmt::Display for TransactionTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         format_transaction_trace(self, 0, f)

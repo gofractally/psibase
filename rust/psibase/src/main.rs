@@ -476,7 +476,11 @@ async fn boot(
     key: &Option<PublicKey>,
     producer: ExactAccountNumber,
 ) -> Result<(), anyhow::Error> {
-    let transactions = create_boot_transactions(key, producer.into());
+    let now_plus_10secs = Utc::now() + Duration::seconds(10);
+    let expiration = TimePointSec {
+        seconds: now_plus_10secs.timestamp() as u32,
+    };
+    let transactions = create_boot_transactions(key, producer.into(), true, true, true, expiration);
     push_boot(args, client, transactions.packed()).await?;
     println!("Ok");
     Ok(())
