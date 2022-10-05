@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::{Action, Fracpack};
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +11,12 @@ pub struct ActionTrace {
     pub raw_retval: Vec<u8>,
     pub inner_traces: Vec<InnerTrace>,
     pub error: Option<String>,
+}
+
+impl fmt::Display for ActionTrace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_action_trace(self, 0, f)
+    }
 }
 
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
@@ -47,4 +55,66 @@ pub struct InnerTrace {
 pub struct TransactionTrace {
     pub action_traces: Vec<ActionTrace>,
     pub error: Option<String>,
+}
+
+impl fmt::Display for TransactionTrace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_transaction_trace(self, 0, f)
+    }
+}
+
+fn format_string(mut s: &str, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    while let Some(nl) = s.find('\n') {
+        write!(f, "{}", &s[..nl])?;
+        s = &s[nl + 1..];
+        if !s.is_empty() {
+            write!(f, "\n{:indent$}", "")?;
+        }
+    }
+    write!(f, "{}", s)
+}
+
+fn format_console(c: &ConsoleTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{:indent$}console:    ", "")?;
+    format_string(&c.console, indent + 12, f)
+}
+
+fn format_event(_: &EventTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    writeln!(f, "{:indent$}event", "")
+}
+
+fn format_action_trace(
+    atrace: &ActionTrace,
+    indent: usize,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    writeln!(f, "{:indent$}action:", "")?;
+    writeln!(
+        f,
+        "{:indent$}    {} => {}::{}",
+        "", atrace.action.sender, atrace.action.service, atrace.action.method
+    )?;
+    for inner in &atrace.inner_traces {
+        match &inner.inner {
+            InnerTraceEnum::ConsoleTrace(c) => format_console(c, indent + 4, f)?,
+            InnerTraceEnum::EventTrace(e) => format_event(e, indent + 4, f)?,
+            InnerTraceEnum::ActionTrace(a) => format_action_trace(a, indent + 4, f)?,
+        }
+    }
+    Ok(())
+}
+
+fn format_transaction_trace(
+    ttrace: &TransactionTrace,
+    indent: usize,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    for a in &ttrace.action_traces {
+        format_action_trace(a, indent, f)?;
+    }
+    if let Some(e) = &ttrace.error {
+        write!(f, "{:indent$}error:     ", "")?;
+        format_string(e, indent + 11, f)?;
+    }
+    Ok(())
 }

@@ -6,7 +6,7 @@
 //!
 //! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
 
-use crate::{tester_raw, ActionTrace, SignedTransaction};
+use crate::{tester_raw, SignedTransaction, TransactionTrace};
 use fracpack::Packable;
 use std::{cell::UnsafeCell, ptr::null_mut};
 
@@ -113,7 +113,7 @@ impl Chain {
     }
 
     /// Push a transaction
-    pub fn push(&mut self, transaction: &SignedTransaction) -> ActionTrace {
+    pub fn push(&mut self, transaction: &SignedTransaction) -> TransactionTrace {
         let transaction = transaction.packed();
         struct Context {
             size: usize,
@@ -140,7 +140,7 @@ impl Chain {
             );
             let mut context = context.into_inner();
             context.bytes.set_len(context.size);
-            ActionTrace::unpacked(&context.bytes).unwrap()
+            TransactionTrace::unpacked(&context.bytes).unwrap()
         }
     }
 
