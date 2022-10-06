@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+    @apply h-full;
+    touch-action: manipulation;
+}
+
+body {
+    @apply text-gray-900;
+    font-variant-numeric: lining-nums;
+    font-weight: 400;
+    @apply bg-gray-50;
+    @apply h-full w-full overflow-hidden;
+}
+#root {
+    /* @apply min-h-screen; */
+    @apply h-full w-full overflow-hidden;
+}
+
+@layer base {
+    p {
+        margin-bottom: 1rem;
+        @apply text-lg;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        @apply font-semibold;
+    }
+
+    h1 {
+        @apply text-5xl md:text-6xl;
+    }
+
+    h2 {
+        @apply text-4xl md:text-5xl;
+    }
+
+    h3 {
+        @apply text-3xl md:text-4xl;
+    }
+
+    h4 {
+        @apply text-2xl md:text-3xl md:tracking-[-0.02em];
+    }
+
+    h5 {
+        @apply text-xl md:text-2xl;
+    }
+
+    h6 {
+        @apply text-lg leading-6 md:text-xl md:leading-7;
+    }
+
+    small,
+    .text_small {
+        font-size: 0.889rem;
+    }
+
+    a {
+        @apply underline hover:text-blue-700;
+    }
+
+    .font-mono,
+    .font-mono.font-normal {
+        font-weight: 410;
+    }
+
+    .font-mono.font-medium {
+        font-weight: 460;
+    }
+
+    .font-mono.font-semibold {
+        font-weight: 560;
+    }
+
+    .font-mono.font-bold {
+        font-weight: 640;
+    }
+}
+
+.ReactModal__Content {
+    @media (min-width: 640px) {
+        width: 624px;
+    }
+    @media (min-width: 640px) and (min-height: 792px) {
+        height: auto;
+    }
+}

@@ -93,6 +93,7 @@ set(JS_DIRS
     services/user/CommonSys/ui:CommonSys_js
     services/user/TokenSys/ui:TokenSys_js
     services/user/ExploreSys/ui:ExploreSys_js
+    services/user/AdminSys/ui:AdminSys_js
 )
 
 option(BUILD_JS "Build JS" ON)

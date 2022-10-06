@@ -64,6 +64,7 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
+    add_subdirectory(AdminSys)
     add_subdirectory(CommonSys)
     add_subdirectory(ExchangeSys)
     add_subdirectory(ExploreSys)
