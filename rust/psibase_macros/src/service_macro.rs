@@ -50,6 +50,9 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     if options.dispatch.is_none() {
         options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
     }
+    if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
+        options.dispatch = Some(false);
+    }
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
     let item = parse_macro_input!(item as Item);
     match item {

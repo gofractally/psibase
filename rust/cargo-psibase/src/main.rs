@@ -275,7 +275,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
             .unwrap_or_default(),
     );
 
-    let mut service_wasms = Vec::new();
+    let mut service_wasms = String::new();
     for (service, src) in services {
         pretty("Service", &format!("{} needed by {}", service, src));
         let mut id = None;
@@ -307,12 +307,18 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
                 service
             ));
         }
-        service_wasms.push((service, wasms.into_iter().next().unwrap()));
+        if !service_wasms.is_empty() {
+            service_wasms += ";";
+        }
+        service_wasms += &(service + ";" + &wasms.into_iter().next().unwrap().to_string_lossy());
     }
 
     let _tests = build(
         &[root],
-        vec![("CARGO_PSIBASE_TEST", "")],
+        vec![
+            ("CARGO_PSIBASE_TEST", ""),
+            ("CARGO_PSIBASE_SERVICE_LOCATIONS", &service_wasms),
+        ],
         &["--tests"],
         TESTER_POLYFILL,
     )

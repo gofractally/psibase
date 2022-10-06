@@ -177,6 +177,10 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 /// `dispatch` will default to true in A's service definition. When cargo builds
 /// B, `dispatch` will default to true in B's service definition but false
 /// in A's. This prevents B from accidentally including A's dispatch.
+///
+/// If the `CARGO_PSIBASE_TEST` environment variable is set, then the macro
+/// forces `dispatch` to false. `cargo psibase test` sets `CARGO_PSIBASE_TEST`
+/// to prevent tests from having service entry points.
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {

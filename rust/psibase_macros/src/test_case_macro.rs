@@ -2,6 +2,7 @@ use darling::FromMeta;
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
 use quote::quote;
+use std::collections::HashMap;
 use syn::{
     parse_macro_input, parse_quote, Ident, Item, ItemFn, Lit, LitStr, NestedMeta, ReturnType,
 };
@@ -69,13 +70,18 @@ fn process_fn(options: &Options, mut func: ItemFn) -> TokenStream {
     if func.sig.inputs.len() > 1 {
         abort!(func.sig.inputs, "test_case has more than 1 argument")
     }
+
+    let inputs = func.sig.inputs;
+    let output = func.sig.output;
     func.sig.inputs = Default::default();
     func.sig.output = ReturnType::Default;
-    func.sig.ident = Ident::new(
-        &(func.sig.ident.to_string() + "_psibase_test_get_needed_services"),
-        func.sig.ident.span(),
-    );
-    if std::env::var_os("CARGO_PSIBASE_ENABLE_TEST").is_none() {
+
+    let locations = std::env::var("CARGO_PSIBASE_SERVICE_LOCATIONS");
+    if locations.is_err() {
+        func.sig.ident = Ident::new(
+            &(func.sig.ident.to_string() + "_psibase_test_get_needed_services"),
+            func.sig.ident.span(),
+        );
         let prints = options.services.0.iter().fold(
             quote! {},
             |acc, x| quote! {#acc println!("psibase-test-need-service {} {}:{}", #x, file!(), line!());},
@@ -88,5 +94,49 @@ fn process_fn(options: &Options, mut func: ItemFn) -> TokenStream {
         .into();
     }
 
-    todo!()
+    let _locations: HashMap<_, _> = locations
+        .unwrap()
+        .split(';')
+        .collect::<Vec<_>>()
+        .chunks(2)
+        .map(|x| (x[0], x[1]))
+        .collect();
+    let mut block = func.block;
+
+    if !inputs.is_empty() {
+        let name = func.sig.ident.to_string();
+        block = parse_quote! {{
+            fn inner(#inputs) #block
+            let mut chain = psibase::Chain::new();
+            for trx in psibase::create_boot_transactions(
+                &None,
+                psibase::account!("prod"),
+                false,
+                false,
+                false,
+                psibase::TimePointSec { seconds: 10 },
+            ) {
+                if let Err(e) = chain.push(&trx).ok() {
+                    panic!("test {} failed with {:?}", #name, e);
+                }
+            }
+            inner(chain)
+        }};
+    }
+
+    if matches!(output, ReturnType::Type(_, _)) {
+        let ident = &func.sig.ident;
+        block = parse_quote! {{
+            if let Err(e) = #block {
+                panic!("test {} failed with {:?}", #ident, e);
+            }
+        }};
+    }
+
+    func.block = block;
+    quote! {
+        #[::std::prelude::v1::test]
+        #func
+    }
+    .into()
 }
