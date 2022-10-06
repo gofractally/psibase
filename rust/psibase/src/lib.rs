@@ -16,6 +16,7 @@ pub mod tester;
 pub mod tester_raw;
 mod time;
 mod to_bin;
+mod to_key;
 mod trace;
 
 pub mod services;
@@ -36,6 +37,7 @@ pub use service::*;
 pub use tester::*;
 pub use time::*;
 pub use to_bin::*;
+pub use to_key::*;
 pub use trace::*;
 
 pub use fracpack;
