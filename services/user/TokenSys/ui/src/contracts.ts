@@ -52,7 +52,7 @@ export class TokenContract extends Service {
     }
 
     @Action
-    public async credit(
+    credit(
         tokenId: number,
         receiver: string,
         amount: string | number,
@@ -88,7 +88,7 @@ export class TokenContract extends Service {
     }
 
     @Action
-    public async uncredit(
+    uncredit(
         tokenId: number,
         receiver: string,
         maxAmount: string | number,
@@ -124,7 +124,7 @@ export class TokenContract extends Service {
     }
 
     @Action
-    public async debit(
+    debit(
         tokenId: number,
         sender: string,
         amount: string | number,
@@ -160,7 +160,7 @@ export class TokenContract extends Service {
     }
 
     @Action
-    public async setUserConf(flag: string, enable: boolean) {
+    setUserConf(flag: string, enable: boolean) {
         console.log("setUserConf Action", flag, enable);
         return {
             flag,

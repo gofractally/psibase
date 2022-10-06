@@ -3,7 +3,7 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
 import { TransferHistory, SharedBalances } from "./views";
 import { Button, Form, Heading, Icon, Text, Switch } from "./components";
-import { getParsedBalanceFromToken } from "./helpers";
+import { getParsedBalanceFromToken, wait } from "./helpers";
 import {
     getLoggedInUser,
     getTokens,
@@ -38,7 +38,14 @@ function App() {
     const [transferHistoryResult, invalidateTransferHistoryQuery] =
         useTransferHistory(userName);
     const [manualDebitMode, setManualDebitMode] = useState(false);
-    const [, invalidateSharedBalancesQuery] = useSharedBalances();
+    const [sharedBalancesResult, invalidateSharedBalancesQuery] =
+        useSharedBalances();
+
+    const refetchData = async () => {
+        await wait(1000);
+        invalidateTransferHistoryQuery();
+        invalidateSharedBalancesQuery();
+    };
 
     useEffect(() => {
         (async () => {
@@ -82,7 +89,7 @@ function App() {
         try {
             await transfer(data);
             reset();
-            invalidateSharedBalancesQuery();
+            refetchData();
         } catch (e) {
             if (
                 Array.isArray(e) &&
@@ -266,7 +273,12 @@ function App() {
                     )}
                 </div>
             </form>
-            <SharedBalances tokens={tokens} currentUser={userName} />
+            <SharedBalances
+                tokens={tokens}
+                currentUser={userName}
+                queryResult={sharedBalancesResult}
+                refetchData={refetchData}
+            />
             <TransferHistory
                 tokens={tokens}
                 currentUser={userName}

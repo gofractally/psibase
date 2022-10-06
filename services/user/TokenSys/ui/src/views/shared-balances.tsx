@@ -1,18 +1,23 @@
+import { QueryResult } from "common/useGraphQLQuery.mjs";
 import { TokenBalance, SharedBalance } from "../types";
 import { Heading, Loader, Text, Button } from "../components";
 import { parseAmount } from "../helpers";
 import { tokenContract } from "../contracts";
-import { useSharedBalances } from "../queries";
 
 interface Props {
     tokens?: TokenBalance[];
     currentUser: string;
+    queryResult: QueryResult;
+    refetchData: () => void;
 }
 
-export const SharedBalances = ({ tokens, currentUser }: Props) => {
-    const [result, invalidateSharedBalancesQuery] = useSharedBalances();
-
-    const balances: SharedBalance[] = result.data?.sharedBalances?.edges?.map(
+export const SharedBalances = ({
+    tokens,
+    currentUser,
+    queryResult,
+    refetchData,
+}: Props) => {
+    const balances: SharedBalance[] = queryResult.data?.sharedBalances?.edges?.map(
         (e: any) => e.node
     );
 
@@ -32,7 +37,7 @@ export const SharedBalances = ({ tokens, currentUser }: Props) => {
                 maxAmount,
                 memo: "Uncredit",
             });
-            invalidateSharedBalancesQuery();
+            refetchData();
         }
     };
 
@@ -44,10 +49,10 @@ export const SharedBalances = ({ tokens, currentUser }: Props) => {
             amount,
             memo: "Debit",
         });
-        invalidateSharedBalancesQuery();
+        refetchData();
     };
 
-    if (result.isLoading) {
+    if (queryResult.isLoading) {
         return (
             <section className="flex h-40 items-center justify-center">
                 <Loader size="4xl" />
@@ -59,7 +64,7 @@ export const SharedBalances = ({ tokens, currentUser }: Props) => {
         return null;
     }
 
-    if (result.isError) {
+    if (queryResult.isError) {
         return (
             <section className="flex h-40 items-center justify-center">
                 <Text className="font-medium text-red-600">
