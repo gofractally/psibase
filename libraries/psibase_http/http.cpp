@@ -137,7 +137,7 @@ namespace psibase::http
                    {
                       self->reader.cancel();
                       auto p = self.get();
-                      p->stream.async_close({websocket::close_code::bad_payload, e.what()},
+                      p->stream.async_close({websocket::close_code::policy_error, e.what()},
                                             [self = std::move(self)](const std::error_code&) {});
                       return;
                    }
