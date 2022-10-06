@@ -275,7 +275,10 @@ void pushTransaction(psibase::SharedState&                  sharedState,
 std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view peer)
 {
    // TODO: handle ipv6 addresses [addr]:port
-   // TODO: use a websocket URI
+   if (peer.starts_with("ws://"))
+   {
+      peer = peer.substr(5);
+   }
    auto pos = peer.find(':');
    if (pos == std::string_view::npos)
    {
@@ -286,6 +289,18 @@ std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view pe
       return {peer.substr(0, pos), peer.substr(pos + 1)};
    }
 }
+
+struct ConnectRequest
+{
+   std::string url;
+};
+PSIO_REFLECT(ConnectRequest, url);
+
+struct DisconnectRequest
+{
+   peer_id id;
+};
+PSIO_REFLECT(DisconnectRequest, id);
 
 using timer_type = boost::asio::system_timer;
 
@@ -409,44 +424,40 @@ void run(const std::string&              db_path,
       http_config->connect =
           [&chainContext, &node, &resolver](std::vector<char> peer, http::connect_callback callback)
       {
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, &resolver, peer = std::move(peer),
-                            callback = std::move(callback)]() mutable
-                           {
-                              auto [host, service] = parse_endpoint({peer.data(), peer.size()});
-                              async_connect(std::make_shared<websocket_connection>(chainContext),
-                                            resolver, host, service,
-                                            [&node](auto&& conn)
-                                            { node.add_connection(std::move(conn)); });
-                              callback(std::nullopt);
-                           });
+         peer.push_back('\0');
+         psio::json_token_stream stream(peer.data());
+
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, &resolver, peer = psio::from_json<ConnectRequest>(stream),
+              callback = std::move(callback)]() mutable
+             {
+                auto [host, service] = parse_endpoint({peer.url.data(), peer.url.size()});
+                async_connect(std::make_shared<websocket_connection>(chainContext), resolver, host,
+                              service,
+                              [&node](auto&& conn) { node.add_connection(std::move(conn)); });
+                callback(std::nullopt);
+             });
       };
 
       http_config->disconnect =
           [&chainContext, &node, &resolver](std::vector<char> peer, http::connect_callback callback)
       {
+         peer.push_back('\0');
+         psio::json_token_stream stream(peer.data());
+
          boost::asio::post(
              chainContext,
-             [&chainContext, &node, &resolver, peer = std::move(peer),
+             [&chainContext, &node, &resolver, peer = psio::from_json<DisconnectRequest>(stream),
               callback = std::move(callback)]() mutable
              {
-                int  id;
-                auto result  = std::from_chars(peer.data(), peer.data() + peer.size(), id);
-                auto message = "Unknown peer";
-                if (result.ec != std::errc() || result.ptr != peer.data() + peer.size())
+                if (!node.peers().disconnect(peer.id))
                 {
-                   callback(message);
+                   callback("Unknown peer");
                 }
                 else
                 {
-                   if (!node.peers().disconnect(id))
-                   {
-                      callback(message);
-                   }
-                   else
-                   {
-                      callback(std::nullopt);
-                   }
+                   callback(std::nullopt);
                 }
              });
       };
