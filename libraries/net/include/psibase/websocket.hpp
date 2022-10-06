@@ -38,10 +38,27 @@ namespace psibase::net
                            {
                               if (ec)
                               {
-                                 PSIBASE_LOG(logger, warning) << ec.message();
+                                 log_error(ec);
                               }
                               f(ec, std::move(inbox));
                            });
+      }
+      void log_error(const std::error_code& ec)
+      {
+         // Don't bother logging errors that we expect to see on shutdown
+         if (ec != make_error_code(boost::asio::error::operation_aborted) &&
+             ec != make_error_code(boost::beast::websocket::error::closed))
+         {
+            // It isn't an error for the remote to close the connection
+            if (ec == make_error_code(boost::asio::error::eof))
+            {
+               PSIBASE_LOG(logger, info) << ec.message();
+            }
+            else
+            {
+               PSIBASE_LOG(logger, warning) << ec.message();
+            }
+         }
       }
       void async_write(std::vector<char>&& data, write_handler f) override
       {
@@ -69,7 +86,7 @@ namespace psibase::net
                                }
                                else
                                {
-                                  PSIBASE_LOG(logger, warning) << ec.message();
+                                  log_error(ec);
                                   for (auto& m : outbox)
                                   {
                                      m.callback(ec);
