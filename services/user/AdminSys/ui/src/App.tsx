@@ -8,7 +8,6 @@ import {
     siblingUrl,
     getJson,
     postJson,
-    postText,
     setOperations,
 } from "common/rpc.mjs";
 import { wait } from "./helpers";
