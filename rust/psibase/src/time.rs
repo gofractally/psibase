@@ -1,7 +1,7 @@
 use crate::Fracpack;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Fracpack, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 pub struct TimePointSec {
     pub seconds: u32,

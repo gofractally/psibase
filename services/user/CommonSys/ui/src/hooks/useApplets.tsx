@@ -157,6 +157,7 @@ export const useApplets = () => {
                 try {
                     if (!payload.callbackId) {
                         payload.callbackId = storeCallback(
+                            // @ts-ignore
                             ({ sender: responseApplet, response, errors }) => {
                                 if (!responseApplet.equals(receiver)) {
                                     return;
@@ -275,6 +276,7 @@ export const useApplets = () => {
 
         // Broadcast trx receipts to all involved Applets
         pendingTransaction.applets.forEach((applet) => {
+            // @ts-ignore
             sendMessage(MessageTypes.TransactionReceipt, COMMON_SYS, applet, {
                 ...transactionReceipt,
                 transactionId: pendingTransaction.id,
@@ -422,6 +424,18 @@ export const useApplets = () => {
         [executeTransaction]
     );
 
+    const handleSetActiveUser = useCallback(
+        (applet: AppletId, payload: any) => {
+            if (applet.name === "account-sys") {
+                return setCurrentUser(payload.account);
+            }
+            console.error(
+                "Not authorized: only AccountSys may set the active account in CommonSys."
+            );
+        },
+        [setCurrentUser]
+    );
+
     const messageRouting = useMemo(
         () => ({
             [MessageTypes.Operation]: {
@@ -444,12 +458,17 @@ export const useApplets = () => {
                 fields: ["callbackId", "response", "errors"],
                 handle: handleOperationResponse,
             },
+            [MessageTypes.SetActiveAccount]: {
+                fields: ["account"],
+                handle: handleSetActiveUser,
+            },
         }),
         [
             handleOperation,
             handleOperationResponse,
             handleQuery,
             handleQueryResponse,
+            handleSetActiveUser,
         ]
     );
 

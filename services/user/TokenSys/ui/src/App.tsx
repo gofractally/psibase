@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 
-import { initializeApplet, setOperations } from "common/rpc.mjs";
+import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
 
 import { TransferHistory } from "./views";
 import { Button, Form, Heading, Icon, Text } from "./components";
 import { getParsedBalanceFromToken } from "./helpers";
-import { executeCredit, operations } from "./operations";
 import {
     getLoggedInUser,
     getTokens,
@@ -15,9 +14,11 @@ import {
 } from "./queries";
 import { TokenBalance } from "./types";
 import WalletIcon from "./assets/app-wallet-icon.svg";
+import { tokenContract } from "./contracts";
 
 initializeApplet(async () => {
-    setOperations(operations);
+    setOperations(tokenContract.operations);
+    setQueries(tokenContract.queries);
 });
 
 type TransferInputs = {
@@ -105,12 +106,12 @@ function App() {
         const decimal = (amountSegments[1] ?? "0").padEnd(token.precision, "0");
         const parsedAmount = `${amountSegments[0]}${decimal}`;
 
-        await executeCredit({
+        await tokenContract.creditOp({
             symbol,
             receiver: to,
             amount: parsedAmount,
             memo: "Working",
-        });
+        })
 
         const updatedTokens = await pollForBalanceChange(userName, token);
         setTokens(updatedTokens);
@@ -192,7 +193,7 @@ function App() {
                                         if (!v.includes(".")) return true;
                                         return (
                                             v.split(".")[1].length <
-                                                token.precision + 1 ||
+                                            token.precision + 1 ||
                                             `Only ${token.precision} decimals allowed`
                                         );
                                     },
@@ -200,8 +201,8 @@ function App() {
                                         if (!token) return true;
                                         return (
                                             Number(v) *
-                                                Math.pow(10, token.precision) <=
-                                                Number(token.balance) ||
+                                            Math.pow(10, token.precision) <=
+                                            Number(token.balance) ||
                                             "Insufficient funds"
                                         );
                                     },

@@ -1,5 +1,6 @@
 mod link;
 
+use anyhow::Error;
 use anyhow::{anyhow, Context};
 use binaryen::{CodegenConfig, Module};
 use cargo_metadata::Message;
@@ -8,6 +9,7 @@ use clap::{Parser, Subcommand};
 use console::style;
 use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
 use std::env;
+use std::ffi::OsString;
 use std::fs::{read, write};
 use std::path::Path;
 use std::path::PathBuf;
@@ -17,7 +19,7 @@ use url::Url;
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
-const _TESTER_POLYFILL: &[u8] =
+const TESTER_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/tester_wasi_polyfill.wasm"));
 
 /// Build, test, and deploy psibase services
@@ -91,6 +93,9 @@ enum Command {
     /// Build a service
     Build {},
 
+    /// Build and run tests
+    Test {},
+
     /// Build and deploy a service
     Deploy(DeployCommand),
 }
@@ -103,7 +108,7 @@ fn status(label: &str, filename: &Path) {
     pretty(label, &filename.file_name().unwrap().to_string_lossy());
 }
 
-fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, Error> {
     status("Reoptimizing", filename);
     let mut module = Module::read(code)
         .map_err(|_| anyhow!("Binaryen failed to parse {}", filename.to_string_lossy()))?;
@@ -115,7 +120,7 @@ fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
     Ok(module.write())
 }
 
-fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), anyhow::Error> {
+fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), Error> {
     let code = &read(filename)
         .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
     status("Polyfilling", filename);
@@ -129,7 +134,7 @@ fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), anyhow::Error> {
 async fn get_files(
     packages: &[&str],
     mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
-) -> Result<Vec<PathBuf>, anyhow::Error> {
+) -> Result<Vec<PathBuf>, Error> {
     let mut result = Vec::new();
     while let Some(line) = lines.next_line().await? {
         match serde_json::from_str::<cargo_metadata::Message>(&line)? {
@@ -142,7 +147,8 @@ async fn get_files(
                         artifact
                             .filenames
                             .iter()
-                            .map(|p| p.clone().into_std_path_buf()),
+                            .map(|p| p.clone().into_std_path_buf())
+                            .filter(|p| p.as_path().extension().unwrap_or_default() == "wasm"),
                     );
                 }
             }
@@ -154,17 +160,19 @@ async fn get_files(
 
 async fn print_messages(
     mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStderr>>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), Error> {
     while let Some(line) = lines.next_line().await? {
         eprintln!("{}", line);
     }
     Ok(())
 }
 
-async fn build() -> Result<Vec<PathBuf>, anyhow::Error> {
-    let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+fn get_cargo() -> OsString {
+    env::var_os("CARGO").unwrap_or_else(|| "cargo".into())
+}
 
-    let output = std::process::Command::new(&cargo)
+fn get_metadata() -> Result<Metadata, Error> {
+    let output = std::process::Command::new(get_cargo())
         .arg("metadata")
         .arg("--format-version=1")
         .arg("--no-deps")
@@ -174,15 +182,27 @@ async fn build() -> Result<Vec<PathBuf>, anyhow::Error> {
     if !output.status.success() {
         exit(output.status.code().unwrap());
     }
-    let meta = serde_json::from_slice::<Metadata>(&output.stdout)?;
-    let packages: Vec<_> = meta.packages.iter().map(|p| p.id.repr.as_str()).collect();
+    Ok(serde_json::from_slice::<Metadata>(&output.stdout)?)
+}
 
-    let mut command = tokio::process::Command::new(cargo)
+async fn build(
+    metadata: &Metadata,
+    envs: Vec<(&str, &str)>,
+    args: &[&str],
+    poly: &[u8],
+) -> Result<Vec<PathBuf>, Error> {
+    let packages: Vec<_> = metadata
+        .packages
+        .iter()
+        .map(|p| p.id.repr.as_str())
+        .collect();
+
+    let mut command = tokio::process::Command::new(get_cargo())
+        .envs(envs)
         .arg("rustc")
+        .args(args)
         .arg("--release")
-        .arg("--lib")
         .arg("--target=wasm32-wasi")
-        .arg("--crate-type=cdylib")
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .arg("--color=always")
         .stdout(Stdio::piped())
@@ -202,14 +222,14 @@ async fn build() -> Result<Vec<PathBuf>, anyhow::Error> {
 
     let files = files?;
     for f in &files {
-        process(f, SERVICE_POLYFILL)?
+        process(f, poly)?
     }
 
     Ok(files)
 }
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> Result<(), Error> {
     let mut is_cargo_subcommand = false;
     if let Some(arg) = env::args().nth(1) {
         is_cargo_subcommand = arg == "psibase";
@@ -222,12 +242,28 @@ async fn main() -> Result<(), anyhow::Error> {
         Args::parse()
     };
 
+    let metadata = get_metadata()?;
+    let service_args = &["--lib", "--crate-type=cdylib"];
+    let test_args = &["--tests"];
+
     match args.command {
         Command::Build {} => {
-            build().await?;
+            build(&metadata, vec![], service_args, SERVICE_POLYFILL).await?;
+        }
+        Command::Test {} => {
+            build(&metadata, vec![], service_args, SERVICE_POLYFILL).await?;
+            let tests = build(
+                &metadata,
+                vec![("CARGO_PSIBASE_TEST", "")],
+                test_args,
+                TESTER_POLYFILL,
+            )
+            .await?;
+            println!("\n{:?}\n", tests);
+            todo!()
         }
         Command::Deploy(_args) => {
-            let files = build().await?;
+            let files = build(&metadata, vec![], service_args, SERVICE_POLYFILL).await?;
             if files.is_empty() {
                 Err(anyhow!("Nothing found to deploy"))?
             }

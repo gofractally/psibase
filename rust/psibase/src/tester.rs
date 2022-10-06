@@ -6,7 +6,7 @@
 //!
 //! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
 
-use crate::{tester_raw, ActionTrace, SignedTransaction};
+use crate::{tester_raw, SignedTransaction, TransactionTrace};
 use fracpack::Packable;
 use std::{cell::UnsafeCell, ptr::null_mut};
 
@@ -95,14 +95,13 @@ impl Chain {
 
     /// Start a new block
     ///
-    /// Starts a new block `skip_milliseconds/1000 + 1` seconds after either
-    /// the head block, or the current block if one is being produced.
-    ///
-    /// TODO: replace `skip_milliseconds` with a time stamp
+    /// Starts a new block at time `time_seconds` (unix time). If
+    /// time_seconds is 0, then starts a new block 1 second after
+    /// the most recent.
     ///
     /// TODO: Support sub-second block times
-    pub fn start_block(&mut self, skip_milliseconds: i64) {
-        unsafe { tester_raw::testerStartBlock(self.chain_handle, skip_milliseconds) }
+    pub fn start_block(&mut self, time_seconds: u32) {
+        unsafe { tester_raw::testerStartBlock(self.chain_handle, time_seconds) }
     }
 
     /// Finish a block
@@ -113,7 +112,7 @@ impl Chain {
     }
 
     /// Push a transaction
-    pub fn push(&mut self, transaction: &SignedTransaction) -> ActionTrace {
+    pub fn push(&mut self, transaction: &SignedTransaction) -> TransactionTrace {
         let transaction = transaction.packed();
         struct Context {
             size: usize,
@@ -140,7 +139,7 @@ impl Chain {
             );
             let mut context = context.into_inner();
             context.bytes.set_len(context.size);
-            ActionTrace::unpacked(&context.bytes).unwrap()
+            TransactionTrace::unpacked(&context.bytes).unwrap()
         }
     }
 

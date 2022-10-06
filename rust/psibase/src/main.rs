@@ -262,10 +262,7 @@ async fn create(
 
     if let Some(key) = key {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(
-            account,
-            auth_ec_sys::service::SERVICE,
-        ));
+        actions.push(set_auth_service_action(account, auth_ec_sys::SERVICE));
     }
 
     let trx = with_tapos(
@@ -300,10 +297,7 @@ async fn modify(
 
     if let Some(key) = key {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(
-            account,
-            auth_ec_sys::service::SERVICE,
-        ));
+        actions.push(set_auth_service_action(account, auth_ec_sys::SERVICE));
     }
 
     if insecure {
@@ -357,10 +351,7 @@ async fn deploy(
     // if the user doesn't have it.
     if let Some(key) = create_account {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(
-            account,
-            auth_ec_sys::service::SERVICE,
-        ));
+        actions.push(set_auth_service_action(account, auth_ec_sys::SERVICE));
     }
 
     actions.push(set_code_action(account, wasm));
@@ -485,7 +476,11 @@ async fn boot(
     key: &Option<PublicKey>,
     producer: ExactAccountNumber,
 ) -> Result<(), anyhow::Error> {
-    let transactions = create_boot_transactions(key, producer.into());
+    let now_plus_10secs = Utc::now() + Duration::seconds(10);
+    let expiration = TimePointSec {
+        seconds: now_plus_10secs.timestamp() as u32,
+    };
+    let transactions = create_boot_transactions(key, producer.into(), true, true, true, expiration);
     push_boot(args, client, transactions.packed()).await?;
     println!("Ok");
     Ok(())
