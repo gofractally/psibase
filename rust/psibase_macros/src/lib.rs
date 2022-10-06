@@ -6,10 +6,12 @@ use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use service_macro::service_macro_impl;
+use test_case_macro::test_case_macro_impl;
 
 mod fracpack_macro;
 mod number_macro;
 mod service_macro;
+mod test_case_macro;
 
 #[proc_macro_derive(Fracpack, attributes(fracpack))]
 pub fn derive_fracpack(input: TokenStream) -> TokenStream {
@@ -179,6 +181,61 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
     service_macro_impl(attr, item)
+}
+
+/// Define a [psibase](https://about.psibase.io) test case.
+///
+/// Psibase tests run in WASM. They create block chains, push transactions,
+/// and check the success or failure of those transactions to verify
+/// correct service operation.
+///
+/// # Example
+///
+/// ```ignore
+/// #[psibase::test_case(services("example1", "example2"))]
+/// fn my_test(chain: psibase::Chain) -> Result<(), anyhow::Error> {
+///     // TODO
+/// }
+/// ```
+///
+/// You may define unit tests within service sources, or define separate
+/// integration tests.
+///
+/// # Running tests
+///
+/// ```text
+/// cargo psibase test
+/// ```
+///
+/// This builds and runs both unit and integration tests. It also builds
+/// any services the tests depend on. These appear in the `test_case`
+/// macro's `services` parameter.
+///
+/// # Loading services
+///
+/// Services in the `services` parameter reference packages which define
+/// services. They may be any of the following:
+///
+/// * The name of the current package
+/// * The name of any package the current package depends on
+/// * The name of any package in the current workspace, if any
+///
+/// If the test function has an argument, e.g. `my_test(chain: psibase::Chain)`,
+/// then the macro initializes a fresh chain, loads it with the requested
+/// services, and passes it to the function. If the test function doesn't
+/// have an argument, then the test may initialize a chain and load services
+/// itself, like the following example.
+///
+/// ```ignore
+/// #[psibase::test_case(services("example1", "example2"))]
+/// fn my_test() -> Result<(), anyhow::Error> {
+///     // TODO
+/// }
+/// ```
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn test_case(attr: TokenStream, item: TokenStream) -> TokenStream {
+    test_case_macro_impl(attr, item)
 }
 
 #[proc_macro_error]
