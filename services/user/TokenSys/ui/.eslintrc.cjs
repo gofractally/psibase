@@ -1,6 +1,12 @@
 module.exports = {
+    "root": true,
+    "parser": "@typescript-eslint/parser",
+    parserOptions: {
+        "sourceType": "module",
+        "ecmaVersion": 2020,
+    },
     extends: ["plugin:prettier/recommended"],
-    plugins: ["prettier"],
+    plugins: ["prettier", "@typescript-eslint"],
     rules: {
         quotes: ["error", "double"],
         "react/react-in-jsx-scope": "off",
@@ -9,12 +15,6 @@ module.exports = {
         "@typescript-eslint/no-unused-vars": [
             "warn",
             { argsIgnorePattern: "^_" },
-        ],
-        "import/no-extraneous-dependencies": [
-            "error",
-            {
-                devDependencies: ["**/*.config.ts", "**/*.config.js"],
-            },
         ],
         "no-nested-ternary": "off",
         "react/no-unstable-nested-components": "off",

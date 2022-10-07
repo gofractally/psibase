@@ -4,3 +4,4 @@ export { Heading } from "./heading";
 export { Icon } from "./icon";
 export { Loader } from "./loader";
 export { Text } from "./text";
+export { Switch } from "./switch";
