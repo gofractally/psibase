@@ -1,0 +1,14 @@
+@font-face {
+    font-family: "Raleway";
+    font-weight: 100 900;
+    font-display: block;
+    src: url("./raleway-variable-normal.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: "Raleway";
+    font-style: italic;
+    font-weight: 100 900;
+    font-display: block;
+    src: url("./raleway-variable-italic.ttf") format("truetype");
+}
