@@ -42,3 +42,10 @@ pub use trace::*;
 
 pub use fracpack;
 pub use psibase_macros::*;
+
+// TODO: decide on an error type. Reexporting anyhow
+// and using it as a return type of library functions
+// is a quick way to get nice printed errors and nice
+// example code until then.
+pub use ::anyhow;
+pub use anyhow::{anyhow, Error};

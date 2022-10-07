@@ -204,7 +204,7 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// #[psibase::test_case(services("example1", "example2"))]
-/// fn my_test(chain: psibase::Chain) -> Result<(), anyhow::Error> {
+/// fn my_test(chain: psibase::Chain) -> Result<(), psibase::Error> {
 ///     // TODO
 /// }
 /// ```
@@ -220,12 +220,14 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// This builds and runs both unit and integration tests. It also builds
 /// any services the tests depend on. These appear in the `test_case`
-/// macro's `services` parameter.
+/// macro's `services` parameter, or as arguments to the `include_service`
+/// macro.
 ///
 /// # Loading services
 ///
-/// Services in the `services` parameter reference packages which define
-/// services. They may be any of the following:
+/// Services in the `services` parameter or in the `include_service` macro
+/// reference packages which define services. They may be any of the
+/// following:
 ///
 /// * The name of the current package
 /// * The name of any package the current package depends on
@@ -238,11 +240,15 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// itself, like the following example.
 ///
 /// ```ignore
-/// #[psibase::test_case(services("example1", "example2"))]
-/// fn my_test() -> Result<(), anyhow::Error> {
+/// #[psibase::test_case]
+/// fn my_test() -> Result<(), psibase::Error> {
 ///     // TODO
 /// }
 /// ```
+///
+/// The `include_service` macro is only available to functions which have
+/// the `psibase::test_case` attribute. It's not defined outside of these
+/// functions.
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn test_case(attr: TokenStream, item: TokenStream) -> TokenStream {
