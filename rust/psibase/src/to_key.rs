@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, BinaryHeap, LinkedList, VecDeque};
+use std::collections::{BTreeSet, LinkedList, VecDeque};
 
 /// ToKey defines a conversion from a type to a sequence of bytes
 /// whose lexicographical ordering is the same as the ordering of
@@ -9,12 +9,11 @@ use std::collections::{BTreeSet, BinaryHeap, LinkedList, VecDeque};
 /// - a.to_key() is not a prefix of b.to_key()
 ///
 /// This format doesn't have the guarantees that fracpack has.
-/// e.g. adding new fields at the end of a struct or tuple which
-/// is embedded in another struct or tuple doesn't work correctly
-/// in ToKey's format. Most changes lead to data corruption.
+/// e.g. adding new fields at the end of a struct or tuple can
+/// corrupt data in some cases.
 ///
 /// The encoding rules match psibase's `to_key.hpp` implementation.
-/// If there's any ordering differences between Rust and C++, the
+/// If there are any ordering differences between Rust and C++, the
 /// C++ rules win. So far I haven't encountered any; e.g. Rust's
 /// `Option` ordering matches C++'s `optional` ordering.
 pub trait ToKey: Sized {
@@ -77,11 +76,13 @@ macro_rules! byte_impl {
 
             fn append_option_key(obj: &Option<&Self>, key: &mut Vec<u8>) {
                 match obj {
-                    None => key.push(0),
+                    None => {
+                        key.push(0);
+                        key.push(0)
+                    }
                     Some(value) => {
-                        let byte = value.to_be_bytes();
-                        key.push(byte[0]);
-                        if byte[0] == 0 {
+                        key.push(**value as u8);
+                        if **value == 0 {
                             key.push(1);
                         }
                     }
@@ -90,7 +91,6 @@ macro_rules! byte_impl {
         }
     };
 }
-
 byte_impl! {u8}
 byte_impl! {i8}
 
@@ -138,7 +138,26 @@ impl<T: ToKey> ToKey for Option<T> {
     }
 }
 
-macro_rules! seq_impl {
+macro_rules! str_impl {
+    ($t:ty) => {
+        impl ToKey for $t {
+            fn append_key(&self, key: &mut Vec<u8>) {
+                for byte in self.bytes() {
+                    key.push(byte);
+                    if byte == 0 {
+                        key.push(1);
+                    }
+                }
+                key.push(0);
+                key.push(0)
+            }
+        }
+    };
+}
+str_impl! {String}
+str_impl! {&str}
+
+macro_rules! container_impl {
     ($t:ident) => {
         impl<T: ToKey> ToKey for $t<T> {
             fn append_key(&self, key: &mut Vec<u8>) {
@@ -150,11 +169,10 @@ macro_rules! seq_impl {
         }
     };
 }
-seq_impl! {Vec}
-seq_impl! {VecDeque}
-seq_impl! {LinkedList}
-seq_impl! {BTreeSet}
-seq_impl! {BinaryHeap}
+container_impl! {Vec}
+container_impl! {VecDeque}
+container_impl! {LinkedList}
+container_impl! {BTreeSet}
 
 impl<T: ToKey, const N: usize> ToKey for [T; N] {
     fn append_key(&self, key: &mut Vec<u8>) {
@@ -162,4 +180,39 @@ impl<T: ToKey, const N: usize> ToKey for [T; N] {
             item.append_key(key);
         }
     }
+}
+
+macro_rules! tuple_impls {
+    ($($len:expr => ($($n:tt $name:ident)*))+) => {
+        $(
+            impl<$($name: ToKey),*> ToKey for ($($name,)*) {
+                #[allow(non_snake_case)]
+                fn append_key(&self, _key: &mut Vec<u8>) {
+                    $(
+                        self.$n.append_key(_key);
+                    )*
+                }
+            }
+        )+
+    }
+}
+
+tuple_impls! {
+    0 => ()
+    1 => (0 T0)
+    2 => (0 T0 1 T1)
+    3 => (0 T0 1 T1 2 T2)
+    4 => (0 T0 1 T1 2 T2 3 T3)
+    5 => (0 T0 1 T1 2 T2 3 T3 4 T4)
+    6 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5)
+    7 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6)
+    8 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7)
+    9 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8)
+    10 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9)
+    11 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10)
+    12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
+    13 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12)
+    14 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13)
+    15 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14)
+    16 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14 15 T15)
 }
