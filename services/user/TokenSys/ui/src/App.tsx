@@ -89,7 +89,6 @@ function App() {
         try {
             await transfer(data);
             reset();
-            refetchData();
         } catch (e) {
             if (
                 Array.isArray(e) &&
@@ -102,7 +101,7 @@ function App() {
                 setTransferError(`${e}`);
             }
         }
-        invalidateTransferHistoryQuery();
+        refetchData();
         setFormSubmitted(false);
     };
 

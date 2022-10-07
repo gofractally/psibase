@@ -16,12 +16,6 @@ module.exports = {
             "warn",
             { argsIgnorePattern: "^_" },
         ],
-        // "import/no-extraneous-dependencies": [
-        //     "error",
-        //     {
-        //         devDependencies: ["**/*.config.ts", "**/*.config.js"],
-        //     },
-        // ],
         "no-nested-ternary": "off",
         "react/no-unstable-nested-components": "off",
     },

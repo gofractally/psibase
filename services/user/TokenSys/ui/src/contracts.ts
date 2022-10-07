@@ -47,7 +47,6 @@ export class TokenContract extends Service {
             "token-sys",
             `api/getUserConf/${user}/${flag}`
         );
-        console.log("getUserConf", url);
         return getJson<TokenBalance[]>(url);
     }
 
@@ -161,7 +160,6 @@ export class TokenContract extends Service {
 
     @Action
     setUserConf(flag: string, enable: boolean) {
-        console.log("setUserConf Action", flag, enable);
         return {
             flag,
             enable,
@@ -170,7 +168,6 @@ export class TokenContract extends Service {
 
     @Op()
     public async setUserConfOp({ flag, enable }: SetUserConfPayload) {
-        console.log("TokenSys Operation: setUserConf", flag, enable);
         try {
             await this.setUserConf(flag, enable);
         } catch (e) {

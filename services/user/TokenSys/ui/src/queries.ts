@@ -85,7 +85,8 @@ const querySharedBalances = () => `{
   }
 }`;
 
-export const useSharedBalances = (user?: string) => {
+export const useSharedBalances = () => {
+    // TODO: it should only query user's balances when backend supports this functionality
     const query = querySharedBalances();
     return useGraphQLQuery("/graphql", query);
 };

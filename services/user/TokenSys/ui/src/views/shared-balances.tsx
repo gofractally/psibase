@@ -27,9 +27,8 @@ export const SharedBalances = ({
         symbol: string,
         maxAmount: string
     ) => {
-        console.log("Cancel", incoming);
         if (incoming) {
-            console.log("Cancel deposit is not implemented yet");
+            // TODO: implement incoming deposits cancel function when backend supports it
         } else {
             await tokenContract.unCreditOp({
                 symbol,
@@ -42,7 +41,6 @@ export const SharedBalances = ({
     };
 
     const onAccept = async (sender: string, symbol: string, amount: string) => {
-        console.log("Accept", currentUser, symbol, amount);
         await tokenContract.debitOp({
             symbol,
             sender,
