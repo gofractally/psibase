@@ -1,4 +1,4 @@
-use crate::Fracpack;
+use crate::{Fracpack, ToKey};
 use custom_error::custom_error;
 use psibase_names::{account_number_from_str, account_number_to_string};
 use serde::{Deserialize, Serialize};
@@ -22,8 +22,9 @@ custom_error! { pub AccountNumberError
 /// use psibase::AccountNumber;
 /// let hello = AccountNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct AccountNumber {
     pub value: u64,
 }
@@ -77,8 +78,9 @@ impl std::fmt::Display for AccountNumber {
 }
 
 /// Like AccountNumber, except FromStr requires exact round-trip conversion
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct ExactAccountNumber {
     pub value: u64,
 }

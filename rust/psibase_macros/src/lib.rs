@@ -7,15 +7,22 @@ use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use service_macro::service_macro_impl;
 use test_case_macro::test_case_macro_impl;
+use to_key_macro::to_key_macro_impl;
 
 mod fracpack_macro;
 mod number_macro;
 mod service_macro;
 mod test_case_macro;
+mod to_key_macro;
 
 #[proc_macro_derive(Fracpack, attributes(fracpack))]
 pub fn derive_fracpack(input: TokenStream) -> TokenStream {
     fracpack_macro_impl(input)
+}
+
+#[proc_macro_derive(ToKey, attributes(to_key))]
+pub fn derive_to_key(input: TokenStream) -> TokenStream {
+    to_key_macro_impl(input)
 }
 
 /// Define a [psibase](https://about.psibase.io) service interface.

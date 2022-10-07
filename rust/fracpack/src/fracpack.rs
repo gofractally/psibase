@@ -42,6 +42,13 @@
 //!
 //! Note: `#[fracpack(fracpack_mod = "fracpack")]` is only needed when using the `fracpack`
 //! library directly instead of through the [psibase crate](https://docs.rs/psibase).
+//!
+//! # Caution
+//!
+//! In Rust, it's easy to accidentally convert from a fixed-size
+//! array reference (`&[u8;7]`) to a slice (`&[u8]`). This matters
+//! to fracpack, which has different, and incompatible, encodings
+//! for the two types.
 
 use custom_error::custom_error;
 use std::mem;

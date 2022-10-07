@@ -16,7 +16,14 @@ use std::collections::{BTreeSet, LinkedList, VecDeque};
 /// If there are any ordering differences between Rust and C++, the
 /// C++ rules win. So far I haven't encountered any; e.g. Rust's
 /// `Option` ordering matches C++'s `optional` ordering.
-pub trait ToKey: Sized {
+///
+/// # Caution
+///
+/// In Rust, it's easy to accidentally convert from a fixed-size
+/// array reference (`&[T;7]`) to a slice (`&[T]`). This matters
+/// to ToKey, which has different, and incompatible, encodings
+/// for the two types.
+pub trait ToKey {
     /// Convert to key
     fn to_key(&self) -> Vec<u8> {
         let mut key = Vec::new();
@@ -38,13 +45,13 @@ pub trait ToKey: Sized {
     }
 }
 
-impl<T: ToKey> ToKey for &T {
+impl<T: ToKey + ?Sized> ToKey for &T {
     fn append_key(&self, key: &mut Vec<u8>) {
         T::append_key(self, key)
     }
 }
 
-impl<T: ToKey> ToKey for &mut T {
+impl<T: ToKey + ?Sized> ToKey for &mut T {
     fn append_key(&self, key: &mut Vec<u8>) {
         T::append_key(self, key)
     }
@@ -173,6 +180,15 @@ container_impl! {Vec}
 container_impl! {VecDeque}
 container_impl! {LinkedList}
 container_impl! {BTreeSet}
+
+impl<T: ToKey> ToKey for [T] {
+    fn append_key(&self, key: &mut Vec<u8>) {
+        for item in self.iter() {
+            T::append_option_key(&Some(item), key);
+        }
+        T::append_option_key(&None, key);
+    }
+}
 
 impl<T: ToKey, const N: usize> ToKey for [T; N] {
     fn append_key(&self, key: &mut Vec<u8>) {
