@@ -56,8 +56,6 @@ pub fn to_key_macro_impl(input: TokenStream) -> TokenStream {
     }
 }
 
-// TODO: compile time: verify no non-optionals are after an optional
-// TODO: unpack: check optionals not in heap
 fn process_struct(
     psibase_mod: &proc_macro2::TokenStream,
     input: &DeriveInput,

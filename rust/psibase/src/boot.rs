@@ -274,8 +274,8 @@ pub fn create_boot_transactions(
     if install_ui {
         let html = "text/html";
         let js = "text/javascript";
-        let css  = "text/css";
-        let ttf  = "font/ttf";
+        let css = "text/css";
+        let ttf = "font/ttf";
 
         let mut reg_actions = vec![
             reg_server(account_sys::SERVICE, account!("r-account-sys")),
