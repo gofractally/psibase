@@ -99,7 +99,7 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
     if !inputs.is_empty() {
         let name = func.sig.ident.to_string();
         block = parse_quote! {{
-            fn inner(#inputs) #block
+            fn with_chain(#inputs) #output #block
             let mut chain = psibase::Chain::new();
             for trx in psibase::create_boot_transactions(
                 &None,
@@ -113,14 +113,15 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
                     panic!("test {} failed with {:?}", #name, e);
                 }
             }
-            inner(chain)
+            with_chain(chain)
         }};
     }
 
     if matches!(output, ReturnType::Type(_, _)) {
-        let ident = &func.sig.ident;
+        let ident = func.sig.ident.to_string();
         block = parse_quote! {{
-            if let Err(e) = #block {
+            fn with_output() #output #block
+            if let Err(e) = with_output() {
                 panic!("test {} failed with {:?}", #ident, e);
             }
         }};
@@ -139,12 +140,16 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
         );
         // Preserves the original code to enable rust-analyzer and other tools to function
         block = parse_quote! {{
+            #[allow(unused_macros)]
             macro_rules! include_service {
                 ($service:expr) => {
                     &[] as &[u8]
                 };
             }
-            if false #block else {
+            fn skip_so_cargo_psibase_can_get_deps() #block
+            if false {
+                skip_so_cargo_psibase_can_get_deps()
+            } else {
                 #prints
             }
         }};

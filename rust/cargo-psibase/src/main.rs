@@ -9,12 +9,12 @@ use clap::{Parser, Subcommand};
 use console::style;
 use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
 use regex::Regex;
-use std::env;
 use std::ffi::OsString;
-use std::fs::{read, write};
+use std::fs::{read, write, OpenOptions};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{exit, Stdio};
+use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
 use url::Url;
 
@@ -107,12 +107,12 @@ fn pretty(label: &str, message: &str) {
     println!("{:>12} {}", style(label).bold().green(), message);
 }
 
-fn status(label: &str, filename: &Path) {
+fn pretty_path(label: &str, filename: &Path) {
     pretty(label, &filename.file_name().unwrap().to_string_lossy());
 }
 
 fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, Error> {
-    status("Reoptimizing", filename);
+    pretty_path("Reoptimizing", filename);
     let mut module = Module::read(code)
         .map_err(|_| anyhow!("Binaryen failed to parse {}", filename.to_string_lossy()))?;
     module.optimize(&CodegenConfig {
@@ -124,13 +124,27 @@ fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, Error> {
 }
 
 fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), Error> {
+    let timestamp_file = filename.to_string_lossy().to_string() + ".cargo_psibase";
+    let md = fs::metadata(filename)
+        .with_context(|| format!("Failed to get metadata for {}", filename.to_string_lossy()))?;
+    if let Ok(md2) = fs::metadata::<PathBuf>(timestamp_file.as_str().into()) {
+        if md2.modified().unwrap() >= md.modified().unwrap() {
+            return Ok(());
+        }
+    }
+
     let code = &read(filename)
         .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
-    status("Polyfilling", filename);
+    pretty_path("Polyfilling", filename);
     let code = link::link(filename, code, polyfill)?;
     let code = optimize(filename, &code)?;
     write(filename, code)
         .with_context(|| format!("Failed to write {}", filename.to_string_lossy()))?;
+    OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(timestamp_file)?;
     Ok(())
 }
 
@@ -313,7 +327,8 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
         service_wasms += &(service + ";" + &wasms.into_iter().next().unwrap().to_string_lossy());
     }
 
-    let _tests = build(
+    println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
+    let tests = build(
         &[root],
         vec![
             ("CARGO_PSIBASE_TEST", ""),
@@ -323,9 +338,25 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
         TESTER_POLYFILL,
     )
     .await?;
+    if tests.is_empty() {
+        return Err(anyhow!("No tests found"));
+    }
 
-    println!("{:?}", service_wasms);
-    todo!()
+    for test in tests {
+        pretty_path("Running", &test);
+        let args = [test.to_str().unwrap(), "--nocapture"];
+        let msg = format!("Failed running: psitest {}", args.join(" "));
+        if !std::process::Command::new("psitest")
+            .args(args)
+            .status()
+            .context(msg.clone())?
+            .success()
+        {
+            return Err(anyhow! {msg});
+        }
+    }
+
+    Ok(())
 }
 
 #[tokio::main]
@@ -355,9 +386,11 @@ async fn main2() -> Result<(), Error> {
     match args.command {
         Command::Build {} => {
             build(&[root], vec![], SERVICE_ARGS, SERVICE_POLYFILL).await?;
+            pretty("Done", "");
         }
         Command::Test {} => {
             test(&metadata, root).await?;
+            pretty("Done", "All tests passed");
         }
         Command::Deploy(_args) => {
             let files = build(&[root], vec![], SERVICE_ARGS, SERVICE_POLYFILL).await?;
@@ -367,11 +400,11 @@ async fn main2() -> Result<(), Error> {
             if files.len() > 1 {
                 Err(anyhow!("Expected a single library"))?
             }
-            todo!()
+            todo!();
+            // pretty("Done", "");
         }
     };
 
-    pretty("Done", "");
     Ok(())
 }
 
