@@ -66,13 +66,14 @@ custom_error! {pub Error
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Use this trait instead of [Packable] when the deserialized
-/// data is owned instead of borrowed.
+/// Use this trait on generic functions instead of [Packable] when
+/// the deserialized data may only be owned instead of borrowed from
+/// the source.
 ///
 /// ```
-/// use fracpack::{PackableOwned, Result};
+/// use fracpack::{PackableOwned, Error};
 ///
-/// pub fn get_unpacked<T: PackableOwned>(packed: &[u8]) -> Result<T> {
+/// pub fn get_unpacked<T: PackableOwned>(packed: &[u8]) -> Result<T, Error> {
 ///     T::unpacked(packed)
 /// }
 /// ```
