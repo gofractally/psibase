@@ -123,6 +123,12 @@ fn format_action_trace(
         "{:indent$}    {} => {}::{}",
         "", atrace.action.sender, atrace.action.service, atrace.action.method
     )?;
+    writeln!(
+        f,
+        "{:indent$}    raw_retval: {} bytes",
+        "",
+        atrace.raw_retval.len()
+    )?;
     for inner in &atrace.inner_traces {
         match &inner.inner {
             InnerTraceEnum::ConsoleTrace(c) => format_console(c, indent + 4, f)?,

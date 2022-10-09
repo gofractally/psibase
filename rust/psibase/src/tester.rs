@@ -7,11 +7,12 @@
 //! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
 
 use crate::{
-    kv_get, status_key, tester_raw, AccountNumber, Action, Caller, InnerTraceEnum,
+    kv_get, services, status_key, tester_raw, AccountNumber, Action, Caller, InnerTraceEnum,
     SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::Packable;
+use psibase_macros::account_raw;
 use std::cell::{Cell, RefCell};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -152,7 +153,7 @@ impl Chain {
             trx.tapos.expiration.seconds = status.current.time.seconds + expire_seconds;
             if let Some(head) = &status.head {
                 let mut suffix = [0; 4];
-                suffix.copy_from_slice(&head.blockId[..head.blockId.len() - 4]);
+                suffix.copy_from_slice(&head.blockId[head.blockId.len() - 4..]);
                 trx.tapos.refBlockIndex = (head.header.blockNum & 0x7f) as u8;
                 trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
             }
@@ -238,6 +239,31 @@ impl Chain {
     pub fn select_chain(&self) {
         unsafe { tester_raw::testerSelectChainForDb(self.chain_handle) }
     }
+
+    /// Create a new account
+    ///
+    /// Create a new account which authenticates using `auth-any-sys`.
+    /// Doesn't fail if the account already exists.
+    pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
+        services::account_sys::Wrapper::push(self)
+            .newAccount(
+                account,
+                AccountNumber::new(account_raw!("auth-any-sys")),
+                false,
+            )
+            .get()
+    }
+
+    /// Deploy a service
+    ///
+    /// Set code on an account. Also creates the account if needed.
+    pub fn deploy_service(&self, account: AccountNumber, code: &[u8]) -> Result<(), anyhow::Error> {
+        self.new_account(account)?;
+        // TODO: update setcode_sys::setCode to not need a vec. Needs changes to the service macro.
+        services::setcode_sys::Wrapper::push_from(self, account)
+            .setCode(account, 0, 0, code.to_vec())
+            .get()
+    }
 }
 
 pub struct ChainEmptyResult {
@@ -279,8 +305,9 @@ impl<T: fracpack::PackableOwned> ChainResult<T> {
                         None
                     }
                 })
-                .next();
+                .last();
             if let Some(ret) = ret {
+                println!("\n\nlength {}\n", ret.len());
                 return Ok(T::unpacked(ret)?);
             }
         }

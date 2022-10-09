@@ -89,7 +89,13 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
                 .split(';')
                 .collect::<Vec<_>>()
                 .chunks(2)
-                .map(|x| (x[0].to_owned(), x[1].to_owned()))
+                .filter_map(|x| {
+                    if x.len() == 2 {
+                        Some((x[0].to_owned(), x[1].to_owned()))
+                    } else {
+                        None
+                    }
+                })
                 .collect(),
         );
     }
@@ -98,22 +104,35 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
 
     if !inputs.is_empty() {
         let name = func.sig.ident.to_string();
+        let deploy_services = load_services.requests.iter().fold(quote! {}, |acc, s| {
+            let ss = s.value().replace('_', "-");
+            quote! {
+                #acc
+                chain.deploy_service(psibase::account!(#ss), include_service!(#s))?;
+            }
+        });
         block = parse_quote! {{
             fn with_chain(#inputs) #output #block
-            let mut chain = psibase::Chain::new();
-            for trx in psibase::create_boot_transactions(
-                &None,
-                psibase::account!("prod"),
-                false,
-                false,
-                false,
-                psibase::TimePointSec { seconds: 10 },
-            ) {
-                if let Err(e) = chain.push(&trx).ok() {
-                    panic!("test {} failed with {:?}", #name, e);
+            fn create_chain() -> Result<psibase::Chain, psibase::Error> {
+                let mut chain = psibase::Chain::new();
+                for trx in psibase::create_boot_transactions(
+                    &None,
+                    psibase::account!("prod"),
+                    false,
+                    false,
+                    false,
+                    psibase::TimePointSec { seconds: 10 },
+                ) {
+                    chain.push(&trx).ok()?;
                 }
+                #deploy_services
+                Ok(chain)
             }
-            with_chain(chain)
+            let chain = create_chain();
+            if let Err(e) = chain {
+                panic!("test {} failed with {:?}", #name, e);
+            }
+            with_chain(chain.unwrap())
         }};
     }
 
