@@ -62,7 +62,7 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 /// the macro creates public definitions (below).
 ///
 /// The macro copies the action documentation (like above) to the
-/// [`Actions<T>` methods](#actions-struct). Use the `[Self::...]`
+/// [`Actions<T>` methods](Actions-struct). Use the `[Self::...]`
 /// syntax like above within action documentation to refer to
 /// other actions.
 ///
@@ -101,7 +101,29 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 ///     // The account this service normally runs on
 ///     pub const SERVICE: psibase::AccountNumber;
 ///
-/// # extern "C" {
+///     // push transactions to psibase::Chain.
+///     //
+///     // `push_*` functions return an object which has methods (one per action) which
+///     // push transactions to a test chain and return a psibase::ChainResult or
+///     // psibase::ChainEmptyResult. This final object can verify success or failure
+///     // and can retrieve the return value, if any.
+///     pub fn push(
+///         chain: &psibase::Chain,
+///     ) -> Actions<psibase::ChainPusher>;
+///     pub fn push_to(
+///         chain: &psibase::Chain,
+///         service: psibase::AccountNumber,
+///     ) -> Actions<psibase::ChainPusher>;
+///     pub fn push_from(
+///         chain: &psibase::Chain,
+///         sender: psibase::AccountNumber,
+///     ) -> Actions<psibase::ChainPusher>;
+///     pub fn push_from_to(
+///         chain: &psibase::Chain,
+///         sender: psibase::AccountNumber,
+///         service: psibase::AccountNumber,
+///     ) -> Actions<psibase::ChainPusher>;
+///
 ///     // Pack actions into psibase::Action.
 ///     //
 ///     // `pack_*` functions return an object which has methods (one per action)
@@ -109,8 +131,12 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 ///     // The `pack_*` series of functions is mainly useful to applications which
 ///     // push transactions to blockchains.
 ///     pub fn pack() -> Actions<psibase::ActionPacker>;
-///     pub fn pack_to(service: psibase::AccountNumber) -> Actions<psibase::ActionPacker>;
-///     pub fn pack_from(sender: psibase::AccountNumber) -> Actions<psibase::ActionPacker>;
+///     pub fn pack_to(
+///         service: psibase::AccountNumber,
+///     ) -> Actions<psibase::ActionPacker>;
+///     pub fn pack_from(
+///         sender: psibase::AccountNumber,
+///     ) -> Actions<psibase::ActionPacker>;
 ///     pub fn pack_from_to(
 ///         sender: psibase::AccountNumber,
 ///         service: psibase::AccountNumber,
