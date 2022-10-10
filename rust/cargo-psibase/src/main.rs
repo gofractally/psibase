@@ -327,7 +327,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
         service_wasms += &(service + ";" + &wasms.into_iter().next().unwrap().to_string_lossy());
     }
 
-    println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
+    // println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
     let tests = build(
         &[root],
         vec![
