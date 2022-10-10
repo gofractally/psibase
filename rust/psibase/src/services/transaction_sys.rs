@@ -1,11 +1,14 @@
 /// Identify a service and method
 ///
 /// An empty `service` or `method` indicates a wildcard.
-#[derive(crate::Fracpack)]
+#[derive(
+    Copy, Clone, Debug, crate::Fracpack, crate::ToKey, serde::Serialize, serde::Deserialize,
+)]
 #[fracpack(fracpack_mod = "crate::fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct ServiceMethod {
-    service: crate::AccountNumber,
-    method: crate::MethodNumber,
+    pub service: crate::AccountNumber,
+    pub method: crate::MethodNumber,
 }
 
 /// Authenticate actions
@@ -29,12 +32,14 @@ pub struct ServiceMethod {
 /// they should define methods with matching signatures.
 #[crate::service(
     name = "example-auth",
-    actions_name = "AuthActions",
-    wrapper_name = "AuthWrapper",
+    actions = "AuthActions",
+    wrapper = "AuthWrapper",
+    structs = "auth_action_structs",
     dispatch = false,
+    pub_constant = false,
     psibase_mod = "crate"
 )]
-#[allow(non_snake_case, unused_variables, dead_code)]
+#[allow(non_snake_case, unused_variables)]
 pub mod auth_interface {
     /// The database is in read-only mode. This flag is only
     /// used for `topActionReq`.
@@ -132,8 +137,8 @@ pub mod auth_interface {
 // TODO: tables
 // TODO: service flags
 #[crate::service(name = "transact-sys", dispatch = false, psibase_mod = "crate")]
-#[allow(non_snake_case, unused_variables, dead_code)]
-pub mod service {
+#[allow(non_snake_case, unused_variables)]
+mod service {
     /// Only called once during chain initialization
     ///
     /// This enables the auth checking system. Before this point, `TransactionSys`

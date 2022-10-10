@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 #include <iostream>
 #include <psibase/Actor.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psibase/print.hpp>
 #include <psibase/trace.hpp>
 
@@ -131,8 +132,9 @@ namespace psibase
    class TestChain
    {
      private:
-      uint32_t                 id;
-      std::optional<BlockInfo> headBlockInfo;
+      uint32_t                          id;
+      std::optional<psibase::StatusRow> status;
+      bool                              producing = false;
 
      public:
       static const PublicKey  defaultPubKey;
@@ -176,8 +178,6 @@ namespace psibase
        * Finish the current pending block.  If no block is pending, creates an empty block.
        */
       void finishBlock();
-
-      const BlockInfo& getHeadBlockInfo();
 
       /*
        * Set the reference block of the transaction to the head block.

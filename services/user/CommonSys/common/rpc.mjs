@@ -339,6 +339,7 @@ export const MessageTypes = {
     QueryResponse: "QueryResponse", // A response to a prior query
     OperationResponse: "OperationResponse",
     TransactionReceipt: "TransactionReceipt",
+    SetActiveAccount: "SetActiveAccount",
 };
 
 export class AppletId {
@@ -428,7 +429,7 @@ export function executePromise(callbackId, response, errors) {
     return true;
 }
 
-async function sendToParent(message) {
+function sendToParent(message) {
     const sendMessage = async () => {
         parentIFrame.sendMessage(message, await siblingUrl(null, null, null));
     };
@@ -515,13 +516,7 @@ const messageRouting = [
                     responsePayload.errors.push(e);
                 }
             } else {
-                responsePayload.errors.push(
-                    "Service " +
-                        contractName +
-                        ' has no operation, "' +
-                        identifier +
-                        '"'
-                );
+                responsePayload.errors.push(`Service ${contractName} has no operation "${identifier}"`);
             }
 
             sendToParent({
@@ -551,13 +546,7 @@ const messageRouting = [
                         responsePayload.errors.push(e);
                     }
                 } else {
-                    responsePayload.errors.push(
-                        "Service " +
-                            contractName +
-                            ' has no query, "' +
-                            identifier +
-                            '"'
-                    );
+                    responsePayload.errors.push(`Service ${contractName} has no query "${identifier}"`);
                 }
             } catch (e) {
                 console.error("fail to process query message", e);
@@ -599,7 +588,7 @@ const messageRouting = [
     },
 ];
 
-export async function initializeApplet(initializer = () => {}) {
+export async function initializeApplet(initializer = () => { }) {
     await redirectIfAccessedDirectly();
 
     const rootUrl = await siblingUrl(null, null, null);
@@ -695,7 +684,7 @@ export function setQueries(queries) {
  * @param {String} name - The name of the operation to run.
  * @param {Object} params - The object containing all parameters expected by the operation handler.
  */
-export function operation(appletId, name, params = {}) {
+export async function operation(appletId, name, params = {}) {
     const operationPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
         const callbackId = storePromise(resolve, reject);
@@ -706,17 +695,17 @@ export function operation(appletId, name, params = {}) {
         });
     });
 
-    return operationPromise;
-}
+    const operationRes = await operationPromise;
 
-export async function operationWithTrxReceipt(appletId, name, params) {
-    const operationRes = await operation(appletId, name, params);
+    let transactionSubmittedPromise;
+    if (operationRes.transactionId) {
+        transactionSubmittedPromise = new Promise((resolve, reject) => {
+            const callbackId = storePromise(resolve, reject);
+            transactions[operationRes.transactionId] = callbackId;
+        });
+    }
 
-    const transactionSubmittedPromise = new Promise((resolve, reject) => {
-        const callbackId = storePromise(resolve, reject);
-        transactions[operationRes.transactionId] = callbackId;
-    });
-    return transactionSubmittedPromise;
+    return { ...operationRes, transactionSubmittedPromise };
 }
 
 /**
@@ -755,4 +744,120 @@ export function query(appletId, name, params = {}) {
     });
 
     return queryPromise;
+}
+
+const OPERATIONS_KEY = 'OPERATIONS_KEY'
+const QUERIES_KEY = 'QUERIES_KEY'
+
+/**
+ * Description: Class to blueprint the applets contract + operations.
+ */
+export class Service {
+    cachedApplet = '';
+
+    constructor() {
+        this.applet();
+    }
+
+    async applet() {
+        if (this.cachedApplet) return this.cachedApplet;
+        const appletName = await getJson("/common/thisservice");
+        this.cachedApplet = appletName;
+        return appletName;
+    }
+
+    async getAppletName() {
+        return this.applet();
+    }
+
+    async getAppletId() {
+        const appletName = await this.getAppletName();
+        return new AppletId(appletName);
+    }
+
+    get operations() {
+        return this[OPERATIONS_KEY] || []
+    }
+
+    get queries() {
+        return this[QUERIES_KEY] || []
+    }
+
+}
+
+export function Action(target, key, descriptor) {
+    const originalMethod = descriptor.value;
+    descriptor.value = function (...args) {
+        const result = originalMethod.apply(this, args);
+        const parent = Object.getPrototypeOf(this);
+        return (parent.getAppletName()).then(appletName => action(appletName, key, result))
+    }
+};
+
+/**
+ * Description: @Op Operation decorator which helps build { id: .., exec: () => ..}
+ * 
+ *
+ * @param {String} name - The optional id of the operation, will otherwise default to the method name.
+ */
+export function Op(name) {
+    return function (target, key, descriptor) {
+        const id = name ? name : key;
+        const op = {
+            exec: descriptor.value.bind(target),
+            id
+        };
+        const isExistingArray = OPERATIONS_KEY in target;
+        if (isExistingArray) {
+            target[OPERATIONS_KEY].push(op)
+        } else {
+            target[OPERATIONS_KEY] = [op]
+        }
+
+        descriptor.value = function (...args) {
+            const parent = 'getAppletId' in Object.getPrototypeOf(this) ? Object.getPrototypeOf(this) : Object.getPrototypeOf(Object.getPrototypeOf(this))
+            return parent.getAppletId().then(appletId => operation(appletId, id, ...args))
+        }
+    };
+}
+
+
+/**
+ * Description: @Qry Query decorator which helps build { id: .., exec: () => ..}
+ * 
+ *
+ * @param {String} name - The optional id of the query, will otherwise default to the method name.
+ */
+export function Qry(name) {
+    return function (target, key, descriptor) {
+        const id = name ? name : key;
+        const op = {
+            exec: descriptor.value.bind(target),
+            id
+        };
+        const isExistingArray = QUERIES_KEY in target;
+        if (isExistingArray) {
+            target[QUERIES_KEY].push(op)
+        } else {
+            target[QUERIES_KEY] = [op]
+        }
+
+        descriptor.value = function (...args) {
+            const parent = 'getAppletId' in Object.getPrototypeOf(this) ? Object.getPrototypeOf(this) : Object.getPrototypeOf(Object.getPrototypeOf(this))
+            return parent.getAppletId().then(appletId => query(appletId, id, ...args))
+        }
+    };
+}
+
+/**
+ * Description: Notifies CommonSys of a change in active account. Callable only by AccountSys.
+ * TODO: AccountSys should emit an event once we have a proper event system. Remove setActiveAccount then.
+ *
+ * @param {String} account - The name of the active account.
+ */
+export function setActiveAccount(account) {
+    sendToParent({
+        type: MessageTypes.SetActiveAccount,
+        payload: { account },
+    });
 }

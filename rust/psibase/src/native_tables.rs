@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 
-use crate::{AccountNumber, BlockHeader, BlockInfo, BlockNum, Claim, DbId, Fracpack, Producer};
+use crate::{
+    AccountNumber, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Fracpack, Producer,
+};
 use serde::{Deserialize, Serialize};
 
 pub type NativeTable = u16;
@@ -17,12 +19,6 @@ pub const PRODUCER_CONFIG_TABLE: NativeTable = 8;
 
 pub const NATIVE_TABLE_PRIMARY_INDEX: NativeIndex = 0;
 
-trait NativeRow {
-    type Key;
-    const DB: DbId;
-    fn key(&self) -> Self::Key;
-}
-
 pub fn status_key() -> (NativeTable, NativeIndex) {
     (STATUS_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
 }
@@ -30,16 +26,17 @@ pub fn status_key() -> (NativeTable, NativeIndex) {
 #[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct StatusRow {
+    pub chainId: Checksum256,
     pub current: BlockHeader,
     pub head: Option<BlockInfo>,
     pub producers: Vec<Producer>,
     pub nextProducers: Option<(Vec<Producer>, BlockNum)>,
 }
 
-impl NativeRow for StatusRow {
-    type Key = (NativeTable, NativeIndex);
-    const DB: DbId = DbId::NativeUnconstrained;
-    fn key(&self) -> Self::Key {
+impl StatusRow {
+    pub const DB: DbId = DbId::NativeUnconstrained;
+
+    pub fn key(&self) -> (NativeTable, NativeIndex) {
         status_key()
     }
 }
@@ -51,10 +48,10 @@ pub struct ConfigRow {
     pub maxValueSize: u32,
 }
 
-impl NativeRow for ConfigRow {
-    type Key = (NativeTable, NativeIndex);
-    const DB: DbId = DbId::NativeConstrained;
-    fn key(&self) -> Self::Key {
+impl ConfigRow {
+    pub const DB: DbId = DbId::NativeConstrained;
+
+    pub fn key(&self) -> (NativeTable, NativeIndex) {
         (CONFIG_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
     }
 }
@@ -70,10 +67,10 @@ pub struct ProducerConfigRow {
     pub producerAuth: Claim,
 }
 
-impl NativeRow for ProducerConfigRow {
-    type Key = (NativeTable, AccountNumber);
-    const DB: DbId = DbId::NativeConstrained;
-    fn key(&self) -> Self::Key {
+impl ProducerConfigRow {
+    pub const DB: DbId = DbId::NativeConstrained;
+
+    pub fn key(&self) -> (NativeTable, AccountNumber) {
         producer_config_key(self.producerName)
     }
 }

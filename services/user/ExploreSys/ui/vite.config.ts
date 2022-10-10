@@ -50,13 +50,21 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: {
-                            "/common/iframeResizer.contentWindow.js":
-                                path.resolve(
+                        alias: [
+                            {
+                                find: "/common/iframeResizer.contentWindow.js",
+                                replacement: path.resolve(
                                     "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
                                 ),
-                            "/common": path.resolve("../../CommonSys/common"),
-                        },
+                            },
+                            {
+                                // bundle non-external (above) common files except fonts (which should only be referenced)
+                                find: /^\/common(?!\/(?:fonts))(.*)$/,
+                                replacement: path.resolve(
+                                    "../../CommonSys/common$1"
+                                ),
+                            },
+                        ],
                     },
                 };
             },

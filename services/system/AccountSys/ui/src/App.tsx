@@ -1,17 +1,20 @@
-import React, { useRef } from "react";
+import React from "react";
 
 import {
     useAccountsWithKeys,
     useCurrentUser,
-    useImportAccount,
-    useCreateAccount,
     useAccounts,
-    useInitialized
-} from './hooks'
+    useInitialized,
+} from "./hooks";
 
-import appAccountIcon from "./components/assets/icons/app-account.svg";
-import { AccountsList, AccountList, CreateAccountForm, Heading } from "./components";
-import { getLoggedInUser } from "./helpers";
+import AccountIcon from "./components/assets/icons/app-account.svg";
+import {
+    AccountsList,
+    AccountList,
+    CreateAccountForm,
+    Heading,
+} from "./components";
+import { getLoggedInUser, updateAccountInCommonNav } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
 
 // needed for common files that won't necessarily use bundles
@@ -27,15 +30,14 @@ export interface KeyPairWithAccounts extends KeyPair {
 
 interface Account {
     accountNum: string;
-    publicKey: KeyPairWithAccounts['publicKey']
+    publicKey: KeyPairWithAccounts["publicKey"];
 }
 export interface AccountWithAuth extends Account {
     authService: string;
 }
 export interface AccountWithKey extends AccountWithAuth {
-    privateKey: KeyPairWithAccounts['privateKey']
+    privateKey: KeyPairWithAccounts["privateKey"];
 }
-
 
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
@@ -45,59 +47,56 @@ function App() {
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
         if (isLoggingOutOfCurrentUser) {
-            setCurrentUser(accountsWithKeys[0].accountNum);
+            const nextAccount = accountsWithKeys.find(
+                (acc) =>
+                    acc.accountNum !== account &&
+                    acc.authService !== "auth-any-sys"
+            );
+            const newUser =
+                typeof nextAccount === "undefined"
+                    ? ""
+                    : nextAccount.accountNum;
+            setCurrentUser(newUser);
         }
-        dropAccount(account)
-    }
-
+        dropAccount(account);
+    };
 
     useInitialized(async () => {
         try {
             setCurrentUser(await getLoggedInUser());
         } catch (e: any) {
-            console.info(
-                "App.appInitialized.useEffect().error:",
-                e.message
-            );
+            console.info("App.appInitialized.useEffect().error:", e.message);
         }
-    })
+    });
 
-    const createAccountFormRef = useRef<{ resetForm: () => void }>(null);
-
-    const [onCreateAccount, isAccountLoading, accountError] = useCreateAccount((newAccount, privateKey) => {
-        createAccountFormRef.current!.resetForm()
-        addAccounts([{ ...newAccount, privateKey }]);
-        refreshAccounts();
-    })
-    const [searchKeyPair, isImportLoading, importError] = useImportAccount(addAccounts);
-
+    const onSelectAccount = (account: string) => {
+        setCurrentUser(account);
+        updateAccountInCommonNav(account);
+    };
 
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
-            <div className="flex gap-2">
-                <img src={appAccountIcon} />
-                <Heading tag="h1" className="text-gray-600">
+            <div className="flex items-center gap-2">
+                <AccountIcon />
+                <Heading tag="h1" className="select-none text-gray-600">
                     Accounts
                 </Heading>
             </div>
-            <div className="bg-slate-50">
-                <AccountList
-                    onLogout={onLogout}
-                    selectedAccount={currentUser}
-                    accounts={accountsWithKeys}
-                    onSelectAccount={setCurrentUser}
-                />
-            </div>
-            <div className="bg-slate-50 mt-4 flex justify-between">
-                <CreateAccountForm errorMessage={accountError} isLoading={isAccountLoading} onCreateAccount={onCreateAccount} ref={createAccountFormRef} />
-                <ImportAccountForm errorMessage={importError} isLoading={isImportLoading} onImport={searchKeyPair} />
-            </div>
-            {/* <SetAuth /> */}
-            <AccountsList
-                accounts={allAccounts}
+            <AccountList
+                onLogout={onLogout}
+                selectedAccount={currentUser}
+                accounts={accountsWithKeys}
+                onSelectAccount={onSelectAccount}
             />
-
-
+            {currentUser && (
+                <CreateAccountForm
+                    addAccounts={addAccounts}
+                    refreshAccounts={refreshAccounts}
+                />
+            )}
+            <ImportAccountForm addAccounts={addAccounts} />
+            {/* <SetAuth /> */}
+            <AccountsList accounts={allAccounts} />
         </div>
     );
 }

@@ -22,7 +22,7 @@ namespace
       [[clang::import_name("testerReadWholeFile")]]      bool     testerReadWholeFile(const char* filename, uint32_t filename_size, void* cb_alloc_data, cb_alloc_type cb_alloc);
       [[clang::import_name("testerSelectChainForDb")]]   void     testerSelectChainForDb(uint32_t chain_index);
       [[clang::import_name("testerShutdownChain")]]      void     testerShutdownChain(uint32_t chain);
-      [[clang::import_name("testerStartBlock")]]         void     testerStartBlock(uint32_t chain_index, int64_t skip_miliseconds);
+      [[clang::import_name("testerStartBlock")]]         void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
       // clang-format on
    }
 
@@ -217,17 +217,8 @@ std::string psibase::TestChain::getPath()
 
 void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 {
-   headBlockInfo.reset();
-   if (skip_miliseconds >= 500)
-   {
-      // Guarantee that there is a recent block for fillTapos to use.
-      ::testerStartBlock(id, skip_miliseconds - 500);
-      ::testerStartBlock(id, 0);
-   }
-   else
-   {
-      ::testerStartBlock(id, skip_miliseconds);
-   }
+   auto time = status ? status->current.time : TimePointSec{};
+   startBlock(TimePointSec{time.seconds + 1 + uint32_t(skip_miliseconds / 1000)});
 }
 
 void psibase::TestChain::startBlock(std::string_view time)
@@ -240,33 +231,23 @@ void psibase::TestChain::startBlock(std::string_view time)
 
 void psibase::TestChain::startBlock(TimePointSec tp)
 {
-   finishBlock();
-   auto head_time = getHeadBlockInfo().header.time;
-   // auto skip      = (tp - head_time).count() / 1000 - 500;
-   auto skip = tp.seconds - head_time.seconds;
-   startBlock(skip);
+   // Guarantee that there is a recent block for fillTapos to use.
+   if (status && status->current.time.seconds + 1 < tp.seconds)
+      ::testerStartBlock(id, tp.seconds - 1);
+   ::testerStartBlock(id, tp.seconds);
+   status    = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   producing = true;
 }
 
 void psibase::TestChain::finishBlock()
 {
-   headBlockInfo.reset();
    ::testerFinishBlock(id);
-}
-
-const psibase::BlockInfo& psibase::TestChain::getHeadBlockInfo()
-{
-   if (!headBlockInfo)
-   {
-      if (auto status = SystemService::getOptionalStatus())
-         headBlockInfo = status->head;
-   }
-   return *headBlockInfo;
+   producing = false;
 }
 
 void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec)
 {
-   auto& info                 = getHeadBlockInfo();
-   t.tapos.expiration.seconds = info.header.time.seconds + expire_sec;
+   t.tapos.expiration.seconds = (status ? status->current.time.seconds : 0) + expire_sec;
    auto [index, suffix]       = SystemService::headTapos();
    t.tapos.refBlockIndex      = index;
    t.tapos.refBlockSuffix     = suffix;
@@ -283,6 +264,8 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
 [[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(
     const SignedTransaction& signedTrx)
 {
+   if (!producing)
+      startBlock();
    std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
    std::vector<char> bin;
    ::pushTransaction(id, packed_trx.data(), packed_trx.size(),

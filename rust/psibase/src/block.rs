@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{AccountNumber, Fracpack, MethodNumber, TimePointSec};
+use crate::{AccountNumber, Fracpack, MethodNumber, TimePointSec, ToKey};
 use serde::{Deserialize, Serialize};
 
 // TODO: move
@@ -11,13 +11,14 @@ pub type BlockNum = u32;
 /// A synchronous call
 ///
 /// An Action represents a synchronous call between services.
-/// It is the argument to [call] and can be fetched using
-/// [getCurrentAction].
+/// It is the argument to [crate::native_raw::call] and can be fetched
+/// using [crate::native_raw::getCurrentAction].
 ///
 /// Transactions also contains actions requested by the
 /// transaction authorizers.
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct Action {
     /// Account sending the action
     pub sender: AccountNumber,
@@ -32,8 +33,9 @@ pub struct Action {
     pub rawData: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct SharedAction<'a> {
     pub sender: AccountNumber,
     pub service: AccountNumber,
@@ -44,23 +46,26 @@ pub struct SharedAction<'a> {
 /// The genesis action is the first action of the first transaction of
 /// the first block. The action struct's fields are ignored, except
 /// rawData, which contains this struct.
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct GenesisActionData {
     pub memo: String,
     pub services: Vec<GenesisService>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct SharedGenesisActionData<'a> {
     pub memo: String,
     #[serde(borrow)]
     pub services: Vec<SharedGenesisService<'a>>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct GenesisService {
     pub service: AccountNumber,
     pub flags: u64,
@@ -69,8 +74,9 @@ pub struct GenesisService {
     pub code: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct SharedGenesisService<'a> {
     pub service: AccountNumber,
     pub flags: u64,
@@ -79,8 +85,9 @@ pub struct SharedGenesisService<'a> {
     pub code: &'a [u8],
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct Claim {
     pub service: AccountNumber,
     pub rawData: Vec<u8>,
@@ -108,8 +115,9 @@ pub struct Claim {
 /// * It references a block that isn't on the current fork, or a block which
 ///   is too old. For best results, use the most-recent irreversible block which
 ///   meets the criteria.
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct Tapos {
     pub expiration: TimePointSec,
     pub refBlockSuffix: u32,
@@ -122,16 +130,18 @@ impl Tapos {
     pub const VALID_FLAGS: u16 = 0x0001;
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct Transaction {
     pub tapos: Tapos,
     pub actions: Vec<Action>,
     pub claims: Vec<Claim>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct SignedTransaction {
     // Contains a packed `Transaction`. TODO: shared_view_ptr
     pub transaction: Vec<u8>,
@@ -140,15 +150,17 @@ pub struct SignedTransaction {
 
 type TermNum = u32;
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct Producer {
     pub name: AccountNumber,
     pub auth: Claim,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
@@ -166,23 +178,26 @@ pub struct BlockHeader {
     pub newProducers: Option<Vec<Producer>>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
     pub subjectiveData: Vec<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct BlockInfo {
     pub header: BlockHeader,
     pub blockId: Checksum256,

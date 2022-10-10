@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
+import svgr from "vite-plugin-svgr";
 
 const psibase = (appletContract: string) => {
     return [
@@ -52,15 +53,21 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: {
-                            "/common/iframeResizer.contentWindow.js":
-                                path.resolve(
+                        alias: [
+                            {
+                                find: "/common/iframeResizer.contentWindow.js",
+                                replacement: path.resolve(
                                     "../../../user/CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
                                 ),
-                            "/common": path.resolve(
-                                "../../../user/CommonSys/common"
-                            ),
-                        },
+                            },
+                            {
+                                // bundle non-external (above) common files except fonts (which should only be referenced)
+                                find: /^\/common(?!\/(?:fonts))(.*)$/,
+                                replacement: path.resolve(
+                                    "../../../user/CommonSys/common$1"
+                                ),
+                            },
+                        ],
                     },
                 };
             },
@@ -83,5 +90,5 @@ const psibase = (appletContract: string) => {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react(), psibase("account-sys")],
+    plugins: [react(), svgr({ exportAsDefault: true }), psibase("account-sys")],
 });

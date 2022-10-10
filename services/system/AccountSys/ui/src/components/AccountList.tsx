@@ -1,78 +1,92 @@
-import logoutIcon from "./assets/icons/logout.svg";
+import LogoutIcon from "./assets/icons/logout.svg";
 import { AccountWithAuth } from "../App";
-import closedIcon from "./assets/icons/lock-closed.svg";
-import openIcon from "./assets/icons/lock-open.svg";
+import Heading from "./Heading";
+import Text from "./Text";
 
 export const AccountList = ({
     accounts,
     onSelectAccount,
     onLogout,
-    selectedAccount
-}: { selectedAccount: string, accounts: AccountWithAuth[], onSelectAccount: (account: string) => void, onLogout: (account: string) => void }) => {
-
-    const isAccountsAvailable = accounts.length > 0
+    selectedAccount,
+}: {
+    selectedAccount: string;
+    accounts: AccountWithAuth[];
+    onSelectAccount: (account: string) => void;
+    onLogout: (account: string) => void;
+}) => {
+    const isAccountsAvailable = accounts.length > 0;
 
     return (
-        <div>
-            <h2 className="pt-6">Available accounts</h2>
-            <div>{isAccountsAvailable ? `Choose an account below to make it active.` : 'No accounts available.'}</div>
+        <section>
+            <Heading tag="h2" className="font-medium text-gray-600">
+                My Accounts
+            </Heading>
+            <Text className="font-medium">
+                {isAccountsAvailable
+                    ? "Select an account below to make it active."
+                    : "Not logged in."}
+            </Text>
 
-            {isAccountsAvailable && <table className="min-w-full table-fixed">
-                <thead className="text-slate-900">
-                    <tr>
-                        <th scope="col" className="py-3.5 w-32 text-left text-sm font-semibold text-gray-900">
-                            Active
-                        </th>
-                        <th scope="col" className="py-3.5 w-32 text-left text-sm font-semibold text-gray-900">
-                            Account
-                        </th>
-                        <th scope="col" className="py-3.5 text-left text-sm font-semibold text-gray-900">
-                            Security
-                        </th>
-                        <th scope="col" className="py-3.5 text-right text-sm font-semibold text-gray-900">
-                            Action
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {accounts.map(account => (
-                        <tr key={account.accountNum} className="w-8">
-                            <td>
-                                <div className="w-20">
-                                    <input
-                                        name="account"
-                                        type="radio"
-                                        onChange={(e) => {
-                                            onSelectAccount(e.target.id)
-                                        }}
-                                        checked={selectedAccount == account.accountNum}
-                                        id={account.accountNum}
-                                    />
-                                </div>
-                            </td>
-                            <td>
-                                <div className="w-32 text-lg">{account.accountNum}</div>
-
-                            </td>
-                            <td className="">
-                                <div className="w-8 h-10">
-                                    <img src={account.authService == 'auth-any-sys' ? openIcon : closedIcon} alt={account.authService} />
-                                </div>
-                            </td>
-                            <td className="flex flex-row-reverse">
-                                <button className=" ml-auto" onClick={() => onLogout(account.accountNum)}>
-                                    <span className="hidden sm:inline underline">Logout</span>
-                                    <img className="ml-2 inline-block" src={logoutIcon} />
-                                </button>
-                            </td>
+            {isAccountsAvailable && (
+                <table className="min-w-full table-fixed">
+                    <thead className="text-slate-900 border-b border-gray-900 text-base font-bold text-gray-900">
+                        <tr>
+                            <th scope="col" className="w-32 text-left">
+                                Active
+                            </th>
+                            <th scope="col" className="w-32 text-left">
+                                Account
+                            </th>
+                            <th scope="col" className="pr-2.5 text-right">
+                                Action
+                            </th>
                         </tr>
-                    ))}
-
-                </tbody>
-
-            </table>}
-
-
-        </div>
+                    </thead>
+                    <tbody>
+                        {accounts.map((account) => (
+                            <tr key={account.accountNum}>
+                                <td>
+                                    <div className="flex h-[60px] w-14 items-center justify-center">
+                                        <input
+                                            name="account"
+                                            type="radio"
+                                            onChange={(e) => {
+                                                onSelectAccount(e.target.id);
+                                            }}
+                                            checked={
+                                                selectedAccount ==
+                                                account.accountNum
+                                            }
+                                            id={account.accountNum}
+                                            className="text-gray-700 focus-within:text-gray-900 focus-within:outline-gray-900"
+                                        />
+                                    </div>
+                                </td>
+                                <td className="w-32 text-lg">
+                                    <div className="flex h-[60px] items-center">
+                                        {account.accountNum}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="flex h-[60px] items-center justify-end">
+                                        <button
+                                            className="flex items-center gap-1 p-2 hover:text-gray-600"
+                                            onClick={() =>
+                                                onLogout(account.accountNum)
+                                            }
+                                        >
+                                            <span className="hidden text-xs font-semibold underline sm:inline">
+                                                Logout
+                                            </span>
+                                            <LogoutIcon />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </section>
     );
 };

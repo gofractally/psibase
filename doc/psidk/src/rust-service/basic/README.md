@@ -34,14 +34,14 @@ Replace the content of `lib.rs` with the following. This is our initial service:
 
 ```rust
 #[psibase::service]
-pub mod service {
+mod service {
     #[action]
-    pub fn add(a: i32, b: i32) -> i32 {
+    fn add(a: i32, b: i32) -> i32 {
         a + b
     }
 
     #[action]
-    pub fn multiply(a: i32, b: i32) -> i32 {
+    fn multiply(a: i32, b: i32) -> i32 {
         a * b
     }
 }
@@ -58,6 +58,11 @@ This, if you have a [local test chain running](../../psibase#booting-a-chain), w
 ```sh
 cargo psibase deploy -i example
 ```
+
+## Where's the pub?
+
+The `service` module and the actions within it don't need to be public. Instead, the [`psibase::service`] macro generates public definitions which wrap the actions. You don't need to make the actions public to document them; the macro copies documentation from the action definitions to the generated definitions. It also copies
+documentation from the `service` module.
 
 ## Psibase and Cargo
 

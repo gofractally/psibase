@@ -18,6 +18,7 @@ declare module "common/rpc.mjs" {
         QueryResponse: "QueryResponse",
         OperationResponse: "OperationResponse",
         TransactionReceipt: "TransactionReceipt",
+        SetActiveAccount: "SetActiveAccount",
     };
 
     declare class AppletId {
@@ -33,7 +34,25 @@ declare module "common/rpc.mjs" {
         static fromObject: (obj: string) => AppletId;
     }
 
+    declare class Service {
+        protected cachedApplet?: string;
+
+        applet(): Promise<string>;
+        getAppletName(): Promise<string>;
+        getAppletId(): Promise<AppletId>;
+
+        public get operations(): Operation[]
+        public get queries(): Operation[]
+
+    }
+
+    function Action(target: any, key: string, descriptor: any): void
+    function Op(name?: string): (target: any, key: string, descriptor: any) => void
+    function Qry(name?: string): (target: any, key: string, descriptor: any) => void
+
+
     function getCurrentApplet(): Promise<string>;
+
     function query<Params, Response>(
         appletId: AppletId,
         queryName: string,
@@ -46,6 +65,8 @@ declare module "common/rpc.mjs" {
         params: ActionParams,
         sender?: string
     ): void;
+
+    function setActiveAccount(account: string): void;
 
     type Operation = { id: string; exec: (params: any) => Promise<void> };
 
@@ -74,11 +95,6 @@ declare module "common/rpc.mjs" {
     function setOperations(operations: Operation[]): void;
     function setQueries(queries: Query[]): void;
     function operation<Params>(
-        appletId: AppletId,
-        name: string,
-        params?: Params
-    ): Promise<any>;
-    function operationWithTrxReceipt<Params>(
         appletId: AppletId,
         name: string,
         params?: Params

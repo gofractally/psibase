@@ -137,7 +137,7 @@ namespace psibase::http
                    {
                       self->reader.cancel();
                       auto p = self.get();
-                      p->stream.async_close({websocket::close_code::bad_payload, e.what()},
+                      p->stream.async_close({websocket::close_code::policy_error, e.what()},
                                             [self = std::move(self)](const std::error_code&) {});
                       return;
                    }
@@ -445,7 +445,13 @@ namespace psibase::http
             if (!server.http_config->ready_for_p2p)
                throw std::runtime_error("not ready for p2p connections");
 
-            // takes a string endpoint
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               send(error(bhttp::status::unsupported_media_type,
+                          "Content-Type must be application/json\n"));
+               return;
+            }
+
             send.pause_read = true;
             server.http_config->connect(
                 req.body(),
@@ -475,7 +481,13 @@ namespace psibase::http
          else if (req.target() == "/native/admin/disconnect" && req.method() == bhttp::verb::post &&
                   server.http_config->disconnect)
          {
-            // takes an integer identifying the peer
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               send(error(bhttp::status::unsupported_media_type,
+                          "Content-Type must be application/json\n"));
+               return;
+            }
+
             send.pause_read = true;
             server.http_config->disconnect(
                 req.body(),

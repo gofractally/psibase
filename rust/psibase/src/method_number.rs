@@ -1,4 +1,4 @@
-use crate::Fracpack;
+use crate::{Fracpack, ToKey};
 use custom_error::custom_error;
 use psibase_names::{method_number_from_str, method_number_to_string};
 use serde::{Deserialize, Serialize};
@@ -24,11 +24,14 @@ custom_error! { pub MethodNumberError
 /// use psibase::MethodNumber;
 /// let hello = MethodNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, ToKey, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
 pub struct MethodNumber {
     pub value: u64,
 }
+
+pub type NamedBit = MethodNumber;
 
 impl MethodNumber {
     pub fn new(value: u64) -> Self {

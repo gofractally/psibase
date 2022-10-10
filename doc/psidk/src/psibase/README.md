@@ -35,6 +35,17 @@ There is one more option which is useful for local development. Production deplo
 
 psinode does not include https hosting; use a [reverse proxy](https.md) to add that when hosting a public node.
 
+Options can also be specified in a configuration file loaded from `<DATABASE>/config`. If an option is specified on both the command line and the config file, the command line takes precedence.
+
+```ini
+slow     = yes
+producer = prod
+host     = 127.0.0.1.sslip.io
+port     = 8080
+```
+
+The configuration file also controls [logging](logging.md).
+
 ## psibase
 
 `psibase` provides commands for booting a chain, creating accounts, deploying services, and more. Notable options and commands for service development:

@@ -1,119 +1,20 @@
-use crate::{ActionTrace, SignedTransaction};
+//! Wrapped native functions for tests to use
+//!
+//! Native functions give tests the ability to execute shell commands,
+//! read files, create block chains, push transactions to those chains,
+//! and control block production on those chains.
+//!
+//! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
+
+use crate::{
+    kv_get, services, status_key, tester_raw, AccountNumber, Action, Caller, InnerTraceEnum,
+    SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace,
+};
+use anyhow::anyhow;
 use fracpack::Packable;
-use std::{cell::UnsafeCell, ptr::null_mut};
-
-/// This is the set of raw native functions (wasm imports) exposed by `psitest`.
-/// They are available for test cases to use directly, but we recommend using
-/// [`Chain`], [`execute`], and [`read_whole_file`] instead.
-pub mod tester_raw {
-    extern "C" {
-        /// Create a new chain and make it active for database native functions.
-        ///
-        /// `max_objects` is the maximum number of objects the database can hold.
-        /// The remaining arguments are log-base-2 of file sizes for the database's
-        /// various files. e.g. `32` is 4 GB.
-        ///
-        /// Returns a chain handle
-        pub fn testerCreateChain(
-            max_objects: u64,
-            hot_addr_bits: u64,
-            warm_addr_bits: u64,
-            cool_addr_bits: u64,
-            cold_addr_bits: u64,
-        ) -> u32;
-
-        /// Destroy chain
-        ///
-        /// This destroys the chain and deletes its database from the filesystem.
-        pub fn testerDestroyChain(chain_handle: u32);
-
-        /// Execute a shell command
-        ///
-        /// Returns the process exit code
-        pub fn testerExecute(command: *const u8, command_size: usize) -> i32;
-
-        /// Finish a block
-        ///
-        /// This does nothing if a block isn't currently being produced.
-        pub fn testerFinishBlock(chain_handle: u32);
-
-        /// Get filesystem path of chain's database
-        ///
-        /// Stores up to `dest_size` bytes if the chain's path into `dest`. Returns
-        /// the path size. The path is UTF8.
-        ///
-        /// It is safe to copy the files to another location on the filesystem. However,
-        /// modifying the original files or launching `psinode` on the original files
-        /// will corrupt the database and likely crash the `psitest` process running this wasm.
-        pub fn testerGetChainPath(chain_handle: u32, dest: *mut u8, dest_size: usize) -> usize;
-
-        /// Push a transaction
-        ///
-        /// `chain_handle` identifies the chain to push to. `transaction/transaction_size`
-        /// contains a fracpacked [`SignedTransaction`](crate::SignedTransaction).
-        ///
-        /// The callback `cb_alloc` must allocate `size` bytes and return a pointer to it.
-        /// If it can't allocate the memory, then it must abort, either by `panic`,
-        /// [`raw::abortMessage`](crate::raw::abortMessage), or the `unreachable` instruction.
-        /// `testerPushTransaction` does not hold onto the pointer; it fills it with a
-        /// packed [`TransactionTrace`](crate::TransactionTrace) then returns.
-        /// `testerPushTransaction` passes `alloc_context` to `cb_alloc`.
-        pub fn testerPushTransaction(
-            chain_handle: u32,
-            transaction: *const u8,
-            transaction_size: usize,
-            alloc_context: *mut u8,
-            cb_alloc: unsafe extern "C" fn(alloc_context: *mut u8, size: usize) -> *mut u8,
-        );
-
-        /// Read a file into memory
-        ///
-        /// Returns true if successful.
-        ///
-        /// The callback `cb_alloc` must allocate `size` bytes and return a pointer to it.
-        /// If it can't allocate the memory, then it must abort, either by `panic`,
-        /// [`raw::abortMessage`](crate::raw::abortMessage), or the `unreachable` instruction.
-        /// `testerReadWholeFile` does not hold onto the pointer; it fills it then returns.
-        /// `testerReadWholeFile` passes `alloc_context` to `cb_alloc`.
-        pub fn testerReadWholeFile(
-            filename: *const u8,
-            filename_size: usize,
-            alloc_context: *mut u8,
-            cb_alloc: unsafe extern "C" fn(alloc_context: *mut u8, size: usize) -> *mut u8,
-        ) -> bool;
-
-        /// Select chain for database native functions
-        ///
-        /// After you call `testerSelectChainForDb`, the following functions will use
-        /// this chain's database:
-        ///
-        /// * [`raw::kvGet`](crate::raw::kvGet)
-        /// * [`raw::getSequential`](crate::raw::getSequential)
-        /// * [`raw::kvGreaterEqual`](crate::raw::kvGreaterEqual)
-        /// * [`raw::kvLessThan`](crate::raw::kvLessThan)
-        /// * [`raw::kvMax`](crate::raw::kvMax)
-        pub fn testerSelectChainForDb(chain_handle: u32);
-
-        /// Shutdown chain without deleting database
-        ///
-        /// This shuts down a chain, but doesn't destroy it or remove the
-        /// database. `chain_handle` still exists, but isn't usable except
-        /// with [`testerGetChainPath`] and [`testerDestroyChain`].
-        ///
-        /// TODO: `testerShutdownChain` probably isn't useful anymore; it might go away.
-        pub fn testerShutdownChain(chain_handle: u32);
-
-        /// Start a new block
-        ///
-        /// Starts a new block `skip_milliseconds/1000 + 1` seconds after either
-        /// the head block, or the current block if one is being produced.
-        ///
-        /// TODO: replace `skip_milliseconds` with a time stamp
-        ///
-        /// TODO: Support sub-second block times
-        pub fn testerStartBlock(chain_handle: u32, skip_milliseconds: i64);
-    }
-}
+use psibase_macros::account_raw;
+use std::cell::{Cell, RefCell};
+use std::{marker::PhantomData, ptr::null_mut};
 
 /// Execute a shell command
 ///
@@ -128,13 +29,13 @@ pub fn read_whole_file(filename: &str) -> Option<Vec<u8>> {
         size: usize,
         bytes: Vec<u8>,
     }
-    let context = UnsafeCell::new(Context {
+    let mut context = Context {
         size: 0,
         bytes: Vec::new(),
-    });
+    };
     unsafe {
         unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-            let context = &mut *UnsafeCell::raw_get(alloc_context as *const UnsafeCell<Context>);
+            let context = &mut *(alloc_context as *mut Context);
             context.size = size;
             context.bytes.reserve(size);
             context.bytes.as_mut_ptr()
@@ -142,20 +43,28 @@ pub fn read_whole_file(filename: &str) -> Option<Vec<u8>> {
         if !tester_raw::testerReadWholeFile(
             filename.as_ptr(),
             filename.len(),
-            (&context) as *const UnsafeCell<Context> as *mut u8,
+            (&mut context) as *mut Context as *mut u8,
             alloc,
         ) {
             return None;
         }
-        let mut context = context.into_inner();
         context.bytes.set_len(context.size);
         Some(context.bytes)
     }
 }
 
-#[derive(Debug, Default)]
+/// Block chain under test
+#[derive(Debug)]
 pub struct Chain {
     chain_handle: u32,
+    status: RefCell<Option<StatusRow>>,
+    producing: Cell<bool>,
+}
+
+impl Default for Chain {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Drop for Chain {
@@ -193,44 +102,85 @@ impl Chain {
                     cool_addr_bits,
                     cold_addr_bits,
                 ),
+                status: None.into(),
+                producing: false.into(),
             }
         }
     }
 
     /// Start a new block
     ///
-    /// Starts a new block `skip_milliseconds/1000 + 1` seconds after either
-    /// the head block, or the current block if one is being produced.
-    ///
-    /// TODO: replace `skip_milliseconds` with a time stamp
+    /// Starts a new block at `time`. If `time.seconds` is 0,
+    /// then starts a new block 1 second after the most recent.
     ///
     /// TODO: Support sub-second block times
-    pub fn start_block(&mut self, skip_milliseconds: i64) {
-        unsafe { tester_raw::testerStartBlock(self.chain_handle, skip_milliseconds) }
+    pub fn start_block_at(&self, time: TimePointSec) {
+        let status = &mut *self.status.borrow_mut();
+        // Guarantee that there is a recent block for fillTapos to use.
+        if let Some(status) = status {
+            if status.current.time.seconds + 1 < time.seconds {
+                unsafe { tester_raw::testerStartBlock(self.chain_handle, time.seconds - 1) }
+            }
+        }
+        unsafe { tester_raw::testerStartBlock(self.chain_handle, time.seconds) }
+        *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
+        self.producing.replace(true);
+    }
+
+    /// Start a new block
+    ///
+    /// Starts a new block 1 second after the most recent.
+    pub fn start_block(&self) {
+        self.start_block_at(TimePointSec { seconds: 0 })
     }
 
     /// Finish a block
     ///
     /// This does nothing if a block isn't currently being produced.
-    pub fn finish_block(&mut self) {
+    pub fn finish_block(&self) {
         unsafe { tester_raw::testerFinishBlock(self.chain_handle) }
+        self.producing.replace(false);
+    }
+
+    /// Fill tapos fields
+    ///
+    /// `expire_seconds` is relative to the most-recent block.
+    pub fn fill_tapos(&self, trx: &mut Transaction, expire_seconds: u32) {
+        trx.tapos.expiration.seconds = expire_seconds;
+        trx.tapos.refBlockIndex = 0;
+        trx.tapos.refBlockSuffix = 0;
+        if let Some(status) = &*self.status.borrow() {
+            trx.tapos.expiration.seconds = status.current.time.seconds + expire_seconds;
+            if let Some(head) = &status.head {
+                let mut suffix = [0; 4];
+                suffix.copy_from_slice(&head.blockId[head.blockId.len() - 4..]);
+                trx.tapos.refBlockIndex = (head.header.blockNum & 0x7f) as u8;
+                trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
+            }
+        }
     }
 
     /// Push a transaction
-    pub fn push(&mut self, transaction: &SignedTransaction) -> ActionTrace {
+    ///
+    /// The returned trace includes detailed information about the execution,
+    /// including whether it succeeded, and the cause if it failed.
+    pub fn push(&self, transaction: &SignedTransaction) -> TransactionTrace {
+        if !self.producing.get() {
+            self.start_block();
+        }
+
         let transaction = transaction.packed();
         struct Context {
             size: usize,
             bytes: Vec<u8>,
         }
-        let context = UnsafeCell::new(Context {
+        let mut context = Context {
             size: 0,
             bytes: Vec::new(),
-        });
+        };
         unsafe {
             unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-                let context =
-                    &mut *UnsafeCell::raw_get(alloc_context as *const UnsafeCell<Context>);
+                let context = &mut *(alloc_context as *mut Context);
                 context.size = size;
                 context.bytes.reserve(size);
                 context.bytes.as_mut_ptr()
@@ -239,12 +189,11 @@ impl Chain {
                 self.chain_handle,
                 transaction.as_ptr(),
                 transaction.len(),
-                (&context) as *const UnsafeCell<Context> as *mut u8,
+                (&mut context) as *mut Context as *mut u8,
                 alloc,
             );
-            let mut context = context.into_inner();
             context.bytes.set_len(context.size);
-            ActionTrace::unpacked(&context.bytes).unwrap()
+            TransactionTrace::unpacked(&context.bytes).unwrap()
         }
     }
 
@@ -282,12 +231,151 @@ impl Chain {
     /// After you call `select_chain`, the following functions will use
     /// this chain's database:
     ///
-    /// * [`raw::kvGet`](crate::raw::kvGet)
-    /// * [`raw::getSequential`](crate::raw::getSequential)
-    /// * [`raw::kvGreaterEqual`](crate::raw::kvGreaterEqual)
-    /// * [`raw::kvLessThan`](crate::raw::kvLessThan)
-    /// * [`raw::kvMax`](crate::raw::kvMax)
+    /// * [`native_raw::kvGet`](crate::native_raw::kvGet)
+    /// * [`native_raw::getSequential`](crate::native_raw::getSequential)
+    /// * [`native_raw::kvGreaterEqual`](crate::native_raw::kvGreaterEqual)
+    /// * [`native_raw::kvLessThan`](crate::native_raw::kvLessThan)
+    /// * [`native_raw::kvMax`](crate::native_raw::kvMax)
     pub fn select_chain(&self) {
         unsafe { tester_raw::testerSelectChainForDb(self.chain_handle) }
+    }
+
+    /// Create a new account
+    ///
+    /// Create a new account which authenticates using `auth-any-sys`.
+    /// Doesn't fail if the account already exists.
+    pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
+        services::account_sys::Wrapper::push(self)
+            .newAccount(
+                account,
+                AccountNumber::new(account_raw!("auth-any-sys")),
+                false,
+            )
+            .get()
+    }
+
+    /// Deploy a service
+    ///
+    /// Set code on an account. Also creates the account if needed.
+    pub fn deploy_service(&self, account: AccountNumber, code: &[u8]) -> Result<(), anyhow::Error> {
+        self.new_account(account)?;
+        // TODO: update setcode_sys::setCode to not need a vec. Needs changes to the service macro.
+        services::setcode_sys::Wrapper::push_from(self, account)
+            .setCode(account, 0, 0, code.to_vec())
+            .get()
+    }
+}
+
+pub struct ChainEmptyResult {
+    pub trace: TransactionTrace,
+}
+
+impl ChainEmptyResult {
+    pub fn get(&self) -> Result<(), anyhow::Error> {
+        if let Some(e) = &self.trace.error {
+            Err(anyhow!("{}", e))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
+        self.trace.match_error(msg)
+    }
+}
+
+pub struct ChainResult<T: fracpack::PackableOwned> {
+    pub trace: TransactionTrace,
+    _marker: PhantomData<T>,
+}
+
+impl<T: fracpack::PackableOwned> ChainResult<T> {
+    pub fn get(&self) -> Result<T, anyhow::Error> {
+        if let Some(e) = &self.trace.error {
+            return Err(anyhow!("{}", e));
+        }
+        if let Some(transact_sys) = self.trace.action_traces.last() {
+            let ret = transact_sys
+                .inner_traces
+                .iter()
+                .filter_map(|inner| {
+                    if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
+                        Some(&at.raw_retval)
+                    } else {
+                        None
+                    }
+                })
+                .last();
+            if let Some(ret) = ret {
+                println!("\n\nlength {}\n", ret.len());
+                return Ok(T::unpacked(ret)?);
+            }
+        }
+        Err(anyhow!("Can't find action in trace"))
+    }
+
+    pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
+        self.trace.match_error(msg)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ChainPusher<'a> {
+    pub chain: &'a Chain,
+    pub sender: AccountNumber,
+    pub service: AccountNumber,
+}
+
+impl<'a> Caller for ChainPusher<'a> {
+    type ReturnsNothing = ChainEmptyResult;
+    type ReturnType<T: fracpack::PackableOwned> = ChainResult<T>;
+
+    fn call_returns_nothing<Args: fracpack::PackableOwned>(
+        &self,
+        method: crate::MethodNumber,
+        args: Args,
+    ) -> Self::ReturnsNothing {
+        let mut trx = Transaction {
+            tapos: Default::default(),
+            actions: vec![Action {
+                sender: self.sender,
+                service: self.service,
+                method,
+                rawData: args.packed(),
+            }],
+            claims: vec![],
+        };
+        self.chain.fill_tapos(&mut trx, 2);
+        let trace = self.chain.push(&SignedTransaction {
+            transaction: trx.packed(),
+            proofs: Default::default(),
+        });
+        ChainEmptyResult { trace }
+    }
+
+    fn call<Ret: fracpack::PackableOwned, Args: fracpack::PackableOwned>(
+        &self,
+        method: crate::MethodNumber,
+        args: Args,
+    ) -> Self::ReturnType<Ret> {
+        let mut trx = Transaction {
+            tapos: Default::default(),
+            actions: vec![Action {
+                sender: self.sender,
+                service: self.service,
+                method,
+                rawData: args.packed(),
+            }],
+            claims: vec![],
+        };
+        self.chain.fill_tapos(&mut trx, 2);
+        let trace = self.chain.push(&SignedTransaction {
+            transaction: trx.packed(),
+            proofs: Default::default(),
+        });
+        ChainResult::<Ret> {
+            trace,
+            _marker: Default::default(),
+        }
     }
 }
