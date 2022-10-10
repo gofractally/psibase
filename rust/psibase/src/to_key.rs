@@ -45,6 +45,21 @@ pub trait ToKey {
     }
 }
 
+/// A serialized key (non-owning)
+///
+/// The serialized data has the same sort order as the non-serialized form
+#[derive(Clone)]
+pub struct KeyView {
+    pub data: Vec<u8>,
+}
+
+impl ToKey for KeyView {
+    fn append_key(&self, key: &mut Vec<u8>) {
+        let mut data = self.data.clone();
+        key.append(&mut data);
+    }
+}
+
 impl<T: ToKey + ?Sized> ToKey for &T {
     fn append_key(&self, key: &mut Vec<u8>) {
         T::append_key(self, key)

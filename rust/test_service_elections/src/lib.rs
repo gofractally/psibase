@@ -7,13 +7,13 @@ use psibase::TimePointSec;
 mod service {
     use fracpack::Fracpack;
     use psibase::{
-        check, check_none, check_some, write_console, AccountNumber, Table, TableHandler,
-        TableRecord, TimePointSec, ToKey,
+        check, check_none, check_some, AccountNumber, Table, TableHandler, TableRecord,
+        TimePointSec,
     };
 
     // #[table]
-    #[derive(Fracpack)]
-    struct ElectionRecord {
+    #[derive(Fracpack, Debug)]
+    pub struct ElectionRecord {
         id: u32,
         voting_start_date: TimePointSec,
         voting_end_date: TimePointSec,
@@ -21,8 +21,10 @@ mod service {
     }
 
     impl TableRecord for ElectionRecord {
-        fn get_primary_key(&self) -> Vec<u8> {
-            self.id.to_key()
+        type PrimaryKey = u32;
+
+        fn get_primary_key(&self) -> Self::PrimaryKey {
+            self.id
         }
     }
 
@@ -42,8 +44,10 @@ mod service {
     }
 
     impl TableRecord for CandidateRecord {
-        fn get_primary_key(&self) -> Vec<u8> {
-            (self.election_id, self.candidate).to_key()
+        type PrimaryKey = (u32, AccountNumber);
+
+        fn get_primary_key(&self) -> Self::PrimaryKey {
+            (self.election_id, self.candidate)
         }
     }
 
@@ -54,6 +58,7 @@ mod service {
         const TABLE_INDEX: u16 = 1;
     }
 
+    #[action]
     fn get_election(election_id: u32) -> ElectionRecord {
         let table = ElectionsTable::open();
         let idx = table.get_index::<u32>(0);
@@ -64,7 +69,7 @@ mod service {
     /// Creates a new election
     #[action]
     fn new(voting_start_date: TimePointSec, voting_end_date: TimePointSec) -> u32 {
-        println!(">>> adding anew election rust println!...");
+        println!(">>> adding a new election rust println!...");
 
         let table = ElectionsTable::open();
         let idx = table.get_index::<u32>(0);
@@ -162,6 +167,13 @@ fn new_elections_are_sequential(chain: psibase::Chain) -> Result<(), psibase::Er
         election1.trace
     );
     assert_eq!(election1.get()?, 1);
+
+    let election1_record = Wrapper::push(&chain).get_election(1);
+    println!(
+        "election1_record result={:?}, trace:\n{}",
+        election1_record.get()?,
+        election1.trace
+    );
 
     println!("Pushing election2...");
     let election2 =
