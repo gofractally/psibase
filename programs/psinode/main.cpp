@@ -302,6 +302,14 @@ struct DisconnectRequest
 };
 PSIO_REFLECT(DisconnectRequest, id);
 
+struct PsinodeConfig
+{
+   bool                     p2p = false;
+   AccountNumber            producer;
+   psibase::loggers::Config loggers;
+};
+PSIO_REFLECT(PsinodeConfig, p2p, producer, loggers);
+
 using timer_type = boost::asio::system_timer;
 
 template <typename Derived>
@@ -403,9 +411,8 @@ void run(const std::string&              db_path,
       // TODO: The websocket uses the http server's io_context, but does not
       // do anything to keep it alive. Stopping the server doesn't close the
       // websocket either.
-      if (enable_incoming_p2p)
-         http_config->accept_p2p_websocket = [&node](auto&& stream)
-         { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
+      http_config->accept_p2p_websocket = [&node](auto&& stream)
+      { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {
@@ -460,6 +467,45 @@ void run(const std::string&              db_path,
                    callback(std::nullopt);
                 }
              });
+      };
+
+      http_config->set_config = [&chainContext, &node, &http_config](
+                                    std::vector<char> json, http::connect_callback callback)
+      {
+         json.push_back('\0');
+         psio::json_token_stream stream(json.data());
+
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
+                            &http_config, callback = std::move(callback)]() mutable
+                           {
+                              node.set_producer_id(config.producer);
+                              http_config->enable_p2p = config.p2p;
+                              loggers::configure(config.loggers);
+                              callback(std::nullopt);
+                           });
+      };
+
+      http_config->get_config =
+          [&chainContext, &node, &allow_slow, &http_config](http::get_config_callback callback)
+      {
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, &allow_slow, &http_config,
+                            callback = std::move(callback)]() mutable
+                           {
+                              PsinodeConfig result;
+                              result.p2p      = http_config->enable_p2p;
+                              result.producer = node.producer_name();
+                              result.loggers  = loggers::Config::get();
+                              callback(
+                                  [result = std::move(result)]() mutable
+                                  {
+                                     std::vector<char>   json;
+                                     psio::vector_stream stream(json);
+                                     to_json(result, stream);
+                                     return json;
+                                  });
+                           });
       };
 
       auto server = http::server::create(http_config, sharedState);
@@ -524,7 +570,7 @@ void run(const std::string&              db_path,
    }
 
    node.set_producer_id(producer);
-   http_config->ready_for_p2p = true;
+   http_config->enable_p2p = enable_incoming_p2p;
 
    bool showedBootMsg = false;
 
