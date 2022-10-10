@@ -55,23 +55,59 @@ function websocketURL(path: string) {
     return result;
 }
 
+type PsinodeConfig = {
+    p2p: boolean;
+    producer: string;
+};
+
+async function putJson(url: string, json: any) {
+    return fetch(url, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(json),
+    });
+}
+
 function App() {
-    const [fetchPeers, setFetchPeers] = useState(true);
+    const [peersTimeout, setPeersTimeout] = useState<
+        ReturnType<typeof setTimeout> | null | undefined
+    >();
+    const [peersError, setPeersError] = useState<string>();
     const [peers, setPeers] = useState<Peer[]>();
     useEffect(() => {
-        (async () => {
-            if (fetchPeers) {
-                let result = await getJson("/native/admin/peers");
-                setPeers(result);
-                setFetchPeers(false);
-            }
-        })();
-    });
+        if (peersTimeout === undefined) {
+            setPeersTimeout(null);
+            (async () => {
+                try {
+                    let result = await getJson("/native/admin/peers");
+                    setPeers(result);
+                    setPeersError(undefined);
+                    setPeersTimeout(
+                        setTimeout(() => setPeersTimeout(undefined), 3000)
+                    );
+                } catch (e) {
+                    setPeersError("Failed to load peers");
+                    setPeersTimeout(
+                        setTimeout(() => setPeersTimeout(undefined), 10000)
+                    );
+                }
+            })();
+        }
+    }, [peersTimeout]);
+
+    const refetchPeers = () => {
+        if (peersTimeout !== undefined && peersTimeout !== null) {
+            clearTimeout(peersTimeout);
+            setPeersTimeout(undefined);
+        }
+    };
 
     const onDisconnect = async (id: number) => {
         try {
             await postJson("/native/admin/disconnect", { id: id });
-            setFetchPeers(true);
+            refetchPeers();
         } catch (e) {
             console.error("DISCONNECT ERROR", e);
         }
@@ -94,15 +130,11 @@ function App() {
         try {
             await postJson("/native/admin/connect", endpoint);
             reset();
-            setFetchPeers(true);
+            refetchPeers();
         } catch (e) {
             console.error("CONNECT ERROR", e);
         }
     };
-
-    setInterval(() => {
-        setFetchPeers(true);
-    }, 3000);
 
     const [logFilter, setLogFilter] = useState("%Severity% >= info");
     const [logData, setLogData] = useState<LogRecord[]>();
@@ -165,6 +197,56 @@ function App() {
         }
     };
 
+    const [configError, setConfigError] = useState<string>();
+
+    //
+
+    const configForm = useForm<PsinodeConfig>({
+        defaultValues: {
+            p2p: false,
+            producer: "",
+        },
+    });
+    configForm.formState.dirtyFields;
+    const onConfig = async (input: PsinodeConfig) => {
+        try {
+            setConfigError(undefined);
+            const result = await putJson("/native/admin/config", input);
+            if (result.ok) {
+                configForm.reset(input);
+            } else {
+                setConfigError(await result.text());
+            }
+        } catch (e) {
+            console.error("error", e);
+            setConfigError("Connection failure");
+        }
+    };
+
+    const [configTimeout, setConfigTimeout] = useState<
+        ReturnType<typeof setTimeout> | null | undefined
+    >();
+    useEffect(() => {
+        if (configTimeout === undefined) {
+            setConfigTimeout(null);
+            (async () => {
+                try {
+                    let result = await getJson("/native/admin/config");
+                    configForm.reset(result, { keepDirtyValues: true });
+                    setConfigError(undefined);
+                    setConfigTimeout(
+                        setTimeout(() => setConfigTimeout(undefined), 3000)
+                    );
+                } catch (e) {
+                    setConfigError("Failed to load config");
+                    setConfigTimeout(
+                        setTimeout(() => setConfigTimeout(undefined), 10000)
+                    );
+                }
+            })();
+        }
+    }, [configTimeout]);
+
     return (
         <div>
             <h1>Peers</h1>
@@ -208,6 +290,21 @@ function App() {
                     </tr>
                 </tbody>
             </table>
+            <h1>Configuration</h1>
+            <form onSubmit={configForm.handleSubmit(onConfig)}>
+                <Form.Checkbox
+                    label="Accept incoming P2P connections"
+                    {...configForm.register("p2p")}
+                />
+                <Form.Input
+                    label="Block Producer Name"
+                    {...configForm.register("producer")}
+                />
+                <Button isSubmit disabled={!configForm.formState.isDirty}>
+                    Save Changes
+                </Button>
+            </form>
+            {configError && <div>{configError}</div>}
             <h1>Log</h1>
             <form onSubmit={filterForm.handleSubmit(onFilter)}>
                 <Form.Input

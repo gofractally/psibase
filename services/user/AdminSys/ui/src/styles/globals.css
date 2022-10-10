@@ -12,11 +12,11 @@ body {
     font-variant-numeric: lining-nums;
     font-weight: 400;
     @apply bg-gray-50;
-    @apply h-full w-full overflow-hidden;
+    @apply h-full w-full /*overflow-hidden*/;
 }
 #root {
     /* @apply min-h-screen; */
-    @apply h-full w-full overflow-hidden;
+    @apply h-full w-full /*overflow-hidden*/;
 }
 
 @layer base {
