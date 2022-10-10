@@ -274,6 +274,8 @@ pub fn create_boot_transactions(
     if install_ui {
         let html = "text/html";
         let js = "text/javascript";
+        let css = "text/css";
+        let ttf = "font/ttf";
 
         let mut reg_actions = vec![
             reg_server(account_sys::SERVICE, account!("r-account-sys")),
@@ -298,6 +300,11 @@ pub fn create_boot_transactions(
             store_common!("useGraphQLQuery.mjs", js),
             store_common!("useLocalStorage.mjs", js),
             store_common!("widgets.mjs", js),
+            store_common!("fonts/raleway.css", css),
+            store_common!("fonts/raleway-variable-italic.ttf", ttf),
+            store_common!("fonts/raleway-variable-normal.ttf", ttf),
+            store_common!("fonts/red-hat-mono.css", css),
+            store_common!("fonts/red-hat-mono-variable-normal.ttf", ttf),
         ];
 
         fill_dir(

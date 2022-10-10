@@ -6,14 +6,23 @@ use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use service_macro::service_macro_impl;
+use test_case_macro::test_case_macro_impl;
+use to_key_macro::to_key_macro_impl;
 
 mod fracpack_macro;
 mod number_macro;
 mod service_macro;
+mod test_case_macro;
+mod to_key_macro;
 
 #[proc_macro_derive(Fracpack, attributes(fracpack))]
 pub fn derive_fracpack(input: TokenStream) -> TokenStream {
     fracpack_macro_impl(input)
+}
+
+#[proc_macro_derive(ToKey, attributes(to_key))]
+pub fn derive_to_key(input: TokenStream) -> TokenStream {
+    to_key_macro_impl(input)
 }
 
 /// Define a [psibase](https://about.psibase.io) service interface.
@@ -53,7 +62,7 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 /// the macro creates public definitions (below).
 ///
 /// The macro copies the action documentation (like above) to the
-/// [`Actions<T>` methods](#actions-struct). Use the `[Self::...]`
+/// [`Actions<T>` methods](Actions-struct). Use the `[Self::...]`
 /// syntax like above within action documentation to refer to
 /// other actions.
 ///
@@ -92,7 +101,29 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 ///     // The account this service normally runs on
 ///     pub const SERVICE: psibase::AccountNumber;
 ///
-/// # extern "C" {
+///     // push transactions to psibase::Chain.
+///     //
+///     // `push_*` functions return an object which has methods (one per action) which
+///     // push transactions to a test chain and return a psibase::ChainResult or
+///     // psibase::ChainEmptyResult. This final object can verify success or failure
+///     // and can retrieve the return value, if any.
+///     pub fn push(
+///         chain: &psibase::Chain,
+///     ) -> Actions<psibase::ChainPusher>;
+///     pub fn push_to(
+///         chain: &psibase::Chain,
+///         service: psibase::AccountNumber,
+///     ) -> Actions<psibase::ChainPusher>;
+///     pub fn push_from(
+///         chain: &psibase::Chain,
+///         sender: psibase::AccountNumber,
+///     ) -> Actions<psibase::ChainPusher>;
+///     pub fn push_from_to(
+///         chain: &psibase::Chain,
+///         sender: psibase::AccountNumber,
+///         service: psibase::AccountNumber,
+///     ) -> Actions<psibase::ChainPusher>;
+///
 ///     // Pack actions into psibase::Action.
 ///     //
 ///     // `pack_*` functions return an object which has methods (one per action)
@@ -100,8 +131,12 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 ///     // The `pack_*` series of functions is mainly useful to applications which
 ///     // push transactions to blockchains.
 ///     pub fn pack() -> Actions<psibase::ActionPacker>;
-///     pub fn pack_to(service: psibase::AccountNumber) -> Actions<psibase::ActionPacker>;
-///     pub fn pack_from(sender: psibase::AccountNumber) -> Actions<psibase::ActionPacker>;
+///     pub fn pack_to(
+///         service: psibase::AccountNumber,
+///     ) -> Actions<psibase::ActionPacker>;
+///     pub fn pack_from(
+///         sender: psibase::AccountNumber,
+///     ) -> Actions<psibase::ActionPacker>;
 ///     pub fn pack_from_to(
 ///         sender: psibase::AccountNumber,
 ///         service: psibase::AccountNumber,
@@ -175,10 +210,75 @@ pub fn derive_fracpack(input: TokenStream) -> TokenStream {
 /// `dispatch` will default to true in A's service definition. When cargo builds
 /// B, `dispatch` will default to true in B's service definition but false
 /// in A's. This prevents B from accidentally including A's dispatch.
+///
+/// If the `CARGO_PSIBASE_TEST` environment variable is set, then the macro
+/// forces `dispatch` to false. `cargo psibase test` sets `CARGO_PSIBASE_TEST`
+/// to prevent tests from having service entry points.
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
     service_macro_impl(attr, item)
+}
+
+/// Define a [psibase](https://about.psibase.io) test case.
+///
+/// Psibase tests run in WASM. They create block chains, push transactions,
+/// and check the success or failure of those transactions to verify
+/// correct service operation.
+///
+/// # Example
+///
+/// ```ignore
+/// #[psibase::test_case(services("example1", "example2"))]
+/// fn my_test(chain: psibase::Chain) -> Result<(), psibase::Error> {
+///     // TODO
+/// }
+/// ```
+///
+/// You may define unit tests within service sources, or define separate
+/// integration tests.
+///
+/// # Running tests
+///
+/// ```text
+/// cargo psibase test
+/// ```
+///
+/// This builds and runs both unit and integration tests. It also builds
+/// any services the tests depend on. These appear in the `test_case`
+/// macro's `services` parameter, or as arguments to the `include_service`
+/// macro.
+///
+/// # Loading services
+///
+/// Services in the `services` parameter or in the `include_service` macro
+/// reference packages which define services. They may be any of the
+/// following:
+///
+/// * The name of the current package
+/// * The name of any package the current package depends on
+/// * The name of any package in the current workspace, if any
+///
+/// If the test function has an argument, e.g. `my_test(chain: psibase::Chain)`,
+/// then the macro initializes a fresh chain, loads it with the requested
+/// services, and passes it to the function. If the test function doesn't
+/// have an argument, then the test may initialize a chain and load services
+/// itself, like the following example.
+///
+/// ```ignore
+/// #[psibase::test_case]
+/// fn my_test() -> Result<(), psibase::Error> {
+///     // TODO
+/// }
+/// ```
+///
+/// The `include_service` macro is only available to functions which have
+/// the `psibase::test_case` attribute. It's not defined outside of these
+/// functions.
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn test_case(attr: TokenStream, item: TokenStream) -> TokenStream {
+    test_case_macro_impl(attr, item)
 }
 
 #[proc_macro_error]

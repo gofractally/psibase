@@ -8,14 +8,17 @@ use cargo_metadata::Metadata;
 use clap::{Parser, Subcommand};
 use console::style;
 use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
-use std::env;
+use regex::Regex;
 use std::ffi::OsString;
-use std::fs::{read, write};
+use std::fs::{read, write, OpenOptions};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{exit, Stdio};
+use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
 use url::Url;
+
+const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
@@ -104,12 +107,12 @@ fn pretty(label: &str, message: &str) {
     println!("{:>12} {}", style(label).bold().green(), message);
 }
 
-fn status(label: &str, filename: &Path) {
+fn pretty_path(label: &str, filename: &Path) {
     pretty(label, &filename.file_name().unwrap().to_string_lossy());
 }
 
 fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, Error> {
-    status("Reoptimizing", filename);
+    pretty_path("Reoptimizing", filename);
     let mut module = Module::read(code)
         .map_err(|_| anyhow!("Binaryen failed to parse {}", filename.to_string_lossy()))?;
     module.optimize(&CodegenConfig {
@@ -121,13 +124,27 @@ fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, Error> {
 }
 
 fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), Error> {
+    let timestamp_file = filename.to_string_lossy().to_string() + ".cargo_psibase";
+    let md = fs::metadata(filename)
+        .with_context(|| format!("Failed to get metadata for {}", filename.to_string_lossy()))?;
+    if let Ok(md2) = fs::metadata::<PathBuf>(timestamp_file.as_str().into()) {
+        if md2.modified().unwrap() >= md.modified().unwrap() {
+            return Ok(());
+        }
+    }
+
     let code = &read(filename)
         .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
-    status("Polyfilling", filename);
+    pretty_path("Polyfilling", filename);
     let code = link::link(filename, code, polyfill)?;
     let code = optimize(filename, &code)?;
     write(filename, code)
         .with_context(|| format!("Failed to write {}", filename.to_string_lossy()))?;
+    OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(timestamp_file)?;
     Ok(())
 }
 
@@ -175,7 +192,6 @@ fn get_metadata() -> Result<Metadata, Error> {
     let output = std::process::Command::new(get_cargo())
         .arg("metadata")
         .arg("--format-version=1")
-        .arg("--no-deps")
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
@@ -186,17 +202,11 @@ fn get_metadata() -> Result<Metadata, Error> {
 }
 
 async fn build(
-    metadata: &Metadata,
+    packages: &[&str],
     envs: Vec<(&str, &str)>,
     args: &[&str],
     poly: &[u8],
 ) -> Result<Vec<PathBuf>, Error> {
-    let packages: Vec<_> = metadata
-        .packages
-        .iter()
-        .map(|p| p.id.repr.as_str())
-        .collect();
-
     let mut command = tokio::process::Command::new(get_cargo())
         .envs(envs)
         .arg("rustc")
@@ -213,7 +223,7 @@ async fn build(
     let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
     let status = command.wait();
     let (status, files, _) =
-        tokio::join!(status, get_files(&packages, stdout), print_messages(stderr),);
+        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
 
     let status = status?;
     if !status.success() {
@@ -228,8 +238,129 @@ async fn build(
     Ok(files)
 }
 
+async fn get_test_services() -> Result<Vec<(String, String)>, Error> {
+    let mut command = tokio::process::Command::new(get_cargo())
+        .arg("test")
+        .arg("--color=always")
+        .arg("--")
+        .arg("--show-output")
+        .arg("_psibase_test_get_needed_services")
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    let mut stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let status = command.wait();
+
+    let (status, lines) = tokio::join!(
+        status, //
+        async {
+            let mut lines = Vec::new();
+            while let Some(line) = stdout.next_line().await? {
+                lines.push(line);
+            }
+            Ok::<_, Error>(lines)
+        },
+    );
+
+    let status = status?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    let re = Regex::new(r"^psibase-test-need-service +([^ ]+) +([^ ]+)$").unwrap();
+    Ok(lines?
+        .iter()
+        .filter_map(|line| re.captures(line))
+        .map(|cap| (cap[1].to_owned(), cap[2].to_owned()))
+        .collect())
+}
+
+async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
+    let mut services = get_test_services().await?;
+    services.sort();
+    services.dedup();
+
+    pretty(
+        "Services",
+        &services
+            .iter()
+            .map(|(s, _)| s.to_owned())
+            .reduce(|acc, item| acc + ", " + &item)
+            .unwrap_or_default(),
+    );
+
+    let mut service_wasms = String::new();
+    for (service, src) in services {
+        pretty("Service", &format!("{} needed by {}", service, src));
+        let mut id = None;
+        for package in &metadata.packages {
+            if package.name == service {
+                // TODO: detect multiple versions
+                id = Some(&package.id.repr);
+            }
+        }
+        if id.is_none() {
+            return Err(anyhow!(
+                "can not find package {service}; try: cargo add {service}"
+            ));
+        }
+
+        let wasms = build(
+            &[id.unwrap()],
+            vec![],
+            &["--lib", "--crate-type=cdylib", "-p", &service],
+            SERVICE_POLYFILL,
+        )
+        .await?;
+        if wasms.is_empty() {
+            return Err(anyhow!("Service {} produced no wasm targets", service));
+        }
+        if wasms.len() > 1 {
+            return Err(anyhow!(
+                "Service {} produced multiple wasm targets",
+                service
+            ));
+        }
+        if !service_wasms.is_empty() {
+            service_wasms += ";";
+        }
+        service_wasms += &(service + ";" + &wasms.into_iter().next().unwrap().to_string_lossy());
+    }
+
+    // println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
+    let tests = build(
+        &[root],
+        vec![
+            ("CARGO_PSIBASE_TEST", ""),
+            ("CARGO_PSIBASE_SERVICE_LOCATIONS", &service_wasms),
+        ],
+        &["--tests"],
+        TESTER_POLYFILL,
+    )
+    .await?;
+    if tests.is_empty() {
+        return Err(anyhow!("No tests found"));
+    }
+
+    for test in tests {
+        pretty_path("Running", &test);
+        let args = [test.to_str().unwrap(), "--nocapture"];
+        let msg = format!("Failed running: psitest {}", args.join(" "));
+        if !std::process::Command::new("psitest")
+            .args(args)
+            .status()
+            .context(msg.clone())?
+            .success()
+        {
+            return Err(anyhow! {msg});
+        }
+    }
+
+    Ok(())
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main2() -> Result<(), Error> {
     let mut is_cargo_subcommand = false;
     if let Some(arg) = env::args().nth(1) {
         is_cargo_subcommand = arg == "psibase";
@@ -243,37 +374,42 @@ async fn main() -> Result<(), Error> {
     };
 
     let metadata = get_metadata()?;
-    let service_args = &["--lib", "--crate-type=cdylib"];
-    let test_args = &["--tests"];
+    let root = &metadata
+        .resolve
+        .as_ref()
+        .unwrap()
+        .root
+        .as_ref()
+        .unwrap()
+        .repr;
 
     match args.command {
         Command::Build {} => {
-            build(&metadata, vec![], service_args, SERVICE_POLYFILL).await?;
+            build(&[root], vec![], SERVICE_ARGS, SERVICE_POLYFILL).await?;
+            pretty("Done", "");
         }
         Command::Test {} => {
-            build(&metadata, vec![], service_args, SERVICE_POLYFILL).await?;
-            let tests = build(
-                &metadata,
-                vec![("CARGO_PSIBASE_TEST", "")],
-                test_args,
-                TESTER_POLYFILL,
-            )
-            .await?;
-            println!("\n{:?}\n", tests);
-            todo!()
+            test(&metadata, root).await?;
+            pretty("Done", "All tests passed");
         }
         Command::Deploy(_args) => {
-            let files = build(&metadata, vec![], service_args, SERVICE_POLYFILL).await?;
+            let files = build(&[root], vec![], SERVICE_ARGS, SERVICE_POLYFILL).await?;
             if files.is_empty() {
                 Err(anyhow!("Nothing found to deploy"))?
             }
             if files.len() > 1 {
                 Err(anyhow!("Expected a single library"))?
             }
-            todo!()
+            todo!();
+            // pretty("Done", "");
         }
     };
 
-    pretty("Done", "");
     Ok(())
+}
+
+fn main() {
+    if let Err(e) = main2() {
+        println!("{:}: {:?}", style("error").bold().red(), e);
+    }
 }

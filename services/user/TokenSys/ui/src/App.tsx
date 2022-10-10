@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
-
 import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
-
-import { TransferHistory } from "./views";
-import { Button, Form, Heading, Icon, Text } from "./components";
-import { getParsedBalanceFromToken } from "./helpers";
+import { TransferHistory, SharedBalances } from "./views";
+import { Button, Form, Heading, Icon, Text, Switch } from "./components";
+import { getParsedBalanceFromToken, wait } from "./helpers";
 import {
     getLoggedInUser,
     getTokens,
     pollForBalanceChange,
     useTransferHistory,
+    useSharedBalances,
+    getUserConf,
 } from "./queries";
 import { TokenBalance } from "./types";
 import WalletIcon from "./assets/app-wallet-icon.svg";
@@ -37,6 +37,15 @@ function App() {
     const [formSubmitted, setFormSubmitted] = useState(false);
     const [transferHistoryResult, invalidateTransferHistoryQuery] =
         useTransferHistory(userName);
+    const [manualDebitMode, setManualDebitMode] = useState(false);
+    const [sharedBalancesResult, invalidateSharedBalancesQuery] =
+        useSharedBalances();
+
+    const refetchData = async () => {
+        await wait(1000);
+        invalidateTransferHistoryQuery();
+        invalidateSharedBalancesQuery();
+    };
 
     useEffect(() => {
         (async () => {
@@ -49,6 +58,9 @@ function App() {
 
                 const tokens = await getTokens(userName);
                 setTokens(tokens);
+
+                const debitMode = await getUserConf(userName, "manualDebit");
+                setManualDebitMode(Boolean(debitMode));
             } catch (e) {
                 console.error("Error getting user or balance information:", e);
             }
@@ -89,7 +101,7 @@ function App() {
                 setTransferError(`${e}`);
             }
         }
-        invalidateTransferHistoryQuery();
+        refetchData();
         setFormSubmitted(false);
     };
 
@@ -111,7 +123,7 @@ function App() {
             receiver: to,
             amount: parsedAmount,
             memo: "Working",
-        })
+        });
 
         const updatedTokens = await pollForBalanceChange(userName, token);
         setTokens(updatedTokens);
@@ -131,21 +143,48 @@ function App() {
             </option>
         );
 
+    const manualDebitModeChange = async () => {
+        const newManualDebitModeValue = !manualDebitMode;
+        setManualDebitMode(newManualDebitModeValue);
+        await tokenContract.setUserConfOp({
+            flag: "manualDebit",
+            enable: newManualDebitModeValue,
+        });
+    };
+
     return (
-        <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
+        <div className="mx-auto max-w-screen-xl space-y-6 p-2 sm:px-8">
             <div className="flex items-center gap-2">
                 <WalletIcon />
                 <Heading tag="h1" className="select-none text-gray-600">
                     Wallet
                 </Heading>
             </div>
-            <div className="flex items-baseline gap-1 border-b border-gray-400 pb-3 font-semibold">
-                <Text size="sm" span className="select-none">
-                    Account:
-                </Text>
-                <Text size="lg" span>
-                    {userName}
-                </Text>
+            <div>
+                <div className="mb-2 flex items-baseline gap-1 font-semibold">
+                    <Text size="sm" span className="select-none">
+                        Account:
+                    </Text>
+                    <Text size="lg" span>
+                        {userName}
+                    </Text>
+                </div>
+                <div className="border-b border-gray-400 pb-3">
+                    <div className="flex items-center bg-gray-100">
+                        <div>
+                            <Switch
+                                label="Manual Debit"
+                                checked={manualDebitMode}
+                                onChange={manualDebitModeChange}
+                            />
+                        </div>
+                        <div className="text-sm italic">
+                            Tokens sent to this account when switched "ON" will
+                            appear in a "Pending transfers" list until manually
+                            accepted or rejected.
+                        </div>
+                    </div>
+                </div>
             </div>
             <form className="bg-gray-100 p-3" onSubmit={handleSubmit(onSubmit)}>
                 <div className="mb-4 flex h-10 w-24 select-none items-center justify-center gap-1.5 border-b border-gray-500">
@@ -233,6 +272,12 @@ function App() {
                     )}
                 </div>
             </form>
+            <SharedBalances
+                tokens={tokens}
+                currentUser={userName}
+                queryResult={sharedBalancesResult}
+                refetchData={refetchData}
+            />
             <TransferHistory
                 tokens={tokens}
                 currentUser={userName}

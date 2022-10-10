@@ -35,6 +35,10 @@ namespace psibase::http
    using connect_callback = std::function<void(connect_result)>;
    using connect_t        = std::function<void(std::vector<char>, connect_callback)>;
 
+   using get_config_result   = std::function<std::vector<char>()>;
+   using get_config_callback = std::function<void(get_config_result)>;
+   using get_config_t        = std::function<void(get_config_callback)>;
+
    struct http_config
    {
       uint32_t                  num_threads            = {};
@@ -51,8 +55,10 @@ namespace psibase::http
       get_peers_t               get_peers              = {};
       connect_t                 connect                = {};
       connect_t                 disconnect             = {};
+      get_config_t              get_config             = {};
+      connect_t                 set_config             = {};
       bool                      host_perf              = false;
-      std::atomic<bool>         ready_for_p2p;
+      std::atomic<bool>         enable_p2p;
    };
 
    struct server

@@ -64,6 +64,24 @@ namespace psibase
       void        configure(const boost::program_options::variables_map&);
       void        configure_default();
       std::string get_config();
+
+      class Config;
+      void configure(const Config&);
+      void from_json(Config&, psio::json_token_stream&);
+      void to_json(const Config&, psio::vector_stream&);
+      class Config
+      {
+        public:
+         static Config get();
+
+        private:
+         struct Impl;
+         friend void           from_json(Config&, psio::json_token_stream&);
+         friend void           to_json(const Config&, psio::vector_stream&);
+         friend void           configure(const Config&);
+         std::shared_ptr<Impl> impl;
+      };
+
    }  // namespace loggers
 
 #define PSIBASE_LOG(logger, log_level) BOOST_LOG_SEV(logger, psibase::loggers::level::log_level)

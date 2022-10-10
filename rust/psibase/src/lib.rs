@@ -16,6 +16,7 @@ pub mod tester;
 pub mod tester_raw;
 mod time;
 mod to_bin;
+mod to_key;
 mod trace;
 
 pub mod services;
@@ -36,7 +37,15 @@ pub use service::*;
 pub use tester::*;
 pub use time::*;
 pub use to_bin::*;
+pub use to_key::*;
 pub use trace::*;
 
 pub use fracpack;
 pub use psibase_macros::*;
+
+// TODO: decide on an error type. Reexporting anyhow
+// and using it as a return type of library functions
+// is a quick way to get nice printed errors and nice
+// example code until then.
+pub use ::anyhow;
+pub use anyhow::{anyhow, Error};

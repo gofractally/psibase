@@ -1,3 +1,0 @@
-# Testing Rust Services
-
-TODO

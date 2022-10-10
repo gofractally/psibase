@@ -1,0 +1,6 @@
+@font-face {
+    font-family: "Red Hat Mono";
+    font-weight: 100 900;
+    font-display: block;
+    src: url("./red-hat-mono-variable-normal.ttf") format("truetype");
+}

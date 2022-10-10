@@ -7,7 +7,7 @@
 - [Log Filters](#log-filters)
 - [Log Formatters](#log-fomatters)
 
-Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../http.md#logging) while the server is running.
+Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../http.md#server-configuration) while the server is running.
 
 ## Config File
 

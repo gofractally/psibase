@@ -42,6 +42,13 @@
 //!
 //! Note: `#[fracpack(fracpack_mod = "fracpack")]` is only needed when using the `fracpack`
 //! library directly instead of through the [psibase crate](https://docs.rs/psibase).
+//!
+//! # Caution
+//!
+//! In Rust, it's easy to accidentally convert from a fixed-size
+//! array reference (`&[u8;7]`) to a slice (`&[u8]`). This matters
+//! to fracpack, which has different, and incompatible, encodings
+//! for the two types.
 
 use custom_error::custom_error;
 use std::mem;
@@ -59,13 +66,14 @@ custom_error! {pub Error
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Use this trait instead of [Packable] when the deserialized
-/// data is owned instead of borrowed.
+/// Use this trait on generic functions instead of [Packable] when
+/// the deserialized data may only be owned instead of borrowed from
+/// the source.
 ///
 /// ```
-/// use fracpack::{PackableOwned, Result};
+/// use fracpack::{PackableOwned, Error};
 ///
-/// pub fn get_unpacked<T: PackableOwned>(packed: &[u8]) -> Result<T> {
+/// pub fn get_unpacked<T: PackableOwned>(packed: &[u8]) -> Result<T, Error> {
 ///     T::unpacked(packed)
 /// }
 /// ```
