@@ -21,6 +21,7 @@
   - [Rust Services]()
     - [Basic Service](rust-service/basic.md)
     - [Testing Services](rust-service/testing.md)
+    - [Calling Others](rust-service/calling.md)
 - [Data Formats]()
   - [JSON](format/json.md)
   - [Schema](format/schema.md)

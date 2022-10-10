@@ -158,3 +158,8 @@ location of the built WASM. `include_service!` then expands into
 
 The `services(...)` argument of the `test_case` macro expands to code which
 uses `include_service!`.
+
+## Next Step
+
+Services may call other services; we show how to do this in
+[Calling Other Services](calling.md).
