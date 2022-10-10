@@ -34,20 +34,16 @@ pub struct Table<Record: TableRecord> {
 
 impl<Record: TableRecord> Table<Record> {
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
-    pub fn get_index(&self, idx: u8) -> TableIndex<Record> {
+    pub fn get_index<Key: ToKey>(&self, idx: u8) -> TableIndex<Key, Record> {
         let mut table_prefix = self.prefix.clone();
         table_prefix.push(idx);
         TableIndex {
-            db_id: DbId::Service,
+            db_id: self.db_id.to_owned(),
             prefix: table_prefix,
             is_secondary: idx > 0,
-            phantom: PhantomData,
+            key_type: PhantomData,
+            record_type: PhantomData,
         }
-    }
-
-    /// Returns the Primary Index
-    pub fn get_primary_index(&self) -> TableIndex<Record> {
-        self.get_index(0)
     }
 
     pub fn serialize_key<K: ToKey>(&self, idx: u8, key: &K) -> Vec<u8> {
@@ -56,20 +52,22 @@ impl<Record: TableRecord> Table<Record> {
 
     pub fn put(&self, value: &Record) {
         let pk = self.serialize_key(0, &value.get_primary_key());
+        println!(">>> putting pk {:?}", pk);
         // todo: handle secondaries
-        kv_put(self.db_id.to_owned(), &pk, value);
+        kv_put(self.db_id.to_owned(), &pk, value); // TODO: this is crashing in the tester
     }
 }
 
-pub struct TableIndex<Record: TableRecord> {
+pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub db_id: DbId,
     pub prefix: Vec<u8>,
     pub is_secondary: bool,
-    pub phantom: PhantomData<Record>,
+    pub key_type: PhantomData<Key>,
+    pub record_type: PhantomData<Record>,
 }
 
-impl<Record: TableRecord> TableIndex<Record> {
-    pub fn get<K: ToKey>(&self, key: K) -> Option<Record> {
+impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
+    pub fn get(&self, key: Key) -> Option<Record> {
         None
     }
 

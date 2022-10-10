@@ -5,7 +5,7 @@
 /// This service adds and multiplies `i32` numbers.
 ///
 /// This is where a detailed description would go.
-#[psibase::service]
+#[psibase::service()]
 mod service {
     /// Add two numbers together.
     ///
@@ -22,4 +22,14 @@ mod service {
     fn multiply(a: i32, b: i32) -> i32 {
         a * b
     }
+}
+
+#[psibase::test_case(services("test_contract"))]
+fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
+    assert_eq!(Wrapper::push(&chain).multiply(3, 4).get()?, 12);
+
+    println!("{}", Wrapper::push(&chain).add(9, 8).trace);
+
+    Ok(())
 }
