@@ -8,6 +8,7 @@ members = [
     "psibase_macros",
     "psibase",
     "test_contract",
+    "test_contract_elections",
     "test_fracpack",
 ]
 

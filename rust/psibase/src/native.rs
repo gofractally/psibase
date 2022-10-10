@@ -7,7 +7,7 @@
 //!
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
-use crate::{native_raw, AccountNumber, ToKey};
+use crate::{native_raw, AccountNumber, DbId, ToKey};
 use fracpack::{Packable, PackableOwned};
 
 /// Write message to console
@@ -49,6 +49,22 @@ pub fn check(condition: bool, message: &str) {
     if !condition {
         abort_message_bytes(message.as_bytes());
     }
+}
+
+/// Abort with message if optional value is empty
+pub fn check_some<T>(opt_value: Option<T>, message: &str) -> T {
+    if !opt_value.is_some() {
+        abort_message_bytes(message.as_bytes());
+    }
+    opt_value.unwrap()
+}
+
+/// Abort with message if optional has value
+pub fn check_none<T>(opt_value: Option<T>, message: &str) -> T {
+    if !opt_value.is_none() {
+        abort_message_bytes(message.as_bytes());
+    }
+    opt_value.unwrap()
 }
 
 /// Get the most-recent result when the size is known in advance
@@ -135,10 +151,18 @@ pub fn set_retval<'a, T: Packable<'a>>(val: &T) {
     unsafe { native_raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
 }
 
+fn get_optional_result_bytes(size: u32) -> Option<Vec<u8>> {
+    if size < u32::MAX {
+        Some(get_result_bytes(size))
+    } else {
+        None
+    }
+}
+
 /// Set a key-value pair
 ///
 /// If key already exists, then replace the existing value.
-pub fn kv_put_bytes(db: crate::DbId, key: &[u8], value: &[u8]) {
+pub fn kv_put_bytes(db: DbId, key: &[u8], value: &[u8]) {
     unsafe {
         native_raw::kvPut(
             db,
@@ -153,14 +177,14 @@ pub fn kv_put_bytes(db: crate::DbId, key: &[u8], value: &[u8]) {
 /// Set a key-value pair
 ///
 /// If key already exists, then replace the existing value.
-pub fn kv_put<'a, K: ToKey, V: Packable<'a>>(db: crate::DbId, key: &K, value: &V) {
+pub fn kv_put<'a, K: ToKey, V: Packable<'a>>(db: DbId, key: &K, value: &V) {
     kv_put_bytes(db, &key.to_key(), &value.packed())
 }
 
 /// Add a sequentially-numbered record
 ///
 /// Returns the id.
-pub fn put_sequential_bytes(db: crate::DbId, value: &[u8]) -> u64 {
+pub fn put_sequential_bytes(db: DbId, value: &[u8]) -> u64 {
     unsafe { native_raw::putSequential(db, value.as_ptr(), value.len() as u32) }
 }
 
@@ -168,7 +192,7 @@ pub fn put_sequential_bytes(db: crate::DbId, value: &[u8]) -> u64 {
 ///
 /// Returns the id.
 pub fn put_sequential<'a, Type: Packable<'a>, V: Packable<'a>>(
-    db: crate::DbId,
+    db: DbId,
     service: AccountNumber,
     ty: &Type,
     value: &V,
@@ -181,30 +205,23 @@ pub fn put_sequential<'a, Type: Packable<'a>, V: Packable<'a>>(
 }
 
 /// Remove a key-value pair if it exists
-pub fn kv_remove_bytes(db: crate::DbId, key: &[u8]) {
+pub fn kv_remove_bytes(db: DbId, key: &[u8]) {
     unsafe { native_raw::kvRemove(db, key.as_ptr(), key.len() as u32) }
 }
 
 /// Remove a key-value pair if it exists
-pub fn kv_remove<K: ToKey>(db: crate::DbId, key: &K) {
+pub fn kv_remove<K: ToKey>(db: DbId, key: &K) {
     kv_remove_bytes(db, &key.to_key())
 }
 
 /// Get a key-value pair, if any
-pub fn kv_get_bytes(db: crate::DbId, key: &[u8]) -> Option<Vec<u8>> {
+pub fn kv_get_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
     let size = unsafe { native_raw::kvGet(db, key.as_ptr(), key.len() as u32) };
-    if size < u32::MAX {
-        Some(get_result_bytes(size))
-    } else {
-        None
-    }
+    get_optional_result_bytes(size)
 }
 
 /// Get a key-value pair, if any
-pub fn kv_get<V: PackableOwned, K: ToKey>(
-    db: crate::DbId,
-    key: &K,
-) -> Result<Option<V>, fracpack::Error> {
+pub fn kv_get<V: PackableOwned, K: ToKey>(db: DbId, key: &K) -> Result<Option<V>, fracpack::Error> {
     if let Some(v) = kv_get_bytes(db, &key.to_key()) {
         Ok(Some(V::unpacked(&v)?))
     } else {
@@ -218,14 +235,10 @@ pub fn kv_get<V: PackableOwned, K: ToKey>(
 /// If one is found, and the first `match_key_size` bytes of the found key
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
-pub fn kv_greater_equal_bytes(db: crate::DbId, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
+pub fn kv_greater_equal_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
     let size =
         unsafe { native_raw::kvGreaterEqual(db, key.as_ptr(), key.len() as u32, match_key_size) };
-    if size < u32::MAX {
-        Some(get_result_bytes(size))
-    } else {
-        None
-    }
+    get_optional_result_bytes(size)
 }
 
 /// Get the key-value pair immediately-before provided key
@@ -233,24 +246,25 @@ pub fn kv_greater_equal_bytes(db: crate::DbId, key: &[u8], match_key_size: u32) 
 /// If one is found, and the first `match_key_size` bytes of the found key
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
-pub fn kv_less_than_bytes(db: crate::DbId, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
+pub fn kv_less_than_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
     let size =
         unsafe { native_raw::kvLessThan(db, key.as_ptr(), key.len() as u32, match_key_size) };
-    if size < u32::MAX {
-        Some(get_result_bytes(size))
-    } else {
-        None
-    }
+    get_optional_result_bytes(size)
 }
 
 /// Get the maximum key-value pair which has key as a prefix
 ///
 /// If one is found, then returns the value. Use [get_key_bytes] to get the found key.
-pub fn kv_max_bytes(db: crate::DbId, key: &[u8]) -> Option<Vec<u8>> {
+pub fn kv_max_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
     let size = unsafe { native_raw::kvMax(db, key.as_ptr(), key.len() as u32) };
-    if size < u32::MAX {
-        Some(get_result_bytes(size))
-    } else {
-        None
-    }
+    get_optional_result_bytes(size)
+}
+
+/// Get the maximum key-value pair which has key as a prefix
+///
+/// If one is found, then returns the value. Use [get_key] to
+/// get the found key.
+pub fn kv_max<K: ToKey, V: PackableOwned>(db_id: DbId, key: &K) -> Option<V> {
+    let bytes = kv_max_bytes(db_id, &key.to_key());
+    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap()) // unwrap won't panic
 }
