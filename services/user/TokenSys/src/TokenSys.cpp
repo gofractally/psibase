@@ -138,7 +138,6 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
    balance.balance += amount.value;
    db.open<TokenTable>().put(token);
    db.open<BalanceTable>().put(balance);
-   
 }
 
 void TokenSys::burn(TID tokenId, Quantity amount)
@@ -205,6 +204,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    auto token       = getToken(tokenId);
    auto untradeable = getTokenConf(tokenId, tokenConfig::untradeable);
 
+   check(sender != receiver, senderIsReceiver);
    check(amount.value > 0, quantityGt0);
    check(amount.value <= balance.balance, insufficientBalance);
    if (not isSenderIssuer(tokenId))
