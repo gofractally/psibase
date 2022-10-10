@@ -1,14 +1,10 @@
 # Rust Installation
 
-## Not Yet Functional
-
-This documents some of our current thoughts and ongoing development for Rust service support. The installation procedure and examples are currently non-functional.
-
 ## Installation
 
 To get started with Rust service development, install the following:
 
-- [Psidk C++ Support](linux.md). We're using its `psibase`, `psinode`, and `psitest` executables.
+- [Psidk C++ Support](linux.md). We're using its `psibase`, `psinode`, and `psitest` executables. You may skip installing CMake, WASI SDK, and Binaryen unless you also plan to also do C++ development.
 - Rust version 1.65.0 or later: see the commands below. If you don't have rustup installed, then follow the [rustup installation instructions](https://rustup.rs/).
 - Rust's wasi support: see the commands below.
 - `cargo-psibase`: see the commands below.

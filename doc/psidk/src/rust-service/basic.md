@@ -1,9 +1,5 @@
 # Basic Rust Service
 
-## Not Yet Functional
-
-This documents some of our current thoughts and ongoing development for Rust service support. The installation procedure and examples are currently non-functional.
-
 ## Installation
 
 Follow the [Rust Installation Guide](../../rust.md).
