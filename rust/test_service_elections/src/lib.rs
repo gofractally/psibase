@@ -14,10 +14,10 @@ mod service {
     // #[table]
     #[derive(Fracpack, Debug)]
     pub struct ElectionRecord {
-        id: u32,
-        voting_start_date: TimePointSec,
-        voting_end_date: TimePointSec,
-        winner: AccountNumber,
+        pub id: u32,
+        pub voting_start_date: TimePointSec,
+        pub voting_end_date: TimePointSec,
+        pub winner: AccountNumber,
     }
 
     impl TableRecord for ElectionRecord {
@@ -66,17 +66,34 @@ mod service {
         check_some(election_opt, "election does not exist")
     }
 
+    #[action]
+    fn list_active_elections(date_time: TimePointSec) -> Vec<ElectionRecord> {
+        let table = ElectionsTable::open();
+        let idx = table.get_index::<u32>(0);
+
+        let current_time = date_time; // TODO: get the current time
+
+        let active_elections = idx
+            .rev() // list from the most recent ones
+            .filter(|election| {
+                election.voting_start_date <= current_time
+                    && election.voting_end_date > current_time
+            })
+            .collect();
+        active_elections
+    }
+
     /// Creates a new election
     #[action]
     fn new(voting_start_date: TimePointSec, voting_end_date: TimePointSec) -> u32 {
         println!(">>> adding a new election rust println!...");
 
         let table = ElectionsTable::open();
-        let idx = table.get_index::<u32>(0);
+        let mut idx = table.get_index::<u32>(0);
 
         println!(">>> indexes initialized!...");
 
-        let last_election = idx.last();
+        let last_election = idx.next_back();
         println!(">>> got last election");
 
         let new_key = if let Some(last_election) = last_election {
@@ -194,6 +211,46 @@ fn new_elections_are_sequential(chain: psibase::Chain) -> Result<(), psibase::Er
         election3.trace
     );
     assert_eq!(election3.get()?, 3);
+
+    Ok(())
+}
+
+#[psibase::test_case(services("elections"))]
+fn active_elections_are_filtered(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    println!("Pushing elections...");
+    Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
+    Wrapper::push(&chain).new(TimePointSec { seconds: 20 }, TimePointSec { seconds: 70 });
+    Wrapper::push(&chain).new(TimePointSec { seconds: 30 }, TimePointSec { seconds: 80 });
+
+    let active_elections = Wrapper::push(&chain)
+        .list_active_elections(TimePointSec { seconds: 45 })
+        .get()?;
+    assert_eq!(active_elections.len(), 3);
+    assert_eq!(active_elections[0].id, 3);
+    assert_eq!(active_elections[1].id, 2);
+    assert_eq!(active_elections[2].id, 1);
+
+    let active_elections = Wrapper::push(&chain)
+        .list_active_elections(TimePointSec { seconds: 65 })
+        .get()?;
+    assert_eq!(active_elections.len(), 2);
+    assert_eq!(active_elections[0].id, 3);
+    assert_eq!(active_elections[1].id, 2);
+
+    let active_elections = Wrapper::push(&chain)
+        .list_active_elections(TimePointSec { seconds: 75 })
+        .get()?;
+    assert_eq!(active_elections.len(), 1);
+    assert_eq!(active_elections[0].id, 3);
+
+    let active_elections = Wrapper::push(&chain)
+        .list_active_elections(TimePointSec { seconds: 5 })
+        .get()?;
+    assert_eq!(active_elections.len(), 0);
+    let active_elections = Wrapper::push(&chain)
+        .list_active_elections(TimePointSec { seconds: 85 })
+        .get()?;
+    assert_eq!(active_elections.len(), 0);
 
     Ok(())
 }

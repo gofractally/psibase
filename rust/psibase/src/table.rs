@@ -2,7 +2,10 @@ use std::marker::PhantomData;
 
 use fracpack::PackableOwned;
 
-use crate::{kv_get, kv_max, kv_put, AccountNumber, DbId, KeyView, ToKey};
+use crate::{
+    get_key_bytes, kv_get, kv_greater_equal, kv_less_than, kv_max, kv_put, AccountNumber, DbId,
+    KeyView, ToKey,
+};
 
 pub trait TableRecord: PackableOwned {
     type PrimaryKey: ToKey;
@@ -33,16 +36,10 @@ pub struct Table<Record: TableRecord> {
 impl<Record: TableRecord> Table<Record> {
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
     pub fn get_index<Key: ToKey>(&self, idx: u8) -> TableIndex<Key, Record> {
-        let mut table_prefix = self.prefix.clone();
-        idx.append_key(&mut table_prefix);
+        let mut idx_prefix = self.prefix.clone();
+        idx.append_key(&mut idx_prefix);
 
-        TableIndex {
-            db_id: self.db_id.to_owned(),
-            prefix: table_prefix,
-            idx,
-            key_type: PhantomData,
-            record_type: PhantomData,
-        }
+        TableIndex::new(self.db_id.to_owned(), idx_prefix)
     }
 
     pub fn serialize_key<K: ToKey>(&self, idx: u8, key: &K) -> impl ToKey {
@@ -62,12 +59,30 @@ impl<Record: TableRecord> Table<Record> {
 pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub db_id: DbId,
     pub prefix: Vec<u8>,
-    pub idx: u8,
+    front_key: KeyView,
+    back_key: KeyView,
+    is_end: bool,
     pub key_type: PhantomData<Key>,
     pub record_type: PhantomData<Record>,
 }
 
 impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
+    fn new(db_id: DbId, prefix: Vec<u8>) -> TableIndex<Key, Record> {
+        TableIndex {
+            db_id,
+            front_key: KeyView {
+                data: prefix.clone(),
+            },
+            back_key: KeyView {
+                data: prefix.clone(),
+            },
+            prefix,
+            is_end: false,
+            key_type: PhantomData,
+            record_type: PhantomData,
+        }
+    }
+
     pub fn get(&self, key: Key) -> Option<Record> {
         let mut data = self.prefix.clone();
         key.append_key(&mut data);
@@ -76,11 +91,88 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         kv_get(self.db_id.to_owned(), &key).unwrap()
     }
 
-    pub fn last(&self) -> Option<Record> {
-        let key = KeyView {
-            data: self.prefix.clone(),
+    pub fn lower_bound(&self, key: Key) -> Option<Record> {
+        let mut data = self.prefix.clone();
+        key.append_key(&mut data);
+        let key = KeyView { data };
+
+        kv_greater_equal(self.db_id.to_owned(), &key, self.prefix.len() as u32)
+    }
+}
+
+impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
+    type Item = Record;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_end {
+            return None;
+        }
+
+        self.front_key.data.push(0);
+        println!(">>> iterating from the front with key {:?}", self.front_key);
+
+        let value: Option<Record> = kv_greater_equal(
+            self.db_id.to_owned(),
+            &self.front_key,
+            self.prefix.len() as u32,
+        );
+
+        if value.is_some() {
+            self.front_key = KeyView {
+                data: get_key_bytes(),
+            };
+
+            if self.front_key == self.back_key {
+                println!(">>> front cursor met back cursor, it's the end");
+                self.is_end = true;
+                return None;
+            }
+
+            println!(">>> iterated and got key {:?}", self.front_key);
+            value
+        } else {
+            println!(">>> setting end of iterator!");
+            self.is_end = true;
+            None
+        }
+    }
+}
+
+impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Record> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.is_end {
+            return None;
+        }
+
+        println!(">>> iterating from the back with key {:?}", self.back_key);
+
+        let value = if self.back_key.data == self.prefix {
+            kv_max(self.db_id.to_owned(), &self.back_key)
+        } else {
+            kv_less_than(
+                self.db_id.to_owned(),
+                &self.back_key,
+                self.prefix.len() as u32,
+            )
         };
 
-        kv_max(self.db_id.to_owned(), &key)
+        if value.is_some() {
+            self.back_key = KeyView {
+                data: get_key_bytes(),
+            };
+
+            if self.back_key == self.front_key {
+                println!(">>> back cursor met front cursor, it's the end");
+                self.is_end = true;
+                return None;
+            }
+
+            println!(">>> back-iterated and got key {:?}", self.back_key);
+            value
+        } else {
+            println!(">>> setting end of iterator!");
+            self.is_end = true;
+            None
+        }
     }
 }

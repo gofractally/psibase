@@ -48,15 +48,16 @@ pub trait ToKey {
 /// A serialized key (non-owning)
 ///
 /// The serialized data has the same sort order as the non-serialized form
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyView {
     pub data: Vec<u8>,
 }
 
 impl ToKey for KeyView {
     fn append_key(&self, key: &mut Vec<u8>) {
-        let mut data = self.data.clone();
-        key.append(&mut data);
+        for byte in &self.data {
+            key.push(*byte);
+        }
     }
 }
 

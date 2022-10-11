@@ -241,6 +241,21 @@ pub fn kv_greater_equal_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Opti
     get_optional_result_bytes(size)
 }
 
+/// Get the first key-value pair which is greater than or equal to the provided
+/// key
+///
+/// If one is found, and the first `match_key_size` bytes of the found key
+/// matches the provided key, then returns the value. Use [get_key_bytes] to get
+/// the found key.
+pub fn kv_greater_equal<K: ToKey, V: PackableOwned>(
+    db_id: DbId,
+    key: &K,
+    match_key_size: u32,
+) -> Option<V> {
+    let bytes = kv_greater_equal_bytes(db_id, &key.to_key(), match_key_size);
+    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap()) // unwrap won't panic
+}
+
 /// Get the key-value pair immediately-before provided key
 ///
 /// If one is found, and the first `match_key_size` bytes of the found key
@@ -250,6 +265,20 @@ pub fn kv_less_than_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Option<V
     let size =
         unsafe { native_raw::kvLessThan(db, key.as_ptr(), key.len() as u32, match_key_size) };
     get_optional_result_bytes(size)
+}
+
+/// Get the key-value pair immediately-before provided key
+///
+/// If one is found, and the first `match_key_size` bytes of the found key
+/// matches the provided key, then returns the value. Use [get_key_bytes] to get
+/// the found key.
+pub fn kv_less_than<K: ToKey, V: PackableOwned>(
+    db_id: DbId,
+    key: &K,
+    match_key_size: u32,
+) -> Option<V> {
+    let bytes = kv_less_than_bytes(db_id, &key.to_key(), match_key_size);
+    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap()) // unwrap won't panic
 }
 
 /// Get the maximum key-value pair which has key as a prefix
@@ -262,8 +291,7 @@ pub fn kv_max_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
 
 /// Get the maximum key-value pair which has key as a prefix
 ///
-/// If one is found, then returns the value. Use [get_key] to
-/// get the found key.
+/// If one is found, then returns the value. Use [get_key_bytes] to get the found key.
 pub fn kv_max<K: ToKey, V: PackableOwned>(db_id: DbId, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db_id, &key.to_key());
     bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap()) // unwrap won't panic
