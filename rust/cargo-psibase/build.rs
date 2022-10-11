@@ -1,7 +1,7 @@
 use binaryen::{CodegenConfig, Module};
 use std::{
     env,
-    fs::{read, write},
+    fs::{create_dir_all, hard_link, read, remove_dir_all, write},
     process::{exit, Command},
 };
 
@@ -17,13 +17,27 @@ fn main() {
     let build = |name| {
         println!("cargo:rerun-if-changed={}", name);
 
+        let package_dir = out_dir.clone() + "/" + name + "-package";
+        let _ = remove_dir_all(&package_dir);
+        create_dir_all(package_dir.clone() + "/src").unwrap();
+        hard_link(
+            name.to_string() + "/Cargo.toml.in",
+            package_dir.clone() + "/Cargo.toml",
+        )
+        .unwrap();
+        hard_link(
+            name.to_string() + "/src/lib.rs",
+            package_dir.clone() + "/src/lib.rs",
+        )
+        .unwrap();
+
         let target_dir = out_dir.clone() + "/" + name + "-target";
         if !Command::new(&cargo)
             .args(["build"])
             .args(["--color", "always"])
             .args(["--target", "wasm32-wasi"])
             .args(["--target-dir", &target_dir])
-            .args(["--manifest-path", &(name.to_owned() + "/Cargo.toml")])
+            .args(["--manifest-path", &(package_dir + "/Cargo.toml")])
             .args(["--release"])
             .status()
             .unwrap()
