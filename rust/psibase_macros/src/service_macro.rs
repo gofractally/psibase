@@ -72,6 +72,15 @@ fn is_action_attr(attr: &Attribute) -> bool {
     false
 }
 
+fn is_table_attr(attr: &Attribute) -> bool {
+    if let AttrStyle::Outer = attr.style {
+        if attr.path.is_ident("table") {
+            return true;
+        }
+    }
+    false
+}
+
 fn process_mod(
     options: &Options,
     psibase_mod: &proc_macro2::TokenStream,
