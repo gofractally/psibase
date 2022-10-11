@@ -69,7 +69,7 @@ pub fn check_none<T>(opt_value: Option<T>, message: &str) {
 /// Get the most-recent result when the size is known in advance
 ///
 /// Other functions set the result.
-fn get_result_bytes(size: u32) -> Vec<u8> {
+pub fn get_result_bytes(size: u32) -> Vec<u8> {
     let mut result = Vec::with_capacity(size as usize);
     if size > 0 {
         unsafe {

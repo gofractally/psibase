@@ -193,11 +193,36 @@ fn process_mod(
             pub struct #wrapper;
         });
 
+        let call_from_to_doc = format!(
+            "
+            Call another service.
+
+            This method returns an object which has [methods]({actions}#implementations)
+            (one per action) which call another service and return the result from the call.
+            This method is only usable by services.
+
+            ",
+            actions = options.actions
+        );
+        let call_doc = format!(
+            "{} This method defaults `sender` to [`{psibase}::get_sender`] and `service` to \"{}\".",
+            call_from_to_doc, options.name,            psibase = options.psibase_mod,
+        );
+        let call_to_doc = format!(
+            "{} This method defaults `sender` to [`{psibase}::get_sender`].",
+            call_from_to_doc,
+            psibase = options.psibase_mod,
+        );
+        let call_from_doc = format!(
+            "{} This method defaults `service` to \"{}\".",
+            call_from_to_doc, options.name
+        );
+
         let push_from_to_doc = format!(
             "
             push transactions to [psibase::Chain]({psibase}::Chain).
 
-            This function returns an object which has [methods]({actions}#implementations)
+            This method returns an object which has [methods]({actions}#implementations)
             (one per action) which push transactions to a test chain and return a
             [psibase::ChainResult]({psibase}::ChainResult) or
             [psibase::ChainEmptyResult]({psibase}::ChainEmptyResult). This final object
@@ -208,15 +233,15 @@ fn process_mod(
             actions = options.actions
         );
         let push_doc = format!(
-            "{} This function defaults both `sender` and `service` to \"{}\".",
+            "{} This method defaults both `sender` and `service` to \"{}\".",
             push_from_to_doc, options.name
         );
         let push_to_doc = format!(
-            "{} This function defaults `sender` to \"{}\".",
+            "{} This method defaults `sender` to \"{}\".",
             push_from_to_doc, options.name
         );
         let push_from_doc = format!(
-            "{} This function defaults `service` to \"{}\".",
+            "{} This method defaults `service` to \"{}\".",
             push_from_to_doc, options.name
         );
 
@@ -224,7 +249,7 @@ fn process_mod(
             "
             Pack actions into [psibase::Action]({psibase}::Action).
 
-            This function returns an object which has [methods]({actions}#implementations)
+            This method returns an object which has [methods]({actions}#implementations)
             (one per action) which pack the action's arguments using [fracpack] and
             return a [psibase::Action]({psibase}::Action). The `pack_*` series of
             functions is mainly useful to applications which push transactions
@@ -235,15 +260,15 @@ fn process_mod(
             actions = options.actions
         );
         let pack_doc = format!(
-            "{} This function defaults both `sender` and `service` to \"{}\".",
+            "{} This method defaults both `sender` and `service` to \"{}\".",
             pack_from_to_doc, options.name
         );
         let pack_to_doc = format!(
-            "{} This function defaults `sender` to \"{}\".",
+            "{} This method defaults `sender` to \"{}\".",
             pack_from_to_doc, options.name
         );
         let pack_from_doc = format!(
-            "{} This function defaults `service` to \"{}\".",
+            "{} This method defaults `service` to \"{}\".",
             pack_from_to_doc, options.name
         );
 
@@ -253,6 +278,46 @@ fn process_mod(
                 #[doc = #constant_doc]
                 pub const SERVICE: #psibase_mod::AccountNumber =
                     #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
+
+                #[doc = #call_doc]
+                pub fn call() -> #actions<#psibase_mod::ServiceCaller> {
+                    #psibase_mod::ServiceCaller {
+                        sender: #psibase_mod::get_service(),
+                        service: Self::#constant,
+                    }
+                    .into()
+                }
+
+                #[doc = #call_to_doc]
+                pub fn call_to(service: #psibase_mod::AccountNumber)
+                -> #actions<#psibase_mod::ServiceCaller>
+                {
+                    #psibase_mod::ServiceCaller {
+                        sender: #psibase_mod::get_service(),
+                        service,
+                    }
+                    .into()
+                }
+
+                #[doc = #call_from_doc]
+                pub fn call_from(sender: #psibase_mod::AccountNumber)
+                -> #actions<#psibase_mod::ServiceCaller>
+                {
+                    #psibase_mod::ServiceCaller {
+                        sender,
+                        service: Self::#constant,
+                    }
+                    .into()
+                }
+
+                #[doc = #call_from_to_doc]
+                pub fn call_from_to(
+                    sender: #psibase_mod::AccountNumber,
+                    service: #psibase_mod::AccountNumber)
+                -> #actions<#psibase_mod::ServiceCaller>
+                {
+                    #psibase_mod::ServiceCaller { sender, service }.into()
+                }
 
                 #[doc = #push_doc]
                 pub fn push(chain: &#psibase_mod::Chain) -> #actions<#psibase_mod::ChainPusher> {

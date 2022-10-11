@@ -1,5 +1,5 @@
-use crate::fracpack::PackableOwned;
-use crate::{AccountNumber, Action, MethodNumber};
+use crate::fracpack::{Packable, PackableOwned};
+use crate::{get_result_bytes, native_raw, AccountNumber, Action, MethodNumber};
 
 #[cfg(target_family = "wasm")]
 static mut SERVICE: AccountNumber = AccountNumber::new(0);
@@ -81,6 +81,44 @@ pub trait Caller: Clone {
         method: MethodNumber,
         args: Args,
     ) -> Self::ReturnType<Ret>;
+}
+
+#[derive(Clone, Default)]
+pub struct ServiceCaller {
+    pub sender: AccountNumber,
+    pub service: AccountNumber,
+}
+
+impl Caller for ServiceCaller {
+    type ReturnsNothing = ();
+    type ReturnType<T: PackableOwned> = T;
+
+    fn call_returns_nothing<Args: PackableOwned>(&self, method: MethodNumber, args: Args) {
+        let act = Action {
+            sender: self.sender,
+            service: self.service,
+            method,
+            rawData: args.packed(),
+        }
+        .packed();
+        unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
+    }
+
+    fn call<Ret: PackableOwned, Args: PackableOwned>(
+        &self,
+        method: MethodNumber,
+        args: Args,
+    ) -> Ret {
+        let act = Action {
+            sender: self.sender,
+            service: self.service,
+            method,
+            rawData: args.packed(),
+        }
+        .packed();
+        let ret = get_result_bytes(unsafe { native_raw::call(act.as_ptr(), act.len() as u32) });
+        Ret::unpacked(&ret).unwrap()
+    }
 }
 
 #[derive(Clone, Default)]

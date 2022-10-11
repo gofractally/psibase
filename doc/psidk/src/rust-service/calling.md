@@ -58,18 +58,20 @@ mod service {
     #[action]
     fn mult_add(a: i32, b: i32, c: i32, d: i32) -> i32 {
         // Synchronous call to other service
-        arithmetic2::Wrapper::call().add(a * b, c * d)
+        arithmetic::Wrapper::call().add(a * b, c * d)
     }
 }
 
 // Our test case needs both services to function
 #[psibase::test_case(services("arithmetic", "arithmetic2"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    // Verify arithmetic1 works
-    assert_eq!(arithmetic1::Wrapper::push(&chain).add(3, 4).get()?, 7);
+    // Verify arithmetic works
+    assert_eq!(arithmetic::Wrapper::push(&chain).add(3, 4).get()?, 7);
 
     // Verify arithmetic2 works
     assert_eq!(Wrapper::push(&chain).mult_add(3, 4, 5, 6).get()?, 42);
+
+    Ok(())
 }
 ```
 
@@ -81,6 +83,45 @@ services, build the test, and run it.
 ```
 cargo psibase test
 ```
+
+## Recursion Safety
+
+By default, Rust services forbid recursive calls. This prevents
+a series of exploits based on this pattern:
+
+- Service `A` calls Service `B`
+- Service `B` calls back into Service `A`
+
+Service `A` may opt into allowing recursion by setting the
+`recursive` option to true:
+
+```
+#[psibase::service(recursive = true)]
+```
+
+This requires very careful design to prevent exploits. The
+following is a non-exhaustive list of potential attacks:
+
+- `A` writes to a table, calls `B`, then writes to another
+  table. Since it was in the middle of writing, `A`'s overall
+  state is inconsistent. `B` calls a method on `A` which
+  malfunctions because of the inconsistency between the
+  two tables.
+- `A` reads some rows from a table then calls `B`. `B` calls an
+  action in `A` which modifies the table. When `B` returns,
+  `A` relies on the previously-read, but now out of date,
+  data.
+- `A` calls `B` while iterating through a table index. `B` calls
+  an action in `A` which modifies the table. When `B` returns,
+  the iteration is now in an inconsistent state.
+
+Rust's borrow checker doesn't prevent these attacks since
+nothing is mutably borrowed long term. Tables wrap psibase's
+[kv native functions](https://docs.rs/psibase/latest/psibase/native_raw/index.html),
+which treat the underlying KV store as if it were in an
+`UnsafeCell`. The Rust table wrappers can't protect against
+this since it's possible, and normal under recursion, to create
+multiple wrappers covering the same data range.
 
 ## Library Or Program?
 

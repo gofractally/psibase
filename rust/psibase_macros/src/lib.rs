@@ -62,7 +62,7 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 /// the macro creates public definitions (below).
 ///
 /// The macro copies the action documentation (like above) to the
-/// [`Actions<T>` methods](Actions-struct). Use the `[Self::...]`
+/// [`Actions<T>` methods](#actions-struct). Use the `[Self::...]`
 /// syntax like above within action documentation to refer to
 /// other actions.
 ///
@@ -137,9 +137,24 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 ///     // The account this service normally runs on
 ///     pub const SERVICE: psibase::AccountNumber;
 ///
+///     // Call another service.
+///     //
+///     // `call_*` methods return an object which has methods (one per action) which
+///     // call another service and return the result from the call. These methods are
+///     // only usable by services.
+///     pub fn call() -> Actions<psibase::ServiceCaller>;
+///     pub fn call_to(service: psibase::AccountNumber)
+///     -> Actions<psibase::ServiceCaller>;
+///     pub fn call_from(sender: psibase::AccountNumber)
+///     -> Actions<psibase::ServiceCaller>;
+///     pub fn call_from_to(
+///         sender: psibase::AccountNumber,
+///         service: psibase::AccountNumber)
+///     -> Actions<psibase::ServiceCaller>;
+///
 ///     // push transactions to psibase::Chain.
 ///     //
-///     // `push_*` functions return an object which has methods (one per action) which
+///     // `push_*` methods return an object which has methods (one per action) which
 ///     // push transactions to a test chain and return a psibase::ChainResult or
 ///     // psibase::ChainEmptyResult. This final object can verify success or failure
 ///     // and can retrieve the return value, if any.
@@ -266,9 +281,37 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Example
 ///
 /// ```ignore
-/// #[psibase::test_case(services("example1", "example2"))]
-/// fn my_test(chain: psibase::Chain) -> Result<(), psibase::Error> {
-///     // TODO
+/// #[psibase::service]
+/// mod service {
+///     #[action]
+///     fn add(a: i32, b: i32) -> i32 {
+///         println!("Let's add {} and {}", a, b);
+///         println!("Hopefully the result is {}", a + b);
+///         a + b
+///     }
+/// }
+///
+/// #[psibase::test_case(services("example"))]
+/// fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
+///     // Verify the action works as expected.
+///     assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
+///
+///     // Start a new block; this prevents the following transaction
+///     // from being rejected as a duplicate.
+///     chain.start_block();
+///
+///     // Print a trace; this allows us to see:
+///     // * The service call chain. Something calls our service;
+///     //   let's see what it is!
+///     // * The service's prints, which are normally invisible
+///     //   during testing
+///     println!(
+///         "\n\nHere is the trace:\n{}",
+///         Wrapper::push(&chain).add(3, 4).trace
+///     );
+///
+///     // If we got this far, then the test has passed
+///     Ok(())
 /// }
 /// ```
 ///
