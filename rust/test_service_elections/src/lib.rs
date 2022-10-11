@@ -1,5 +1,3 @@
-use psibase::TimePointSec;
-
 /// This service exemplifies the management of simple elections.
 ///
 /// Please don't publish this as a real elections service.
@@ -73,6 +71,7 @@ mod service {
 
         let current_time = date_time; // TODO: get the current time
 
+        #[allow(clippy::let_and_return)] // TODO
         let active_elections = idx
             .rev() // list from the most recent ones
             .filter(|election| {
@@ -173,6 +172,7 @@ mod service {
     // }
 }
 
+/*
 #[psibase::test_case(services("elections"))]
 fn new_elections_are_sequential(chain: psibase::Chain) -> Result<(), psibase::Error> {
     println!("Pushing election1...");
@@ -254,3 +254,4 @@ fn active_elections_are_filtered(chain: psibase::Chain) -> Result<(), psibase::E
 
     Ok(())
 }
+*/

@@ -21,7 +21,7 @@ pub trait TableHandler<Record: TableRecord> {
         let prefix = (Self::TABLE_SERVICE, Self::TABLE_INDEX).to_key();
         Table {
             db_id: DbId::Service,
-            prefix: prefix,
+            prefix,
             phantom: PhantomData,
         }
     }

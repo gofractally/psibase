@@ -53,7 +53,7 @@ pub fn check(condition: bool, message: &str) {
 
 /// Abort with message if optional value is empty
 pub fn check_some<T>(opt_value: Option<T>, message: &str) -> T {
-    if !opt_value.is_some() {
+    if opt_value.is_none() {
         abort_message_bytes(message.as_bytes());
     }
     opt_value.unwrap()
@@ -61,7 +61,7 @@ pub fn check_some<T>(opt_value: Option<T>, message: &str) -> T {
 
 /// Abort with message if optional has value
 pub fn check_none<T>(opt_value: Option<T>, message: &str) {
-    if !opt_value.is_none() {
+    if opt_value.is_some() {
         abort_message_bytes(message.as_bytes());
     }
 }
