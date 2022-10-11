@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use fracpack::PackableOwned;
 
 use crate::{
-    get_key_bytes, kv_get, kv_greater_equal, kv_less_than, kv_max, kv_put, AccountNumber, DbId,
-    RawKey, ToKey,
+    get_key_bytes, kv_get, kv_greater_equal, kv_less_than, kv_max, kv_put, kv_remove,
+    AccountNumber, DbId, RawKey, ToKey,
 };
 
 pub trait TableRecord: PackableOwned {
@@ -42,6 +42,11 @@ impl<Record: TableRecord> Table<Record> {
         TableIndex::new(self.db_id.to_owned(), idx_prefix)
     }
 
+    /// Returns the Primary Key Index
+    pub fn get_index_pk(&self) -> TableIndex<Record::PrimaryKey, Record> {
+        self.get_index::<Record::PrimaryKey>(0)
+    }
+
     pub fn serialize_key<K: ToKey>(&self, idx: u8, key: &K) -> impl ToKey {
         let mut data = self.prefix.clone();
         idx.append_key(&mut data);
@@ -53,6 +58,12 @@ impl<Record: TableRecord> Table<Record> {
         let pk = self.serialize_key(0, &value.get_primary_key());
         // todo: handle secondaries
         kv_put(self.db_id.to_owned(), &pk, value);
+    }
+
+    pub fn remove(&self, primary_key: &impl ToKey) {
+        let pk = self.serialize_key(0, primary_key);
+        // todo: handle secondaries
+        kv_remove(self.db_id.to_owned(), &pk);
     }
 }
 

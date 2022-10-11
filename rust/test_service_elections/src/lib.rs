@@ -1,3 +1,7 @@
+use psibase::{AccountNumber, TimePointSec};
+
+use crate::service::CandidateRecord;
+
 /// This service exemplifies the management of simple elections.
 ///
 /// Please don't publish this as a real elections service.
@@ -34,11 +38,11 @@ mod service {
     }
 
     // #[table]
-    #[derive(Fracpack)]
-    struct CandidateRecord {
-        election_id: u32,
-        candidate: AccountNumber,
-        votes: u32,
+    #[derive(Fracpack, Eq, PartialEq, Clone)]
+    pub struct CandidateRecord {
+        pub election_id: u32,
+        pub candidate: AccountNumber,
+        pub votes: u32,
     }
 
     impl TableRecord for CandidateRecord {
@@ -59,7 +63,7 @@ mod service {
     #[action]
     fn get_election(election_id: u32) -> ElectionRecord {
         let table = ElectionsTable::open();
-        let idx = table.get_index::<u32>(0);
+        let idx = table.get_index_pk();
         let election_opt = idx.get(election_id);
         check_some(election_opt, "election does not exist")
     }
@@ -67,7 +71,7 @@ mod service {
     #[action]
     fn list_active_elections(date_time: TimePointSec) -> Vec<ElectionRecord> {
         let table = ElectionsTable::open();
-        let idx = table.get_index::<u32>(0);
+        let idx = table.get_index_pk();
 
         let current_time = date_time; // TODO: get the current time
 
@@ -82,13 +86,29 @@ mod service {
         active_elections
     }
 
+    #[action]
+    fn list_candidates(election_id: u32) -> Vec<CandidateRecord> {
+        // check election exists
+        get_election(election_id);
+
+        let table = CandidatesTable::open();
+
+        // TODO: implement secondary key vs scanning entire table and filtering election_id
+        let idx = table.get_index_pk();
+
+        let candidates = idx
+            .filter(|record| record.election_id == election_id)
+            .collect();
+        candidates
+    }
+
     /// Creates a new election
     #[action]
     fn new(voting_start_date: TimePointSec, voting_end_date: TimePointSec) -> u32 {
         println!(">>> adding a new election rust println!...");
 
         let table = ElectionsTable::open();
-        let mut idx = table.get_index::<u32>(0);
+        let mut idx = table.get_index_pk();
 
         println!(">>> indexes initialized!...");
 
@@ -139,9 +159,9 @@ mod service {
         );
 
         let table = CandidatesTable::open();
-        let idx = table.get_index::<(AccountNumber, u32)>(0);
+        let idx = table.get_index_pk();
 
-        let candidate_record = idx.get((candidate, election_id));
+        let candidate_record = idx.get((election_id, candidate));
         check_none(candidate_record, "candidate is already registered");
 
         let new_candidate_record = CandidateRecord {
@@ -153,11 +173,30 @@ mod service {
         table.put(&new_candidate_record);
     }
 
-    // /// Unregister a candidate from the election
-    // #[action]
-    // fn unregister(election_id: u32) {
-    //     unimplemented!()
-    // }
+    /// Unregister a candidate from the election
+    #[action]
+    fn unregister(candidate: AccountNumber, election_id: u32) {
+        // TODO: implement get_sender; let candidate = get_sender();
+
+        let election = get_election(election_id);
+
+        // TODO: implement get current time
+        let current_time = TimePointSec { seconds: 0 };
+
+        check(
+            current_time < election.voting_start_date,
+            "election is already in progress",
+        );
+
+        let table = CandidatesTable::open();
+        let idx = table.get_index_pk();
+
+        let key = (election_id, candidate);
+        let candidate_record = idx.get(key);
+        check_some(candidate_record, "candidate is not registered");
+
+        table.remove(&key);
+    }
 
     // /// Vote for a candidate in an active election
     // #[action]
@@ -172,7 +211,6 @@ mod service {
     // }
 }
 
-/*
 #[psibase::test_case(services("elections"))]
 fn new_elections_are_sequential(chain: psibase::Chain) -> Result<(), psibase::Error> {
     println!("Pushing election1...");
@@ -254,4 +292,100 @@ fn active_elections_are_filtered(chain: psibase::Chain) -> Result<(), psibase::E
 
     Ok(())
 }
-*/
+
+#[psibase::test_case(services("elections"))]
+fn register_and_unregister_from_election_successfully(
+    chain: psibase::Chain,
+) -> Result<(), psibase::Error> {
+    println!("Pushing elections...");
+    Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
+
+    Wrapper::push(&chain).register(AccountNumber::from("bob"), 1);
+    Wrapper::push(&chain).register(AccountNumber::from("alice"), 1);
+    Wrapper::push(&chain).register(AccountNumber::from("charles"), 1);
+
+    let candidate_bob = CandidateRecord {
+        candidate: AccountNumber::from("bob"),
+        election_id: 1,
+        votes: 0,
+    };
+
+    let candidate_alice = CandidateRecord {
+        candidate: AccountNumber::from("alice"),
+        election_id: 1,
+        votes: 0,
+    };
+
+    let candidate_charles = CandidateRecord {
+        candidate: AccountNumber::from("charles"),
+        election_id: 1,
+        votes: 0,
+    };
+
+    let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+    assert_eq!(candidates.len(), 3);
+
+    let expected_candidates = vec![
+        candidate_alice.clone(),
+        candidate_bob.clone(),
+        candidate_charles.clone(),
+    ];
+    assert!(candidates
+        .iter()
+        .all(|item| expected_candidates.contains(item)));
+
+    chain.start_block();
+    let x = Wrapper::push(&chain).unregister(AccountNumber::from("charles"), 1);
+    println!(">>> unregister trace {}", x.trace);
+
+    let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+    assert_eq!(candidates.len(), 2);
+
+    let expected_candidates = vec![candidate_alice.clone(), candidate_bob.clone()];
+    assert!(candidates
+        .iter()
+        .all(|item| expected_candidates.contains(item)));
+
+    // Unregister an already unregistered user should fail
+    chain.start_block();
+    let error = Wrapper::push(&chain)
+        .unregister(AccountNumber::from("charles"), 1)
+        .trace
+        .error
+        .unwrap();
+    assert!(
+        error.contains("candidate is not registered"),
+        "error = {}",
+        error
+    );
+
+    // Register an already registered user should fail
+    let error = Wrapper::push(&chain)
+        .register(AccountNumber::from("alice"), 1)
+        .trace
+        .error
+        .unwrap();
+    assert!(
+        error.contains("candidate is already registered"),
+        "error = {}",
+        error
+    );
+
+    // Check candidate was added back
+    chain.start_block();
+    Wrapper::push(&chain).register(AccountNumber::from("charles"), 1);
+
+    let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+    assert_eq!(candidates.len(), 3);
+
+    let expected_candidates = vec![
+        candidate_alice.clone(),
+        candidate_bob.clone(),
+        candidate_charles.clone(),
+    ];
+    assert!(candidates
+        .iter()
+        .all(|item| expected_candidates.contains(item)));
+
+    Ok(())
+}
