@@ -171,7 +171,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          auto parameters = request.target.substr(string("/api/getTokenTypes").size());
          check(parameters.find('/') == string::npos, "invalid request");
 
-         TokenSys::Tables db{getReceiver()};
+         TokenSys::Tables db{TokenSys::service};
          auto             idx = db.open<TokenTable>().getIndex<0>();
 
          std::vector<UserService::TokenRecord> allTokens;
@@ -187,7 +187,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          check(user.find('/') == string::npos, "invalid user " + user);
          psibase::AccountNumber acc(string_view{user});
 
-         TokenSys::Tables db{getReceiver()};
+         TokenSys::Tables db{TokenSys::service};
          auto             idx = db.open<TokenTable>().getIndex<0>();
          check(idx.begin() != idx.end(), "No tokens");
 
@@ -218,14 +218,14 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
       if (request.target.starts_with("/api/getUserConf/"))
       {
          auto user_and_flag = request.target.substr(string("/api/getUserConf/").size());
-         auto delimiter = user_and_flag.find('/');
+         auto delimiter     = user_and_flag.find('/');
          check(delimiter != string::npos, "invalid user or flag " + user_and_flag);
-         auto user = user_and_flag.substr(0, delimiter);
-         auto flag = user_and_flag.substr(delimiter + 1, user_and_flag.size());
+         auto                   user = user_and_flag.substr(0, delimiter);
+         auto                   flag = user_and_flag.substr(delimiter + 1, user_and_flag.size());
          psibase::AccountNumber acc(string_view{user});
-         auto tokService = to<TokenSys>();
-         auto manualDebit = tokService.getUserConf(acc, flag);
-         return to_json(manualDebit);
+         auto                   tokService  = to<TokenSys>();
+         auto                   manualDebit = tokService.getUserConf(acc, flag);
+         return to_json_reply(manualDebit);
       }
    }
 
