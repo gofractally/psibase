@@ -5,7 +5,7 @@
 /// This service adds and multiplies `i32` numbers.
 ///
 /// This is where a detailed description would go.
-#[psibase::service()]
+#[psibase::service]
 mod service {
     /// Add two numbers together.
     ///

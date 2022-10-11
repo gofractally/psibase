@@ -4,7 +4,7 @@ use fracpack::PackableOwned;
 
 use crate::{
     get_key_bytes, kv_get, kv_greater_equal, kv_less_than, kv_max, kv_put, AccountNumber, DbId,
-    KeyView, ToKey,
+    RawKey, ToKey,
 };
 
 pub trait TableRecord: PackableOwned {
@@ -46,7 +46,7 @@ impl<Record: TableRecord> Table<Record> {
         let mut data = self.prefix.clone();
         idx.append_key(&mut data);
         key.append_key(&mut data);
-        KeyView { data }
+        RawKey::new(data)
     }
 
     pub fn put(&self, value: &Record) {
@@ -59,8 +59,8 @@ impl<Record: TableRecord> Table<Record> {
 pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub db_id: DbId,
     pub prefix: Vec<u8>,
-    front_key: KeyView,
-    back_key: KeyView,
+    front_key: RawKey,
+    back_key: RawKey,
     is_end: bool,
     pub key_type: PhantomData<Key>,
     pub record_type: PhantomData<Record>,
@@ -70,12 +70,8 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     fn new(db_id: DbId, prefix: Vec<u8>) -> TableIndex<Key, Record> {
         TableIndex {
             db_id,
-            front_key: KeyView {
-                data: prefix.clone(),
-            },
-            back_key: KeyView {
-                data: prefix.clone(),
-            },
+            front_key: RawKey::new(prefix.clone()),
+            back_key: RawKey::new(prefix.clone()),
             prefix,
             is_end: false,
             key_type: PhantomData,
@@ -86,7 +82,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     pub fn get(&self, key: Key) -> Option<Record> {
         let mut data = self.prefix.clone();
         key.append_key(&mut data);
-        let key = KeyView { data };
+        let key = RawKey { data };
 
         kv_get(self.db_id.to_owned(), &key).unwrap()
     }
@@ -94,7 +90,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     pub fn lower_bound(&self, key: Key) -> Option<Record> {
         let mut data = self.prefix.clone();
         key.append_key(&mut data);
-        let key = KeyView { data };
+        let key = RawKey::new(data);
 
         kv_greater_equal(self.db_id.to_owned(), &key, self.prefix.len() as u32)
     }
@@ -118,9 +114,7 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
         );
 
         if value.is_some() {
-            self.front_key = KeyView {
-                data: get_key_bytes(),
-            };
+            self.front_key = RawKey::new(get_key_bytes());
 
             if self.front_key == self.back_key {
                 println!(">>> front cursor met back cursor, it's the end");
@@ -157,9 +151,7 @@ impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Re
         };
 
         if value.is_some() {
-            self.back_key = KeyView {
-                data: get_key_bytes(),
-            };
+            self.back_key = RawKey::new(get_key_bytes());
 
             if self.back_key == self.front_key {
                 println!(">>> back cursor met front cursor, it's the end");

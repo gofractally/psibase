@@ -60,11 +60,10 @@ pub fn check_some<T>(opt_value: Option<T>, message: &str) -> T {
 }
 
 /// Abort with message if optional has value
-pub fn check_none<T>(opt_value: Option<T>, message: &str) -> T {
+pub fn check_none<T>(opt_value: Option<T>, message: &str) {
     if !opt_value.is_none() {
         abort_message_bytes(message.as_bytes());
     }
-    opt_value.unwrap()
 }
 
 /// Get the most-recent result when the size is known in advance
@@ -253,7 +252,7 @@ pub fn kv_greater_equal<K: ToKey, V: PackableOwned>(
     match_key_size: u32,
 ) -> Option<V> {
     let bytes = kv_greater_equal_bytes(db_id, &key.to_key(), match_key_size);
-    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap()) // unwrap won't panic
+    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
 }
 
 /// Get the key-value pair immediately-before provided key
@@ -278,7 +277,7 @@ pub fn kv_less_than<K: ToKey, V: PackableOwned>(
     match_key_size: u32,
 ) -> Option<V> {
     let bytes = kv_less_than_bytes(db_id, &key.to_key(), match_key_size);
-    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap()) // unwrap won't panic
+    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
 }
 
 /// Get the maximum key-value pair which has key as a prefix
@@ -294,5 +293,5 @@ pub fn kv_max_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
 /// If one is found, then returns the value. Use [get_key_bytes] to get the found key.
 pub fn kv_max<K: ToKey, V: PackableOwned>(db_id: DbId, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db_id, &key.to_key());
-    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap()) // unwrap won't panic
+    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
 }
