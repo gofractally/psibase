@@ -66,6 +66,42 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 /// syntax like above within action documentation to refer to
 /// other actions.
 ///
+/// # Recursion Safety
+///
+/// The [`recursive` option](#options), which defaults to false,
+/// controls whether the service can be reentered while it's
+/// currently executing. This prevents a series of exploits
+/// based on this pattern:
+///
+/// - Service `A` calls Service `B`
+/// - Service `B` calls back into Service `A`
+///
+/// Service `A` may opt into allowing recursion by setting the
+/// `recursive` option to true. This requires very careful
+/// design to prevent exploits. The following is a non-exhaustive
+/// list of potential attacks:
+///
+/// - `A` writes to a table, calls `B`, then writes to another
+///   table. Since it was in the middle of writing, `A`'s overall
+///   state is inconsistent. `B` calls a method on `A` which
+///   malfunctions because of the inconsistency between the
+///   two tables.
+/// - `A` reads some rows from a table then calls `B`. `B` calls an
+///   action in `A` which modifies the table. When `B` returns,
+///   `A` relies on the previously-read, but now out of date,
+///   data.
+/// - `A` calls `B` while iterating through a table index. `B` calls
+///   an action in `A` which modifies the table. When `B` returns,
+///   the iteration is now in an inconsistent state.
+///
+/// Rust's borrow checker doesn't prevent these attacks since
+/// nothing is mutably borrowed long term. Tables wrap psibase's
+/// [kv native functions](https://docs.rs/psibase/latest/psibase/native_raw/index.html),
+/// which treat the underlying KV store as if it were in an
+/// `UnsafeCell`. The Rust table wrappers can't protect against
+/// this since it's possible, and normal under recursion, to create
+/// multiple wrappers covering the same data range.
+///
 /// # Generated Output
 ///
 /// The macro adds the following definitions to the service module:
@@ -192,6 +228,7 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 /// ```ignore
 /// #[psibase::service(
 ///     name = see_blow,            // Account service is normally installed on
+///     recursive = false,          // Allow service to be recursively entered?
 ///     constant = "SERVICE",       // Name of generated constant
 ///     actions = "Actions",        // Name of generated struct
 ///     wrapper = "Wrapper",        // Name of generated struct

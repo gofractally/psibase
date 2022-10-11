@@ -12,6 +12,7 @@ use syn::{
 #[darling(default)]
 pub struct Options {
     name: String,
+    recursive: bool,
     constant: String,
     actions: String,
     wrapper: String,
@@ -25,6 +26,7 @@ impl Default for Options {
     fn default() -> Self {
         Options {
             name: "".into(),
+            recursive: false,
             constant: "SERVICE".into(),
             actions: "Actions".into(),
             wrapper: "Wrapper".into(),
@@ -103,6 +105,7 @@ fn process_mod(
         for (item_index, item) in items.iter_mut().enumerate() {
             if let Item::Fn(f) = item {
                 if f.attrs.iter().any(is_action_attr) {
+                    f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
                 }
             }
@@ -334,9 +337,28 @@ fn process_mod(
                 }
             }
         });
+        let begin_protection = if options.recursive {
+            quote! {}
+        } else {
+            quote! {
+                static mut executing: bool = false;
+                if executing {
+                    #psibase_mod::abort_message_bytes(b"Service is not recursive");
+                }
+                executing = true;
+            }
+        };
+        let end_protection = if options.recursive {
+            quote! {}
+        } else {
+            quote! {
+                executing = false;
+            }
+        };
         if options.dispatch.unwrap() {
             items.push(parse_quote! {
                 #[automatically_derived]
+                #[cfg(target_family = "wasm")]
                 mod service_wasm_interface {
                     fn dispatch(act: #psibase_mod::SharedAction) -> #psibase_mod::fracpack::Result<()> {
                         #dispatch_body
@@ -344,11 +366,16 @@ fn process_mod(
                     }
 
                     #[no_mangle]
-                    pub extern "C" fn called(_this_service: u64, _sender: u64) {
+                    pub unsafe extern "C" fn called(_this_service: u64, sender: u64) {
+                        #begin_protection
+                        let prev = #psibase_mod::get_sender();
+                        #psibase_mod::set_sender(#psibase_mod::AccountNumber::new(sender));
                         #psibase_mod::with_current_action(|act| {
                             dispatch(act)
                                     .unwrap_or_else(|_| #psibase_mod::abort_message("unpack action data failed"));
                         });
+                        #psibase_mod::set_sender(prev);
+                        #end_protection
                     }
 
                     extern "C" {
@@ -358,6 +385,7 @@ fn process_mod(
                     #[no_mangle]
                     pub unsafe extern "C" fn start(this_service: u64) {
                         __wasm_call_ctors();
+                        #psibase_mod::set_service(#psibase_mod::AccountNumber::new(this_service));
                     }
                 }
             });
