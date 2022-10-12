@@ -4,7 +4,7 @@ In psibase, projects include a **service** similar to smart contracts on other b
 
 An applet is a front end deployed to the blockchain which acts as an interface to the service, able to trigger transactions or it can be entirely independent, simply used as a personal website.
 
-Applets have the ability to set their own operations and queries, read about this at [James article]()
+Applets have the ability to set their own operations and queries, read about this at [James article](applet/inter-applet-communication.md)
 
 The React generator comes with an example of using the Service class and its decorators to make defining these as easy as possible.
 
