@@ -3,7 +3,6 @@
 # To use this configuration copy it to the root directory of the node.
 # The command `psinode db` will find this file in db/config.
 
-slow     = yes
 p2p      = off
 producer = psibase
 # sign     = <private key>

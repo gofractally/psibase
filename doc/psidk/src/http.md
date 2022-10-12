@@ -20,6 +20,7 @@
 - [Service-provided services](#service-provided-services)
   - [Packing actions (http)](#packing-actions-http)
 - [Node administrator services](#node-administrator-services)
+  - [Server status](#server-status)
   - [Peer management](#peer-management)
   - [Server configuration](#server-configuration)
   - [Logging](#logging)
@@ -390,8 +391,11 @@ TODO
 
 ## Node administrator services
 
+The administrator interface under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`).
+
 | Method | URL                        | Description                                                                   |
 |--------|----------------------------|-------------------------------------------------------------------------------|
+| `GET`  | `/native/admin/status`     | Returns status conditions currently affecting the server                      |
 | `GET`  | `/native/admin/peers`      | Returns a JSON array of all the peers that the node is currently connected to |
 | `POST` | `/native/admin/connect`    | Connects to another node                                                      |
 | `POST` | `/native/admin/disconnect` | Disconnects an existing peer connection                                       |
@@ -399,16 +403,25 @@ TODO
 | `PUT`  | `/native/admin/config`     | Sets the [server configuration](#server-configuration)                        |
 | `GET`  | `/native/admin/log`        | Websocket that provides access to [live server logs](#websocket-logger)       |
 
+### Server status
+
+`/native/admin/status` returns an array of strings identifying conditions that affect the server.
+
+| Status      | Description                                                                                                                                                                                                                                                                                                                                                                  |
+|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `"slow"`    | `psinode` was unable to lock its database cache in memory. This may result in reduced performance. This condition can be caused either by insufficient physical RAM on the host machine, or by a lack of permissions. In the latter case, the command `sudo prlimit --memlock=-1 --pid $$` can be run before lauching `psinode` to increase the limits of the current shell. |
+| `"startup"` | `psinode` is still initializing. Some functionality may be unavailable.                                                                                                                                                                                                                                                                                                      |
+
 ### Peer management
 
 `/native/admin/peers` lists the currently connected peers.
 
 Each peer has the following fields:
 
-| Field    | Type   | Description                                 |
-|----------|--------|---------------------------------------------|
-| id       | Number | A unique integer identifying the connection |
-| endpoint | String | The remote endpoint in the form `host:port` |
+| Field      | Type   | Description                                 |
+|------------|--------|---------------------------------------------|
+| `id`       | Number | A unique integer identifying the connection |
+| `endpoint` | String | The remote endpoint in the form `host:port` |
 
 `/native/admin/connect` creates a new p2p connection to another node.
 
@@ -425,19 +438,23 @@ Each peer has the following fields:
 
 ### Server configuration
 
-`/native/admin/config` provides `GET` and `PUT` access to the server's configuration.
+`/native/admin/config` provides `GET` and `PUT` access to the server's configuration. Changes made using this API are persistent across server restarts. New versions of psibase may add fields at any time. Clients that wish to set the configuration should `GET` the configuration first and return unknown fields to the server unchanged.
 
-| Field    | Type    | Description                                                                                                                                                                          |
-|----------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| p2p      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                        |
-| producer | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production. |
-| loggers  | Object  | A description of the [destinations for log records](#logging)                                                                                                                        |
+| Field      | Type    | Description                                                                                                                                                                          |
+|------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `p2p`      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                        |
+| `producer` | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production. |
+| `host`     | String  | The server's hostname. Changes to the host will take effect the next time the server starts.                                                                                         |
+| `port`     | Number  | The port that the server runs on. Changes to the port will take effect the next time the server starts.                                                                              |
+| `loggers`  | Object  | A description of the [destinations for log records](#logging)                                                                                                                        |
 
-Example
+Example:
 ```json
 {
-    "p2p":true,
-    "producer":"prod",
+    "p2p": true,
+    "producer": "prod",
+    "host": "127.0.0.1.sslip.io",
+    "port": 8080,
     "loggers": {
         "console": {
             "type": "console",
