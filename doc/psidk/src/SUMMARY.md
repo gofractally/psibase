@@ -1,7 +1,9 @@
 # psidk
 
 - [Quick Start]()
-  - [Dependencies]()
+  - [Intro](intro.md)
+  - [Deploy](deploy.md)
+  - [Operations & Queries](defining-operations-queries.md)
 - [Installation]()
   - [Linux](linux.md)
   - [Rust](rust.md)
