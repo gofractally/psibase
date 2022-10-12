@@ -12,6 +12,7 @@ use syn::{
 #[darling(default)]
 pub struct Options {
     name: String,
+    recursive: bool,
     constant: String,
     actions: String,
     wrapper: String,
@@ -25,6 +26,7 @@ impl Default for Options {
     fn default() -> Self {
         Options {
             name: "".into(),
+            recursive: false,
             constant: "SERVICE".into(),
             actions: "Actions".into(),
             wrapper: "Wrapper".into(),
@@ -72,6 +74,17 @@ fn is_action_attr(attr: &Attribute) -> bool {
     false
 }
 
+/*
+fn is_table_attr(attr: &Attribute) -> bool {
+    if let AttrStyle::Outer = attr.style {
+        if attr.path.is_ident("table") {
+            return true;
+        }
+    }
+    false
+}
+*/
+
 fn process_mod(
     options: &Options,
     psibase_mod: &proc_macro2::TokenStream,
@@ -92,6 +105,7 @@ fn process_mod(
         for (item_index, item) in items.iter_mut().enumerate() {
             if let Item::Fn(f) = item {
                 if f.attrs.iter().any(is_action_attr) {
+                    f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
                 }
             }
@@ -179,11 +193,36 @@ fn process_mod(
             pub struct #wrapper;
         });
 
+        let call_from_to_doc = format!(
+            "
+            Call another service.
+
+            This method returns an object which has [methods]({actions}#implementations)
+            (one per action) which call another service and return the result from the call.
+            This method is only usable by services.
+
+            ",
+            actions = options.actions
+        );
+        let call_doc = format!(
+            "{} This method defaults `sender` to [`{psibase}::get_sender`] and `service` to \"{}\".",
+            call_from_to_doc, options.name,            psibase = options.psibase_mod,
+        );
+        let call_to_doc = format!(
+            "{} This method defaults `sender` to [`{psibase}::get_sender`].",
+            call_from_to_doc,
+            psibase = options.psibase_mod,
+        );
+        let call_from_doc = format!(
+            "{} This method defaults `service` to \"{}\".",
+            call_from_to_doc, options.name
+        );
+
         let push_from_to_doc = format!(
             "
             push transactions to [psibase::Chain]({psibase}::Chain).
 
-            This function returns an object which has [methods]({actions}#implementations)
+            This method returns an object which has [methods]({actions}#implementations)
             (one per action) which push transactions to a test chain and return a
             [psibase::ChainResult]({psibase}::ChainResult) or
             [psibase::ChainEmptyResult]({psibase}::ChainEmptyResult). This final object
@@ -194,15 +233,15 @@ fn process_mod(
             actions = options.actions
         );
         let push_doc = format!(
-            "{} This function defaults both `sender` and `service` to \"{}\".",
+            "{} This method defaults both `sender` and `service` to \"{}\".",
             push_from_to_doc, options.name
         );
         let push_to_doc = format!(
-            "{} This function defaults `sender` to \"{}\".",
+            "{} This method defaults `sender` to \"{}\".",
             push_from_to_doc, options.name
         );
         let push_from_doc = format!(
-            "{} This function defaults `service` to \"{}\".",
+            "{} This method defaults `service` to \"{}\".",
             push_from_to_doc, options.name
         );
 
@@ -210,7 +249,7 @@ fn process_mod(
             "
             Pack actions into [psibase::Action]({psibase}::Action).
 
-            This function returns an object which has [methods]({actions}#implementations)
+            This method returns an object which has [methods]({actions}#implementations)
             (one per action) which pack the action's arguments using [fracpack] and
             return a [psibase::Action]({psibase}::Action). The `pack_*` series of
             functions is mainly useful to applications which push transactions
@@ -221,15 +260,15 @@ fn process_mod(
             actions = options.actions
         );
         let pack_doc = format!(
-            "{} This function defaults both `sender` and `service` to \"{}\".",
+            "{} This method defaults both `sender` and `service` to \"{}\".",
             pack_from_to_doc, options.name
         );
         let pack_to_doc = format!(
-            "{} This function defaults `sender` to \"{}\".",
+            "{} This method defaults `sender` to \"{}\".",
             pack_from_to_doc, options.name
         );
         let pack_from_doc = format!(
-            "{} This function defaults `service` to \"{}\".",
+            "{} This method defaults `service` to \"{}\".",
             pack_from_to_doc, options.name
         );
 
@@ -239,6 +278,46 @@ fn process_mod(
                 #[doc = #constant_doc]
                 pub const SERVICE: #psibase_mod::AccountNumber =
                     #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
+
+                #[doc = #call_doc]
+                pub fn call() -> #actions<#psibase_mod::ServiceCaller> {
+                    #psibase_mod::ServiceCaller {
+                        sender: #psibase_mod::get_service(),
+                        service: Self::#constant,
+                    }
+                    .into()
+                }
+
+                #[doc = #call_to_doc]
+                pub fn call_to(service: #psibase_mod::AccountNumber)
+                -> #actions<#psibase_mod::ServiceCaller>
+                {
+                    #psibase_mod::ServiceCaller {
+                        sender: #psibase_mod::get_service(),
+                        service,
+                    }
+                    .into()
+                }
+
+                #[doc = #call_from_doc]
+                pub fn call_from(sender: #psibase_mod::AccountNumber)
+                -> #actions<#psibase_mod::ServiceCaller>
+                {
+                    #psibase_mod::ServiceCaller {
+                        sender,
+                        service: Self::#constant,
+                    }
+                    .into()
+                }
+
+                #[doc = #call_from_to_doc]
+                pub fn call_from_to(
+                    sender: #psibase_mod::AccountNumber,
+                    service: #psibase_mod::AccountNumber)
+                -> #actions<#psibase_mod::ServiceCaller>
+                {
+                    #psibase_mod::ServiceCaller { sender, service }.into()
+                }
 
                 #[doc = #push_doc]
                 pub fn push(chain: &#psibase_mod::Chain) -> #actions<#psibase_mod::ChainPusher> {
@@ -323,9 +402,28 @@ fn process_mod(
                 }
             }
         });
+        let begin_protection = if options.recursive {
+            quote! {}
+        } else {
+            quote! {
+                static mut executing: bool = false;
+                if executing {
+                    #psibase_mod::abort_message_bytes(b"Service is not recursive");
+                }
+                executing = true;
+            }
+        };
+        let end_protection = if options.recursive {
+            quote! {}
+        } else {
+            quote! {
+                executing = false;
+            }
+        };
         if options.dispatch.unwrap() {
             items.push(parse_quote! {
                 #[automatically_derived]
+                #[cfg(target_family = "wasm")]
                 mod service_wasm_interface {
                     fn dispatch(act: #psibase_mod::SharedAction) -> #psibase_mod::fracpack::Result<()> {
                         #dispatch_body
@@ -333,11 +431,16 @@ fn process_mod(
                     }
 
                     #[no_mangle]
-                    pub extern "C" fn called(_this_service: u64, _sender: u64) {
+                    pub unsafe extern "C" fn called(_this_service: u64, sender: u64) {
+                        #begin_protection
+                        let prev = #psibase_mod::get_sender();
+                        #psibase_mod::set_sender(#psibase_mod::AccountNumber::new(sender));
                         #psibase_mod::with_current_action(|act| {
                             dispatch(act)
                                     .unwrap_or_else(|_| #psibase_mod::abort_message("unpack action data failed"));
                         });
+                        #psibase_mod::set_sender(prev);
+                        #end_protection
                     }
 
                     extern "C" {
@@ -347,6 +450,7 @@ fn process_mod(
                     #[no_mangle]
                     pub unsafe extern "C" fn start(this_service: u64) {
                         __wasm_call_ctors();
+                        #psibase_mod::set_service(#psibase_mod::AccountNumber::new(this_service));
                     }
                 }
             });

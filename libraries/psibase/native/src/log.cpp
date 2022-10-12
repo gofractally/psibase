@@ -1,3 +1,4 @@
+#include <psibase/ConfigFile.hpp>
 #include <psibase/LogQueue.hpp>
 #include <psibase/log.hpp>
 
@@ -1555,6 +1556,80 @@ namespace psibase::loggers
             to_json(value, stream);
          }
          stream.write('}');
+      }
+   }
+
+   void to_config_impl(const std::string& section, std::monostate, ConfigFile& file) {}
+
+   void to_config_impl(const std::string& section, const FileSinkConfig& obj, ConfigFile& file)
+   {
+      if (!obj.filename.empty())
+      {
+         file.set(section, "filename", obj.filename.native(), "The log file pattern");
+      }
+      if (!obj.target.empty())
+      {
+         file.set(section, "target", obj.target.native(), "The pattern for rotated log files");
+      }
+      if (obj.rotationSize != std::numeric_limits<std::uintmax_t>::max())
+      {
+         file.set(section, "rotationSize", std::to_string(obj.rotationSize),
+                  "Rotate logs when they reach this size");
+      }
+      if (!obj.rotationTime.empty())
+      {
+         file.set(section, "rotationTime", obj.rotationTime, "Time when logs are rotated");
+      }
+      if (obj.maxFiles != std::numeric_limits<std::uintmax_t>::max())
+      {
+         file.set(section, "maxFiles", std::to_string(obj.maxFiles),
+                  "Maximum number of log files retained");
+      }
+      if (obj.maxSize != std::numeric_limits<std::uintmax_t>::max())
+      {
+         file.set(section, "maxSize", std::to_string(obj.maxSize),
+                  "Maximum total size of log files retained");
+      }
+      file.set(section, "flush", obj.flush ? "on" : "off", "Whether to flush every log record");
+   }
+
+   void format_to_config(const std::string& section, std::string format_json, ConfigFile& file)
+   {
+      psio::json_token_stream stream(format_json.data());
+      if (stream.peek_token().get().type == psio::json_token_type::type_start_object)
+      {
+         psio::from_json_object(stream,
+                                [&](std::string_view key)
+                                {
+                                   if (key == "default")
+                                   {
+                                      file.set(section, "format", stream.get_string(), "");
+                                   }
+                                   else
+                                   {
+                                      file.set(section, "format." + std::string(key),
+                                               stream.get_string(), "");
+                                   }
+                                });
+      }
+      else
+      {
+         file.set(section, "filter", stream.get_string(), "");
+      }
+   }
+
+   void to_config(const Config& obj, ConfigFile& file)
+   {
+      if (obj.impl)
+      {
+         for (const auto& [name, sink] : obj.impl->sinks)
+         {
+            auto section = "logger." + name;
+            file.set(section, "type", sink.type, "");
+            file.set(section, "filter", sink.filter_str, "");
+            format_to_config(section, sink.format_str, file);
+            std::visit([&](auto& v) { to_config_impl(section, v, file); }, sink.backend);
+         }
       }
    }
 

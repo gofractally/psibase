@@ -1,3 +1,4 @@
+#include <psibase/ConfigFile.hpp>
 #include <psibase/EcdsaProver.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/cft.hpp>
@@ -304,11 +305,40 @@ PSIO_REFLECT(DisconnectRequest, id);
 
 struct PsinodeConfig
 {
-   bool                     p2p = false;
+   bool                     slow = false;
+   bool                     p2p  = false;
    AccountNumber            producer;
+   std::string              host;
+   std::uint16_t            port = 8080;
    psibase::loggers::Config loggers;
 };
-PSIO_REFLECT(PsinodeConfig, p2p, producer, loggers);
+PSIO_REFLECT(PsinodeConfig, slow, p2p, producer, host, port, loggers);
+
+void to_config(const PsinodeConfig& config, ConfigFile& file)
+{
+   file.set("", "slow", config.slow ? "on" : "off",
+            "Allow psinode to run without locking the database in RAM");
+   file.set("", "p2p", config.p2p ? "on" : "off", "Whether to accept incoming P2P connections");
+   if (config.producer != AccountNumber())
+   {
+      file.set("", "producer", config.producer.str(), "The name to use for block production");
+   }
+   if (!config.host.empty())
+   {
+      file.set("", "host", config.host, "The HTTP server's host name");
+      file.set("", "port", std::to_string(config.port),
+               "The TCP port that the HTTP server listens on");
+   }
+   // TODO: Not implemented yet.  Sign needs some thought,
+   // because it's probably a bad idea to reveal the
+   // private keys.
+   file.keep("", "sign");
+   file.keep("", "peer");
+   file.keep("", "leeway");
+   file.keep("", "host-perf");
+   //
+   to_config(config.loggers, file);
+}
 
 using timer_type = boost::asio::system_timer;
 
@@ -338,7 +368,7 @@ void run(const std::string&              db_path,
          std::shared_ptr<Prover>         prover,
          const std::vector<std::string>& peers,
          bool                            enable_incoming_p2p,
-         const std::string&              host,
+         std::string                     host,
          unsigned short                  port,
          bool                            host_perf,
          uint32_t                        leeway_us,
@@ -469,33 +499,53 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->set_config = [&chainContext, &node, &http_config](
-                                    std::vector<char> json, http::connect_callback callback)
+      http_config->set_config = [&chainContext, &node, &db_path, &http_config, &allow_slow, &host,
+                                 &port](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
 
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
-                            &http_config, callback = std::move(callback)]() mutable
-                           {
-                              node.set_producer_id(config.producer);
-                              http_config->enable_p2p = config.p2p;
-                              loggers::configure(config.loggers);
-                              callback(std::nullopt);
-                           });
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
+              &http_config, &allow_slow, &host, &port, callback = std::move(callback)]() mutable
+             {
+                node.set_producer_id(config.producer);
+                allow_slow              = config.slow;
+                http_config->enable_p2p = config.p2p;
+                host                    = config.host;
+                port                    = config.port;
+                loggers::configure(config.loggers);
+                {
+                   auto       path = std::filesystem::path(db_path) / "config";
+                   ConfigFile file;
+                   {
+                      std::ifstream in(path);
+                      file.parse(in);
+                   }
+                   to_config(config, file);
+                   {
+                      std::ofstream out(path);
+                      file.write(out);
+                   }
+                }
+                callback(std::nullopt);
+             });
       };
 
-      http_config->get_config =
-          [&chainContext, &node, &allow_slow, &http_config](http::get_config_callback callback)
+      http_config->get_config = [&chainContext, &node, &allow_slow, &http_config, &host,
+                                 &port](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
-                           [&chainContext, &node, &allow_slow, &http_config,
+                           [&chainContext, &node, &allow_slow, &http_config, &host, &port,
                             callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
+                              result.slow     = allow_slow;
                               result.p2p      = http_config->enable_p2p;
                               result.producer = node.producer_name();
+                              result.host     = host;
+                              result.port     = port;
                               result.loggers  = loggers::Config::get();
                               callback(
                                   [result = std::move(result)]() mutable

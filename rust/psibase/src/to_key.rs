@@ -45,6 +45,28 @@ pub trait ToKey {
     }
 }
 
+/// A serialized key
+///
+/// The serialized data has the same sort order as the non-serialized form
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RawKey {
+    pub data: Vec<u8>,
+}
+
+impl RawKey {
+    pub fn new(data: Vec<u8>) -> Self {
+        RawKey { data }
+    }
+}
+
+impl ToKey for RawKey {
+    fn append_key(&self, key: &mut Vec<u8>) {
+        for byte in &self.data {
+            key.push(*byte);
+        }
+    }
+}
+
 impl<T: ToKey + ?Sized> ToKey for &T {
     fn append_key(&self, key: &mut Vec<u8>) {
         T::append_key(self, key)

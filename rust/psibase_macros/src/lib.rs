@@ -62,9 +62,45 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 /// the macro creates public definitions (below).
 ///
 /// The macro copies the action documentation (like above) to the
-/// [`Actions<T>` methods](Actions-struct). Use the `[Self::...]`
+/// [`Actions<T>` methods](#actions-struct). Use the `[Self::...]`
 /// syntax like above within action documentation to refer to
 /// other actions.
+///
+/// # Recursion Safety
+///
+/// The [`recursive` option](#options), which defaults to false,
+/// controls whether the service can be reentered while it's
+/// currently executing. This prevents a series of exploits
+/// based on this pattern:
+///
+/// - Service `A` calls Service `B`
+/// - Service `B` calls back into Service `A`
+///
+/// Service `A` may opt into allowing recursion by setting the
+/// `recursive` option to true. This requires very careful
+/// design to prevent exploits. The following is a non-exhaustive
+/// list of potential attacks:
+///
+/// - `A` writes to a table, calls `B`, then writes to another
+///   table. Since it was in the middle of writing, `A`'s overall
+///   state is inconsistent. `B` calls a method on `A` which
+///   malfunctions because of the inconsistency between the
+///   two tables.
+/// - `A` reads some rows from a table then calls `B`. `B` calls an
+///   action in `A` which modifies the table. When `B` returns,
+///   `A` relies on the previously-read, but now out of date,
+///   data.
+/// - `A` calls `B` while iterating through a table index. `B` calls
+///   an action in `A` which modifies the table. When `B` returns,
+///   the iteration is now in an inconsistent state.
+///
+/// Rust's borrow checker doesn't prevent these attacks since
+/// nothing is mutably borrowed long term. Tables wrap psibase's
+/// [kv native functions](https://docs.rs/psibase/latest/psibase/native_raw/index.html),
+/// which treat the underlying KV store as if it were in an
+/// `UnsafeCell`. The Rust table wrappers can't protect against
+/// this since it's possible, and normal under recursion, to create
+/// multiple wrappers covering the same data range.
 ///
 /// # Generated Output
 ///
@@ -101,9 +137,24 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 ///     // The account this service normally runs on
 ///     pub const SERVICE: psibase::AccountNumber;
 ///
+///     // Call another service.
+///     //
+///     // `call_*` methods return an object which has methods (one per action) which
+///     // call another service and return the result from the call. These methods are
+///     // only usable by services.
+///     pub fn call() -> Actions<psibase::ServiceCaller>;
+///     pub fn call_to(service: psibase::AccountNumber)
+///     -> Actions<psibase::ServiceCaller>;
+///     pub fn call_from(sender: psibase::AccountNumber)
+///     -> Actions<psibase::ServiceCaller>;
+///     pub fn call_from_to(
+///         sender: psibase::AccountNumber,
+///         service: psibase::AccountNumber)
+///     -> Actions<psibase::ServiceCaller>;
+///
 ///     // push transactions to psibase::Chain.
 ///     //
-///     // `push_*` functions return an object which has methods (one per action) which
+///     // `push_*` methods return an object which has methods (one per action) which
 ///     // push transactions to a test chain and return a psibase::ChainResult or
 ///     // psibase::ChainEmptyResult. This final object can verify success or failure
 ///     // and can retrieve the return value, if any.
@@ -192,6 +243,7 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 /// ```ignore
 /// #[psibase::service(
 ///     name = see_blow,            // Account service is normally installed on
+///     recursive = false,          // Allow service to be recursively entered?
 ///     constant = "SERVICE",       // Name of generated constant
 ///     actions = "Actions",        // Name of generated struct
 ///     wrapper = "Wrapper",        // Name of generated struct
@@ -229,9 +281,37 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Example
 ///
 /// ```ignore
-/// #[psibase::test_case(services("example1", "example2"))]
-/// fn my_test(chain: psibase::Chain) -> Result<(), psibase::Error> {
-///     // TODO
+/// #[psibase::service]
+/// mod service {
+///     #[action]
+///     fn add(a: i32, b: i32) -> i32 {
+///         println!("Let's add {} and {}", a, b);
+///         println!("Hopefully the result is {}", a + b);
+///         a + b
+///     }
+/// }
+///
+/// #[psibase::test_case(services("example"))]
+/// fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
+///     // Verify the action works as expected.
+///     assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
+///
+///     // Start a new block; this prevents the following transaction
+///     // from being rejected as a duplicate.
+///     chain.start_block();
+///
+///     // Print a trace; this allows us to see:
+///     // * The service call chain. Something calls our service;
+///     //   let's see what it is!
+///     // * The service's prints, which are normally invisible
+///     //   during testing
+///     println!(
+///         "\n\nHere is the trace:\n{}",
+///         Wrapper::push(&chain).add(3, 4).trace
+///     );
+///
+///     // If we got this far, then the test has passed
+///     Ok(())
 /// }
 /// ```
 ///

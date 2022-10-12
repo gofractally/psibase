@@ -49,7 +49,7 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     assert_eq!(Wrapper::push(&chain).multiply(3, 4).get()?, 12);
 
     // Start a new block; this prevents the following transaction
-    // from being marked as a duplicate.
+    // from being rejected as a duplicate.
     chain.start_block();
 
     // Print a trace; this allows us to see:
@@ -158,3 +158,8 @@ location of the built WASM. `include_service!` then expands into
 
 The `services(...)` argument of the `test_case` macro expands to code which
 uses `include_service!`.
+
+## Next Step
+
+Services may call other services; we show how to do this in
+[Calling Other Services](calling.md).
