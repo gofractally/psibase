@@ -34,7 +34,7 @@ mod service {
     }
 
     // #[table]
-    #[derive(Fracpack, Eq, PartialEq, Clone)]
+    #[derive(Fracpack, Eq, PartialEq, Clone, Debug)]
     pub struct CandidateRecord {
         pub election_id: u32,
         pub candidate: AccountNumber,
@@ -103,6 +103,7 @@ mod service {
 
         let current_time = date_time; // TODO: get the current time
 
+        // TODO: this expensive table scan needs secondary indexes
         idx.rev() // list from the most recent ones
             .filter(|election| {
                 election.voting_start_date <= current_time
@@ -127,11 +128,33 @@ mod service {
         .collect()
     }
 
-    // /// Get the winner for a closed election
-    // #[action]
-    // fn get_winner(election_id: u32) {
-    //     unimplemented!()
-    // }
+    /// Get the winner for a closed election
+    #[action]
+    fn get_winner(election_id: u32) -> CandidateRecord {
+        let election = get_election(election_id);
+
+        // TODO: implement get time
+        let current_time = TimePointSec { seconds: 90 };
+
+        check(
+            current_time > election.voting_end_date,
+            "election is not finished",
+        );
+
+        let table = CandidatesTable::open();
+        let mut idx = table.get_index_pk();
+
+        // TODO: implement secondary key to get the FIRST candidate with the biggest votes count
+        let mut candidates_records: Vec<CandidateRecord> = idx
+            .range(
+                (election_id, AccountNumber::default()),
+                (election_id + 1, AccountNumber::default()),
+            )
+            .collect();
+
+        candidates_records.sort_by_key(|record| record.votes);
+        check_some(candidates_records.pop(), "election has no winner")
+    }
 
     /// Creates a new election
     #[action]
@@ -229,7 +252,7 @@ mod service {
         let election = get_election(election_id);
 
         // TODO: implement get current time
-        let current_time = TimePointSec { seconds: 0 };
+        let current_time = TimePointSec { seconds: 30 };
 
         check(
             current_time >= election.voting_start_date,
@@ -395,8 +418,7 @@ mod tests {
             .all(|item| expected_candidates.contains(item)));
 
         chain.start_block();
-        let x = Wrapper::push(&chain).unregister(AccountNumber::from("charles"), 1);
-        println!(">>> unregister trace {}", x.trace);
+        Wrapper::push(&chain).unregister(AccountNumber::from("charles"), 1);
 
         let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
         assert_eq!(candidates.len(), 2);
@@ -446,6 +468,68 @@ mod tests {
         assert!(candidates
             .iter()
             .all(|item| expected_candidates.contains(item)));
+
+        Ok(())
+    }
+
+    #[psibase::test_case(services("elections"))]
+    fn votes_are_submitted_successfully(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        println!("Starting election...");
+        Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
+
+        Wrapper::push(&chain).register(AccountNumber::from("bob"), 1);
+        Wrapper::push(&chain).register(AccountNumber::from("alice"), 1);
+        Wrapper::push(&chain).register(AccountNumber::from("charles"), 1);
+
+        for i in 1..=100 {
+            let voter = AccountNumber::from(format!("voter{i}").as_str());
+            let candidate = if i <= 10 {
+                AccountNumber::from("bob")
+            } else if i <= 50 {
+                AccountNumber::from("alice")
+            } else {
+                AccountNumber::from("charles")
+            };
+
+            Wrapper::push(&chain).vote(voter, 1, candidate);
+        }
+
+        let candidate_bob = CandidateRecord {
+            candidate: AccountNumber::from("bob"),
+            election_id: 1,
+            votes: 10,
+        };
+
+        let candidate_alice = CandidateRecord {
+            candidate: AccountNumber::from("alice"),
+            election_id: 1,
+            votes: 40,
+        };
+
+        let candidate_charles = CandidateRecord {
+            candidate: AccountNumber::from("charles"),
+            election_id: 1,
+            votes: 50,
+        };
+
+        let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+        assert_eq!(candidates.len(), 3);
+
+        let expected_candidates = vec![
+            candidate_alice.clone(),
+            candidate_bob.clone(),
+            candidate_charles.clone(),
+        ];
+        assert!(
+            candidates
+                .iter()
+                .all(|item| expected_candidates.contains(item)),
+            "Expected voting candidates results are wrong: {:?}",
+            candidates
+        );
+
+        let winner = Wrapper::push(&chain).get_winner(1).get()?;
+        assert_eq!(winner, candidate_charles, "unexpected winner: {:?}", winner);
 
         Ok(())
     }
