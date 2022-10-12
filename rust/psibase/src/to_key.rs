@@ -61,9 +61,7 @@ impl RawKey {
 
 impl ToKey for RawKey {
     fn append_key(&self, key: &mut Vec<u8>) {
-        for byte in &self.data {
-            key.push(*byte);
-        }
+        key.extend_from_slice(&self.data[..]);
     }
 }
 

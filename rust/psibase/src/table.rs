@@ -39,7 +39,7 @@ impl<Record: TableRecord> Table<Record> {
         let mut idx_prefix = self.prefix.clone();
         idx.append_key(&mut idx_prefix);
 
-        TableIndex::new(self.db_id.to_owned(), idx_prefix)
+        TableIndex::new(self.db_id, idx_prefix)
     }
 
     /// Returns the Primary Key Index
@@ -57,13 +57,13 @@ impl<Record: TableRecord> Table<Record> {
     pub fn put(&self, value: &Record) {
         let pk = self.serialize_key(0, &value.get_primary_key());
         // todo: handle secondaries
-        kv_put(self.db_id.to_owned(), &pk, value);
+        kv_put(self.db_id, &pk, value);
     }
 
     pub fn remove(&self, primary_key: &impl ToKey) {
         let pk = self.serialize_key(0, primary_key);
         // todo: handle secondaries
-        kv_remove(self.db_id.to_owned(), &pk);
+        kv_remove(self.db_id, &pk);
     }
 }
 
@@ -99,7 +99,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         key.append_key(&mut data);
         let key = RawKey::new(data);
 
-        kv_get(self.db_id.to_owned(), &key).unwrap()
+        kv_get(self.db_id, &key).unwrap()
     }
 
     /// Set the range of available records for the iterator; useful for viewing a slice of the records
@@ -130,11 +130,8 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
 
         println!(">>> iterating from the front with key {:?}", self.front_key);
 
-        let value: Option<Record> = kv_greater_equal(
-            self.db_id.to_owned(),
-            &self.front_key,
-            self.prefix.len() as u32,
-        );
+        let value: Option<Record> =
+            kv_greater_equal(self.db_id, &self.front_key, self.prefix.len() as u32);
 
         if value.is_some() {
             self.front_key = RawKey::new(get_key_bytes());
@@ -167,13 +164,9 @@ impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Re
         println!(">>> iterating from the back with key {:?}", self.back_key);
 
         let value = if self.back_key.data == self.prefix {
-            kv_max(self.db_id.to_owned(), &self.back_key)
+            kv_max(self.db_id, &self.back_key)
         } else {
-            kv_less_than(
-                self.db_id.to_owned(),
-                &self.back_key,
-                self.prefix.len() as u32,
-            )
+            kv_less_than(self.db_id, &self.back_key, self.prefix.len() as u32)
         };
 
         if value.is_some() {
