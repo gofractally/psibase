@@ -48,7 +48,7 @@ pub trait ToKey {
 /// A serialized key
 ///
 /// The serialized data has the same sort order as the non-serialized form
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RawKey {
     pub data: Vec<u8>,
 }
@@ -253,4 +253,48 @@ tuple_impls! {
     14 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13)
     15 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14)
     16 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14 15 T15)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keys_can_be_compared() {
+        let a = RawKey::new(vec![1, 2, 3]);
+        let b = RawKey::new(vec![1, 2, 3]);
+        assert!(a == b, "keys expected to be equal");
+
+        let a = RawKey::new(vec![1, 2, 3, 4]);
+        let b = RawKey::new(vec![1, 2, 3]);
+        assert!(a > b, "key a expected to be greater than key b");
+
+        let a = RawKey::new(vec![1, 2, 3, 4]);
+        let b = RawKey::new(vec![1, 2, 3, 0]);
+        assert!(a > b, "key a expected to be greater than key b");
+
+        let a = RawKey::new(vec![1, 2, 3, 4]);
+        let b = RawKey::new(vec![1, 2, 3, 3]);
+        assert!(a > b, "key a expected to be greater than key b");
+
+        let a = RawKey::new(vec![1, 2, 3, 4]);
+        let b = RawKey::new(vec![1, 2, 3, 3, 0]);
+        assert!(a > b, "key a expected to be greater than key b");
+
+        let a = RawKey::new(vec![1, 2, 3, 4]);
+        let b = RawKey::new(vec![1, 2, 3, 3, 255]);
+        assert!(a > b, "key a expected to be greater than key b");
+
+        let a = RawKey::new(vec![1, 2, 3, 4]);
+        let b = RawKey::new(vec![1, 2, 3, 4, 0]);
+        assert!(a < b, "key a expected to be less than key b");
+
+        let a = RawKey::new(vec![1, 2, 3, 4]);
+        let b = RawKey::new(vec![1, 2, 3, 4, 1]);
+        assert!(a < b, "key a expected to be less than key b");
+
+        let a = RawKey::new(vec![1, 2, 3, 4]);
+        let b = RawKey::new(vec![1, 2, 3, 4, 255]);
+        assert!(a < b, "key a expected to be less than key b");
+    }
 }

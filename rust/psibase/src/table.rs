@@ -78,6 +78,7 @@ pub struct TableIndex<Key: ToKey, Record: TableRecord> {
 }
 
 impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
+    /// Instantiate a new Table Index (Primary or Secondary)
     fn new(db_id: DbId, prefix: Vec<u8>) -> TableIndex<Key, Record> {
         TableIndex {
             db_id,
@@ -90,20 +91,32 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         }
     }
 
+    /// Get the table record for the given key, if any
+    ///
+    /// It does not affect the iterator
     pub fn get(&self, key: Key) -> Option<Record> {
-        let mut data = self.prefix.clone();
-        key.append_key(&mut data);
-        let key = RawKey { data };
-
-        kv_get(self.db_id.to_owned(), &key).unwrap()
-    }
-
-    pub fn lower_bound(&self, key: Key) -> Option<Record> {
         let mut data = self.prefix.clone();
         key.append_key(&mut data);
         let key = RawKey::new(data);
 
-        kv_greater_equal(self.db_id.to_owned(), &key, self.prefix.len() as u32)
+        kv_get(self.db_id.to_owned(), &key).unwrap()
+    }
+
+    /// Set the range of available records for the iterator; useful for viewing a slice of the records
+    ///
+    /// - `from` is inclusive, `to` is not: [from..to)
+    /// - using this after the start of an iteration process (for..loops, next(), next_back() etc)
+    /// can mess the iteration sequence order, since it resets the front and the back cursors
+    pub fn range(&mut self, from: Key, to: Key) -> &mut Self {
+        let mut front_key = self.prefix.clone();
+        from.append_key(&mut front_key);
+        self.front_key = RawKey::new(front_key);
+
+        let mut back_key = self.prefix.clone();
+        to.append_key(&mut back_key);
+        self.back_key = RawKey::new(back_key);
+
+        self
     }
 }
 
@@ -115,7 +128,6 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
             return None;
         }
 
-        self.front_key.data.push(0);
         println!(">>> iterating from the front with key {:?}", self.front_key);
 
         let value: Option<Record> = kv_greater_equal(
@@ -127,11 +139,14 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
         if value.is_some() {
             self.front_key = RawKey::new(get_key_bytes());
 
-            if self.front_key == self.back_key {
+            if self.front_key >= self.back_key {
                 println!(">>> front cursor met back cursor, it's the end");
                 self.is_end = true;
                 return None;
             }
+
+            // prepare the front key for the next iteration
+            self.front_key.data.push(0);
 
             println!(">>> iterated and got key {:?}", self.front_key);
             value
@@ -164,7 +179,7 @@ impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Re
         if value.is_some() {
             self.back_key = RawKey::new(get_key_bytes());
 
-            if self.back_key == self.front_key {
+            if self.back_key <= self.front_key {
                 println!(">>> back cursor met front cursor, it's the end");
                 self.is_end = true;
                 return None;

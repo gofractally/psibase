@@ -60,12 +60,44 @@ mod service {
         const TABLE_INDEX: u16 = 1;
     }
 
+    // #[table]
+    #[derive(Fracpack, Eq, PartialEq, Clone)]
+    struct VotingRecord {
+        election_id: u32,
+        voter: AccountNumber,
+        candidate: AccountNumber,
+        voted_at: TimePointSec,
+    }
+
+    impl TableRecord for VotingRecord {
+        type PrimaryKey = (u32, AccountNumber);
+
+        fn get_primary_key(&self) -> Self::PrimaryKey {
+            (self.election_id, self.voter)
+        }
+    }
+
+    type VotesTable = Table<VotingRecord>;
+
+    impl TableHandler<VotingRecord> for VotesTable {
+        const TABLE_SERVICE: AccountNumber = SERVICE;
+        const TABLE_INDEX: u16 = 2;
+    }
+
     #[action]
     fn get_election(election_id: u32) -> ElectionRecord {
         let table = ElectionsTable::open();
         let idx = table.get_index_pk();
         let election_opt = idx.get(election_id);
         check_some(election_opt, "election does not exist")
+    }
+
+    #[action]
+    fn get_candidate(election_id: u32, candidate: AccountNumber) -> CandidateRecord {
+        let table = CandidatesTable::open();
+        let idx = table.get_index_pk();
+        let candidate_opt = idx.get((election_id, candidate));
+        check_some(candidate_opt, "candidate for election does not exist")
     }
 
     #[action]
@@ -93,14 +125,20 @@ mod service {
 
         let table = CandidatesTable::open();
 
-        // TODO: implement secondary key vs scanning entire table and filtering election_id
-        let idx = table.get_index_pk();
+        let mut idx = table.get_index_pk();
 
-        let candidates = idx
-            .filter(|record| record.election_id == election_id)
-            .collect();
-        candidates
+        idx.range(
+            (election_id, AccountNumber::default()),
+            (election_id + 1, AccountNumber::default()),
+        )
+        .collect()
     }
+
+    // /// Get the winner for a closed election
+    // #[action]
+    // fn get_winner(election_id: u32) {
+    //     unimplemented!()
+    // }
 
     /// Creates a new election
     #[action]
@@ -136,13 +174,6 @@ mod service {
 
         new_key
     }
-
-    // // #[table]
-    // struct VotingRecord {
-    //     election_id: u32,
-    //     voter: AccountNumber,
-    //     candidate: AccountNumber,
-    // }
 
     /// Register a new candidate to be elected, can only be done while the election does not start
     #[action]
@@ -198,17 +229,41 @@ mod service {
         table.remove(&key);
     }
 
-    // /// Vote for a candidate in an active election
-    // #[action]
-    // fn vote(election_id: u32, candidate: AccountNumber) {
-    //     unimplemented!()
-    // }
+    /// Vote for a candidate in an active election
+    #[action]
+    fn vote(voter: AccountNumber, election_id: u32, candidate: AccountNumber) {
+        // TODO: implement get_sender; let voter = get_sender();
+        let election = get_election(election_id);
 
-    // /// Get the winner for a closed election
-    // #[action]
-    // fn get_winner(election_id: u32) {
-    //     unimplemented!()
-    // }
+        // TODO: implement get current time
+        let current_time = TimePointSec { seconds: 0 };
+
+        check(
+            current_time >= election.voting_start_date,
+            "election has not started",
+        );
+
+        let mut candidate_record = get_candidate(election_id, candidate);
+
+        let table = VotesTable::open();
+        let idx = table.get_index_pk();
+
+        let voting_record = idx.get((election_id, voter));
+        check_none(voting_record, "voter has already submitted a vote");
+
+        let new_voting_record = VotingRecord {
+            election_id,
+            voter,
+            candidate,
+            voted_at: current_time,
+        };
+
+        table.put(&new_voting_record);
+
+        // Increment candidate vote
+        candidate_record.votes += 1;
+        CandidatesTable::open().put(&candidate_record);
+    }
 }
 
 #[psibase::test_case(services("elections"))]
@@ -303,6 +358,12 @@ fn register_and_unregister_from_election_successfully(
     Wrapper::push(&chain).register(AccountNumber::from("bob"), 1);
     Wrapper::push(&chain).register(AccountNumber::from("alice"), 1);
     Wrapper::push(&chain).register(AccountNumber::from("charles"), 1);
+
+    // Add another election just to check that the range operation is behaving properly
+    Wrapper::push(&chain).new(TimePointSec { seconds: 11 }, TimePointSec { seconds: 61 });
+    Wrapper::push(&chain).register(AccountNumber::from("bobby"), 2);
+    Wrapper::push(&chain).register(AccountNumber::from("alicey"), 2);
+    Wrapper::push(&chain).register(AccountNumber::from("charlesy"), 2);
 
     let candidate_bob = CandidateRecord {
         candidate: AccountNumber::from("bob"),
