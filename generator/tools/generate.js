@@ -7,7 +7,7 @@ generateTemplateFiles([
         entry: {
             folderPath: './tools/templates/react',
         },
-        stringReplacers: [{ question: 'Name of contract', slot: '__contract__', defaultCase: "(pascalCase)" }],
+        stringReplacers: [{ question: 'Name of service', slot: '__contract__', defaultCase: "(pascalCase)" }],
         output: {
             path: '../services/user/__contract__/ui',
             pathAndFileNameDefaultCase: '(pascalCase)',
@@ -15,12 +15,25 @@ generateTemplateFiles([
         onComplete: (data) => { console.log(`Success! \nTo get started.. \n \ncd ${data.output.path}`) }
     },
     {
-        option: "Contract",
+        option: "C++ Service",
         defaultCase: '(pascalCase)',
         entry: {
-            folderPath: './tools/templates/contract',
+            folderPath: './tools/templates/cplusplus-service',
         },
-        stringReplacers: [{ question: 'Name of contract', slot: '__contract__' }],
+        stringReplacers: [{ question: 'Name of service', slot: '__contract__' }],
+        output: {
+            path: '../services/user/__contract__',
+            pathAndFileNameDefaultCase: '(pascalCase)',
+        },
+        onComplete: (data) => { console.log(`Success! \nTo get started.. \n \ncd ${data.output.path}`) }
+    },
+    {
+        option: "Rust Service",
+        defaultCase: '(pascalCase)',
+        entry: {
+            folderPath: './tools/templates/rust-service',
+        },
+        stringReplacers: [{ question: 'Name of service', slot: '__contract__' }],
         output: {
             path: '../services/user/__contract__',
             pathAndFileNameDefaultCase: '(pascalCase)',
