@@ -19,12 +19,12 @@ export const AccountList = ({
     return (
         <section>
             <Heading tag="h2" className="font-medium text-gray-600">
-                Available accounts
+                My Accounts
             </Heading>
             <Text className="font-medium">
                 {isAccountsAvailable
-                    ? "Choose an account below to make it active."
-                    : "No accounts available."}
+                    ? "Select an account below to make it active."
+                    : "Not logged in."}
             </Text>
 
             {isAccountsAvailable && (

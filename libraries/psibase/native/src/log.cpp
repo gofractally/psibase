@@ -907,7 +907,7 @@ namespace psibase::loggers
          std::uintmax_t                 rotationSize;
          std::string                    rotationTime;
          bool                           flush = false;
-         std::unique_ptr<time_rotation> rotationTimeFunc;
+         std::shared_ptr<time_rotation> rotationTimeFunc;
          bool                           resetCollector = true;
          bool                           needsScan      = true;
          bool                           updateCounter  = true;
@@ -1382,6 +1382,36 @@ namespace psibase::loggers
                }
             }
          }
+         void set_parsed(auto&& map)
+         {
+            auto core = boost::log::core::get();
+            for (auto& [name, cfg] : map)
+            {
+               auto iter = sinks.find(name);
+               if (iter == sinks.end())
+               {
+                  auto sink = make_sink(cfg);
+                  sinks.try_emplace(std::string(name), cfg, sink);
+                  core->add_sink(sink);
+               }
+               else
+               {
+                  update_sink(iter->second.second, iter->second.first, sink_config(cfg));
+               }
+            }
+            for (auto iter = sinks.begin(), end = sinks.end(); iter != end;)
+            {
+               if (map.find(iter->first) != map.end())
+               {
+                  ++iter;
+               }
+               else
+               {
+                  core->remove_sink(iter->second.second);
+                  iter = sinks.erase(iter);
+               }
+            }
+         }
 
          static log_config& instance()
          {
@@ -1458,6 +1488,74 @@ namespace psibase::loggers
       psio::string_stream stream{result};
       to_json(log_config::instance(), stream);
       return result;
+   }
+
+   struct Config::Impl
+   {
+      std::map<std::string, sink_config> sinks;
+   };
+
+   Config Config::get()
+   {
+      Config result;
+      result.impl.reset(new Impl);
+      for (const auto& [name, cfg] : log_config::instance().sinks)
+      {
+         result.impl->sinks.try_emplace(name, cfg.first);
+      }
+      return result;
+   }
+
+   void configure(const Config& cfg)
+   {
+      log_config::instance().set_parsed(cfg.impl->sinks);
+   }
+
+   void from_json(Config& obj, psio::json_token_stream& stream)
+   {
+      if (!obj.impl)
+      {
+         obj.impl.reset(new Config::Impl);
+      }
+      from_json_object(stream,
+                       [&](std::string_view key)
+                       {
+                          sink_config cfg;
+                          from_json(cfg, stream);
+                          auto [iter, inserted] =
+                              obj.impl->sinks.try_emplace(std::string(key), std::move(cfg));
+                          if (!inserted)
+                          {
+                             iter->second = std::move(cfg);
+                          }
+                       });
+   }
+
+   void to_json(const Config& obj, psio::vector_stream& stream)
+   {
+      if (!obj.impl)
+      {
+         stream.write("{}", 2);
+      }
+      else
+      {
+         bool first = true;
+         stream.write('{');
+         for (const auto& [key, value] : obj.impl->sinks)
+         {
+            if (first)
+            {
+               first = false;
+            }
+            else
+            {
+            }
+            to_json(key, stream);
+            stream.write(':');
+            to_json(value, stream);
+         }
+         stream.write('}');
+      }
    }
 
    std::ostream& operator<<(std::ostream& os, const level& l)

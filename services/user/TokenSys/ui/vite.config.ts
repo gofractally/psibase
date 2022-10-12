@@ -15,10 +15,9 @@ const psibase = (appletContract: string) => {
                         cssCodeSplit: false,
                         rollupOptions: {
                             external: [
-                                "/common/rootdomain.mjs",
+                                // modules only; everthing in this list will have a module mime type in build mode
                                 "/common/rpc.mjs",
                                 "/common/useGraphQLQuery.mjs",
-                                "/common/iframeResizer.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
                             output: {
@@ -51,13 +50,21 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: {
-                            "/common/iframeResizer.contentWindow.js":
-                                path.resolve(
+                        alias: [
+                            {
+                                find: "/common/iframeResizer.contentWindow.js",
+                                replacement: path.resolve(
                                     "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
                                 ),
-                            "/common": path.resolve("../../CommonSys/common"),
-                        },
+                            },
+                            {
+                                // bundle non-external (above) common files except fonts (which should only be referenced)
+                                find: /^\/common(?!\/(?:fonts))(.*)$/,
+                                replacement: path.resolve(
+                                    "../../CommonSys/common$1"
+                                ),
+                            },
+                        ],
                     },
                 };
             },
@@ -76,5 +83,15 @@ const psibase = (appletContract: string) => {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react(), svgr({ exportAsDefault: true }), psibase("token-sys")],
+    plugins: [
+        react({
+            babel: {
+                parserOpts: {
+                    plugins: ["decorators-legacy"],
+                },
+            },
+        }),
+        svgr({ exportAsDefault: true }),
+        psibase("token-sys"),
+    ],
 });

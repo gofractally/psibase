@@ -167,6 +167,18 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
 
          return to_json(balances);
       }
+      if (request.target.starts_with("/api/getUserConf/"))
+      {
+         auto user_and_flag = request.target.substr(string("/api/getUserConf/").size());
+         auto delimiter = user_and_flag.find('/');
+         check(delimiter != string::npos, "invalid user or flag " + user_and_flag);
+         auto user = user_and_flag.substr(0, delimiter);
+         auto flag = user_and_flag.substr(delimiter + 1, user_and_flag.size());
+         psibase::AccountNumber acc(string_view{user});
+         auto tokService = to<TokenSys>();
+         auto manualDebit = tokService.getUserConf(acc, flag);
+         return to_json(manualDebit);
+      }
    }
 
    return std::nullopt;

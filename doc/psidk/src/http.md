@@ -21,7 +21,13 @@
   - [Packing actions (http)](#packing-actions-http)
 - [Node administrator services](#node-administrator-services)
   - [Peer management](#peer-management)
+  - [Server configuration](#server-configuration)
   - [Logging](#logging)
+    - [Console Logger](#console-logger)
+    - [File Logger](#file-logger)
+    - Syslog Logger (TODO)
+    - [Websocket Logger](#websocket-logger)
+
 
 ## TLDR: Pushing a transaction
 
@@ -389,8 +395,8 @@ TODO
 | `GET`  | `/native/admin/peers`      | Returns a JSON array of all the peers that the node is currently connected to |
 | `POST` | `/native/admin/connect`    | Connects to another node                                                      |
 | `POST` | `/native/admin/disconnect` | Disconnects an existing peer connection                                       |
-| `GET`  | `/native/admin/loggers`    | Returns the current [log configuration](#logging)                             |
-| `PUT`  | `/native/admin/loggers`    | Sets the [log configuration](#logging)                                        |
+| `GET`  | `/native/admin/config`     | Returns the current [server configuration](#server-configuration)             |
+| `PUT`  | `/native/admin/config`     | Sets the [server configuration](#server-configuration)                        |
 | `GET`  | `/native/admin/log`        | Websocket that provides access to [live server logs](#websocket-logger)       |
 
 ### Peer management
@@ -404,8 +410,53 @@ Each peer has the following fields:
 | id       | Number | A unique integer identifying the connection |
 | endpoint | String | The remote endpoint in the form `host:port` |
 
-`/native/admin/connect`
-`/native/admin/disconnect`
+`/native/admin/connect` creates a new p2p connection to another node.
+
+| Field | Type   | Description                                  |
+|-------|--------|----------------------------------------------|
+| `url` | String | The remote server, e.g. `"ws://psibase.io/"` |
+
+`/native/admin/disconnect` closes an existing p2p connection.
+
+| Field | Type   | Description                       |
+|-------|--------|-----------------------------------|
+| `id`  | Number | The id of the connection to close |
+
+
+### Server configuration
+
+`/native/admin/config` provides `GET` and `PUT` access to the server's configuration.
+
+| Field    | Type    | Description                                                                                                                                                                          |
+|----------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| p2p      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                        |
+| producer | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production. |
+| loggers  | Object  | A description of the [destinations for log records](#logging)                                                                                                                        |
+
+Example
+```json
+{
+    "p2p":true,
+    "producer":"prod",
+    "loggers": {
+        "console": {
+            "type": "console",
+            "filter": "%Severity% >= info",
+            "format": "[%TimeStamp%] [%Severity%]: %Message%"
+        },
+        "file": {
+            "type": "file",
+            "filter": "%Severity >= info%",
+            "format": "[%TimeStamp%]: %Message%",
+            "filename": "psibase.log",
+            "target": "psibase-%Y%m%d-%N.log",
+            "rotationTime": "00:00:00Z",
+            "rotationSize": 16777216,
+            "maxSize": 1073741824
+        }
+    }
+}
+```
 
 ### Logging
 
@@ -414,19 +465,9 @@ Each peer has the following fields:
 - Syslog Logger (TODO)
 - [Websocket Logger](#websocket-logger)
 
-`/native/admin/loggers` provides `GET` and `PUT` access to the server's logging configuration.
+The `loggers` field of `/native/admin/config` controls the server's logging configuration.
 
-The body is a JSON object which has a field for each logger. The name of the logger is only significant to identify the logger. When the log configuration is changed, if the new configuration has a logger with the same name and type as one in the old configuration, the old logger will be updated to the new configuration without dropping or duplicating any log records.
-
-```json
-{
-    "console": {
-        "type": "console",
-        "filter": "%Severity% >= info",
-        "format": "[%TimeStamp%] [%Severity%]: %Message%"
-    }
-}
-```
+The log configuration is a JSON object which has a field for each logger. The name of the logger is only significant to identify the logger. When the log configuration is changed, if the new configuration has a logger with the same name and type as one in the old configuration, the old logger will be updated to the new configuration without dropping or duplicating any log records.
 
 All loggers must have the following fields:
 

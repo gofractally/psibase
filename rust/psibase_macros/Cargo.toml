@@ -1,6 +1,6 @@
 [package]
 name = "psibase_macros"
-version = "0.1.1"
+version = "0.1.4"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -17,4 +17,4 @@ proc-macro-error = "1.0.4"
 proc-macro2 = "1.0.36"
 psibase_names = { version = "0.1.3", path = "../psibase_names" }
 quote = "1.0.15"
-syn = {version = "1.0.86", features = ["full"] }
+syn = {version = "1.0.86", features = ["full", "visit-mut"] }

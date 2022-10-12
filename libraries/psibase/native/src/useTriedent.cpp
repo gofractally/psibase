@@ -192,7 +192,7 @@ namespace psibase
       {
          if (!std::filesystem::exists(dir))
          {
-            std::cout << "Creating " << dir << "\n";
+            // std::cout << "Creating " << dir << "\n";
             triedent::database::create(  //
                 dir,                     //
                 triedent::database::config{
@@ -205,7 +205,7 @@ namespace psibase
          }
          else
          {
-            std::cout << "Open existing " << dir << "\n";
+            // std::cout << "Open existing " << dir << "\n";
          }
          trie   = std::make_shared<triedent::database>(dir.c_str(), triedent::database::read_write,
                                                      allowSlow);

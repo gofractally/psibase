@@ -220,6 +220,7 @@ namespace SystemService
       ///   `AuthInterface::runAsMatchedExpandedReq` if not empty (normally fails).
       /// * All other cases, requires `action.sender's authService`
       ///   to approve with flag `AuthInterface::runAsOtherReq` (normally fails).
+      // TODO: rename. Requires changes throughout C++, Rust, js, and documentation.
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
       /// Get the currently executing transaction

@@ -37,7 +37,10 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
             return uniqueAccounts([...currentAccounts, ...userAccounts])
         }));
 
-        Promise.all(keyPairs.map(keyPair => fetchAccountsByKey(keyPair.publicKey))).then(responses => {
+        Promise.all(keyPairs
+            .filter(keyPair => keyPair.publicKey)
+            .map(keyPair => fetchAccountsByKey(keyPair.publicKey))
+        ).then(responses => {
             const flatAccounts = responses.flat(1);
             setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authService: 'auth-ec-sys', publicKey: account.pubkey })), ...currentAccounts]))
             const currentKeyPairs = keyPairs;
@@ -55,8 +58,10 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
         if (foundAccount) {
             const key = foundAccount.publicKey;
             setAccounts(accounts => accounts.filter(account => account.publicKey !== key));
-            console.log({ key, keyPairs })
-            setKeyPairs(keyPairs.filter(keyPair => keyPair.publicKey !== key))
+            setKeyPairs(keyPairs.filter(keyPair => {
+                if ('knownAccounts' in keyPair && keyPair.knownAccounts!.includes(accountNum)) return false
+                return keyPair.publicKey !== key
+            }));
         } else {
             console.warn(`Failed to find account ${accountNum} to drop`)
         }

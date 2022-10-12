@@ -1,9 +1,5 @@
 # Basic Rust Service
 
-## Not Yet Functional
-
-This documents some of our current thoughts and ongoing development for Rust service support. The installation procedure and examples are currently non-functional.
-
 ## Installation
 
 Follow the [Rust Installation Guide](../../rust.md).
@@ -34,14 +30,14 @@ Replace the content of `lib.rs` with the following. This is our initial service:
 
 ```rust
 #[psibase::service]
-pub mod service {
+mod service {
     #[action]
-    pub fn add(a: i32, b: i32) -> i32 {
+    fn add(a: i32, b: i32) -> i32 {
         a + b
     }
 
     #[action]
-    pub fn multiply(a: i32, b: i32) -> i32 {
+    fn multiply(a: i32, b: i32) -> i32 {
         a * b
     }
 }
@@ -59,6 +55,10 @@ This, if you have a [local test chain running](../../psibase#booting-a-chain), w
 cargo psibase deploy -i example
 ```
 
+## Where's the pub?
+
+The `service` module and the actions within it don't need to be public. Instead, the `psibase::service` macro generates public definitions which wrap the actions. You don't need to make the actions public to document them; the macro copies documentation from the action definitions to the generated definitions. It also copies documentation from the `service` module.
+
 ## Psibase and Cargo
 
 There are two related commands for interacting with psibase blockchains:
@@ -70,7 +70,7 @@ Here's an example of how they differ: `psibase deploy` has an argument which mus
 
 ## Testing the Service
 
-The next section, [Testing Services](../testing) covers testing our service.
+The next section, [Testing Services](testing.html) covers testing our service.
 
 ## Homework
 

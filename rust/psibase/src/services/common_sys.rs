@@ -1,8 +1,8 @@
 // TODO: tables
 
 #[crate::service(name = "common-sys", dispatch = false, psibase_mod = "crate")]
-#[allow(non_snake_case, unused_variables, dead_code)]
-pub mod service {
+#[allow(non_snake_case, unused_variables)]
+mod service {
     use crate::http::HttpRequest;
 
     #[action]

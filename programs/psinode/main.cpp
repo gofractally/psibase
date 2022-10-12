@@ -275,7 +275,10 @@ void pushTransaction(psibase::SharedState&                  sharedState,
 std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view peer)
 {
    // TODO: handle ipv6 addresses [addr]:port
-   // TODO: use a websocket URI
+   if (peer.starts_with("ws://"))
+   {
+      peer = peer.substr(5);
+   }
    auto pos = peer.find(':');
    if (pos == std::string_view::npos)
    {
@@ -286,6 +289,26 @@ std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view pe
       return {peer.substr(0, pos), peer.substr(pos + 1)};
    }
 }
+
+struct ConnectRequest
+{
+   std::string url;
+};
+PSIO_REFLECT(ConnectRequest, url);
+
+struct DisconnectRequest
+{
+   peer_id id;
+};
+PSIO_REFLECT(DisconnectRequest, id);
+
+struct PsinodeConfig
+{
+   bool                     p2p = false;
+   AccountNumber            producer;
+   psibase::loggers::Config loggers;
+};
+PSIO_REFLECT(PsinodeConfig, p2p, producer, loggers);
 
 using timer_type = boost::asio::system_timer;
 
@@ -388,9 +411,8 @@ void run(const std::string&              db_path,
       // TODO: The websocket uses the http server's io_context, but does not
       // do anything to keep it alive. Stopping the server doesn't close the
       // websocket either.
-      if (enable_incoming_p2p)
-         http_config->accept_p2p_websocket = [&node](auto&& stream)
-         { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
+      http_config->accept_p2p_websocket = [&node](auto&& stream)
+      { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {
@@ -409,46 +431,81 @@ void run(const std::string&              db_path,
       http_config->connect =
           [&chainContext, &node, &resolver](std::vector<char> peer, http::connect_callback callback)
       {
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, &resolver, peer = std::move(peer),
-                            callback = std::move(callback)]() mutable
-                           {
-                              auto [host, service] = parse_endpoint({peer.data(), peer.size()});
-                              async_connect(std::make_shared<websocket_connection>(chainContext),
-                                            resolver, host, service,
-                                            [&node](auto&& conn)
-                                            { node.add_connection(std::move(conn)); });
-                              callback(std::nullopt);
-                           });
+         peer.push_back('\0');
+         psio::json_token_stream stream(peer.data());
+
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, &resolver, peer = psio::from_json<ConnectRequest>(stream),
+              callback = std::move(callback)]() mutable
+             {
+                auto [host, service] = parse_endpoint({peer.url.data(), peer.url.size()});
+                async_connect(std::make_shared<websocket_connection>(chainContext), resolver, host,
+                              service,
+                              [&node](auto&& conn) { node.add_connection(std::move(conn)); });
+                callback(std::nullopt);
+             });
       };
 
       http_config->disconnect =
           [&chainContext, &node, &resolver](std::vector<char> peer, http::connect_callback callback)
       {
+         peer.push_back('\0');
+         psio::json_token_stream stream(peer.data());
+
          boost::asio::post(
              chainContext,
-             [&chainContext, &node, &resolver, peer = std::move(peer),
+             [&chainContext, &node, &resolver, peer = psio::from_json<DisconnectRequest>(stream),
               callback = std::move(callback)]() mutable
              {
-                int  id;
-                auto result  = std::from_chars(peer.data(), peer.data() + peer.size(), id);
-                auto message = "Unknown peer";
-                if (result.ec != std::errc() || result.ptr != peer.data() + peer.size())
+                if (!node.peers().disconnect(peer.id))
                 {
-                   callback(message);
+                   callback("Unknown peer");
                 }
                 else
                 {
-                   if (!node.peers().disconnect(id))
-                   {
-                      callback(message);
-                   }
-                   else
-                   {
-                      callback(std::nullopt);
-                   }
+                   callback(std::nullopt);
                 }
              });
+      };
+
+      http_config->set_config = [&chainContext, &node, &http_config](
+                                    std::vector<char> json, http::connect_callback callback)
+      {
+         json.push_back('\0');
+         psio::json_token_stream stream(json.data());
+
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
+                            &http_config, callback = std::move(callback)]() mutable
+                           {
+                              node.set_producer_id(config.producer);
+                              http_config->enable_p2p = config.p2p;
+                              loggers::configure(config.loggers);
+                              callback(std::nullopt);
+                           });
+      };
+
+      http_config->get_config =
+          [&chainContext, &node, &allow_slow, &http_config](http::get_config_callback callback)
+      {
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, &allow_slow, &http_config,
+                            callback = std::move(callback)]() mutable
+                           {
+                              PsinodeConfig result;
+                              result.p2p      = http_config->enable_p2p;
+                              result.producer = node.producer_name();
+                              result.loggers  = loggers::Config::get();
+                              callback(
+                                  [result = std::move(result)]() mutable
+                                  {
+                                     std::vector<char>   json;
+                                     psio::vector_stream stream(json);
+                                     to_json(result, stream);
+                                     return json;
+                                  });
+                           });
       };
 
       auto server = http::server::create(http_config, sharedState);
@@ -513,7 +570,7 @@ void run(const std::string&              db_path,
    }
 
    node.set_producer_id(producer);
-   http_config->ready_for_p2p = true;
+   http_config->enable_p2p = enable_incoming_p2p;
 
    bool showedBootMsg = false;
 

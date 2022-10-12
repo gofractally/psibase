@@ -71,13 +71,13 @@ extern "C" {
     /// Get a key-value pair, if any
     ///
     /// If key exists, then sets result to value and returns size. If key does not
-    /// exist, returns `-1` and clears result. Use [getResult] to get result.
+    /// exist, returns `u32::MAX` and clears result. Use [getResult] to get result.
     pub fn kvGet(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
 
     /// Get a sequentially-numbered record
     ///
     /// If `id` is available, then sets result to value and returns size. If id does
-    /// not exist, returns -1 and clears result.
+    /// not exist, returns `u32::MAX` and clears result.
     pub fn getSequential(db: crate::DbId, id: u64) -> u32;
 
     /// Get the first key-value pair which is greater than or equal to the provided
@@ -85,7 +85,7 @@ extern "C" {
     ///
     /// If one is found, and the first `match_key_size` bytes of the found key
     /// matches the provided key, then sets result to value and returns size. Also
-    /// sets key. Otherwise returns `-1` and clears result. Use [getResult] to get
+    /// sets key. Otherwise returns `u32::MAX` and clears result. Use [getResult] to get
     /// result and [getKey] to get found key.
     pub fn kvGreaterEqual(
         db: crate::DbId,
@@ -98,14 +98,14 @@ extern "C" {
     ///
     /// If one is found, and the first `match_key_size` bytes of the found key
     /// matches the provided key, then sets result to value and returns size.
-    /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult]
+    /// Also sets key. Otherwise returns `u32::MAX` and clears result. Use [getResult]
     /// to get result and [getKey] to get found key.
     pub fn kvLessThan(db: crate::DbId, key: *const u8, key_len: u32, match_key_size: u32) -> u32;
 
     /// Get the maximum key-value pair which has key as a prefix
     ///
     /// If one is found, then sets result to value and returns size. Also sets key.
-    /// Otherwise returns `-1` and clears result. Use [getResult] to get result
+    /// Otherwise returns `u32::MAX` and clears result. Use [getResult] to get result
     /// and [getKey] to get found key.
     pub fn kvMax(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
 }

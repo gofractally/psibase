@@ -274,6 +274,7 @@ void DefaultTestChain::registerSysRpc()
    const std::string html = "text/html";
    const std::string js   = "text/javascript";
    const std::string css  = "text/css";
+   const std::string ttf  = "font/ttf";
    const std::string svg  = "image/svg+xml";
 
    std::vector<psibase::Action> b{
@@ -319,6 +320,11 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/common/keyConversions.mjs", js,
                           readWholeFile(comDir + "/common/keyConversions.mjs")),
        rpcCommon.storeSys("/common/widgets.mjs", js, readWholeFile(comDir + "/common/widgets.mjs")),
+       rpcCommon.storeSys("/common/fonts/raleway.css", css, readWholeFile(comDir + "/common/fonts/raleway.css")),
+       rpcCommon.storeSys("/common/fonts/raleway-variable-italic.ttf", ttf, readWholeFile(comDir + "/common/fonts/raleway-variable-italic.ttf")),
+       rpcCommon.storeSys("/common/fonts/raleway-variable-normal.ttf", ttf, readWholeFile(comDir + "/common/fonts/raleway-variable-normal.ttf")),
+       rpcCommon.storeSys("/common/fonts/red-hat-mono.css", css, readWholeFile(comDir + "/common/fonts/red-hat-mono.css")),
+       rpcCommon.storeSys("/common/fonts/red-hat-mono-variable-normal.ttf", ttf, readWholeFile(comDir + "/common/fonts/red-hat-mono-variable-normal.ttf")),
 
        // CommonSys - 3rd party
        rpcCommon.storeSys("/common/iframeResizer.js", js,
