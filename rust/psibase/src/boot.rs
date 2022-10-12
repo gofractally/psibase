@@ -23,7 +23,7 @@ macro_rules! method {
     };
 }
 
-const ACCOUNTS: [AccountNumber; 22] = [
+const ACCOUNTS: [AccountNumber; 23] = [
     account_sys::SERVICE,
     admin_sys::SERVICE,
     account!("alice"),
