@@ -679,6 +679,20 @@ namespace psibase
       std::vector<char> prefix;
    };
 
+   template <typename T>
+   concept TableType = requires(T table)
+   {
+      typename decltype(table)::key_type;
+      typename decltype(table)::value_type;
+   };
+
+   template <typename RecordType>
+   struct inner
+   {
+      template <TableType T>
+      using is_container_of = std::is_same<typename T::value_type, RecordType>;
+   };
+
    // TODO: allow tables to be forward declared.  The simplest method is:
    // struct xxx : Table<...> {};
    /// Defines the set of tables in a service
@@ -732,10 +746,24 @@ namespace psibase
       /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<MyTable>();`
       ///
       /// Returns a [Table].
-      template <typename T>
+      template <TableType T>
       auto open() const
       {
          return open<boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>::value>();
+      }
+
+      /// Open by record type
+      ///
+      /// This gets a table by the record type contained by the table.
+      ///
+      /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<TableRecord>();`
+      ///
+      /// Returns a [Table].
+      template <typename RecordType>
+      auto open() const
+      {
+         return open<boost::mp11::mp_find_if<boost::mp11::mp_list<Tables...>,
+                                             inner<RecordType>::template is_container_of>::value>();
       }
 
       AccountNumber account;  ///< the service runs on this account

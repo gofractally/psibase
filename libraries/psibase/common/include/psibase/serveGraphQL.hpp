@@ -1204,4 +1204,58 @@ namespace psibase
       return result;
    }  // makeEventConnection
 
+   template <typename Tables, typename RecordType, typename Events>
+   class EventIndex
+   {
+     public:
+      AccountNumber service;
+      uint64_t RecordType::*eventHead;
+      std::string_view      previousEventFieldName;
+
+      template <typename PrimaryKeyType>
+      auto query(PrimaryKeyType key, auto first, auto after)
+      {
+         auto eventId = getEventHeadId(key);
+
+         return makeEventConnection<typename Events::History>(DbId::historyEvent, eventId, service,
+                                                              previousEventFieldName, first, after);
+      }
+
+     private:
+      template <typename PrimaryKeyType>
+      uint64_t getEventHeadId(PrimaryKeyType key)
+      {
+         uint64_t eventId = 0;
+         if (auto record =
+                 Tables{service}.template open<RecordType>().template getIndex<0>().get(key))
+         {
+            eventId = (*record).*eventHead;
+         }
+         return eventId;
+      }
+   };
+
+   template <typename Tables, typename Events>
+   struct QueryableService
+   {
+      AccountNumber service;
+
+      template <typename TableType, int Idx>
+      auto index()
+      {
+         return Tables{service}.template open<TableType>().template getIndex<Idx>();
+      }
+
+      auto allEvents()
+      {  //
+         return EventQuery<Events>{service};
+      }
+
+      template <typename RecordType>
+      auto eventIndex(uint64_t RecordType::*eventHead, std::string_view previousEventFieldName)
+      {
+         return EventIndex<Tables, RecordType, Events>{service, eventHead, previousEventFieldName};
+      }
+   };
+
 }  // namespace psibase

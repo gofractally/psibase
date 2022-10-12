@@ -14,91 +14,30 @@ using namespace UserService;
 using namespace std;
 using namespace psibase;
 
-template <typename Tables>
-struct StateQuery
-{
-   AccountNumber service;
-
-   template <typename TableType, int Idx>
-   auto index()
-   {
-      return Tables{service}.template open<TableType>().template getIndex<Idx>();
-   }
-};
-
-template <typename Service, typename TableType>
-struct EventLink
-{
-   using Tables         = typename Service::Tables;
-   using RecordType     = typename TableType::value_type;
-   using PrimaryKeyType = typename TableType::key_type;
-   using HistoryEvents  = typename Service::Events::History;
-
-   psibase::AccountNumber serviceName;
-   uint64_t RecordType::*eventHead;
-   string_view           previousEventFieldName;
-
-   EventLink(psibase::AccountNumber serviceName,
-             uint64_t RecordType::*eventHead,
-             string_view           previousEventFieldName)
-       : serviceName(serviceName),
-         eventHead(eventHead),
-         previousEventFieldName(previousEventFieldName)
-   {
-   }
-
-   uint64_t getEventHead(PrimaryKeyType key)
-   {
-      auto idx = StateQuery<Tables>{serviceName}.template index<TableType, 0>();
-
-      uint64_t eventId = 0;
-      if (auto record = idx.get(key))
-      {
-         eventId = (*record).*eventHead;
-      }
-
-      return eventId;
-   }
-
-   auto makeConnection(PrimaryKeyType key, auto first, auto after)
-   {
-      auto eventId = getEventHead(key);
-
-      return makeEventConnection<HistoryEvents>(DbId::historyEvent, eventId, serviceName,
-                                                previousEventFieldName, first, after);
-   }
-};
-
-EventLink<TokenSys, TokenHolderTable> transactionEvents(getReceiver(),
-                                                        &TokenHolderRecord::lastHistoryEvent,
-                                                        "prevEvent");
-
+auto tokenSys = QueryableService<TokenSys::Tables, TokenSys::Events>{TokenSys::service};
 struct TokenQuery
 {
-   static constexpr auto stateQuery = []() { return StateQuery<TokenSys::Tables>{getReceiver()}; };
-   static constexpr auto eventQuery = []() { return EventQuery<TokenSys::Events>{getReceiver()}; };
-
    auto balances() const
    {  //
-
-      return stateQuery().index<BalanceTable, 0>();
+      return tokenSys.index<BalanceTable, 0>();
    }
 
    auto sharedBalances() const
    {  //
-      return stateQuery().index<SharedBalanceTable, 0>();
+      return tokenSys.index<SharedBalanceTable, 0>();
    }
 
    auto events() const
    {  //
-      return eventQuery();
+      return tokenSys.allEvents();
    }
 
    auto holderEvents(AccountNumber           holder,
                      optional<uint32_t>      first,
                      const optional<string>& after) const
    {
-      return transactionEvents.makeConnection(holder, first, after);
+      auto index = tokenSys.eventIndex(&TokenHolderRecord::lastHistoryEvent, "prevEvent");
+      return index.query(holder, first, after);
    }
 };
 PSIO_REFLECT(TokenQuery,
@@ -109,9 +48,6 @@ PSIO_REFLECT(TokenQuery,
 
 optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {
-   // if (auto result = to<SystemService::CommonSys>().serveCommon(request).unpack())
-   //    return result;
-
    if (auto result = servePackAction<TokenSys>(request))
       return result;
 
