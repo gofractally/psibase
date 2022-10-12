@@ -16,6 +16,7 @@
 
 namespace psibase
 {
+   class ConfigFile;
    namespace loggers
    {
       std::string to_string(const Checksum256& c);
@@ -69,16 +70,19 @@ namespace psibase
       void configure(const Config&);
       void from_json(Config&, psio::json_token_stream&);
       void to_json(const Config&, psio::vector_stream&);
+      void to_config(const Config& obj, ConfigFile& file);
       class Config
       {
         public:
          static Config get();
 
         private:
+         friend void from_json(Config&, psio::json_token_stream&);
+         friend void to_json(const Config&, psio::vector_stream&);
+         friend void configure(const Config&);
+         friend void to_config(const Config& obj, ConfigFile& file);
+
          struct Impl;
-         friend void           from_json(Config&, psio::json_token_stream&);
-         friend void           to_json(const Config&, psio::vector_stream&);
-         friend void           configure(const Config&);
          std::shared_ptr<Impl> impl;
       };
 
