@@ -1,6 +1,6 @@
 use crate::services::{
-    account_sys, auth_ec_sys, common_sys, nft_sys, producer_sys, proxy_sys, psispace_sys,
-    setcode_sys, transaction_sys,
+    account_sys, admin_sys, auth_ec_sys, common_sys, nft_sys, producer_sys, proxy_sys,
+    psispace_sys, setcode_sys, transaction_sys,
 };
 use crate::{
     method_raw, AccountNumber, Action, Claim, MethodNumber, ProducerConfigRow, PublicKey,
@@ -23,8 +23,9 @@ macro_rules! method {
     };
 }
 
-const ACCOUNTS: [AccountNumber; 22] = [
+const ACCOUNTS: [AccountNumber; 23] = [
     account_sys::SERVICE,
+    admin_sys::SERVICE,
     account!("alice"),
     auth_ec_sys::SERVICE,
     account!("auth-any-sys"),
@@ -154,6 +155,7 @@ fn without_tapos(actions: Vec<Action>, expiration: TimePointSec) -> Transaction 
 fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
     let services = vec![
         sgc!("account-sys", 0, "AccountSys.wasm"),
+        sgc!("admin-sys", 0, "AdminSys.wasm"),
         sgc!("auth-ec-sys", 0, "AuthEcSys.wasm"),
         sgc!("auth-any-sys", 0, "AuthAnySys.wasm"),
         sgc!("common-sys", 0, "CommonSys.wasm"),
@@ -279,6 +281,7 @@ pub fn create_boot_transactions(
 
         let mut reg_actions = vec![
             reg_server(account_sys::SERVICE, account!("r-account-sys")),
+            reg_server(admin_sys::SERVICE, admin_sys::SERVICE),
             reg_server(auth_ec_sys::SERVICE, account!("r-ath-ec-sys")),
             reg_server(common_sys::SERVICE, common_sys::SERVICE),
             reg_server(account!("explore-sys"), account!("explore-sys")),
@@ -348,6 +351,14 @@ pub fn create_boot_transactions(
             account!("r-account-sys"),
         );
 
+        let mut admin_sys_files = vec![];
+        fill_dir(
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/AdminSys/ui/dist"),
+            &mut admin_sys_files,
+            admin_sys::SERVICE,
+            admin_sys::SERVICE,
+        );
+
         let mut auth_ec_sys_files = vec![
             // store!("r-ath-ec-sys", "/", html, "AuthEcSys/ui/index.html"),
             // store!("r-ath-ec-sys", "/ui/index.js", js, "AuthEcSys/ui/index.js"),
@@ -401,6 +412,7 @@ pub fn create_boot_transactions(
         actions.append(&mut common_sys_files);
         actions.append(&mut common_sys_3rd_party_files);
         actions.append(&mut account_sys_files);
+        actions.append(&mut admin_sys_files);
         actions.append(&mut auth_ec_sys_files);
         actions.append(&mut explore_sys_files);
         actions.append(&mut token_sys_files);
