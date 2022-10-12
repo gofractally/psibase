@@ -56,8 +56,11 @@ function websocketURL(path: string) {
 }
 
 type PsinodeConfig = {
+    slow: boolean;
     p2p: boolean;
     producer: string;
+    host: string;
+    port: number;
 };
 
 async function putJson(url: string, json: any) {
@@ -299,6 +302,21 @@ function App() {
                 <Form.Input
                     label="Block Producer Name"
                     {...configForm.register("producer")}
+                />
+                <Form.Checkbox
+                    label="Slow (requires restart)"
+                    {...configForm.register("slow")}
+                />
+                <Form.Input
+                    label="Host (requires restart)"
+                    {...configForm.register("host")}
+                />
+                <Form.Input
+                    label="Port (requires restart)"
+                    type="number"
+                    min="0"
+                    max="65535"
+                    {...configForm.register("port")}
                 />
                 <Button isSubmit disabled={!configForm.formState.isDirty}>
                     Save Changes
