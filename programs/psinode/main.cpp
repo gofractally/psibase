@@ -305,19 +305,16 @@ PSIO_REFLECT(DisconnectRequest, id);
 
 struct PsinodeConfig
 {
-   bool                     slow = false;
-   bool                     p2p  = false;
+   bool                     p2p = false;
    AccountNumber            producer;
    std::string              host;
    std::uint16_t            port = 8080;
    psibase::loggers::Config loggers;
 };
-PSIO_REFLECT(PsinodeConfig, slow, p2p, producer, host, port, loggers);
+PSIO_REFLECT(PsinodeConfig, p2p, producer, host, port, loggers);
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
 {
-   file.set("", "slow", config.slow ? "on" : "off",
-            "Allow psinode to run without locking the database in RAM");
    file.set("", "p2p", config.p2p ? "on" : "off", "Whether to accept incoming P2P connections");
    if (config.producer != AccountNumber())
    {
@@ -347,7 +344,6 @@ using cft_consensus = basic_cft_consensus<Derived, timer_type>;
 
 const char default_config[] = R"(# psinode configuration
 
-slow     = no
 p2p      = off
 # producer = psibase
 # sign     = <private key>
@@ -372,7 +368,6 @@ void run(const std::string&              db_path,
          unsigned short                  port,
          bool                            host_perf,
          uint32_t                        leeway_us,
-         bool                            allow_slow,
          const std::string&              replay_blocks,
          const std::string&              save_blocks)
 {
@@ -380,10 +375,19 @@ void run(const std::string&              db_path,
 
    // TODO: configurable WasmCache size
    auto sharedState =
-       std::make_shared<psibase::SharedState>(SharedDatabase{db_path, allow_slow}, WasmCache{128});
+       std::make_shared<psibase::SharedState>(SharedDatabase{db_path, true}, WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
    auto queue       = std::make_shared<transaction_queue>();
+
+   if (system->sharedDatabase.isSlow())
+   {
+      PSIBASE_LOG(psibase::loggers::generic::get(), error)
+          << "unable to lock memory for " << db_path
+          << ". Try upgrading your shell's limits using \"sudo prlimit --memlock=-1 --pid "
+             "$$\". "
+             "If that doesn't work, try running psinode with \"sudo\".";
+   }
 
    // If the server's config file doesn't exist yet, create it
    {
@@ -417,6 +421,8 @@ void run(const std::string&              db_path,
       http_config->port             = port;
       http_config->host             = host;
       http_config->host_perf        = host_perf;
+      http_config->status =
+          http::http_status{.slow = system->sharedDatabase.isSlow(), .startup = 1};
 
       // TODO: speculative execution on non-producers
       if (producer != AccountNumber{})
@@ -499,8 +505,8 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->set_config = [&chainContext, &node, &db_path, &http_config, &allow_slow, &host,
-                                 &port](std::vector<char> json, http::connect_callback callback)
+      http_config->set_config = [&chainContext, &node, &db_path, &http_config, &host, &port](
+                                    std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
@@ -508,10 +514,9 @@ void run(const std::string&              db_path,
          boost::asio::post(
              chainContext,
              [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
-              &http_config, &allow_slow, &host, &port, callback = std::move(callback)]() mutable
+              &http_config, &host, &port, callback = std::move(callback)]() mutable
              {
                 node.set_producer_id(config.producer);
-                allow_slow              = config.slow;
                 http_config->enable_p2p = config.p2p;
                 host                    = config.host;
                 port                    = config.port;
@@ -533,15 +538,14 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->get_config = [&chainContext, &node, &allow_slow, &http_config, &host,
-                                 &port](http::get_config_callback callback)
+      http_config->get_config =
+          [&chainContext, &node, &http_config, &host, &port](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
-                           [&chainContext, &node, &allow_slow, &http_config, &host, &port,
+                           [&chainContext, &node, &http_config, &host, &port,
                             callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
-                              result.slow     = allow_slow;
                               result.p2p      = http_config->enable_p2p;
                               result.producer = node.producer_name();
                               result.host     = host;
@@ -621,6 +625,12 @@ void run(const std::string&              db_path,
 
    node.set_producer_id(producer);
    http_config->enable_p2p = enable_incoming_p2p;
+   {
+      // For now no one else writes the status, so we don't need an atomic RMW.
+      auto status         = http_config->status.load();
+      status.startup      = false;
+      http_config->status = status;
+   }
 
    bool showedBootMsg = false;
 
@@ -723,11 +733,10 @@ int main(int argc, char* argv[])
    std::string              db_path;
    std::string              producer = {};
    std::vector<PrivateKey>  keys;
-   std::string              host       = {};
-   unsigned short           port       = 8080;
-   bool                     host_perf  = false;
-   uint32_t                 leeway_us  = 200000;  // TODO: real value once resources are in place
-   bool                     allow_slow = false;
+   std::string              host      = {};
+   unsigned short           port      = 8080;
+   bool                     host_perf = false;
+   uint32_t                 leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string> peers;
    bool                     enable_incoming_p2p = false;
    std::string              replay_blocks       = {};
@@ -748,9 +757,6 @@ int main(int argc, char* argv[])
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
        "Transaction leeway, in us. Defaults to 200000.");
-   opt("slow", po::bool_switch(&allow_slow),
-       "Don't complain if unable to lock memory for database. This will still attempt to lock "
-       "memory, but if it fails it will continue to run, but more slowly.");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
@@ -813,7 +819,7 @@ int main(int argc, char* argv[])
              std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"}, key));
       }
       run(db_path, AccountNumber{producer}, prover, peers, enable_incoming_p2p, host, port,
-          host_perf, leeway_us, allow_slow, replay_blocks, save_blocks);
+          host_perf, leeway_us, replay_blocks, save_blocks);
       return 0;
    }
    catch (std::exception& e)

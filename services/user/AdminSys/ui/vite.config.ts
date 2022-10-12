@@ -38,7 +38,7 @@ const psibase = (appletContract: string) => {
                                         subdomain === appletContract &&
                                         req.method !== "POST" &&
                                         req.headers.accept !==
-                                            "application/json" &&
+                                        "application/json" &&
                                         !req.url.startsWith("/common") &&
                                         !req.url.startsWith("/api")
                                     ) {
@@ -49,13 +49,21 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: {
-                            "/common/iframeResizer.contentWindow.js":
-                                path.resolve(
+                        alias: [
+                            {
+                                find: "/common/iframeResizer.contentWindow.js",
+                                replacement: path.resolve(
                                     "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
                                 ),
-                            "/common": path.resolve("../../CommonSys/common"),
-                        },
+                            },
+                            {
+                                // bundle non-external (above) common files except fonts (which should only be referenced)
+                                find: /^\/common(?!\/(?:fonts))(.*)$/,
+                                replacement: path.resolve(
+                                    "../../CommonSys/common$1"
+                                ),
+                            },
+                        ],
                     },
                 };
             },
@@ -70,5 +78,11 @@ const psibase = (appletContract: string) => {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react(), psibase("admin-sys")],
+    plugins: [react({
+        babel: {
+            parserOpts: {
+                plugins: ['decorators-legacy']
+            }
+        }
+    }), psibase("__contract__(kebabCase)")],
 });

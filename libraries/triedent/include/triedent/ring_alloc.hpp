@@ -91,6 +91,8 @@ namespace triedent
       void validate();
       void validate(id i) { _obj_ids->validate(i); }
 
+      bool is_slow() const;
+
      private:
       uint64_t wait_on_free_space(managed_ring& ring, uint64_t used_size);
       char*    alloc(managed_ring&        ring,
@@ -232,6 +234,7 @@ namespace triedent
 
       ring_allocator::cache_level_type level;
 
+      bool                                _slow  = false;
       FILE*                               _cfile = nullptr;
       int                                 _cfileno;
       header*                             _head;
@@ -487,6 +490,11 @@ namespace triedent
       warm()._head->validate();
       cool()._head->validate();
       cold()._head->validate();
+   }
+
+   inline bool ring_allocator::is_slow() const
+   {
+      return hot()._slow || warm()._slow || cool()._slow || cold()._slow;
    }
 
 }  // namespace triedent

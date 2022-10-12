@@ -468,6 +468,22 @@ namespace psibase::http
             send(websocket_upgrade{}, std::move(req), server.http_config->accept_p2p_websocket);
             return;
          }
+         else if (req.target() == "/native/admin/status")
+         {
+            if (req.method() == bhttp::verb::get)
+            {
+               auto status = server.http_config->status.load();
+               //
+               std::vector<char>   body;
+               psio::vector_stream stream{body};
+               to_json(status, stream);
+               send(ok(std::move(body), "application/json"));
+            }
+            else
+            {
+               send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+         }
          else if (req.target() == "/native/admin/peers" && req.method() == bhttp::verb::get &&
                   server.http_config->get_peers)
          {

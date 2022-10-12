@@ -29,16 +29,11 @@ Three more options are important for connecting multiple nodes together in a net
 - `--peer` tells psinode a peer to sync with. The argument should have the form `host:port`. This argument can appear any number of times.
 - `--p2p` tells psinode to allow external nodes to peer to it over its http interface at `/native/p2p`.
 
-There is one more option which is useful for local development. Production deployments shouldn't use this:
-
-- `--slow` stops it from complaining when it is unable to lock memory for its database. It will still attempt to lock memory, but if it fails it will continue to run, but more slowly. If you don't run with `--slow` and it fails, psinode will give suggestions on how to configure Linux to allow psinode to lock memory.
-
 psinode does not include https hosting; use a [reverse proxy](https.md) to add that when hosting a public node.
 
 Options can also be specified in a configuration file loaded from `<DATABASE>/config`. If an option is specified on both the command line and the config file, the command line takes precedence.
 
 ```ini
-slow     = yes
 producer = prod
 host     = 127.0.0.1.sslip.io
 port     = 8080
@@ -61,7 +56,7 @@ A chain doesn't exist until it's booted. This procedure boots a chain suitable f
 ### Start psinode
 
 ```
-psinode -p prod -o psibase.127.0.0.1.sslip.io my_psinode_db --slow
+psinode -p prod -o psibase.127.0.0.1.sslip.io my_psinode_db
 ```
 
 This will:

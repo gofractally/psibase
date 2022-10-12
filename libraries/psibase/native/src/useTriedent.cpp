@@ -316,6 +316,11 @@ namespace psibase
       writer.set_top_root(topRoot);
    }  // removeRevisions
 
+   bool SharedDatabase::isSlow() const
+   {
+      return impl->trie->is_slow();
+   }
+
    struct DatabaseImpl
    {
       SharedDatabase                           shared;

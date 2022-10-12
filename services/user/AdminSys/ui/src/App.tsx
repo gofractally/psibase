@@ -56,7 +56,6 @@ function websocketURL(path: string) {
 }
 
 type PsinodeConfig = {
-    slow: boolean;
     p2p: boolean;
     producer: string;
     host: string;
@@ -73,39 +72,50 @@ async function putJson(url: string, json: any) {
     });
 }
 
-function App() {
-    const [peersTimeout, setPeersTimeout] = useState<
+function pollJson<R>(
+    url: string
+): [R | undefined, string | undefined, () => void] {
+    const [pollTimer, setPollTimer] = useState<
         ReturnType<typeof setTimeout> | null | undefined
     >();
-    const [peersError, setPeersError] = useState<string>();
-    const [peers, setPeers] = useState<Peer[]>();
+    const [error, setError] = useState<string>();
+    const [value, setValue] = useState<R>();
     useEffect(() => {
-        if (peersTimeout === undefined) {
-            setPeersTimeout(null);
+        if (pollTimer === undefined) {
+            setPollTimer(null);
             (async () => {
                 try {
-                    let result = await getJson("/native/admin/peers");
-                    setPeers(result);
-                    setPeersError(undefined);
-                    setPeersTimeout(
-                        setTimeout(() => setPeersTimeout(undefined), 3000)
+                    let result = await getJson(url);
+                    setValue(result);
+                    setError(undefined);
+                    setPollTimer(
+                        setTimeout(() => setPollTimer(undefined), 3000)
                     );
                 } catch (e) {
-                    setPeersError("Failed to load peers");
-                    setPeersTimeout(
-                        setTimeout(() => setPeersTimeout(undefined), 10000)
+                    setError(`Failed to load ${url}`);
+                    setPollTimer(
+                        setTimeout(() => setPollTimer(undefined), 10000)
                     );
                 }
             })();
         }
-    }, [peersTimeout]);
+    }, [pollTimer]);
+    return [
+        value,
+        error,
+        () => {
+            if (pollTimer !== undefined && pollTimer !== null) {
+                clearTimeout(pollTimer);
+                setPollTimer(undefined);
+            }
+        },
+    ];
+}
 
-    const refetchPeers = () => {
-        if (peersTimeout !== undefined && peersTimeout !== null) {
-            clearTimeout(peersTimeout);
-            setPeersTimeout(undefined);
-        }
-    };
+function App() {
+    const [peers, peersError, refetchPeers] = pollJson<Peer[]>(
+        "/native/admin/peers"
+    );
 
     const onDisconnect = async (id: number) => {
         try {
@@ -201,7 +211,7 @@ function App() {
     };
 
     const [configError, setConfigError] = useState<string>();
-
+    const [configPutError, setConfigPutError] = useState<string>();
     //
 
     const configForm = useForm<PsinodeConfig>({
@@ -213,16 +223,16 @@ function App() {
     configForm.formState.dirtyFields;
     const onConfig = async (input: PsinodeConfig) => {
         try {
-            setConfigError(undefined);
+            setConfigPutError(undefined);
             const result = await putJson("/native/admin/config", input);
             if (result.ok) {
                 configForm.reset(input);
             } else {
-                setConfigError(await result.text());
+                setConfigPutError(await result.text());
             }
         } catch (e) {
             console.error("error", e);
-            setConfigError("Connection failure");
+            setConfigPutError("Failed to write /native/admin/config");
         }
     };
 
@@ -241,7 +251,7 @@ function App() {
                         setTimeout(() => setConfigTimeout(undefined), 3000)
                     );
                 } catch (e) {
-                    setConfigError("Failed to load config");
+                    setConfigError("Failed to load /native/admin/config");
                     setConfigTimeout(
                         setTimeout(() => setConfigTimeout(undefined), 10000)
                     );
@@ -250,8 +260,42 @@ function App() {
         }
     }, [configTimeout]);
 
+    const [status, statusError, fetchStatus] = pollJson<string[]>(
+        "/native/admin/status"
+    );
+
+    let serverStatus = [
+        ...(status || []),
+        ...(!statusError ? [] : [statusError]),
+        ...(!peersError ? [] : [peersError]),
+        ...(!configError ? [] : [configError]),
+        ...(!logConnectionError ? [] : [logConnectionError]),
+    ];
+    if (peersError && configError && logConnectionError && statusError) {
+        serverStatus = ["Not connected"];
+    }
+
+    if (!serverStatus || serverStatus.length == 0) {
+        serverStatus = ["Ready"];
+    }
+
     return (
         <div>
+            <h1>Status</h1>
+            {serverStatus?.map((id) => {
+                if (id == "slow") {
+                    return (
+                        <p>
+                            Failed to lock database memory. Performance may be
+                            degraded.
+                        </p>
+                    );
+                } else if (id == "startup") {
+                    return <p>Initializing</p>;
+                } else {
+                    return <p>{id}</p>;
+                }
+            })}
             <h1>Peers</h1>
             <table>
                 <thead>
@@ -303,10 +347,6 @@ function App() {
                     label="Block Producer Name"
                     {...configForm.register("producer")}
                 />
-                <Form.Checkbox
-                    label="Slow (requires restart)"
-                    {...configForm.register("slow")}
-                />
                 <Form.Input
                     label="Host (requires restart)"
                     {...configForm.register("host")}
@@ -322,7 +362,7 @@ function App() {
                     Save Changes
                 </Button>
             </form>
-            {configError && <div>{configError}</div>}
+            {configPutError && <div>{configPutError}</div>}
             <h1>Log</h1>
             <form onSubmit={filterForm.handleSubmit(onFilter)}>
                 <Form.Input
@@ -349,7 +389,6 @@ function App() {
                     ))}
                 </tbody>
             </table>
-            {logConnectionError && <div>{logConnectionError}</div>}
         </div>
     );
 }

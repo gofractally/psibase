@@ -39,6 +39,40 @@ namespace psibase::http
    using get_config_callback = std::function<void(get_config_result)>;
    using get_config_t        = std::function<void(get_config_callback)>;
 
+   struct http_status
+   {
+      unsigned slow : 1;
+      unsigned startup : 1;
+   };
+   template <typename S>
+   void to_json(http_status obj, S& stream)
+   {
+      stream.write('[');
+      bool first       = true;
+      auto maybe_comma = [&]()
+      {
+         if (first)
+         {
+            first = false;
+         }
+         else
+         {
+            stream.write(',');
+         }
+      };
+      if (obj.slow)
+      {
+         maybe_comma();
+         to_json("slow", stream);
+      }
+      if (obj.startup)
+      {
+         maybe_comma();
+         to_json("startup", stream);
+      }
+      stream.write(']');
+   }
+
    struct http_config
    {
       uint32_t                  num_threads            = {};
@@ -59,6 +93,7 @@ namespace psibase::http
       connect_t                 set_config             = {};
       bool                      host_perf              = false;
       std::atomic<bool>         enable_p2p;
+      std::atomic<http_status>  status;
    };
 
    struct server
