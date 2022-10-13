@@ -34,11 +34,11 @@ mod service {
     }
 
     // #[table]
-    #[derive(Fracpack)]
-    struct CandidateRecord {
-        election_id: u32,
-        candidate: AccountNumber,
-        votes: u32,
+    #[derive(Fracpack, Eq, PartialEq, Clone, Debug)]
+    pub struct CandidateRecord {
+        pub election_id: u32,
+        pub candidate: AccountNumber,
+        pub votes: u32,
     }
 
     impl TableRecord for CandidateRecord {
@@ -56,30 +56,104 @@ mod service {
         const TABLE_INDEX: u16 = 1;
     }
 
+    // #[table]
+    #[derive(Fracpack, Eq, PartialEq, Clone)]
+    struct VotingRecord {
+        election_id: u32,
+        voter: AccountNumber,
+        candidate: AccountNumber,
+        voted_at: TimePointSec,
+    }
+
+    impl TableRecord for VotingRecord {
+        type PrimaryKey = (u32, AccountNumber);
+
+        fn get_primary_key(&self) -> Self::PrimaryKey {
+            (self.election_id, self.voter)
+        }
+    }
+
+    type VotesTable = Table<VotingRecord>;
+
+    impl TableHandler<VotingRecord> for VotesTable {
+        const TABLE_SERVICE: AccountNumber = SERVICE;
+        const TABLE_INDEX: u16 = 2;
+    }
+
     #[action]
     fn get_election(election_id: u32) -> ElectionRecord {
         let table = ElectionsTable::open();
-        let idx = table.get_index::<u32>(0);
+        let idx = table.get_index_pk();
         let election_opt = idx.get(election_id);
         check_some(election_opt, "election does not exist")
     }
 
     #[action]
+    fn get_candidate(election_id: u32, candidate: AccountNumber) -> CandidateRecord {
+        let table = CandidatesTable::open();
+        let idx = table.get_index_pk();
+        let candidate_opt = idx.get((election_id, candidate));
+        check_some(candidate_opt, "candidate for election does not exist")
+    }
+
+    #[action]
     fn list_active_elections(date_time: TimePointSec) -> Vec<ElectionRecord> {
         let table = ElectionsTable::open();
-        let idx = table.get_index::<u32>(0);
+        let idx = table.get_index_pk();
 
         let current_time = date_time; // TODO: get the current time
 
-        #[allow(clippy::let_and_return)] // TODO
-        let active_elections = idx
-            .rev() // list from the most recent ones
+        // TODO: this expensive table scan needs secondary indexes
+        idx.rev() // list from the most recent ones
             .filter(|election| {
                 election.voting_start_date <= current_time
                     && election.voting_end_date > current_time
             })
+            .collect()
+    }
+
+    #[action]
+    fn list_candidates(election_id: u32) -> Vec<CandidateRecord> {
+        // check election exists
+        get_election(election_id);
+
+        let table = CandidatesTable::open();
+
+        let mut idx = table.get_index_pk();
+
+        idx.range(
+            (election_id, AccountNumber::default()),
+            (election_id + 1, AccountNumber::default()),
+        )
+        .collect()
+    }
+
+    /// Get the winner for a closed election
+    #[action]
+    fn get_winner(election_id: u32) -> CandidateRecord {
+        let election = get_election(election_id);
+
+        // TODO: implement get time
+        let current_time = TimePointSec { seconds: 90 };
+
+        check(
+            current_time > election.voting_end_date,
+            "election is not finished",
+        );
+
+        let table = CandidatesTable::open();
+        let mut idx = table.get_index_pk();
+
+        // TODO: implement secondary key to get the FIRST candidate with the biggest votes count
+        let mut candidates_records: Vec<CandidateRecord> = idx
+            .range(
+                (election_id, AccountNumber::default()),
+                (election_id + 1, AccountNumber::default()),
+            )
             .collect();
-        active_elections
+
+        candidates_records.sort_by_key(|record| record.votes);
+        check_some(candidates_records.pop(), "election has no winner")
     }
 
     /// Creates a new election
@@ -88,7 +162,7 @@ mod service {
         println!(">>> adding a new election rust println!...");
 
         let table = ElectionsTable::open();
-        let mut idx = table.get_index::<u32>(0);
+        let mut idx = table.get_index_pk();
 
         println!(">>> indexes initialized!...");
 
@@ -117,13 +191,6 @@ mod service {
         new_key
     }
 
-    // // #[table]
-    // struct VotingRecord {
-    //     election_id: u32,
-    //     voter: AccountNumber,
-    //     candidate: AccountNumber,
-    // }
-
     /// Register a new candidate to be elected, can only be done while the election does not start
     #[action]
     fn register(candidate: AccountNumber, election_id: u32) {
@@ -139,9 +206,9 @@ mod service {
         );
 
         let table = CandidatesTable::open();
-        let idx = table.get_index::<(AccountNumber, u32)>(0);
+        let idx = table.get_index_pk();
 
-        let candidate_record = idx.get((candidate, election_id));
+        let candidate_record = idx.get((election_id, candidate));
         check_none(candidate_record, "candidate is already registered");
 
         let new_candidate_record = CandidateRecord {
@@ -153,105 +220,317 @@ mod service {
         table.put(&new_candidate_record);
     }
 
-    // /// Unregister a candidate from the election
-    // #[action]
-    // fn unregister(election_id: u32) {
-    //     unimplemented!()
-    // }
+    /// Unregister a candidate from the election
+    #[action]
+    fn unregister(candidate: AccountNumber, election_id: u32) {
+        // TODO: implement get_sender; let candidate = get_sender();
 
-    // /// Vote for a candidate in an active election
-    // #[action]
-    // fn vote(election_id: u32, candidate: AccountNumber) {
-    //     unimplemented!()
-    // }
+        let election = get_election(election_id);
 
-    // /// Get the winner for a closed election
-    // #[action]
-    // fn get_winner(election_id: u32) {
-    //     unimplemented!()
-    // }
+        // TODO: implement get current time
+        let current_time = TimePointSec { seconds: 0 };
+
+        check(
+            current_time < election.voting_start_date,
+            "election is already in progress",
+        );
+
+        let table = CandidatesTable::open();
+        let idx = table.get_index_pk();
+
+        let key = (election_id, candidate);
+        let candidate_record = idx.get(key);
+        check_some(candidate_record, "candidate is not registered");
+
+        table.remove(&key);
+    }
+
+    /// Vote for a candidate in an active election
+    #[action]
+    fn vote(voter: AccountNumber, election_id: u32, candidate: AccountNumber) {
+        // TODO: implement get_sender; let voter = get_sender();
+        let election = get_election(election_id);
+
+        // TODO: implement get current time
+        let current_time = TimePointSec { seconds: 30 };
+
+        check(
+            current_time >= election.voting_start_date,
+            "election has not started",
+        );
+
+        let mut candidate_record = get_candidate(election_id, candidate);
+
+        let table = VotesTable::open();
+        let idx = table.get_index_pk();
+
+        let voting_record = idx.get((election_id, voter));
+        check_none(voting_record, "voter has already submitted a vote");
+
+        let new_voting_record = VotingRecord {
+            election_id,
+            voter,
+            candidate,
+            voted_at: current_time,
+        };
+
+        table.put(&new_voting_record);
+
+        // Increment candidate vote
+        candidate_record.votes += 1;
+        CandidatesTable::open().put(&candidate_record);
+    }
 }
 
-/*
-#[psibase::test_case(services("elections"))]
-fn new_elections_are_sequential(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    println!("Pushing election1...");
-    let election1 =
-        Wrapper::push(&chain).new(TimePointSec { seconds: 1 }, TimePointSec { seconds: 121 });
-    println!(
-        "election1 result={}, trace:\n{}",
-        election1.get()?,
-        election1.trace
-    );
-    assert_eq!(election1.get()?, 1);
+#[cfg(test)]
+mod tests {
+    use super::service::CandidateRecord;
+    use crate::Wrapper;
+    use psibase::{AccountNumber, TimePointSec};
 
-    let election1_record = Wrapper::push(&chain).get_election(1);
-    println!(
-        "election1_record result={:?}, trace:\n{}",
-        election1_record.get()?,
-        election1.trace
-    );
+    #[psibase::test_case(services("elections"))]
+    fn new_elections_are_sequential(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        println!("Pushing election1...");
+        let election1 =
+            Wrapper::push(&chain).new(TimePointSec { seconds: 1 }, TimePointSec { seconds: 121 });
+        println!(
+            "election1 result={}, trace:\n{}",
+            election1.get()?,
+            election1.trace
+        );
+        assert_eq!(election1.get()?, 1);
 
-    println!("Pushing election2...");
-    let election2 =
-        Wrapper::push(&chain).new(TimePointSec { seconds: 2 }, TimePointSec { seconds: 122 });
-    println!(
-        "election2 result={}, trace:\n{}",
-        election2.get()?,
-        election2.trace
-    );
-    assert_eq!(election2.get()?, 2);
+        let election1_record = Wrapper::push(&chain).get_election(1);
+        println!(
+            "election1_record result={:?}, trace:\n{}",
+            election1_record.get()?,
+            election1.trace
+        );
 
-    println!("Pushing election3...");
-    let election3 =
-        Wrapper::push(&chain).new(TimePointSec { seconds: 3 }, TimePointSec { seconds: 123 });
-    println!(
-        "election3 result={}, trace:\n{}",
-        election3.get()?,
-        election3.trace
-    );
-    assert_eq!(election3.get()?, 3);
+        println!("Pushing election2...");
+        let election2 =
+            Wrapper::push(&chain).new(TimePointSec { seconds: 2 }, TimePointSec { seconds: 122 });
+        println!(
+            "election2 result={}, trace:\n{}",
+            election2.get()?,
+            election2.trace
+        );
+        assert_eq!(election2.get()?, 2);
 
-    Ok(())
+        println!("Pushing election3...");
+        let election3 =
+            Wrapper::push(&chain).new(TimePointSec { seconds: 3 }, TimePointSec { seconds: 123 });
+        println!(
+            "election3 result={}, trace:\n{}",
+            election3.get()?,
+            election3.trace
+        );
+        assert_eq!(election3.get()?, 3);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(services("elections"))]
+    fn active_elections_are_filtered(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        println!("Pushing elections...");
+        Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
+        Wrapper::push(&chain).new(TimePointSec { seconds: 20 }, TimePointSec { seconds: 70 });
+        Wrapper::push(&chain).new(TimePointSec { seconds: 30 }, TimePointSec { seconds: 80 });
+
+        let active_elections = Wrapper::push(&chain)
+            .list_active_elections(TimePointSec { seconds: 45 })
+            .get()?;
+        assert_eq!(active_elections.len(), 3);
+        assert_eq!(active_elections[0].id, 3);
+        assert_eq!(active_elections[1].id, 2);
+        assert_eq!(active_elections[2].id, 1);
+
+        let active_elections = Wrapper::push(&chain)
+            .list_active_elections(TimePointSec { seconds: 65 })
+            .get()?;
+        assert_eq!(active_elections.len(), 2);
+        assert_eq!(active_elections[0].id, 3);
+        assert_eq!(active_elections[1].id, 2);
+
+        let active_elections = Wrapper::push(&chain)
+            .list_active_elections(TimePointSec { seconds: 75 })
+            .get()?;
+        assert_eq!(active_elections.len(), 1);
+        assert_eq!(active_elections[0].id, 3);
+
+        let active_elections = Wrapper::push(&chain)
+            .list_active_elections(TimePointSec { seconds: 5 })
+            .get()?;
+        assert_eq!(active_elections.len(), 0);
+        let active_elections = Wrapper::push(&chain)
+            .list_active_elections(TimePointSec { seconds: 85 })
+            .get()?;
+        assert_eq!(active_elections.len(), 0);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(services("elections"))]
+    fn register_and_unregister_from_election_successfully(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        println!("Pushing elections...");
+        Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
+
+        Wrapper::push(&chain).register(AccountNumber::from("bob"), 1);
+        Wrapper::push(&chain).register(AccountNumber::from("alice"), 1);
+        Wrapper::push(&chain).register(AccountNumber::from("charles"), 1);
+
+        // Add another election just to check that the range operation is behaving properly
+        Wrapper::push(&chain).new(TimePointSec { seconds: 11 }, TimePointSec { seconds: 61 });
+        Wrapper::push(&chain).register(AccountNumber::from("bobby"), 2);
+        Wrapper::push(&chain).register(AccountNumber::from("alicey"), 2);
+        Wrapper::push(&chain).register(AccountNumber::from("charlesy"), 2);
+
+        let candidate_bob = CandidateRecord {
+            candidate: AccountNumber::from("bob"),
+            election_id: 1,
+            votes: 0,
+        };
+
+        let candidate_alice = CandidateRecord {
+            candidate: AccountNumber::from("alice"),
+            election_id: 1,
+            votes: 0,
+        };
+
+        let candidate_charles = CandidateRecord {
+            candidate: AccountNumber::from("charles"),
+            election_id: 1,
+            votes: 0,
+        };
+
+        let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+        assert_eq!(candidates.len(), 3);
+
+        let expected_candidates = vec![
+            candidate_alice.clone(),
+            candidate_bob.clone(),
+            candidate_charles.clone(),
+        ];
+        assert!(candidates
+            .iter()
+            .all(|item| expected_candidates.contains(item)));
+
+        chain.start_block();
+        Wrapper::push(&chain).unregister(AccountNumber::from("charles"), 1);
+
+        let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+        assert_eq!(candidates.len(), 2);
+
+        let expected_candidates = vec![candidate_alice.clone(), candidate_bob.clone()];
+        assert!(candidates
+            .iter()
+            .all(|item| expected_candidates.contains(item)));
+
+        // Unregister an already unregistered user should fail
+        chain.start_block();
+        let error = Wrapper::push(&chain)
+            .unregister(AccountNumber::from("charles"), 1)
+            .trace
+            .error
+            .unwrap();
+        assert!(
+            error.contains("candidate is not registered"),
+            "error = {}",
+            error
+        );
+
+        // Register an already registered user should fail
+        let error = Wrapper::push(&chain)
+            .register(AccountNumber::from("alice"), 1)
+            .trace
+            .error
+            .unwrap();
+        assert!(
+            error.contains("candidate is already registered"),
+            "error = {}",
+            error
+        );
+
+        // Check candidate was added back
+        chain.start_block();
+        Wrapper::push(&chain).register(AccountNumber::from("charles"), 1);
+
+        let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+        assert_eq!(candidates.len(), 3);
+
+        let expected_candidates = vec![
+            candidate_alice.clone(),
+            candidate_bob.clone(),
+            candidate_charles.clone(),
+        ];
+        assert!(candidates
+            .iter()
+            .all(|item| expected_candidates.contains(item)));
+
+        Ok(())
+    }
+
+    #[psibase::test_case(services("elections"))]
+    fn votes_are_submitted_successfully(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        println!("Starting election...");
+        Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
+
+        Wrapper::push(&chain).register(AccountNumber::from("bob"), 1);
+        Wrapper::push(&chain).register(AccountNumber::from("alice"), 1);
+        Wrapper::push(&chain).register(AccountNumber::from("charles"), 1);
+
+        for i in 1..=100 {
+            let voter = AccountNumber::from(format!("voter{i}").as_str());
+            let candidate = if i <= 10 {
+                AccountNumber::from("bob")
+            } else if i <= 50 {
+                AccountNumber::from("alice")
+            } else {
+                AccountNumber::from("charles")
+            };
+
+            Wrapper::push(&chain).vote(voter, 1, candidate);
+        }
+
+        let candidate_bob = CandidateRecord {
+            candidate: AccountNumber::from("bob"),
+            election_id: 1,
+            votes: 10,
+        };
+
+        let candidate_alice = CandidateRecord {
+            candidate: AccountNumber::from("alice"),
+            election_id: 1,
+            votes: 40,
+        };
+
+        let candidate_charles = CandidateRecord {
+            candidate: AccountNumber::from("charles"),
+            election_id: 1,
+            votes: 50,
+        };
+
+        let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+        assert_eq!(candidates.len(), 3);
+
+        let expected_candidates = vec![
+            candidate_alice.clone(),
+            candidate_bob.clone(),
+            candidate_charles.clone(),
+        ];
+        assert!(
+            candidates
+                .iter()
+                .all(|item| expected_candidates.contains(item)),
+            "Expected voting candidates results are wrong: {:?}",
+            candidates
+        );
+
+        let winner = Wrapper::push(&chain).get_winner(1).get()?;
+        assert_eq!(winner, candidate_charles, "unexpected winner: {:?}", winner);
+
+        Ok(())
+    }
 }
-
-#[psibase::test_case(services("elections"))]
-fn active_elections_are_filtered(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    println!("Pushing elections...");
-    Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
-    Wrapper::push(&chain).new(TimePointSec { seconds: 20 }, TimePointSec { seconds: 70 });
-    Wrapper::push(&chain).new(TimePointSec { seconds: 30 }, TimePointSec { seconds: 80 });
-
-    let active_elections = Wrapper::push(&chain)
-        .list_active_elections(TimePointSec { seconds: 45 })
-        .get()?;
-    assert_eq!(active_elections.len(), 3);
-    assert_eq!(active_elections[0].id, 3);
-    assert_eq!(active_elections[1].id, 2);
-    assert_eq!(active_elections[2].id, 1);
-
-    let active_elections = Wrapper::push(&chain)
-        .list_active_elections(TimePointSec { seconds: 65 })
-        .get()?;
-    assert_eq!(active_elections.len(), 2);
-    assert_eq!(active_elections[0].id, 3);
-    assert_eq!(active_elections[1].id, 2);
-
-    let active_elections = Wrapper::push(&chain)
-        .list_active_elections(TimePointSec { seconds: 75 })
-        .get()?;
-    assert_eq!(active_elections.len(), 1);
-    assert_eq!(active_elections[0].id, 3);
-
-    let active_elections = Wrapper::push(&chain)
-        .list_active_elections(TimePointSec { seconds: 5 })
-        .get()?;
-    assert_eq!(active_elections.len(), 0);
-    let active_elections = Wrapper::push(&chain)
-        .list_active_elections(TimePointSec { seconds: 85 })
-        .get()?;
-    assert_eq!(active_elections.len(), 0);
-
-    Ok(())
-}
-*/
