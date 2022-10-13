@@ -3,9 +3,20 @@ use std::marker::PhantomData;
 use fracpack::PackableOwned;
 
 use crate::{
-    get_key_bytes, kv_get, kv_greater_equal, kv_insert_unique, kv_less_than, kv_max, kv_put,
-    kv_remove, AccountNumber, DbId, KeyView, RawKey, ToKey,
+    get_key_bytes, kv_get, kv_greater_equal_bytes, kv_insert_unique_bytes, kv_less_than_bytes,
+    kv_max_bytes, kv_put, kv_remove, AccountNumber, DbId, KeyView, RawKey, ToKey,
 };
+
+// TODO: remove helper
+fn to_hex(bytes: &[u8]) -> String {
+    let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    for byte in bytes {
+        result.push(DIGITS[(byte >> 4) as usize]);
+        result.push(DIGITS[(byte & 0x0f) as usize]);
+    }
+    String::from_utf8(result).unwrap()
+}
 
 pub trait TableRecord: PackableOwned {
     type PrimaryKey: ToKey;
@@ -43,23 +54,13 @@ pub struct Table<Record: TableRecord> {
     phantom: PhantomData<Record>,
 }
 
-fn to_hex(bytes: &[u8]) -> String {
-    let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    for byte in bytes {
-        result.push(DIGITS[(byte >> 4) as usize]);
-        result.push(DIGITS[(byte & 0x0f) as usize]);
-    }
-    String::from_utf8(result).unwrap()
-}
-
 impl<Record: TableRecord> Table<Record> {
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
     pub fn get_index<Key: ToKey>(&self, idx: u8) -> TableIndex<Key, Record> {
         let mut idx_prefix = self.prefix.clone();
         idx.append_key(&mut idx_prefix);
 
-        TableIndex::new(self.db_id, idx_prefix)
+        TableIndex::new(self.db_id, idx_prefix, idx > 0)
     }
 
     /// Returns the Primary Key Index
@@ -80,23 +81,54 @@ impl<Record: TableRecord> Table<Record> {
         kv_put(self.db_id, &pk, value);
     }
 
-    pub fn handle_put_secondary_keys(&self, pk: &Vec<u8>, value: &Record) {
+    pub fn handle_put_secondary_keys(&self, pk: &[u8], value: &Record) {
         let secondary_keys = value.get_secondary_keys();
 
         if secondary_keys.is_empty() {
             return;
         }
 
-        let existing_record: Option<Record> = kv_get(self.db_id, pk).unwrap();
+        let old_record: Option<Record> = kv_get(self.db_id, &KeyView::new(pk)).unwrap();
 
-        if let Some(_existing_record) = existing_record {
-            // TODO: replace secondary
+        if let Some(old_record) = old_record {
+            self.replace_secondary_keys(pk, &secondary_keys, old_record);
         } else {
             self.write_secondary_keys(pk, &secondary_keys);
         }
     }
 
-    pub fn write_secondary_keys(&self, pk: &Vec<u8>, secondary_keys: &Vec<RawKey>) {
+    pub fn replace_secondary_keys(&self, pk: &[u8], secondary_keys: &[RawKey], old_record: Record) {
+        let mut key_buffer = self.prefix.clone();
+        let mut idx: u8 = 1; // Secondary keys starts at position 1 (Pk is 0)
+
+        let old_keys = old_record.get_secondary_keys();
+
+        for (new_key, old_key) in secondary_keys.iter().zip(&old_keys) {
+            if old_key != new_key {
+                println!(
+                    ">>> replacing secondary key idx: {} // old: {} // new: {} // pk: {}",
+                    idx,
+                    to_hex(&old_key.data[..]),
+                    to_hex(&new_key.data[..]),
+                    to_hex(pk)
+                );
+
+                idx.append_key(&mut key_buffer);
+
+                old_key.append_key(&mut key_buffer);
+                kv_remove(self.db_id, &KeyView::new(&key_buffer));
+                key_buffer.truncate(self.prefix.len() + 1);
+
+                new_key.append_key(&mut key_buffer);
+                kv_insert_unique_bytes(self.db_id, &KeyView::new(&key_buffer), pk);
+                key_buffer.truncate(self.prefix.len());
+            }
+
+            idx += 1;
+        }
+    }
+
+    pub fn write_secondary_keys(&self, pk: &[u8], secondary_keys: &Vec<RawKey>) {
         let mut key_buffer = self.prefix.clone();
         let mut idx: u8 = 1; // Secondary keys starts at position 1 (Pk is 0)
         for raw_key in secondary_keys {
@@ -107,9 +139,9 @@ impl<Record: TableRecord> Table<Record> {
                 ">>> inserting secondary key {} // {} // {}",
                 idx,
                 to_hex(&key_buffer[..]),
-                to_hex(&pk[..])
+                to_hex(pk)
             );
-            kv_insert_unique(self.db_id, &KeyView::new(&key_buffer), pk);
+            kv_insert_unique_bytes(self.db_id, &KeyView::new(&key_buffer), pk);
 
             key_buffer.truncate(self.prefix.len());
             idx += 1;
@@ -128,6 +160,7 @@ pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub prefix: Vec<u8>,
     front_key: RawKey,
     back_key: RawKey,
+    is_secondary: bool,
     is_end: bool,
     pub key_type: PhantomData<Key>,
     pub record_type: PhantomData<Record>,
@@ -135,12 +168,13 @@ pub struct TableIndex<Key: ToKey, Record: TableRecord> {
 
 impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     /// Instantiate a new Table Index (Primary or Secondary)
-    fn new(db_id: DbId, prefix: Vec<u8>) -> TableIndex<Key, Record> {
+    fn new(db_id: DbId, prefix: Vec<u8>, is_secondary: bool) -> TableIndex<Key, Record> {
         TableIndex {
             db_id,
             front_key: RawKey::new(prefix.clone()),
             back_key: RawKey::new(prefix.clone()),
             prefix,
+            is_secondary,
             is_end: false,
             key_type: PhantomData,
             record_type: PhantomData,
@@ -174,6 +208,14 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
 
         self
     }
+
+    fn get_value_from_pk_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
+        if self.is_secondary {
+            kv_get(self.db_id, &RawKey::new(bytes)).unwrap()
+        } else {
+            Some(Record::unpack(&bytes[..], &mut 0).unwrap())
+        }
+    }
 }
 
 impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
@@ -186,10 +228,13 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
 
         println!(">>> iterating from the front with key {:?}", self.front_key);
 
-        let value: Option<Record> =
-            kv_greater_equal(self.db_id, &self.front_key, self.prefix.len() as u32);
+        let value = kv_greater_equal_bytes(
+            self.db_id,
+            &self.front_key.data[..],
+            self.prefix.len() as u32,
+        );
 
-        if value.is_some() {
+        if let Some(value) = value {
             self.front_key = RawKey::new(get_key_bytes());
 
             if self.front_key >= self.back_key {
@@ -202,7 +247,8 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
             self.front_key.data.push(0);
 
             println!(">>> iterated and got key {:?}", self.front_key);
-            value
+
+            self.get_value_from_pk_bytes(value)
         } else {
             println!(">>> setting end of iterator!");
             self.is_end = true;
@@ -217,15 +263,22 @@ impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Re
             return None;
         }
 
-        println!(">>> iterating from the back with key {:?}", self.back_key);
+        println!(
+            ">>> iterating from the back with key {:?}",
+            to_hex(&self.back_key.data[..])
+        );
 
         let value = if self.back_key.data == self.prefix {
-            kv_max(self.db_id, &self.back_key)
+            kv_max_bytes(self.db_id, &self.back_key.data[..])
         } else {
-            kv_less_than(self.db_id, &self.back_key, self.prefix.len() as u32)
+            kv_less_than_bytes(
+                self.db_id,
+                &self.back_key.data[..],
+                self.prefix.len() as u32,
+            )
         };
 
-        if value.is_some() {
+        if let Some(value) = value {
             self.back_key = RawKey::new(get_key_bytes());
 
             if self.back_key <= self.front_key {
@@ -234,8 +287,12 @@ impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Re
                 return None;
             }
 
-            println!(">>> back-iterated and got key {:?}", self.back_key);
-            value
+            println!(
+                ">>> back-iterated and got key {:?}",
+                to_hex(&self.back_key.data[..])
+            );
+
+            self.get_value_from_pk_bytes(value)
         } else {
             println!(">>> setting end of iterator!");
             self.is_end = true;

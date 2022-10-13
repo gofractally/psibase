@@ -183,10 +183,10 @@ pub fn kv_put<'a, K: ToKey, V: Packable<'a>>(db: DbId, key: &K, value: &V) {
 /// Set a key-value pair if the key is unique
 ///
 /// If key already exists, throws an error
-pub fn kv_insert_unique<'a, K: ToKey, V: Packable<'a>>(db: DbId, key: &K, value: &V) {
+pub fn kv_insert_unique_bytes<K: ToKey>(db: DbId, key: &K, bytes: &[u8]) {
     let key_bytes = key.to_key();
     check_none(kv_get_bytes(db, &key_bytes), "key already exists");
-    kv_put_bytes(db, &key_bytes, &value.packed())
+    kv_put_bytes(db, &key_bytes, bytes)
 }
 
 /// Add a sequentially-numbered record

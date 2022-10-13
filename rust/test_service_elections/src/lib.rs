@@ -40,6 +40,13 @@ mod service {
         pub candidate: AccountNumber,
         pub votes: u32,
     }
+    type ByElectionVotesCount = (u32, u32, AccountNumber);
+
+    impl CandidateRecord {
+        fn by_election_votes_key(&self) -> ByElectionVotesCount {
+            (self.election_id, self.votes, self.candidate)
+        }
+    }
 
     impl TableRecord for CandidateRecord {
         type PrimaryKey = (u32, AccountNumber);
@@ -49,15 +56,12 @@ mod service {
         }
 
         fn get_secondary_keys(&self) -> Vec<RawKey> {
-            let by_election_votes_key =
-                RawKey::new((self.election_id, self.votes, self.candidate).to_key());
-
-            vec![by_election_votes_key]
+            let sk1 = RawKey::new(self.by_election_votes_key().to_key());
+            vec![sk1]
         }
     }
 
     type CandidatesTable = Table<CandidateRecord>;
-
     impl TableHandler<CandidateRecord> for CandidatesTable {
         const TABLE_SERVICE: AccountNumber = SERVICE;
         const TABLE_INDEX: u16 = 1;
@@ -149,18 +153,16 @@ mod service {
         );
 
         let table = CandidatesTable::open();
-        let mut idx = table.get_index_pk();
+        let mut idx = table.get_index::<ByElectionVotesCount>(1);
 
-        // TODO: implement secondary key to get the FIRST candidate with the biggest votes count
-        let mut candidates_records: Vec<CandidateRecord> = idx
+        let winner = idx
             .range(
-                (election_id, AccountNumber::default()),
-                (election_id + 1, AccountNumber::default()),
+                (election_id, 0, AccountNumber::default()),
+                (election_id + 1, 0, AccountNumber::default()),
             )
-            .collect();
+            .next_back();
 
-        candidates_records.sort_by_key(|record| record.votes);
-        check_some(candidates_records.pop(), "election has no winner")
+        check_some(winner, "election has no winner")
     }
 
     /// Creates a new election
@@ -497,36 +499,39 @@ mod tests {
         Wrapper::push_from(&chain, account!("alice")).register(1);
         Wrapper::push_from(&chain, account!("charles")).register(1);
 
-        for i in 1..=100 {
+        for i in 1..=20 {
             let voter = AccountNumber::from(format!("voter{i}").as_str());
             chain.new_account(voter)?;
-            let candidate = if i <= 10 {
+            let candidate = if i <= 3 {
                 account!("bob")
-            } else if i <= 50 {
+            } else if i <= 10 {
                 account!("alice")
             } else {
                 account!("charles")
             };
 
-            Wrapper::push_from(&chain, voter).vote(1, candidate);
+            println!(
+                "{}",
+                Wrapper::push_from(&chain, voter).vote(1, candidate).trace
+            );
         }
 
         let candidate_bob = CandidateRecord {
             candidate: account!("bob"),
             election_id: 1,
-            votes: 10,
+            votes: 3,
         };
 
         let candidate_alice = CandidateRecord {
             candidate: account!("alice"),
             election_id: 1,
-            votes: 40,
+            votes: 7,
         };
 
         let candidate_charles = CandidateRecord {
             candidate: account!("charles"),
             election_id: 1,
-            votes: 50,
+            votes: 10,
         };
 
         let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
@@ -545,7 +550,9 @@ mod tests {
             candidates
         );
 
-        let winner = Wrapper::push(&chain).get_winner(1).get()?;
+        let winner = Wrapper::push(&chain).get_winner(1);
+        println!("winner trace: {}", winner.trace);
+        let winner = winner.get()?;
         assert_eq!(winner, candidate_charles, "unexpected winner: {:?}", winner);
 
         Ok(())
