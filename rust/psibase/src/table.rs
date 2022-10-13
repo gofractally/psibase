@@ -68,22 +68,29 @@ impl<Record: TableRecord> Table<Record> {
         self.get_index::<Record::PrimaryKey>(0)
     }
 
-    pub fn serialize_key<K: ToKey>(&self, idx: u8, key: &K) -> impl ToKey {
+    /// Put a value in the table
+    pub fn put(&self, value: &Record) {
+        let pk = self.serialize_key(0, &value.get_primary_key());
+        self.handle_secondary_keys_put(&pk.to_key(), value);
+        kv_put(self.db_id, &pk, value);
+    }
+
+    /// Removes a value from the table
+    pub fn remove(&self, value: &Record) {
+        let pk = self.serialize_key(0, &value.get_primary_key());
+        kv_remove(self.db_id, &pk);
+        self.handle_secondary_keys_removal(value);
+    }
+
+    fn serialize_key<K: ToKey>(&self, idx: u8, key: &K) -> impl ToKey {
         let mut data = self.prefix.clone();
         idx.append_key(&mut data);
         key.append_key(&mut data);
         RawKey::new(data)
     }
 
-    pub fn put(&self, value: &Record) {
-        let pk = self.serialize_key(0, &value.get_primary_key());
-        self.handle_put_secondary_keys(&pk.to_key(), value);
-        kv_put(self.db_id, &pk, value);
-    }
-
-    pub fn handle_put_secondary_keys(&self, pk: &[u8], value: &Record) {
+    fn handle_secondary_keys_put(&self, pk: &[u8], value: &Record) {
         let secondary_keys = value.get_secondary_keys();
-
         if secondary_keys.is_empty() {
             return;
         }
@@ -97,7 +104,7 @@ impl<Record: TableRecord> Table<Record> {
         }
     }
 
-    pub fn replace_secondary_keys(&self, pk: &[u8], secondary_keys: &[RawKey], old_record: Record) {
+    fn replace_secondary_keys(&self, pk: &[u8], secondary_keys: &[RawKey], old_record: Record) {
         let mut key_buffer = self.prefix.clone();
         let mut idx: u8 = 1; // Secondary keys starts at position 1 (Pk is 0)
 
@@ -128,7 +135,7 @@ impl<Record: TableRecord> Table<Record> {
         }
     }
 
-    pub fn write_secondary_keys(&self, pk: &[u8], secondary_keys: &Vec<RawKey>) {
+    fn write_secondary_keys(&self, pk: &[u8], secondary_keys: &Vec<RawKey>) {
         let mut key_buffer = self.prefix.clone();
         let mut idx: u8 = 1; // Secondary keys starts at position 1 (Pk is 0)
         for raw_key in secondary_keys {
@@ -148,10 +155,29 @@ impl<Record: TableRecord> Table<Record> {
         }
     }
 
-    pub fn remove(&self, primary_key: &impl ToKey) {
-        let pk = self.serialize_key(0, primary_key);
-        // todo: handle secondaries
-        kv_remove(self.db_id, &pk);
+    fn handle_secondary_keys_removal(&self, value: &Record) {
+        let secondary_keys = value.get_secondary_keys();
+        if secondary_keys.is_empty() {
+            return;
+        }
+
+        let mut key_buffer = self.prefix.clone();
+        let mut idx: u8 = 1; // Secondary keys starts at position 1 (Pk is 0)
+
+        for raw_key in secondary_keys {
+            idx.append_key(&mut key_buffer);
+            raw_key.append_key(&mut key_buffer);
+
+            println!(
+                ">>> removing secondary key idx: {} // key: {}",
+                idx,
+                to_hex(&raw_key.data[..])
+            );
+            kv_remove(self.db_id, &KeyView::new(&key_buffer));
+
+            key_buffer.truncate(self.prefix.len());
+            idx += 1;
+        }
     }
 }
 

@@ -242,15 +242,11 @@ mod service {
             "election is already in progress",
         );
 
-        let table = CandidatesTable::open();
-        let idx = table.get_index_pk();
-
         let candidate = get_sender();
-        let key = (election_id, candidate);
-        let candidate_record = idx.get(key);
-        check_some(candidate_record, "candidate is not registered");
 
-        table.remove(&key);
+        let table = CandidatesTable::open();
+        let candidate_record = get_candidate(election_id, candidate);
+        table.remove(&candidate_record);
     }
 
     /// Vote for a candidate in an active election
@@ -450,7 +446,7 @@ mod tests {
             .error
             .unwrap();
         assert!(
-            error.contains("candidate is not registered"),
+            error.contains("candidate for election does not exist"),
             "error = {}",
             error
         );
@@ -467,22 +463,21 @@ mod tests {
             error
         );
 
-        // TODO:fix secondary key removal
-        // // Check candidate was added back
-        // chain.start_block();
-        // Wrapper::push_from(&chain, account!("charles")).register(1);
+        // Check candidate was added back
+        chain.start_block();
+        Wrapper::push_from(&chain, account!("charles")).register(1);
 
-        // let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
-        // assert_eq!(candidates.len(), 3);
+        let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
+        assert_eq!(candidates.len(), 3);
 
-        // let expected_candidates = vec![
-        //     candidate_alice.clone(),
-        //     candidate_bob.clone(),
-        //     candidate_charles.clone(),
-        // ];
-        // assert!(candidates
-        //     .iter()
-        //     .all(|item| expected_candidates.contains(item)));
+        let expected_candidates = vec![
+            candidate_alice.clone(),
+            candidate_bob.clone(),
+            candidate_charles.clone(),
+        ];
+        assert!(candidates
+            .iter()
+            .all(|item| expected_candidates.contains(item)));
 
         Ok(())
     }
