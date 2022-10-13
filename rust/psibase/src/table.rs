@@ -3,14 +3,24 @@ use std::marker::PhantomData;
 use fracpack::PackableOwned;
 
 use crate::{
-    get_key_bytes, kv_get, kv_greater_equal, kv_less_than, kv_max, kv_put, kv_remove,
-    AccountNumber, DbId, RawKey, ToKey,
+    get_key_bytes, kv_get, kv_greater_equal, kv_insert_unique, kv_less_than, kv_max, kv_put,
+    kv_remove, AccountNumber, DbId, KeyView, RawKey, ToKey,
 };
 
 pub trait TableRecord: PackableOwned {
     type PrimaryKey: ToKey;
 
     fn get_primary_key(&self) -> Self::PrimaryKey;
+
+    fn get_secondary_keys(&self) -> Vec<RawKey> {
+        Vec::new()
+    }
+}
+
+pub trait TableRecordWithSecondaryKey: TableRecord {
+    type SecondaryKey: ToKey;
+
+    fn get_secondary_key(&self) -> Self::SecondaryKey;
 }
 
 pub trait TableHandler<Record: TableRecord> {
@@ -31,6 +41,16 @@ pub struct Table<Record: TableRecord> {
     db_id: DbId,
     prefix: Vec<u8>,
     phantom: PhantomData<Record>,
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    for byte in bytes {
+        result.push(DIGITS[(byte >> 4) as usize]);
+        result.push(DIGITS[(byte & 0x0f) as usize]);
+    }
+    String::from_utf8(result).unwrap()
 }
 
 impl<Record: TableRecord> Table<Record> {
@@ -56,8 +76,44 @@ impl<Record: TableRecord> Table<Record> {
 
     pub fn put(&self, value: &Record) {
         let pk = self.serialize_key(0, &value.get_primary_key());
-        // todo: handle secondaries
+        self.handle_put_secondary_keys(&pk.to_key(), value);
         kv_put(self.db_id, &pk, value);
+    }
+
+    pub fn handle_put_secondary_keys(&self, pk: &Vec<u8>, value: &Record) {
+        let secondary_keys = value.get_secondary_keys();
+
+        if secondary_keys.is_empty() {
+            return;
+        }
+
+        let existing_record: Option<Record> = kv_get(self.db_id, pk).unwrap();
+
+        if let Some(_existing_record) = existing_record {
+            // TODO: replace secondary
+        } else {
+            self.write_secondary_keys(pk, &secondary_keys);
+        }
+    }
+
+    pub fn write_secondary_keys(&self, pk: &Vec<u8>, secondary_keys: &Vec<RawKey>) {
+        let mut key_buffer = self.prefix.clone();
+        let mut idx: u8 = 1; // Secondary keys starts at position 1 (Pk is 0)
+        for raw_key in secondary_keys {
+            idx.append_key(&mut key_buffer);
+            raw_key.append_key(&mut key_buffer);
+
+            println!(
+                ">>> inserting secondary key {} // {} // {}",
+                idx,
+                to_hex(&key_buffer[..]),
+                to_hex(&pk[..])
+            );
+            kv_insert_unique(self.db_id, &KeyView::new(&key_buffer), pk);
+
+            key_buffer.truncate(self.prefix.len());
+            idx += 1;
+        }
     }
 
     pub fn remove(&self, primary_key: &impl ToKey) {
