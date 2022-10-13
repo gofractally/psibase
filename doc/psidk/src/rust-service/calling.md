@@ -12,13 +12,15 @@ Let's create two services, `arithmetic` and `arithmetic2`.
 cargo new --lib arithmetic
 cargo new --lib arithmetic2
 
-# arithmetic needs the psibase library
+# arithmetic needs the psibase and serde packages
 cd arithmetic
 cargo add psibase
+cargo add -F derive serde
 
-# arithmetic2 needs both psibase and arithmetic
+# arithmetic2 also needs arithmetic
 cd ../arithmetic2
 cargo add psibase
+cargo add -F derive serde
 cargo add --path ../arithmetic
 ```
 

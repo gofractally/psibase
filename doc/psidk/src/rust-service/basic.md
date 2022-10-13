@@ -12,6 +12,7 @@ Run the following to create a project:
 cargo new --lib example
 cd example
 cargo add psibase
+cargo add -F derive serde
 ```
 
 This creates the following files:

@@ -5,6 +5,7 @@ mod crypto;
 mod db;
 mod from_bin;
 mod http;
+mod internal_macros;
 mod method_number;
 pub mod native;
 pub mod native_raw;
@@ -41,6 +42,8 @@ pub use time::*;
 pub use to_bin::*;
 pub use to_key::*;
 pub use trace::*;
+
+use internal_macros::*;
 
 pub use fracpack;
 pub use psibase_macros::*;

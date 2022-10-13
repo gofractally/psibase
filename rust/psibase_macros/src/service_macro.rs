@@ -532,7 +532,7 @@ fn process_action_args(
 
     *new_items = quote! {
         #new_items
-        #[derive(#psibase_mod::Fracpack)]
+        #[derive(#psibase_mod::Fracpack, serde::Deserialize, serde::Serialize)]
         #[fracpack(fracpack_mod = #fracpack_mod)]
         #[doc = #doc]
         pub struct #fn_name {

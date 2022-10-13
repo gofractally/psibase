@@ -21,4 +21,6 @@ pub struct TimePointSec {
     pub seconds: u32,
 }
 
+// TODO: string conversions
+// TODO: JSON
 // TODO: implement trait with the time functions helpers
