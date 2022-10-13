@@ -11,6 +11,28 @@
 #include <services/user/tokenTypes.hpp>
 #include "services/user/symbolTables.hpp"
 
+namespace psibase
+{
+   template <auto eventHead, auto getEventPtrField>  //,
+   struct EventIndex
+   {
+      // type-dependent expression silences failure unless instantiated
+      static_assert(
+          sizeof(decltype(getEventPtrField)) != sizeof(decltype(getEventPtrField)),
+          "Failed to extract eventHead and getEventPtrField lambda from EventIndex definition");
+   };
+
+   template <typename RecordType,
+             typename KeyType,
+             KeyType RecordType::*eventHead,
+             auto                 getEventPtrField>
+   struct EventIndex<eventHead, getEventPtrField>
+   {
+      static constexpr auto             evHead = eventHead;
+      static constexpr std::string_view prevField{getEventPtrField()};
+   };
+}  // namespace psibase
+
 namespace UserService
 {
 
@@ -19,6 +41,7 @@ namespace UserService
      public:
       using Tables = psibase::
           ServiceTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
+
       static constexpr auto service  = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken = TID{1};
 
@@ -111,6 +134,7 @@ namespace UserService
             void recalled(TID tokenId, Account from, Quantity amount, StringView memo) {}
          };
       };
+      using HolderEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, [] { return "prevEvent"; }>;
       // clang-format on
    };
 

@@ -686,13 +686,6 @@ namespace psibase
       typename decltype(table)::value_type;
    };
 
-   template <typename RecordType>
-   struct inner
-   {
-      template <TableType T>
-      using is_container_of = std::is_same<typename T::value_type, RecordType>;
-   };
-
    // TODO: allow tables to be forward declared.  The simplest method is:
    // struct xxx : Table<...> {};
    /// Defines the set of tables in a service
@@ -762,9 +755,17 @@ namespace psibase
       template <typename RecordType>
       auto open() const
       {
-         return open<boost::mp11::mp_find_if<boost::mp11::mp_list<Tables...>,
-                                             inner<RecordType>::template is_container_of>::value>();
+         return open<
+             boost::mp11::mp_find_if<boost::mp11::mp_list<Tables...>,
+                                     InnerType<RecordType>::template is_contained_by>::value>();
       }
+
+      template <typename RecordType>
+      struct InnerType
+      {
+         template <TableType T>
+         using is_contained_by = std::is_same<typename T::value_type, RecordType>;
+      };
 
       AccountNumber account;  ///< the service runs on this account
    };

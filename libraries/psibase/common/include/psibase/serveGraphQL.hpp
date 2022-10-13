@@ -1204,37 +1204,65 @@ namespace psibase
       return result;
    }  // makeEventConnection
 
-   template <typename Tables, typename RecordType, typename Events>
-   class EventIndex
+   /// Helper function to allow graphql queries of History event chains
+   template <typename Tables, typename Events, typename RecordType, typename PrimaryKeyType>
+   auto historyQuery(AccountNumber service,
+                     uint64_t RecordType::*eventHead,
+                     std::string_view      previousEventFieldName,
+                     PrimaryKeyType        key,
+                     auto                  first,
+                     auto                  after)
    {
-     public:
-      AccountNumber service;
-      uint64_t RecordType::*eventHead;
-      std::string_view      previousEventFieldName;
-
-      template <typename PrimaryKeyType>
-      auto query(PrimaryKeyType key, auto first, auto after)
+      uint64_t eventId = 0;
+      if (auto record = Tables{service}.template open<RecordType>().template getIndex<0>().get(key))
       {
-         auto eventId = getEventHeadId(key);
-
-         return makeEventConnection<typename Events::History>(DbId::historyEvent, eventId, service,
-                                                              previousEventFieldName, first, after);
+         eventId = (*record).*eventHead;
       }
 
-     private:
-      template <typename PrimaryKeyType>
-      uint64_t getEventHeadId(PrimaryKeyType key)
-      {
-         uint64_t eventId = 0;
-         if (auto record =
-                 Tables{service}.template open<RecordType>().template getIndex<0>().get(key))
-         {
-            eventId = (*record).*eventHead;
-         }
-         return eventId;
-      }
-   };
+      return makeEventConnection<typename Events::History>(DbId::historyEvent, eventId, service,
+                                                           previousEventFieldName, first, after);
+   }
 
+   /// Construct a QueryableService object to simplify the 
+   /// implementation of a GraphQL QueryRoot object for your 
+   /// service.
+   ///
+   /// The class template takes the Tables and Events objects
+   /// as template parameters, and is constructed with the 
+   /// account number at which your service is deployed. E.g.
+   /// ```c++
+   /// auto myService = QueryableService<MyService::Tables, MyService::Events>{"myservice"};
+   /// ```
+   ///
+   /// A QueryableService object can then be used to simplify
+   /// querying table indices and historical events in the 
+   /// QueryRoot object definition. E.g.
+   /// ```c++
+   /// struct MyQueryRoot
+   /// {
+   ///    auto readTableA() const
+   ///    {  //
+   ///       return myService.index<TableA, 0>();
+   ///    }
+   /// 
+   ///    auto events() const
+   ///    {  //
+   ///       return myService.allEvents();
+   ///    }
+   /// 
+   ///    auto userEvents(AccountNumber          user,
+   ///                   optional<uint32_t>      first,
+   ///                   const optional<string>& after) const
+   ///    {
+   ///       return myService.eventIndex<MyService::UserEvents>(user, first, after);
+   ///    }
+   /// };
+   /// PSIO_REFLECT(MyQueryRoot,
+   ///              method(readTableA),
+   ///              method(events),
+   ///              method(userEvents, user, first, after))
+   /// ```
+   /// 
    template <typename Tables, typename Events>
    struct QueryableService
    {
@@ -1251,10 +1279,13 @@ namespace psibase
          return EventQuery<Events>{service};
       }
 
-      template <typename RecordType>
-      auto eventIndex(uint64_t RecordType::*eventHead, std::string_view previousEventFieldName)
+      template <typename EventType>
+      auto eventIndex(auto                              key,
+                       std::optional<uint32_t>           first,
+                       const std::optional<std::string>& after)
       {
-         return EventIndex<Tables, RecordType, Events>{service, eventHead, previousEventFieldName};
+         return historyQuery<Tables, Events>(service, EventType::evHead, EventType::prevField, key,
+                                             first, after);
       }
    };
 

@@ -36,8 +36,7 @@ struct TokenQuery
                      optional<uint32_t>      first,
                      const optional<string>& after) const
    {
-      auto index = tokenSys.eventIndex(&TokenHolderRecord::lastHistoryEvent, "prevEvent");
-      return index.query(holder, first, after);
+      return tokenSys.eventIndex<TokenSys::HolderEvents>(holder, first, after);
    }
 };
 PSIO_REFLECT(TokenQuery,
@@ -72,15 +71,15 @@ void RTokenSys::storeSys(string path, string contentType, vector<char> content)
 
 struct AccountBalance
 {
-   psibase::AccountNumber account;
-   TID                    token;
-   psibase::AccountNumber symbol;
-   uint8_t                precision;
-   uint64_t               balance;
+   AccountNumber account;
+   TID           token;
+   AccountNumber symbol;
+   uint8_t       precision;
+   uint64_t      balance;
 };
 PSIO_REFLECT(AccountBalance, account, token, symbol, precision, balance);
 
-std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
+optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
 {
    auto to_json_reply = [](const auto& obj)
    {
@@ -110,7 +109,7 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          TokenSys::Tables db{TokenSys::service};
          auto             idx = db.open<TokenTable>().getIndex<0>();
 
-         std::vector<UserService::TokenRecord> allTokens;
+         vector<TokenRecord> allTokens;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)
          {
             allTokens.push_back(*itr);
@@ -121,15 +120,15 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
       {
          auto user = request.target.substr(string("/api/balances/").size());
          check(user.find('/') == string::npos, "invalid user " + user);
-         psibase::AccountNumber acc(string_view{user});
+         AccountNumber acc(string_view{user});
 
          TokenSys::Tables db{TokenSys::service};
          auto             idx = db.open<TokenTable>().getIndex<0>();
          check(idx.begin() != idx.end(), "No tokens");
 
-         auto                        balIdx = db.open<BalanceTable>().getIndex<0>();
-         std::vector<AccountBalance> balances;
-         TID                         tokenId = 1;
+         auto                   balIdx = db.open<BalanceTable>().getIndex<0>();
+         vector<AccountBalance> balances;
+         TID                    tokenId = 1;
          for (auto itr = idx.begin(); itr != idx.end(); ++itr)
          {
             auto balance = to<TokenSys>().getBalance(tokenId, acc);
@@ -156,16 +155,16 @@ std::optional<HttpReply> RTokenSys::_serveRestEndpoints(HttpRequest& request)
          auto user_and_flag = request.target.substr(string("/api/getUserConf/").size());
          auto delimiter     = user_and_flag.find('/');
          check(delimiter != string::npos, "invalid user or flag " + user_and_flag);
-         auto                   user = user_and_flag.substr(0, delimiter);
-         auto                   flag = user_and_flag.substr(delimiter + 1, user_and_flag.size());
-         psibase::AccountNumber acc(string_view{user});
-         auto                   tokService  = to<TokenSys>();
-         auto                   manualDebit = tokService.getUserConf(acc, flag);
+         auto          user = user_and_flag.substr(0, delimiter);
+         auto          flag = user_and_flag.substr(delimiter + 1, user_and_flag.size());
+         AccountNumber acc(string_view{user});
+         auto          tokService  = to<TokenSys>();
+         auto          manualDebit = tokService.getUserConf(acc, flag);
          return to_json_reply(manualDebit);
       }
    }
 
-   return std::nullopt;
+   return nullopt;
 }
 
 PSIBASE_DISPATCH(UserService::RTokenSys)
