@@ -110,7 +110,7 @@ fn enum_named<'a>(
                     quote! {#f,}
                 })
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
-            quote! {<#as_tuple_of_ref as #frackpack_mod::TupleOfRefPackable>::pack_tuple_of_ref(&(#numbered), dest)}
+            quote! {<#as_tuple_of_ref as #frackpack_mod::Packable>::pack(&(#numbered), dest)}
         },
         unpack: {
             let init = field
@@ -209,7 +209,7 @@ fn enum_tuple<'a>(
                     quote! {#f,}
                 })
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
-            quote! {<#as_tuple_of_ref as #frackpack_mod::TupleOfRefPackable>::pack_tuple_of_ref(&(#numbered), dest)}
+            quote! {<#as_tuple_of_ref as #frackpack_mod::Packable>::pack(&(#numbered), dest)}
         },
         unpack: {
             let numbered = field
@@ -330,6 +330,7 @@ fn process_struct(
             let ty = &field.ty;
             let pos = &positions[i];
             quote! {
+                #[allow(non_snake_case)]
                 let #pos = dest.len() as u32;
                 <#ty as #frackpack_mod::Packable>::embedded_fixed_pack(&self.#name, dest);
             }

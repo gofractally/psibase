@@ -1,7 +1,6 @@
 // TODO: fix reading structs and tuples which have unknown fields
 // TODO: option to allow/disallow unknown fields during verify and unpack
 // TODO: rename misnamed "heap_size"
-// TODO: support packing references; replace TupleOfRefPackable
 
 //! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
 //!
@@ -270,11 +269,6 @@ pub trait Packable<'a>: Sized {
         }
     }
 } // Packable
-
-#[doc(hidden)]
-pub trait TupleOfRefPackable<'a>: Sized {
-    fn pack_tuple_of_ref(&self, dest: &mut Vec<u8>);
-}
 
 fn read_u8_arr<const SIZE: usize>(src: &[u8], pos: &mut u32) -> Result<[u8; SIZE]> {
     let mut bytes: [u8; SIZE] = [0; SIZE];
@@ -680,25 +674,6 @@ macro_rules! tuple_impls {
                     )*
                     *pos = heap_pos;
                     Ok(())
-                }
-            }
-
-            impl<'a, $($name: Packable<'a>),*> TupleOfRefPackable<'a> for ($(&$name,)*)
-            {
-                #[allow(non_snake_case)]
-                fn pack_tuple_of_ref(&self, dest: &mut Vec<u8>) {
-                    let heap: u32 = $($name::FIXED_SIZE +)* 0;
-                    assert!(heap as u16 as u32 == heap); // TODO: return error
-                    (heap as u16).pack(dest);
-                    $(
-                        let $name = dest.len() as u32;
-                        self.$n.embedded_fixed_pack(dest);
-                    )*
-                    $(
-                        let heap_pos = dest.len() as u32;
-                        self.$n.embedded_fixed_repack($name, heap_pos, dest);
-                        self.$n.embedded_variable_pack(dest);
-                    )*
                 }
             }
         )+
