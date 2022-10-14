@@ -50,7 +50,7 @@
 //! for the two types.
 
 use custom_error::custom_error;
-use std::mem;
+use std::{mem, rc::Rc, sync::Arc};
 
 pub use psibase_macros::Fracpack;
 
@@ -333,70 +333,85 @@ scalar_impl! {u64}
 scalar_impl! {f32}
 scalar_impl! {f64}
 
-impl<'a, T: Packable<'a>> Packable<'a> for Box<T> {
-    const FIXED_SIZE: u32 = T::FIXED_SIZE;
-    const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
-    const IS_OPTIONAL: bool = T::IS_OPTIONAL;
+macro_rules! ptr_impl {
+    ($ptr:ident) => {
+        impl<'a, T: Packable<'a>> Packable<'a> for $ptr<T> {
+            const FIXED_SIZE: u32 = T::FIXED_SIZE;
+            const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
+            const IS_OPTIONAL: bool = T::IS_OPTIONAL;
 
-    fn pack(&self, dest: &mut Vec<u8>) {
-        self.as_ref().pack(dest)
-    }
+            fn pack(&self, dest: &mut Vec<u8>) {
+                self.as_ref().pack(dest)
+            }
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        Ok(Box::new(<T>::unpack(src, pos)?))
-    }
+            fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
+                Ok(Self::new(<T>::unpack(src, pos)?))
+            }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        <T>::verify(src, pos)
-    }
+            fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+                <T>::verify(src, pos)
+            }
 
-    fn is_empty_container(&self) -> bool {
-        self.as_ref().is_empty_container()
-    }
+            fn is_empty_container(&self) -> bool {
+                self.as_ref().is_empty_container()
+            }
 
-    fn new_empty_container() -> Result<Self> {
-        Ok(Box::new(<T>::new_empty_container()?))
-    }
+            fn new_empty_container() -> Result<Self> {
+                Ok(Self::new(<T>::new_empty_container()?))
+            }
 
-    fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-        self.as_ref().embedded_fixed_pack(dest)
-    }
+            fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
+                self.as_ref().embedded_fixed_pack(dest)
+            }
 
-    fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-        self.as_ref()
-            .embedded_fixed_repack(fixed_pos, heap_pos, dest)
-    }
+            fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+                self.as_ref()
+                    .embedded_fixed_repack(fixed_pos, heap_pos, dest)
+            }
 
-    fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-        self.as_ref().embedded_variable_pack(dest)
-    }
+            fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
+                self.as_ref().embedded_variable_pack(dest)
+            }
 
-    fn embedded_variable_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<Self> {
-        Ok(Box::new(<T>::embedded_variable_unpack(
-            src, fixed_pos, heap_pos,
-        )?))
-    }
+            fn embedded_variable_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> Result<Self> {
+                Ok(Self::new(<T>::embedded_variable_unpack(
+                    src, fixed_pos, heap_pos,
+                )?))
+            }
 
-    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
-        Ok(Box::new(<T>::embedded_unpack(src, fixed_pos, heap_pos)?))
-    }
+            fn embedded_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> Result<Self> {
+                Ok(Self::new(<T>::embedded_unpack(src, fixed_pos, heap_pos)?))
+            }
 
-    fn embedded_variable_verify(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<()> {
-        <T>::embedded_variable_verify(src, fixed_pos, heap_pos)
-    }
+            fn embedded_variable_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> Result<()> {
+                <T>::embedded_variable_verify(src, fixed_pos, heap_pos)
+            }
 
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        <T>::embedded_verify(src, fixed_pos, heap_pos)
-    }
+            fn embedded_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> Result<()> {
+                <T>::embedded_verify(src, fixed_pos, heap_pos)
+            }
+        }
+    };
 }
+ptr_impl!(Box);
+ptr_impl!(Rc);
+ptr_impl!(Arc);
 
 impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
     const FIXED_SIZE: u32 = 4;
