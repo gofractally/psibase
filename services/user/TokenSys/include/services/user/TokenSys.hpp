@@ -4,6 +4,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/String.hpp>
 #include <psibase/check.hpp>
+#include <psibase/serveGraphQL.hpp>  // TODO: Included for access to EventIndex, maybe EventIndex should be moved?
 #include <string>
 
 #include <services/user/tokenErrors.hpp>
@@ -11,53 +12,8 @@
 #include <services/user/tokenTypes.hpp>
 #include "services/user/symbolTables.hpp"
 
-namespace psibase
-{
-
-   // This does nothing, but causes an error when called from a `consteval` function.
-   inline void expectedNullTerminatedArray() {}
-
-   // StringLiteral idea taken from:
-   // https://stackoverflow.com/questions/68024563/passing-a-string-literal-to-a-template-char-array-parameter
-   template <size_t N>
-   struct StringLiteral
-   {
-      char str[N]{};
-
-      static constexpr size_t size = N - 1;
-
-      consteval StringLiteral() {}
-      consteval StringLiteral(const char (&new_str)[N])
-      {
-         if (new_str[N - 1] != '\0')
-            expectedNullTerminatedArray();
-         std::copy_n(new_str, size, str);
-      }
-   };
-
-   template <auto eventHead, StringLiteral eventPtrField>  //,
-   struct EventIndex
-   {
-      // type-dependent expression silences failure unless instantiated
-      static_assert(sizeof(decltype(eventHead)) != sizeof(decltype(eventHead)),
-                    "Failed to extract eventHead and eventPtrField from EventIndex definition");
-   };
-
-   template <typename RecordType,
-             typename KeyType,
-             KeyType RecordType::*eventHead,
-             StringLiteral        eventPtrField>
-   struct EventIndex<eventHead, eventPtrField>
-   {
-      static constexpr auto             evHead = eventHead;
-      static constexpr std::string_view prevField{eventPtrField.str};
-   };
-
-}  // namespace psibase
-
 namespace UserService
 {
-
    class TokenSys : public psibase::Service<TokenSys>
    {
      public:

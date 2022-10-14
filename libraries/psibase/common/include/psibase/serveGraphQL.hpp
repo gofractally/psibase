@@ -1223,19 +1223,19 @@ namespace psibase
                                                            previousEventFieldName, first, after);
    }
 
-   /// Construct a QueryableService object to simplify the 
-   /// implementation of a GraphQL QueryRoot object for your 
+   /// Construct a QueryableService object to simplify the
+   /// implementation of a GraphQL QueryRoot object for your
    /// service.
    ///
    /// The class template takes the Tables and Events objects
-   /// as template parameters, and is constructed with the 
+   /// as template parameters, and is constructed with the
    /// account number at which your service is deployed. E.g.
    /// ```c++
    /// auto myService = QueryableService<MyService::Tables, MyService::Events>{"myservice"};
    /// ```
    ///
    /// A QueryableService object can then be used to simplify
-   /// querying table indices and historical events in the 
+   /// querying table indices and historical events in the
    /// QueryRoot object definition. E.g.
    /// ```c++
    /// struct MyQueryRoot
@@ -1244,12 +1244,12 @@ namespace psibase
    ///    {  //
    ///       return myService.index<TableA, 0>();
    ///    }
-   /// 
+   ///
    ///    auto events() const
    ///    {  //
    ///       return myService.allEvents();
    ///    }
-   /// 
+   ///
    ///    auto userEvents(AccountNumber          user,
    ///                   optional<uint32_t>      first,
    ///                   const optional<string>& after) const
@@ -1262,7 +1262,7 @@ namespace psibase
    ///              method(events),
    ///              method(userEvents, user, first, after))
    /// ```
-   /// 
+   ///
    template <typename Tables, typename Events>
    struct QueryableService
    {
@@ -1281,12 +1281,51 @@ namespace psibase
 
       template <typename EventType>
       auto eventIndex(auto                              key,
-                       std::optional<uint32_t>           first,
-                       const std::optional<std::string>& after)
+                      std::optional<uint32_t>           first,
+                      const std::optional<std::string>& after)
       {
          return historyQuery<Tables, Events>(service, EventType::evHead, EventType::prevField, key,
                                              first, after);
       }
+   };
+
+   // This does nothing, but causes an error when called from a `consteval` function.
+   inline void expectedNullTerminatedArray() {}
+
+   // StringLiteral idea taken from:
+   // https://stackoverflow.com/questions/68024563/passing-a-string-literal-to-a-template-char-array-parameter
+   template <size_t N>
+   struct StringLiteral
+   {
+      char str[N]{};
+
+      static constexpr size_t size = N - 1;
+
+      consteval StringLiteral() {}
+      consteval StringLiteral(const char (&new_str)[N])
+      {
+         if (new_str[N - 1] != '\0')
+            expectedNullTerminatedArray();
+         std::copy_n(new_str, size, str);
+      }
+   };
+
+   template <auto eventHead, StringLiteral eventPtrField>  //,
+   struct EventIndex
+   {
+      // type-dependent expression silences failure unless instantiated
+      static_assert(sizeof(decltype(eventHead)) != sizeof(decltype(eventHead)),
+                    "Failed to extract eventHead and eventPtrField from EventIndex definition");
+   };
+
+   template <typename RecordType,
+             typename KeyType,
+             KeyType RecordType::*eventHead,
+             StringLiteral        eventPtrField>
+   struct EventIndex<eventHead, eventPtrField>
+   {
+      static constexpr auto             evHead = eventHead;
+      static constexpr std::string_view prevField{eventPtrField.str};
    };
 
 }  // namespace psibase
