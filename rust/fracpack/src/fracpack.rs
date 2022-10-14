@@ -62,6 +62,7 @@ custom_error! {pub Error
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
     ExtraData           = "Extra data in buffer",
+    UnpackRef           = "Can't unpack a ref"
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -295,6 +296,68 @@ impl MissingBoolConversions for bool {
             true => [1],
             false => [0],
         }
+    }
+}
+
+impl<'a, T: Packable<'a>> Packable<'a> for &'a T {
+    const FIXED_SIZE: u32 = T::FIXED_SIZE;
+    const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
+    const IS_OPTIONAL: bool = T::IS_OPTIONAL;
+
+    fn pack(&self, dest: &mut Vec<u8>) {
+        (*self).pack(dest)
+    }
+
+    fn unpack(_src: &'a [u8], _pos: &mut u32) -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        <T>::verify(src, pos)
+    }
+
+    fn is_empty_container(&self) -> bool {
+        (*self).is_empty_container()
+    }
+
+    fn new_empty_container() -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
+        (*self).embedded_fixed_pack(dest)
+    }
+
+    fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+        (*self).embedded_fixed_repack(fixed_pos, heap_pos, dest)
+    }
+
+    fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
+        (*self).embedded_variable_pack(dest)
+    }
+
+    fn embedded_variable_unpack(
+        _src: &'a [u8],
+        _fixed_pos: &mut u32,
+        _heap_pos: &mut u32,
+    ) -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn embedded_unpack(_src: &'a [u8], _fixed_pos: &mut u32, _heap_pos: &mut u32) -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn embedded_variable_verify(
+        src: &'a [u8],
+        fixed_pos: &mut u32,
+        heap_pos: &mut u32,
+    ) -> Result<()> {
+        <T>::embedded_variable_verify(src, fixed_pos, heap_pos)
+    }
+
+    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+        <T>::embedded_verify(src, fixed_pos, heap_pos)
     }
 }
 
