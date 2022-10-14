@@ -26,7 +26,7 @@
   - [Logging](#logging)
     - [Console Logger](#console-logger)
     - [File Logger](#file-logger)
-    - Syslog Logger (TODO)
+    - [Local Socket Logger](#local-socket-logger)
     - [Websocket Logger](#websocket-logger)
 
 
@@ -479,7 +479,7 @@ Example:
 
 - [Console Logger](#console-logger)
 - [File Logger](#file-logger)
-- Syslog Logger (TODO)
+- [Local Socket Logger](#local-socket-logger)
 - [Websocket Logger](#websocket-logger)
 
 The `loggers` field of `/native/admin/config` controls the server's logging configuration.
@@ -488,11 +488,11 @@ The log configuration is a JSON object which has a field for each logger. The na
 
 All loggers must have the following fields:
 
-| Field    | Type             | Description                                                                        |
-|----------|------------------|------------------------------------------------------------------------------------|
-| `type`   | String           | The type of the logger: [`"console"`](#console-logger) or [`"file"`](#file-logger) |
-| `filter` | String           | The [filter](psibase/logging.md#log-filters) for the logger                        |
-| `format` | String or Object | Determines the [format](psibase/logging.md#log-fomatters) of log messages          |
+| Field    | Type             | Description                                                                                                            |
+|----------|------------------|------------------------------------------------------------------------------------------------------------------------|
+| `type`   | String           | The type of the logger: [`"console"`](#console-logger), [`"file"`](#file-logger), or [`"local"`](#local-socket-logger) |
+| `filter` | String           | The [filter](psibase/logging.md#log-filters) for the logger                                                            |
+| `format` | String or Object | Determines the [format](psibase/logging.md#log-fomatters) of log messages                                              |
 
 Additional fields are determined by the logger type.
 
@@ -540,6 +540,27 @@ Example:
     }
 }
 ```
+
+### Local Socket Logger
+
+The socket type `local` writes to a local datagram socket. Each log record is sent in a single message. With an appropriate format, it can be used to communicate with logging daemons on most unix systems.
+
+| Field  | Type   | Description     |
+|--------|--------|-----------------|
+| `path` | String | The socket path |
+
+Example:
+```json
+{
+    "syslog": {
+        "type": "local",
+        "filter": "%Severity% >= info",
+        "format": "%Syslog(format=glibc)%%Message%",
+        "path": "/dev/log"
+    }
+}
+```
+
 
 ### Websocket logger
 

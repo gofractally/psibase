@@ -5,6 +5,9 @@
 #include <psio/json/any.hpp>
 #include <psio/to_json.hpp>
 
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/local/datagram_protocol.hpp>
+#include <boost/log/attributes/current_process_name.hpp>
 #include <boost/log/attributes/function.hpp>
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/log/sinks/syslog_constants.hpp>
@@ -15,9 +18,11 @@
 #include <boost/log/utility/setup/formatter_parser.hpp>
 #include <charconv>
 #include <chrono>
+#include <ctime>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <random>
 
 #include <unistd.h>  // gethostname
 
@@ -117,6 +122,24 @@ namespace psibase::loggers
          return true;
       }
 
+      boost::log::sinks::syslog::level to_syslog(level l)
+      {
+         switch (l)
+         {
+            case level::debug:
+               return boost::log::sinks::syslog::debug;
+            case level::info:
+               return boost::log::sinks::syslog::info;
+            case level::notice:
+               return boost::log::sinks::syslog::notice;
+            case level::warning:
+               return boost::log::sinks::syslog::warning;
+            case level::error:
+               return boost::log::sinks::syslog::error;
+         }
+         __builtin_unreachable();
+      }
+
       auto gelf_formatter =
           [](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
       {
@@ -144,25 +167,7 @@ namespace psibase::loggers
 
          if (auto l = boost::log::extract<level>("Severity", rec))
          {
-            os << ",\"level\":";
-            switch (*l)
-            {
-               case level::debug:
-                  os << boost::log::sinks::syslog::debug;
-                  break;
-               case level::info:
-                  os << boost::log::sinks::syslog::info;
-                  break;
-               case level::notice:
-                  os << boost::log::sinks::syslog::notice;
-                  break;
-               case level::warning:
-                  os << boost::log::sinks::syslog::warning;
-                  break;
-               case level::error:
-                  os << boost::log::sinks::syslog::error;
-                  break;
-            }
+            os << ",\"level\":" << to_syslog(*l);
          }
 
          if (auto attr = boost::log::extract<unsigned>("PeerId", rec))
@@ -201,6 +206,16 @@ namespace psibase::loggers
          if (auto attr = boost::log::extract<std::string>("Host", rec))
          {
             os << ",\"Host\":" << psio::convert_to_json(*attr);
+         }
+
+         if (auto attr = boost::log::extract<std::string>("Process", rec))
+         {
+            os << ",\"Process\":" << psio::convert_to_json(*attr);
+         }
+
+         if (auto attr = boost::log::extract<boost::log::process_id>("ProcessId", rec))
+         {
+            os << ",\"ProcessId\":" << attr->native_id();
          }
 
          if (auto timestamp =
@@ -257,6 +272,226 @@ namespace psibase::loggers
          os << '}';
       };
 
+      auto rfc5424_formatter(int facility)
+      {
+         return [facility](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
+         {
+            // PRI
+            {
+               auto l = boost::log::extract<level>("Severity", rec);
+               os << '<' << (facility * 8 + to_syslog(l ? *l : level::info)) << '>';
+            }
+            // VERSION
+            os << "1 ";
+            // TIMESTAMP
+            {
+               auto t =
+                   boost::log::extract<std::chrono::system_clock::time_point>("TimeStamp", rec);
+               format_timestamp(os, t ? *t : std::chrono::system_clock::now());
+            }
+            os << ' ';
+            // HOSTNAME
+            if (auto attr = boost::log::extract<std::string>("Host", rec))
+            {
+               os << *attr;
+            }
+            else
+            {
+               os << '-';
+            }
+            os << ' ';
+            // APPNAME
+            if (auto attr = boost::log::extract<std::string>("Process", rec))
+            {
+               os << *attr;
+            }
+            else
+            {
+               os << '-';
+            }
+            os << ' ';
+            // PROCID
+            if (auto attr = boost::log::extract<boost::log::process_id>("ProcessId", rec))
+            {
+               os << attr->native_id();
+            }
+            else
+            {
+               os << '-';
+            }
+            os << ' ';
+            // MSGID
+            if (auto attr = boost::log::extract<std::string>("Channel", rec))
+            {
+               os << *attr;
+            }
+            else
+            {
+               os << '-';
+            }
+            os << " [timeQuality tzKnown=\"1\" isSynced=\"1\"] ";
+         };
+      }
+
+      int parse_facility(std::string_view facility)
+      {
+         int num;
+         if (facility == "kern")
+         {
+            num = 0;
+         }
+         else if (facility == "user")
+         {
+            num = 1;
+         }
+         else if (facility == "mail")
+         {
+            num = 2;
+         }
+         else if (facility == "daemon")
+         {
+            num = 3;
+         }
+         else if (facility == "auth")
+         {
+            num = 4;
+         }
+         else if (facility == "syslog")
+         {
+            num = 5;
+         }
+         else if (facility == "lpr")
+         {
+            num = 6;
+         }
+         else if (facility == "news")
+         {
+            num = 7;
+         }
+         else if (facility == "uucp")
+         {
+            num = 8;
+         }
+         else if (facility == "cron")
+         {
+            num = 9;
+         }
+         else if (facility == "authpriv")
+         {
+            num = 10;
+         }
+         else if (facility == "ftp")
+         {
+            num = 11;
+         }
+         else if (facility == "ntp")
+         {
+            num = 12;
+         }
+         else if (facility == "local0")
+         {
+            num = 16;
+         }
+         else if (facility == "local1")
+         {
+            num = 17;
+         }
+         else if (facility == "local2")
+         {
+            num = 18;
+         }
+         else if (facility == "local3")
+         {
+            num = 19;
+         }
+         else if (facility == "local4")
+         {
+            num = 20;
+         }
+         else if (facility == "local5")
+         {
+            num = 21;
+         }
+         else if (facility == "local6")
+         {
+            num = 22;
+         }
+         else if (facility == "local7")
+         {
+            num = 23;
+         }
+         else
+         {
+            auto res = std::from_chars(facility.begin(), facility.end(), num);
+            if (res.ptr != facility.end() || res.ec != std::errc{} || num < 0 || num > 23)
+            {
+               throw std::runtime_error(std::string(facility) + " is not a valid syslog facility");
+            }
+         }
+         return num;
+      }
+
+      auto rfc3164_formatter(int facility, bool include_host = true)
+      {
+         return [facility, include_host](const boost::log::record_view&  rec,
+                                         boost::log::formatting_ostream& os)
+         {
+            // PRI
+            {
+               auto l = boost::log::extract<level>("Severity", rec);
+               os << '<' << (facility * 8 + to_syslog(l ? *l : level::info)) << '>';
+            }
+            {
+               // The timestamp must be in local time and follows an odd format
+               // TODO: use std::local_t once it's available.
+               auto t =
+                   boost::log::extract<std::chrono::system_clock::time_point>("TimeStamp", rec);
+               std::time_t ctime =
+                   std::chrono::system_clock::to_time_t(t ? *t : std::chrono::system_clock::now());
+               std::tm tm;
+               localtime_r(&ctime, &tm);
+               // Note: not using strftime, because strftime is locale dependent
+               const char* months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+               os << months[tm.tm_mon] << ' ' << std::setw(2) << tm.tm_mday << ' '
+                  << std::setfill('0') << std::setw(2) << tm.tm_hour << ':' << std::setw(2)
+                  << tm.tm_min << ':' << std::setw(2) << tm.tm_sec << std::setfill(' ');
+            }
+            os << ' ';
+            // HOSTNAME
+            if (include_host)
+            {
+               if (auto attr = boost::log::extract<std::string>("Host", rec))
+               {
+                  // The domain name MUST NOT be included (unlike rfc5424 which prefers FQDN)
+                  std::string_view host = *attr;
+                  os << host.substr(0, host.find('.'));
+               }
+               else
+               {
+                  // This isn't correct for BSD syslog, but we don't have a way to
+                  // fill it correctly if a host attribute wasn't set.
+                  os << '-';
+               }
+               os << ' ';
+            }
+            // TAG
+            if (auto attr = boost::log::extract<std::string>("Process", rec))
+            {
+               os << *attr;
+            }
+            else
+            {
+               os << "psibase";
+            }
+            if (auto attr = boost::log::extract<boost::log::process_id>("ProcessId", rec))
+            {
+               os << '[' << attr->native_id() << ']';
+            }
+            os << ": ";
+         };
+      }
+
       class timestamp_formatter_factory : public boost::log::formatter_factory<char>
       {
         public:
@@ -292,6 +527,24 @@ namespace psibase::loggers
       };
 
       template <typename T>
+      class id_formatter_factory : public boost::log::formatter_factory<char>
+      {
+        public:
+         formatter_type create_formatter(const boost::log::attribute_name& name,
+                                         const args_map&                   args)
+         {
+            // TODO: use std::format when it becomes available
+            return [name](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
+            {
+               if (auto attr = boost::log::extract<T>(name, rec))
+               {
+                  os << attr->native_id();
+               }
+            };
+         }
+      };
+
+      template <typename T>
       class json_formatter_factory : public boost::log::formatter_factory<char>
       {
         public:
@@ -305,6 +558,45 @@ namespace psibase::loggers
                   os << psio::convert_to_json(*header);
                }
             };
+         }
+      };
+
+      // args:
+      // - facility: can be specified as either a string or number. default local0
+      // - format: rfc3164, rfc5424, glibc, bsd (equivalent to rfc3164). default bsd
+      class syslog_formatter_factory : public boost::log::formatter_factory<char>
+      {
+        public:
+         formatter_type create_formatter(const boost::log::attribute_name& name,
+                                         const args_map&                   args)
+         {
+            int              facility = 16;
+            std::string_view format   = "bsd";
+            auto             iter     = args.find("facility");
+            if (auto iter = args.find("facility"); iter != args.end())
+            {
+               facility = parse_facility(iter->second);
+            }
+            if (auto iter = args.find("format"); iter != args.end())
+            {
+               format = iter->second;
+            }
+            if (format == "bsd" || format == "rfc3164")
+            {
+               return rfc3164_formatter(facility);
+            }
+            else if (format == "rfc5424")
+            {
+               return rfc5424_formatter(facility);
+            }
+            else if (format == "glibc")
+            {
+               return rfc3164_formatter(facility, false);
+            }
+            else
+            {
+               throw std::runtime_error("Unknown syslog format: " + std::string(format));
+            }
          }
       };
 
@@ -444,6 +736,19 @@ namespace psibase::loggers
 
       // searchable with string_view
       using sink_args_type = std::map<std::string, psio::json::any, std::less<>>;
+
+      struct ConsoleSinkConfig
+      {
+         using backend_type = boost::log::sinks::text_ostream_backend;
+         ConsoleSinkConfig() {}
+         explicit ConsoleSinkConfig(const sink_args_type& args) {}
+         static void init(backend_type& backend)
+         {
+            backend.add_stream(boost::shared_ptr<std::ostream>(&std::clog, boost::null_deleter()));
+         }
+         void apply(backend_type& backend) const {}
+         void setPrevious(ConsoleSinkConfig&&) {}
+      };
 
       struct time_rotation
       {
@@ -771,6 +1076,7 @@ namespace psibase::loggers
 
       struct FileSinkConfig
       {
+         using backend_type = boost::log::sinks::text_file_backend;
          FileSinkConfig(const sink_args_type& args)
          {
             auto make_canonical_dir = [](auto& p)
@@ -850,7 +1156,8 @@ namespace psibase::loggers
                }
             }
          }
-         void apply(boost::log::sinks::text_file_backend& backend) const
+         static void init(backend_type&) {}
+         void        apply(boost::log::sinks::text_file_backend& backend) const
          {
             backend.set_file_name_pattern(filename.native());
             backend.set_target_file_name_pattern(target.native());
@@ -963,6 +1270,91 @@ namespace psibase::loggers
          psio::to_json(obj.flush, stream);
       }
 
+      struct LocalSocketBackend
+          : public boost::log::sinks::
+                basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding>
+      {
+         explicit LocalSocketBackend() : socket(ctx, boost::asio::local::datagram_protocol())
+         {
+            std::random_device rng;
+            for (int tries = 0; tries < 5; ++tries)
+            {
+               auto suffix = rng() % 1000000;
+               auto tmp =
+                   std::filesystem::temp_directory_path() / ("psibase" + std::to_string(suffix));
+               boost::system::error_code ec;
+               socket.bind(boost::asio::local::datagram_protocol::endpoint(tmp), ec);
+               if (!ec)
+               {
+                  break;
+               }
+               else if (tries >= 5)
+               {
+                  throw std::system_error(ec);
+               }
+            }
+         }
+         ~LocalSocketBackend()
+         {
+            if (!mypath.empty())
+            {
+               std::filesystem::remove(mypath);
+            }
+         }
+         void consume(const boost::log::record_view&, const string_type& message)
+         {
+            socket.send(boost::asio::buffer(message));
+         }
+         boost::asio::io_context                       ctx;
+         std::filesystem::path                         mypath;
+         boost::asio::local::datagram_protocol::socket socket;
+      };
+
+      // Write to a local (unix domain) socket
+      struct LocalSocketSinkConfig
+      {
+         using backend_type = LocalSocketBackend;
+         explicit LocalSocketSinkConfig(const sink_args_type& args)
+         {
+            auto as_string = [](const auto& value) -> const std::string&
+            {
+               if (auto* result = std::get_if<std::string>(&value.value()))
+               {
+                  return *result;
+               }
+               else
+               {
+                  throw std::runtime_error("Expected string");
+               }
+            };
+            auto iter = args.find("path");
+            if (iter == args.end())
+            {
+               throw std::runtime_error("Missing path for local socket");
+            }
+            path = log_file_path / as_string(iter->second);
+         }
+         static void init(LocalSocketBackend&) {}
+         void        apply(LocalSocketBackend& backend) const
+         {
+            if (newPath)
+            {
+               backend.socket.connect(
+                   boost::asio::local::datagram_protocol::endpoint(path.native()));
+            }
+         }
+         void setPrevious(LocalSocketSinkConfig&& prev) { newPath = (prev.path != path); }
+         std::filesystem::path path;
+         bool                  newPath = true;
+      };
+      void to_json(const LocalSocketSinkConfig& obj, auto& stream)
+      {
+         stream.write(',');
+         psio::to_json("path", stream);
+         stream.write(':');
+         psio::to_json(obj.path.native(), stream);
+      }
+
       struct sink_config
       {
          boost::log::formatter format;
@@ -971,7 +1363,7 @@ namespace psibase::loggers
          std::string           filter_str;
          std::string           type;
          //
-         std::variant<std::monostate, FileSinkConfig> backend;
+         std::variant<ConsoleSinkConfig, FileSinkConfig, LocalSocketSinkConfig> backend;
       };
 
       void from_json(sink_config& obj, auto& stream)
@@ -1001,9 +1393,17 @@ namespace psibase::loggers
                                       args.try_emplace(std::string(key), std::move(val));
                                    }
                                 });
+         if (obj.type == "console")
+         {
+            obj.backend.emplace<ConsoleSinkConfig>(args);
+         }
          if (obj.type == "file")
          {
             obj.backend.emplace<FileSinkConfig>(args);
+         }
+         if (obj.type == "local")
+         {
+            obj.backend.emplace<LocalSocketSinkConfig>(args);
          }
       }
 
@@ -1028,34 +1428,35 @@ namespace psibase::loggers
          {
             to_json(*backend, stream);
          }
+         else if (auto* backend = std::get_if<LocalSocketSinkConfig>(&obj.backend))
+         {
+            to_json(*backend, stream);
+         }
          stream.write('}');
+      }
+
+      template <typename Config>
+      auto make_sink(const sink_config& cfg, Config& backendConfig)
+      {
+         auto backend = boost::make_shared<typename Config::backend_type>();
+         Config::init(*backend);
+         backendConfig.apply(*backend);
+         auto result =
+             boost::make_shared<boost::log::sinks::synchronous_sink<typename Config::backend_type>>(
+                 backend);
+         result->set_filter(cfg.filter);
+         result->set_formatter(cfg.format);
+         return result;
       }
 
       boost::shared_ptr<boost::log::sinks::sink> make_sink(const sink_config& cfg)
       {
-         if (cfg.type == "console")
-         {
-            auto backend = boost::make_shared<boost::log::sinks::text_ostream_backend>();
-            backend->add_stream(boost::shared_ptr<std::ostream>(&std::clog, boost::null_deleter()));
-            auto result = boost::make_shared<
-                boost::log::sinks::synchronous_sink<boost::log::sinks::text_ostream_backend>>(
-                backend);
-            result->set_filter(cfg.filter);
-            result->set_formatter(cfg.format);
-            return result;
-         }
-         else if (cfg.type == "file")
-         {
-            auto  backend       = boost::make_shared<boost::log::sinks::text_file_backend>();
-            auto& backendConfig = std::get<FileSinkConfig>(cfg.backend);
-            backendConfig.apply(*backend);
-            auto result = boost::make_shared<
-                boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>>(backend);
-            result->set_filter(cfg.filter);
-            result->set_formatter(cfg.format);
-            return result;
-         }
-         throw std::runtime_error("Unkown sink type: " + cfg.type);
+         return std::visit(
+             [&](auto& backend) {
+                return static_cast<boost::shared_ptr<boost::log::sinks::sink>>(
+                    make_sink(cfg, backend));
+             },
+             cfg.backend);
       }
 
       std::string translate_size(std::string_view s)
@@ -1163,20 +1564,22 @@ namespace psibase::loggers
             frontend->set_filter(new_cfg.filter);
             old_cfg = std::move(new_cfg);
          }
-         else if (old_cfg.type == "file")
-         {
-            auto& backendConfig = std::get<FileSinkConfig>(new_cfg.backend);
-            backendConfig.setPrevious(std::move(std::get<FileSinkConfig>(old_cfg.backend)));
-            auto frontend = static_cast<
-                boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>*>(
-                sink.get());
-            backendConfig.apply(*frontend->locked_backend());
-            frontend->set_formatter(new_cfg.format);
-            frontend->set_filter(new_cfg.filter);
-            old_cfg = std::move(new_cfg);
-         }
          else
          {
+            std::visit(
+                [&](auto& backendConfig)
+                {
+                   using BC = std::remove_cvref_t<decltype(backendConfig)>;
+                   backendConfig.setPrevious(std::move(std::get<BC>(old_cfg.backend)));
+                   auto frontend =
+                       static_cast<boost::log::sinks::synchronous_sink<typename BC::backend_type>*>(
+                           sink.get());
+                   backendConfig.apply(*frontend->locked_backend());
+                   frontend->set_formatter(new_cfg.format);
+                   frontend->set_filter(new_cfg.filter);
+                   old_cfg = std::move(new_cfg);
+                },
+                new_cfg.backend);
             throw std::runtime_error("Unkown sink type: " + new_cfg.type);
          }
       }
@@ -1195,6 +1598,8 @@ namespace psibase::loggers
          hostname[HOST_NAME_MAX] = '\0';
          core->add_global_attribute("Host",
                                     boost::log::attributes::constant(std::string(hostname)));
+         core->add_global_attribute("Process", boost::log::attributes::current_process_name());
+         core->add_global_attribute("ProcessId", boost::log::attributes::current_process_id());
 
          boost::log::register_simple_formatter_factory<level, char>("Severity");
          boost::log::register_simple_filter_factory<level, char>("Severity");
@@ -1204,7 +1609,12 @@ namespace psibase::loggers
                                                 boost::make_shared<blockid_formatter_factory>());
          boost::log::register_formatter_factory(
              "BlockHeader", boost::make_shared<json_formatter_factory<BlockHeader>>());
+         boost::log::register_formatter_factory(
+             "ProcessId", boost::make_shared<id_formatter_factory<boost::log::process_id>>());
+         // Compound formatters
          register_function_formatter("Json", json_formatter);
+         boost::log::register_formatter_factory("Syslog",
+                                                boost::make_shared<syslog_formatter_factory>());
       }
 
       struct log_config
@@ -1241,6 +1651,10 @@ namespace psibase::loggers
                if (current_config.type == "file")
                {
                   current_config.backend.emplace<FileSinkConfig>(current_args);
+               }
+               if (current_config.type == "local")
+               {
+                  current_config.backend.emplace<LocalSocketSinkConfig>(current_args);
                }
                auto sink = make_sink(current_config);
                sinks.try_emplace(std::string(current_name), std::move(current_config), sink);
@@ -1559,7 +1973,7 @@ namespace psibase::loggers
       }
    }
 
-   void to_config_impl(const std::string& section, std::monostate, ConfigFile& file) {}
+   void to_config_impl(const std::string& section, const ConsoleSinkConfig, ConfigFile& file) {}
 
    void to_config_impl(const std::string& section, const FileSinkConfig& obj, ConfigFile& file)
    {
@@ -1591,6 +2005,13 @@ namespace psibase::loggers
                   "Maximum total size of log files retained");
       }
       file.set(section, "flush", obj.flush ? "on" : "off", "Whether to flush every log record");
+   }
+
+   void to_config_impl(const std::string&           section,
+                       const LocalSocketSinkConfig& obj,
+                       ConfigFile&                  file)
+   {
+      file.set(section, "path", obj.path.native(), "");
    }
 
    void format_to_config(const std::string& section, std::string format_json, ConfigFile& file)
