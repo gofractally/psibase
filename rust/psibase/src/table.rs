@@ -3,8 +3,9 @@ use std::marker::PhantomData;
 use fracpack::PackableOwned;
 
 use crate::{
-    get_key_bytes, kv_get, kv_greater_equal_bytes, kv_insert_unique_bytes, kv_less_than_bytes,
-    kv_max_bytes, kv_put, kv_remove, AccountNumber, DbId, KeyView, RawKey, ToKey,
+    get_key_bytes, kv_get, kv_get_bytes, kv_greater_equal_bytes, kv_insert_unique_bytes,
+    kv_less_than_bytes, kv_max_bytes, kv_put, kv_remove, AccountNumber, DbId, KeyView, RawKey,
+    ToKey,
 };
 
 // TODO: remove helper
@@ -211,11 +212,10 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     ///
     /// It does not affect the iterator
     pub fn get(&self, key: Key) -> Option<Record> {
-        let mut data = self.prefix.clone();
-        key.append_key(&mut data);
-        let key = RawKey::new(data);
+        let mut key_bytes = self.prefix.clone();
+        key.append_key(&mut key_bytes);
 
-        kv_get(self.db_id, &key).unwrap()
+        kv_get_bytes(self.db_id, &key_bytes).and_then(|v| self.get_value_from_bytes(v))
     }
 
     /// Set the range of available records for the iterator; useful for viewing a slice of the records
@@ -235,7 +235,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         self
     }
 
-    fn get_value_from_pk_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
+    fn get_value_from_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
         if self.is_secondary {
             kv_get(self.db_id, &RawKey::new(bytes)).unwrap()
         } else {
@@ -274,7 +274,7 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
 
             println!(">>> iterated and got key {:?}", self.front_key);
 
-            self.get_value_from_pk_bytes(value)
+            self.get_value_from_bytes(value)
         } else {
             println!(">>> setting end of iterator!");
             self.is_end = true;
@@ -318,7 +318,7 @@ impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Re
                 to_hex(&self.back_key.data[..])
             );
 
-            self.get_value_from_pk_bytes(value)
+            self.get_value_from_bytes(value)
         } else {
             println!(">>> setting end of iterator!");
             self.is_end = true;
