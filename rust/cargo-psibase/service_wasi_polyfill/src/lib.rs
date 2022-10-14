@@ -25,6 +25,18 @@ pub unsafe extern "C" fn environ_get(_environ: *mut *mut u8, _environ_buf: *mut 
     0
 }
 
+// Unfortunately it looks like we have to lie instead of returning an error
+// to not break some Rust libraries
+#[no_mangle]
+pub unsafe extern "C" fn random_get(mut buf: *mut u8, mut buf_len: Size) -> Errno {
+    while buf_len > 0 {
+        *buf = 0;
+        buf = buf.offset(1);
+        buf_len -= 1;
+    }
+    0
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn fd_write(
     fd: Fd,
@@ -47,4 +59,9 @@ pub unsafe extern "C" fn fd_write(
         iovs_len -= 1;
     }
     0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_close(fd: Fd) -> Errno {
+    ERRNO_BADF.raw()
 }
