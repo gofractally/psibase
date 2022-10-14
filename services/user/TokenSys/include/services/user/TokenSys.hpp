@@ -13,24 +13,46 @@
 
 namespace psibase
 {
-   template <auto eventHead, auto getEventPtrField>  //,
+
+   // This does nothing, but causes an error when called from a `consteval` function.
+   inline void expectedNullTerminatedArray() {}
+
+   // StringLiteral idea taken from:
+   // https://stackoverflow.com/questions/68024563/passing-a-string-literal-to-a-template-char-array-parameter
+   template <size_t N>
+   struct StringLiteral
+   {
+      char str[N]{};
+
+      static constexpr size_t size = N - 1;
+
+      consteval StringLiteral() {}
+      consteval StringLiteral(const char (&new_str)[N])
+      {
+         if (new_str[N - 1] != '\0')
+            expectedNullTerminatedArray();
+         std::copy_n(new_str, size, str);
+      }
+   };
+
+   template <auto eventHead, StringLiteral eventPtrField>  //,
    struct EventIndex
    {
       // type-dependent expression silences failure unless instantiated
-      static_assert(
-          sizeof(decltype(getEventPtrField)) != sizeof(decltype(getEventPtrField)),
-          "Failed to extract eventHead and getEventPtrField lambda from EventIndex definition");
+      static_assert(sizeof(decltype(eventHead)) != sizeof(decltype(eventHead)),
+                    "Failed to extract eventHead and eventPtrField from EventIndex definition");
    };
 
    template <typename RecordType,
              typename KeyType,
              KeyType RecordType::*eventHead,
-             auto                 getEventPtrField>
-   struct EventIndex<eventHead, getEventPtrField>
+             StringLiteral        eventPtrField>
+   struct EventIndex<eventHead, eventPtrField>
    {
       static constexpr auto             evHead = eventHead;
-      static constexpr std::string_view prevField{getEventPtrField()};
+      static constexpr std::string_view prevField{eventPtrField.str};
    };
+
 }  // namespace psibase
 
 namespace UserService
@@ -134,7 +156,7 @@ namespace UserService
             void recalled(TID tokenId, Account from, Quantity amount, StringView memo) {}
          };
       };
-      using HolderEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, [] { return "prevEvent"; }>;
+      using HolderEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, "prevEvent">;
       // clang-format on
    };
 
