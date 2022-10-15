@@ -19,16 +19,23 @@ mod service {
     }
 
     impl ElectionRecord {
+        // #[primary_key]
+        fn by_id(&self) -> u32 {
+            self.id
+        }
+
+        // #[secondary_key(1)]
         fn by_dates_key(&self) -> (TimePointSec, TimePointSec, u32) {
             (self.voting_start_date, self.voting_end_date, self.id)
         }
     }
 
+    // TODO: Auto generated from above #[primary_key] and #[secondary_key(1)]
     impl TableRecord for ElectionRecord {
         type PrimaryKey = u32;
 
         fn get_primary_key(&self) -> Self::PrimaryKey {
-            self.id
+            self.by_id()
         }
 
         fn get_secondary_keys(&self) -> Vec<RawKey> {
@@ -58,10 +65,10 @@ mod service {
     impl TableWrapper<ElectionRecord> for ElectionsTable {}
 
     trait ElectionsTableWrapper: TableWrapper<ElectionRecord> {
+        // TODO: this typing is loose but it will be auto-generated from #[secondary(1)]
         fn get_index_by_dates_key(
             &self,
         ) -> TableIndex<(TimePointSec, TimePointSec, u32), ElectionRecord> {
-            // TODO: this typing is loose but at least will be controlled from macro
             self.get_index(1)
         }
     }
@@ -76,16 +83,23 @@ mod service {
     }
 
     impl CandidateRecord {
+        // #[primary_key]
+        fn by_election_id_candidate(&self) -> (u32, AccountNumber) {
+            (self.election_id, self.candidate)
+        }
+
+        // #[secondary_key(1)]
         fn by_election_votes_key(&self) -> (u32, u32, AccountNumber) {
             (self.election_id, self.votes, self.candidate)
         }
     }
 
+    // TODO: Auto generated from above #[primary_key] and #[secondary_key(1)]
     impl TableRecord for CandidateRecord {
         type PrimaryKey = (u32, AccountNumber);
 
         fn get_primary_key(&self) -> Self::PrimaryKey {
-            (self.election_id, self.candidate)
+            self.by_election_id_candidate()
         }
 
         fn get_secondary_keys(&self) -> Vec<RawKey> {
@@ -115,10 +129,10 @@ mod service {
     impl TableWrapper<CandidateRecord> for CandidatesTable {}
 
     trait CandidatesTableWrapper: TableWrapper<CandidateRecord> {
+        // TODO: this typing is loose but it will be auto-generated from #[secondary(1)]
         fn get_index_by_election_votes_key(
             &self,
         ) -> TableIndex<(u32, u32, AccountNumber), CandidateRecord> {
-            // TODO: this typing is loose but at least will be controlled from macro
             self.get_index(1)
         }
     }
