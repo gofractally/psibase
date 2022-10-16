@@ -1,12 +1,19 @@
 use darling::FromMeta;
 use proc_macro::TokenStream;
+use proc_macro2::{Ident, Span};
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 use syn::{
-    parse_macro_input, parse_quote, AttrStyle, Attribute, FnArg, Item, ItemFn, ItemMod, Pat,
-    ReturnType,
+    parse_macro_input, parse_quote, AttrStyle, Attribute, Field, FnArg, ImplItem, Item, ItemFn,
+    ItemImpl, ItemMod, ItemStruct, Pat, ReturnType, Type,
 };
+
+#[derive(Debug, FromMeta)]
+pub struct TableOptions {
+    name: String,
+    index: u16,
+}
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -74,7 +81,6 @@ fn is_action_attr(attr: &Attribute) -> bool {
     false
 }
 
-/*
 fn is_table_attr(attr: &Attribute) -> bool {
     if let AttrStyle::Outer = attr.style {
         if attr.path.is_ident("table") {
@@ -83,7 +89,6 @@ fn is_table_attr(attr: &Attribute) -> bool {
     }
     false
 }
-*/
 
 fn process_mod(
     options: &Options,
@@ -101,8 +106,15 @@ fn process_mod(
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
 
     if let Some((_, items)) = &mut impl_mod.content {
+        let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
         let mut action_fns: Vec<usize> = Vec::new();
         for (item_index, item) in items.iter_mut().enumerate() {
+            if let Item::Struct(s) = item {
+                if s.attrs.iter().any(is_table_attr) {
+                    table_structs.insert(s.ident.clone(), vec![item_index]);
+                }
+            }
+
             if let Item::Fn(f) = item {
                 if f.attrs.iter().any(is_action_attr) {
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
@@ -110,6 +122,47 @@ fn process_mod(
                 }
             }
         }
+
+        // A second loop is needed in case the code has `impl` for a relevant table above the struct definition
+        for (item_index, item) in items.iter_mut().enumerate() {
+            if let Item::Impl(i) = item {
+                if let Type::Path(type_path) = &*i.self_ty {
+                    if let Some(tpps) = type_path.path.segments.first() {
+                        table_structs.entry(tpps.ident.clone()).and_modify(|refs| {
+                            refs.push(item_index);
+                        });
+                    }
+                }
+            }
+        }
+
+        let mut processed_tables = Vec::new();
+        for (tb_name, items_idxs) in table_structs.iter() {
+            let table_idx = process_service_tables(psibase_mod, tb_name, items, items_idxs);
+            processed_tables.push((tb_name, table_idx));
+        }
+
+        // Validates table indexes
+        processed_tables.sort_by_key(|t| t.1);
+        let mut last_idx = u16::MAX;
+        for (table_struct, tb_index) in processed_tables.iter() {
+            if *tb_index as usize >= processed_tables.len() {
+                abort!(
+                    table_struct,
+                    format!("Table index number is greater than the quantity of defined tables.")
+                );
+            } else if *tb_index == last_idx {
+                abort!(
+                    table_struct,
+                    "Table index {} already taken by table {}.",
+                    tb_index,
+                    processed_tables[*tb_index as usize].0
+                );
+            } else {
+                last_idx = *tb_index;
+            }
+        }
+
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
@@ -490,6 +543,345 @@ fn process_mod(
     }
     .into()
 } // process_mod
+
+struct PkIdentData {
+    ident: Ident,
+    ty: proc_macro2::TokenStream,
+    call_ident: proc_macro2::TokenStream,
+}
+
+impl PkIdentData {
+    fn new(
+        ident: Ident,
+        ty: proc_macro2::TokenStream,
+        call_ident: proc_macro2::TokenStream,
+    ) -> Self {
+        Self {
+            ident,
+            ty,
+            call_ident,
+        }
+    }
+}
+
+struct SkIdentData {
+    ident: Ident,
+    idx: u8,
+    ty: proc_macro2::TokenStream,
+}
+
+impl SkIdentData {
+    fn new(ident: Ident, idx: u8, ty: proc_macro2::TokenStream) -> Self {
+        Self { ident, idx, ty }
+    }
+}
+
+fn process_service_tables(
+    psibase_mod: &proc_macro2::TokenStream,
+    table_record_struct_name: &Ident,
+    items: &mut Vec<Item>,
+    table_idxs: &Vec<usize>,
+) -> u16 {
+    let mut pk_data: Option<PkIdentData> = None;
+    let mut secondary_keys = Vec::new();
+    let mut table_options: Option<TableOptions> = None;
+
+    for idx in table_idxs {
+        match &mut items[*idx] {
+            Item::Struct(s) => {
+                process_table_attrs(s, &mut table_options, psibase_mod);
+                process_table_fields(s, &mut pk_data);
+            }
+            Item::Impl(i) => process_table_impls(i, &mut pk_data, &mut secondary_keys),
+            item => abort!(item, "Unknown table item to be processed"),
+        }
+    }
+
+    if pk_data.is_none() {
+        abort!(
+            table_record_struct_name,
+            "Table record has not defined a primary key"
+        );
+    }
+
+    let pk_data = pk_data.unwrap();
+    let pk_ty = pk_data.ty;
+    let pk_call_ident = pk_data.call_ident;
+
+    secondary_keys.sort_by_key(|sk| sk.idx);
+    let mut sks_fns = quote! {};
+    let mut sks = quote! {};
+    let mut last_idx = 0;
+    for secondary_key in secondary_keys.iter() {
+        let sk_ident = &secondary_key.ident;
+        let sk_idx = secondary_key.idx;
+        let sk_ty = &secondary_key.ty;
+
+        // check duplicates, since it's sorted we can check the last idx
+        if sk_idx as usize > secondary_keys.len() {
+            abort!(sk_ident, format!("Secondary index number is greater than the quantity of defined secondary indexes"));
+        } else if sk_idx == last_idx {
+            abort!(
+                sk_ident,
+                format!(
+                    "Secondary index {} is taken by index {}.",
+                    sk_idx,
+                    secondary_keys[(last_idx - 1) as usize].ident
+                )
+            )
+        } else {
+            last_idx = sk_idx;
+        }
+
+        sks = quote! { #sks #psibase_mod::RawKey::new(self.#sk_ident().to_key()), };
+
+        let sk_fn_name = Ident::new(&format!("get_index_{}", sk_ident), Span::call_site());
+
+        sks_fns = quote! {
+            #sks_fns
+            fn #sk_fn_name(&self) -> #psibase_mod::TableIndex<#sk_ty, #table_record_struct_name> {
+                self.get_index(#sk_idx)
+            }
+        }
+    }
+
+    let table_record_impl = quote! {
+        impl #psibase_mod::TableRecord for #table_record_struct_name {
+            type PrimaryKey = #pk_ty;
+
+            fn get_primary_key(&self) -> Self::PrimaryKey {
+                self.#pk_call_ident
+            }
+
+            fn get_secondary_keys(&self) -> Vec<#psibase_mod::RawKey> {
+                vec![#sks]
+            }
+        }
+    };
+    items.push(parse_quote! {#table_record_impl});
+    // eprintln!("Table record impls >>> \n{}", table_record_impl);
+
+    if table_options.is_none() {
+        abort!(table_record_struct_name, "Table name and index not defined");
+    }
+    let table_options = table_options.unwrap();
+
+    let table_wrapper_name =
+        Ident::new(&format!("{}Wrapper", table_options.name), Span::call_site());
+    let table_name = Ident::new(table_options.name.as_str(), table_record_struct_name.span());
+    let table_index = table_options.index;
+    let table_index = quote! { #table_index };
+
+    // eprintln!("Table name >>> \n{}", table_name);
+    let table_struct = quote! {
+        struct #table_name(#psibase_mod::Table);
+    };
+
+    let table_base_impl = quote! {
+        impl #psibase_mod::TableBase for #table_name {
+            fn prefix(&self) -> Vec<u8> {
+                self.0.prefix.clone()
+            }
+            fn db_id(&self) -> DbId {
+                self.0.db_id
+            }
+        }
+    };
+
+    let table_handler_impl = quote! {
+        impl #psibase_mod::TableHandler for #table_name {
+            type TableType = #table_name;
+            const TABLE_SERVICE: #psibase_mod::AccountNumber = SERVICE;
+            const TABLE_INDEX: u16 = #table_index;
+
+            fn new(table: #psibase_mod::Table) -> #table_name {
+                #table_name(table)
+            }
+        }
+    };
+
+    let table_raw_wrapper_impl = quote! {
+        impl #psibase_mod::TableWrapper<#table_record_struct_name> for #table_name {}
+    };
+
+    let table_wrapper_trait = quote! {
+        trait #table_wrapper_name: #psibase_mod::TableWrapper<#table_record_struct_name> {
+            #sks_fns
+        }
+    };
+
+    let table_wrapper_impl = quote! {
+        impl #table_wrapper_name for #table_name {}
+    };
+
+    // eprintln!(
+    //     "Table impl >>>\n{}\n{}\n{}\n{}\n{}\n{}",
+    //     table_struct,
+    //     table_base_impl,
+    //     table_handler_impl,
+    //     table_raw_wrapper_impl,
+    //     table_wrapper_trait,
+    //     table_wrapper_impl
+    // );
+    items.push(parse_quote! {#table_struct});
+    items.push(parse_quote! {#table_base_impl});
+    items.push(parse_quote! {#table_handler_impl});
+    items.push(parse_quote! {#table_raw_wrapper_impl});
+    items.push(parse_quote! {#table_wrapper_trait});
+    items.push(parse_quote! {#table_wrapper_impl});
+
+    table_options.index
+}
+
+fn process_table_attrs(
+    table_struct: &mut ItemStruct,
+    table_options: &mut Option<TableOptions>,
+    psibase_mod: &proc_macro2::TokenStream,
+) {
+    // Parse table name and remove #[table]
+    if let Some(i) = table_struct.attrs.iter().position(is_table_attr) {
+        let attr = &table_struct.attrs[i];
+
+        match TableOptions::from_meta(&attr.parse_meta().unwrap()) {
+            Ok(options) => {
+                // eprintln!("Table Options >>> {:?}", options);
+                *table_options = Some(options);
+            }
+            Err(err) => {
+                abort!(attr, format!("Invalid service table attribute, expected `#[table(name = \"TableName\", index = N)]\n{}`", err));
+            }
+        };
+
+        // TODO: Think about this sugar attribute #[table(TableName, 1)]
+        // *table_name = syn::parse2::<Group>(attr.tokens.clone())
+        //     .and_then(|group| syn::parse2::<Ident>(group.stream()))
+        //     .map(|ident| quote! {#ident})
+        //     .unwrap_or_else(|_| {
+        //         abort!(
+        //             attr,
+        //             "Invalid service table attribute, expected is `#[table(TableName)]`"
+        //         )
+        //     });
+
+        table_struct.attrs.remove(i);
+    }
+
+    // TODO: allow dead_code?
+    table_struct
+        .attrs
+        .push(parse_quote! {#[derive(#psibase_mod::Fracpack)]});
+}
+
+fn process_table_fields(table_record_struct: &mut ItemStruct, pk_data: &mut Option<PkIdentData>) {
+    for field in table_record_struct.fields.iter_mut() {
+        let mut removable_attr_idxs = Vec::new();
+
+        for (field_attr_idx, field_attr) in field.attrs.iter().enumerate() {
+            if field_attr.style == AttrStyle::Outer && field_attr.path.is_ident("primary_key") {
+                process_table_pk_field(pk_data, field);
+                removable_attr_idxs.push(field_attr_idx);
+            }
+        }
+
+        for i in removable_attr_idxs {
+            field.attrs.remove(i);
+        }
+    }
+}
+
+fn process_table_impls(
+    table_impl: &mut ItemImpl,
+    pk_data: &mut Option<PkIdentData>,
+    secondary_keys: &mut Vec<SkIdentData>,
+) {
+    for impl_item in table_impl.items.iter_mut() {
+        if let ImplItem::Method(method) = impl_item {
+            let mut removable_attr_idxs = Vec::new();
+
+            for (attr_idx, attr) in method.attrs.iter().enumerate() {
+                if attr.style == AttrStyle::Outer {
+                    if attr.path.is_ident("primary_key") {
+                        let pk_method = &method.sig.ident;
+                        check_unique_pk(pk_data, pk_method);
+
+                        if let ReturnType::Type(_, return_type) = &method.sig.output {
+                            let pk_type = quote! {#return_type};
+                            let pk_call = quote! {#pk_method()};
+                            *pk_data = Some(PkIdentData::new(pk_method.clone(), pk_type, pk_call));
+                        } else {
+                            abort!(impl_item, "Invalid primary key return type");
+                        }
+
+                        removable_attr_idxs.push(attr_idx);
+                    } else if attr.path.is_ident("secondary_key") {
+                        if let Ok(lit) = attr.parse_args::<syn::LitInt>() {
+                            if let Ok(idx) = lit.base10_parse::<u8>() {
+                                if idx == 0 {
+                                    abort!(method, "Index 0 is reserved for Primary Key, secondary keys needs to be at least 1");
+                                }
+
+                                if let ReturnType::Type(_, return_type) = &method.sig.output {
+                                    let sk_method = &method.sig.ident;
+                                    let sk_type = quote! {#return_type};
+                                    secondary_keys.push(SkIdentData::new(
+                                        sk_method.clone(),
+                                        idx,
+                                        sk_type,
+                                    ));
+                                } else {
+                                    abort!(impl_item, "Invalid secondary key return type, make sure it is a valid ToKey.");
+                                }
+                            } else {
+                                abort!(
+                                    method,
+                                    "Invalid secondary key index number it needs to be a valid u8."
+                                );
+                            }
+                        } else {
+                            abort!(method, "Unable to parse secondary key index number.");
+                        }
+
+                        removable_attr_idxs.push(attr_idx);
+                    }
+                }
+            }
+
+            for i in removable_attr_idxs {
+                method.attrs.remove(i);
+            }
+        }
+    }
+}
+
+fn check_unique_pk(pk_data: &mut Option<PkIdentData>, item_ident: &Ident) {
+    if pk_data.is_some() {
+        abort!(
+            item_ident,
+            format!(
+                "Primary key already set on {}.",
+                pk_data.as_ref().unwrap().ident
+            )
+        )
+    }
+}
+
+fn process_table_pk_field(pk_data: &mut Option<PkIdentData>, field: &Field) {
+    let pk_field_ident = field
+        .ident
+        .as_ref()
+        .expect("Attempt to add a Primary key field with no ident");
+    check_unique_pk(pk_data, pk_field_ident);
+
+    let pk_fn_name = quote! {#pk_field_ident};
+    let pk_type = &field.ty;
+    let pk_type = quote! {#pk_type};
+
+    *pk_data = Some(PkIdentData::new(
+        pk_field_ident.clone(),
+        pk_type,
+        pk_fn_name,
+    ));
+}
 
 fn process_action_args(
     options: &Options,
