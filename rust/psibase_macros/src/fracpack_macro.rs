@@ -46,7 +46,7 @@ fn struct_fields(data: &DataStruct) -> Vec<StructField> {
                 ty: &field.ty,
             })
             .collect(),
-        Fields::Unnamed(_) => unimplemented!("fracpack does not support unnamed fields"),
+        Fields::Unnamed(_) => unimplemented!(),
         Fields::Unit => unimplemented!("fracpack does not support unit struct"),
     }
 }
@@ -283,6 +283,9 @@ fn process_struct(
     data: &DataStruct,
     opts: &Options,
 ) -> TokenStream {
+    if let Fields::Unnamed(unnamed) = &data.fields {
+        return process_struct_unnamed(fracpack_mod, input, unnamed, opts);
+    }
     let name = &input.ident;
     let generics = &input.generics;
     let fields = struct_fields(data);
@@ -404,6 +407,150 @@ fn process_struct(
         }
     })
 } // process_struct
+
+fn process_struct_unnamed(
+    fracpack_mod: &proc_macro2::TokenStream,
+    input: &DeriveInput,
+    unnamed: &FieldsUnnamed,
+    opts: &Options,
+) -> TokenStream {
+    if opts.definition_will_not_change {
+        unimplemented!("definition_will_not_change only supported on structs with named fields")
+    }
+    let name = &input.ident;
+    let generics = &input.generics;
+
+    let ty = if unnamed.unnamed.len() == 1 {
+        let ty = &unnamed.unnamed[0].ty;
+        quote! {#ty}
+    } else {
+        let ty = unnamed.unnamed.iter().fold(quote! {}, |acc, a| {
+            let ty = &a.ty;
+            quote! {#acc #ty,}
+        });
+        quote! {(#ty)}
+    };
+    let ty = quote! {<#ty as #fracpack_mod::Packable>};
+
+    let ref_ty = if unnamed.unnamed.len() == 1 {
+        let ty = &unnamed.unnamed[0].ty;
+        quote! {&#ty}
+    } else {
+        let ty = unnamed.unnamed.iter().fold(quote! {}, |acc, a| {
+            let ty = &a.ty;
+            quote! {#acc &#ty,}
+        });
+        quote! {(#ty)}
+    };
+    let ref_ty = quote! {<#ref_ty as #fracpack_mod::Packable>};
+
+    let to_value = if unnamed.unnamed.len() == 1 {
+        quote! {let value = &self.0;}
+    } else {
+        let to_value = unnamed
+            .unnamed
+            .iter()
+            .enumerate()
+            .fold(quote! {}, |acc, (i, _)| {
+                let i = syn::Index::from(i);
+                quote! {#acc &self.#i,}
+            });
+        quote! {let value = (#to_value);}
+    };
+
+    let from_value = if unnamed.unnamed.len() == 1 {
+        quote! {Self(value)}
+    } else {
+        let from_value = unnamed
+            .unnamed
+            .iter()
+            .enumerate()
+            .fold(quote! {}, |acc, (i, _)| {
+                let i = syn::Index::from(i);
+                quote! {#acc value.#i,}
+            });
+        quote! {Self(#from_value)}
+    };
+
+    let containers = if unnamed.unnamed.len() == 1 {
+        quote! {
+            fn is_empty_container(&self) -> bool {
+                self.0.is_empty_container()
+            }
+
+            fn new_empty_container() -> #fracpack_mod::Result<Self> {
+                Ok(Self(#ty::new_empty_container()?))
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    TokenStream::from(quote! {
+        impl<'a> #fracpack_mod::Packable<'a> for #name #generics {
+            const FIXED_SIZE: u32 = #ty::FIXED_SIZE;
+            const VARIABLE_SIZE: bool = #ty::VARIABLE_SIZE;
+            const IS_OPTIONAL: bool = #ty::IS_OPTIONAL;
+
+            fn pack(&self, dest: &mut Vec<u8>) {
+                #to_value
+                #ref_ty::pack(&value, dest)
+            }
+
+            fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
+                let value = #ty::unpack(src, pos)?;
+                Ok(#from_value)
+            }
+
+            fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
+                #ty::verify(src, pos)
+            }
+
+            #containers
+
+            fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
+                #to_value
+                #ref_ty::embedded_fixed_pack(&value, dest)
+            }
+
+            fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+                #to_value
+                #ref_ty::embedded_fixed_repack(&value, fixed_pos, heap_pos, dest)
+            }
+
+            fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
+                #to_value
+                #ref_ty::embedded_variable_pack(&value, dest)
+            }
+
+            fn embedded_variable_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> #fracpack_mod::Result<Self> {
+                let value = #ty::embedded_variable_unpack(src, fixed_pos, heap_pos)?;
+                Ok(#from_value)
+            }
+
+            fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> #fracpack_mod::Result<Self> {
+                let value = #ty::embedded_unpack(src, fixed_pos, heap_pos)?;
+                Ok(#from_value)
+            }
+
+            fn embedded_variable_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> #fracpack_mod::Result<()> {
+                #ty::embedded_variable_verify(src, fixed_pos, heap_pos)
+            }
+
+            fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> #fracpack_mod::Result<()> {
+                #ty::embedded_verify(src, fixed_pos, heap_pos)
+            }
+        }
+    })
+}
 
 fn process_enum(
     fracpack_mod: &proc_macro2::TokenStream,

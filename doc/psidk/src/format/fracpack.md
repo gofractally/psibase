@@ -59,15 +59,18 @@ Fixed-size subobjects live entirely within `fixed_data`. Variable-size subobject
 
 Tuples have the same encoding as structs, except they don't have a non-extensible option; tuples are always extensible, so they're always variable-size.
 
-### Unit and Unit Structs (Rust)
+### Unit (Rust)
 
-Fracpack doesn't support Rust unit (`()`) or unit structs (below) since this would create an inconsistency with `serde_json`, which renders these as `null` instead of `[]`. See `Empty`, below, for an alternative.
+Fracpack treats the unit type (`()`) as an empty tuple. Be careful since this creates an inconsistency with `serde_json`, which renders unit as `null` instead of `[]`. See `Empty`, below, for an alternative.
+
+### Unit Structs (Rust)
+
+Fracpack doesn't support unit structs. See `Empty`, below, for an alternative.
 
 ```
+// Not supported
 struct MyUnit;
 ```
-
-TODO: remove existing unit support
 
 ### Tuple Structs (Rust)
 
@@ -80,8 +83,6 @@ struct TupleOfTwo(u32, String);         // Encodes as a tuple
 struct TupleOfThree(u32, String, f64);  // Encodes as a tuple
 ```
 
-TODO: implement
-
 ### Special Cases (Rust)
 
 Fracpack encodes these structs as their inner items instead of encoding them as a struct or tuple. This matches `serde_json` semantics. This can result in either a fixed-size object or a variable-size object.
@@ -90,8 +91,6 @@ Fracpack encodes these structs as their inner items instead of encoding them as 
 struct Single1(u32);        // Encodes as a u32 (fixed size)
 struct Single2(String, );   // Encodes as a String (variable size)
 ```
-
-TODO: implement
 
 ### Offset Pointers
 
