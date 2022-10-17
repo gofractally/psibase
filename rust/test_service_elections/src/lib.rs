@@ -8,30 +8,29 @@ mod service {
         TimePointSec, ToKey,
     };
 
+    // TODO: make these configurable in a singleton
+    // An election cannot run for more than 24h
+    const MAX_ELECTION_TIME_SECONDS: TimePointSec = TimePointSec {
+        seconds: 24 * 60 * 60,
+    };
+
+    // An election cannot run for less than 1h
+    const MIN_ELECTION_TIME_SECONDS: TimePointSec = TimePointSec { seconds: 60 * 60 };
+
     #[table(name = "ElectionsTable", index = 0)]
     #[derive(Debug)]
     pub struct ElectionRecord {
         #[primary_key]
         pub id: u32,
-        pub voting_start_date: TimePointSec,
-        pub voting_end_date: TimePointSec,
-        pub winner: AccountNumber,
+        pub voting_start_time: TimePointSec,
+        pub voting_end_time: TimePointSec,
+        pub owner: AccountNumber,
     }
 
     impl ElectionRecord {
         #[secondary_key(1)]
         fn by_dates_key(&self) -> (TimePointSec, TimePointSec, u32) {
-            (self.voting_start_date, self.voting_end_date, self.id)
-        }
-
-        #[secondary_key(2)]
-        fn by_start_date_key(&self) -> (TimePointSec, u32) {
-            (self.voting_start_date, self.id)
-        }
-
-        #[secondary_key(3)]
-        fn by_end_date_key(&self) -> (TimePointSec, u32) {
-            (self.voting_end_date, self.id)
+            (self.voting_end_time, self.voting_start_time, self.id)
         }
     }
 
@@ -90,17 +89,18 @@ mod service {
     #[action]
     fn list_active_elections(date_time: TimePointSec) -> Vec<ElectionRecord> {
         let table = ElectionsTable::open();
-        let idx = table.get_index_pk();
+        let mut idx = table.get_index_by_dates_key();
 
         let current_time = date_time; // TODO: get the current time
 
-        // TODO: this expensive table scan needs secondary indexes
-        idx.rev() // list from the most recent ones
-            .filter(|election| {
-                election.voting_start_date <= current_time
-                    && election.voting_end_date > current_time
-            })
-            .collect()
+        idx.range(
+            (current_time, TimePointSec::from(0), 0),
+            (TimePointSec::from(u32::MAX), current_time, u32::MAX),
+        )
+        .filter(|election| {
+            election.voting_start_time <= current_time && election.voting_end_time > current_time
+        })
+        .collect()
     }
 
     #[action]
@@ -125,10 +125,10 @@ mod service {
         let election = get_election(election_id);
 
         // TODO: implement get time
-        let current_time = TimePointSec { seconds: 90 };
+        let current_time = TimePointSec { seconds: 9000 };
 
         check(
-            current_time > election.voting_end_date,
+            current_time > election.voting_end_time,
             "election is not finished",
         );
 
@@ -147,16 +147,21 @@ mod service {
 
     /// Creates a new election
     #[action]
-    fn new(voting_start_date: TimePointSec, voting_end_date: TimePointSec) -> u32 {
-        println!(">>> adding a new election rust println!...");
+    fn new(voting_start_time: TimePointSec, voting_end_time: TimePointSec) -> u32 {
+        let election_duration = voting_end_time - voting_start_time;
+        check(
+            election_duration <= MAX_ELECTION_TIME_SECONDS,
+            "Election is longer than the maximum allowed duration of 24hs",
+        );
+        check(
+            election_duration >= MIN_ELECTION_TIME_SECONDS,
+            "Election is less than the minimum allowed duration of 1h",
+        );
 
         let table = ElectionsTable::open();
         let mut idx = table.get_index_pk();
 
-        println!(">>> indexes initialized!...");
-
         let last_election = idx.next_back();
-        println!(">>> got last election");
 
         let new_key = if let Some(last_election) = last_election {
             last_election.id + 1
@@ -168,9 +173,9 @@ mod service {
 
         let new_election = ElectionRecord {
             id: new_key,
-            voting_start_date,
-            voting_end_date,
-            winner: AccountNumber { value: 0 },
+            voting_start_time,
+            voting_end_time,
+            owner: get_sender(),
         };
 
         println!(">>> inserting new election record");
@@ -189,7 +194,7 @@ mod service {
         let current_time = TimePointSec { seconds: 0 };
 
         check(
-            current_time < election.voting_start_date,
+            current_time < election.voting_start_time,
             "election is already in progress",
         );
 
@@ -218,7 +223,7 @@ mod service {
         let current_time = TimePointSec { seconds: 0 };
 
         check(
-            current_time < election.voting_start_date,
+            current_time < election.voting_start_time,
             "election is already in progress",
         );
 
@@ -235,10 +240,10 @@ mod service {
         let election = get_election(election_id);
 
         // TODO: implement get current time
-        let current_time = TimePointSec { seconds: 30 };
+        let current_time = TimePointSec { seconds: 3000 };
 
         check(
-            current_time >= election.voting_start_date,
+            current_time >= election.voting_start_time,
             "election has not started",
         );
 
@@ -276,7 +281,7 @@ mod tests {
     fn new_elections_are_sequential(chain: psibase::Chain) -> Result<(), psibase::Error> {
         println!("Pushing election1...");
         let election1 =
-            Wrapper::push(&chain).new(TimePointSec { seconds: 1 }, TimePointSec { seconds: 121 });
+            Wrapper::push(&chain).new(TimePointSec { seconds: 1 }, TimePointSec { seconds: 3610 });
         println!(
             "election1 result={}, trace:\n{}",
             election1.get()?,
@@ -293,7 +298,7 @@ mod tests {
 
         println!("Pushing election2...");
         let election2 =
-            Wrapper::push(&chain).new(TimePointSec { seconds: 2 }, TimePointSec { seconds: 122 });
+            Wrapper::push(&chain).new(TimePointSec { seconds: 2 }, TimePointSec { seconds: 3620 });
         println!(
             "election2 result={}, trace:\n{}",
             election2.get()?,
@@ -303,7 +308,7 @@ mod tests {
 
         println!("Pushing election3...");
         let election3 =
-            Wrapper::push(&chain).new(TimePointSec { seconds: 3 }, TimePointSec { seconds: 123 });
+            Wrapper::push(&chain).new(TimePointSec { seconds: 3 }, TimePointSec { seconds: 3630 });
         println!(
             "election3 result={}, trace:\n{}",
             election3.get()?,
@@ -317,37 +322,61 @@ mod tests {
     #[psibase::test_case(services("elections"))]
     fn active_elections_are_filtered(chain: psibase::Chain) -> Result<(), psibase::Error> {
         println!("Pushing elections...");
-        Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
-        Wrapper::push(&chain).new(TimePointSec { seconds: 20 }, TimePointSec { seconds: 70 });
-        Wrapper::push(&chain).new(TimePointSec { seconds: 30 }, TimePointSec { seconds: 80 });
+        println!(
+            "{}",
+            Wrapper::push(&chain)
+                .new(
+                    TimePointSec { seconds: 1000 },
+                    TimePointSec { seconds: 6000 }
+                )
+                .trace
+        );
+        println!(
+            "{}",
+            Wrapper::push(&chain)
+                .new(
+                    TimePointSec { seconds: 2000 },
+                    TimePointSec { seconds: 7000 }
+                )
+                .trace
+        );
+        println!(
+            "{}",
+            Wrapper::push(&chain)
+                .new(
+                    TimePointSec { seconds: 3000 },
+                    TimePointSec { seconds: 8000 }
+                )
+                .trace
+        );
 
         let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 45 })
+            .list_active_elections(TimePointSec { seconds: 4500 })
             .get()?;
         assert_eq!(active_elections.len(), 3);
-        assert_eq!(active_elections[0].id, 3);
+        assert_eq!(active_elections[0].id, 1);
         assert_eq!(active_elections[1].id, 2);
-        assert_eq!(active_elections[2].id, 1);
+        assert_eq!(active_elections[2].id, 3);
 
         let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 65 })
+            .list_active_elections(TimePointSec { seconds: 6500 })
             .get()?;
         assert_eq!(active_elections.len(), 2);
-        assert_eq!(active_elections[0].id, 3);
-        assert_eq!(active_elections[1].id, 2);
+        assert_eq!(active_elections[0].id, 2);
+        assert_eq!(active_elections[1].id, 3);
 
         let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 75 })
+            .list_active_elections(TimePointSec { seconds: 7500 })
             .get()?;
         assert_eq!(active_elections.len(), 1);
         assert_eq!(active_elections[0].id, 3);
 
         let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 5 })
+            .list_active_elections(TimePointSec { seconds: 500 })
             .get()?;
         assert_eq!(active_elections.len(), 0);
         let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 85 })
+            .list_active_elections(TimePointSec { seconds: 8500 })
             .get()?;
         assert_eq!(active_elections.len(), 0);
 
@@ -366,13 +395,19 @@ mod tests {
         chain.new_account(account!("charlesy"))?;
 
         println!("Pushing elections...");
-        Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
+        Wrapper::push(&chain).new(
+            TimePointSec { seconds: 1000 },
+            TimePointSec { seconds: 6000 },
+        );
         Wrapper::push_from(&chain, account!("bob")).register(1);
         Wrapper::push_from(&chain, account!("alice")).register(1);
         Wrapper::push_from(&chain, account!("charles")).register(1);
 
         // Add another election just to check that the range operation is behaving properly
-        Wrapper::push(&chain).new(TimePointSec { seconds: 11 }, TimePointSec { seconds: 61 });
+        Wrapper::push(&chain).new(
+            TimePointSec { seconds: 1100 },
+            TimePointSec { seconds: 6100 },
+        );
         Wrapper::push_from(&chain, account!("bobby")).register(2);
         Wrapper::push_from(&chain, account!("alicey")).register(2);
         Wrapper::push_from(&chain, account!("charlesy")).register(2);
@@ -469,7 +504,10 @@ mod tests {
         chain.new_account(account!("charles"))?;
 
         println!("Starting election...");
-        Wrapper::push(&chain).new(TimePointSec { seconds: 10 }, TimePointSec { seconds: 60 });
+        Wrapper::push(&chain).new(
+            TimePointSec { seconds: 1000 },
+            TimePointSec { seconds: 6000 },
+        );
         Wrapper::push_from(&chain, account!("bob")).register(1);
         Wrapper::push_from(&chain, account!("alice")).register(1);
         Wrapper::push_from(&chain, account!("charles")).register(1);
