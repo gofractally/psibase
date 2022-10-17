@@ -206,7 +206,7 @@ We used `{type reference}` to indicate a type reference in the definitions above
 - `{"vector": {inner type}}` - a vector of inner type
 - `{"optional": {inner type}}` - an optional of inner type
 - `{"tuple": [{inner type}, ...]}` - a tuple of inner types
-- `{"array": {inner type}, "size": 8}` - a fixed-size array of inner type
+- `{"array": [{inner type}, size]}` - a fixed-size array of inner type
 
 Built-in types live in a separate namespace from user-defined types to minimize conflicts in the future if more built-in types are added.
 
