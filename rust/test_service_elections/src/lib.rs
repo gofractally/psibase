@@ -5,8 +5,8 @@
 mod service {
     use fracpack::Fracpack;
     use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, RawKey, Table, TableHandler,
-        TableRecord, TimePointSec, ToKey,
+        check, check_none, check_some, get_sender, AccountNumber, DbId, RawKey, Table, TableBase,
+        TableHandler, TableIndex, TableRecord, TableWrapper, TimePointSec, ToKey,
     };
 
     // #[table]
@@ -18,20 +18,61 @@ mod service {
         pub winner: AccountNumber,
     }
 
+    impl ElectionRecord {
+        // #[primary_key]
+        fn by_id(&self) -> u32 {
+            self.id
+        }
+
+        // #[secondary_key(1)]
+        fn by_dates_key(&self) -> (TimePointSec, TimePointSec, u32) {
+            (self.voting_start_date, self.voting_end_date, self.id)
+        }
+    }
+
+    // TODO: Auto generated from above #[primary_key] and #[secondary_key(1)]
     impl TableRecord for ElectionRecord {
         type PrimaryKey = u32;
 
         fn get_primary_key(&self) -> Self::PrimaryKey {
-            self.id
+            self.by_id()
+        }
+
+        fn get_secondary_keys(&self) -> Vec<RawKey> {
+            vec![RawKey::new(self.by_dates_key().to_key())]
         }
     }
 
-    type ElectionsTable = Table<ElectionRecord>;
+    struct ElectionsTable(Table);
+    impl TableBase for ElectionsTable {
+        fn prefix(&self) -> Vec<u8> {
+            self.0.prefix.clone()
+        }
 
-    impl TableHandler<ElectionRecord> for ElectionsTable {
+        fn db_id(&self) -> DbId {
+            self.0.db_id
+        }
+    }
+    impl TableHandler for ElectionsTable {
+        type TableType = ElectionsTable;
         const TABLE_SERVICE: AccountNumber = SERVICE;
         const TABLE_INDEX: u16 = 0;
+
+        fn new(table: Table) -> ElectionsTable {
+            ElectionsTable(table)
+        }
     }
+    impl TableWrapper<ElectionRecord> for ElectionsTable {}
+
+    trait ElectionsTableWrapper: TableWrapper<ElectionRecord> {
+        // TODO: this typing is loose but it will be auto-generated from #[secondary(1)]
+        fn get_index_by_dates_key(
+            &self,
+        ) -> TableIndex<(TimePointSec, TimePointSec, u32), ElectionRecord> {
+            self.get_index(1)
+        }
+    }
+    impl ElectionsTableWrapper for ElectionsTable {}
 
     // #[table]
     #[derive(Fracpack, Eq, PartialEq, Clone, Debug)]
@@ -40,32 +81,62 @@ mod service {
         pub candidate: AccountNumber,
         pub votes: u32,
     }
-    type ByElectionVotesCount = (u32, u32, AccountNumber);
 
     impl CandidateRecord {
-        fn by_election_votes_key(&self) -> ByElectionVotesCount {
+        // #[primary_key]
+        fn by_election_id_candidate(&self) -> (u32, AccountNumber) {
+            (self.election_id, self.candidate)
+        }
+
+        // #[secondary_key(1)]
+        fn by_election_votes_key(&self) -> (u32, u32, AccountNumber) {
             (self.election_id, self.votes, self.candidate)
         }
     }
 
+    // TODO: Auto generated from above #[primary_key] and #[secondary_key(1)]
     impl TableRecord for CandidateRecord {
         type PrimaryKey = (u32, AccountNumber);
 
         fn get_primary_key(&self) -> Self::PrimaryKey {
-            (self.election_id, self.candidate)
+            self.by_election_id_candidate()
         }
 
         fn get_secondary_keys(&self) -> Vec<RawKey> {
-            let sk1 = RawKey::new(self.by_election_votes_key().to_key());
-            vec![sk1]
+            vec![RawKey::new(self.by_election_votes_key().to_key())]
         }
     }
 
-    type CandidatesTable = Table<CandidateRecord>;
-    impl TableHandler<CandidateRecord> for CandidatesTable {
+    struct CandidatesTable(Table);
+    impl TableBase for CandidatesTable {
+        fn prefix(&self) -> Vec<u8> {
+            self.0.prefix.clone()
+        }
+
+        fn db_id(&self) -> DbId {
+            self.0.db_id
+        }
+    }
+    impl TableHandler for CandidatesTable {
+        type TableType = CandidatesTable;
         const TABLE_SERVICE: AccountNumber = SERVICE;
         const TABLE_INDEX: u16 = 1;
+
+        fn new(table: Table) -> CandidatesTable {
+            CandidatesTable(table)
+        }
     }
+    impl TableWrapper<CandidateRecord> for CandidatesTable {}
+
+    trait CandidatesTableWrapper: TableWrapper<CandidateRecord> {
+        // TODO: this typing is loose but it will be auto-generated from #[secondary(1)]
+        fn get_index_by_election_votes_key(
+            &self,
+        ) -> TableIndex<(u32, u32, AccountNumber), CandidateRecord> {
+            self.get_index(1)
+        }
+    }
+    impl CandidatesTableWrapper for CandidatesTable {}
 
     // #[table]
     #[derive(Fracpack, Eq, PartialEq, Clone)]
@@ -84,12 +155,26 @@ mod service {
         }
     }
 
-    type VotesTable = Table<VotingRecord>;
+    struct VotesTable(Table);
+    impl TableBase for VotesTable {
+        fn prefix(&self) -> Vec<u8> {
+            self.0.prefix.clone()
+        }
 
-    impl TableHandler<VotingRecord> for VotesTable {
+        fn db_id(&self) -> DbId {
+            self.0.db_id
+        }
+    }
+    impl TableHandler for VotesTable {
+        type TableType = VotesTable;
         const TABLE_SERVICE: AccountNumber = SERVICE;
         const TABLE_INDEX: u16 = 2;
+
+        fn new(table: Table) -> VotesTable {
+            VotesTable(table)
+        }
     }
+    impl TableWrapper<VotingRecord> for VotesTable {}
 
     #[action]
     fn get_election(election_id: u32) -> ElectionRecord {
@@ -153,7 +238,7 @@ mod service {
         );
 
         let table = CandidatesTable::open();
-        let mut idx = table.get_index::<ByElectionVotesCount>(1);
+        let mut idx = table.get_index_by_election_votes_key();
 
         let winner = idx
             .range(
