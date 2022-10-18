@@ -48,6 +48,15 @@ pub trait TableHandler {
 
     fn open() -> Self::TableType {
         let prefix = (Self::TABLE_SERVICE, Self::TABLE_INDEX).to_key();
+        Self::create_table_from_prefix(prefix)
+    }
+
+    fn open_custom(service: AccountNumber, table_index: u16) -> Self::TableType {
+        let prefix = (service, table_index).to_key();
+        Self::create_table_from_prefix(prefix)
+    }
+
+    fn create_table_from_prefix(prefix: Vec<u8>) -> Self::TableType {
         let table = Table {
             db_id: DbId::Service,
             prefix,
