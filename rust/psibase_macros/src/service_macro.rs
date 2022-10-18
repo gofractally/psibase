@@ -144,22 +144,12 @@ fn process_mod(
 
         // Validates table indexes
         processed_tables.sort_by_key(|t| t.1);
-        let mut last_idx = u16::MAX;
-        for (table_struct, tb_index) in processed_tables.iter() {
-            if *tb_index as usize >= processed_tables.len() {
+        for (expected_idx, (table_struct, tb_index)) in processed_tables.iter().enumerate() {
+            if *tb_index as usize != expected_idx {
                 abort!(
                     table_struct,
-                    format!("Table index number is greater than the quantity of defined tables.")
+                    format!("Missing expected table index {}; tables may not have gaps and may not be removed or reordered.", expected_idx)
                 );
-            } else if *tb_index == last_idx {
-                abort!(
-                    table_struct,
-                    "Table index {} already taken by table {}.",
-                    tb_index,
-                    processed_tables[*tb_index as usize].0
-                );
-            } else {
-                last_idx = *tb_index;
             }
         }
 
@@ -611,26 +601,14 @@ fn process_service_tables(
     secondary_keys.sort_by_key(|sk| sk.idx);
     let mut sks_fns = quote! {};
     let mut sks = quote! {};
-    let mut last_idx = 0;
-    for secondary_key in secondary_keys.iter() {
+    for (idx, secondary_key) in secondary_keys.iter().enumerate() {
         let sk_ident = &secondary_key.ident;
         let sk_idx = secondary_key.idx;
         let sk_ty = &secondary_key.ty;
 
-        // check duplicates, since it's sorted we can check the last idx
-        if sk_idx as usize > secondary_keys.len() {
-            abort!(sk_ident, format!("Secondary index number is greater than the quantity of defined secondary indexes"));
-        } else if sk_idx == last_idx {
-            abort!(
-                sk_ident,
-                format!(
-                    "Secondary index {} is taken by index {}.",
-                    sk_idx,
-                    secondary_keys[(last_idx - 1) as usize].ident
-                )
-            )
-        } else {
-            last_idx = sk_idx;
+        let expected_idx = idx + 1;
+        if sk_idx as usize != expected_idx {
+            abort!(sk_ident, format!("Missing expected secondary index {}; indexes may not have gaps and may not be removed or reordered", expected_idx));
         }
 
         sks = quote! { #sks #psibase_mod::RawKey::new(self.#sk_ident().to_key()), };
