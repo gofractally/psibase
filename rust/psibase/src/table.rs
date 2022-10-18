@@ -273,7 +273,8 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
         if let Some(value) = value {
             self.front_key = RawKey::new(get_key_bytes());
 
-            if self.front_key >= self.back_key {
+            let has_back_key = self.back_key.data != self.prefix;
+            if has_back_key && self.front_key >= self.back_key {
                 println!(">>> front cursor met back cursor, it's the end");
                 self.is_end = true;
                 return None;

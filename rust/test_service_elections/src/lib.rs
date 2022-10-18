@@ -86,6 +86,29 @@ mod service {
         check_some(candidate_opt, "candidate for election does not exist")
     }
 
+    // Full elections paginator
+    #[action]
+    fn list_elections(cursor: Option<u32>, reverse: bool, page_size: u32) -> Vec<ElectionRecord> {
+        let table = ElectionsTable::open();
+        let mut idx = table.get_index_pk();
+        let page_size = page_size as usize;
+
+        if let Some(cursor) = cursor {
+            if reverse {
+                let reverse_cursor = cursor + 1; // handles non inclusive upper bound property of a range
+                return idx.range(0, reverse_cursor).rev().take(page_size).collect();
+            } else {
+                return idx.range(cursor, u32::MAX).take(page_size).collect();
+            }
+        }
+
+        if reverse {
+            idx.rev().take(page_size).collect()
+        } else {
+            idx.take(page_size).collect()
+        }
+    }
+
     #[action]
     fn list_active_elections(date_time: TimePointSec) -> Vec<ElectionRecord> {
         let table = ElectionsTable::open();
@@ -278,76 +301,77 @@ mod tests {
     use psibase::{account, AccountNumber, TimePointSec};
 
     #[psibase::test_case(services("elections"))]
-    fn new_elections_are_sequential(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        println!("Pushing election1...");
-        let election1 =
-            Wrapper::push(&chain).new(TimePointSec { seconds: 1 }, TimePointSec { seconds: 3610 });
-        println!(
-            "election1 result={}, trace:\n{}",
-            election1.get()?,
-            election1.trace
-        );
-        assert_eq!(election1.get()?, 1);
+    fn new_elections_are_sequentially_created_and_paginated(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        for i in 1..=100 {
+            let election_id = Wrapper::push(&chain)
+                .new(
+                    TimePointSec { seconds: i },
+                    TimePointSec { seconds: 3600 + i },
+                )
+                .get()?;
+            assert_eq!(election_id, i);
+        }
 
-        let election1_record = Wrapper::push(&chain).get_election(1);
-        println!(
-            "election1_record result={:?}, trace:\n{}",
-            election1_record.get()?,
-            election1.trace
-        );
+        // paginates forward
+        let elections = Wrapper::push(&chain)
+            .list_elections(None, false, 40)
+            .get()?;
+        assert_eq!(elections.len(), 40);
+        assert_eq!(elections[0].id, 1);
+        assert_eq!(elections[39].id, 40);
 
-        println!("Pushing election2...");
-        let election2 =
-            Wrapper::push(&chain).new(TimePointSec { seconds: 2 }, TimePointSec { seconds: 3620 });
-        println!(
-            "election2 result={}, trace:\n{}",
-            election2.get()?,
-            election2.trace
-        );
-        assert_eq!(election2.get()?, 2);
+        let elections = Wrapper::push(&chain)
+            .list_elections(Some(41), false, 40)
+            .get()?;
+        assert_eq!(elections.len(), 40);
+        assert_eq!(elections[0].id, 41);
+        assert_eq!(elections[39].id, 80);
 
-        println!("Pushing election3...");
-        let election3 =
-            Wrapper::push(&chain).new(TimePointSec { seconds: 3 }, TimePointSec { seconds: 3630 });
-        println!(
-            "election3 result={}, trace:\n{}",
-            election3.get()?,
-            election3.trace
-        );
-        assert_eq!(election3.get()?, 3);
+        let elections = Wrapper::push(&chain)
+            .list_elections(Some(81), false, 40)
+            .get()?;
+        assert_eq!(elections.len(), 20);
+        assert_eq!(elections[0].id, 81);
+        assert_eq!(elections[19].id, 100);
 
+        // paginates backwards
+        let elections = Wrapper::push(&chain).list_elections(None, true, 40).get()?;
+        assert_eq!(elections.len(), 40);
+        assert_eq!(elections[0].id, 100);
+        assert_eq!(elections[39].id, 61);
+
+        let elections = Wrapper::push(&chain)
+            .list_elections(Some(60), true, 40)
+            .get()?;
+        assert_eq!(elections.len(), 40);
+        assert_eq!(elections[0].id, 60);
+        assert_eq!(elections[39].id, 21);
+
+        let elections = Wrapper::push(&chain)
+            .list_elections(Some(20), true, 40)
+            .get()?;
+        assert_eq!(elections.len(), 20);
+        assert_eq!(elections[0].id, 20);
+        assert_eq!(elections[19].id, 1);
         Ok(())
     }
 
     #[psibase::test_case(services("elections"))]
     fn active_elections_are_filtered(chain: psibase::Chain) -> Result<(), psibase::Error> {
         println!("Pushing elections...");
-        println!(
-            "{}",
-            Wrapper::push(&chain)
-                .new(
-                    TimePointSec { seconds: 1000 },
-                    TimePointSec { seconds: 6000 }
-                )
-                .trace
+        Wrapper::push(&chain).new(
+            TimePointSec { seconds: 1000 },
+            TimePointSec { seconds: 6000 },
         );
-        println!(
-            "{}",
-            Wrapper::push(&chain)
-                .new(
-                    TimePointSec { seconds: 2000 },
-                    TimePointSec { seconds: 7000 }
-                )
-                .trace
+        Wrapper::push(&chain).new(
+            TimePointSec { seconds: 2000 },
+            TimePointSec { seconds: 7000 },
         );
-        println!(
-            "{}",
-            Wrapper::push(&chain)
-                .new(
-                    TimePointSec { seconds: 3000 },
-                    TimePointSec { seconds: 8000 }
-                )
-                .trace
+        Wrapper::push(&chain).new(
+            TimePointSec { seconds: 3000 },
+            TimePointSec { seconds: 8000 },
         );
 
         let active_elections = Wrapper::push(&chain)
@@ -522,11 +546,7 @@ mod tests {
             } else {
                 account!("charles")
             };
-
-            println!(
-                "{}",
-                Wrapper::push_from(&chain, voter).vote(1, candidate).trace
-            );
+            Wrapper::push_from(&chain, voter).vote(1, candidate);
         }
 
         let candidate_bob = CandidateRecord {
