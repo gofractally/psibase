@@ -90,7 +90,7 @@ impl<T: Reflect> Reflect for Vec<T> {
 }
 
 impl<T: Reflect, const SIZE: usize> Reflect for [T; SIZE] {
-    type StaticType = Box<[T::StaticType; SIZE]>;
+    type StaticType = [T::StaticType; SIZE];
     fn reflect(visitor: impl ReflectVisitor) {
         visitor.array::<T, SIZE>()
     }
