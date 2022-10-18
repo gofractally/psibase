@@ -10,8 +10,10 @@ mod method_number;
 pub mod native;
 pub mod native_raw;
 mod native_tables;
+mod reflect;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
+mod schema;
 mod service;
 mod table;
 pub mod tester;
@@ -33,8 +35,10 @@ pub use http::*;
 pub use method_number::*;
 pub use native::*;
 pub use native_tables::*;
+pub use reflect::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
+pub use schema::*;
 pub use service::*;
 pub use table::*;
 pub use tester::*;
