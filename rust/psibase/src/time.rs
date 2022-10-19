@@ -48,6 +48,7 @@ impl Sub for TimePointSec {
     }
 }
 
+// TODO: TimePointSec is both a time point and a duration
 // TODO: string conversions
 // TODO: JSON
 // TODO: implement trait with the time functions helpers
