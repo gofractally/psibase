@@ -998,7 +998,7 @@ namespace psibase
    /// {
    ///    psibase::AccountNumber service;
    ///
-   ///    auto holderEvents(
+   ///    auto userEvents(
    ///        psibase::AccountNumber      holder,
    ///        std::optional<uint32_t>     first,
    ///        std::optional<std::string>  after
@@ -1019,14 +1019,14 @@ namespace psibase
    ///           psibase::DbId::historyEvent, eventId, service, "prevEvent", first, after);
    ///    }
    /// };
-   /// PSIO_REFLECT(Query, method(holderEvents, holder, first, after))
+   /// PSIO_REFLECT(Query, method(userEvents, holder, first, after))
    /// ```
    ///
    /// Example query:
    ///
    /// ```text
    /// {
-   ///   holderEvents(holder: "alice", first: 3) {
+   ///   userEvents(holder: "alice", first: 3) {
    ///     pageInfo {
    ///       hasNextPage
    ///       endCursor
@@ -1047,7 +1047,7 @@ namespace psibase
    /// ```text
    /// {
    ///   "data": {
-   ///     "holderEvents": {
+   ///     "userEvents": {
    ///       "pageInfo": {
    ///         "hasNextPage": true,
    ///         "endCursor": "13"
@@ -1313,8 +1313,9 @@ namespace psibase
    template <auto eventHead, StringLiteral eventPtrField>  //,
    struct EventIndex
    {
+      using EventIndexFailed = std::false_type;
       // type-dependent expression silences failure unless instantiated
-      static_assert(sizeof(decltype(eventHead)) != sizeof(decltype(eventHead)),
+      static_assert(decltype(eventPtrField)::size != decltype(eventPtrField)::size,
                     "Failed to extract eventHead and eventPtrField from EventIndex definition");
    };
 
@@ -1324,8 +1325,16 @@ namespace psibase
              StringLiteral        eventPtrField>
    struct EventIndex<eventHead, eventPtrField>
    {
+      using Record                             = RecordType;
       static constexpr auto             evHead = eventHead;
       static constexpr std::string_view prevField{eventPtrField.str};
+
+      static void updateEventHead(RecordType& record, KeyType eventHeadId)
+      {
+         record.*evHead = eventHeadId;
+      }
+
+      static KeyType getEventHead(const RecordType& record) { return record.*evHead; }
    };
 
 }  // namespace psibase

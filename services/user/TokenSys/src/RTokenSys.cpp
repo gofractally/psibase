@@ -43,11 +43,11 @@ struct TokenQuery
       return tokenSys.allEvents();
    }
 
-   auto holderEvents(AccountNumber           holder,
-                     optional<uint32_t>      first,
-                     const optional<string>& after) const
+   auto userEvents(AccountNumber           holder,
+                   optional<uint32_t>      first,
+                   const optional<string>& after) const
    {
-      return tokenSys.eventIndex<TokenSys::HolderEvents>(holder, first, after);
+      return tokenSys.eventIndex<TokenSys::UserEvents>(holder, first, after);
    }
 };
 PSIO_REFLECT(TokenQuery,
@@ -56,7 +56,7 @@ PSIO_REFLECT(TokenQuery,
              method(tokenTypes),
              method(getUserConf, user, flag),
              method(events),
-             method(holderEvents, holder, first, after))
+             method(userEvents, holder, first, after))
 
 optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {
