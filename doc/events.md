@@ -6,22 +6,36 @@ A vital component of the solution in Psibase blockchains is the event system. If
 
 # Events - What are they?
 
-Events are objects that are stored in a database on the blockchain node. Crucially, these event objects are not stored in blockchain state, and are therefore only kept around for a limited time, configurable by the blockchain node itself. To use the event system requires some development on both the blockchain service side (back-end) and the applet side (UI/front-end). On the back-end, the blockchain service is responsible for:
+Events are objects that are stored in a database on the blockchain node. Crucially, these event objects are not stored in blockchain state, and are therefore only kept around for a limited time, configurable by the blockchain node itself. 
+
+```mermaid
+    C4Context
+      Boundary(b0, "Psibase node") {
+        Boundary(b1, "Non-prunable") {
+            SystemDb(ChainState, "Distributed Chain State", "Accounts/Tables/Services")
+        }
+        Boundary(b2, "Prunable") {
+            SystemDb(EventLog, "Local Event Log", "Events")
+        }
+      }
+```
+
+To use the event system requires some development on both the blockchain service side (back-end) and the applet side (UI/front-end). On the back-end, the blockchain service is responsible for:
 
 1. Defining the events it can emit
 2. Emitting the events
 3. Exposing access to these events through RPC queries
 
-On the front-end, the applet is simply responsible for consuming events exposed by the service, and displaying them in a meaninful way to the users. 
+On the front-end, the applet is simply responsible for:
+1. Reading events history exposed by the service
+2. Displaying relevant events
+3. Subscribing to events
 
 ## When are events consumed by a front-end?
 
-Events are typically consumed on the front-end for two reasons:
+The primary reason that events are consumed on the front-end is to view historical chain activity related to a particular blockchain service. There is another use-case that aids in bridging multiple Psibase blockchains through inter-blockchain communication, but that use-case is outside the scope of this document.
 
-1. To view the historical activity of a user as it relates to a particular blockchain service
-2. To be notified of a state change that happened in real-time while an interface was being viewed
-
-For example, a wallet application may want to display a historical view of all past transfers into and out of a particular user account. All those historical transfers are not saved in active blockchain state, but each of those historical transfers would have emitted a `transferred` event, which the UI could query to efficiently retrieve a list of all past transfers.
+A wallet application may want to display a historical view of all past transfers into and out of a particular user account. All those historical transfers are not saved in active blockchain state, but each of those historical transfers would have emitted a `transferred` event, which the UI could query to efficiently retrieve a list of all past transfers.
 
 Keep in mind, some nodes may have smaller storage capacity, and may therefore be configured to "forget" past events beyond a particular time horizon. Therefore if you need to guarantee access to historical events to a specific time window, the safest way to accomplish this would be to configure and run your own full node. On the other hand, if your application simply needs to display the current state of a blockchain service, it may not be necessary to use the event system at all.
 
@@ -29,7 +43,32 @@ Keep in mind, some nodes may have smaller storage capacity, and may therefore be
 
 One challenge with an event system is in maintaining lookup efficiency. To show a list of historical token transactions, it would be inefficient to search through the entire event list to find the relevant events. Rather, Psibase provides a mechanism to aid in the construction of manual indices to drastically improve lookup efficiency.
 
-Whenever an event is emitted, a unique event ID is returned to the caller. The solution to provide efficient lookups is to save the most recently emitted event ID (i.e. event head) in blockchain state, and each event will itself include a field that indicates the previous event in that index. For example, in the Token Service, a Transferred event is defined, and is included in an index of events called `HolderEvents`:
+Whenever an event is emitted from a service, a unique event ID is returned to the caller. That event ID is known as the Event Head because it's the most recently emitted event of its type. The event head should be stored in blockchain state, and each event will itself include a field that indicates the previous event in that index. The result is that the Event Log contains followable event chains:
+
+<br/>
+
+**Event Log**
+
+|ID   |prevEvent | other | event | data |
+|-----|----------|-------|-------|------|
+| 1   |  0       | ...   | ...   | ...  |
+| `2` |  0       | ...   | ...   | ...  |
+| 3   |  0       | ...   | ...   | ...  |
+| `4` |  `2`     | ...   | ...   | ...  |
+| 5   |  1       | ...   | ...   | ...  |
+| 6   |  0       | ...   | ...   | ...  |
+| 7   |  `4`     | ...   | ...   | ...  |
+
+```
+eventHead = 7
+
+event chain = 7, 4, 2
+```
+
+<br/>
+
+
+For example, in the Token Service, a `Transferred` event is defined, and is included in an index of events called `HolderEvents`:
 
 <details>
   <summary>Reveal code</summary>
@@ -93,13 +132,12 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
 {
     // ...
-
-    emit<HolderEvents>(sender).history().transferred(
-        tokenId, senderHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
-
-    emit<HolderEvents>(receiver).history().transferred(
-        tokenId, receiverHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
-
+    auto senderRecord = getTokenHolder(sender);
+    auto receiverRecord = getTokenHolder(receiver);
+    emit<HolderEvents>(senderRecord).history().transferred(tokenId, time, sender, receiver, amount, memo);
+    emit<HolderEvents>(receiverRecord).history().transferred(tokenId, time, sender, receiver, amount, memo);
+    db.open<TokenHolderTable>().put(senderRecord);
+    db.open<TokenHolderTable>().put(receiverHolder);
     // ...
 }
 ```
@@ -269,17 +307,11 @@ Which, when submitted to a full-node, returns the Holder Events index as expecte
 
 # Event types
 
-All emitted events are one of three different event types. The three types are: History events, UI events, or merkle events. Three different event types are provided because there are three distinct use-cases for the event system.
+All emitted events are either History events or Merkle events. These two different event types are used for two separate use-cases, and using the wrong type may cause excessive billing to the Service developer.
 
 ## History events (Long-term events)
 
 The most common type of event is the history event. History events are emitted and stored to allow for the efficient historical event queries previously described. These events are more expensive to emit than UI events, because they are stored longer.
-
-## UI events (Short-term events)
-
-To understand UI events, think about how an application front-end will interact with the blockchain. The front-end will initialize and read blockchain state and/or historical events to display the current application state. Then, the front-end wants to get notified when there are updates that may be relevant to the information it displays to a user, but the information may not be the type of information that the application wants to store long-term. 
-
-An example of this type of event is the `credited` event found in the Token service. We don't need to store a long-lived chain of credited events, since the most important information for a user is simply the total available balance that has been credited to them, or which they have credited to another. Therefore, an initializing user-interface doesn't rely on any credited event, it simply reads the credit tables to determine how to display that information to the user. But a credited event is still emitted to prompt a *live* user-interface to update its view on credited balances.
 
 ## Merkle events (Inter-blockchain communication events)
 

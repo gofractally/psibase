@@ -107,6 +107,7 @@ namespace psibase
       ///
       /// TODO: right now the value must begin with the service. Revisit
       /// whether beginning with the block number is useful.
+      /// TODO: consider removing UI events
       uiEvent,
 
       /// Events which go into the merkle tree
