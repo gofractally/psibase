@@ -68,7 +68,7 @@ event chain = 7, 4, 2
 <br/>
 
 
-For example, in the Token Service, a `Transferred` event is defined, and is included in an index of events called `HolderEvents`:
+For example, in the Token Service, a `Transferred` event is defined, and is included in an index of events called `UserEvents`:
 
 <details>
   <summary>Reveal code</summary>
@@ -84,7 +84,7 @@ For example, in the Token Service, a `Transferred` event is defined, and is incl
     };
 
     // Specify the details needed to create an index of events.
-    using HolderEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, "prevEvent">;
+    using UserEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, "prevEvent">;
 
     // Reflect the events
     PSIBASE_REFLECT_EVENTS(TokenSys)
@@ -96,7 +96,7 @@ For example, in the Token Service, a `Transferred` event is defined, and is incl
 
 <br>
 
-The definition of `HolderEvents` indicates that the head event ID (most recently emitted event related to a Token Holder) is stored in the `lastHistoryEvent` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`. 
+The definition of `UserEvents` indicates that the head event ID (most recently emitted event related to a Token Holder) is stored in the `lastHistoryEvent` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`. 
 
 Notice that when the transferred event gets emitted by the Token service, the ID of the previous transferred event is included (via the `prevEvent` field) in the new event, and the event ID of the new event is saved to state (in the `lastHistoryEvent` field of the sender's `TokenHolderRecord`):
 
@@ -125,31 +125,11 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
 <br>
 
-<details>
-  <summary>Reveal alternate code</summary>
-
-```cpp
-void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
-{
-    // ...
-    auto senderRecord = getTokenHolder(sender);
-    auto receiverRecord = getTokenHolder(receiver);
-    emit<HolderEvents>(senderRecord).history().transferred(tokenId, time, sender, receiver, amount, memo);
-    emit<HolderEvents>(receiverRecord).history().transferred(tokenId, time, sender, receiver, amount, memo);
-    db.open<TokenHolderTable>().put(senderRecord);
-    db.open<TokenHolderTable>().put(receiverHolder);
-    // ...
-}
-```
-</details>
-
-<br>
-
-Notice that the transferred event is emitted twice, in order to generate the event for the sender's "HolderEvents" index, and another event for the receiver's "HolderEvents" index. As you will see, Psibase has mechanisms for efficiently querying event chains created in this way, for the small price of storing only one extra field (per desired index) in blockchain state.
+Notice that the transferred event is emitted twice, in order to generate the event for the sender's "UserEvents" index, and another event for the receiver's "UserEvents" index. As you will see, Psibase has mechanisms for efficiently querying event chains created in this way, for the small price of storing only one extra field (per desired index) in blockchain state.
 
 # Providing GraphQL access to event chains
 
-In Psibase, it is very simple to provide GraphQL access to any event chain. In the below example, you can see how the Token RPC Service exposes an index of all events (via the `events` query), and an index on just the "Holder Events" (via the `holderEvents` query):
+In Psibase, it is very simple to provide GraphQL access to any event chain. In the below example, you can see how the Token RPC Service exposes an index of all events (via the `events` query), and an index on just the "Holder Events" (via the `userEvents` query):
 
 <details>
   <summary>Reveal code</summary>
@@ -165,14 +145,14 @@ In Psibase, it is very simple to provide GraphQL access to any event chain. In t
         {
             return tokenSys.allEvents();
         }
-        auto holderEvents(AccountNumber holder, optional<uint32_t> first, const optional<string>& after) const
+        auto userEvents(AccountNumber holder, optional<uint32_t> first, const optional<string>& after) const
         {
-            return tokenSys.eventIndex<TokenSys::HolderEvents>(holder, first, after);
+            return tokenSys.eventIndex<TokenSys::UserEvents>(holder, first, after);
         }
     };
     PSIO_REFLECT(TokenQuery, 
         method(events), 
-        method(holderEvents, holder, first, after)
+        method(userEvents, holder, first, after)
     )
 
     // Expose the defined queries over a GraphQL interface
@@ -197,7 +177,7 @@ Once the above Service and RPC Service are deployed, a front-end developer may a
     ...
     type Query {
         events: TokenSys_Events!
-        holderEvents(holder: String! first: Float after: String): TokenSys_EventsHistoryConnection!
+        userEvents(holder: String! first: Float after: String): TokenSys_EventsHistoryConnection!
     }
 
   ```
@@ -212,7 +192,7 @@ A query for the Holder Events index can be easily constructed by following that 
 
   ```
     query {
-    holderEvents(holder: "alice") {
+    userEvents(holder: "alice") {
         pageInfo {
             hasNextPage
             endCursor
@@ -239,7 +219,7 @@ Which, when submitted to a full-node, returns the Holder Events index as expecte
   ```
     {
         "data": {
-            "holderEvents": {
+            "userEvents": {
                 "pageInfo": {
                     "hasNextPage": false,
                     "endCursor": "10"
