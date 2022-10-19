@@ -668,7 +668,7 @@ fn process_service_tables(
 
     let table_handler_impl = quote! {
         impl #psibase_mod::TableHandler for #table_name {
-            type TableType = #table_name;
+            type TableType = Self;
             const TABLE_SERVICE: #psibase_mod::AccountNumber = SERVICE;
             const TABLE_INDEX: u16 = #table_index;
 

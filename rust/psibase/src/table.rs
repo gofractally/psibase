@@ -48,6 +48,15 @@ pub trait TableHandler {
 
     fn open() -> Self::TableType {
         let prefix = (Self::TABLE_SERVICE, Self::TABLE_INDEX).to_key();
+        Self::create_table_from_prefix(prefix)
+    }
+
+    fn open_custom(service: AccountNumber, table_index: u16) -> Self::TableType {
+        let prefix = (service, table_index).to_key();
+        Self::create_table_from_prefix(prefix)
+    }
+
+    fn create_table_from_prefix(prefix: Vec<u8>) -> Self::TableType {
         let table = Table {
             db_id: DbId::Service,
             prefix,
@@ -186,8 +195,8 @@ pub trait TableWrapper<Record: TableRecord>: TableBase {
 pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub db_id: DbId,
     pub prefix: Vec<u8>,
-    front_key: RawKey,
-    back_key: RawKey,
+    front_key: Option<RawKey>,
+    back_key: Option<RawKey>,
     is_secondary: bool,
     is_end: bool,
     pub key_type: PhantomData<Key>,
@@ -199,8 +208,8 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     fn new(db_id: DbId, prefix: Vec<u8>, is_secondary: bool) -> TableIndex<Key, Record> {
         TableIndex {
             db_id,
-            front_key: RawKey::new(prefix.clone()),
-            back_key: RawKey::new(prefix.clone()),
+            front_key: None, // RawKey::new(prefix.clone()),
+            back_key: None,
             prefix,
             is_secondary,
             is_end: false,
@@ -227,11 +236,11 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     pub fn range(&mut self, from: Key, to: Key) -> &mut Self {
         let mut front_key = self.prefix.clone();
         from.append_key(&mut front_key);
-        self.front_key = RawKey::new(front_key);
+        self.front_key = Some(RawKey::new(front_key));
 
         let mut back_key = self.prefix.clone();
         to.append_key(&mut back_key);
-        self.back_key = RawKey::new(back_key);
+        self.back_key = Some(RawKey::new(back_key));
 
         self
     }
@@ -255,23 +264,23 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
 
         println!(">>> iterating from the front with key {:?}", self.front_key);
 
-        let value = kv_greater_equal_bytes(
-            self.db_id,
-            &self.front_key.data[..],
-            self.prefix.len() as u32,
-        );
+        let key = self
+            .front_key
+            .as_ref()
+            .map_or(&self.prefix[..], |k| &k.data[..]);
+        let value = kv_greater_equal_bytes(self.db_id, key, self.prefix.len() as u32);
 
         if let Some(value) = value {
-            self.front_key = RawKey::new(get_key_bytes());
+            self.front_key = Some(RawKey::new(get_key_bytes()));
 
-            if self.front_key >= self.back_key {
+            if self.back_key.is_some() && self.front_key >= self.back_key {
                 println!(">>> front cursor met back cursor, it's the end");
                 self.is_end = true;
                 return None;
             }
 
             // prepare the front key for the next iteration
-            self.front_key.data.push(0);
+            self.front_key.as_mut().unwrap().data.push(0);
 
             println!(">>> iterated and got key {:?}", self.front_key);
 
@@ -290,35 +299,19 @@ impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Re
             return None;
         }
 
-        println!(
-            ">>> iterating from the back with key {:?}",
-            to_hex(&self.back_key.data[..])
-        );
-
-        let value = if self.back_key.data == self.prefix {
-            kv_max_bytes(self.db_id, &self.back_key.data[..])
+        let value = if let Some(back_key) = &self.back_key {
+            kv_less_than_bytes(self.db_id, &back_key.data[..], self.prefix.len() as u32)
         } else {
-            kv_less_than_bytes(
-                self.db_id,
-                &self.back_key.data[..],
-                self.prefix.len() as u32,
-            )
+            kv_max_bytes(self.db_id, &self.prefix)
         };
 
         if let Some(value) = value {
-            self.back_key = RawKey::new(get_key_bytes());
-
+            self.back_key = Some(RawKey::new(get_key_bytes()));
             if self.back_key <= self.front_key {
                 println!(">>> back cursor met front cursor, it's the end");
                 self.is_end = true;
                 return None;
             }
-
-            println!(
-                ">>> back-iterated and got key {:?}",
-                to_hex(&self.back_key.data[..])
-            );
-
             self.get_value_from_bytes(value)
         } else {
             println!(">>> setting end of iterator!");
