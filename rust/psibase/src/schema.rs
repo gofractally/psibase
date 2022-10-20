@@ -1,10 +1,8 @@
-use crate::reflect;
-use crate::reflect::{
-    EnumFieldsVisitor, NamedFieldsVisitor, Reflect, UnnamedFieldsVisitor, Visitor,
-};
+use crate::reflect::{self, NamedVisitor};
+use crate::reflect::{EnumVisitor, Reflect, StructVisitor, UnnamedVisitor, Visitor};
 use fracpack::Fracpack;
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, borrow::Cow, cell::Cell, collections::HashMap, rc::Rc};
+use std::{any::TypeId, borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Clone, Default, Fracpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -55,7 +53,11 @@ pub struct Method<String> {
     args: Vec<Field<String>>,
 }
 
-type BuildString = Rc<Cell<Cow<'static, str>>>;
+type BuildString = Rc<RefCell<Cow<'static, str>>>;
+
+fn extract_str(str: &BuildString) -> String {
+    Rc::make_mut(&mut str.clone()).take().into_owned()
+}
 
 pub fn create_schema<T: Reflect>() -> Schema<BuildString> {
     let mut builder: SchemaBuilder = Default::default();
@@ -113,8 +115,8 @@ impl<'a> Visitor for TypeBuilder<'a> {
     type Return = TypeRef<BuildString>;
     type TupleVisitor = TupleBuilder<'a>;
     type StructTupleVisitor = StructTupleBuilder<'a>;
-    type NamedFieldsVisitor = NamedFieldsBuilder<'a>;
-    type EnumFieldsVisitor = EnumFieldsBuilder;
+    type StructVisitor = StructBuilder<'a>;
+    type EnumVisitor = EnumBuilder<'a>;
 
     fn custom_json(mut self) -> Self {
         self.custom_json = Some(true);
@@ -126,8 +128,8 @@ impl<'a> Visitor for TypeBuilder<'a> {
         self
     }
 
-    fn builtin_type<T: Reflect>(self, name: &'static str) -> Self::Return {
-        let name = Rc::new(Cell::new(name.into()));
+    fn builtin<T: Reflect>(self, name: &'static str) -> Self::Return {
+        let name = Rc::new(RefCell::new(name.into()));
         self.schema_builder
             .insert::<T>(Some(name.clone()), TypeRef::builtinType(name))
             .type_ref
@@ -178,9 +180,9 @@ impl<'a> Visitor for TypeBuilder<'a> {
         }
     }
 
-    fn struct_alias<T: Reflect, Inner: Reflect>(self, name: Cow<'static, str>) -> Self::Return {
+    fn struct_single<T: Reflect, Inner: Reflect>(self, name: Cow<'static, str>) -> Self::Return {
         let inner = self.schema_builder.get_type_ref::<Inner>();
-        let name = Rc::new(Cell::new(name));
+        let name = Rc::new(RefCell::new(name));
         self.schema_builder.schema.userTypes.push(Definition {
             name: name.clone(),
             alias: Some(inner),
@@ -201,7 +203,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
         name: Cow<'static, str>,
         fields_len: usize,
     ) -> Self::StructTupleVisitor {
-        let name = Rc::new(Cell::new(name));
+        let name = Rc::new(RefCell::new(name));
         let type_ref = self
             .schema_builder
             .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
@@ -219,14 +221,14 @@ impl<'a> Visitor for TypeBuilder<'a> {
         self,
         name: Cow<'static, str>,
         fields_len: usize,
-    ) -> Self::NamedFieldsVisitor {
-        let name = Rc::new(Cell::new(name));
+    ) -> Self::StructVisitor {
+        let name = Rc::new(RefCell::new(name));
         let type_ref = self
             .schema_builder
             .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
             .type_ref
             .clone();
-        NamedFieldsBuilder {
+        StructBuilder {
             schema_builder: self.schema_builder,
             name,
             type_ref,
@@ -236,8 +238,23 @@ impl<'a> Visitor for TypeBuilder<'a> {
         }
     }
 
-    fn enumeration<T: Reflect>(self, _name: Cow<'static, str>) -> Self::EnumFieldsVisitor {
-        todo!()
+    fn enumeration<T: Reflect>(
+        self,
+        name: Cow<'static, str>,
+        fields_len: usize,
+    ) -> Self::EnumVisitor {
+        let name = Rc::new(RefCell::new(name));
+        let type_ref = self
+            .schema_builder
+            .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
+            .type_ref
+            .clone();
+        EnumBuilder {
+            schema_builder: self.schema_builder,
+            name,
+            type_ref,
+            fields: Vec::with_capacity(fields_len),
+        }
     }
 }
 
@@ -247,7 +264,7 @@ struct TupleBuilder<'a> {
     type_id: TypeId,
 }
 
-impl<'a> UnnamedFieldsVisitor<TypeRef<BuildString>> for TupleBuilder<'a> {
+impl<'a> UnnamedVisitor<TypeRef<BuildString>> for TupleBuilder<'a> {
     fn field<T: Reflect>(mut self) -> Self {
         self.fields.push(self.schema_builder.get_type_ref::<T>());
         self
@@ -273,7 +290,7 @@ struct StructTupleBuilder<'a> {
     fields: Vec<TypeRef<BuildString>>,
 }
 
-impl<'a> UnnamedFieldsVisitor<TypeRef<BuildString>> for StructTupleBuilder<'a> {
+impl<'a> UnnamedVisitor<TypeRef<BuildString>> for StructTupleBuilder<'a> {
     fn field<T: Reflect>(mut self) -> Self {
         self.fields.push(self.schema_builder.get_type_ref::<T>());
         self
@@ -293,7 +310,7 @@ impl<'a> UnnamedFieldsVisitor<TypeRef<BuildString>> for StructTupleBuilder<'a> {
     }
 }
 
-struct NamedFieldsBuilder<'a> {
+struct StructBuilder<'a> {
     schema_builder: &'a mut SchemaBuilder,
     name: BuildString,
     type_ref: TypeRef<BuildString>,
@@ -302,11 +319,9 @@ struct NamedFieldsBuilder<'a> {
     fields: Vec<Field<BuildString>>,
 }
 
-impl<'a> NamedFieldsVisitor<TypeRef<BuildString>> for NamedFieldsBuilder<'a> {
-    type MethodsVisitor = Self;
-
+impl<'a> NamedVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
     fn field<T: Reflect>(mut self, name: Cow<'static, str>) -> Self {
-        let name = Rc::new(Cell::new(name));
+        let name = Rc::new(RefCell::new(name));
         self.fields.push(Field {
             name,
             ty: self.schema_builder.get_type_ref::<T>(),
@@ -326,14 +341,125 @@ impl<'a> NamedFieldsVisitor<TypeRef<BuildString>> for NamedFieldsBuilder<'a> {
         });
         self.type_ref
     }
+}
+
+impl<'a> StructVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
+    type MethodsVisitor = Self;
 
     fn with_methods(self) -> Self {
         self
     }
 }
 
-impl<'a> reflect::MethodsVisitor<TypeRef<BuildString>> for NamedFieldsBuilder<'a> {}
+impl<'a> reflect::MethodsVisitor<TypeRef<BuildString>> for StructBuilder<'a> {}
 
-struct EnumFieldsBuilder {}
+struct EnumBuilder<'a> {
+    schema_builder: &'a mut SchemaBuilder,
+    name: BuildString,
+    type_ref: TypeRef<BuildString>,
+    fields: Vec<Field<BuildString>>,
+}
 
-impl EnumFieldsVisitor<TypeRef<BuildString>> for EnumFieldsBuilder {}
+impl<'a> EnumVisitor<TypeRef<BuildString>> for EnumBuilder<'a> {
+    type TupleVisitor = EnumTupleBuilder<'a>;
+    type NamedVisitor = EnumNamedBuilder<'a>;
+
+    fn single<T: Reflect, Inner: Reflect>(mut self, name: Cow<'static, str>) -> Self {
+        self.fields.push(Field {
+            name: Rc::new(RefCell::new(name)),
+            ty: self.schema_builder.get_type_ref::<Inner>(),
+        });
+        self
+    }
+
+    fn tuple<T: Reflect>(self, name: Cow<'static, str>, fields_len: usize) -> Self::TupleVisitor {
+        EnumTupleBuilder {
+            enum_builder: self,
+            name: Rc::new(RefCell::new(name)),
+            fields: Vec::with_capacity(fields_len),
+        }
+    }
+
+    fn named<T: Reflect>(self, name: Cow<'static, str>, fields_len: usize) -> Self::NamedVisitor {
+        EnumNamedBuilder {
+            enum_builder: self,
+            name: Rc::new(RefCell::new(name)),
+            fields: Vec::with_capacity(fields_len),
+        }
+    }
+
+    fn end(self) -> TypeRef<BuildString> {
+        self.schema_builder.schema.userTypes.push(Definition {
+            name: self.name,
+            alias: None,
+            structFields: None,
+            unionFields: Some(self.fields),
+            customJson: None,
+            definitionWillNotChange: None,
+            methods: None,
+        });
+        self.type_ref
+    }
+}
+
+struct EnumTupleBuilder<'a> {
+    enum_builder: EnumBuilder<'a>,
+    name: BuildString,
+    fields: Vec<TypeRef<BuildString>>,
+}
+
+impl<'a> UnnamedVisitor<EnumBuilder<'a>> for EnumTupleBuilder<'a> {
+    fn field<T: Reflect>(mut self) -> Self {
+        self.fields
+            .push(self.enum_builder.schema_builder.get_type_ref::<T>());
+        self
+    }
+
+    fn end(mut self) -> EnumBuilder<'a> {
+        self.enum_builder.fields.push(Field {
+            name: self.name,
+            ty: TypeRef::tuple(self.fields),
+        });
+        self.enum_builder
+    }
+}
+
+struct EnumNamedBuilder<'a> {
+    enum_builder: EnumBuilder<'a>,
+    name: BuildString,
+    fields: Vec<Field<BuildString>>,
+}
+
+impl<'a> NamedVisitor<EnumBuilder<'a>> for EnumNamedBuilder<'a> {
+    fn field<T: Reflect>(mut self, name: Cow<'static, str>) -> Self {
+        self.fields.push(Field {
+            name: Rc::new(RefCell::new(name)),
+            ty: self.enum_builder.schema_builder.get_type_ref::<T>(),
+        });
+        self
+    }
+
+    fn end(mut self) -> EnumBuilder<'a> {
+        let struct_name = Rc::new(RefCell::new(Cow::Owned(
+            extract_str(&self.enum_builder.name) + "::" + self.name.as_ref().borrow().as_ref(),
+        )));
+        self.enum_builder
+            .schema_builder
+            .schema
+            .userTypes
+            .push(Definition {
+                name: struct_name.clone(),
+                alias: None,
+                structFields: Some(self.fields),
+                unionFields: None,
+                customJson: None,
+                definitionWillNotChange: None,
+                methods: None,
+            });
+        self.enum_builder.fields.push(Field {
+            name: self.name,
+            ty: TypeRef::userType(struct_name),
+        });
+        self.enum_builder
+    }
+}

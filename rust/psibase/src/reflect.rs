@@ -7,15 +7,15 @@ pub trait Reflect {
 
 pub trait Visitor {
     type Return;
-    type TupleVisitor: UnnamedFieldsVisitor<Self::Return>;
-    type StructTupleVisitor: UnnamedFieldsVisitor<Self::Return>;
-    type NamedFieldsVisitor: NamedFieldsVisitor<Self::Return>;
-    type EnumFieldsVisitor: EnumFieldsVisitor<Self::Return>;
+    type TupleVisitor: UnnamedVisitor<Self::Return>;
+    type StructTupleVisitor: UnnamedVisitor<Self::Return>;
+    type StructVisitor: StructVisitor<Self::Return>;
+    type EnumVisitor: EnumVisitor<Self::Return>;
 
     fn custom_json(self) -> Self;
     fn definition_will_not_change(self) -> Self;
 
-    fn builtin_type<T: Reflect>(self, name: &'static str) -> Self::Return;
+    fn builtin<T: Reflect>(self, name: &'static str) -> Self::Return;
     fn refed<Inner: Reflect>(self) -> Self::Return;
     fn mut_ref<Inner: Reflect>(self) -> Self::Return;
     fn boxed<Inner: Reflect>(self) -> Self::Return;
@@ -24,7 +24,7 @@ pub trait Visitor {
     fn container<T: Reflect, Inner: Reflect>(self) -> Self::Return;
     fn array<Inner: Reflect, const SIZE: usize>(self) -> Self::Return;
     fn tuple<T: Reflect>(self, fields_len: usize) -> Self::TupleVisitor;
-    fn struct_alias<T: Reflect, Inner: Reflect>(self, name: Cow<'static, str>) -> Self::Return;
+    fn struct_single<T: Reflect, Inner: Reflect>(self, name: Cow<'static, str>) -> Self::Return;
     fn struct_tuple<T: Reflect>(
         self,
         name: Cow<'static, str>,
@@ -34,26 +34,41 @@ pub trait Visitor {
         self,
         name: Cow<'static, str>,
         fields_len: usize,
-    ) -> Self::NamedFieldsVisitor;
-    fn enumeration<T: Reflect>(self, name: Cow<'static, str>) -> Self::EnumFieldsVisitor;
+    ) -> Self::StructVisitor;
+    fn enumeration<T: Reflect>(
+        self,
+        name: Cow<'static, str>,
+        fields_len: usize,
+    ) -> Self::EnumVisitor;
 }
 
-pub trait UnnamedFieldsVisitor<Return> {
+pub trait UnnamedVisitor<Return> {
     fn field<T: Reflect>(self) -> Self;
     fn end(self) -> Return;
 }
 
-pub trait NamedFieldsVisitor<Return> {
-    type MethodsVisitor: MethodsVisitor<Return>;
-
+pub trait NamedVisitor<Return> {
     fn field<T: Reflect>(self, name: Cow<'static, str>) -> Self;
     fn end(self) -> Return;
+}
+
+pub trait StructVisitor<Return>: NamedVisitor<Return> {
+    type MethodsVisitor: MethodsVisitor<Return>;
+
     fn with_methods(self) -> Self::MethodsVisitor;
 }
 
 pub trait MethodsVisitor<Return> {}
 
-pub trait EnumFieldsVisitor<Return> {}
+pub trait EnumVisitor<Return>: Sized {
+    type TupleVisitor: UnnamedVisitor<Self>;
+    type NamedVisitor: NamedVisitor<Self>;
+
+    fn single<T: Reflect, Inner: Reflect>(self, name: Cow<'static, str>) -> Self;
+    fn tuple<T: Reflect>(self, name: Cow<'static, str>, fields_len: usize) -> Self::TupleVisitor;
+    fn named<T: Reflect>(self, name: Cow<'static, str>, fields_len: usize) -> Self::NamedVisitor;
+    fn end(self) -> Return;
+}
 
 impl<'a, T: Reflect> Reflect for &'a T {
     type StaticType = &'static T::StaticType;
@@ -135,7 +150,7 @@ macro_rules! builtin_impl {
         impl Reflect for $ty {
             type StaticType = $ty;
             fn reflect<V: Visitor>(visitor: V) -> V::Return {
-                visitor.builtin_type::<$ty>($name)
+                visitor.builtin::<$ty>($name)
             }
         }
     };
@@ -157,7 +172,7 @@ builtin_impl!(String, "string");
 impl<'a> Reflect for &'a str {
     type StaticType = &'static str;
     fn reflect<V: Visitor>(visitor: V) -> V::Return {
-        visitor.builtin_type::<&'a str>("string")
+        visitor.builtin::<&'a str>("string")
     }
 }
 
@@ -181,6 +196,7 @@ macro_rules! tuple_impls {
     }
 }
 
+// Reflect excludes () to avoid an inconsistency between serde_json and psio::to_json
 tuple_impls! {
     1 => (0 T0)
     2 => (0 T0 1 T1)
