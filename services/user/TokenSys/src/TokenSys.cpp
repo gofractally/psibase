@@ -215,7 +215,6 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    balance.balance -= amount.value;
    db.open<BalanceTable>().put(balance);
 
-   emit().ui().credited(tokenId, sender, receiver, amount, memo);
    auto manualDebitFlag = TokenHolderConfig::getIndex(userConfig::manualDebit);
    bool manualDebitBit  = getTokenHolder(receiver).config.get(manualDebitFlag);
    if (manualDebitBit)
@@ -269,8 +268,6 @@ void TokenSys::uncredit(TID                tokenId,
       db.open<SharedBalanceTable>().put(sharedBalance);
    }
    db.open<BalanceTable>().put(creditorBalance);
-
-   emit().ui().uncredited(tokenId, sender, receiver, uncreditAmt, memo);
 }
 
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)

@@ -100,11 +100,7 @@ namespace UserService
             void recalled(uint64_t prevEvent, TID tokenId, psibase::TimePointSec time, Account from, Quantity amount, StringView memo) {}
          };
 
-         struct Ui
-         {
-            void credited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-            void uncredited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-         };
+         struct Ui {};
 
          struct Merkle
          {
@@ -151,10 +147,7 @@ namespace UserService
       method(transferred, prevEvent, tokenId, time, sender, receiver, amount, memo),
       method(recalled, prevEvent, tokenId, time, from, amount, memo),
    );
-   PSIBASE_REFLECT_UI_EVENTS(TokenSys,
-      method(credited, tokenId, sender, receiver, amount, memo),
-      method(uncredited, tokenId, sender, receiver, amount, memo),
-   );
+   PSIBASE_REFLECT_UI_EVENTS(TokenSys);
    PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys,
       method(transferred, tokenId, sender, receiver, amount, memo),
       method(recalled, tokenId, from, amount, memo)
