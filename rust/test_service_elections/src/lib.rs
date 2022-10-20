@@ -90,35 +90,38 @@ mod service {
     #[action]
     fn list_elections(cursor: Option<u32>, reverse: bool, page_size: u32) -> Vec<ElectionRecord> {
         let table = ElectionsTable::open();
-        let mut idx = table.get_index_pk();
+        let idx = table.get_index_pk();
         let page_size = page_size as usize;
+
+        // for x in &idx {
+        //     println!("{:?}", x);
+        // }
 
         if let Some(cursor) = cursor {
             if reverse {
-                let reverse_cursor = cursor + 1; // handles non inclusive upper bound property of a range
-                return idx.range(0, reverse_cursor).rev().take(page_size).collect();
+                return idx.range(..=cursor).rev().take(page_size).collect();
             } else {
-                return idx.range(cursor, u32::MAX).take(page_size).collect();
+                return idx.range(cursor..).take(page_size).collect();
             }
         }
 
         if reverse {
-            idx.rev().take(page_size).collect()
+            idx.into_iter().rev().take(page_size).collect()
         } else {
-            idx.take(page_size).collect()
+            idx.into_iter().take(page_size).collect()
         }
     }
 
     #[action]
     fn list_active_elections(date_time: TimePointSec) -> Vec<ElectionRecord> {
         let table = ElectionsTable::open();
-        let mut idx = table.get_index_by_dates_key();
+        let idx = table.get_index_by_dates_key();
 
         let current_time = date_time; // TODO: get the current time
 
         idx.range(
-            (current_time, TimePointSec::from(0), 0),
-            (TimePointSec::from(u32::MAX), current_time, u32::MAX),
+            (current_time, TimePointSec::from(0), 0)
+                ..(TimePointSec::from(u32::MAX), current_time, u32::MAX),
         )
         .filter(|election| {
             election.voting_start_time <= current_time && election.voting_end_time > current_time
@@ -133,11 +136,10 @@ mod service {
 
         let table = CandidatesTable::open();
 
-        let mut idx = table.get_index_pk();
+        let idx = table.get_index_pk();
 
         idx.range(
-            (election_id, AccountNumber::default()),
-            (election_id + 1, AccountNumber::default()),
+            (election_id, AccountNumber::default())..(election_id + 1, AccountNumber::default()),
         )
         .collect()
     }
@@ -156,12 +158,12 @@ mod service {
         );
 
         let table = CandidatesTable::open();
-        let mut idx = table.get_index_by_election_votes_key();
+        let idx = table.get_index_by_election_votes_key();
 
         let winner = idx
             .range(
-                (election_id, 0, AccountNumber::default()),
-                (election_id + 1, 0, AccountNumber::default()),
+                (election_id, 0, AccountNumber::default())
+                    ..(election_id + 1, 0, AccountNumber::default()),
             )
             .next_back();
 
@@ -182,9 +184,9 @@ mod service {
         );
 
         let table = ElectionsTable::open();
-        let mut idx = table.get_index_pk();
+        let idx = table.get_index_pk();
 
-        let last_election = idx.next_back();
+        let last_election = idx.into_iter().last();
 
         let new_key = if let Some(last_election) = last_election {
             last_election.id + 1
@@ -526,6 +528,9 @@ mod tests {
         chain.new_account(account!("bob"))?;
         chain.new_account(account!("alice"))?;
         chain.new_account(account!("charles"))?;
+        chain.new_account(account!("bobby"))?;
+        chain.new_account(account!("alicey"))?;
+        chain.new_account(account!("charlesy"))?;
 
         println!("Starting election...");
         Wrapper::push(&chain).new(
@@ -535,6 +540,15 @@ mod tests {
         Wrapper::push_from(&chain, account!("bob")).register(1);
         Wrapper::push_from(&chain, account!("alice")).register(1);
         Wrapper::push_from(&chain, account!("charles")).register(1);
+
+        // Add another election just to check that the range operation is behaving properly
+        Wrapper::push(&chain).new(
+            TimePointSec { seconds: 1100 },
+            TimePointSec { seconds: 6100 },
+        );
+        Wrapper::push_from(&chain, account!("bobby")).register(2);
+        Wrapper::push_from(&chain, account!("alicey")).register(2);
+        Wrapper::push_from(&chain, account!("charlesy")).register(2);
 
         for i in 1..=20 {
             let voter = AccountNumber::from(format!("voter{i}").as_str());

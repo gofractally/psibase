@@ -1,4 +1,7 @@
-use std::marker::PhantomData;
+use std::{
+    marker::PhantomData,
+    ops::{Bound, RangeBounds},
+};
 
 use fracpack::PackableOwned;
 
@@ -195,10 +198,7 @@ pub trait TableWrapper<Record: TableRecord>: TableBase {
 pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub db_id: DbId,
     pub prefix: Vec<u8>,
-    front_key: Option<RawKey>,
-    back_key: Option<RawKey>,
-    is_secondary: bool,
-    is_end: bool,
+    pub is_secondary: bool,
     pub key_type: PhantomData<Key>,
     pub record_type: PhantomData<Record>,
 }
@@ -208,19 +208,14 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     fn new(db_id: DbId, prefix: Vec<u8>, is_secondary: bool) -> TableIndex<Key, Record> {
         TableIndex {
             db_id,
-            front_key: None, // RawKey::new(prefix.clone()),
-            back_key: None,
             prefix,
             is_secondary,
-            is_end: false,
             key_type: PhantomData,
             record_type: PhantomData,
         }
     }
 
     /// Get the table record for the given key, if any
-    ///
-    /// It does not affect the iterator
     pub fn get(&self, key: Key) -> Option<Record> {
         let mut key_bytes = self.prefix.clone();
         key.append_key(&mut key_bytes);
@@ -228,21 +223,77 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         kv_get_bytes(self.db_id, &key_bytes).and_then(|v| self.get_value_from_bytes(v))
     }
 
-    /// Set the range of available records for the iterator; useful for viewing a slice of the records
-    ///
-    /// - `from` is inclusive, `to` is not: [from..to)
-    /// - using this after the start of an iteration process (for..loops, next(), next_back() etc)
-    /// can mess the iteration sequence order, since it resets the front and the back cursors
-    pub fn range(&mut self, from: Key, to: Key) -> &mut Self {
+    /// Creates an iterator for visiting all the table key-values, in sorted order.
+    pub fn iter(&self) -> TableIter<'_, Key, Record> {
+        TableIter {
+            table_index: self,
+            front_key: None,
+            back_key: None,
+            is_end: false,
+        }
+    }
+
+    /// Constructs a double-ended iterator over a sub-range of elements in the table.
+    /// The simplest way is to use the range syntax `min..max`, thus `range(min..max)` will
+    /// yield elements from min (inclusive) to max (exclusive).
+    /// The range may also be entered as `(Bound<T>, Bound<T>)`, so for example
+    /// `range((Excluded(4), Included(10)))` will yield a left-exclusive, right-inclusive
+    /// range from 4 to 10.
+    pub fn range(&self, range: impl RangeBounds<Key>) -> TableIter<'_, Key, Record> {
         let mut front_key = self.prefix.clone();
-        from.append_key(&mut front_key);
-        self.front_key = Some(RawKey::new(front_key));
+        let front_key = match range.start_bound() {
+            Bound::Included(k) => {
+                println!("included fc");
+                k.append_key(&mut front_key);
+                Some(front_key)
+            }
+            Bound::Excluded(k) => {
+                println!("excluded fc");
+                k.append_key(&mut front_key);
+                front_key.push(0);
+                Some(front_key)
+            }
+            Bound::Unbounded => None,
+        }
+        .map(RawKey::new);
+        if front_key.is_some() {
+            println!("range2 fc: {}", to_hex(&front_key.as_ref().unwrap().data));
+        }
 
         let mut back_key = self.prefix.clone();
-        to.append_key(&mut back_key);
-        self.back_key = Some(RawKey::new(back_key));
+        let back_key = match range.end_bound() {
+            Bound::Included(k) => {
+                println!("excluded bc");
+                k.append_key(&mut back_key);
+                // since the kv_less_than is used, increment last byte to be included
+                let mut last_byte = back_key.pop().unwrap();
+                if last_byte == u8::MAX {
+                    back_key.push(last_byte);
+                    back_key.push(0);
+                } else {
+                    last_byte += 1;
+                    back_key.push(last_byte);
+                }
+                Some(back_key)
+            }
+            Bound::Excluded(k) => {
+                println!("excluded bc");
+                k.append_key(&mut back_key);
+                Some(back_key)
+            }
+            Bound::Unbounded => None,
+        }
+        .map(RawKey::new);
+        if back_key.is_some() {
+            println!("range2 bc: {}", to_hex(&back_key.as_ref().unwrap().data));
+        }
 
-        self
+        TableIter {
+            table_index: self,
+            front_key,
+            back_key,
+            is_end: false,
+        }
     }
 
     fn get_value_from_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
@@ -254,7 +305,23 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     }
 }
 
-impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
+impl<'a, Key: ToKey, Record: TableRecord> IntoIterator for &'a TableIndex<Key, Record> {
+    type Item = Record;
+    type IntoIter = TableIter<'a, Key, Record>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct TableIter<'a, Key: ToKey, Record: TableRecord> {
+    table_index: &'a TableIndex<Key, Record>,
+    front_key: Option<RawKey>,
+    back_key: Option<RawKey>,
+    is_end: bool,
+}
+
+impl<'a, Key: ToKey, Record: TableRecord> Iterator for TableIter<'a, Key, Record> {
     type Item = Record;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -267,8 +334,12 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
         let key = self
             .front_key
             .as_ref()
-            .map_or(&self.prefix[..], |k| &k.data[..]);
-        let value = kv_greater_equal_bytes(self.db_id, key, self.prefix.len() as u32);
+            .map_or(&self.table_index.prefix[..], |k| &k.data[..]);
+        let value = kv_greater_equal_bytes(
+            self.table_index.db_id,
+            key,
+            self.table_index.prefix.len() as u32,
+        );
 
         if let Some(value) = value {
             self.front_key = Some(RawKey::new(get_key_bytes()));
@@ -284,35 +355,65 @@ impl<Key: ToKey, Record: TableRecord> Iterator for TableIndex<Key, Record> {
 
             println!(">>> iterated and got key {:?}", self.front_key);
 
-            self.get_value_from_bytes(value)
+            self.table_index.get_value_from_bytes(value)
         } else {
             println!(">>> setting end of iterator!");
             self.is_end = true;
             None
         }
     }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
+    fn min(mut self) -> Option<Self::Item> {
+        self.next()
+    }
+
+    fn max(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
 }
 
-impl<Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIndex<Key, Record> {
+impl<'a, Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIter<'a, Key, Record> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.is_end {
             return None;
         }
 
         let value = if let Some(back_key) = &self.back_key {
-            kv_less_than_bytes(self.db_id, &back_key.data[..], self.prefix.len() as u32)
+            kv_less_than_bytes(
+                self.table_index.db_id,
+                &back_key.data[..],
+                self.table_index.prefix.len() as u32,
+            )
         } else {
-            kv_max_bytes(self.db_id, &self.prefix)
+            kv_max_bytes(self.table_index.db_id, &self.table_index.prefix)
         };
 
         if let Some(value) = value {
             self.back_key = Some(RawKey::new(get_key_bytes()));
+
+            if self.front_key.is_some() {
+                println!(
+                    "iterated from the back bc: {} fc: {}",
+                    to_hex(&self.back_key.as_ref().unwrap().data),
+                    to_hex(&self.front_key.as_ref().unwrap().data)
+                );
+            } else {
+                println!(
+                    "iterated from the back bc: {} NO FC",
+                    to_hex(&self.back_key.as_ref().unwrap().data)
+                );
+            }
+
             if self.back_key <= self.front_key {
                 println!(">>> back cursor met front cursor, it's the end");
                 self.is_end = true;
                 return None;
             }
-            self.get_value_from_bytes(value)
+            self.table_index.get_value_from_bytes(value)
         } else {
             println!(">>> setting end of iterator!");
             self.is_end = true;
