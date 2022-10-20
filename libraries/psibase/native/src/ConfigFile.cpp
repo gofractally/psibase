@@ -304,7 +304,61 @@ std::size_t ConfigFile::findSection(std::string_view section)
    }
 }
 
-//void ConfigFile::set(std::string_view key, std::span<std::string_view> values, std::string_view comment)
-//{
-// If existing values match
-//}
+void ConfigFile::set(std::string_view                             section,
+                     std::string_view                             key,
+                     const std::vector<std::string>&              values,
+                     std::function<std::string(std::string_view)> normalize,
+                     std::string_view                             comment)
+{
+   auto pos = keys.find(fullKey(section, key));
+   if (pos == keys.end())
+   {
+      // figure out where to insert the new key
+      std::string& line = insertions[findSection(section)];
+      if (!comment.empty())
+      {
+         line += comment;
+         line += '\n';
+      }
+      for (auto value : values)
+      {
+         line += editLine(key, value, "");
+      }
+   }
+   else
+   {
+      std::map<std::string, std::size_t> locations;
+      for (const auto* group : {&pos->second.enabled, &pos->second.disabled})
+      {
+         for (auto loc : *group)
+         {
+            auto [key, value, comment, enabled] = parseLine(lines[loc]);
+            locations.try_emplace(normalize(value), loc);
+         }
+      }
+
+      auto insertPoint = findSection(section);
+      for (auto value : values)
+      {
+         auto iter = locations.find(normalize(value));
+         if (iter == locations.end())
+         {
+            insertions[insertPoint] += editLine(key, value, "");
+         }
+         else
+         {
+            auto location                                   = iter->second;
+            auto [old_key, old_value, old_comment, enabled] = parseLine(lines[location]);
+            std::string& ins                                = insertions[location + 1];
+            ins = editLine(old_key, value, old_comment) + ins;
+            lines[location].clear();
+            insertPoint = location + 1;
+         }
+      }
+      // Finally, delete any values that were not overwritten
+      for (auto location : pos->second.enabled)
+      {
+         lines[location].clear();
+      }
+   }
+}

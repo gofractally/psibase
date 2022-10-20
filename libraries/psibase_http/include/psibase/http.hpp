@@ -3,6 +3,7 @@
 #include <boost/beast/core/tcp_stream.hpp>
 #include <boost/beast/websocket/stream_fwd.hpp>
 #include <chrono>
+#include <filesystem>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
 
@@ -73,6 +74,74 @@ namespace psibase::http
       stream.write(']');
    }
 
+   struct native_content
+   {
+      std::filesystem::path path;
+      std::string           content_type;
+      std::uintmax_t        size;
+   };
+   using services_t =
+       std::map<std::string, std::map<std::string, native_content, std::less<>>, std::less<>>;
+
+   // Identifies which services are allowed to access the native API
+   struct admin_none
+   {
+      std::string str() const { return ""; }
+   };
+   struct admin_any
+   {
+      std::string str() const { return "*"; }
+   };
+   struct admin_any_native
+   {
+      std::string str() const { return "static:*"; }
+   };
+   using admin_service = std::variant<admin_none, admin_any, admin_any_native, AccountNumber>;
+
+   inline admin_service admin_service_from_string(std::string_view s)
+   {
+      if (s == "")
+      {
+         return admin_none{};
+      }
+      else if (s == "*")
+      {
+         return admin_any{};
+      }
+      else if (s == "static:*")
+      {
+         return admin_any_native{};
+      }
+      else
+      {
+         return AccountNumber{s};
+      }
+   }
+
+   void from_json(admin_service& obj, auto& stream)
+   {
+      if (stream.get_null_pred())
+      {
+         obj = admin_none{};
+      }
+      else
+      {
+         obj = admin_service_from_string(stream.get_string());
+      }
+   }
+
+   void to_json(const admin_service& obj, auto& stream)
+   {
+      if (std::holds_alternative<admin_none>(obj))
+      {
+         stream.write("null", 4);
+      }
+      else
+      {
+         std::visit([&](const auto& value) { to_json(value.str(), stream); }, obj);
+      }
+   }
+
    struct http_config
    {
       uint32_t                  num_threads            = {};
@@ -91,7 +160,9 @@ namespace psibase::http
       connect_t                 disconnect             = {};
       get_config_t              get_config             = {};
       connect_t                 set_config             = {};
+      admin_service             admin                  = {};
       bool                      host_perf              = false;
+      services_t                services;
       std::atomic<bool>         enable_p2p;
       std::atomic<http_status>  status;
    };

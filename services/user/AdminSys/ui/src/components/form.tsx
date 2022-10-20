@@ -231,6 +231,23 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
     }
 );
 
+export interface RadioProps extends HTMLProps<HTMLInputElement> {
+    disabled?: boolean;
+    label?: string;
+}
+
+export const Radio = forwardRef<HTMLInputElement, RadioProps>((props, ref) => {
+    return (
+        <label
+            htmlFor={props.id}
+            className="flex place-items-center gap-4 bg-gray-100 p-3 font-medium text-gray-700"
+        >
+            <input type="radio" ref={ref} {...props} />
+            <div className="flex-1">{props.label}</div>
+        </label>
+    );
+});
+
 export interface LabeledSetProps {
     htmlFor: string;
     label: string;
@@ -268,6 +285,7 @@ export const Form = {
     LabeledSet,
     FileInput,
     Checkbox,
+    Radio,
 };
 
 export default Form;

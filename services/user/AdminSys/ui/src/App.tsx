@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm, SubmitHandler } from "react-hook-form";
+import { useFieldArray, useForm, SubmitHandler } from "react-hook-form";
 import "./App.css";
 import {
     initializeApplet,
@@ -11,7 +11,7 @@ import {
     setOperations,
 } from "common/rpc.mjs";
 import { wait } from "./helpers";
-import { Button, Form } from "./components";
+import { Button, Form, Service } from "./components";
 
 type Peer = {
     id: number;
@@ -55,11 +55,20 @@ function websocketURL(path: string) {
     return result;
 }
 
+type ServiceConfig = {
+    host: string;
+    root: string;
+    // auto-generated
+    key: string;
+};
+
 type PsinodeConfig = {
     p2p: boolean;
     producer: string;
     host: string;
     port: number;
+    services: ServiceConfig[];
+    admin: string;
 };
 
 async function putJson(url: string, json: any) {
@@ -110,6 +119,181 @@ function pollJson<R>(
             }
         },
     ];
+}
+
+type DiffItem<T> = {
+    modified: boolean;
+    value?: T;
+    insertions: T[];
+};
+
+function diff<T>(
+    base: T[],
+    value: T[],
+    cmp: (a: T, b: T) => boolean | "samekey"
+): DiffItem<T>[] {
+    type RowKind = "root" | "insert" | "delete" | "keep" | "modify";
+    type EDiffRow = {
+        quality: number;
+        kind: RowKind;
+    };
+    let data: EDiffRow[][] = [];
+    const cell = (i: number, j: number): EDiffRow => {
+        if (i < 0 && j < 0) {
+            return { quality: 0, kind: "root" };
+        } else if (i < 0) {
+            return { quality: j + 1, kind: "insert" };
+        } else if (j < 0) {
+            return { quality: i + 1, kind: "delete" };
+        } else {
+            return data[i][j];
+        }
+    };
+    const update = (
+        current: EDiffRow | undefined,
+        prev: EDiffRow,
+        kind: RowKind
+    ) => {
+        if (current === undefined || prev.quality < current.quality) {
+            return {
+                quality: prev.quality + (kind == "keep" ? 0 : 1),
+                kind: kind,
+            };
+        } else {
+            return current;
+        }
+    };
+
+    for (const [i, ival] of base.entries()) {
+        data[i] = Array(value.length);
+        for (const [j, jval] of value.entries()) {
+            const res = cmp(ival, jval);
+            let current: EDiffRow | undefined = undefined;
+            if (res == true || res == "samekey") {
+                current = update(
+                    current,
+                    cell(i - 1, j - 1),
+                    res === true ? "keep" : "modify"
+                );
+            }
+            current = update(current, cell(i - 1, j), "delete");
+            current = update(current, cell(i, j - 1), "insert");
+            data[i][j] = current;
+        }
+    }
+
+    let result = Array<DiffItem<T>>(base.length + 1);
+    let i = base.length - 1;
+    let j = value.length - 1;
+    while (true) {
+        const { kind } = cell(i, j);
+        if (result[i + 1] === undefined) {
+            result[i + 1] = { modified: false, value: base[i], insertions: [] };
+        }
+        if (kind == "root") {
+            console.log(base);
+            console.log(value);
+            console.log(data);
+            console.log(result);
+            return result;
+        } else if (kind == "insert") {
+            result[i + 1].insertions = [value[j], ...result[i + 1].insertions];
+            j = j - 1;
+        } else if (kind == "delete") {
+            result[i + 1].modified = true;
+            result[i + 1].value = undefined;
+            i = i - 1;
+        } else if (kind == "keep") {
+            result[i + 1].modified = false;
+            result[i + 1].value = base[i];
+            i = i - 1;
+            j = j - 1;
+        } else if (kind == "modify") {
+            result[i + 1].modified = true;
+            result[i + 1].value = value[j];
+            i = i - 1;
+            j = j - 1;
+        }
+    }
+    return result;
+}
+
+function mergeDiff<T>(
+    diff1: DiffItem<T>[],
+    diff2: DiffItem<T>[]
+): DiffItem<T>[] {
+    return diff1.map((v1, idx) => {
+        const v2 = diff2[idx];
+        return {
+            modified: v1.modified || v2.modified,
+            value: v1.modified ? v1.value : v2.value,
+            insertions: [...v1.insertions, ...v2.insertions],
+        };
+    });
+}
+
+function idiff<T>(diff: DiffItem<T>[]): T[] {
+    let result: T[] = [];
+    for (const item of diff) {
+        if (item.value) {
+            result = [...result, item.value];
+        }
+        result = [...result, ...item.insertions];
+    }
+    return result;
+}
+
+function mergeList<T>(
+    prev: T[],
+    updated: T[],
+    user: T[],
+    cmp: (a: T, b: T) => boolean | "samekey"
+): T[] {
+    return idiff(mergeDiff(diff(prev, updated, cmp), diff(prev, user, cmp)));
+}
+
+function compareService(
+    a: ServiceConfig,
+    b: ServiceConfig
+): boolean | "samekey" {
+    if (a.host == b.host && a.root == b.root) {
+        return true;
+    } else if (a.host == b.host) {
+        return "samekey";
+    } else {
+        return false;
+    }
+}
+
+function mergeSimple<T>(prev: T, updated: T, user: T): T {
+    return prev == updated ? user : updated;
+}
+
+let nextId = 1;
+function newId(): string {
+    return (nextId++).toString();
+}
+
+// On conflict, updated overrides user
+function mergeConfig(
+    prev: PsinodeConfig,
+    updated: PsinodeConfig,
+    user: PsinodeConfig
+): PsinodeConfig {
+    return {
+        ...updated,
+        p2p: mergeSimple(prev.p2p, updated.p2p, user.p2p),
+        producer: mergeSimple(prev.producer, updated.producer, user.producer),
+        host: mergeSimple(prev.host, updated.host, user.host),
+        port: mergeSimple(prev.port, updated.port, user.port),
+        services: mergeList(
+            prev.services,
+            updated.services,
+            user.services,
+            compareService
+        ),
+        admin: mergeSimple(prev.admin, updated.admin, user.admin),
+    };
 }
 
 function App() {
@@ -218,13 +402,24 @@ function App() {
         defaultValues: {
             p2p: false,
             producer: "",
+            host: "",
+            port: 0,
+            services: [],
+            admin: "",
         },
     });
     configForm.formState.dirtyFields;
     const onConfig = async (input: PsinodeConfig) => {
         try {
             setConfigPutError(undefined);
-            const result = await putJson("/native/admin/config", input);
+            const result = await putJson("/native/admin/config", {
+                ...input,
+                services: input.services.map((s) => ({
+                    host: s.host,
+                    root: s.root,
+                })),
+                admin: input.admin != "" ? input.admin : null,
+            });
             if (result.ok) {
                 configForm.reset(input);
             } else {
@@ -245,12 +440,31 @@ function App() {
             (async () => {
                 try {
                     let result = await getJson("/native/admin/config");
-                    configForm.reset(result, { keepDirtyValues: true });
+                    const oldDefaults = configForm.formState
+                        .defaultValues as PsinodeConfig;
+                    result.services = result.services.map((s: any) => {
+                        const old = oldDefaults.services.find(
+                            (item) => item.host == s.host && item.root == s.root
+                        );
+                        return { key: old ? old.key : newId(), ...s };
+                    });
+                    result.admin = result.admin ? result.admin : "";
+                    let newState = mergeConfig(
+                        oldDefaults,
+                        result,
+                        configForm.getValues()
+                    );
+                    configForm.reset(result, {
+                        keepDirty: true,
+                        keepValues: true,
+                    });
+                    configForm.reset(newState, { keepDefaultValues: true });
                     setConfigError(undefined);
                     setConfigTimeout(
                         setTimeout(() => setConfigTimeout(undefined), 3000)
                     );
                 } catch (e) {
+                    console.error(e);
                     setConfigError("Failed to load /native/admin/config");
                     setConfigTimeout(
                         setTimeout(() => setConfigTimeout(undefined), 10000)
@@ -259,6 +473,11 @@ function App() {
             })();
         }
     }, [configTimeout]);
+
+    const services = useFieldArray({
+        control: configForm.control,
+        name: "services",
+    });
 
     const [status, statusError, fetchStatus] = pollJson<string[]>(
         "/native/admin/status"
@@ -358,6 +577,34 @@ function App() {
                     max="65535"
                     {...configForm.register("port")}
                 />
+                {services.fields.map((field, index) => (
+                    <Service
+                        key={field.key}
+                        register={(name) =>
+                            configForm.register(`services.${name}`)
+                        }
+                        index={index}
+                        services={services}
+                    />
+                ))}
+                <fieldset>
+                    <legend>Access to admin API (Requires restart)</legend>
+                    <Form.Radio
+                        {...configForm.register("admin")}
+                        value="static:*"
+                        label="Builtin services only (recommended)"
+                    />
+                    <Form.Radio
+                        {...configForm.register("admin")}
+                        value="*"
+                        label="All services (not recommended)"
+                    />
+                    <Form.Radio
+                        {...configForm.register("admin")}
+                        value=""
+                        label="Disabled"
+                    />
+                </fieldset>
                 <Button isSubmit disabled={!configForm.formState.isDirty}>
                     Save Changes
                 </Button>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <iosfwd>
 #include <map>
 #include <string>
@@ -24,6 +25,14 @@ namespace psibase
                std::string_view key,
                std::string_view value,
                std::string_view comment);
+      // Sets a multi-value property
+      // The normalize function is used to determine whether two property values
+      // are equivalent.
+      void set(std::string_view                             section,
+               std::string_view                             key,
+               const std::vector<std::string>&              values,
+               std::function<std::string(std::string_view)> normalize,
+               std::string_view                             comment);
       // Preserves the existing values of the key.  This can be used
       // for properties that should not be modified using the HTTP API.
       void keep(std::string_view section, std::string_view key);

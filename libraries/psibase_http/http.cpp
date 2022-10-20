@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -171,6 +172,57 @@ namespace psibase::http
          return origin.substr(pos + 3);
       }
       return origin;
+   }
+
+   beast::string_view deport(beast::string_view host)
+   {
+      if (auto pos = host.rfind(':'); pos != std::string::npos)
+      {
+         if (host.find(']', pos) == std::string::npos)
+         {
+            return host.substr(0, pos);
+         }
+      }
+      return host;
+   }
+
+   bool is_admin(admin_none, const http_config&, beast::string_view)
+   {
+      return false;
+   }
+
+   bool is_admin(admin_any, const http_config&, beast::string_view)
+   {
+      return true;
+   }
+
+   bool is_admin(admin_any_native, const http_config& cfg, beast::string_view host)
+   {
+      return cfg.services.find(host) != cfg.services.end();
+   }
+
+   bool is_admin(AccountNumber admin, const http_config& cfg, beast::string_view host)
+   {
+      if (host.size() > cfg.host.size() && host.ends_with(cfg.host) &&
+          host[host.size() - cfg.host.size() - 1] == '.')
+      {
+         return admin.str() == host.substr(0, host.size() - cfg.host.size() - 1);
+      }
+      else
+      {
+         return false;
+      }
+   }
+
+   bool is_admin(const http_config& cfg, beast::string_view host)
+   {
+      return std::visit([&](const auto& admin) { return is_admin(admin, cfg, host); }, cfg.admin);
+   }
+
+   template <class Body, class Allocator>
+   bool is_admin(const http_config& cfg, bhttp::request<Body, bhttp::basic_fields<Allocator>>& req)
+   {
+      return is_admin(cfg, deport(req.at(bhttp::field::host)));
    }
 
    // This function produces an HTTP response for the given
@@ -330,13 +382,42 @@ namespace psibase::http
 
       try
       {
-         auto host  = req.at("Host");
-         auto colon = host.find(':');
-         if (colon != host.npos)
-            host.remove_suffix(host.size() - colon);
+         auto host = deport(req.at(bhttp::field::host));
 
          if (!req.target().starts_with("/native"))
          {
+            if (auto iter = server.http_config->services.find(host);
+                iter != server.http_config->services.end())
+            {
+               auto file = iter->second.find(req.target());
+               if (file != iter->second.end())
+               {
+                  if (req.method() == bhttp::verb::options)
+                  {
+                     return send(ok_no_content());
+                  }
+                  else if (req.method() != bhttp::verb::get)
+                  {
+                     return send(
+                         method_not_allowed(req.target(), req.method_string(), "GET, OPTIONS"));
+                  }
+
+                  std::vector<char> contents;
+                  // read file
+                  std::ifstream in(file->second.path, std::ios_base::binary);
+                  contents.resize(file->second.size);
+                  in.read(contents.data(), contents.size());
+                  return send(ok(std::move(contents), file->second.content_type.c_str()));
+               }
+               else
+               {
+                  return send(not_found(req.target()));
+               }
+            }
+
+            if (server.http_config->host.empty())
+               return send(not_found(req.target()));
+
             if (req.method() == bhttp::verb::options)
             {
                return send(ok_no_content());
@@ -407,6 +488,9 @@ namespace psibase::http
          }  // !native
          else if (req.target() == "/native/push_boot" && server.http_config->push_boot_async)
          {
+            if (server.http_config->host.empty())
+               return send(not_found(req.target()));
+
             if (req.method() != bhttp::verb::post)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "POST"));
@@ -462,6 +546,9 @@ namespace psibase::http
          else if (req.target() == "/native/push_transaction" &&
                   server.http_config->push_transaction_async)
          {
+            if (server.http_config->host.empty())
+               return send(not_found(req.target()));
+
             if (req.method() != bhttp::verb::post)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "POST"));
@@ -527,6 +614,9 @@ namespace psibase::http
          else if (req.target() == "/native/p2p" && websocket::is_upgrade(req) &&
                   server.http_config->accept_p2p_websocket && server.http_config->enable_p2p)
          {
+            if (server.http_config->host.empty())
+               return send(not_found(req.target()));
+
             if (forbid_cross_origin())
                return;
             // Stop reading HTTP requests
@@ -536,6 +626,10 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/status")
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() == bhttp::verb::get)
             {
                auto status = server.http_config->status.load();
@@ -552,6 +646,10 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/peers" && server.http_config->get_peers)
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::get)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "GET"));
@@ -579,9 +677,13 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/connect" && server.http_config->connect)
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::post)
             {
-               send(method_not_allowed(req.target(), req.method_string(), "POST"));
+               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
             }
 
             if (req[bhttp::field::content_type] != "application/json")
@@ -619,9 +721,13 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/disconnect" && server.http_config->disconnect)
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::post)
             {
-               send(method_not_allowed(req.target(), req.method_string(), "POST"));
+               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
             }
 
             if (req[bhttp::field::content_type] != "application/json")
@@ -659,6 +765,8 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/log" && websocket::is_upgrade(req))
          {
+            if (!is_admin(*server.http_config, req))
+               return send(not_found(req.target()));
             if (forbid_cross_origin())
                return;
             send.pause_read = true;
@@ -673,6 +781,10 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/config")
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() == bhttp::verb::get)
             {
                run_native_handler(server.http_config->get_config,
