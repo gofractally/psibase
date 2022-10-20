@@ -1,10 +1,12 @@
-# Background
+# Events
+
+## Background
 
 Blockchain applications should aim to provide a user experience that exceeds those available in traditional centralized applications. To accomplish this goal, application user-interfaces must be able to easily retrieve information about blockchain services.
 
 A vital component of the solution in Psibase blockchains is the event system. If you're an application developer, it's worth taking time to understand it deeply.
 
-# Events - What are they?
+## What are Psibase events?
 
 Events are objects that are stored in a database on the blockchain node. Crucially, these event objects are not stored in blockchain state, and are therefore only kept around for a limited time, configurable by the blockchain node itself.
 
@@ -32,7 +34,7 @@ On the front-end, the applet is simply responsible for:
 2. Displaying relevant events
 3. Subscribing to events
 
-## When are events consumed by a front-end?
+### When are events consumed by a front-end?
 
 The primary reason that events are consumed on the front-end is to view historical chain activity related to a particular blockchain service. There is another use-case that aids in bridging multiple Psibase blockchains through inter-blockchain communication, but that use-case is outside the scope of this document.
 
@@ -40,7 +42,7 @@ A wallet application may want to display a historical view of all past transfers
 
 Keep in mind, some nodes may have smaller storage capacity, and may therefore be configured to "forget" past events beyond a particular time horizon. Therefore if you need to guarantee access to historical events to a specific time window, the safest way to accomplish this would be to configure and run your own full node. On the other hand, if your application simply needs to display the current state of a blockchain service, it may not be necessary to use the event system at all.
 
-# Emitting event chains
+## Emitting event chains
 
 One challenge with an event system is in maintaining lookup efficiency. To show a list of historical token transactions, it would be inefficient to search through the entire event list to find the relevant events. Rather, Psibase provides a mechanism to aid in the construction of manual indices to drastically improve lookup efficiency.
 
@@ -48,7 +50,7 @@ Whenever an event is emitted from a service, a unique event ID is returned to th
 
 <br/>
 
-**Event Log**
+### Event Log example
 
 | ID  | prevEvent | other | event | data |
 | --- | --------- | ----- | ----- | ---- |
@@ -60,11 +62,8 @@ Whenever an event is emitted from a service, a unique event ID is returned to th
 | 6   | 0         | ...   | ...   | ...  |
 | 7   | `4`       | ...   | ...   | ...  |
 
-```
-eventHead = 7
-
-event chain = 7, 4, 2
-```
+- event head = 7
+- event chain = 7, 4, 2
 
 <br/>
 
@@ -129,7 +128,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
 Notice that the transferred event is emitted twice, in order to generate the event for the sender's "UserEvents" index, and another event for the receiver's "UserEvents" index. As you will see, Psibase has mechanisms for efficiently querying event chains created in this way, for the small price of storing only one extra field (per desired index) in blockchain state.
 
-# Providing GraphQL access to event chains
+## Providing GraphQL access to event chains
 
 In Psibase, it is very simple to provide GraphQL access to any event chain. In the below example, you can see how the Token RPC Service exposes an index of all events (via the `events` query), and an index on just the "Holder Events" (via the `userEvents` query):
 
@@ -221,91 +220,91 @@ Which, when submitted to a full-node, returns the Holder Events index as expecte
 <details>
   <summary>Reveal</summary>
 
-```
-  {
-      "data": {
-          "userEvents": {
-              "pageInfo": {
-                  "hasNextPage": false,
-                  "endCursor": "10"
-              },
-              "edges": [
-                  {
-                      "node": {
-                          "event_id": "15",
-                          "event_type": "transferred",
-                          "tokenId": 1,
-                          "prevEvent": "14",
-                          "time": "2022-09-21T22:05:56.000Z",
-                          "sender": "alice",
-                          "receiver": "bob",
-                          "amount": {
-                              "value": "1200000000"
-                          },
-                          "memo": {
-                              "contents": "Working"
-                          }
-                      }
-                  },
-                  {
-                      "node": {
-                          "event_id": "14",
-                          "event_type": "transferred",
-                          "tokenId": 1,
-                          "prevEvent": "10",
-                          "time": "2022-09-19T21:08:49.000Z",
-                          "sender": "bob",
-                          "receiver": "alice",
-                          "amount": {
-                              "value": "1000000000"
-                          },
-                          "memo": {
-                              "contents": "Working"
-                          }
-                      }
-                  },
-                  {
-                      "node": {
-                          "event_id": "10",
-                          "event_type": "transferred",
-                          "tokenId": 1,
-                          "prevEvent": "0",
-                          "time": "2022-09-19T16:15:21.000Z",
-                          "sender": "symbol-sys",
-                          "receiver": "alice",
-                          "amount": {
-                              "value": "100000000000"
-                          },
-                          "memo": {
-                              "contents": "memo"
-                          }
-                      }
-                  }
-              ]
+```json
+{
+  "data": {
+    "userEvents": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "10"
+      },
+      "edges": [
+        {
+          "node": {
+            "event_id": "15",
+            "event_type": "transferred",
+            "tokenId": 1,
+            "prevEvent": "14",
+            "time": "2022-09-21T22:05:56.000Z",
+            "sender": "alice",
+            "receiver": "bob",
+            "amount": {
+              "value": "1200000000"
+            },
+            "memo": {
+              "contents": "Working"
+            }
           }
-      }
+        },
+        {
+          "node": {
+            "event_id": "14",
+            "event_type": "transferred",
+            "tokenId": 1,
+            "prevEvent": "10",
+            "time": "2022-09-19T21:08:49.000Z",
+            "sender": "bob",
+            "receiver": "alice",
+            "amount": {
+              "value": "1000000000"
+            },
+            "memo": {
+              "contents": "Working"
+            }
+          }
+        },
+        {
+          "node": {
+            "event_id": "10",
+            "event_type": "transferred",
+            "tokenId": 1,
+            "prevEvent": "0",
+            "time": "2022-09-19T16:15:21.000Z",
+            "sender": "symbol-sys",
+            "receiver": "alice",
+            "amount": {
+              "value": "100000000000"
+            },
+            "memo": {
+              "contents": "memo"
+            }
+          }
+        }
+      ]
+    }
   }
+}
 ```
 
 </details>
 
 <br>
 
-# Event types
+## Event types
 
 All emitted events are either History events or Merkle events. These two different event types are used for two separate use-cases, and using the wrong type may cause excessive billing to the Service developer.
 
-## History events (Long-term events)
+### History events (Long-term events)
 
 The most common type of event is the history event. History events are emitted and stored to allow for the efficient historical event queries previously described. These events are more expensive to emit than UI events, because they are stored longer.
 
-## Merkle events (Inter-blockchain communication events)
+### Merkle events (Inter-blockchain communication events)
 
 If you need a particular events to be provable on another Psibase chains, you would emit a Merkle event. Emitting a merkle event will ensure that the event is included in a merkle proof for that block, which could be used to prove that an event happened to another psibase blockchain.
 
 If an events shouldn't need to be verified on another chain, then a merkle event need not be emitted.
 
-# Conclusion
+## Conclusion
 
 In Psibase, the philosophy is that "transactions" or "groups of actions" should not be user-facing. Unlike other blockchains that provide users transaction IDs (txids) for each blockchain interaction, Psibase provides Event IDs. Proof of any event can then be established by providing someone a link to a query that returns the event.
 
