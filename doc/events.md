@@ -1,12 +1,12 @@
 # Background
 
-Blockchain applications should aim to provide a user experience that exceeds those available in traditional centralized applications. To accomplish this goal, application user-interfaces must be able to easily retrieve information about blockchain services. 
+Blockchain applications should aim to provide a user experience that exceeds those available in traditional centralized applications. To accomplish this goal, application user-interfaces must be able to easily retrieve information about blockchain services.
 
 A vital component of the solution in Psibase blockchains is the event system. If you're an application developer, it's worth taking time to understand it deeply.
 
 # Events - What are they?
 
-Events are objects that are stored in a database on the blockchain node. Crucially, these event objects are not stored in blockchain state, and are therefore only kept around for a limited time, configurable by the blockchain node itself. 
+Events are objects that are stored in a database on the blockchain node. Crucially, these event objects are not stored in blockchain state, and are therefore only kept around for a limited time, configurable by the blockchain node itself.
 
 ```mermaid
     C4Context
@@ -27,6 +27,7 @@ To use the event system requires some development on both the blockchain service
 3. Exposing access to these events through RPC queries
 
 On the front-end, the applet is simply responsible for:
+
 1. Reading events history exposed by the service
 2. Displaying relevant events
 3. Subscribing to events
@@ -49,15 +50,15 @@ Whenever an event is emitted from a service, a unique event ID is returned to th
 
 **Event Log**
 
-|ID   |prevEvent | other | event | data |
-|-----|----------|-------|-------|------|
-| 1   |  0       | ...   | ...   | ...  |
-| `2` |  0       | ...   | ...   | ...  |
-| 3   |  0       | ...   | ...   | ...  |
-| `4` |  `2`     | ...   | ...   | ...  |
-| 5   |  1       | ...   | ...   | ...  |
-| 6   |  0       | ...   | ...   | ...  |
-| 7   |  `4`     | ...   | ...   | ...  |
+| ID  | prevEvent | other | event | data |
+| --- | --------- | ----- | ----- | ---- |
+| 1   | 0         | ...   | ...   | ...  |
+| `2` | 0         | ...   | ...   | ...  |
+| 3   | 0         | ...   | ...   | ...  |
+| `4` | `2`       | ...   | ...   | ...  |
+| 5   | 1         | ...   | ...   | ...  |
+| 6   | 0         | ...   | ...   | ...  |
+| 7   | `4`       | ...   | ...   | ...  |
 
 ```
 eventHead = 7
@@ -67,36 +68,36 @@ event chain = 7, 4, 2
 
 <br/>
 
-
 For example, in the Token Service, a `Transferred` event is defined, and is included in an index of events called `UserEvents`:
 
 <details>
   <summary>Reveal code</summary>
 
-  ```cpp
-    struct Events
-    {
-        struct History
-        {
-            // Define the transferred event
-            void transferred(TID tokenId, uint64_t prevEvent, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, StringView memo) {}
-        };
-    };
+```cpp
+  struct Events
+  {
+      struct History
+      {
+          // Define the transferred event
+          void transferred(TID tokenId, uint64_t prevEvent, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, StringView memo) {}
+      };
+  };
 
-    // Specify the details needed to create an index of events.
-    using UserEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, "prevEvent">;
+  // Specify the details needed to create an index of events.
+  using UserEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, "prevEvent">;
 
-    // Reflect the events
-    PSIBASE_REFLECT_EVENTS(TokenSys)
-    PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys,
-        method(transferred, tokenId, prevEvent, time, sender, receiver, amount, memo)
-    );
-  ```
+  // Reflect the events
+  PSIBASE_REFLECT_EVENTS(TokenSys)
+  PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys,
+      method(transferred, tokenId, prevEvent, time, sender, receiver, amount, memo)
+  );
+```
+
 </details>
 
 <br>
 
-The definition of `UserEvents` indicates that the head event ID (most recently emitted event related to a Token Holder) is stored in the `lastHistoryEvent` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`. 
+The definition of `UserEvents` indicates that the head event ID (most recently emitted event related to a Token Holder) is stored in the `lastHistoryEvent` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`.
 
 Notice that when the transferred event gets emitted by the Token service, the ID of the previous transferred event is included (via the `prevEvent` field) in the new event, and the event ID of the new event is saved to state (in the `lastHistoryEvent` field of the sender's `TokenHolderRecord`):
 
@@ -107,9 +108,9 @@ Notice that when the transferred event gets emitted by the Token service, the ID
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
 {
     // ...
-    
+
     auto senderHolder             = getTokenHolder(sender);
-    senderHolder.lastHistoryEvent = emit().history().transferred( 
+    senderHolder.lastHistoryEvent = emit().history().transferred(
         tokenId, senderHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
     db.open<TokenHolderTable>().put(senderHolder);
 
@@ -121,6 +122,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
     // ...
 }
 ```
+
 </details>
 
 <br>
@@ -134,36 +136,37 @@ In Psibase, it is very simple to provide GraphQL access to any event chain. In t
 <details>
   <summary>Reveal code</summary>
 
-  ```cpp
-    // Create a QueryableService object using TokenSys service details
-    auto tokenSys = QueryableService<TokenSys::Tables, TokenSys::Events>{TokenSys::service};
+```cpp
+  // Create a QueryableService object using TokenSys service details
+  auto tokenSys = QueryableService<TokenSys::Tables, TokenSys::Events>{TokenSys::service};
 
-    // Construct and reflect the query object
-    struct TokenQuery
-    {
-        auto events() const
-        {
-            return tokenSys.allEvents();
-        }
-        auto userEvents(AccountNumber holder, optional<uint32_t> first, const optional<string>& after) const
-        {
-            return tokenSys.eventIndex<TokenSys::UserEvents>(holder, first, after);
-        }
-    };
-    PSIO_REFLECT(TokenQuery, 
-        method(events), 
-        method(userEvents, holder, first, after)
-    )
+  // Construct and reflect the query object
+  struct TokenQuery
+  {
+      auto events() const
+      {
+          return tokenSys.allEvents();
+      }
+      auto userEvents(AccountNumber holder, optional<uint32_t> first, const optional<string>& after) const
+      {
+          return tokenSys.eventIndex<TokenSys::UserEvents>(holder, first, after);
+      }
+  };
+  PSIO_REFLECT(TokenQuery,
+      method(events),
+      method(userEvents, holder, first, after)
+  )
 
-    // Expose the defined queries over a GraphQL interface
-    optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
-    {
-        if (auto result = serveGraphQL(request, TokenQuery{}))
-            return result;
+  // Expose the defined queries over a GraphQL interface
+  optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
+  {
+      if (auto result = serveGraphQL(request, TokenQuery{}))
+          return result;
 
-        return nullopt;
-    }
-  ```
+      return nullopt;
+  }
+```
+
 </details>
 
 <br>
@@ -173,14 +176,15 @@ Once the above Service and RPC Service are deployed, a front-end developer may a
 <details>
   <summary>Reveal</summary>
 
-  ```
-    ...
-    type Query {
-        events: TokenSys_Events!
-        userEvents(holder: String! first: Float after: String): TokenSys_EventsHistoryConnection!
-    }
+```
+  ...
+  type Query {
+      events: TokenSys_Events!
+      userEvents(holder: String! first: Float after: String): TokenSys_EventsHistoryConnection!
+  }
 
-  ```
+```
+
 </details>
 
 <br>
@@ -190,23 +194,24 @@ A query for the Holder Events index can be easily constructed by following that 
 <details>
   <summary>Reveal</summary>
 
-  ```
-    query {
-    userEvents(holder: "alice") {
-        pageInfo {
-            hasNextPage
-            endCursor
-        }
-        edges {
-            node {
-                event_id
-                event_type
-                event_all_content
-            }
-        }
-    }
+```
+  query {
+  userEvents(holder: "alice") {
+      pageInfo {
+          hasNextPage
+          endCursor
+      }
+      edges {
+          node {
+              event_id
+              event_type
+              event_all_content
+          }
+      }
+  }
 }
-  ```
+```
+
 </details>
 
 <br>
@@ -216,71 +221,72 @@ Which, when submitted to a full-node, returns the Holder Events index as expecte
 <details>
   <summary>Reveal</summary>
 
-  ```
-    {
-        "data": {
-            "userEvents": {
-                "pageInfo": {
-                    "hasNextPage": false,
-                    "endCursor": "10"
-                },
-                "edges": [
-                    {
-                        "node": {
-                            "event_id": "15",
-                            "event_type": "transferred",
-                            "tokenId": 1,
-                            "prevEvent": "14",
-                            "time": "2022-09-21T22:05:56.000Z",
-                            "sender": "alice",
-                            "receiver": "bob",
-                            "amount": {
-                                "value": "1200000000"
-                            },
-                            "memo": {
-                                "contents": "Working"
-                            }
-                        }
-                    },
-                    {
-                        "node": {
-                            "event_id": "14",
-                            "event_type": "transferred",
-                            "tokenId": 1,
-                            "prevEvent": "10",
-                            "time": "2022-09-19T21:08:49.000Z",
-                            "sender": "bob",
-                            "receiver": "alice",
-                            "amount": {
-                                "value": "1000000000"
-                            },
-                            "memo": {
-                                "contents": "Working"
-                            }
-                        }
-                    },
-                    {
-                        "node": {
-                            "event_id": "10",
-                            "event_type": "transferred",
-                            "tokenId": 1,
-                            "prevEvent": "0",
-                            "time": "2022-09-19T16:15:21.000Z",
-                            "sender": "symbol-sys",
-                            "receiver": "alice",
-                            "amount": {
-                                "value": "100000000000"
-                            },
-                            "memo": {
-                                "contents": "memo"
-                            }
-                        }
-                    }
-                ]
-            }
-        }
-    }
-  ```
+```
+  {
+      "data": {
+          "userEvents": {
+              "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "10"
+              },
+              "edges": [
+                  {
+                      "node": {
+                          "event_id": "15",
+                          "event_type": "transferred",
+                          "tokenId": 1,
+                          "prevEvent": "14",
+                          "time": "2022-09-21T22:05:56.000Z",
+                          "sender": "alice",
+                          "receiver": "bob",
+                          "amount": {
+                              "value": "1200000000"
+                          },
+                          "memo": {
+                              "contents": "Working"
+                          }
+                      }
+                  },
+                  {
+                      "node": {
+                          "event_id": "14",
+                          "event_type": "transferred",
+                          "tokenId": 1,
+                          "prevEvent": "10",
+                          "time": "2022-09-19T21:08:49.000Z",
+                          "sender": "bob",
+                          "receiver": "alice",
+                          "amount": {
+                              "value": "1000000000"
+                          },
+                          "memo": {
+                              "contents": "Working"
+                          }
+                      }
+                  },
+                  {
+                      "node": {
+                          "event_id": "10",
+                          "event_type": "transferred",
+                          "tokenId": 1,
+                          "prevEvent": "0",
+                          "time": "2022-09-19T16:15:21.000Z",
+                          "sender": "symbol-sys",
+                          "receiver": "alice",
+                          "amount": {
+                              "value": "100000000000"
+                          },
+                          "memo": {
+                              "contents": "memo"
+                          }
+                      }
+                  }
+              ]
+          }
+      }
+  }
+```
+
 </details>
 
 <br>
@@ -297,7 +303,7 @@ The most common type of event is the history event. History events are emitted a
 
 If you need a particular events to be provable on another Psibase chains, you would emit a Merkle event. Emitting a merkle event will ensure that the event is included in a merkle proof for that block, which could be used to prove that an event happened to another psibase blockchain.
 
-If an events shouldn't need to be verified on another chain, then a merkle event need not be emitted. 
+If an events shouldn't need to be verified on another chain, then a merkle event need not be emitted.
 
 # Conclusion
 
