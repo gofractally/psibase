@@ -7,14 +7,14 @@ table.service-table {
     @apply w-full
 }
 
-table.service-table thead tr th:nth-child(1) {
+table.service-table th:nth-child(1) {
     width: 20%
 }
 
-table.service-table thead tr th:nth-child(2) {
+table.service-table th:nth-child(2) {
     width: 80%
 }
 
-tr.service-control td input {
+table.service-table input {
     @apply w-full border bg-white px-3 py-2 text-base text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500
 }

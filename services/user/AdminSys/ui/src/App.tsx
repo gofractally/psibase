@@ -11,7 +11,7 @@ import {
     setOperations,
 } from "common/rpc.mjs";
 import { wait } from "./helpers";
-import { Button, Form, Service } from "./components";
+import { Button, Form, Service, Logger } from "./components";
 
 type Peer = {
     id: number;
@@ -55,6 +55,14 @@ function websocketURL(path: string) {
     return result;
 }
 
+type LogConfig = {
+    type: string;
+    filter: string;
+    format: string;
+    filename?: string;
+    target?: string;
+};
+
 type ServiceConfig = {
     host: string;
     root: string;
@@ -69,6 +77,7 @@ type PsinodeConfig = {
     port: number;
     services: ServiceConfig[];
     admin: string;
+    loggers: { [index: string]: LogConfig };
 };
 
 async function putJson(url: string, json: any) {
@@ -192,6 +201,33 @@ function mergeServices(
     return leading.concat(...result);
 }
 
+function mergeLogger(prev: LogConfig, updated: LogConfig, user: LogConfig) {
+    // TODO:
+    return user;
+}
+
+function mergeLoggers(
+    prev: { [index: string]: LogConfig },
+    updated: { [index: string]: LogConfig },
+    user: { [index: string]: LogConfig }
+): { [index: string]: LogConfig } {
+    const result = { ...user };
+    console.log(prev, updated, user);
+    for (const key in prev) {
+        if (!(key in updated)) {
+            delete result[key];
+        }
+    }
+    for (const key in updated) {
+        if (key in result) {
+            result[key] = mergeLogger(prev[key], updated[key], result[key]);
+        } else if (!(key in prev)) {
+            result[key] = updated[key];
+        }
+    }
+    return result;
+}
+
 function mergeSimple<T>(prev: T, updated: T, user: T): T {
     return prev == updated ? user : updated;
 }
@@ -219,6 +255,7 @@ function mergeConfig(
             user.services
         ),
         admin: mergeSimple(prev.admin, updated.admin, user.admin),
+        loggers: mergeLoggers(prev.loggers, updated.loggers, user.loggers),
     };
 }
 
@@ -232,6 +269,26 @@ function defaultService(root: string) {
     } else {
         return "";
     }
+}
+
+function normalizeLogger(logger: LogConfig): LogConfig {
+    const result: any = { ...logger };
+    for (const key in result) {
+        if (result[key] == "") {
+            delete result[key];
+        }
+    }
+    return result;
+}
+
+function normalizeLoggers(loggers: { [index: string]: LogConfig }): {
+    [index: string]: LogConfig;
+} {
+    const result: any = {};
+    for (const key in loggers) {
+        result[key] = normalizeLogger(loggers[key]);
+    }
+    return result;
 }
 
 function App() {
@@ -344,6 +401,7 @@ function App() {
             port: 0,
             services: [{ host: "", root: "", key: "x" }],
             admin: "",
+            loggers: {},
         },
     });
     configForm.formState.dirtyFields;
@@ -364,6 +422,7 @@ function App() {
                         root: s.root,
                     })),
                 admin: input.admin != "" ? input.admin : null,
+                loggers: normalizeLoggers(input.loggers),
             });
             if (result.ok) {
                 configForm.reset(input);
@@ -426,6 +485,7 @@ function App() {
                         setTimeout(() => setConfigTimeout(undefined), 3000)
                     );
                 } catch (e) {
+                    console.error(e);
                     setConfigError("Failed to load /native/admin/config");
                     setConfigTimeout(
                         setTimeout(() => setConfigTimeout(undefined), 10000)
@@ -439,6 +499,8 @@ function App() {
         control: configForm.control,
         name: "services",
     });
+
+    const loggers = configForm.watch("loggers");
 
     // Fix up the default value of the key after deleting the last row
     // This is strictly to keep the form's dirty state correct.
@@ -560,6 +622,38 @@ function App() {
                     max="65535"
                     {...configForm.register("port")}
                 />
+                {loggers &&
+                    Object.entries(loggers).map(([name, contents]) => (
+                        <Logger
+                            key={name}
+                            name={name}
+                            register={(field) =>
+                                configForm.register(`loggers.${name}.${field}`)
+                            }
+                            watch={(field) =>
+                                configForm.watch(`loggers.${name}.${field}`)
+                            }
+                            remove={() =>
+                                configForm.unregister(`loggers.${name}`)
+                            }
+                        />
+                    ))}
+                <Button
+                    onClick={() => {
+                        const state = configForm.getValues();
+                        if (!state.loggers) {
+                            state.loggers = {};
+                        }
+                        state.loggers["New Logger"] = {
+                            type: "",
+                            filter: "",
+                            format: "",
+                        };
+                        configForm.reset(state, { keepDefaultValues: true });
+                    }}
+                >
+                    New Logger
+                </Button>
                 <fieldset>
                     <legend>Builtin Services</legend>
                     <table className="service-table">

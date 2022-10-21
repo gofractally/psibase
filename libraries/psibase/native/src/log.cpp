@@ -620,6 +620,66 @@ namespace psibase::loggers
              boost::make_shared<function_formatter_factory<std::decay_t<F>>>(std::forward<F>(f)));
       }
 
+      class if_formatter_factory : public boost::log::formatter_factory<char>
+      {
+        public:
+         formatter_type create_formatter(const boost::log::attribute_name& name,
+                                         const args_map&                   args)
+         {
+            auto cond   = args.find("cond");
+            auto true_  = args.find("true");
+            auto false_ = args.find("false");
+            if (cond == args.end())
+            {
+               throw std::runtime_error("missing 'cond' in if");
+            }
+            if (true_ == args.end() && false_ == args.end())
+            {
+               throw std::runtime_error("no format in if");
+            }
+            auto c = boost::log::parse_filter(cond->second);
+            if (false_ == args.end())
+            {
+               auto t = boost::log::parse_formatter(true_->second);
+               return [c, t](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
+               {
+                  if (c(rec.attribute_values()))
+                  {
+                     t(rec, os);
+                  }
+               };
+            }
+            else if (true_ == args.end())
+            {
+               auto f = boost::log::parse_formatter(false_->second);
+               return [c, f](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
+               {
+                  if (!c(rec.attribute_values()))
+                  {
+                     f(rec, os);
+                  }
+               };
+            }
+            else
+            {
+               auto t = boost::log::parse_formatter(true_->second);
+               auto f = boost::log::parse_formatter(false_->second);
+               return
+                   [c, t, f](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
+               {
+                  if (c(rec.attribute_values()))
+                  {
+                     t(rec, os);
+                  }
+                  else
+                  {
+                     f(rec, os);
+                  }
+               };
+            }
+         }
+      };
+
       class log_queue_backend
           : public boost::log::sinks::
                 basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding>
@@ -1615,6 +1675,7 @@ namespace psibase::loggers
          register_function_formatter("Json", json_formatter);
          boost::log::register_formatter_factory("Syslog",
                                                 boost::make_shared<syslog_formatter_factory>());
+         boost::log::register_formatter_factory("if", boost::make_shared<if_formatter_factory>());
       }
 
       struct log_config
@@ -1923,7 +1984,15 @@ namespace psibase::loggers
 
    void configure(const Config& cfg)
    {
-      log_config::instance().set_parsed(cfg.impl->sinks);
+      if (!cfg.impl)
+      {
+         Config::Impl tmp;
+         log_config::instance().set_parsed(tmp.sinks);
+      }
+      else
+      {
+         log_config::instance().set_parsed(cfg.impl->sinks);
+      }
    }
 
    void from_json(Config& obj, psio::json_token_stream& stream)
@@ -1964,6 +2033,7 @@ namespace psibase::loggers
             }
             else
             {
+               stream.write(',');
             }
             to_json(key, stream);
             stream.write(':');
@@ -2035,7 +2105,7 @@ namespace psibase::loggers
       }
       else
       {
-         file.set(section, "filter", stream.get_string(), "");
+         file.set(section, "format", stream.get_string(), "");
       }
    }
 

@@ -250,6 +250,7 @@ void ConfigFile::set(std::string_view section,
       std::string& line = insertions[findSection(section)];
       if (!comment.empty())
       {
+         line += "# ";
          line += comment;
          line += '\n';
       }
@@ -317,6 +318,7 @@ void ConfigFile::set(std::string_view                             section,
       std::string& line = insertions[findSection(section)];
       if (!comment.empty())
       {
+         line += "# ";
          line += comment;
          line += '\n';
       }
