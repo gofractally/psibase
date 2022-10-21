@@ -422,3 +422,133 @@ fn test_structs() {
         }
     ]));
 }
+
+#[derive(psibase::Reflect)]
+enum Enum0 {}
+
+#[derive(psibase::Reflect)]
+enum EnumSimple {
+    Unnamed0(),
+    Unnamed1(u16),
+    Unnamed1Tuple((u8,)),
+    Unnamed2(u32, String),
+    Named0 {},
+    Named1 { a: f32 },
+    Named2 { a: f32, b: f64 },
+}
+
+#[test]
+fn test_enums() {
+    verify::<Enum0>(json!([
+        {
+            "name": "Enum0",
+            "unionFields": [],
+        }
+    ]));
+    verify::<EnumSimple>(json!([
+        {
+            "name": "EnumSimple::Named0",
+            "structFields": [],
+        },
+        {
+            "name": "EnumSimple::Named1",
+            "structFields": [{"name": "a", "ty": {"ty": "f32"}}],
+        },
+        {
+            "name": "EnumSimple::Named2",
+            "structFields": [
+                {"name": "a", "ty": {"ty": "f32"}},
+                {"name": "b", "ty": {"ty": "f64"}},
+            ],
+        },
+        {
+            "name": "EnumSimple",
+            "unionFields": [{
+                "name": "Unnamed0",
+                "ty": {"tuple": []},
+            }, {
+                "name": "Unnamed1",
+                "ty": {"ty": "u16"},
+            }, {
+                "name": "Unnamed1Tuple",
+                "ty": {"tuple": [{"ty": "u8"}]},
+            }, {
+                "name": "Unnamed2",
+                "ty": {"tuple": [{"ty": "u32"}, {"ty": "string"}]},
+            }, {
+                "name": "Named0",
+                "ty": {"user": "EnumSimple::Named0"},
+            }, {
+                "name": "Named1",
+                "ty": {"user": "EnumSimple::Named1"},
+            }, {
+                "name": "Named2",
+                "ty": {"user": "EnumSimple::Named2"},
+            }],
+        }
+    ]));
+}
+
+#[derive(psibase::Reflect)]
+enum EnumRecursive {
+    Maybe(Option<Box<EnumRecursive>>),
+    Many(Vec<EnumRecursive>),
+}
+
+#[derive(psibase::Reflect)]
+enum EnumLifetime<'a, 'b> {
+    Stuff(&'a u32, &'b str),
+}
+
+#[derive(psibase::Reflect)]
+enum EnumT1T2<T1: psibase::reflect::Reflect, T2: psibase::reflect::Reflect> {
+    Stuff(T1, T2),
+}
+
+#[derive(psibase::Reflect)]
+enum EnumRefT1<'a, T1: psibase::reflect::Reflect + 'a> {
+    Stuff(&'a T1),
+}
+
+#[test]
+fn test_enum_more() {
+    verify::<EnumRecursive>(json!([
+        {
+            "name": "EnumRecursive",
+            "unionFields": [{
+                "name": "Maybe",
+                "ty": {"option": {"user": "EnumRecursive"}},
+            }, {
+                "name": "Many",
+                "ty": {"vector": {"user": "EnumRecursive"}},
+            }],
+        }
+    ]));
+    verify::<EnumLifetime>(json!([
+        {
+            "name": "EnumLifetime",
+            "unionFields": [{
+                "name": "Stuff",
+                "ty": {"tuple": [{"ty": "u32"}, {"ty": "string"}]},
+            }],
+        }
+    ]));
+    verify::<EnumT1T2<f32, f64>>(json!([
+        {
+            "name": "EnumT1T2",
+            "unionFields": [{
+                "name": "Stuff",
+                "ty": {"tuple": [{"ty": "f32"}, {"ty": "f64"}]},
+            }],
+        }
+    ]));
+    verify::<EnumRefT1<u16>>(json!([
+        {
+            "name": "EnumRefT1",
+            "unionFields": [{
+                "name": "Stuff",
+                "ty": {"ty": "u16"},
+            }],
+        }
+    ]));
+}

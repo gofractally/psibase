@@ -27,6 +27,7 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
     to_key_macro_impl(input)
 }
 
+#[proc_macro_error]
 #[proc_macro_derive(Reflect, attributes(reflect, fracpack))]
 pub fn derive_reflect(input: TokenStream) -> TokenStream {
     reflect_macro_impl(input)

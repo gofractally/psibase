@@ -2,6 +2,7 @@ use crate::fracpack_macro::Options as FracpackOptions;
 use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
+use proc_macro_error::emit_error;
 use quote::quote;
 use std::str::FromStr;
 use syn::{parse_macro_input, Data, DataEnum, DeriveInput, Fields, FieldsNamed, FieldsUnnamed};
@@ -187,9 +188,9 @@ fn visit_struct_unnamed(
 }
 
 fn visit_enum(
-    _psibase_mod: &TokenStream2,
-    _input: &DeriveInput,
-    _data: &DataEnum,
+    psibase_mod: &TokenStream2,
+    input: &DeriveInput,
+    data: &DataEnum,
     opts: &Options,
     fracpack_opts: &FracpackOptions,
 ) -> TokenStream2 {
@@ -199,5 +200,75 @@ fn visit_enum(
     if fracpack_opts.definition_will_not_change {
         unimplemented!("definition_will_not_change only supported on structs")
     }
-    todo!();
+
+    let name = &input.ident;
+    let str_name = name.to_string();
+    let num_variants = data.variants.len();
+
+    let visit_variants = data
+        .variants
+        .iter()
+        .map(|variant| {
+            if let Some((eq, _)) = &variant.discriminant {
+                emit_error! {eq, "Reflect does not support discriminants"};
+                return quote! {};
+            }
+            let variant_name = variant.ident.to_string();
+            match &variant.fields {
+                Fields::Named(fields) => {
+                    let num_fields = fields.named.len();
+                    let fields = fields
+                        .named
+                        .iter()
+                        .map(|field| {
+                            let ty = &field.ty;
+                            let name = field.ident.as_ref().unwrap().to_string();
+                            quote! {.field::<#ty>(#name.into())}
+                        })
+                        .fold(quote! {}, |acc, field| quote! {#acc #field});
+                    quote! {
+                        .named::<Self>(#variant_name.into(), #num_fields)
+                        #fields
+                        .end()
+                    }
+                }
+                Fields::Unnamed(fields) => {
+                    if fields.unnamed.len() == 1 {
+                        let ty = &fields.unnamed[0].ty;
+                        quote! {.single::<Self, #ty>(#variant_name.into())}
+                    } else {
+                        let num_fields = fields.unnamed.len();
+                        let fields = fields
+                            .unnamed
+                            .iter()
+                            .map(|field| {
+                                let ty = &field.ty;
+                                quote! {.field::<#ty>()}
+                            })
+                            .fold(quote! {}, |acc, field| quote! {#acc #field});
+                        quote! {
+                            .tuple::<Self>(#variant_name.into(), #num_fields)
+                            #fields
+                            .end()
+                        }
+                    }
+                }
+                Fields::Unit => {
+                    emit_error! {variant, "Reflect does not support unit variants"};
+                    quote! {}
+                }
+            }
+        })
+        .fold(quote! {}, |acc, field| quote! {#acc #field});
+
+    quote! {
+        use #psibase_mod::reflect::EnumVisitor;
+        use #psibase_mod::reflect::UnnamedVisitor;
+        use #psibase_mod::reflect::NamedVisitor;
+
+        visitor
+        .enumeration::<Self>(#str_name.into(), #num_variants)
+        #visit_variants
+        .end()
+    }
 }
