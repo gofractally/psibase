@@ -126,7 +126,6 @@ function mergeServices(
     updated: ServiceConfig[],
     user: ServiceConfig[]
 ): ServiceConfig[] {
-    console.log(`merge: ${base.length} ${updated.length} ${user.length}`);
     let leading: ServiceConfig[] = [];
     let result = updated.map((item) => [item]);
     let insertPoint = -1;
@@ -175,20 +174,16 @@ function mergeServices(
     };
     let prevIndex = 0;
     for (const s of user) {
-        console.log(s);
         const baseIndex = baseMap[s.key];
         if (baseIndex === undefined) {
-            console.log("merge new item");
             // new item
             remove(s);
             insert(s);
         } else {
             if (prevIndex != baseIndex) {
-                console.log("merge move item");
                 // The row was moved by the user
                 if (remove(s)) insert(s);
             } else {
-                console.log("merge unmodified item");
                 replace(s);
             }
             prevIndex = baseIndex + 1;
@@ -411,13 +406,11 @@ function App() {
                         userValues.services.length > 0 &&
                         emptyService(userValues.services.at(-1)!)
                     ) {
-                        console.log("reusing id");
                         result.services = [
                             ...result.services,
                             userValues.services.at(-1),
                         ];
                     } else {
-                        console.log("creating new id");
                         result.services = [
                             ...result.services,
                             { host: "", root: "", key: newId() },
@@ -433,7 +426,6 @@ function App() {
                         setTimeout(() => setConfigTimeout(undefined), 3000)
                     );
                 } catch (e) {
-                    console.error(e);
                     setConfigError("Failed to load /native/admin/config");
                     setConfigTimeout(
                         setTimeout(() => setConfigTimeout(undefined), 10000)
