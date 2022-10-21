@@ -16,11 +16,23 @@ pub struct Schema<String> {
 #[allow(non_snake_case)]
 pub struct Definition<String> {
     pub name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<TypeRef<String>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub structFields: Option<Vec<Field<String>>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub unionFields: Option<Vec<Field<String>>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub customJson: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub definitionWillNotChange: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub methods: Option<Vec<Method<String>>>,
 }
 

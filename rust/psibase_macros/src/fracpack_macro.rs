@@ -9,9 +9,9 @@ use syn::{
 /// Fracpack struct level options
 #[derive(Debug, FromDeriveInput)]
 #[darling(default, attributes(fracpack))]
-pub struct Options {
-    definition_will_not_change: bool,
-    fracpack_mod: String,
+pub(crate) struct Options {
+    pub(crate) definition_will_not_change: bool,
+    pub(crate) fracpack_mod: String,
 }
 
 impl Default for Options {

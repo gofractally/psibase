@@ -10,7 +10,7 @@ mod method_number;
 pub mod native;
 pub mod native_raw;
 mod native_tables;
-mod reflect;
+pub mod reflect;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod schema;
