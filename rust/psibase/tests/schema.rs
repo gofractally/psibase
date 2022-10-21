@@ -135,11 +135,36 @@ struct UnnamedStructSingleU32(u32);
 struct UnnamedStructSingleT<T: psibase::reflect::Reflect>(T);
 
 #[derive(psibase::Reflect)]
+struct UnnamedStructInnerTupleRef<'a, 'b>((&'a str, &'b i32));
+
+#[derive(psibase::Reflect)]
+struct UnnamedStructSingleRefT<'a, T: psibase::reflect::Reflect + 'a>(&'a T);
+
+#[derive(psibase::Reflect)]
 #[rustfmt::skip] // Don't remove the extra comma
 struct UnnamedStructSingleExtraComma(u64,);
 
 #[derive(psibase::Reflect)]
 struct TupleStruct1((u64,));
+
+#[derive(psibase::Reflect)]
+struct TupleStruct2(Option<u8>, String);
+
+#[derive(psibase::Reflect)]
+struct TupleStruct5(u8, u16, u32, i8, i16);
+
+#[derive(psibase::Reflect)]
+struct TupleStruct3T<
+    T1: psibase::reflect::Reflect,
+    T2: psibase::reflect::Reflect,
+    T3: psibase::reflect::Reflect,
+>(T1, T2, T3);
+
+#[derive(psibase::Reflect)]
+struct TupleStruct2Ref<'a, 'b>(&'a u32, &'b Alias<u16>);
+
+#[derive(psibase::Reflect)]
+struct TupleStructRecurse(Option<Box<TupleStructRecurse>>, Vec<TupleStructRecurse>);
 
 #[test]
 fn test_tuple_structs() {
@@ -173,6 +198,24 @@ fn test_tuple_structs() {
             "name": "UnnamedStructSingleT"
         }
     ]));
+    verify::<UnnamedStructInnerTupleRef>(json!([
+        {
+            "alias": {"tuple": [{"ty": "string"}, {"ty": "i32"}]},
+            "name": "UnnamedStructInnerTupleRef"
+        }
+    ]));
+    verify::<UnnamedStructSingleRefT<String>>(json!([
+        {
+            "alias": {"ty": "string"},
+            "name": "UnnamedStructSingleRefT"
+        }
+    ]));
+    verify::<UnnamedStructSingleRefT<i8>>(json!([
+        {
+            "alias": {"ty": "i8"},
+            "name": "UnnamedStructSingleRefT"
+        }
+    ]));
     verify::<UnnamedStructSingleExtraComma>(json!([
         {
             "alias": {"ty": "u64"},
@@ -183,6 +226,199 @@ fn test_tuple_structs() {
         {
             "alias": {"tuple": [{"ty": "u64"}]},
             "name": "TupleStruct1"
+        }
+    ]));
+    verify::<TupleStruct2>(json!([
+        {
+            "alias": {"tuple": [{"option": {"ty": "u8"}}, {"ty": "string"}]},
+            "name": "TupleStruct2"
+        }
+    ]));
+    verify::<TupleStruct5>(json!([
+        {
+            "alias": {"tuple": [{"ty": "u8"}, {"ty": "u16"}, {"ty": "u32"}, {"ty": "i8"}, {"ty": "i16"}]},
+            "name": "TupleStruct5"
+        }
+    ]));
+    verify::<TupleStruct3T<String, Option<String>, (String,)>>(json!([
+        {
+            "alias": {"tuple": [{"ty": "string"}, {"option": {"ty": "string"}}, {"tuple": [{"ty": "string"}]}]},
+            "name": "TupleStruct3T"
+        }
+    ]));
+    verify::<TupleStruct2Ref>(json!([
+        {
+            "alias": {"ty": "u16"},
+            "name": "Alias"
+        },
+        {
+            "alias": {"tuple": [{"ty": "u32"}, {"user": "Alias"}]},
+            "name": "TupleStruct2Ref"
+        }
+    ]));
+    verify::<TupleStructRecurse>(json!([
+        {
+            "alias": {"tuple": [{"option": {"user": "TupleStructRecurse"}}, {"vector": {"user": "TupleStructRecurse"}}]},
+            "name": "TupleStructRecurse"
+        }
+    ]));
+}
+
+#[derive(psibase::Reflect)]
+struct Struct0 {}
+
+#[derive(psibase::Reflect)]
+struct Struct1 {
+    a: u32,
+}
+
+#[derive(psibase::Reflect)]
+struct Struct2 {
+    a: u32,
+    b: String,
+}
+
+#[derive(psibase::Reflect)]
+struct Struct3 {
+    a: u32,
+    b: String,
+    c: Alias<f64>,
+}
+
+#[derive(psibase::Reflect)]
+struct Struct2Ref<'a> {
+    a: &'a u32,
+    b: &'a String,
+}
+
+#[derive(psibase::Reflect)]
+struct StructT1T2<T1: psibase::reflect::Reflect, T2: psibase::reflect::Reflect> {
+    a: T1,
+    b: T2,
+}
+
+#[derive(psibase::Reflect)]
+struct StructRecurse {
+    a: Option<Box<StructRecurse>>,
+    b: Vec<StructRecurse>,
+}
+
+#[derive(psibase::Reflect)]
+#[reflect(custom_json)]
+struct StructCustomJson {
+    a: u32,
+}
+
+#[derive(psibase::Reflect)]
+#[fracpack(definition_will_not_change)]
+struct StructWNC {
+    a: u32,
+}
+
+#[derive(psibase::Reflect)]
+#[fracpack(definition_will_not_change)]
+#[reflect(custom_json)]
+struct StructBothFlags {
+    a: u32,
+}
+
+#[test]
+fn test_structs() {
+    verify::<Struct0>(json!([
+        {
+            "name": "Struct0",
+            "structFields": [],
+        }
+    ]));
+    verify::<Struct1>(json!([
+        {
+            "name": "Struct1",
+            "structFields": [{"name": "a", "ty": {"ty": "u32"}}],
+        }
+    ]));
+    verify::<Struct2>(json!([
+        {
+            "name": "Struct2",
+            "structFields": [
+                {"name": "a", "ty": {"ty": "u32"}},
+                {"name": "b", "ty": {"ty": "string"}},
+            ],
+        }
+    ]));
+    verify::<Struct3>(json!([
+        {
+            "name": "Alias",
+            "alias": {"ty": "f64"},
+        },
+        {
+            "name": "Struct3",
+            "structFields": [
+                {"name": "a", "ty": {"ty": "u32"}},
+                {"name": "b", "ty": {"ty": "string"}},
+                {"name": "c", "ty": {"user": "Alias"}},
+            ],
+        }
+    ]));
+    verify::<Struct2Ref>(json!([
+        {
+            "name": "Struct2Ref",
+            "structFields": [
+                {"name": "a", "ty": {"ty": "u32"}},
+                {"name": "b", "ty": {"ty": "string"}},
+            ],
+        }
+    ]));
+    verify::<StructT1T2<i8, i16>>(json!([
+        {
+            "name": "StructT1T2",
+            "structFields": [
+                {"name": "a", "ty": {"ty": "i8"}},
+                {"name": "b", "ty": {"ty": "i16"}},
+            ],
+        }
+    ]));
+    verify::<StructT1T2<&f32, &Alias<&String>>>(json!([
+        {
+            "name": "Alias",
+            "alias": {"ty": "string"},
+        },
+        {
+            "name": "StructT1T2",
+            "structFields": [
+                {"name": "a", "ty": {"ty": "f32"}},
+                {"name": "b", "ty": {"user": "Alias"}},
+            ],
+        }
+    ]));
+    verify::<StructRecurse>(json!([
+        {
+            "name": "StructRecurse",
+            "structFields": [
+                {"name": "a", "ty": {"option": {"user": "StructRecurse"}}},
+                {"name": "b", "ty": {"vector": {"user": "StructRecurse"}}},
+            ],
+        }
+    ]));
+    verify::<StructCustomJson>(json!([
+        {
+            "name": "StructCustomJson",
+            "customJson": true,
+            "structFields": [{"name": "a", "ty": {"ty": "u32"}}],
+        }
+    ]));
+    verify::<StructWNC>(json!([
+        {
+            "name": "StructWNC",
+            "definitionWillNotChange": true,
+            "structFields": [{"name": "a", "ty": {"ty": "u32"}}],
+        }
+    ]));
+    verify::<StructBothFlags>(json!([
+        {
+            "name": "StructBothFlags",
+            "customJson": true,
+            "definitionWillNotChange": true,
+            "structFields": [{"name": "a", "ty": {"ty": "u32"}}],
         }
     ]));
 }
