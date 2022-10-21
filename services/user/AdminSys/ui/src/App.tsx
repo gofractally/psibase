@@ -121,148 +121,80 @@ function pollJson<R>(
     ];
 }
 
-type DiffItem<T> = {
-    modified: boolean;
-    value?: T;
-    insertions: T[];
-};
-
-function diff<T>(
-    base: T[],
-    value: T[],
-    cmp: (a: T, b: T) => boolean | "samekey"
-): DiffItem<T>[] {
-    type RowKind = "root" | "insert" | "delete" | "keep" | "modify";
-    type EDiffRow = {
-        quality: number;
-        kind: RowKind;
-    };
-    let data: EDiffRow[][] = [];
-    const cell = (i: number, j: number): EDiffRow => {
-        if (i < 0 && j < 0) {
-            return { quality: 0, kind: "root" };
-        } else if (i < 0) {
-            return { quality: j + 1, kind: "insert" };
-        } else if (j < 0) {
-            return { quality: i + 1, kind: "delete" };
-        } else {
-            return data[i][j];
+function mergeServices(
+    base: ServiceConfig[],
+    updated: ServiceConfig[],
+    user: ServiceConfig[]
+): ServiceConfig[] {
+    console.log(`merge: ${base.length} ${updated.length} ${user.length}`);
+    let leading: ServiceConfig[] = [];
+    let result = updated.map((item) => [item]);
+    let insertPoint = -1;
+    const remove = (s: ServiceConfig): boolean => {
+        const found = result.find(
+            (item) => item.length && item[0].key == s.key
+        );
+        if (found) {
+            found.shift();
+            return true;
         }
-    };
-    const update = (
-        current: EDiffRow | undefined,
-        prev: EDiffRow,
-        kind: RowKind
-    ) => {
-        if (current === undefined || prev.quality < current.quality) {
-            return {
-                quality: prev.quality + (kind == "keep" ? 0 : 1),
-                kind: kind,
-            };
-        } else {
-            return current;
-        }
-    };
-
-    for (const [i, ival] of base.entries()) {
-        data[i] = Array(value.length);
-        for (const [j, jval] of value.entries()) {
-            const res = cmp(ival, jval);
-            let current: EDiffRow | undefined = undefined;
-            if (res == true || res == "samekey") {
-                current = update(
-                    current,
-                    cell(i - 1, j - 1),
-                    res === true ? "keep" : "modify"
-                );
-            }
-            current = update(current, cell(i - 1, j), "delete");
-            current = update(current, cell(i, j - 1), "insert");
-            data[i][j] = current;
-        }
-    }
-
-    let result = Array<DiffItem<T>>(base.length + 1);
-    let i = base.length - 1;
-    let j = value.length - 1;
-    while (true) {
-        const { kind } = cell(i, j);
-        if (result[i + 1] === undefined) {
-            result[i + 1] = { modified: false, value: base[i], insertions: [] };
-        }
-        if (kind == "root") {
-            console.log(base);
-            console.log(value);
-            console.log(data);
-            console.log(result);
-            return result;
-        } else if (kind == "insert") {
-            result[i + 1].insertions = [value[j], ...result[i + 1].insertions];
-            j = j - 1;
-        } else if (kind == "delete") {
-            result[i + 1].modified = true;
-            result[i + 1].value = undefined;
-            i = i - 1;
-        } else if (kind == "keep") {
-            result[i + 1].modified = false;
-            result[i + 1].value = base[i];
-            i = i - 1;
-            j = j - 1;
-        } else if (kind == "modify") {
-            result[i + 1].modified = true;
-            result[i + 1].value = value[j];
-            i = i - 1;
-            j = j - 1;
-        }
-    }
-    return result;
-}
-
-function mergeDiff<T>(
-    diff1: DiffItem<T>[],
-    diff2: DiffItem<T>[]
-): DiffItem<T>[] {
-    return diff1.map((v1, idx) => {
-        const v2 = diff2[idx];
-        return {
-            modified: v1.modified || v2.modified,
-            value: v1.modified ? v1.value : v2.value,
-            insertions: [...v1.insertions, ...v2.insertions],
-        };
-    });
-}
-
-function idiff<T>(diff: DiffItem<T>[]): T[] {
-    let result: T[] = [];
-    for (const item of diff) {
-        if (item.value) {
-            result = [...result, item.value];
-        }
-        result = [...result, ...item.insertions];
-    }
-    return result;
-}
-
-function mergeList<T>(
-    prev: T[],
-    updated: T[],
-    user: T[],
-    cmp: (a: T, b: T) => boolean | "samekey"
-): T[] {
-    return idiff(mergeDiff(diff(prev, updated, cmp), diff(prev, user, cmp)));
-}
-
-function compareService(
-    a: ServiceConfig,
-    b: ServiceConfig
-): boolean | "samekey" {
-    if (a.host == b.host && a.root == b.root) {
-        return true;
-    } else if (a.host == b.host) {
-        return "samekey";
-    } else {
         return false;
+    };
+    const replace = (s: ServiceConfig): void => {
+        const pos = result.findIndex(
+            (item) => item.length && item[0].key == s.key
+        );
+        if (pos != -1) {
+            result[pos][0] = s;
+            insertPoint = pos;
+        }
+    };
+    // First delete anything that was deleted by the user
+    let baseMap: { [index: string]: number } = {};
+    let baseIndex = 0;
+    for (const s of base) {
+        if (!user.find((item) => item.key == s.key)) {
+            remove(s);
+        } else {
+            baseMap[s.key] = baseIndex++;
+        }
     }
+    const insert = (s: ServiceConfig): void => {
+        // prefer to put new values from the server before new values from the user
+        while (
+            insertPoint + 1 < result.length &&
+            !user.find((item) => item.key == updated[insertPoint + 1].key)
+        ) {
+            ++insertPoint;
+        }
+        if (insertPoint == -1) {
+            leading.push(s);
+        } else {
+            result[insertPoint].push(s);
+        }
+    };
+    let prevIndex = 0;
+    for (const s of user) {
+        console.log(s);
+        const baseIndex = baseMap[s.key];
+        if (baseIndex === undefined) {
+            console.log("merge new item");
+            // new item
+            remove(s);
+            insert(s);
+        } else {
+            if (prevIndex != baseIndex) {
+                console.log("merge move item");
+                // The row was moved by the user
+                if (remove(s)) insert(s);
+            } else {
+                console.log("merge unmodified item");
+                replace(s);
+            }
+            prevIndex = baseIndex + 1;
+        }
+    }
+    return leading.concat(...result);
 }
 
 function mergeSimple<T>(prev: T, updated: T, user: T): T {
@@ -286,14 +218,25 @@ function mergeConfig(
         producer: mergeSimple(prev.producer, updated.producer, user.producer),
         host: mergeSimple(prev.host, updated.host, user.host),
         port: mergeSimple(prev.port, updated.port, user.port),
-        services: mergeList(
-            prev.services,
+        services: mergeServices(
+            prev.services.filter((item) => !emptyService(item)),
             updated.services,
-            user.services,
-            compareService
+            user.services
         ),
         admin: mergeSimple(prev.admin, updated.admin, user.admin),
     };
+}
+
+function emptyService(s: ServiceConfig) {
+    return s.host == "" && s.root == "";
+}
+
+function defaultService(root: string) {
+    if (root) {
+        return root.substring(root.lastIndexOf("/") + 1) + ".";
+    } else {
+        return "";
+    }
 }
 
 function App() {
@@ -404,7 +347,7 @@ function App() {
             producer: "",
             host: "",
             port: 0,
-            services: [],
+            services: [{ host: "", root: "", key: "x" }],
             admin: "",
         },
     });
@@ -412,12 +355,19 @@ function App() {
     const onConfig = async (input: PsinodeConfig) => {
         try {
             setConfigPutError(undefined);
+            for (let service of input.services) {
+                if (service.host == "") {
+                    service.host = defaultService(service.root);
+                }
+            }
             const result = await putJson("/native/admin/config", {
                 ...input,
-                services: input.services.map((s) => ({
-                    host: s.host,
-                    root: s.root,
-                })),
+                services: input.services
+                    .filter((s) => !emptyService(s))
+                    .map((s) => ({
+                        host: s.host,
+                        root: s.root,
+                    })),
                 admin: input.admin != "" ? input.admin : null,
             });
             if (result.ok) {
@@ -442,18 +392,37 @@ function App() {
                     let result = await getJson("/native/admin/config");
                     const oldDefaults = configForm.formState
                         .defaultValues as PsinodeConfig;
+                    const userValues = configForm.getValues();
                     result.services = result.services.map((s: any) => {
-                        const old = oldDefaults.services.find(
-                            (item) => item.host == s.host && item.root == s.root
-                        );
+                        const old =
+                            oldDefaults.services.find(
+                                (item) =>
+                                    item.host == s.host && item.root == s.root
+                            ) ||
+                            userValues.services.find(
+                                (item) =>
+                                    item.host == s.host && item.root == s.root
+                            );
                         return { key: old ? old.key : newId(), ...s };
                     });
                     result.admin = result.admin ? result.admin : "";
-                    let newState = mergeConfig(
-                        oldDefaults,
-                        result,
-                        configForm.getValues()
-                    );
+                    let newState = mergeConfig(oldDefaults, result, userValues);
+                    if (
+                        userValues.services.length > 0 &&
+                        emptyService(userValues.services.at(-1)!)
+                    ) {
+                        console.log("reusing id");
+                        result.services = [
+                            ...result.services,
+                            userValues.services.at(-1),
+                        ];
+                    } else {
+                        console.log("creating new id");
+                        result.services = [
+                            ...result.services,
+                            { host: "", root: "", key: newId() },
+                        ];
+                    }
                     configForm.reset(result, {
                         keepDirty: true,
                         keepValues: true,
@@ -477,6 +446,28 @@ function App() {
     const services = useFieldArray({
         control: configForm.control,
         name: "services",
+    });
+
+    // Fix up the default value of the key after deleting the last row
+    // This is strictly to keep the form's dirty state correct.
+    useEffect(() => {
+        const fields = services.fields;
+        if (fields !== undefined) {
+            const defaultValues = configForm.formState
+                .defaultValues as PsinodeConfig;
+            if (
+                fields.length != 0 &&
+                fields.length == defaultValues.services.length &&
+                emptyService(fields.at(-1)!) &&
+                emptyService(defaultValues.services.at(-1)!)
+            ) {
+                const index = fields.length - 1;
+                const key: `services.${number}.key` = `services.${index}.key`;
+                configForm.resetField(key, {
+                    defaultValue: configForm.getValues(key),
+                });
+            }
+        }
     });
 
     const [status, statusError, fetchStatus] = pollJson<string[]>(
@@ -577,16 +568,38 @@ function App() {
                     max="65535"
                     {...configForm.register("port")}
                 />
-                {services.fields.map((field, index) => (
-                    <Service
-                        key={field.key}
-                        register={(name) =>
-                            configForm.register(`services.${name}`)
-                        }
-                        index={index}
-                        services={services}
-                    />
-                ))}
+                <fieldset>
+                    <legend>Builtin Services</legend>
+                    <table className="service-table">
+                        <thead>
+                            <tr>
+                                <th>Hostname</th>
+                                <th>Path</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {services.fields.map((field, index) => (
+                                <Service
+                                    key={field.key}
+                                    register={(name, options) =>
+                                        configForm.register(
+                                            `services.${name}`,
+                                            options
+                                        )
+                                    }
+                                    getValues={() =>
+                                        configForm.getValues(
+                                            `services.${index}`
+                                        ) as ServiceConfig
+                                    }
+                                    index={index}
+                                    services={services}
+                                    newId={newId}
+                                />
+                            ))}
+                        </tbody>
+                    </table>
+                </fieldset>
                 <fieldset>
                     <legend>Access to admin API (Requires restart)</legend>
                     <Form.Radio
