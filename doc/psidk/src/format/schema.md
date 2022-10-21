@@ -181,7 +181,7 @@ A struct definition may have methods on it.
 }
 ```
 
-If a method doesn't return a value, `returns` should be `{"builtinType": "void"}`.
+If a method doesn't return a value, `returns` should be `{"ty": "void"}`.
 
 ### Method Upgradeability
 
@@ -201,8 +201,8 @@ The following break backwards compatibility; if you do these, data will end up c
 
 We used `{type reference}` to indicate a type reference in the definitions above. This can be one of the following:
 
-- `{"builtinType": "u32"}` - a [built-in type](#built-in-types)
-- `{"userType": "Foo"}` - a type defined in the [userTypes array](#type-definitions)
+- `{"ty": "u32"}` - a [built-in type](#built-in-types)
+- `{"user": "Foo"}` - a type defined in the [userTypes array](#type-definitions)
 - `{"vector": {inner type}}` - a vector of inner type
 - `{"optional": {inner type}}` - an optional of inner type
 - `{"tuple": [{inner type}, ...]}` - a tuple of inner types
@@ -224,7 +224,7 @@ The following break backwards compatibility; if you do these, data will end up c
 
 ## Built-in Types
 
-`{"builtinType":"..."}` can name one of the following built-in types:
+`{"ty":"..."}` can name one of the following built-in types:
 
 - `void`: only supported as a method return type
 - `bool`

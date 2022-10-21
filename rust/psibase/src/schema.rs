@@ -40,8 +40,8 @@ pub struct Definition<String> {
 #[fracpack(fracpack_mod = "fracpack")]
 #[allow(non_camel_case_types)]
 pub enum TypeRef<String> {
-    builtinType(String),
-    userType(String),
+    ty(String),
+    user(String),
     vector(Box<TypeRef<String>>),
     optional(Box<TypeRef<String>>),
     tuple(Vec<TypeRef<String>>),
@@ -143,7 +143,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
     fn builtin<T: Reflect>(self, name: &'static str) -> Self::Return {
         let name = Rc::new(RefCell::new(name.into()));
         self.schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::builtinType(name))
+            .insert::<T>(Some(name.clone()), TypeRef::ty(name))
             .type_ref
             .clone()
     }
@@ -205,7 +205,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
             methods: None,
         });
         self.schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::userType(name))
+            .insert::<T>(Some(name.clone()), TypeRef::user(name))
             .type_ref
             .clone()
     }
@@ -218,7 +218,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let name = Rc::new(RefCell::new(name));
         let type_ref = self
             .schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
+            .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
             .type_ref
             .clone();
         StructTupleBuilder {
@@ -237,7 +237,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let name = Rc::new(RefCell::new(name));
         let type_ref = self
             .schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
+            .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
             .type_ref
             .clone();
         StructBuilder {
@@ -258,7 +258,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let name = Rc::new(RefCell::new(name));
         let type_ref = self
             .schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
+            .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
             .type_ref
             .clone();
         EnumBuilder {
@@ -470,7 +470,7 @@ impl<'a> NamedVisitor<EnumBuilder<'a>> for EnumNamedBuilder<'a> {
             });
         self.enum_builder.fields.push(Field {
             name: self.name,
-            ty: TypeRef::userType(struct_name),
+            ty: TypeRef::user(struct_name),
         });
         self.enum_builder
     }
