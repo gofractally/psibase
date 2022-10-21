@@ -1,5 +1,11 @@
 #![allow(dead_code)]
 
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    sync::Arc,
+};
+
 use serde::Serialize;
 use serde_json::{json, ser::PrettyFormatter, to_value, Serializer, Value};
 
@@ -33,15 +39,12 @@ fn verify<T: psibase::reflect::Reflect>(expected: Value) {
 }
 
 #[test]
-fn builtin_and_tuple() {
+fn builtin() {
     // No user definitions -> empty
     verify::<u8>(json!([]));
     verify::<String>(json!([]));
     verify::<&str>(json!([]));
     verify::<Vec<u8>>(json!([]));
-    verify::<(u8,)>(json!([]));
-    verify::<(u8, u16)>(json!([]));
-    verify::<(u8, u16, String, &str)>(json!([]));
 
     // Aliasing exposes the types
     fn alias<T: psibase::reflect::Reflect>(name: &str) {
@@ -63,6 +66,41 @@ fn builtin_and_tuple() {
     alias::<f64>("f64");
     alias::<String>("string");
     alias::<&str>("string");
+
+    alias::<Box<&mut Rc<Arc<&Cell<RefCell<f32>>>>>>("f32");
+
+    verify::<Alias<Vec<u8>>>(json!([
+        {
+            "alias": {"vector": {"ty": "u8"}},
+            "name": "Alias"
+        }
+    ]));
+    verify::<&mut Alias<Box<Vec<Cell<u8>>>>>(json!([
+        {
+            "alias": {"vector": {"ty": "u8"}},
+            "name": "Alias"
+        }
+    ]));
+    verify::<Alias<Option<String>>>(json!([
+        {
+            "alias": {"option": {"ty": "string"}},
+            "name": "Alias"
+        }
+    ]));
+    verify::<Alias<[i16; 7]>>(json!([
+        {
+            "alias": {"array": [{"ty": "i16"}, 7]},
+            "name": "Alias"
+        }
+    ]));
+}
+
+#[test]
+fn tuple() {
+    // No user definitions -> empty
+    verify::<(u8,)>(json!([]));
+    verify::<(u8, u16)>(json!([]));
+    verify::<(u8, u16, String, &str)>(json!([]));
 
     fn tuple<T: psibase::reflect::Reflect>(args: &Value) {
         verify::<Alias<T>>(json!([{
@@ -94,6 +132,9 @@ struct TupleStructEmpty();
 struct UnnamedStructSingleU32(u32);
 
 #[derive(psibase::Reflect)]
+struct UnnamedStructSingleT<T: psibase::reflect::Reflect>(T);
+
+#[derive(psibase::Reflect)]
 #[rustfmt::skip] // Don't remove the extra comma
 struct UnnamedStructSingleExtraComma(u64,);
 
@@ -112,6 +153,24 @@ fn test_tuple_structs() {
         {
             "alias": {"ty": "u32"},
             "name": "UnnamedStructSingleU32"
+        }
+    ]));
+    verify::<UnnamedStructSingleT<String>>(json!([
+        {
+            "alias": {"ty": "string"},
+            "name": "UnnamedStructSingleT"
+        }
+    ]));
+    verify::<UnnamedStructSingleT<&str>>(json!([
+        {
+            "alias": {"ty": "string"},
+            "name": "UnnamedStructSingleT"
+        }
+    ]));
+    verify::<UnnamedStructSingleT<&&&mut &&u8>>(json!([
+        {
+            "alias": {"ty": "u8"},
+            "name": "UnnamedStructSingleT"
         }
     ]));
     verify::<UnnamedStructSingleExtraComma>(json!([

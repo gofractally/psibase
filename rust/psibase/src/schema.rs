@@ -43,7 +43,7 @@ pub enum TypeRef<String> {
     ty(String),
     user(String),
     vector(Box<TypeRef<String>>),
-    optional(Box<TypeRef<String>>),
+    option(Box<TypeRef<String>>),
     tuple(Vec<TypeRef<String>>),
     array(Box<TypeRef<String>>, u32),
 }
@@ -166,6 +166,22 @@ impl<'a> Visitor for TypeBuilder<'a> {
 
     fn arc<Inner: Reflect>(self) -> Self::Return {
         self.schema_builder.get_type_ref::<Inner>()
+    }
+
+    fn cell<Inner: Reflect>(self) -> Self::Return {
+        self.schema_builder.get_type_ref::<Inner>()
+    }
+
+    fn ref_cell<Inner: Reflect>(self) -> Self::Return {
+        self.schema_builder.get_type_ref::<Inner>()
+    }
+
+    fn option<Inner: Reflect>(self) -> Self::Return {
+        let inner = self.schema_builder.get_type_ref::<Inner>();
+        self.schema_builder
+            .insert::<Option<Inner>>(None, TypeRef::option(Box::new(inner)))
+            .type_ref
+            .clone()
     }
 
     fn container<T: Reflect, Inner: Reflect>(self) -> Self::Return {

@@ -1,4 +1,9 @@
-use std::{borrow::Cow, rc::Rc, sync::Arc};
+use std::{
+    borrow::Cow,
+    cell::{Cell, RefCell},
+    rc::Rc,
+    sync::Arc,
+};
 
 pub trait Reflect {
     type StaticType: 'static + Reflect;
@@ -21,6 +26,9 @@ pub trait Visitor {
     fn boxed<Inner: Reflect>(self) -> Self::Return;
     fn rc<Inner: Reflect>(self) -> Self::Return;
     fn arc<Inner: Reflect>(self) -> Self::Return;
+    fn cell<Inner: Reflect>(self) -> Self::Return;
+    fn ref_cell<Inner: Reflect>(self) -> Self::Return;
+    fn option<Inner: Reflect>(self) -> Self::Return;
     fn container<T: Reflect, Inner: Reflect>(self) -> Self::Return;
     fn array<Inner: Reflect, const SIZE: usize>(self) -> Self::Return;
     fn tuple<T: Reflect>(self, fields_len: usize) -> Self::TupleVisitor;
@@ -102,6 +110,30 @@ impl<T: Reflect> Reflect for Arc<T> {
     type StaticType = Arc<T::StaticType>;
     fn reflect<V: Visitor>(visitor: V) -> V::Return {
         visitor.arc::<T>()
+    }
+}
+
+impl<T: Reflect> Reflect for Cell<T> {
+    type StaticType = Cell<T::StaticType>;
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.cell::<T>()
+    }
+}
+
+impl<T: Reflect> Reflect for RefCell<T> {
+    type StaticType = RefCell<T::StaticType>;
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.ref_cell::<T>()
+    }
+}
+
+impl<T: Reflect> Reflect for Option<T>
+where
+    T::StaticType: Sized,
+{
+    type StaticType = Option<T::StaticType>;
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.option::<T>()
     }
 }
 

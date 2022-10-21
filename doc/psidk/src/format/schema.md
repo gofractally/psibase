@@ -204,7 +204,7 @@ We used `{type reference}` to indicate a type reference in the definitions above
 - `{"ty": "u32"}` - a [built-in type](#built-in-types)
 - `{"user": "Foo"}` - a type defined in the [userTypes array](#type-definitions)
 - `{"vector": {inner type}}` - a vector of inner type
-- `{"optional": {inner type}}` - an optional of inner type
+- `{"option": {inner type}}` - an optional of inner type
 - `{"tuple": [{inner type}, ...]}` - a tuple of inner types
 - `{"array": [{inner type}, size]}` - a fixed-size array of inner type
 
