@@ -242,6 +242,110 @@ The following break backwards compatibility; if you do these, data will end up c
 
 The schema schema defines both the JSON format and the binary (fracpack) format of schemas.
 
-```
-TODO...
+```json
+{
+  "userTypes": [
+    {
+      "name": "TypeRef",
+      "unionFields": [
+        {
+          "name": "ty",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "user",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "vector",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "option",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "tuple",
+          "ty": { "vector": { "user": "TypeRef" } }
+        },
+        {
+          "name": "array",
+          "ty": { "tuple": [{ "user": "TypeRef" }, { "ty": "u32" }] }
+        }
+      ]
+    },
+    {
+      "name": "Field",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "ty",
+          "ty": { "user": "TypeRef" }
+        }
+      ]
+    },
+    {
+      "name": "Method",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "returns",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "args",
+          "ty": { "vector": { "user": "Field" } }
+        }
+      ]
+    },
+    {
+      "name": "Definition",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "alias",
+          "ty": { "option": { "user": "TypeRef" } }
+        },
+        {
+          "name": "structFields",
+          "ty": { "option": { "vector": { "user": "Field" } } }
+        },
+        {
+          "name": "unionFields",
+          "ty": { "option": { "vector": { "user": "Field" } } }
+        },
+        {
+          "name": "customJson",
+          "ty": { "option": { "ty": "bool" } }
+        },
+        {
+          "name": "definitionWillNotChange",
+          "ty": { "option": { "ty": "bool" } }
+        },
+        {
+          "name": "methods",
+          "ty": { "option": { "vector": { "user": "Method" } } }
+        }
+      ]
+    },
+    {
+      "name": "Schema",
+      "structFields": [
+        {
+          "name": "userTypes",
+          "ty": { "vector": { "user": "Definition" } }
+        }
+      ]
+    }
+  ]
+}
 ```

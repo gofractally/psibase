@@ -208,6 +208,13 @@ impl<'a> Reflect for &'a str {
     }
 }
 
+impl<'a> Reflect for Cow<'a, str> {
+    type StaticType = Cow<'static, str>;
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.builtin::<Cow<'a, str>>("string")
+    }
+}
+
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)*))+) => {
         $(

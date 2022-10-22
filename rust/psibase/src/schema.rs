@@ -1,20 +1,29 @@
 use crate::reflect::{self, NamedVisitor};
 use crate::reflect::{EnumVisitor, Reflect, StructVisitor, UnnamedVisitor, Visitor};
 use fracpack::Fracpack;
+use psibase_macros::Reflect;
 use serde::{Deserialize, Serialize};
 use std::{any::TypeId, borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
 
-#[derive(Debug, Clone, Default, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
-pub struct Schema<String> {
+pub struct Schema<String>
+where
+    String: reflect::Reflect,
+{
     pub userTypes: Vec<Definition<String>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
-pub struct Definition<String> {
+pub struct Definition<String>
+where
+    String: reflect::Reflect,
+{
     pub name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -36,10 +45,14 @@ pub struct Definition<String> {
     pub methods: Option<Vec<Method<String>>>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_camel_case_types)]
-pub enum TypeRef<String> {
+pub enum TypeRef<String>
+where
+    String: reflect::Reflect,
+{
     ty(String),
     user(String),
     vector(Box<TypeRef<String>>),
@@ -48,18 +61,26 @@ pub enum TypeRef<String> {
     array(Box<TypeRef<String>>, u32),
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
-pub struct Field<String> {
+pub struct Field<String>
+where
+    String: reflect::Reflect,
+{
     name: String,
     ty: TypeRef<String>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
-pub struct Method<String> {
+pub struct Method<String>
+where
+    String: reflect::Reflect,
+{
     name: String,
     returns: TypeRef<String>,
     args: Vec<Field<String>>,
