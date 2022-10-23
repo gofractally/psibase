@@ -424,6 +424,62 @@ fn test_structs() {
 }
 
 #[derive(psibase::Reflect)]
+struct DupNameStruct<
+    T1: psibase::reflect::Reflect,
+    T2: psibase::reflect::Reflect,
+    T3: psibase::reflect::Reflect,
+> {
+    a: T1,
+    b: Option<Box<DupNameStruct<T2, T3, T1>>>,
+    c: Option<Box<DupNameStruct<T3, T1, T2>>>,
+}
+
+#[test]
+fn test_dup_names() {
+    verify::<DupNameStruct<u8, u16, u32>>(json!([
+        {
+            "name": "DupNameStruct1",
+            "structFields": [{
+                "name": "a",
+                "ty": {"ty": "u32"},
+            }, {
+                "name": "b",
+                "ty": {"option": {"user": "DupNameStruct"}},
+            }, {
+                "name": "c",
+                "ty": {"option": {"user": "DupNameStruct0"}},
+            }],
+        },
+        {
+            "name": "DupNameStruct0",
+            "structFields": [{
+                "name": "a",
+                "ty": {"ty": "u16"},
+            }, {
+                "name": "b",
+                "ty": {"option": {"user": "DupNameStruct1"}},
+            }, {
+                "name": "c",
+                "ty": {"option": {"user": "DupNameStruct"}},
+            }],
+        },
+        {
+            "name": "DupNameStruct",
+            "structFields": [{
+                "name": "a",
+                "ty": {"ty": "u8"},
+            }, {
+                "name": "b",
+                "ty": {"option": {"user": "DupNameStruct0"}},
+            }, {
+                "name": "c",
+                "ty": {"option": {"user": "DupNameStruct1"}},
+            }],
+        },
+    ]));
+}
+
+#[derive(psibase::Reflect)]
 enum Enum0 {}
 
 #[derive(psibase::Reflect)]

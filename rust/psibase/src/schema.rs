@@ -3,6 +3,7 @@ use crate::reflect::{EnumVisitor, Reflect, StructVisitor, UnnamedVisitor, Visito
 use fracpack::Fracpack;
 use psibase_macros::Reflect;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::{any::TypeId, borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Clone, Default, Fracpack, Reflect, Serialize, Deserialize)]
@@ -95,26 +96,39 @@ fn extract_str(str: &BuildString) -> String {
 pub fn create_schema<T: Reflect>() -> Schema<BuildString> {
     let mut builder: SchemaBuilder = Default::default();
     builder.get_type_ref::<T>();
-    // TODO: handle duplicate names
+    let mut names: HashSet<String> = HashSet::new();
+    for shared_name in builder.names {
+        let name = extract_str(&shared_name);
+        if names.contains(&name) {
+            let mut i = 0;
+            let new_name = loop {
+                let n = format!("{}{}", &name, i);
+                if !names.contains(&n) {
+                    break n;
+                }
+                i += 1;
+            };
+            shared_name.replace(new_name.clone().into());
+            names.insert(new_name);
+        } else {
+            names.insert(name);
+        }
+    }
     builder.schema
-}
-
-struct BuiltType {
-    _name: Option<BuildString>, // TODO
-    type_ref: TypeRef<BuildString>,
 }
 
 #[derive(Default)]
 struct SchemaBuilder {
-    types: HashMap<TypeId, BuiltType>,
+    names: Vec<BuildString>,
+    type_refs: HashMap<TypeId, TypeRef<BuildString>>,
     schema: Schema<BuildString>,
 }
 
 impl SchemaBuilder {
     fn get_type_ref<T: Reflect>(&mut self) -> TypeRef<BuildString> {
         let type_id = TypeId::of::<T::StaticType>();
-        if let Some(tr) = self.types.get(&type_id) {
-            tr.type_ref.clone()
+        if let Some(tr) = self.type_refs.get(&type_id) {
+            tr.clone()
         } else {
             T::StaticType::reflect(TypeBuilder {
                 schema_builder: self,
@@ -128,12 +142,14 @@ impl SchemaBuilder {
         &mut self,
         name: Option<BuildString>,
         type_ref: TypeRef<BuildString>,
-    ) -> &mut BuiltType {
-        self.types
+    ) -> &TypeRef<BuildString> {
+        self.type_refs
             .entry(TypeId::of::<T::StaticType>())
-            .or_insert(BuiltType {
-                _name: name,
-                type_ref,
+            .or_insert_with(|| {
+                if let Some(name) = name {
+                    self.names.push(name);
+                }
+                type_ref
             })
     }
 }
@@ -165,7 +181,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let name = Rc::new(RefCell::new(name.into()));
         self.schema_builder
             .insert::<T>(Some(name.clone()), TypeRef::ty(name))
-            .type_ref
             .clone()
     }
 
@@ -201,7 +216,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let inner = self.schema_builder.get_type_ref::<Inner>();
         self.schema_builder
             .insert::<Option<Inner>>(None, TypeRef::option(Box::new(inner)))
-            .type_ref
             .clone()
     }
 
@@ -209,7 +223,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let inner = self.schema_builder.get_type_ref::<Inner>();
         self.schema_builder
             .insert::<T>(None, TypeRef::vector(Box::new(inner)))
-            .type_ref
             .clone()
     }
 
@@ -217,7 +230,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let inner = self.schema_builder.get_type_ref::<Inner>();
         self.schema_builder
             .insert::<[Inner; SIZE]>(None, TypeRef::array(Box::new(inner), SIZE as u32))
-            .type_ref
             .clone()
     }
 
@@ -243,7 +255,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         });
         self.schema_builder
             .insert::<T>(Some(name.clone()), TypeRef::user(name))
-            .type_ref
             .clone()
     }
 
@@ -256,7 +267,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let type_ref = self
             .schema_builder
             .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
-            .type_ref
             .clone();
         StructTupleBuilder {
             schema_builder: self.schema_builder,
@@ -275,7 +285,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let type_ref = self
             .schema_builder
             .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
-            .type_ref
             .clone();
         StructBuilder {
             schema_builder: self.schema_builder,
@@ -296,7 +305,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let type_ref = self
             .schema_builder
             .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
-            .type_ref
             .clone();
         EnumBuilder {
             schema_builder: self.schema_builder,
@@ -321,13 +329,9 @@ impl<'a> UnnamedVisitor<TypeRef<BuildString>> for TupleBuilder<'a> {
 
     fn end(self) -> TypeRef<BuildString> {
         self.schema_builder
-            .types
+            .type_refs
             .entry(self.type_id)
-            .or_insert(BuiltType {
-                _name: None,
-                type_ref: TypeRef::tuple(self.fields),
-            })
-            .type_ref
+            .or_insert(TypeRef::tuple(self.fields))
             .clone()
     }
 }
