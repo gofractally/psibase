@@ -10,6 +10,16 @@ pub trait Reflect {
     fn reflect<V: Visitor>(visitor: V) -> V::Return;
 }
 
+pub trait ReflectNoMethods {
+    fn reflect_methods<Return>(visitor: impl StructVisitor<Return>) -> Return;
+}
+
+impl<T> ReflectNoMethods for T {
+    fn reflect_methods<Return>(visitor: impl StructVisitor<Return>) -> Return {
+        visitor.end()
+    }
+}
+
 pub trait Visitor {
     type Return;
     type TupleVisitor: UnnamedVisitor<Self::Return>;
@@ -63,10 +73,24 @@ pub trait NamedVisitor<Return> {
 pub trait StructVisitor<Return>: NamedVisitor<Return> {
     type MethodsVisitor: MethodsVisitor<Return>;
 
-    fn with_methods(self) -> Self::MethodsVisitor;
+    fn with_methods(self, num_methods: usize) -> Self::MethodsVisitor;
 }
 
-pub trait MethodsVisitor<Return> {}
+pub trait MethodsVisitor<Return>: Sized {
+    type ArgVisitor: ArgVisitor<Self>;
+
+    fn method<MethodReturn: Reflect>(
+        self,
+        name: Cow<'static, str>,
+        num_args: usize,
+    ) -> Self::ArgVisitor;
+    fn end(self) -> Return;
+}
+
+pub trait ArgVisitor<Return> {
+    fn arg<T: Reflect>(self, name: Cow<'static, str>) -> Self;
+    fn end(self) -> Return;
+}
 
 pub trait EnumVisitor<Return>: Sized {
     type TupleVisitor: UnnamedVisitor<Self>;
@@ -188,6 +212,8 @@ macro_rules! builtin_impl {
     };
 }
 
+pub struct Void;
+
 builtin_impl!(bool, "bool");
 builtin_impl!(u8, "u8");
 builtin_impl!(u16, "u16");
@@ -200,6 +226,7 @@ builtin_impl!(i64, "i64");
 builtin_impl!(f32, "f32");
 builtin_impl!(f64, "f64");
 builtin_impl!(String, "string");
+builtin_impl!(Void, "void");
 
 impl<'a> Reflect for &'a str {
     type StaticType = &'static str;
