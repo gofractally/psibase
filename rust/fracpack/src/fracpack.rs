@@ -1,7 +1,6 @@
 // TODO: fix reading structs and tuples which have unknown fields
 // TODO: option to allow/disallow unknown fields during verify and unpack
 // TODO: rename misnamed "heap_size"
-// TODO: support packing references; replace TupleOfRefPackable
 
 //! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
 //!
@@ -51,7 +50,7 @@
 //! for the two types.
 
 use custom_error::custom_error;
-use std::mem;
+use std::{mem, rc::Rc, sync::Arc};
 
 pub use psibase_macros::Fracpack;
 
@@ -63,6 +62,7 @@ custom_error! {pub Error
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
     ExtraData           = "Extra data in buffer",
+    UnpackRef           = "Can't unpack a ref"
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -271,11 +271,6 @@ pub trait Packable<'a>: Sized {
     }
 } // Packable
 
-#[doc(hidden)]
-pub trait TupleOfRefPackable<'a>: Sized {
-    fn pack_tuple_of_ref(&self, dest: &mut Vec<u8>);
-}
-
 fn read_u8_arr<const SIZE: usize>(src: &[u8], pos: &mut u32) -> Result<[u8; SIZE]> {
     let mut bytes: [u8; SIZE] = [0; SIZE];
     bytes.copy_from_slice(
@@ -301,6 +296,68 @@ impl MissingBoolConversions for bool {
             true => [1],
             false => [0],
         }
+    }
+}
+
+impl<'a, T: Packable<'a>> Packable<'a> for &'a T {
+    const FIXED_SIZE: u32 = T::FIXED_SIZE;
+    const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
+    const IS_OPTIONAL: bool = T::IS_OPTIONAL;
+
+    fn pack(&self, dest: &mut Vec<u8>) {
+        (*self).pack(dest)
+    }
+
+    fn unpack(_src: &'a [u8], _pos: &mut u32) -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        <T>::verify(src, pos)
+    }
+
+    fn is_empty_container(&self) -> bool {
+        (*self).is_empty_container()
+    }
+
+    fn new_empty_container() -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
+        (*self).embedded_fixed_pack(dest)
+    }
+
+    fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+        (*self).embedded_fixed_repack(fixed_pos, heap_pos, dest)
+    }
+
+    fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
+        (*self).embedded_variable_pack(dest)
+    }
+
+    fn embedded_variable_unpack(
+        _src: &'a [u8],
+        _fixed_pos: &mut u32,
+        _heap_pos: &mut u32,
+    ) -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn embedded_unpack(_src: &'a [u8], _fixed_pos: &mut u32, _heap_pos: &mut u32) -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn embedded_variable_verify(
+        src: &'a [u8],
+        fixed_pos: &mut u32,
+        heap_pos: &mut u32,
+    ) -> Result<()> {
+        <T>::embedded_variable_verify(src, fixed_pos, heap_pos)
+    }
+
+    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+        <T>::embedded_verify(src, fixed_pos, heap_pos)
     }
 }
 
@@ -338,6 +395,86 @@ scalar_impl! {u32}
 scalar_impl! {u64}
 scalar_impl! {f32}
 scalar_impl! {f64}
+
+macro_rules! ptr_impl {
+    ($ptr:ident) => {
+        impl<'a, T: Packable<'a>> Packable<'a> for $ptr<T> {
+            const FIXED_SIZE: u32 = T::FIXED_SIZE;
+            const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
+            const IS_OPTIONAL: bool = T::IS_OPTIONAL;
+
+            fn pack(&self, dest: &mut Vec<u8>) {
+                self.as_ref().pack(dest)
+            }
+
+            fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
+                Ok(Self::new(<T>::unpack(src, pos)?))
+            }
+
+            fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+                <T>::verify(src, pos)
+            }
+
+            fn is_empty_container(&self) -> bool {
+                self.as_ref().is_empty_container()
+            }
+
+            fn new_empty_container() -> Result<Self> {
+                Ok(Self::new(<T>::new_empty_container()?))
+            }
+
+            fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
+                self.as_ref().embedded_fixed_pack(dest)
+            }
+
+            fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+                self.as_ref()
+                    .embedded_fixed_repack(fixed_pos, heap_pos, dest)
+            }
+
+            fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
+                self.as_ref().embedded_variable_pack(dest)
+            }
+
+            fn embedded_variable_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> Result<Self> {
+                Ok(Self::new(<T>::embedded_variable_unpack(
+                    src, fixed_pos, heap_pos,
+                )?))
+            }
+
+            fn embedded_unpack(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> Result<Self> {
+                Ok(Self::new(<T>::embedded_unpack(src, fixed_pos, heap_pos)?))
+            }
+
+            fn embedded_variable_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> Result<()> {
+                <T>::embedded_variable_verify(src, fixed_pos, heap_pos)
+            }
+
+            fn embedded_verify(
+                src: &'a [u8],
+                fixed_pos: &mut u32,
+                heap_pos: &mut u32,
+            ) -> Result<()> {
+                <T>::embedded_verify(src, fixed_pos, heap_pos)
+            }
+        }
+    };
+}
+ptr_impl!(Box);
+ptr_impl!(Rc);
+ptr_impl!(Arc);
 
 impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
     const FIXED_SIZE: u32 = 4;
@@ -680,25 +817,6 @@ macro_rules! tuple_impls {
                     )*
                     *pos = heap_pos;
                     Ok(())
-                }
-            }
-
-            impl<'a, $($name: Packable<'a>),*> TupleOfRefPackable<'a> for ($(&$name,)*)
-            {
-                #[allow(non_snake_case)]
-                fn pack_tuple_of_ref(&self, dest: &mut Vec<u8>) {
-                    let heap: u32 = $($name::FIXED_SIZE +)* 0;
-                    assert!(heap as u16 as u32 == heap); // TODO: return error
-                    (heap as u16).pack(dest);
-                    $(
-                        let $name = dest.len() as u32;
-                        self.$n.embedded_fixed_pack(dest);
-                    )*
-                    $(
-                        let heap_pos = dest.len() as u32;
-                        self.$n.embedded_fixed_repack($name, heap_pos, dest);
-                        self.$n.embedded_variable_pack(dest);
-                    )*
                 }
             }
         )+

@@ -3,6 +3,7 @@
 #include <boost/beast/core/tcp_stream.hpp>
 #include <boost/beast/websocket/stream_fwd.hpp>
 #include <chrono>
+#include <filesystem>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
 
@@ -35,6 +36,112 @@ namespace psibase::http
    using connect_callback = std::function<void(connect_result)>;
    using connect_t        = std::function<void(std::vector<char>, connect_callback)>;
 
+   using get_config_result   = std::function<std::vector<char>()>;
+   using get_config_callback = std::function<void(get_config_result)>;
+   using get_config_t        = std::function<void(get_config_callback)>;
+
+   struct http_status
+   {
+      unsigned slow : 1;
+      unsigned startup : 1;
+   };
+   template <typename S>
+   void to_json(http_status obj, S& stream)
+   {
+      stream.write('[');
+      bool first       = true;
+      auto maybe_comma = [&]()
+      {
+         if (first)
+         {
+            first = false;
+         }
+         else
+         {
+            stream.write(',');
+         }
+      };
+      if (obj.slow)
+      {
+         maybe_comma();
+         to_json("slow", stream);
+      }
+      if (obj.startup)
+      {
+         maybe_comma();
+         to_json("startup", stream);
+      }
+      stream.write(']');
+   }
+
+   struct native_content
+   {
+      std::filesystem::path path;
+      std::string           content_type;
+      std::uintmax_t        size;
+   };
+   using services_t =
+       std::map<std::string, std::map<std::string, native_content, std::less<>>, std::less<>>;
+
+   // Identifies which services are allowed to access the native API
+   struct admin_none
+   {
+      std::string str() const { return ""; }
+   };
+   struct admin_any
+   {
+      std::string str() const { return "*"; }
+   };
+   struct admin_any_native
+   {
+      std::string str() const { return "static:*"; }
+   };
+   using admin_service = std::variant<admin_none, admin_any, admin_any_native, AccountNumber>;
+
+   inline admin_service admin_service_from_string(std::string_view s)
+   {
+      if (s == "")
+      {
+         return admin_none{};
+      }
+      else if (s == "*")
+      {
+         return admin_any{};
+      }
+      else if (s == "static:*")
+      {
+         return admin_any_native{};
+      }
+      else
+      {
+         return AccountNumber{s};
+      }
+   }
+
+   void from_json(admin_service& obj, auto& stream)
+   {
+      if (stream.get_null_pred())
+      {
+         obj = admin_none{};
+      }
+      else
+      {
+         obj = admin_service_from_string(stream.get_string());
+      }
+   }
+
+   void to_json(const admin_service& obj, auto& stream)
+   {
+      if (std::holds_alternative<admin_none>(obj))
+      {
+         stream.write("null", 4);
+      }
+      else
+      {
+         std::visit([&](const auto& value) { to_json(value.str(), stream); }, obj);
+      }
+   }
+
    struct http_config
    {
       uint32_t                  num_threads            = {};
@@ -51,8 +158,13 @@ namespace psibase::http
       get_peers_t               get_peers              = {};
       connect_t                 connect                = {};
       connect_t                 disconnect             = {};
+      get_config_t              get_config             = {};
+      connect_t                 set_config             = {};
+      admin_service             admin                  = {};
       bool                      host_perf              = false;
-      std::atomic<bool>         ready_for_p2p;
+      services_t                services;
+      std::atomic<bool>         enable_p2p;
+      std::atomic<http_status>  status;
    };
 
    struct server

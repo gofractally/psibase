@@ -340,7 +340,21 @@ namespace psibase::net
          auto& connection      = get_connection(origin);
          connection.peer_ready = true;
       }
-      void set_producer_id(producer_id prod) { self = prod; }
+      void set_producer_id(producer_id prod)
+      {
+         if (self != prod)
+         {
+            self = prod;
+            // Re-evaluates producer state
+            // This may leave the leader running even it it changed names.
+            // I believe that this is safe because the fact that it's
+            // still the same node guarantees that the hand-off is atomic.
+            if (active_producers[0])
+            {
+               set_producers({active_producers[0], active_producers[1]});
+            }
+         }
+      }
       void set_producers(
           std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> prods)
       {

@@ -13,23 +13,25 @@ pub struct ServiceMethod {
 
 /// Authenticate actions
 ///
-/// [TransactionSys] calls into auth services using this interface
-/// to authenticate senders of top-level actions and uses of
-/// [TransactionSys::runAs]. Any service may become an auth
-/// service by implementing `AuthInterface`. Any account may
-/// select any service to be its authenticator. Be careful;
-/// this allows that service to act on the account's behalf and
-/// that service to authorize other accounts and services to
-/// act on the account's behalf. It can also can lock out that
-/// account. See `AuthEcSys` for a canonical example of
-/// implementing this interface.
+/// [transaction_sys](crate::services::transaction_sys::Actions)
+/// calls into auth services using `auth_interface` to authenticate
+/// senders of top-level actions and uses of
+/// [runAs](crate::services::transaction_sys::Actions::runAs).
+/// Any service may become an auth service by implementing
+/// `auth_interface`. Any account may select any service to be
+/// its authenticator. Be careful; this allows that service to
+/// act on the account's behalf and that service to authorize
+/// other accounts and services to act on the account's behalf.
+/// It can also can lock out that account. See `AuthEcSys` (C++)
+/// for a canonical example of implementing `auth_interface`.
 ///
 /// This interface can't authenticate non-top-level actions other
-/// than [TransactionSys::runAs] actions. Most services shouldn't
-/// call or implement `AuthInterface`; use `getSender()`.
+/// than [runAs](crate::services::transaction_sys::Actions::runAs)
+/// actions. Most services shouldn't call or implement
+/// `auth_interface`; use `get_sender()` TODO: link.
 ///
-/// Auth services shouldn't inherit from this struct. Instead,
-/// they should define methods with matching signatures.
+/// Services implement `auth_interface` by defining actions with
+/// identical signatures; there is no trait.
 #[crate::service(
     name = "example-auth",
     actions = "AuthActions",
@@ -129,11 +131,12 @@ pub mod auth_interface {
 ///
 /// This privileged service dispatches top-level actions to other
 /// services, checks TAPoS, detects duplicate transactions, and
-/// checks authorizations using [SystemService::AuthInterface].
+/// checks authorizations using
+/// [auth_interface](crate::services::transaction_sys::auth_interface).
 ///
 /// Other services use it to get information about the chain,
 /// current block, and head block. They also use it to call actions
-/// using other accounts' authorities via [runAs].
+/// using other accounts' authorities via [runAs](Self::runAs).
 // TODO: tables
 // TODO: service flags
 #[crate::service(name = "transact-sys", dispatch = false, psibase_mod = "crate")]
@@ -141,10 +144,11 @@ pub mod auth_interface {
 mod service {
     /// Only called once during chain initialization
     ///
-    /// This enables the auth checking system. Before this point, `TransactionSys`
+    /// This enables the auth checking system. Before this point, `transaction_sys`
     /// allows all transactions to execute without auth checks. After this point,
-    /// `TransactionSys` uses [AuthInterface::checkAuthSys] to authenticate
-    /// top-level actions and uses of [runAs].
+    /// `transaction_sys` uses
+    /// [checkAuthSys](crate::services::transaction_sys::AuthActions::checkAuthSys)
+    /// to authenticate top-level actions and uses of [runAs](Self::runAs).
     #[action]
     fn init() {
         unimplemented!()
@@ -167,17 +171,22 @@ mod service {
     /// Returns the action's return value, if any.
     ///
     /// This will succeed if any of the following are true:
-    /// * `getSender() == action.sender's authService`
-    /// * `getSender() == action.sender`. Requires `action.sender's authService`
-    ///   to approve with flag `AuthInterface::runAsRequesterReq` (normally succeeds).
-    /// * An existing `runAs` is currently on the call stack, `getSender()` matches
+    /// * `get_sender() == action.sender's authService`
+    /// * `get_sender() == action.sender`. Requires `action.sender's authService`
+    ///   to approve with flag
+    ///   [RUN_AS_REQUESTER_REQ](crate::services::transaction_sys::auth_interface::RUN_AS_REQUESTER_REQ)
+    ///   (normally succeeds).
+    /// * An existing `runAs` is currently on the call stack, `get_sender()` matches
     ///   `action.service` on that earlier call, and `action` matches
     ///   `allowedActions` from that same earlier call. Requires `action.sender's
-    ///   authService` to approve with flag `AuthInterface::runAsMatchedReq`
+    ///   authService` to approve with flag
+    ///   [RUN_AS_MATCHED_REQ](crate::services::transaction_sys::auth_interface::RUN_AS_MATCHED_REQ)
     ///   if `allowedActions` is empty (normally succeeds), or
-    ///   `AuthInterface::runAsMatchedExpandedReq` if not empty (normally fails).
+    ///   [RUN_AS_MATCHED_EXPANDED_REQ](crate::services::transaction_sys::auth_interface::RUN_AS_MATCHED_EXPANDED_REQ)
+    ///   if not empty (normally fails).
     /// * All other cases, requires `action.sender's authService`
-    ///   to approve with flag `AuthInterface::runAsOtherReq` (normally fails).
+    ///   to approve with flag [RUN_AS_OTHER_REQ](crate::services::transaction_sys::auth_interface::RUN_AS_OTHER_REQ)
+    ///   (normally fails).
     #[action]
     fn runAs(
         action: crate::Action,
@@ -201,7 +210,7 @@ mod service {
     /// Get the head block header
     ///
     /// This is *not* the currently executing block.
-    /// See [currentBlock].
+    /// See [currentBlock](Self::currentBlock).
     #[action]
     fn headBlock() -> crate::BlockHeader {
         unimplemented!()

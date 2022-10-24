@@ -59,6 +59,39 @@ Fixed-size subobjects live entirely within `fixed_data`. Variable-size subobject
 
 Tuples have the same encoding as structs, except they don't have a non-extensible option; tuples are always extensible, so they're always variable-size.
 
+### Unit (Rust)
+
+Fracpack treats the unit type (`()`) as an empty tuple. Be careful since this creates an inconsistency with `serde_json`, which renders unit as `null` instead of `[]`. See `Empty`, below, for an alternative.
+
+### Unit Structs (Rust)
+
+Fracpack doesn't support unit structs. See `Empty`, below, for an alternative.
+
+```
+// Not supported
+struct MyUnit;
+```
+
+### Tuple Structs (Rust)
+
+Fracpack encodes these structs as tuples. This matches `serde_json` semantics. Beware of the [special cases](#special-cases-rust).
+
+```
+struct Empty();                         // Encodes as an empty tuple
+struct TupleOfOne((u32,));              // Encodes as a tuple
+struct TupleOfTwo(u32, String);         // Encodes as a tuple
+struct TupleOfThree(u32, String, f64);  // Encodes as a tuple
+```
+
+### Special Cases (Rust)
+
+Fracpack encodes these structs as their inner items instead of encoding them as a struct or tuple. This matches `serde_json` semantics. This can result in either a fixed-size object or a variable-size object.
+
+```
+struct Single1(u32);        // Encodes as a u32 (fixed size)
+struct Single2(String, );   // Encodes as a String (variable size)
+```
+
 ### Offset Pointers
 
 When a subobject is variable size, it has an Offset Pointer which points to the beginning of that subobject. Offset pointers are unsigned 32-bit integers which record the difference between the target address and the pointer's address. Values 0-3 point to within the offset pointer itself; they have special meaning:

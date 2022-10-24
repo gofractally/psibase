@@ -307,7 +307,6 @@ impl<T: fracpack::PackableOwned> ChainResult<T> {
                 })
                 .last();
             if let Some(ret) = ret {
-                println!("\n\nlength {}\n", ret.len());
                 return Ok(T::unpacked(ret)?);
             }
         }

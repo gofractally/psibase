@@ -33,6 +33,10 @@ struct Args {
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<PrivateKey>,
 
+    /// Suppress "Ok" message
+    #[clap(long)]
+    suppress_ok: bool,
+
     #[clap(subcommand)]
     command: Command,
 }
@@ -275,7 +279,9 @@ async fn create(
         sign_transaction(trx, &args.sign)?.packed(),
     )
     .await?;
-    println!("Ok");
+    if !args.suppress_ok {
+        println!("Ok");
+    }
     Ok(())
 }
 
@@ -314,7 +320,9 @@ async fn modify(
         sign_transaction(trx, &args.sign)?.packed(),
     )
     .await?;
-    println!("Ok");
+    if !args.suppress_ok {
+        println!("Ok");
+    }
     Ok(())
 }
 
@@ -370,7 +378,9 @@ async fn deploy(
         sign_transaction(trx, &args.sign)?.packed(),
     )
     .await?;
-    println!("Ok");
+    if !args.suppress_ok {
+        println!("Ok");
+    }
     Ok(())
 }
 
@@ -407,7 +417,9 @@ async fn upload(
         sign_transaction(trx, &args.sign)?.packed(),
     )
     .await?;
-    println!("Ok");
+    if !args.suppress_ok {
+        println!("Ok");
+    }
     Ok(())
 }
 
@@ -482,7 +494,9 @@ async fn boot(
     };
     let transactions = create_boot_transactions(key, producer.into(), true, true, true, expiration);
     push_boot(args, client, transactions.packed()).await?;
-    println!("Ok");
+    if !args.suppress_ok {
+        println!("Ok");
+    }
     Ok(())
 }
 
@@ -583,7 +597,9 @@ async fn upload_tree(
         return Err(anyhow!("{}/{} failed transactions", num_failed, num_trx));
     }
 
-    println!("Ok");
+    if !args.suppress_ok {
+        println!("Ok");
+    }
     Ok(())
 }
 

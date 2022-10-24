@@ -1,6 +1,6 @@
 [package]
 name = "psibase"
-version = "0.1.2"
+version = "0.1.3"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -12,13 +12,13 @@ license = "MIT"
 anyhow = "1.0"
 chrono = "0.4"
 custom_error = "1.9"
-fracpack = { version = "0.1.3", path = "../fracpack" }
+fracpack = { version = "0.1.4", path = "../fracpack" }
 include_dir = "0.7"
 mime_guess = "2.0"
-psibase_macros = { version = "0.1.3", path = "../psibase_macros" }
+psibase_macros = { version = "0.1.4", path = "../psibase_macros" }
 psibase_names = { version = "0.1.3", path = "../psibase_names" }
 ripemd = "0.1"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = {version = "3.1", features = ["derive"]}

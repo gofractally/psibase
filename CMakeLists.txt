@@ -93,6 +93,7 @@ set(JS_DIRS
     services/user/CommonSys/ui:CommonSys_js
     services/user/TokenSys/ui:TokenSys_js
     services/user/ExploreSys/ui:ExploreSys_js
+    services/user/AdminSys/ui:AdminSys_js
 )
 
 option(BUILD_JS "Build JS" ON)
@@ -108,6 +109,24 @@ if(BUILD_JS)
     endforeach()
 endif()
 
+function(psinode_files target pfx)
+add_custom_target(
+  ${target}
+  ALL
+  DEPENDS AdminSys_js
+  COMMAND rm -rf ${pfx}/share/psibase/services/admin-sys
+  COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
+  COMMAND cp -a -T ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist ${pfx}/share/psibase/services/admin-sys
+  COMMAND cp -a -T ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
+  COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/rpc.mjs ${pfx}/share/psibase/services/admin-sys/common/
+  COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/keyConversions.mjs ${pfx}/share/psibase/services/admin-sys/common/
+  COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
+  )
+endfunction()
+
+psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
+psinode_files(psinode-psidk-share ${CMAKE_CURRENT_BINARY_DIR}/psidk)
+
 option(BUILD_RUST "Build rust" ON)
 if(BUILD_RUST)
     set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
@@ -121,9 +140,10 @@ if(BUILD_RUST)
         CONFIGURE_COMMAND ""
         BUILD_COMMAND   rm -rf ${BOOT_IMAGE}
         COMMAND         mkdir -p ${BOOT_IMAGE}/CommonSys/common ${BOOT_IMAGE}/CommonSys/common/fonts ${BOOT_IMAGE}/CommonSys/ui/vanilla
-        COMMAND         mkdir -p ${BOOT_IMAGE}/AccountSys/ui ${BOOT_IMAGE}/ExploreSys/ui
+        COMMAND         mkdir -p ${BOOT_IMAGE}/AccountSys/ui ${BOOT_IMAGE}/AdminSys/ui ${BOOT_IMAGE}/ExploreSys/ui
         COMMAND         mkdir -p ${BOOT_IMAGE}/AuthEcSys ${BOOT_IMAGE}/TokenSys/ui ${BOOT_IMAGE}/PsiSpaceSys/ui
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AdminSys.wasm                     ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm                    ${BOOT_IMAGE}
@@ -151,6 +171,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist      ${BOOT_IMAGE}/ExploreSys/ui/dist
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist        ${BOOT_IMAGE}/TokenSys/ui/dist
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui/dist     ${BOOT_IMAGE}/PsiSpaceSys/ui/dist
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist        ${BOOT_IMAGE}/AdminSys/ui/dist
 
         COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc || mkdir -p ${BOOT_IMAGE}/doc"
 

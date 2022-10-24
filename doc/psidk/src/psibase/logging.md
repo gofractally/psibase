@@ -3,11 +3,12 @@
 - [Config File](#config-file)
   - [Console Logger](#console-logger)
   - [File Logger](#file-logger)
+  - [Local Socket Logger](#local-socket-logger)
   - [Differences from JSON](#differences-from-json)
 - [Log Filters](#log-filters)
-- [Log Formatters](#log-fomatters)
+- [Log Formatters](#log-formatters)
 
-Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../http.md#logging) while the server is running.
+Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../http.md#server-configuration) while the server is running.
 
 ## Config File
 
@@ -22,12 +23,12 @@ format = [%TimeStamp%] [%Severity%]: %Message%
 
 Each logger should have the following properties
 
-| Property           | Description                                                                        |
-|--------------------|------------------------------------------------------------------------------------|
-| `type`             | The type of the logger: [`"console"`](#console-logger) or [`"file"`](#file-logger) |
-| `filter`           | The [filter](#log-filters) for the logger                                          |
-| `format`           | Determines the [format](#log-fomatters) of log messages                            |
-| `format.<Channel>` | Overrides the format for a specific channel                                        |
+| Property           | Description                                                                                                      |
+|--------------------|------------------------------------------------------------------------------------------------------------------|
+| `type`             | The type of the logger: [`console`](#console-logger), [`file`](#file-logger), or [`local`](#local-socket-logger) |
+| `filter`           | The [filter](#log-filters) for the logger                                                                        |
+| `format`           | Determines the [format](#log-fomatters) of log messages                                                          |
+| `format.<Channel>` | Overrides the format for a specific channel                                                                      |
 
 
 ### Console logger
@@ -73,6 +74,23 @@ maxFiles     = 128
 maxSize      = 1 GiB
 ```
 
+### Local socket logger
+
+The socket type `local` writes to a local datagram socket. Each log record is sent in a single message. With an appropriate format, it can be used to communicate with logging daemons on most unix systems.
+
+| Property | Description     |
+|----------|-----------------|
+| `path`   | The socket path |
+
+Example:
+```ini
+[logger.syslog]
+type   = local
+filter = %Severity% >= info
+format = %Syslog(format=glibc)%%Message%
+path   = /dev/log
+```
+
 ### Differences from JSON
 
 The config file format is intended to allow manual editing and is therefore more permissive than the JSON format used by the [HTTP API](../http.md#logging), which is designed as a machine-to-machine interface.
@@ -114,7 +132,7 @@ Examples:
   }
   ```
 
-Formatters have several attributes that are not available for filters.
+Formatters have several attributes beyond those available for filters including several compound formats.
 
 | Attribute          | Availability                                                                     | Notes                                                                |
 |--------------------|----------------------------------------------------------------------------------|----------------------------------------------------------------------|
@@ -125,6 +143,21 @@ Formatters have several attributes that are not available for filters.
 | `%Json%`           |                                                                                  | Formats the entire log record as JSON                                |
 | `%Message%`        |                                                                                  | The log message                                                      |
 | `%PeerId%`         | Log records related to p2p connections                                           |                                                                      |
+| `%Process%`        | All records                                                                      | The program name (usually `psinode`)                                 |
+| `%ProcessId%`      | All records                                                                      | The server's pid                                                     |
 | `%RemoteEndpoint%` | Log records related to HTTP requests, websocket connections, and p2p connections |                                                                      |
 | `%Severity%`       | All records                                                                      | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
+| `%Syslog%`         |                                                                                  | Formats a [syslog](#syslog) header.                                  |
 | `%TimeStamp%`      | All records                                                                      | ISO 8601 extended format                                             |
+
+### Syslog
+
+The `Syslog` format creates a syslog header. It should be prepended to the desired message format with no space.
+
+`Syslog` has additional options:
+- `format`: one of `bsd` (equivalent to `rfc3164`), `rfc3164`, `rfc5424`, `glibc`. Default is `bsd`.
+- `facility`: A syslog facility number or keyword.  Default is `local0`.
+
+Examples:
+- `%Syslog(facility=local1,format=rfc5424)%`
+- `%Syslog(format=glibc)%`: Suitable for writing to `/dev/log` on linux systems.

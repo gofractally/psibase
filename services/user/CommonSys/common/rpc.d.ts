@@ -10,6 +10,7 @@ declare module "common/rpc.mjs" {
     function initializeApplet(fn: (data: any) => Promise<void>): void;
 
     function getJson<T = any>(url: string): Promise<T>;
+    function postJson<T = any>(url: string, json: any): Promise<T>;
 
     const MessageTypes = {
         Action: "Action",

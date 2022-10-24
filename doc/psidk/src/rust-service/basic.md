@@ -1,9 +1,5 @@
 # Basic Rust Service
 
-## Not Yet Functional
-
-This documents some of our current thoughts and ongoing development for Rust service support. The installation procedure and examples are currently non-functional.
-
 ## Installation
 
 Follow the [Rust Installation Guide](../../rust.md).
@@ -16,6 +12,7 @@ Run the following to create a project:
 cargo new --lib example
 cd example
 cargo add psibase
+cargo add -F derive serde
 ```
 
 This creates the following files:
@@ -61,8 +58,7 @@ cargo psibase deploy -i example
 
 ## Where's the pub?
 
-The `service` module and the actions within it don't need to be public. Instead, the [`psibase::service`] macro generates public definitions which wrap the actions. You don't need to make the actions public to document them; the macro copies documentation from the action definitions to the generated definitions. It also copies
-documentation from the `service` module.
+The `service` module and the actions within it don't need to be public. Instead, the `psibase::service` macro generates public definitions which wrap the actions. You don't need to make the actions public to document them; the macro copies documentation from the action definitions to the generated definitions. It also copies documentation from the `service` module.
 
 ## Psibase and Cargo
 
@@ -75,7 +71,7 @@ Here's an example of how they differ: `psibase deploy` has an argument which mus
 
 ## Testing the Service
 
-The next section, [Testing Services](../testing) covers testing our service.
+The next section, [Testing Services](testing.html) covers testing our service.
 
 ## Homework
 

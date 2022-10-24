@@ -59,6 +59,8 @@ namespace triedent
                    "$$\". "
                    "If that doesn't work, try running psinode with \"sudo\". If that doesn't work, "
                    "then try using psinode's \"--slow\" option.");
+            else
+               _slow = true;
       }
       _begin = _head->begin.get();
       _end   = _head->end.get();

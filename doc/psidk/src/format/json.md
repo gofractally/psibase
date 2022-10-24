@@ -4,7 +4,41 @@ Both C++ and Rust services support typed JSON serialization. C++ services use `p
 
 ## Structs
 
-Both psio and serde_json represent structs-with-fields as JSON objects.
+Both psio and serde_json represent structs with named fields as JSON objects.
+
+## Tuples
+
+Both psio and serde_json represent tuples as JSON arrays. The empty tuple has a problem. `psio` renders `std::tuple<>{}` as you'd expect: `[]`. `serde_json`, however, renders `()`, the unit, as `null`. [schema](schema.html) doesn't support Rust's unit to avoid this inconsistency. See `Empty`, below, for a workaround.
+
+- TODO: psio json support for tuples
+
+## Unit Structs (Rust)
+
+serde_json represents unit structs (like below) as `null`. We recommend against using this; [fracpack](fracpack.html) and [schema](schema.html) don't support it. See `Empty`, below, for an alternative.
+
+```
+struct MyUnit;
+```
+
+## Tuple Structs (Rust)
+
+serde_json represents these structs as tuples. Beware of the [special cases](#special-cases-rust).
+
+```
+struct Empty();                         // []
+struct TupleOfOne((u32,));              // [value]
+struct TupleOfTwo(u32, String);         // [value, value]
+struct TupleOfThree(u32, String, f64);  // [value, value, value]
+```
+
+### Special Cases (Rust)
+
+serde_json represents these structs as their inner values instead of as tuples (`[...]`). [Fracpack](fracpack.html) and [Schema](schema.html) act the same.
+
+```
+struct Single1(u32);        // 1234
+struct Single2(String, );   // "A string"
+```
 
 ## Numbers
 
@@ -50,12 +84,6 @@ When should a vector or array use a hex representation? It's convenient to autom
 - TODO: Rust: A fixed-size bytes type
 - TODO: Rust: fracpack support for encoding bytes type as a vector instead of a struct of vector
 - TODO: Rust: fracpack support for encoding fixed-size bytes type as an array instead of a struct of array
-
-## Tuples
-
-Both psio and serde_json represent tuples as JSON arrays. The empty tuple has a problem. `psio` renders `std::tuple<>{}` as you'd expect: `[]`. `serde_json`, however, renders `()`, the unit, as `null`.
-
-- TODO: psio json support for tuples
 
 ## Variants / Enums
 

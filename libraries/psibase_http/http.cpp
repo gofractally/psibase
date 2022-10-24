@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -86,6 +87,12 @@ namespace psibase::http
          threads.clear();
       }
    };  // server_impl
+
+   template <typename T>
+   constexpr std::size_t function_arg_count = 0;
+
+   template <typename R, typename... T>
+   constexpr std::size_t function_arg_count<std::function<R(T...)>> = sizeof...(T);
 
    // Reads log records from the queue and writes them to a websocket
    template <typename StreamType>
@@ -157,6 +164,67 @@ namespace psibase::http
       beast::flat_buffer          buffer;
    };
 
+   beast::string_view remove_scheme(beast::string_view origin)
+   {
+      auto pos = origin.find("://");
+      if (pos != beast::string_view::npos)
+      {
+         return origin.substr(pos + 3);
+      }
+      return origin;
+   }
+
+   beast::string_view deport(beast::string_view host)
+   {
+      if (auto pos = host.rfind(':'); pos != std::string::npos)
+      {
+         if (host.find(']', pos) == std::string::npos)
+         {
+            return host.substr(0, pos);
+         }
+      }
+      return host;
+   }
+
+   bool is_admin(admin_none, const http_config&, beast::string_view)
+   {
+      return false;
+   }
+
+   bool is_admin(admin_any, const http_config&, beast::string_view)
+   {
+      return true;
+   }
+
+   bool is_admin(admin_any_native, const http_config& cfg, beast::string_view host)
+   {
+      return cfg.services.find(host) != cfg.services.end();
+   }
+
+   bool is_admin(AccountNumber admin, const http_config& cfg, beast::string_view host)
+   {
+      if (host.size() > cfg.host.size() && host.ends_with(cfg.host) &&
+          host[host.size() - cfg.host.size() - 1] == '.')
+      {
+         return admin.str() == host.substr(0, host.size() - cfg.host.size() - 1);
+      }
+      else
+      {
+         return false;
+      }
+   }
+
+   bool is_admin(const http_config& cfg, beast::string_view host)
+   {
+      return std::visit([&](const auto& admin) { return is_admin(admin, cfg, host); }, cfg.admin);
+   }
+
+   template <class Body, class Allocator>
+   bool is_admin(const http_config& cfg, bhttp::request<Body, bhttp::basic_fields<Allocator>>& req)
+   {
+      return is_admin(cfg, deport(req.at(bhttp::field::host)));
+   }
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -168,10 +236,11 @@ namespace psibase::http
    {
       unsigned req_version    = req.version();
       bool     req_keep_alive = req.keep_alive();
+      bool     req_allow_cors = !req.target().starts_with("/native/");
 
-      const auto set_cors = [&server](auto& res)
+      const auto set_cors = [&server, req_allow_cors](auto& res)
       {
-         if (!server.http_config->allow_origin.empty())
+         if (!server.http_config->allow_origin.empty() && req_allow_cors)
          {
             res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
             res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS");
@@ -189,6 +258,23 @@ namespace psibase::http
          set_cors(res);
          res.keep_alive(req_keep_alive);
          res.body() = why.to_string();
+         res.prepare_payload();
+         return res;
+      };
+
+      // Returns a method_not_allowed response
+      const auto method_not_allowed = [&server, set_cors, req_version, req_keep_alive](
+                                          beast::string_view target, beast::string_view method,
+                                          beast::string_view allowed_methods)
+      {
+         bhttp::response<bhttp::string_body> res{bhttp::status::method_not_allowed, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         res.set(bhttp::field::content_type, "text/html");
+         res.set(bhttp::field::allow, allowed_methods);
+         set_cors(res);
+         res.keep_alive(req_keep_alive);
+         res.body() = "The resource '" + target.to_string() + "' does not accept the method " +
+                      method.to_string() + ".";
          res.prepare_payload();
          return res;
       };
@@ -249,20 +335,94 @@ namespace psibase::http
          return res;
       };
 
+      // Used for requests that are not subject to CORS such as websockets
+      auto forbid_cross_origin = [&req, &send, &error]()
+      {
+         if (auto iter = req.find(bhttp::field::origin); iter != req.end())
+         {
+            const auto& host   = req[bhttp::field::host];
+            const auto& origin = iter->value();
+            if (origin == "null" || remove_scheme(origin) != host)
+            {
+               send(error(bhttp::status::bad_request, "Cross origin request refused"));
+               return true;
+            }
+         }
+         return false;
+      };
+
+      const auto run_native_handler = [&send, &req](auto&& request_handler, auto&& callback)
+      {
+         send.pause_read = true;
+         auto post_back_to_http =
+             [callback = static_cast<decltype(callback)>(callback),
+              session  = send.self.derived_session().shared_from_this(),
+              server   = send.self.server.shared_from_this()](auto&& result) mutable
+         {
+            auto* p = session.get();
+            net::post(p->stream.socket().get_executor(),
+                      [callback = std::move(callback), session = std::move(session),
+                       result = static_cast<decltype(result)>(result)]()
+                      {
+                         session->queue_.pause_read = false;
+                         callback(std::move(result));
+                         if (session->queue_.can_read())
+                            session->do_read();
+                      });
+         };
+         if constexpr (function_arg_count<std::remove_cvref_t<decltype(request_handler)>> == 2)
+         {
+            request_handler(std::move(req.body()), std::move(post_back_to_http));
+         }
+         else
+         {
+            request_handler(std::move(post_back_to_http));
+         }
+      };
+
       try
       {
-         auto host  = req.at("Host");
-         auto colon = host.find(':');
-         if (colon != host.npos)
-            host.remove_suffix(host.size() - colon);
+         auto host = deport(req.at(bhttp::field::host));
 
-         if (req.method() == bhttp::verb::options)
+         if (!req.target().starts_with("/native"))
          {
-            return send(ok_no_content());
-         }
+            if (auto iter = server.http_config->services.find(host);
+                iter != server.http_config->services.end())
+            {
+               auto file = iter->second.find(req.target());
+               if (file != iter->second.end())
+               {
+                  if (req.method() == bhttp::verb::options)
+                  {
+                     return send(ok_no_content());
+                  }
+                  else if (req.method() != bhttp::verb::get)
+                  {
+                     return send(
+                         method_not_allowed(req.target(), req.method_string(), "GET, OPTIONS"));
+                  }
 
-         else if (!req.target().starts_with("/native"))
-         {
+                  std::vector<char> contents;
+                  // read file
+                  std::ifstream in(file->second.path, std::ios_base::binary);
+                  contents.resize(file->second.size);
+                  in.read(contents.data(), contents.size());
+                  return send(ok(std::move(contents), file->second.content_type.c_str()));
+               }
+               else
+               {
+                  return send(not_found(req.target()));
+               }
+            }
+
+            if (server.http_config->host.empty())
+               return send(not_found(req.target()));
+
+            if (req.method() == bhttp::verb::options)
+            {
+               return send(ok_no_content());
+            }
+
             auto        startTime = steady_clock::now();
             HttpRequest data;
             if (req.method() == bhttp::verb::get)
@@ -270,8 +430,8 @@ namespace psibase::http
             else if (req.method() == bhttp::verb::post)
                data.method = "POST";
             else
-               return send(error(bhttp::status::bad_request,
-                                 "Unsupported HTTP-method for " + req.target().to_string() + "\n"));
+               return send(
+                   method_not_allowed(req.target(), req.method_string(), "GET, POST, OPTIONS"));
             data.host        = {host.begin(), host.size()};
             data.rootHost    = server.http_config->host;
             data.target      = req.target().to_string();
@@ -326,9 +486,30 @@ namespace psibase::http
                          "The resource '" + req.target().to_string() + "' was not found.\n"));
             return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
          }  // !native
-         else if (req.target() == "/native/push_boot" && req.method() == bhttp::verb::post &&
-                  server.http_config->push_boot_async)
+         else if (req.target() == "/native/push_boot" && server.http_config->push_boot_async)
          {
+            if (server.http_config->host.empty())
+               return send(not_found(req.target()));
+
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
+            }
+
+            if (auto content_type = req.find(bhttp::field::content_type); content_type != req.end())
+            {
+               if (content_type->value() != "application/octet-stream")
+               {
+                  return send(error(bhttp::status::unsupported_media_type,
+                                    "Content-Type must be application/octet-stream\n"));
+               }
+            }
+
+            if (forbid_cross_origin())
+            {
+               return;
+            }
+
             server.http_config->push_boot_async(
                 std::move(req.body()),
                 [error, ok, session = send.self.derived_session().shared_from_this(),
@@ -362,9 +543,31 @@ namespace psibase::http
             send.pause_read = true;
             return;
          }  // push_boot
-         else if (req.target() == "/native/push_transaction" && req.method() == bhttp::verb::post &&
+         else if (req.target() == "/native/push_transaction" &&
                   server.http_config->push_transaction_async)
          {
+            if (server.http_config->host.empty())
+               return send(not_found(req.target()));
+
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
+            }
+
+            if (auto content_type = req.find(bhttp::field::content_type); content_type != req.end())
+            {
+               if (content_type->value() != "application/octet-stream")
+               {
+                  return send(error(bhttp::status::unsupported_media_type,
+                                    "Content-Type must be application/octet-stream\n"));
+               }
+            }
+
+            if (forbid_cross_origin())
+            {
+               return;
+            }
+
             // TODO: prevent an http timeout from disconnecting or reporting a failure when the transaction was successful
             //       but... that could open up a vulnerability (resource starvation) where the client intentionally doesn't
             //       read and doesn't close the socket.
@@ -409,16 +612,49 @@ namespace psibase::http
             return;
          }  // push_transaction
          else if (req.target() == "/native/p2p" && websocket::is_upgrade(req) &&
-                  server.http_config->accept_p2p_websocket && server.http_config->ready_for_p2p)
+                  server.http_config->accept_p2p_websocket && server.http_config->enable_p2p)
          {
+            if (server.http_config->host.empty())
+               return send(not_found(req.target()));
+
+            if (forbid_cross_origin())
+               return;
             // Stop reading HTTP requests
             send.pause_read = true;
             send(websocket_upgrade{}, std::move(req), server.http_config->accept_p2p_websocket);
             return;
          }
-         else if (req.target() == "/native/admin/peers" && req.method() == bhttp::verb::get &&
-                  server.http_config->get_peers)
+         else if (req.target() == "/native/admin/status")
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() == bhttp::verb::get)
+            {
+               auto status = server.http_config->status.load();
+               //
+               std::vector<char>   body;
+               psio::vector_stream stream{body};
+               to_json(status, stream);
+               send(ok(std::move(body), "application/json"));
+            }
+            else
+            {
+               send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+         }
+         else if (req.target() == "/native/admin/peers" && server.http_config->get_peers)
+         {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() != bhttp::verb::get)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+
             // returns json list of {id:int,endpoint:string}
             send.pause_read = true;
             server.http_config->get_peers(
@@ -439,11 +675,16 @@ namespace psibase::http
                 });
             return;
          }
-         else if (req.target() == "/native/admin/connect" && req.method() == bhttp::verb::post &&
-                  server.http_config->connect)
+         else if (req.target() == "/native/admin/connect" && server.http_config->connect)
          {
-            if (!server.http_config->ready_for_p2p)
-               throw std::runtime_error("not ready for p2p connections");
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
+            }
 
             if (req[bhttp::field::content_type] != "application/json")
             {
@@ -478,9 +719,17 @@ namespace psibase::http
                 });
             return;
          }
-         else if (req.target() == "/native/admin/disconnect" && req.method() == bhttp::verb::post &&
-                  server.http_config->disconnect)
+         else if (req.target() == "/native/admin/disconnect" && server.http_config->disconnect)
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
+            }
+
             if (req[bhttp::field::content_type] != "application/json")
             {
                send(error(bhttp::status::unsupported_media_type,
@@ -516,6 +765,10 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/log" && websocket::is_upgrade(req))
          {
+            if (!is_admin(*server.http_config, req))
+               return send(not_found(req.target()));
+            if (forbid_cross_origin())
+               return;
             send.pause_read = true;
             send(websocket_upgrade{}, std::move(req),
                  [&server](auto&& stream)
@@ -526,17 +779,46 @@ namespace psibase::http
                     websocket_log_session<stream_type>::run(std::move(session));
                  });
          }
-         else if (req.target() == "/native/admin/loggers" && req.method() == bhttp::verb::get)
+         else if (req.target() == "/native/admin/config")
          {
-            auto result = psibase::loggers::get_config();
-            return send(ok(std::vector<char>(result.begin(), result.end()), "application/json"));
-         }
-         else if (req.target() == "/native/admin/loggers" && req.method() == bhttp::verb::put &&
-                  req[bhttp::field::content_type] == "application/json")
-         {
-            const auto& body = req.body();
-            psibase::loggers::configure({body.data(), body.size()});
-            return send(ok_no_content());
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() == bhttp::verb::get)
+            {
+               run_native_handler(server.http_config->get_config,
+                                  [ok, session = send.self.derived_session().shared_from_this()](
+                                      auto&& make_result)
+                                  { session->queue_(ok(make_result(), "application/json")); });
+            }
+            else if (req.method() == bhttp::verb::put)
+            {
+               if (req[bhttp::field::content_type] != "application/json")
+               {
+                  return send(error(bhttp::status::unsupported_media_type,
+                                    "Content-Type must be application/json\n"));
+               }
+               run_native_handler(
+                   server.http_config->set_config,
+                   [error, ok_no_content,
+                    session = send.self.derived_session().shared_from_this()](auto&& result)
+                   {
+                      if (result)
+                      {
+                         session->queue_(error(bhttp::status::internal_server_error, *result));
+                      }
+                      else
+                      {
+                         session->queue_(ok_no_content());
+                      }
+                   });
+            }
+            else
+            {
+               send(method_not_allowed(req.target(), req.method_string(), "GET, PUT"));
+            }
+            return;
          }
          else
          {

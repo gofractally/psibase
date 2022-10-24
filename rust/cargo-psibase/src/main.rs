@@ -327,7 +327,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
         service_wasms += &(service + ";" + &wasms.into_iter().next().unwrap().to_string_lossy());
     }
 
-    println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
+    // println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
     let tests = build(
         &[root],
         vec![
@@ -355,6 +355,56 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
             return Err(anyhow! {msg});
         }
     }
+
+    Ok(())
+}
+
+async fn deploy(opts: &DeployCommand, root: &str) -> Result<(), Error> {
+    let files = build(&[root], vec![], SERVICE_ARGS, SERVICE_POLYFILL).await?;
+    if files.is_empty() {
+        Err(anyhow!("Nothing found to deploy"))?
+    }
+    if files.len() > 1 {
+        Err(anyhow!("Expected a single library"))?
+    }
+
+    let account = if let Some(account) = opts.account {
+        account.to_string()
+    } else {
+        files[0]
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace('_', "-")
+            .replace(".wasm", "")
+    };
+
+    let mut args = vec!["--suppress-ok".into(), "deploy".into()];
+    if let Some(key) = &opts.create_account {
+        args.append(&mut vec!["--create-account".into(), key.to_string()]);
+    }
+    if opts.create_insecure_account {
+        args.push("--create-insecure-account".into());
+    }
+    if opts.register_proxy {
+        args.push("--register-proxy".into());
+    }
+    args.append(&mut vec!["--sender".into(), opts.sender.to_string()]);
+    args.push(account.clone());
+    args.push(files[0].to_string_lossy().into());
+
+    let msg = format!("Failed running: psibase {}", args.join(" "));
+    if !std::process::Command::new("psibase")
+        .args(args)
+        .status()
+        .context(msg.clone())?
+        .success()
+    {
+        Err(anyhow! {msg})?;
+    }
+
+    pretty("Deployed", &account);
 
     Ok(())
 }
@@ -392,16 +442,8 @@ async fn main2() -> Result<(), Error> {
             test(&metadata, root).await?;
             pretty("Done", "All tests passed");
         }
-        Command::Deploy(_args) => {
-            let files = build(&[root], vec![], SERVICE_ARGS, SERVICE_POLYFILL).await?;
-            if files.is_empty() {
-                Err(anyhow!("Nothing found to deploy"))?
-            }
-            if files.len() > 1 {
-                Err(anyhow!("Expected a single library"))?
-            }
-            todo!();
-            // pretty("Done", "");
+        Command::Deploy(args) => {
+            deploy(&args, root).await?;
         }
     };
 

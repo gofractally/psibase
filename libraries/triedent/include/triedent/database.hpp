@@ -466,6 +466,8 @@ namespace triedent
 
       void print_stats(bool detail = false);
 
+      bool is_slow() const { return _ring->is_slow(); }
+
      private:
       inline void release(id);
       inline void claim_free() const;
@@ -783,9 +785,12 @@ namespace triedent
       else
       {
          if constexpr (debug_roots)
-            if (r == nullptr) {
+            if (r == nullptr)
+            {
                std::cout << id.id << ": update_root original was nullptr" << std::endl;
-            } else {
+            }
+            else
+            {
                std::cout << id.id << ": update_root replacing as new root:" << r->id.id
                          << std::endl;
             }

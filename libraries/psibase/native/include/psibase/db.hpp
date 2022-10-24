@@ -47,6 +47,7 @@ namespace psibase
       void             setHead(Writer& writer, ConstRevisionPtr revision);
       ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
       void             removeRevisions(Writer& writer, const Checksum256& irreversible);
+      bool             isSlow() const;
    };
 
    struct DatabaseImpl;

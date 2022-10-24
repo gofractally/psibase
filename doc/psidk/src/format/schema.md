@@ -6,11 +6,11 @@ TODO: implement schema
 
 ## Type Definitions
 
-Type definitions live in the `userType` array:
+Type definitions live in the `userTypes` array:
 
 ```json
 {
-    "userType": [
+    "userTypes": [
         {definition},
         {definition},
         ...
@@ -52,7 +52,7 @@ A struct definition has this form:
     "structFields": [
         {
             "name": "field1",
-            "type": {type reference}
+            "ty": {type reference}
         },
         ...
     ]
@@ -83,7 +83,7 @@ A union definition describes an `std::variant` in C++ or an `enum` in Rust.
     "unionFields": [
         {
             "name": "alternative0",
-            "type": {type reference}
+            "ty": {type reference}
         },
         ...
     ]
@@ -107,7 +107,7 @@ enum MyEnumType {
 }
 ```
 
-`serde_json` has an interesting gap. Tuples render as `[...]`, but `()`, the unit, renders as `null`. There is no true empty tuple in Rust; `()` comes closest, but fills multiple roles in Rust, which may explain why `serde_json` chose `null` for it. `Example5` opens up an opportunity since `serde_json` renders it as `{"Example5":[]}`. The schema treats it as an empty tuple because it renders like an empty tuple would, if `serde_json` supported empty tuples. Empty tuples are useful because the fracpack format for empty tuples supports adding new optional fields to them in a compatible way. e.g. the following definition is compatible with the above definition:
+`serde_json` has an interesting gap. Tuples render as `[...]`, but `()`, the unit, renders as `null`. `Example5` opens up an opportunity since `serde_json` renders it as `{"Example5":[]}`. The schema treats it as an empty tuple because it renders like an empty tuple would, if `serde_json` supported empty tuples. Empty tuples are useful because the fracpack format for empty tuples supports adding new optional fields to them in a compatible way. e.g. the following definition is compatible with the above definition:
 
 ```rust
 #[derive(psibase::Schema)]
@@ -118,7 +118,7 @@ enum MyEnumType {
 }
 ```
 
-The schema format doesn't support `Example6` because `serde_json` renders it as `{"Example6":null}`.
+The schema format doesn't support `Example6` because `serde_json` renders it as `{"Example6":null}` instead of `{"Example6":[]}`.
 
 The schema format doesn't support discriminants in Rust since fracpack numbers alternatives starting at 0 with no gaps. The schema format also doesn't support `enum` in C++; use `std::variant` instead.
 
@@ -171,7 +171,7 @@ A struct definition may have methods on it.
             "args": [
                 {
                     "name": "arg0",
-                    "type": {type reference}
+                    "ty": {type reference}
                 },
                 ...
             ]
@@ -181,7 +181,7 @@ A struct definition may have methods on it.
 }
 ```
 
-If a method doesn't return a value, `returns` should be `{"builtinType": "void"}`.
+If a method doesn't return a value, `returns` should be `{"ty": "void"}`.
 
 ### Method Upgradeability
 
@@ -201,12 +201,12 @@ The following break backwards compatibility; if you do these, data will end up c
 
 We used `{type reference}` to indicate a type reference in the definitions above. This can be one of the following:
 
-- `{"builtinType": "u32"}` - a [built-in type](#built-in-types)
-- `{"userType": "Foo"}` - a type defined in the [userType array](#type-definitions)
+- `{"ty": "u32"}` - a [built-in type](#built-in-types)
+- `{"user": "Foo"}` - a type defined in the [userTypes array](#type-definitions)
 - `{"vector": {inner type}}` - a vector of inner type
-- `{"optional": {inner type}}` - an optional of inner type
+- `{"option": {inner type}}` - an optional of inner type
 - `{"tuple": [{inner type}, ...]}` - a tuple of inner types
-- `{"array": {inner type}, "size": 8}` - a fixed-size array of inner type
+- `{"array": [{inner type}, size]}` - a fixed-size array of inner type
 
 Built-in types live in a separate namespace from user-defined types to minimize conflicts in the future if more built-in types are added.
 
@@ -224,7 +224,7 @@ The following break backwards compatibility; if you do these, data will end up c
 
 ## Built-in Types
 
-`{"builtinType":"..."}` can name one of the following built-in types:
+`{"ty":"..."}` can name one of the following built-in types:
 
 - `void`: only supported as a method return type
 - `bool`
@@ -242,6 +242,110 @@ The following break backwards compatibility; if you do these, data will end up c
 
 The schema schema defines both the JSON format and the binary (fracpack) format of schemas.
 
-```
-TODO...
+```json
+{
+  "userTypes": [
+    {
+      "name": "TypeRef",
+      "unionFields": [
+        {
+          "name": "ty",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "user",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "vector",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "option",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "tuple",
+          "ty": { "vector": { "user": "TypeRef" } }
+        },
+        {
+          "name": "array",
+          "ty": { "tuple": [{ "user": "TypeRef" }, { "ty": "u32" }] }
+        }
+      ]
+    },
+    {
+      "name": "Field",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "ty",
+          "ty": { "user": "TypeRef" }
+        }
+      ]
+    },
+    {
+      "name": "Method",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "returns",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "args",
+          "ty": { "vector": { "user": "Field" } }
+        }
+      ]
+    },
+    {
+      "name": "Definition",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "alias",
+          "ty": { "option": { "user": "TypeRef" } }
+        },
+        {
+          "name": "structFields",
+          "ty": { "option": { "vector": { "user": "Field" } } }
+        },
+        {
+          "name": "unionFields",
+          "ty": { "option": { "vector": { "user": "Field" } } }
+        },
+        {
+          "name": "customJson",
+          "ty": { "option": { "ty": "bool" } }
+        },
+        {
+          "name": "definitionWillNotChange",
+          "ty": { "option": { "ty": "bool" } }
+        },
+        {
+          "name": "methods",
+          "ty": { "option": { "vector": { "user": "Method" } } }
+        }
+      ]
+    },
+    {
+      "name": "Schema",
+      "structFields": [
+        {
+          "name": "userTypes",
+          "ty": { "vector": { "user": "Definition" } }
+        }
+      ]
+    }
+  ]
+}
 ```

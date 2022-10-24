@@ -20,8 +20,15 @@
 - [Service-provided services](#service-provided-services)
   - [Packing actions (http)](#packing-actions-http)
 - [Node administrator services](#node-administrator-services)
+  - [Server status](#server-status)
   - [Peer management](#peer-management)
+  - [Server configuration](#server-configuration)
   - [Logging](#logging)
+    - [Console Logger](#console-logger)
+    - [File Logger](#file-logger)
+    - [Local Socket Logger](#local-socket-logger)
+    - [Websocket Logger](#websocket-logger)
+
 
 ## TLDR: Pushing a transaction
 
@@ -384,14 +391,26 @@ TODO
 
 ## Node administrator services
 
+The administrator interface under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`).
+
 | Method | URL                        | Description                                                                   |
 |--------|----------------------------|-------------------------------------------------------------------------------|
+| `GET`  | `/native/admin/status`     | Returns status conditions currently affecting the server                      |
 | `GET`  | `/native/admin/peers`      | Returns a JSON array of all the peers that the node is currently connected to |
 | `POST` | `/native/admin/connect`    | Connects to another node                                                      |
 | `POST` | `/native/admin/disconnect` | Disconnects an existing peer connection                                       |
-| `GET`  | `/native/admin/loggers`    | Returns the current [log configuration](#logging)                             |
-| `PUT`  | `/native/admin/loggers`    | Sets the [log configuration](#logging)                                        |
+| `GET`  | `/native/admin/config`     | Returns the current [server configuration](#server-configuration)             |
+| `PUT`  | `/native/admin/config`     | Sets the [server configuration](#server-configuration)                        |
 | `GET`  | `/native/admin/log`        | Websocket that provides access to [live server logs](#websocket-logger)       |
+
+### Server status
+
+`/native/admin/status` returns an array of strings identifying conditions that affect the server.
+
+| Status      | Description                                                                                                                                                                                                                                                                                                                                                                  |
+|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `"slow"`    | `psinode` was unable to lock its database cache in memory. This may result in reduced performance. This condition can be caused either by insufficient physical RAM on the host machine, or by a lack of permissions. In the latter case, the command `sudo prlimit --memlock=-1 --pid $$` can be run before lauching `psinode` to increase the limits of the current shell. |
+| `"startup"` | `psinode` is still initializing. Some functionality may be unavailable.                                                                                                                                                                                                                                                                                                      |
 
 ### Peer management
 
@@ -399,42 +418,81 @@ TODO
 
 Each peer has the following fields:
 
-| Field    | Type   | Description                                 |
-|----------|--------|---------------------------------------------|
-| id       | Number | A unique integer identifying the connection |
-| endpoint | String | The remote endpoint in the form `host:port` |
+| Field      | Type   | Description                                 |
+|------------|--------|---------------------------------------------|
+| `id`       | Number | A unique integer identifying the connection |
+| `endpoint` | String | The remote endpoint in the form `host:port` |
 
-`/native/admin/connect`
-`/native/admin/disconnect`
+`/native/admin/connect` creates a new p2p connection to another node.
+
+| Field | Type   | Description                                  |
+|-------|--------|----------------------------------------------|
+| `url` | String | The remote server, e.g. `"ws://psibase.io/"` |
+
+`/native/admin/disconnect` closes an existing p2p connection.
+
+| Field | Type   | Description                       |
+|-------|--------|-----------------------------------|
+| `id`  | Number | The id of the connection to close |
+
+
+### Server configuration
+
+`/native/admin/config` provides `GET` and `PUT` access to the server's configuration. Changes made using this API are persistent across server restarts. New versions of psibase may add fields at any time. Clients that wish to set the configuration should `GET` the configuration first and return unknown fields to the server unchanged.
+
+| Field      | Type    | Description                                                                                                                                                                          |
+|------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `p2p`      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                        |
+| `producer` | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production. |
+| `host`     | String  | The server's hostname. Changes to the host will take effect the next time the server starts.                                                                                         |
+| `port`     | Number  | The port that the server runs on. Changes to the port will take effect the next time the server starts.                                                                              |
+| `loggers`  | Object  | A description of the [destinations for log records](#logging)                                                                                                                        |
+
+Example:
+```json
+{
+    "p2p": true,
+    "producer": "prod",
+    "host": "127.0.0.1.sslip.io",
+    "port": 8080,
+    "loggers": {
+        "console": {
+            "type": "console",
+            "filter": "%Severity% >= info",
+            "format": "[%TimeStamp%] [%Severity%]: %Message%"
+        },
+        "file": {
+            "type": "file",
+            "filter": "%Severity >= info%",
+            "format": "[%TimeStamp%]: %Message%",
+            "filename": "psibase.log",
+            "target": "psibase-%Y%m%d-%N.log",
+            "rotationTime": "00:00:00Z",
+            "rotationSize": 16777216,
+            "maxSize": 1073741824
+        }
+    }
+}
+```
 
 ### Logging
 
 - [Console Logger](#console-logger)
 - [File Logger](#file-logger)
-- Syslog Logger (TODO)
+- [Local Socket Logger](#local-socket-logger)
 - [Websocket Logger](#websocket-logger)
 
-`/native/admin/loggers` provides `GET` and `PUT` access to the server's logging configuration.
+The `loggers` field of `/native/admin/config` controls the server's logging configuration.
 
-The body is a JSON object which has a field for each logger. The name of the logger is only significant to identify the logger. When the log configuration is changed, if the new configuration has a logger with the same name and type as one in the old configuration, the old logger will be updated to the new configuration without dropping or duplicating any log records.
-
-```json
-{
-    "console": {
-        "type": "console",
-        "filter": "%Severity% >= info",
-        "format": "[%TimeStamp%] [%Severity%]: %Message%"
-    }
-}
-```
+The log configuration is a JSON object which has a field for each logger. The name of the logger is only significant to identify the logger. When the log configuration is changed, if the new configuration has a logger with the same name and type as one in the old configuration, the old logger will be updated to the new configuration without dropping or duplicating any log records.
 
 All loggers must have the following fields:
 
-| Field    | Type             | Description                                                                        |
-|----------|------------------|------------------------------------------------------------------------------------|
-| `type`   | String           | The type of the logger: [`"console"`](#console-logger) or [`"file"`](#file-logger) |
-| `filter` | String           | The [filter](psibase/logging.md#log-filters) for the logger                        |
-| `format` | String or Object | Determines the [format](psibase/logging.md#log-fomatters) of log messages          |
+| Field    | Type             | Description                                                                                                            |
+|----------|------------------|------------------------------------------------------------------------------------------------------------------------|
+| `type`   | String           | The type of the logger: [`"console"`](#console-logger), [`"file"`](#file-logger), or [`"local"`](#local-socket-logger) |
+| `filter` | String           | The [filter](psibase/logging.md#log-filters) for the logger                                                            |
+| `format` | String or Object | Determines the [format](psibase/logging.md#log-fomatters) of log messages                                              |
 
 Additional fields are determined by the logger type.
 
@@ -482,6 +540,27 @@ Example:
     }
 }
 ```
+
+### Local Socket Logger
+
+The socket type `local` writes to a local datagram socket. Each log record is sent in a single message. With an appropriate format, it can be used to communicate with logging daemons on most unix systems.
+
+| Field  | Type   | Description     |
+|--------|--------|-----------------|
+| `path` | String | The socket path |
+
+Example:
+```json
+{
+    "syslog": {
+        "type": "local",
+        "filter": "%Severity% >= info",
+        "format": "%Syslog(format=glibc)%%Message%",
+        "path": "/dev/log"
+    }
+}
+```
+
 
 ### Websocket logger
 

@@ -16,6 +16,7 @@
 
 namespace psibase
 {
+   class ConfigFile;
    namespace loggers
    {
       std::string to_string(const Checksum256& c);
@@ -64,6 +65,27 @@ namespace psibase
       void        configure(const boost::program_options::variables_map&);
       void        configure_default();
       std::string get_config();
+
+      class Config;
+      void configure(const Config&);
+      void from_json(Config&, psio::json_token_stream&);
+      void to_json(const Config&, psio::vector_stream&);
+      void to_config(const Config& obj, ConfigFile& file);
+      class Config
+      {
+        public:
+         static Config get();
+
+        private:
+         friend void from_json(Config&, psio::json_token_stream&);
+         friend void to_json(const Config&, psio::vector_stream&);
+         friend void configure(const Config&);
+         friend void to_config(const Config& obj, ConfigFile& file);
+
+         struct Impl;
+         std::shared_ptr<Impl> impl;
+      };
+
    }  // namespace loggers
 
 #define PSIBASE_LOG(logger, log_level) BOOST_LOG_SEV(logger, psibase::loggers::level::log_level)

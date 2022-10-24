@@ -1,4 +1,4 @@
-use crate::Fracpack;
+use crate::{serialize_as_str, Fracpack};
 use custom_error::custom_error;
 use ripemd::{Digest, Ripemd160};
 use std::{fmt, str::FromStr};
@@ -34,6 +34,8 @@ pub enum PublicKeyEnum {
 pub struct PublicKey {
     pub data: PublicKeyEnum,
 }
+
+serialize_as_str!(PublicKey, "public key");
 
 impl FromStr for PublicKey {
     type Err = Error;
@@ -99,6 +101,8 @@ impl PrivateKey {
         }
     }
 }
+
+serialize_as_str!(PrivateKey, "private key");
 
 impl FromStr for PrivateKey {
     type Err = Error;

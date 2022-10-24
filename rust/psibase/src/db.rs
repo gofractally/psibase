@@ -4,6 +4,7 @@
 /// various purposes. This enum identifies which database to
 /// use when invoking those functions.
 #[repr(u32)]
+#[derive(Clone, Copy)]
 pub enum DbId {
     /// Services should store their tables here
     ///

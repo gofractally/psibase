@@ -5,13 +5,17 @@ mod crypto;
 mod db;
 mod from_bin;
 mod http;
+mod internal_macros;
 mod method_number;
 pub mod native;
 pub mod native_raw;
 mod native_tables;
+pub mod reflect;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
+mod schema;
 mod service;
+mod table;
 pub mod tester;
 pub mod tester_raw;
 mod time;
@@ -33,12 +37,16 @@ pub use native::*;
 pub use native_tables::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
+pub use schema::*;
 pub use service::*;
+pub use table::*;
 pub use tester::*;
 pub use time::*;
 pub use to_bin::*;
 pub use to_key::*;
 pub use trace::*;
+
+use internal_macros::*;
 
 pub use fracpack;
 pub use psibase_macros::*;

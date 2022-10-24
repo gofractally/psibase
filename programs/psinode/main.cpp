@@ -1,3 +1,4 @@
+#include <psibase/ConfigFile.hpp>
 #include <psibase/EcdsaProver.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/cft.hpp>
@@ -11,6 +12,7 @@
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
 
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
@@ -28,6 +30,164 @@
 using namespace psibase;
 using namespace psibase::net;
 
+struct native_service
+{
+   std::string           host;
+   std::filesystem::path root;
+   friend auto           operator<=>(const native_service&, const native_service&) = default;
+};
+PSIO_REFLECT(native_service, host, root)
+
+void to_json(const native_service& obj, auto& stream)
+{
+   stream.write('{');
+   to_json("host", stream);
+   stream.write(':');
+   to_json(obj.host, stream);
+   stream.write(',');
+   to_json("root", stream);
+   stream.write(':');
+   to_json(obj.root.native(), stream);
+   stream.write('}');
+}
+
+void from_json(native_service& obj, auto& stream)
+{
+   psio::from_json_object(stream,
+                          [&](std::string_view key)
+                          {
+                             if (key == "host")
+                             {
+                                obj.host = stream.get_string();
+                             }
+                             else if (key == "root")
+                             {
+                                obj.root = stream.get_string();
+                             }
+                             else
+                             {
+                                psio::from_json_skip_value(stream);
+                             }
+                          });
+}
+
+std::string to_string(const native_service& obj)
+{
+   return obj.host + ":" + obj.root.native();
+}
+
+std::filesystem::path get_prefix()
+{
+   auto prefix = std::filesystem::read_symlink("/proc/self/exe").parent_path();
+   if (prefix.filename() == "bin")
+   {
+      prefix = prefix.parent_path();
+   }
+   return prefix;
+}
+
+std::filesystem::path option_path;
+std::filesystem::path parse_path(std::string_view             s,
+                                 const std::filesystem::path& context = option_path)
+{
+   if (s.starts_with("$PREFIX"))
+   {
+      return get_prefix() / std::filesystem::path(s.substr(7)).relative_path();
+   }
+   else
+   {
+      return context / s;
+   }
+}
+
+void parse_config(native_service&              service,
+                  std::string_view             str,
+                  const std::filesystem::path& context = option_path)
+{
+   auto pos = str.find(':');
+   if (pos == std::string_view::npos)
+   {
+      service.root = parse_path(str, context);
+      service.host = (service.root.has_filename() ? service.root.filename()
+                                                  : service.root.parent_path().filename())
+                         .native() +
+                     ".";
+   }
+   else
+   {
+      service.host = str.substr(0, pos);
+      service.root = parse_path(str.substr(pos + 1), context);
+   }
+}
+
+native_service service_from_string(std::string_view s)
+{
+   native_service result;
+   parse_config(result, s);
+   return result;
+}
+
+void validate(boost::any& v, const std::vector<std::string>& values, native_service*, int)
+{
+   boost::program_options::validators::check_first_occurrence(v);
+   native_service result;
+   parse_config(result, boost::program_options::validators::get_single_string(values));
+   v = std::move(result);
+}
+
+std::filesystem::path config_template_path()
+{
+   return get_prefix() / "share" / "psibase" / "config.in";
+}
+
+void load_service(const native_service& config,
+                  http::services_t&     services,
+                  const std::string&    root_host)
+{
+   auto  host    = config.host.ends_with('.') ? config.host + root_host : config.host;
+   auto& service = services[config.host];
+   for (const auto& entry : std::filesystem::recursive_directory_iterator{config.root})
+   {
+      auto                 extension = entry.path().filename().extension().native();
+      http::native_content result;
+      if (extension == ".html")
+      {
+         result.content_type = "text/html";
+      }
+      else if (extension == ".svg")
+      {
+         result.content_type = "image/svg+xml";
+      }
+      else if (extension == ".js" || extension == ".mjs")
+      {
+         result.content_type = "text/javascript";
+      }
+      else if (extension == ".css")
+      {
+         result.content_type = "text/css";
+      }
+      else if (extension == ".ttf")
+      {
+         result.content_type = "font/ttf";
+      }
+      if (!result.content_type.empty() && entry.is_regular_file())
+      {
+         result.size = entry.file_size();
+         result.path = entry.path();
+         auto path   = "/" + entry.path().lexically_relative(config.root).generic_string();
+         service.try_emplace(path, result);
+         if (path.ends_with("/index.html"))
+         {
+            service.try_emplace(path.substr(0, path.size() - 10), result);
+            if (path.size() > 11)
+            {
+               service.try_emplace(path.substr(0, path.size() - 11), result);
+            }
+         }
+      }
+   }
+}
+
 namespace psibase
 {
    void validate(boost::any& v, const std::vector<std::string>& values, PrivateKey*, int)
@@ -35,6 +195,16 @@ namespace psibase
       boost::program_options::validators::check_first_occurrence(v);
       v = privateKeyFromString(boost::program_options::validators::get_single_string(values));
    }
+
+   namespace http
+   {
+      void validate(boost::any& v, const std::vector<std::string>& values, admin_service*, int)
+      {
+         boost::program_options::validators::check_first_occurrence(v);
+         const auto& s = boost::program_options::validators::get_single_string(values);
+         v             = admin_service_from_string(s);
+      }
+   }  // namespace http
 }  // namespace psibase
 
 struct transaction_queue
@@ -302,39 +472,78 @@ struct DisconnectRequest
 };
 PSIO_REFLECT(DisconnectRequest, id);
 
+struct PsinodeConfig
+{
+   bool                        p2p = false;
+   AccountNumber               producer;
+   std::string                 host;
+   std::uint16_t               port = 8080;
+   std::vector<native_service> services;
+   http::admin_service         admin;
+   psibase::loggers::Config    loggers;
+};
+PSIO_REFLECT(PsinodeConfig, p2p, producer, host, port, services, admin, loggers);
+
+void to_config(const PsinodeConfig& config, ConfigFile& file)
+{
+   file.set("", "p2p", config.p2p ? "on" : "off", "Whether to accept incoming P2P connections");
+   if (config.producer != AccountNumber())
+   {
+      file.set("", "producer", config.producer.str(), "The name to use for block production");
+   }
+   if (!config.host.empty())
+   {
+      file.set("", "host", config.host, "The HTTP server's host name");
+   }
+   if (!config.host.empty() || !config.services.empty())
+   {
+      file.set("", "port", std::to_string(config.port),
+               "The TCP port that the HTTP server listens on");
+   }
+   if (!config.services.empty())
+   {
+      std::vector<std::string> services;
+      for (const auto& service : config.services)
+      {
+         services.push_back(to_string(service));
+      }
+      file.set(
+          "", "service", services,
+          [](std::string_view text) { return service_from_string(text).host; },
+          "Native service root directory");
+   }
+   if (!std::holds_alternative<http::admin_none>(config.admin))
+   {
+      file.set("", "admin", std::visit([](const auto& v) { return v.str(); }, config.admin),
+               "Which services can access the admin API");
+   }
+   // TODO: Not implemented yet.  Sign needs some thought,
+   // because it's probably a bad idea to reveal the
+   // private keys.
+   file.keep("", "sign");
+   file.keep("", "peer");
+   file.keep("", "leeway");
+   file.keep("", "host-perf");
+   //
+   to_config(config.loggers, file);
+}
+
 using timer_type = boost::asio::system_timer;
 
 template <typename Derived>
 using cft_consensus = basic_cft_consensus<Derived, timer_type>;
-
-const char default_config[] = R"(# psinode configuration
-
-slow     = no
-p2p      = off
-# producer = psibase
-# sign     = <private key>
-# host     = 127.0.0.1.sslip.io
-# port     = 8080
-# peer     = localhost:8080
-
-[logger.stderr]
-type         = console
-filter       = %Severity% >= info
-format       = [%TimeStamp%] [%Severity%]: %Message%
-format.p2p   = [%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%
-format.block = [%TimeStamp%] [%Severity%]: %Message% %BlockId%
-)";
 
 void run(const std::string&              db_path,
          AccountNumber                   producer,
          std::shared_ptr<Prover>         prover,
          const std::vector<std::string>& peers,
          bool                            enable_incoming_p2p,
-         const std::string&              host,
+         std::string                     host,
          unsigned short                  port,
+         std::vector<native_service>&    services,
+         http::admin_service&            admin,
          bool                            host_perf,
          uint32_t                        leeway_us,
-         bool                            allow_slow,
          const std::string&              replay_blocks,
          const std::string&              save_blocks)
 {
@@ -342,18 +551,30 @@ void run(const std::string&              db_path,
 
    // TODO: configurable WasmCache size
    auto sharedState =
-       std::make_shared<psibase::SharedState>(SharedDatabase{db_path, allow_slow}, WasmCache{128});
+       std::make_shared<psibase::SharedState>(SharedDatabase{db_path, true}, WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
    auto queue       = std::make_shared<transaction_queue>();
+
+   if (system->sharedDatabase.isSlow())
+   {
+      PSIBASE_LOG(psibase::loggers::generic::get(), error)
+          << "unable to lock memory for " << db_path
+          << ". Try upgrading your shell's limits using \"sudo prlimit --memlock=-1 --pid "
+             "$$\". "
+             "If that doesn't work, try running psinode with \"sudo\".";
+   }
 
    // If the server's config file doesn't exist yet, create it
    {
       auto config_path = std::filesystem::path(db_path) / "config";
       if (!std::filesystem::exists(config_path))
       {
-         std::ofstream out(config_path);
-         out << default_config;
+         auto template_path = config_template_path();
+         if (std::filesystem::is_regular_file(template_path))
+         {
+            std::filesystem::copy_file(template_path, config_path);
+         }
       }
    }
 
@@ -368,7 +589,7 @@ void run(const std::string&              db_path,
    boost::asio::ip::tcp::resolver resolver(chainContext);
 
    auto http_config = std::make_shared<http::http_config>();
-   if (!host.empty())
+   if (!host.empty() || !services.empty())
    {
       // TODO: command-line options
       http_config->num_threads      = 4;
@@ -379,6 +600,14 @@ void run(const std::string&              db_path,
       http_config->port             = port;
       http_config->host             = host;
       http_config->host_perf        = host_perf;
+      http_config->status =
+          http::http_status{.slow = system->sharedDatabase.isSlow(), .startup = 1};
+
+      for (const auto& entry : services)
+      {
+         load_service(entry, http_config->services, host);
+      }
+      http_config->admin = admin;
 
       // TODO: speculative execution on non-producers
       if (producer != AccountNumber{})
@@ -403,9 +632,8 @@ void run(const std::string&              db_path,
       // TODO: The websocket uses the http server's io_context, but does not
       // do anything to keep it alive. Stopping the server doesn't close the
       // websocket either.
-      if (enable_incoming_p2p)
-         http_config->accept_p2p_websocket = [&node](auto&& stream)
-         { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
+      http_config->accept_p2p_websocket = [&node](auto&& stream)
+      { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {
@@ -460,6 +688,67 @@ void run(const std::string&              db_path,
                    callback(std::nullopt);
                 }
              });
+      };
+
+      http_config->set_config = [&chainContext, &node, &db_path, &http_config, &host, &port, &admin,
+                                 &services](std::vector<char> json, http::connect_callback callback)
+      {
+         json.push_back('\0');
+         psio::json_token_stream stream(json.data());
+
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
+                            &db_path, &http_config, &host, &port, &services, &admin,
+                            callback = std::move(callback)]() mutable
+                           {
+                              node.set_producer_id(config.producer);
+                              http_config->enable_p2p = config.p2p;
+                              host                    = config.host;
+                              port                    = config.port;
+                              services                = config.services;
+                              admin                   = config.admin;
+                              loggers::configure(config.loggers);
+                              {
+                                 auto       path = std::filesystem::path(db_path) / "config";
+                                 ConfigFile file;
+                                 {
+                                    std::ifstream in(path);
+                                    file.parse(in);
+                                 }
+                                 to_config(config, file);
+                                 {
+                                    std::ofstream out(path);
+                                    file.write(out);
+                                 }
+                              }
+                              callback(std::nullopt);
+                           });
+      };
+
+      http_config->get_config = [&chainContext, &node, &http_config, &host, &port, &admin,
+                                 &services](http::get_config_callback callback)
+      {
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, &http_config, &host, &port, &services, &admin,
+                            callback = std::move(callback)]() mutable
+                           {
+                              PsinodeConfig result;
+                              result.p2p      = http_config->enable_p2p;
+                              result.producer = node.producer_name();
+                              result.host     = host;
+                              result.port     = port;
+                              result.services = services;
+                              result.admin    = admin;
+                              result.loggers  = loggers::Config::get();
+                              callback(
+                                  [result = std::move(result)]() mutable
+                                  {
+                                     std::vector<char>   json;
+                                     psio::vector_stream stream(json);
+                                     to_json(result, stream);
+                                     return json;
+                                  });
+                           });
       };
 
       auto server = http::server::create(http_config, sharedState);
@@ -524,7 +813,13 @@ void run(const std::string&              db_path,
    }
 
    node.set_producer_id(producer);
-   http_config->ready_for_p2p = true;
+   http_config->enable_p2p = enable_incoming_p2p;
+   {
+      // For now no one else writes the status, so we don't need an atomic RMW.
+      auto status         = http_config->status.load();
+      status.startup      = false;
+      http_config->status = status;
+   }
 
    bool showedBootMsg = false;
 
@@ -624,18 +919,19 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 
 int main(int argc, char* argv[])
 {
-   std::string              db_path;
-   std::string              producer = {};
-   std::vector<PrivateKey>  keys;
-   std::string              host       = {};
-   unsigned short           port       = 8080;
-   bool                     host_perf  = false;
-   uint32_t                 leeway_us  = 200000;  // TODO: real value once resources are in place
-   bool                     allow_slow = false;
-   std::vector<std::string> peers;
-   bool                     enable_incoming_p2p = false;
-   std::string              replay_blocks       = {};
-   std::string              save_blocks         = {};
+   std::string                 db_path;
+   std::string                 producer = {};
+   std::vector<PrivateKey>     keys;
+   std::string                 host      = {};
+   unsigned short              port      = 8080;
+   bool                        host_perf = false;
+   uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
+   std::vector<std::string>    peers;
+   bool                        enable_incoming_p2p = false;
+   std::vector<native_service> services;
+   http::admin_service         admin;
+   std::string                 replay_blocks = {};
+   std::string                 save_blocks   = {};
 
    namespace po = boost::program_options;
 
@@ -649,12 +945,11 @@ int main(int argc, char* argv[])
        "Enable incoming p2p connections; requires --host");
    opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
    opt("port", po::value(&port), "http server port");
+   opt("service", po::value(&services), "Static content");
+   opt("admin", po::value(&admin), "Controls which services can access the admin API");
    opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
        "Transaction leeway, in us. Defaults to 200000.");
-   opt("slow", po::bool_switch(&allow_slow),
-       "Don't complain if unable to lock memory for database. This will still attempt to lock "
-       "memory, but if it fails it will continue to run, but more slowly.");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
@@ -677,14 +972,26 @@ int main(int argc, char* argv[])
    po::variables_map vm;
    try
    {
+      option_path = std::filesystem::current_path();
       po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
       if (vm.count("database"))
       {
-         auto config_path = std::filesystem::path(vm["database"].as<std::string>()) / "config";
+         auto db_root     = std::filesystem::path(vm["database"].as<std::string>());
+         option_path      = option_path / db_root;
+         auto config_path = db_root / "config";
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
             po::store(po::parse_config_file(in, cfg_opts), vm);
+         }
+         else if (!exists(config_path))
+         {
+            auto template_path = config_template_path();
+            if (std::filesystem::is_regular_file(template_path))
+            {
+               std::ifstream in(config_template_path());
+               po::store(po::parse_config_file(in, cfg_opts), vm);
+            }
          }
       }
       po::notify(vm);
@@ -717,7 +1024,7 @@ int main(int argc, char* argv[])
              std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"}, key));
       }
       run(db_path, AccountNumber{producer}, prover, peers, enable_incoming_p2p, host, port,
-          host_perf, leeway_us, allow_slow, replay_blocks, save_blocks);
+          services, admin, host_perf, leeway_us, replay_blocks, save_blocks);
       return 0;
    }
    catch (std::exception& e)
