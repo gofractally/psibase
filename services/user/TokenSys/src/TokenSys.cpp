@@ -229,7 +229,6 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
       auto balance = getBalance(tokenId, receiver);
       balance.balance += amount.value;
       db.open<BalanceTable>().put(balance);
-      emit().merkle().transferred(tokenId, sender, receiver, amount, memo);
 
       auto senderHolder             = getTokenHolder(sender);
       senderHolder.lastHistoryEvent = emit().history().transferred(
@@ -293,8 +292,6 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    }
    db.open<BalanceTable>().put(receiverBalance);
 
-   emit().merkle().transferred(tokenId, sender, receiver, amount, memo);
-
    auto senderHolder             = getTokenHolder(sender);
    senderHolder.lastHistoryEvent = emit().history().transferred(
        senderHolder.lastHistoryEvent, tokenId, time, sender, receiver, amount, memo);
@@ -324,8 +321,6 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
 
    auto balanceTable = db.open<BalanceTable>();
    balanceTable.put(fromBalance);
-
-   emit().merkle().recalled(tokenId, from, amount, memo);
 
    auto holder = getTokenHolder(from);
    holder.lastHistoryEvent =
