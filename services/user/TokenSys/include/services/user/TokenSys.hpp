@@ -4,13 +4,13 @@
 #include <psibase/Service.hpp>
 #include <psibase/String.hpp>
 #include <psibase/check.hpp>
-#include <psibase/serveGraphQL.hpp>  // TODO: Included for access to EventIndex, maybe EventIndex should be moved?
+#include <psibase/eventIndex.hpp>
 #include <string>
 
+#include <services/user/symbolTables.hpp>
 #include <services/user/tokenErrors.hpp>
 #include <services/user/tokenTables.hpp>
 #include <services/user/tokenTypes.hpp>
-#include "services/user/symbolTables.hpp"
 
 namespace UserService
 {
