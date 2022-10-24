@@ -2,13 +2,15 @@
 
 ## Background
 
-Blockchain applications should aim to provide a user experience that exceeds those available in traditional centralized applications. To accomplish this goal, application user-interfaces must be able to easily retrieve information about blockchain services.
+Many modern web services not only need the ability to display data regarding the current state of an application, but it is often helpful to also display a record of the historical events that modified or were otherwise relevant to the application state. This implies that the state of an application should also include a historical record of events that modify other state. The challenge is that individual web service developers often lack the domain expertise to design an efficient solution, which should include Event creation, storage, queryability, and pruning.
 
-A vital component of the solution in Psibase blockchains is the event system. If you're an application developer, it's worth taking time to understand it deeply.
+The Psibase platform acknowledges this challenge, and provides an efficient, flexible, and simple solution for all web service developers. This greatly simplifies the expertise required to develop professional web services with excellent user-experience, minimizes time spent working with third-party services, and maximises the time developers are able to spend building their actual service.
+
+The Psibase event system is one of its many important innovations. If you're an application developer, it's worth taking time to understand it.
 
 ## What are Psibase events?
 
-Events are objects that are stored in a database on the blockchain node. Crucially, these event objects are not stored in blockchain state, and are therefore only kept around for a limited time, configurable by the blockchain node itself.
+Events are queryable objects that are stored in a database and that describe past events related to a particular web service. Since events do not store the active service state, they could be pruned without affecting the core operations of a particular service, and therefore Psinode allows node operators to configure the times beyond which events are automatically pruned.
 
 ```mermaid
     C4Context
@@ -22,31 +24,22 @@ Events are objects that are stored in a database on the blockchain node. Crucial
       }
 ```
 
-To use the event system requires some development on both the blockchain service side (back-end) and the applet side (UI/front-end). On the back-end, the blockchain service is responsible for:
+A web service is responsible for defining the types of events it can emit, emitting the events, and exposing access to the events over some RPC interface. Any Psibase applet may then query the events through that RPC interface and display them according to its users' needs. Psibase applets are also able to use the Event Sourcing design pattern, in which they may subscribe to events and define handlers for automatic execution whenever such events are emitted.
 
-1. Defining the events it can emit
-2. Emitting the events
-3. Exposing access to these events through RPC queries
-
-On the front-end, the applet is simply responsible for:
-
-1. Reading events history exposed by the service
-2. Displaying relevant events
-3. Subscribing to events
 
 ### When are events consumed by a front-end?
 
-The primary reason that events are consumed on the front-end is to view historical chain activity related to a particular blockchain service. There is another use-case that aids in bridging multiple Psibase blockchains through inter-blockchain communication, but that use-case is outside the scope of this document.
+The primary reason that events are consumed in an applet is to view historical events related to a particular web service. If your application only needs to display the current state of a web service, it may not be necessary to use the Psibase event system at all. Another use-case allows cryptographic proofs to be generated for events, which could allow separate Psibase networks that do not trust each other to mathematically prove to each other when various events happen, but this use-case is outside the scope of this document.
 
-A wallet application may want to display a historical view of all past transfers into and out of a particular user account. All those historical transfers are not saved in active blockchain state, but each of those historical transfers would have emitted a `transferred` event, which the UI could query to efficiently retrieve a list of all past transfers.
+Imagine a web service that facilitates the transfer of some kind of "tokens." Such an application may not only want to display a user's current balance of these tokens, but also display a historical view of any events that would have affected the user balance. Such historical transfers are an example usecase for the Psibase event system. To accomplish this, a web service developer would emit a `transferred` event after each transfer, which would facilitate the creation and storage of an event into the prunable event database that could be queried by the front-end (applet) to display the list of historical events.
 
-Keep in mind, some nodes may have smaller storage capacity, and may therefore be configured to "forget" past events beyond a particular time horizon. Therefore if you need to guarantee access to historical events to a specific time window, the safest way to accomplish this would be to configure and run your own full node. On the other hand, if your application simply needs to display the current state of a blockchain service, it may not be necessary to use the event system at all.
+Psinode may be deployed on hardware with limited storage capacity, and therefore the Psinode operators may configure event stores to prune more quickly than would be desired by a particular web service. Therefore, the safest way to guarantee your applet will keep access to a sufficiently large history of events is to run your own Psinode network, rather than rely on a third-party Psinode network deployment.
 
-## Emitting event chains
+## Event chaining
 
-One challenge with an event system is in maintaining lookup efficiency. To show a list of historical token transactions, it would be inefficient to search through the entire event list to find the relevant events. Rather, Psibase provides a mechanism to aid in the construction of manual indices to drastically improve lookup efficiency.
+One challenge with an event system is in maintaining lookup efficiency. If all events were simply stored in a list, lookups would require linear-time searches through the list to construct the subset of events relevant to the query. Rather, Psibase provides a mechanism to aid in the construction of manual indices on events to drastically improve lookup efficiency.
 
-Whenever an event is emitted from a service, a unique event ID is returned to the caller. That event ID is known as the Event Head because it's the most recently emitted event of its type. The event head should be stored in blockchain state, and each event will itself include a field that indicates the previous event in that index. The result is that the Event Log contains followable event chains:
+Whenever an event is emitted from a service, a unique event ID is returned to the caller. That event ID is known as the Event Head because it's the most recently emitted event of its type. Each event includes a field that records the ID of the previous event of its type, and the event head is stored in active application state. The result is that the Event Log contains easily-followable event chains:
 
 <br/>
 
@@ -67,7 +60,7 @@ Whenever an event is emitted from a service, a unique event ID is returned to th
 
 <br/>
 
-For example, in the Token Service, a `Transferred` event is defined, and is included in an index of events called `UserEvents`:
+For example, in the example Token Service, a `Transferred` event is defined, and is included in an index of events called `UserEvents`:
 
 <details>
   <summary>Reveal code</summary>
@@ -78,7 +71,7 @@ For example, in the Token Service, a `Transferred` event is defined, and is incl
       struct History
       {
           // Define the transferred event
-          void transferred(TID tokenId, uint64_t prevEvent, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, StringView memo) {}
+          void transferred(uint64_t prevEvent, TID tokenId, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, StringView memo) {}
       };
   };
 
@@ -88,7 +81,7 @@ For example, in the Token Service, a `Transferred` event is defined, and is incl
   // Reflect the events
   PSIBASE_REFLECT_EVENTS(TokenSys)
   PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys,
-      method(transferred, tokenId, prevEvent, time, sender, receiver, amount, memo)
+      method(transferred, prevEvent, tokenId, time, sender, receiver, amount, memo)
   );
 ```
 
@@ -96,9 +89,9 @@ For example, in the Token Service, a `Transferred` event is defined, and is incl
 
 <br>
 
-The definition of `UserEvents` indicates that the head event ID (most recently emitted event related to a Token Holder) is stored in the `lastHistoryEvent` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`.
+The definition of `UserEvents` indicates that the head event ID is stored in the `lastHistoryEvent` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`.
 
-Notice that when the transferred event gets emitted by the Token service, the ID of the previous transferred event is included (via the `prevEvent` field) in the new event, and the event ID of the new event is saved to state (in the `lastHistoryEvent` field of the sender's `TokenHolderRecord`):
+When the `transferred` event gets emitted by the service, the ID of the previous transferred event is included (via the `prevEvent` field) in the new event, and the event ID of the new event is saved to state (in the `lastHistoryEvent` field of the sender's `TokenHolderRecord`):
 
 <details>
   <summary>Reveal code</summary>
@@ -126,11 +119,11 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
 <br>
 
-Notice that the transferred event is emitted twice, in order to generate the event for the sender's "UserEvents" index, and another event for the receiver's "UserEvents" index. As you will see, Psibase has mechanisms for efficiently querying event chains created in this way, for the small price of storing only one extra field (per desired index) in blockchain state.
+Notice that the `transferred` event is emitted twice, in order to generate the event for the sender's `UserEvents` index, and another event for the receiver's `UserEvents` index. As you will see, Psibase has mechanisms for efficiently querying event chains created in this way.
 
 ## Providing GraphQL access to event chains
 
-In Psibase, it is very simple to provide GraphQL access to any event chain. In the below example, you can see how the Token RPC Service exposes an index of all events (via the `events` query), and an index on just the "Holder Events" (via the `userEvents` query):
+In Psibase, it is very simple to provide GraphQL access to any event chain. In the below example, you can see how the Token Service exposes an index of all events (via the `events` query), and an index on just the user events (via the `userEvents` query):
 
 <details>
   <summary>Reveal code</summary>
@@ -170,7 +163,7 @@ In Psibase, it is very simple to provide GraphQL access to any event chain. In t
 
 <br>
 
-Once the above Service and RPC Service are deployed, a front-end developer may access `https://token-sys.<domain>/graphql` to see these queries are now available as part of the TokenSys GraphQL schema:
+Once the above Service and RPC Service are deployed, a front-end developer may access `https://token-sys.<domain>/graphql` to see these queries are now available as part of the GraphQL schema:
 
 <details>
   <summary>Reveal</summary>
@@ -188,14 +181,14 @@ Once the above Service and RPC Service are deployed, a front-end developer may a
 
 <br>
 
-A query for the Holder Events index can be easily constructed by following that GraphQL Schema:
+A query for the User Events index can be easily constructed by following that GraphQL Schema:
 
 <details>
   <summary>Reveal</summary>
 
 ```
   query {
-  userEvents(holder: "alice") {
+  userEvents(user: "alice") {
       pageInfo {
           hasNextPage
           endCursor
@@ -215,7 +208,7 @@ A query for the Holder Events index can be easily constructed by following that 
 
 <br>
 
-Which, when submitted to a full-node, returns the Holder Events index as expected:
+Which, when submitted to a Psinode, returns the User Events index as expected:
 
 <details>
   <summary>Reveal</summary>
@@ -292,24 +285,24 @@ Which, when submitted to a full-node, returns the Holder Events index as expecte
 
 ## Event types
 
-All emitted events are either History events or Merkle events. These two different event types are used for two separate use-cases, and using the wrong type may cause excessive billing to the Service developer.
+All emitted events are either History events or Merkle events.
 
-### History events (Long-term events)
+### History events
 
-The most common type of event is the history event. History events are emitted and stored to allow for the efficient historical event queries previously described. These events are more expensive to emit than UI events, because they are stored longer.
+The most common type of event is the history event. History events are emitted and stored to allow for the efficient historical event queries previously described.
 
-### Merkle events (Inter-blockchain communication events)
+### Merkle events
 
-If you need a particular events to be provable on another Psibase chains, you would emit a Merkle event. Emitting a merkle event will ensure that the event is included in a merkle proof for that block, which could be used to prove that an event happened to another psibase blockchain.
+Emitting a merkle event will ensure that a merkle proof is generated for that event, which is a type of cryptographic proof that could be used to prove to a third-party Psibase network that an event has occured.
 
-If an events shouldn't need to be verified on another chain, then a merkle event need not be emitted.
+If the developer isn't concerned with the interaction of their service with multiple Psibase deployments, then she should not emit a merkle event.
 
 ## Conclusion
 
-In Psibase, the philosophy is that "transactions" or "groups of actions" should not be user-facing. Unlike other blockchains that provide users transaction IDs (txids) for each blockchain interaction, Psibase provides Event IDs. Proof of any event can then be established by providing someone a link to a query that returns the event.
+Event IDs are unique between all web services on a particular Psibase deployment. Because of that, proof of an event on a Psibase deployment can be established by sharing a link to a query for an event ID that returns the relevant event.
 
-Events in Psibase are not simply stored in an ever-growing log with correspondingly growing search times. Rather, developers can create custom indices on all events emitted by their service, guaranteeing fast historical access times.
+Psibase events are not simply stored in an ever-growing list with linear search times. Rather, developers can create custom indices on events emitted by their service, guaranteeing fast historical access times.
 
-No third-party tools are therefore needed to index and expose access to on-chain events. All events may be easily exposed to the public over GraphQL interfaces by adding a few simple lines of code in an RPC service.
+Unlike other web service deployment architectures, no third-party tools are needed to index and expose access to events. All events may be easily exposed to the public over GraphQL interfaces by adding a few simple lines of code in an RPC service.
 
-The Psibase event system is a powerful example of one of the many innovations that allow Psibase blockchains to uniquely meet the growing needs of the decentralized internet.
+The Psibase event system is a powerful example of one of the many innovations that allows Psibase to uniquely meet the growing needs of modern web applications.
