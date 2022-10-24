@@ -205,7 +205,7 @@ mod service {
 
         println!(">>> inserting new election record");
 
-        table.put(&new_election);
+        table.put(&new_election).unwrap();
 
         new_key
     }
@@ -236,7 +236,7 @@ mod service {
             votes: 0,
         };
 
-        table.put(&new_candidate_record);
+        table.put(&new_candidate_record).unwrap();
     }
 
     /// Unregister a candidate from the election
@@ -288,11 +288,11 @@ mod service {
             voted_at: current_time,
         };
 
-        table.put(&new_voting_record);
+        table.put(&new_voting_record).unwrap();
 
         // Increment candidate vote
         candidate_record.votes += 1;
-        CandidatesTable::open().put(&candidate_record);
+        CandidatesTable::open().put(&candidate_record).unwrap();
     }
 }
 
