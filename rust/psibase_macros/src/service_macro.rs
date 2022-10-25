@@ -104,6 +104,7 @@ fn process_mod(
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
+    let psibase_mod_str = psibase_mod.to_string();
 
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
@@ -204,11 +205,14 @@ fn process_mod(
             .iter()
             .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
             .fold(quote! {}, |a, b| quote! {#a #b});
+        let static_type = quote! {#psibase_mod::JustSchema}.to_string();
         items.push(parse_quote! {
-            #[derive(Clone)]
+            #[derive(Debug, Clone, #psibase_mod::Reflect)]
+            #[reflect(psibase_mod = #psibase_mod_str, static_type=#static_type)]
             #[automatically_derived]
             #doc
             pub struct #actions <T: #psibase_mod::Caller> {
+                #[reflect(skip)]
                 pub caller: T,
             }
         });

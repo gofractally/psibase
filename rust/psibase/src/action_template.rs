@@ -4,7 +4,7 @@ use crate::reflect::{
 };
 use serde_json::to_string;
 
-pub fn generate_template<T: Reflect>() -> String {
+pub fn generate_action_templates<T: Reflect>() -> String {
     let mut result = String::new();
     T::reflect(TemplateGenerator(&mut result));
     result

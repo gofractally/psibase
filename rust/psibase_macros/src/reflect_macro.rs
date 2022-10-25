@@ -1,5 +1,5 @@
 use crate::fracpack_macro::Options as FracpackOptions;
-use darling::{FromDeriveInput, FromMeta};
+use darling::{FromDeriveInput, FromField, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, TokenStream as TokenStream2};
 use proc_macro_error::{abort, emit_error};
@@ -15,6 +15,7 @@ use syn::{
 struct DeriveOptions {
     psibase_mod: String,
     custom_json: bool,
+    static_type: Option<String>,
 }
 
 impl Default for DeriveOptions {
@@ -22,8 +23,15 @@ impl Default for DeriveOptions {
         Self {
             psibase_mod: "psibase".into(),
             custom_json: false,
+            static_type: None,
         }
     }
+}
+
+#[derive(Debug, Default, FromField)]
+#[darling(default, attributes(reflect))]
+struct FieldOptions {
+    skip: bool,
 }
 
 #[derive(Debug, FromMeta)]
@@ -43,6 +51,7 @@ impl Default for AttrOptions {
 struct StructField<'a> {
     name: &'a proc_macro2::Ident,
     ty: &'a syn::Type,
+    options: FieldOptions,
 }
 
 fn struct_fields(named: &FieldsNamed) -> Vec<StructField> {
@@ -52,6 +61,10 @@ fn struct_fields(named: &FieldsNamed) -> Vec<StructField> {
         .map(|field| StructField {
             name: field.ident.as_ref().unwrap(),
             ty: &field.ty,
+            options: match FieldOptions::from_field(field) {
+                Ok(val) => val,
+                Err(err) => abort!("{}", err),
+            },
         })
         .collect()
 }
@@ -91,6 +104,11 @@ pub fn reflect_derive_macro(input: TokenStream) -> TokenStream {
         })
         .reduce(|a, b| quote! {#a, #b})
         .map(|a| quote! {<#a>});
+    let static_type = if let Some(t) = &opts.static_type {
+        TokenStream2::from_str(t).unwrap()
+    } else {
+        quote! {#name #static_generics}
+    };
 
     let mut additional_defs = quote! {};
     let visit = match &input.data {
@@ -114,7 +132,7 @@ pub fn reflect_derive_macro(input: TokenStream) -> TokenStream {
 
     quote! {
         impl #impl_generics #psibase_mod::reflect::Reflect for #name #ty_generics #where_clause {
-            type StaticType = #name #static_generics;
+            type StaticType = #static_type;
             fn reflect<V: #psibase_mod::reflect::Visitor>(visitor: V) -> V::Return {
                 #visit
             }
@@ -152,10 +170,14 @@ fn visit_struct(
 
     let visit_fields = fields
         .iter()
-        .map(|field| {
-            let name_str = field.name.to_string();
-            let ty = field.ty;
-            quote! { .field::<#ty>(#name_str.into()) }
+        .filter_map(|field| {
+            if field.options.skip {
+                None
+            } else {
+                let name_str = field.name.to_string();
+                let ty = field.ty;
+                Some(quote! { .field::<#ty>(#name_str.into()) })
+            }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
 
