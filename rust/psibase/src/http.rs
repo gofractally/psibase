@@ -1,18 +1,24 @@
 #![allow(non_snake_case)]
 
-use crate::{Fracpack, ToKey};
+use crate::{Fracpack, Reflect, ToKey};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, PartialEq, Eq, Clone, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, PartialEq, Eq, Clone, Fracpack, Reflect, ToKey, Serialize, Deserialize,
+)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct HttpHeader {
     pub name: String,
     pub value: String,
 }
 
-#[derive(Debug, Default, PartialEq, Eq, Clone, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, PartialEq, Eq, Clone, Fracpack, Reflect, ToKey, Serialize, Deserialize,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct HttpRequest {
     pub host: String,
@@ -23,8 +29,11 @@ pub struct HttpRequest {
     pub body: Vec<u8>,
 }
 
-#[derive(Debug, Default, PartialEq, Eq, Clone, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, PartialEq, Eq, Clone, Fracpack, Reflect, ToKey, Serialize, Deserialize,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct HttpReply {
     pub contentType: String,

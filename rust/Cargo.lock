@@ -537,6 +537,7 @@ version = "0.1.0"
 dependencies = [
  "fracpack",
  "psibase",
+ "serde",
 ]
 
 [[package]]
@@ -2369,8 +2370,8 @@ dependencies = [
 name = "test_contract"
 version = "0.1.0"
 dependencies = [
- "fracpack",
  "psibase",
+ "serde",
 ]
 
 [[package]]

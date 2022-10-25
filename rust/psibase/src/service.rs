@@ -1,5 +1,5 @@
 use crate::fracpack::{Packable, PackableOwned};
-use crate::{get_result_bytes, native_raw, AccountNumber, Action, MethodNumber};
+use crate::{get_result_bytes, native_raw, reflect, AccountNumber, Action, MethodNumber, Reflect};
 
 #[cfg(target_family = "wasm")]
 static mut SERVICE: AccountNumber = AccountNumber::new(0);
@@ -84,6 +84,25 @@ pub trait Caller: Clone {
 }
 
 #[derive(Clone, Default)]
+pub struct JustSchema;
+
+impl Caller for JustSchema {
+    type ReturnsNothing = ();
+    type ReturnType<T: PackableOwned> = ();
+
+    fn call_returns_nothing<Args: PackableOwned>(&self, _method: MethodNumber, _args: Args) {}
+    fn call<Ret: PackableOwned, Args: PackableOwned>(&self, _method: MethodNumber, _args: Args) {}
+}
+
+impl reflect::Reflect for JustSchema {
+    type StaticType = Self;
+    fn reflect<V: reflect::Visitor>(_visitor: V) -> V::Return {
+        unimplemented!()
+    }
+}
+
+#[derive(Clone, Default, Reflect)]
+#[reflect(psibase_mod = "crate")]
 pub struct ServiceCaller {
     pub sender: AccountNumber,
     pub service: AccountNumber,
@@ -121,7 +140,8 @@ impl Caller for ServiceCaller {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Reflect)]
+#[reflect(psibase_mod = "crate")]
 pub struct ActionPacker {
     pub sender: AccountNumber,
     pub service: AccountNumber,

@@ -1,4 +1,4 @@
-use crate::{Fracpack, ToKey};
+use crate::{Fracpack, Reflect, ToKey};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
@@ -12,11 +12,13 @@ use std::ops::{Add, Sub};
     PartialOrd,
     Ord,
     Fracpack,
+    Reflect,
     ToKey,
     Serialize,
     Deserialize,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct TimePointSec {
     pub seconds: u32,

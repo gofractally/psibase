@@ -1,10 +1,12 @@
+use crate::{Fracpack, Reflect, ToKey};
+use serde::{Deserialize, Serialize};
+
 /// Identify a service and method
 ///
 /// An empty `service` or `method` indicates a wildcard.
-#[derive(
-    Copy, Clone, Debug, crate::Fracpack, crate::ToKey, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Copy, Clone, Debug, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "crate::fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct ServiceMethod {
     pub service: crate::AccountNumber,

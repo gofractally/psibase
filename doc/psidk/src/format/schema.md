@@ -181,7 +181,7 @@ A struct definition may have methods on it.
 }
 ```
 
-If a method doesn't return a value, `returns` should be `{"builtinType": "void"}`.
+If a method doesn't return a value, `returns` should be `{"ty": "void"}`.
 
 ### Method Upgradeability
 
@@ -201,10 +201,10 @@ The following break backwards compatibility; if you do these, data will end up c
 
 We used `{type reference}` to indicate a type reference in the definitions above. This can be one of the following:
 
-- `{"builtinType": "u32"}` - a [built-in type](#built-in-types)
-- `{"userType": "Foo"}` - a type defined in the [userTypes array](#type-definitions)
+- `{"ty": "u32"}` - a [built-in type](#built-in-types)
+- `{"user": "Foo"}` - a type defined in the [userTypes array](#type-definitions)
 - `{"vector": {inner type}}` - a vector of inner type
-- `{"optional": {inner type}}` - an optional of inner type
+- `{"option": {inner type}}` - an optional of inner type
 - `{"tuple": [{inner type}, ...]}` - a tuple of inner types
 - `{"array": [{inner type}, size]}` - a fixed-size array of inner type
 
@@ -224,7 +224,7 @@ The following break backwards compatibility; if you do these, data will end up c
 
 ## Built-in Types
 
-`{"builtinType":"..."}` can name one of the following built-in types:
+`{"ty":"..."}` can name one of the following built-in types:
 
 - `void`: only supported as a method return type
 - `bool`
@@ -242,6 +242,110 @@ The following break backwards compatibility; if you do these, data will end up c
 
 The schema schema defines both the JSON format and the binary (fracpack) format of schemas.
 
-```
-TODO...
+```json
+{
+  "userTypes": [
+    {
+      "name": "TypeRef",
+      "unionFields": [
+        {
+          "name": "ty",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "user",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "vector",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "option",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "tuple",
+          "ty": { "vector": { "user": "TypeRef" } }
+        },
+        {
+          "name": "array",
+          "ty": { "tuple": [{ "user": "TypeRef" }, { "ty": "u32" }] }
+        }
+      ]
+    },
+    {
+      "name": "Field",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "ty",
+          "ty": { "user": "TypeRef" }
+        }
+      ]
+    },
+    {
+      "name": "Method",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "returns",
+          "ty": { "user": "TypeRef" }
+        },
+        {
+          "name": "args",
+          "ty": { "vector": { "user": "Field" } }
+        }
+      ]
+    },
+    {
+      "name": "Definition",
+      "structFields": [
+        {
+          "name": "name",
+          "ty": { "ty": "string" }
+        },
+        {
+          "name": "alias",
+          "ty": { "option": { "user": "TypeRef" } }
+        },
+        {
+          "name": "structFields",
+          "ty": { "option": { "vector": { "user": "Field" } } }
+        },
+        {
+          "name": "unionFields",
+          "ty": { "option": { "vector": { "user": "Field" } } }
+        },
+        {
+          "name": "customJson",
+          "ty": { "option": { "ty": "bool" } }
+        },
+        {
+          "name": "definitionWillNotChange",
+          "ty": { "option": { "ty": "bool" } }
+        },
+        {
+          "name": "methods",
+          "ty": { "option": { "vector": { "user": "Method" } } }
+        }
+      ]
+    },
+    {
+      "name": "Schema",
+      "structFields": [
+        {
+          "name": "userTypes",
+          "ty": { "vector": { "user": "Definition" } }
+        }
+      ]
+    }
+  ]
+}
 ```

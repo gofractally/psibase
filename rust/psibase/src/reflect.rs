@@ -1,8 +1,23 @@
-use std::{borrow::Cow, rc::Rc, sync::Arc};
+use std::{
+    borrow::Cow,
+    cell::{Cell, RefCell},
+    rc::Rc,
+    sync::Arc,
+};
 
 pub trait Reflect {
     type StaticType: 'static + Reflect;
     fn reflect<V: Visitor>(visitor: V) -> V::Return;
+}
+
+pub trait ReflectNoMethods {
+    fn reflect_methods<Return>(visitor: impl StructVisitor<Return>) -> Return;
+}
+
+impl<T> ReflectNoMethods for T {
+    fn reflect_methods<Return>(visitor: impl StructVisitor<Return>) -> Return {
+        visitor.end()
+    }
 }
 
 pub trait Visitor {
@@ -21,6 +36,9 @@ pub trait Visitor {
     fn boxed<Inner: Reflect>(self) -> Self::Return;
     fn rc<Inner: Reflect>(self) -> Self::Return;
     fn arc<Inner: Reflect>(self) -> Self::Return;
+    fn cell<Inner: Reflect>(self) -> Self::Return;
+    fn ref_cell<Inner: Reflect>(self) -> Self::Return;
+    fn option<Inner: Reflect>(self) -> Self::Return;
     fn container<T: Reflect, Inner: Reflect>(self) -> Self::Return;
     fn array<Inner: Reflect, const SIZE: usize>(self) -> Self::Return;
     fn tuple<T: Reflect>(self, fields_len: usize) -> Self::TupleVisitor;
@@ -55,10 +73,24 @@ pub trait NamedVisitor<Return> {
 pub trait StructVisitor<Return>: NamedVisitor<Return> {
     type MethodsVisitor: MethodsVisitor<Return>;
 
-    fn with_methods(self) -> Self::MethodsVisitor;
+    fn with_methods(self, num_methods: usize) -> Self::MethodsVisitor;
 }
 
-pub trait MethodsVisitor<Return> {}
+pub trait MethodsVisitor<Return>: Sized {
+    type ArgVisitor: ArgVisitor<Self>;
+
+    fn method<MethodReturn: Reflect>(
+        self,
+        name: Cow<'static, str>,
+        num_args: usize,
+    ) -> Self::ArgVisitor;
+    fn end(self) -> Return;
+}
+
+pub trait ArgVisitor<Return> {
+    fn arg<T: Reflect>(self, name: Cow<'static, str>) -> Self;
+    fn end(self) -> Return;
+}
 
 pub trait EnumVisitor<Return>: Sized {
     type TupleVisitor: UnnamedVisitor<Self>;
@@ -102,6 +134,30 @@ impl<T: Reflect> Reflect for Arc<T> {
     type StaticType = Arc<T::StaticType>;
     fn reflect<V: Visitor>(visitor: V) -> V::Return {
         visitor.arc::<T>()
+    }
+}
+
+impl<T: Reflect> Reflect for Cell<T> {
+    type StaticType = Cell<T::StaticType>;
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.cell::<T>()
+    }
+}
+
+impl<T: Reflect> Reflect for RefCell<T> {
+    type StaticType = RefCell<T::StaticType>;
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.ref_cell::<T>()
+    }
+}
+
+impl<T: Reflect> Reflect for Option<T>
+where
+    T::StaticType: Sized,
+{
+    type StaticType = Option<T::StaticType>;
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.option::<T>()
     }
 }
 
@@ -156,6 +212,8 @@ macro_rules! builtin_impl {
     };
 }
 
+pub struct Void;
+
 builtin_impl!(bool, "bool");
 builtin_impl!(u8, "u8");
 builtin_impl!(u16, "u16");
@@ -168,11 +226,19 @@ builtin_impl!(i64, "i64");
 builtin_impl!(f32, "f32");
 builtin_impl!(f64, "f64");
 builtin_impl!(String, "string");
+builtin_impl!(Void, "void");
 
 impl<'a> Reflect for &'a str {
     type StaticType = &'static str;
     fn reflect<V: Visitor>(visitor: V) -> V::Return {
         visitor.builtin::<&'a str>("string")
+    }
+}
+
+impl<'a> Reflect for Cow<'a, str> {
+    type StaticType = Cow<'static, str>;
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.builtin::<Cow<'a, str>>("string")
     }
 }
 
@@ -214,4 +280,74 @@ tuple_impls! {
     14 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13)
     15 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14)
     16 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14 15 T15)
+}
+
+pub struct IgnoreVisit<Return>(pub Return);
+
+impl<Return> UnnamedVisitor<Return> for IgnoreVisit<Return> {
+    fn field<T: Reflect>(self) -> Self {
+        self
+    }
+    fn end(self) -> Return {
+        self.0
+    }
+}
+
+impl<Return> NamedVisitor<Return> for IgnoreVisit<Return> {
+    fn field<T: Reflect>(self, _name: Cow<'static, str>) -> Self {
+        self
+    }
+    fn end(self) -> Return {
+        self.0
+    }
+}
+
+impl<Return> StructVisitor<Return> for IgnoreVisit<Return> {
+    type MethodsVisitor = Self;
+
+    fn with_methods(self, _num_methods: usize) -> Self::MethodsVisitor {
+        self
+    }
+}
+
+impl<Return> MethodsVisitor<Return> for IgnoreVisit<Return> {
+    type ArgVisitor = IgnoreVisit<Self>;
+
+    fn method<MethodReturn: Reflect>(
+        self,
+        _name: Cow<'static, str>,
+        _num_args: usize,
+    ) -> Self::ArgVisitor {
+        IgnoreVisit(self)
+    }
+    fn end(self) -> Return {
+        self.0
+    }
+}
+
+impl<Return> ArgVisitor<Return> for IgnoreVisit<Return> {
+    fn arg<T: Reflect>(self, _name: Cow<'static, str>) -> Self {
+        self
+    }
+    fn end(self) -> Return {
+        self.0
+    }
+}
+
+impl<Return> EnumVisitor<Return> for IgnoreVisit<Return> {
+    type TupleVisitor = IgnoreVisit<Self>;
+    type NamedVisitor = IgnoreVisit<Self>;
+
+    fn single<T: Reflect, Inner: Reflect>(self, _name: Cow<'static, str>) -> Self {
+        self
+    }
+    fn tuple<T: Reflect>(self, _name: Cow<'static, str>, _fields_len: usize) -> Self::TupleVisitor {
+        IgnoreVisit(self)
+    }
+    fn named<T: Reflect>(self, _name: Cow<'static, str>, _fields_len: usize) -> Self::NamedVisitor {
+        IgnoreVisit(self)
+    }
+    fn end(self) -> Return {
+        self.0
+    }
 }

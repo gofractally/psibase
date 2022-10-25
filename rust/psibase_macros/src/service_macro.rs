@@ -104,6 +104,7 @@ fn process_mod(
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
+    let psibase_mod_str = psibase_mod.to_string();
 
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
@@ -204,11 +205,14 @@ fn process_mod(
             .iter()
             .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
             .fold(quote! {}, |a, b| quote! {#a #b});
+        let static_type = quote! {#psibase_mod::JustSchema}.to_string();
         items.push(parse_quote! {
-            #[derive(Clone)]
+            #[derive(Debug, Clone, #psibase_mod::Reflect)]
+            #[reflect(psibase_mod = #psibase_mod_str, static_type=#static_type)]
             #[automatically_derived]
             #doc
             pub struct #actions <T: #psibase_mod::Caller> {
+                #[reflect(skip)]
                 pub caller: T,
             }
         });
@@ -894,7 +898,8 @@ fn process_action_args(
         };
     }
     let fn_name = &f.sig.ident;
-    let fracpack_mod = psibase_mod.to_string() + "::fracpack";
+    let psibase_mod_str = psibase_mod.to_string();
+    let fracpack_mod = psibase_mod_str.clone() + "::fracpack";
 
     let doc = format!(
         "This structure has the same JSON and Fracpack format as the arguments to [{actions}::{fn_name}]({actions}::{fn_name}).",
@@ -902,8 +907,9 @@ fn process_action_args(
 
     *new_items = quote! {
         #new_items
-        #[derive(#psibase_mod::Fracpack, serde::Deserialize, serde::Serialize)]
+        #[derive(Debug, Clone, #psibase_mod::Fracpack, #psibase_mod::Reflect, serde::Deserialize, serde::Serialize)]
         #[fracpack(fracpack_mod = #fracpack_mod)]
+        #[reflect(psibase_mod = #psibase_mod_str)]
         #[doc = #doc]
         pub struct #fn_name {
             #struct_members

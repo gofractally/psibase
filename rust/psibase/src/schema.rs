@@ -1,20 +1,30 @@
 use crate::reflect::{self, NamedVisitor};
 use crate::reflect::{EnumVisitor, Reflect, StructVisitor, UnnamedVisitor, Visitor};
 use fracpack::Fracpack;
+use psibase_macros::Reflect;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::{any::TypeId, borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
 
-#[derive(Debug, Clone, Default, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
-pub struct Schema<String> {
+pub struct Schema<String>
+where
+    String: reflect::Reflect,
+{
     pub userTypes: Vec<Definition<String>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
-pub struct Definition<String> {
+pub struct Definition<String>
+where
+    String: reflect::Reflect,
+{
     pub name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -36,30 +46,42 @@ pub struct Definition<String> {
     pub methods: Option<Vec<Method<String>>>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_camel_case_types)]
-pub enum TypeRef<String> {
-    builtinType(String),
-    userType(String),
+pub enum TypeRef<String>
+where
+    String: reflect::Reflect,
+{
+    ty(String),
+    user(String),
     vector(Box<TypeRef<String>>),
-    optional(Box<TypeRef<String>>),
+    option(Box<TypeRef<String>>),
     tuple(Vec<TypeRef<String>>),
     array(Box<TypeRef<String>>, u32),
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
-pub struct Field<String> {
+pub struct Field<String>
+where
+    String: reflect::Reflect,
+{
     name: String,
     ty: TypeRef<String>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
-pub struct Method<String> {
+pub struct Method<String>
+where
+    String: reflect::Reflect,
+{
     name: String,
     returns: TypeRef<String>,
     args: Vec<Field<String>>,
@@ -74,26 +96,39 @@ fn extract_str(str: &BuildString) -> String {
 pub fn create_schema<T: Reflect>() -> Schema<BuildString> {
     let mut builder: SchemaBuilder = Default::default();
     builder.get_type_ref::<T>();
-    // TODO: handle duplicate names
+    let mut names: HashSet<String> = HashSet::new();
+    for shared_name in builder.names {
+        let name = extract_str(&shared_name);
+        if names.contains(&name) {
+            let mut i = 0;
+            let new_name = loop {
+                let n = format!("{}{}", &name, i);
+                if !names.contains(&n) {
+                    break n;
+                }
+                i += 1;
+            };
+            shared_name.replace(new_name.clone().into());
+            names.insert(new_name);
+        } else {
+            names.insert(name);
+        }
+    }
     builder.schema
-}
-
-struct BuiltType {
-    _name: Option<BuildString>, // TODO
-    type_ref: TypeRef<BuildString>,
 }
 
 #[derive(Default)]
 struct SchemaBuilder {
-    types: HashMap<TypeId, BuiltType>,
+    names: Vec<BuildString>,
+    type_refs: HashMap<TypeId, TypeRef<BuildString>>,
     schema: Schema<BuildString>,
 }
 
 impl SchemaBuilder {
     fn get_type_ref<T: Reflect>(&mut self) -> TypeRef<BuildString> {
         let type_id = TypeId::of::<T::StaticType>();
-        if let Some(tr) = self.types.get(&type_id) {
-            tr.type_ref.clone()
+        if let Some(tr) = self.type_refs.get(&type_id) {
+            tr.clone()
         } else {
             T::StaticType::reflect(TypeBuilder {
                 schema_builder: self,
@@ -107,12 +142,14 @@ impl SchemaBuilder {
         &mut self,
         name: Option<BuildString>,
         type_ref: TypeRef<BuildString>,
-    ) -> &mut BuiltType {
-        self.types
+    ) -> &TypeRef<BuildString> {
+        self.type_refs
             .entry(TypeId::of::<T::StaticType>())
-            .or_insert(BuiltType {
-                _name: name,
-                type_ref,
+            .or_insert_with(|| {
+                if let Some(name) = name {
+                    self.names.push(name);
+                }
+                type_ref
             })
     }
 }
@@ -143,8 +180,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
     fn builtin<T: Reflect>(self, name: &'static str) -> Self::Return {
         let name = Rc::new(RefCell::new(name.into()));
         self.schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::builtinType(name))
-            .type_ref
+            .insert::<T>(Some(name.clone()), TypeRef::ty(name))
             .clone()
     }
 
@@ -168,11 +204,25 @@ impl<'a> Visitor for TypeBuilder<'a> {
         self.schema_builder.get_type_ref::<Inner>()
     }
 
+    fn cell<Inner: Reflect>(self) -> Self::Return {
+        self.schema_builder.get_type_ref::<Inner>()
+    }
+
+    fn ref_cell<Inner: Reflect>(self) -> Self::Return {
+        self.schema_builder.get_type_ref::<Inner>()
+    }
+
+    fn option<Inner: Reflect>(self) -> Self::Return {
+        let inner = self.schema_builder.get_type_ref::<Inner>();
+        self.schema_builder
+            .insert::<Option<Inner>>(None, TypeRef::option(Box::new(inner)))
+            .clone()
+    }
+
     fn container<T: Reflect, Inner: Reflect>(self) -> Self::Return {
         let inner = self.schema_builder.get_type_ref::<Inner>();
         self.schema_builder
             .insert::<T>(None, TypeRef::vector(Box::new(inner)))
-            .type_ref
             .clone()
     }
 
@@ -180,7 +230,6 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let inner = self.schema_builder.get_type_ref::<Inner>();
         self.schema_builder
             .insert::<[Inner; SIZE]>(None, TypeRef::array(Box::new(inner), SIZE as u32))
-            .type_ref
             .clone()
     }
 
@@ -205,8 +254,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
             methods: None,
         });
         self.schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::userType(name))
-            .type_ref
+            .insert::<T>(Some(name.clone()), TypeRef::user(name))
             .clone()
     }
 
@@ -218,8 +266,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let name = Rc::new(RefCell::new(name));
         let type_ref = self
             .schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
-            .type_ref
+            .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
             .clone();
         StructTupleBuilder {
             schema_builder: self.schema_builder,
@@ -237,8 +284,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let name = Rc::new(RefCell::new(name));
         let type_ref = self
             .schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
-            .type_ref
+            .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
             .clone();
         StructBuilder {
             schema_builder: self.schema_builder,
@@ -247,6 +293,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
             custom_json: self.custom_json,
             definition_will_not_change: self.definition_will_not_change,
             fields: Vec::with_capacity(fields_len),
+            methods: None,
         }
     }
 
@@ -258,8 +305,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let name = Rc::new(RefCell::new(name));
         let type_ref = self
             .schema_builder
-            .insert::<T>(Some(name.clone()), TypeRef::userType(name.clone()))
-            .type_ref
+            .insert::<T>(Some(name.clone()), TypeRef::user(name.clone()))
             .clone();
         EnumBuilder {
             schema_builder: self.schema_builder,
@@ -284,13 +330,9 @@ impl<'a> UnnamedVisitor<TypeRef<BuildString>> for TupleBuilder<'a> {
 
     fn end(self) -> TypeRef<BuildString> {
         self.schema_builder
-            .types
+            .type_refs
             .entry(self.type_id)
-            .or_insert(BuiltType {
-                _name: None,
-                type_ref: TypeRef::tuple(self.fields),
-            })
-            .type_ref
+            .or_insert(TypeRef::tuple(self.fields))
             .clone()
     }
 }
@@ -329,6 +371,7 @@ struct StructBuilder<'a> {
     custom_json: Option<bool>,
     definition_will_not_change: Option<bool>,
     fields: Vec<Field<BuildString>>,
+    methods: Option<Vec<Method<BuildString>>>,
 }
 
 impl<'a> NamedVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
@@ -349,7 +392,7 @@ impl<'a> NamedVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
             unionFields: None,
             customJson: self.custom_json,
             definitionWillNotChange: self.definition_will_not_change,
-            methods: None,
+            methods: self.methods,
         });
         self.type_ref
     }
@@ -358,12 +401,59 @@ impl<'a> NamedVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
 impl<'a> StructVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
     type MethodsVisitor = Self;
 
-    fn with_methods(self) -> Self {
+    fn with_methods(mut self, num_methods: usize) -> Self {
+        self.methods = Some(Vec::with_capacity(num_methods));
         self
     }
 }
 
-impl<'a> reflect::MethodsVisitor<TypeRef<BuildString>> for StructBuilder<'a> {}
+impl<'a> reflect::MethodsVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
+    type ArgVisitor = MethodBuilder<'a>;
+
+    fn method<MethodReturn: Reflect>(
+        self,
+        name: Cow<'static, str>,
+        num_args: usize,
+    ) -> Self::ArgVisitor {
+        let returns = self.schema_builder.get_type_ref::<MethodReturn>();
+        MethodBuilder {
+            struct_builder: self,
+            name: Rc::new(name.into()),
+            returns,
+            args: Vec::with_capacity(num_args),
+        }
+    }
+
+    fn end(self) -> TypeRef<BuildString> {
+        <Self as NamedVisitor<TypeRef<BuildString>>>::end(self)
+    }
+}
+
+struct MethodBuilder<'a> {
+    struct_builder: StructBuilder<'a>,
+    name: BuildString,
+    returns: TypeRef<BuildString>,
+    args: Vec<Field<BuildString>>,
+}
+
+impl<'a> reflect::ArgVisitor<StructBuilder<'a>> for MethodBuilder<'a> {
+    fn arg<T: Reflect>(mut self, name: Cow<'static, str>) -> Self {
+        self.args.push(Field {
+            name: Rc::new(name.into()),
+            ty: self.struct_builder.schema_builder.get_type_ref::<T>(),
+        });
+        self
+    }
+
+    fn end(mut self) -> StructBuilder<'a> {
+        self.struct_builder.methods.as_mut().unwrap().push(Method {
+            name: self.name,
+            returns: self.returns,
+            args: self.args,
+        });
+        self.struct_builder
+    }
+}
 
 struct EnumBuilder<'a> {
     schema_builder: &'a mut SchemaBuilder,
@@ -470,7 +560,7 @@ impl<'a> NamedVisitor<EnumBuilder<'a>> for EnumNamedBuilder<'a> {
             });
         self.enum_builder.fields.push(Field {
             name: self.name,
-            ty: TypeRef::userType(struct_name),
+            ty: TypeRef::user(struct_name),
         });
         self.enum_builder
     }
