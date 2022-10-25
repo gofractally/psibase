@@ -14,8 +14,10 @@ pub mod reflect;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod schema;
+mod serve_http;
 mod service;
 mod table;
+mod template;
 pub mod tester;
 pub mod tester_raw;
 mod time;
@@ -38,8 +40,10 @@ pub use native_tables::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use schema::*;
+pub use serve_http::*;
 pub use service::*;
 pub use table::*;
+pub use template::*;
 pub use tester::*;
 pub use time::*;
 pub use to_bin::*;
