@@ -1,10 +1,11 @@
 use std::fmt;
 
-use crate::{Action, Fracpack};
+use crate::{Action, Fracpack, Reflect};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct ActionTrace {
     pub action: Action,
@@ -19,38 +20,43 @@ impl fmt::Display for ActionTrace {
     }
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct EventTrace {
     pub name: String,
     pub data: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleTrace {
     pub console: String,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 pub enum InnerTraceEnum {
     ConsoleTrace(ConsoleTrace),
     EventTrace(EventTrace),
     ActionTrace(ActionTrace),
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct InnerTrace {
     pub inner: InnerTraceEnum,
 }
 
-#[derive(Debug, Clone, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {
     pub action_traces: Vec<ActionTrace>,

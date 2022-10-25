@@ -1,4 +1,4 @@
-use crate::{serialize_as_str, Fracpack};
+use crate::{serialize_as_str, Fracpack, Reflect};
 use custom_error::custom_error;
 use ripemd::{Digest, Ripemd160};
 use std::{fmt, str::FromStr};
@@ -22,15 +22,17 @@ custom_error! { pub K1Error
 
 pub type EccPublicKey = [u8; 33];
 
-#[derive(Debug, Clone, Fracpack)]
+#[derive(Debug, Clone, Fracpack, Reflect)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 pub enum PublicKeyEnum {
     K1(EccPublicKey),
     R1(EccPublicKey),
 }
 
-#[derive(Debug, Clone, Fracpack)]
+#[derive(Debug, Clone, Fracpack, Reflect)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate", custom_json = true)]
 pub struct PublicKey {
     pub data: PublicKeyEnum,
 }
@@ -78,15 +80,17 @@ impl From<&secp256k1::PublicKey> for PublicKey {
 
 pub type EccPrivateKey = [u8; 32];
 
-#[derive(Debug, Clone, Fracpack)]
+#[derive(Debug, Clone, Fracpack, Reflect)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 pub enum PrivateKeyEnum {
     K1(EccPrivateKey),
     R1(EccPrivateKey),
 }
 
-#[derive(Debug, Clone, Fracpack)]
+#[derive(Debug, Clone, Fracpack, Reflect)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate", custom_json = true)]
 pub struct PrivateKey {
     pub data: PrivateKeyEnum,
 }
@@ -145,15 +149,17 @@ impl From<&secp256k1::SecretKey> for PrivateKey {
 
 pub type EccSignature = [u8; 64];
 
-#[derive(Debug, Clone, Fracpack)]
+#[derive(Debug, Clone, Fracpack, Reflect)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 pub enum SignatureEnum {
     K1(EccSignature),
     R1(EccSignature),
 }
 
-#[derive(Debug, Clone, Fracpack)]
+#[derive(Debug, Clone, Fracpack, Reflect)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate", custom_json = true)]
 pub struct Signature {
     pub data: SignatureEnum,
 }

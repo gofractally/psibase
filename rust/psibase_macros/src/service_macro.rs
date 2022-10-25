@@ -894,7 +894,8 @@ fn process_action_args(
         };
     }
     let fn_name = &f.sig.ident;
-    let fracpack_mod = psibase_mod.to_string() + "::fracpack";
+    let psibase_mod_str = psibase_mod.to_string();
+    let fracpack_mod = psibase_mod_str.clone() + "::fracpack";
 
     let doc = format!(
         "This structure has the same JSON and Fracpack format as the arguments to [{actions}::{fn_name}]({actions}::{fn_name}).",
@@ -902,8 +903,9 @@ fn process_action_args(
 
     *new_items = quote! {
         #new_items
-        #[derive(#psibase_mod::Fracpack, serde::Deserialize, serde::Serialize)]
+        #[derive(Debug, Clone, #psibase_mod::Fracpack, #psibase_mod::Reflect, serde::Deserialize, serde::Serialize)]
         #[fracpack(fracpack_mod = #fracpack_mod)]
+        #[reflect(psibase_mod = #psibase_mod_str)]
         #[doc = #doc]
         pub struct #fn_name {
             #struct_members
