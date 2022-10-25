@@ -16,6 +16,37 @@ export type LogConfig = {
     flush?: boolean;
 };
 
+export function readLogger(config: LogConfig): LogConfig {
+    const result: any = { ...config };
+    for (const key of [
+        "filename",
+        "target",
+        "rotationSize",
+        "rotationTime",
+        "maxSize",
+        "maxFiles",
+        "path",
+        "flush",
+    ]) {
+        if (!(key in result)) {
+            result[key] = undefined;
+        }
+    }
+    return result;
+}
+
+export function readLoggers(config: { [index: string]: LogConfig }): {
+    [index: string]: LogConfig;
+} {
+    const result: any = {};
+    if (config !== undefined) {
+        for (const key in config) {
+            result[key] = readLogger(config[key]);
+        }
+    }
+    return result;
+}
+
 type LoggerProps = {
     name: string;
     register: (name: keyof LogConfig) => any;
@@ -87,4 +118,4 @@ export const Logger = ({ name, register, watch, remove }: LoggerProps) => {
     );
 };
 
-export default Logger;
+export default { Logger, readLoggers };

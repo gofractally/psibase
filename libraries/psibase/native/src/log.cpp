@@ -7,15 +7,14 @@
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/local/datagram_protocol.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/log/attributes/current_process_id.hpp>
 #include <boost/log/attributes/current_process_name.hpp>
 #include <boost/log/attributes/function.hpp>
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/log/sinks/syslog_constants.hpp>
 #include <boost/log/sinks/text_file_backend.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/console.hpp>
-#include <boost/log/utility/setup/filter_parser.hpp>
-#include <boost/log/utility/setup/formatter_parser.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
 #include <charconv>
 #include <chrono>
 #include <ctime>
@@ -492,191 +491,62 @@ namespace psibase::loggers
          };
       }
 
-      class timestamp_formatter_factory : public boost::log::formatter_factory<char>
-      {
-        public:
-         formatter_type create_formatter(const boost::log::attribute_name& name,
-                                         const args_map&                   args)
-         {
-            // TODO: use std::format when it becomes available
-            return [name](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
-            {
-               if (auto timestamp =
-                       boost::log::extract<std::chrono::system_clock::time_point>(name, rec))
-               {
-                  format_timestamp(os, *timestamp);
-               }
-            };
-         }
-      };
-
-      class blockid_formatter_factory : public boost::log::formatter_factory<char>
-      {
-        public:
-         formatter_type create_formatter(const boost::log::attribute_name& name,
-                                         const args_map&                   args)
-         {
-            return [name](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
-            {
-               if (auto header = boost::log::extract<Checksum256>(name, rec))
-               {
-                  os << loggers::to_string(*header);
-               }
-            };
-         }
-      };
-
-      template <typename T>
-      class id_formatter_factory : public boost::log::formatter_factory<char>
-      {
-        public:
-         formatter_type create_formatter(const boost::log::attribute_name& name,
-                                         const args_map&                   args)
-         {
-            // TODO: use std::format when it becomes available
-            return [name](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
-            {
-               if (auto attr = boost::log::extract<T>(name, rec))
-               {
-                  os << attr->native_id();
-               }
-            };
-         }
-      };
-
-      template <typename T>
-      class json_formatter_factory : public boost::log::formatter_factory<char>
-      {
-        public:
-         formatter_type create_formatter(const boost::log::attribute_name& name,
-                                         const args_map&                   args)
-         {
-            return [name](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
-            {
-               if (auto header = boost::log::extract<T>(name, rec))
-               {
-                  os << psio::convert_to_json(*header);
-               }
-            };
-         }
-      };
-
-      // args:
+      // args (';' separated keywords):
       // - facility: can be specified as either a string or number. default local0
       // - format: rfc3164, rfc5424, glibc, bsd (equivalent to rfc3164). default bsd
-      class syslog_formatter_factory : public boost::log::formatter_factory<char>
+      auto make_syslog_formatter = [](boost::log::attribute_name,
+                                      std::string_view spec) -> boost::log::formatter
       {
-        public:
-         formatter_type create_formatter(const boost::log::attribute_name& name,
-                                         const args_map&                   args)
+         int              facility     = 16;
+         std::string_view format       = "bsd";
+         bool             has_facility = false;
+         bool             has_format   = false;
+         if (!spec.empty())
          {
-            int              facility = 16;
-            std::string_view format   = "bsd";
-            auto             iter     = args.find("facility");
-            if (auto iter = args.find("facility"); iter != args.end())
+            while (true)
             {
-               facility = parse_facility(iter->second);
-            }
-            if (auto iter = args.find("format"); iter != args.end())
-            {
-               format = iter->second;
-            }
-            if (format == "bsd" || format == "rfc3164")
-            {
-               return rfc3164_formatter(facility);
-            }
-            else if (format == "rfc5424")
-            {
-               return rfc5424_formatter(facility);
-            }
-            else if (format == "glibc")
-            {
-               return rfc3164_formatter(facility, false);
-            }
-            else
-            {
-               throw std::runtime_error("Unknown syslog format: " + std::string(format));
+               auto pos     = spec.find(';');
+               auto keyword = spec.substr(0, pos);
+               if (keyword == "bsd" || keyword == "rfc3164" || keyword == "rfc5424" ||
+                   keyword == "glibc")
+               {
+                  if (has_format)
+                  {
+                     throw std::runtime_error("Syslog: multiple formats specified");
+                  }
+                  has_format = true;
+                  format     = keyword;
+               }
+               else
+               {
+                  if (has_facility)
+                  {
+                     throw std::runtime_error("Syslog: multiple facilities specified");
+                  }
+                  facility = parse_facility(keyword);
+               }
+               if (pos == std::string::npos)
+               {
+                  break;
+               }
+               spec = spec.substr(pos + 1);
             }
          }
-      };
-
-      template <typename F>
-      class function_formatter_factory : public boost::log::formatter_factory<char>
-      {
-        public:
-         function_formatter_factory(const F& f) : f(f) {}
-         formatter_type create_formatter(const boost::log::attribute_name&, const args_map&)
+         if (format == "bsd" || format == "rfc3164")
          {
-            return f;
+            return rfc3164_formatter(facility);
          }
-         F f;
-      };
-
-      template <typename N, typename F>
-      void register_function_formatter(N&& name, F&& f)
-      {
-         boost::log::register_formatter_factory(
-             name,
-             boost::make_shared<function_formatter_factory<std::decay_t<F>>>(std::forward<F>(f)));
-      }
-
-      class if_formatter_factory : public boost::log::formatter_factory<char>
-      {
-        public:
-         formatter_type create_formatter(const boost::log::attribute_name& name,
-                                         const args_map&                   args)
+         else if (format == "rfc5424")
          {
-            auto cond   = args.find("cond");
-            auto true_  = args.find("true");
-            auto false_ = args.find("false");
-            if (cond == args.end())
-            {
-               throw std::runtime_error("missing 'cond' in if");
-            }
-            if (true_ == args.end() && false_ == args.end())
-            {
-               throw std::runtime_error("no format in if");
-            }
-            auto c = boost::log::parse_filter(cond->second);
-            if (false_ == args.end())
-            {
-               auto t = boost::log::parse_formatter(true_->second);
-               return [c, t](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
-               {
-                  if (c(rec.attribute_values()))
-                  {
-                     t(rec, os);
-                  }
-               };
-            }
-            else if (true_ == args.end())
-            {
-               auto f = boost::log::parse_formatter(false_->second);
-               return [c, f](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
-               {
-                  if (!c(rec.attribute_values()))
-                  {
-                     f(rec, os);
-                  }
-               };
-            }
-            else
-            {
-               auto t = boost::log::parse_formatter(true_->second);
-               auto f = boost::log::parse_formatter(false_->second);
-               return
-                   [c, t, f](const boost::log::record_view& rec, boost::log::formatting_ostream& os)
-               {
-                  if (c(rec.attribute_values()))
-                  {
-                     t(rec, os);
-                  }
-                  else
-                  {
-                     f(rec, os);
-                  }
-               };
-            }
+            return rfc5424_formatter(facility);
+         }
+         else if (format == "glibc")
+         {
+            return rfc3164_formatter(facility, false);
+         }
+         else
+         {
+            __builtin_unreachable();
          }
       };
 
@@ -693,77 +563,12 @@ namespace psibase::loggers
          LogQueue queue;
       };
 
-      struct per_channel_formatter
-      {
-         void operator()(const boost::log::record_view&  rec,
-                         boost::log::formatting_ostream& os) const
-         {
-            if (auto channel = boost::log::extract<std::string>("Channel", rec))
-            {
-               auto iter = formatters.find(*channel);
-               if (iter != formatters.end())
-               {
-                  return iter->second(rec, os);
-               }
-            }
-            return default_(rec, os);
-         }
-         boost::log::formatter                        default_;
-         std::map<std::string, boost::log::formatter> formatters;
-      };
+      boost::log::filter    parse_filter(std::string_view filter);
+      boost::log::formatter parse_formatter(std::string_view formatter);
 
       bool is_known_channel(std::string_view name)
       {
          return name == "p2p" || name == "consensus" || name == "chain" || name == "block";
-      }
-      boost::log::formatter formatter_from_json(auto&& stream, std::string& raw)
-      {
-         auto t = stream.peek_token();
-         if (t.get().type == psio::json_token_type::type_start_object)
-         {
-            // parse map
-            per_channel_formatter result;
-            bool                  needs_comma = false;
-            raw += '{';
-            psio::from_json_object(
-                stream,
-                [&](auto key)
-                {
-                   auto s = stream.get_string();
-                   auto f = boost::log::parse_formatter(s.begin(), s.end());
-                   if (key == "default")
-                   {
-                      result.default_ = f;
-                   }
-                   else
-                   {
-                      if (!is_known_channel(key))
-                      {
-                         throw std::runtime_error("Unknown log channel: " + std::string(s));
-                      }
-                      result.formatters.try_emplace(std::string(key), std::move(f));
-                   }
-                   if (needs_comma)
-                   {
-                      raw.push_back(',');
-                   }
-                   else
-                   {
-                      needs_comma = true;
-                   }
-                   raw += psio::convert_to_json(key);
-                   raw += ':';
-                   raw += psio::convert_to_json(s);
-                });
-            raw += '}';
-            return std::move(result);
-         }
-         else
-         {
-            auto s = stream.get_string();
-            raw += psio::convert_to_json(s);
-            return boost::log::parse_formatter(s.begin(), s.end());
-         }
       }
 
       struct LogReaderConfig
@@ -780,12 +585,11 @@ namespace psibase::loggers
                                    if (key == "format")
                                    {
                                       std::string tmp;
-                                      obj.format = formatter_from_json(stream, tmp);
+                                      obj.format = parse_formatter(stream.get_string());
                                    }
                                    else if (key == "filter")
                                    {
-                                      auto s     = stream.get_string();
-                                      obj.filter = boost::log::parse_filter(s.begin(), s.end());
+                                      obj.filter = parse_filter(stream.get_string());
                                    }
                                    else
                                    {
@@ -804,7 +608,7 @@ namespace psibase::loggers
          explicit ConsoleSinkConfig(const sink_args_type& args) {}
          static void init(backend_type& backend)
          {
-            backend.add_stream(boost::shared_ptr<std::ostream>(&std::clog, boost::null_deleter()));
+            backend.add_stream(boost::shared_ptr<std::ostream>(&std::clog, [](void*) {}));
          }
          void apply(backend_type& backend) const {}
          void setPrevious(ConsoleSinkConfig&&) {}
@@ -1434,13 +1238,15 @@ namespace psibase::loggers
                                 {
                                    if (key == "format")
                                    {
-                                      obj.format = formatter_from_json(stream, obj.format_str);
+                                      auto s         = stream.get_string();
+                                      obj.format_str = s;
+                                      obj.format     = parse_formatter(s);
                                    }
                                    else if (key == "filter")
                                    {
                                       auto s         = stream.get_string();
                                       obj.filter_str = s;
-                                      obj.filter     = boost::log::parse_filter(s.begin(), s.end());
+                                      obj.filter     = parse_filter(s);
                                    }
                                    else if (key == "type")
                                    {
@@ -1483,7 +1289,7 @@ namespace psibase::loggers
          stream.write(',');
          psio::to_json("format", stream);
          stream.write(':');
-         stream.write(obj.format_str.data(), obj.format_str.size());
+         psio::to_json(obj.format_str, stream);
          if (auto* backend = std::get_if<FileSinkConfig>(&obj.backend))
          {
             to_json(*backend, stream);
@@ -1644,6 +1450,831 @@ namespace psibase::loggers
          }
       }
 
+      struct formatter_list
+      {
+         void operator()(auto&& rec, auto&& stream) const
+         {
+            for (const auto& f : formatters)
+            {
+               f(rec, stream);
+            }
+         }
+         std::vector<boost::log::formatter> formatters;
+      };
+
+      struct attr_set_filter
+      {
+         bool operator()(auto&& attr_set) const
+         {
+            for (auto attr : attrs)
+            {
+               if (!attr_set.count(attr))
+               {
+                  return false;
+               }
+            }
+            return true;
+         }
+         std::vector<boost::log::attribute_name> attrs;
+      };
+
+      using filter_generator = std::function<
+          boost::log::filter(boost::log::attribute_name, std::string_view, std::string_view)>;
+      using formatter_generator =
+          std::function<boost::log::formatter(boost::log::attribute_name, std::string_view)>;
+
+      struct filter_parser
+      {
+         const char*                                                      begin;
+         const char*                                                      end;
+         std::vector<boost::log::filter>                                  result;
+         std::vector<char>                                                states;
+         bool                                                             not_ = false;
+         static std::map<std::string_view, filter_generator, std::less<>> global_filters;
+         bool parse(bool in_format = false)
+         {
+            while (true)
+            {
+               parse_ws();
+               if (*begin == '(')
+               {
+                  states.push_back('(');
+                  ++begin;
+               }
+               else if (parse_not())
+               {
+                  if (states.empty() || states.back() != '!')
+                  {
+                     states.push_back('!');
+                  }
+                  else
+                  {
+                     states.pop_back();
+                  }
+                  not_ = !not_;
+               }
+               else
+               {
+                  if (!parse_attribute())
+                  {
+                     return false;
+                  }
+                  if (!states.empty() && states.back() == '!')
+                  {
+                     states.pop_back();
+                  }
+                  parse_ws();
+                  if (begin == end || (in_format && begin != end && *begin == ':'))
+                  {
+                     collect_and();
+                     collect_or();
+                     return states.empty();
+                  }
+                  if (*begin == ')')
+                  {
+                     collect_and();
+                     collect_or();
+                     if (states.empty() || states.back() != '(')
+                     {
+                        return false;
+                     }
+                     states.pop_back();
+                     if (!states.empty() && states.back() == '!')
+                     {
+                        states.pop_back();
+                     }
+                     ++begin;
+                  }
+                  else if (parse_and())
+                  {
+                     states.push_back('&');
+                  }
+                  else if (parse_or())
+                  {
+                     collect_and();
+                     states.push_back('|');
+                  }
+                  else
+                  {
+                     return false;
+                  }
+               }
+            }
+         }
+         void parse_ws()
+         {
+            while (begin != end && *begin == ' ' || *begin == '\t')
+            {
+               ++begin;
+            }
+         }
+         bool parse_and()
+         {
+            if (end - begin >= 4 && begin[0] == 'a' && begin[1] == 'n' && begin[2] == 'd' &&
+                (begin[3] == ' ' || begin[3] == '\t' || begin[3] == '('))
+            {
+               begin += 3;
+               return true;
+            }
+            else if (begin != end && *begin == '&')
+            {
+               ++begin;
+               return true;
+            }
+            return false;
+         }
+         bool parse_or()
+         {
+            if (end - begin >= 3 && begin[0] == 'o' && begin[1] == 'r' &&
+                (begin[2] == ' ' || begin[2] == '\t' || begin[2] == '('))
+            {
+               begin += 2;
+               return true;
+            }
+            else if (begin != end && *begin == '|')
+            {
+               ++begin;
+               return true;
+            }
+            return false;
+         }
+         bool parse_not()
+         {
+            if (end - begin >= 4 && begin[0] == 'n' && begin[1] == 'o' && begin[2] == 't' &&
+                (begin[3] == ' ' || begin[3] == '\t' || begin[3] == '('))
+            {
+               begin += 3;
+               return true;
+            }
+            else if (begin != end && *begin == '!')
+            {
+               ++begin;
+               return true;
+            }
+            return false;
+         }
+         void apply_andor(bool is_and)
+         {
+            auto rhs = std::move(result.back());
+            result.pop_back();
+            if (is_and)
+            {
+               result.back() = [lhs = std::move(result.back()), rhs = std::move(rhs)](auto& attrs)
+               { return lhs(attrs) && rhs(attrs); };
+            }
+            else
+            {
+               result.back() = [lhs = std::move(result.back()), rhs = std::move(rhs)](auto& attrs)
+               { return lhs(attrs) || rhs(attrs); };
+            }
+            states.pop_back();
+         }
+         void collect_and()
+         {
+            while (!states.empty() && states.back() == '&')
+            {
+               apply_andor(!not_);
+            }
+         }
+         void collect_or()
+         {
+            while (!states.empty() && states.back() == '|')
+            {
+               apply_andor(not_);
+            }
+         }
+         bool push_exists(std::string_view name)
+         {
+            if (global_filters.find(name) != global_filters.end())
+            {
+               if (!not_)
+               {
+                  result.push_back([name = boost::log::attribute_name{std::string(name)}](
+                                       auto& attrs) { return attrs.count(name) != 0; });
+               }
+               else
+               {
+                  result.push_back([name = boost::log::attribute_name{std::string(name)}](
+                                       auto& attrs) { return attrs.count(name) == 0; });
+               }
+               return true;
+            }
+            else
+            {
+               throw std::runtime_error("Unknown attribute " + std::string(name));
+            }
+         }
+         bool push_op(std::string_view name, std::string_view op, std::string_view value)
+         {
+            if (auto iter = global_filters.find(name); iter != global_filters.end())
+            {
+               if (!not_)
+               {
+                  result.push_back(
+                      iter->second(boost::log::attribute_name{std::string(name)}, op, value));
+               }
+               else
+               {
+                  result.push_back([f = iter->second(boost::log::attribute_name{std::string(name)},
+                                                     op, value)](auto& attrs)
+                                   { return !f(attrs); });
+               }
+               return true;
+            }
+            else
+            {
+               throw std::runtime_error("Unknown attribute " + std::string(name));
+            }
+         }
+         void parse_attribute_name(std::string_view& out)
+         {
+            auto start = begin;
+            while (begin != end)
+            {
+               if (!std::isalnum(*begin) && *begin != '_' && *begin != '.')
+               {
+                  break;
+               }
+               ++begin;
+            }
+            out = {start, begin};
+         }
+         bool parse_operand(std::string& out)
+         {
+            if (begin == end)
+            {
+               return false;
+            }
+            if (*begin == '"')
+            {
+               ++begin;
+               while (begin != end)
+               {
+                  if (*begin == '"')
+                  {
+                     ++begin;
+                     return true;
+                  }
+                  else if (*begin == '\\')
+                  {
+                     ++begin;
+                     if (begin == end)
+                     {
+                        return false;
+                     }
+                  }
+                  out.push_back(*begin);
+                  ++begin;
+               }
+               return false;
+            }
+            while (begin != end)
+            {
+               if (*begin == ' ' || *begin == '\t' || *begin == '&' || *begin == '|' ||
+                   *begin == ':' || *begin == '{' || *begin == '}' || *begin == '(' ||
+                   *begin == ')' || *begin == '"')
+               {
+                  return true;
+               }
+               out.push_back(*begin);
+               ++begin;
+            }
+            return true;
+         }
+         bool parse_attribute()
+         {
+            std::string_view name;
+            parse_ws();
+            parse_attribute_name(name);
+            parse_ws();
+            std::string_view op;
+            if (parse_operator(op))
+            {
+               parse_ws();
+               std::string arg;
+               if (parse_operand(arg))
+               {
+                  return push_op(name, op, arg);
+               }
+               return false;
+            }
+            else
+            {
+               return push_exists(name);
+            }
+         }
+         bool parse_operator(std::string_view& op)
+         {
+            if (begin != end)
+            {
+               if (*begin == '=')
+               {
+                  op = {begin, begin + 1};
+                  ++begin;
+                  return true;
+               }
+               else if (*begin == '>' || *begin == '<')
+               {
+                  if (begin + 1 != end && begin[1] == '=')
+                  {
+                     op = {begin, begin + 2};
+                     begin += 2;
+                     return true;
+                  }
+                  else
+                  {
+                     op = {begin, begin + 1};
+                     ++begin;
+                     return true;
+                  }
+               }
+               else if (begin + 1 != end && begin[0] == '!' && begin[1] == '=')
+               {
+                  op = {begin, begin + 2};
+                  begin += 2;
+                  return true;
+               }
+            }
+            return false;
+         }
+      };
+
+      struct formatter_parser
+      {
+         const char*                        begin;
+         const char*                        end;
+         std::string                        text;
+         std::vector<boost::log::formatter> result;
+         static std::map<std::string_view,
+                         std::pair<boost::log::attribute_name, formatter_generator>,
+                         std::less<>>
+             global_formatters;
+
+         boost::log::formatter reduce(std::size_t pos = 0)
+         {
+            if (pos + 1 == result.size())
+            {
+               auto last = std::move(result.back());
+               result.pop_back();
+               return last;
+            }
+            else if (pos == result.size())
+            {
+               return [](auto&&, auto&&) {};
+            }
+            else if (pos == 0)
+            {
+               return formatter_list{std::move(result)};
+            }
+            else
+            {
+               formatter_list sub;
+               sub.formatters.reserve(result.size() - pos);
+               for (std::size_t i = pos; i < result.size(); ++i)
+               {
+                  sub.formatters.push_back(std::move(result[i]));
+               }
+               result.resize(pos);
+               return sub;
+            }
+         }
+         bool parse_expansion(attr_set_filter* condition)
+         {
+            if (begin == end)
+            {
+               return false;
+            }
+            else if (*begin == '{')
+            {
+               text.push_back('{');
+               ++begin;
+               return true;
+            }
+            else if (*begin == '?')
+            {
+               ++begin;
+               end_text();
+               return parse_conditional();
+            }
+            else
+            {
+               end_text();
+               return parse_attribute(condition);
+            }
+         }
+         void end_text()
+         {
+            if (!text.empty())
+            {
+               result.push_back([text = std::move(text)](auto&, auto& stream) { stream << text; });
+               text.clear();
+            }
+         }
+         bool push_attribute(std::string_view name,
+                             std::string_view format_spec,
+                             attr_set_filter* condition)
+         {
+            auto iter = global_formatters.find(name);
+            if (iter == global_formatters.end())
+            {
+               return false;
+            }
+            boost::log::attribute_name attr = iter->second.first;
+            result.push_back(iter->second.second(attr, format_spec));
+            if (condition && attr != boost::log::attribute_name())
+            {
+               condition->attrs.push_back(attr);
+            }
+            return true;
+         }
+         bool parse_attribute(attr_set_filter* condition)
+         {
+            auto name_start = begin;
+            while (begin != end)
+            {
+               if (*begin == ':')
+               {
+                  auto name_end = begin;
+                  ++begin;
+                  begin = std::find(begin, end, '}');
+                  if (begin == end)
+                  {
+                     return false;
+                  }
+                  auto spec_end = begin;
+                  ++begin;
+                  return push_attribute({name_start, name_end}, {name_end + 1, spec_end},
+                                        condition);
+               }
+               else if (*begin == '}')
+               {
+                  auto name_end = begin;
+                  ++begin;
+                  return push_attribute({name_start, name_end}, {begin, begin}, condition);
+               }
+               ++begin;
+            }
+            return false;
+         }
+         bool parse_conditional()
+         {
+            if (begin == end)
+            {
+               return false;
+            }
+            else if (*begin == ':')
+            {
+               ++begin;
+               attr_set_filter cond;
+               auto            pos = result.size();
+               if (!parse(true, &cond))
+               {
+                  return false;
+               }
+               if (begin == end || *begin != '}')
+               {
+                  return false;
+               }
+               ++begin;
+               result.push_back(
+                   [cond = std::move(cond), format = reduce(pos)](auto& rec, auto& stream)
+                   {
+                      if (cond(rec.attribute_values()))
+                      {
+                         format(rec, stream);
+                      }
+                   });
+            }
+            else
+            {
+               boost::log::filter filter;
+               if (!parse_filter(filter))
+               {
+                  return false;
+               }
+               if (begin == end || *begin != ':')
+               {
+                  return false;
+               }
+               auto pos = result.size();
+               ++begin;
+               parse(true);
+               if (begin == end || *begin != '}')
+               {
+                  return false;
+               }
+               ++begin;
+               result.push_back(
+                   [filter = std::move(filter), format = reduce(pos)](auto&& rec, auto&& stream)
+                   {
+                      if (filter(rec.attribute_values()))
+                      {
+                         format(rec, stream);
+                      }
+                   });
+            }
+            return true;
+         }
+         bool parse_filter(boost::log::filter& out)
+         {
+            filter_parser parser{begin, end};
+            if (parser.parse(true))
+            {
+               // If there isn't exactly one, it's a bug in parse
+               assert(parser.result.size() == 1);
+               out   = parser.result.front();
+               begin = parser.begin;
+               return true;
+            }
+            return false;
+         }
+         bool parse(bool in_expansion = false, attr_set_filter* condition = nullptr)
+         {
+            bool prev_close = false;
+            while (begin != end)
+            {
+               if (*begin == '{')
+               {
+                  prev_close = false;
+                  ++begin;
+                  if (!parse_expansion(condition))
+                  {
+                     return false;
+                  }
+               }
+               else if (*begin == '}')
+               {
+                  if (in_expansion)
+                  {
+                     end_text();
+                     return true;
+                  }
+                  else if (prev_close)
+                  {
+                     prev_close = false;
+                  }
+                  else
+                  {
+                     prev_close = true;
+                     text.push_back('}');
+                  }
+                  ++begin;
+               }
+               else
+               {
+                  prev_close = false;
+                  text.push_back(*begin);
+                  ++begin;
+               }
+            }
+            end_text();
+            return true;
+         }
+      };
+
+      std::map<std::string_view, filter_generator, std::less<>> filter_parser::global_filters;
+      std::map<std::string_view,
+               std::pair<boost::log::attribute_name, formatter_generator>,
+               std::less<>>
+          formatter_parser::global_formatters;
+
+      boost::log::filter parse_filter(std::string_view filter)
+      {
+         filter_parser parser{filter.begin(), filter.end()};
+         if (!parser.parse())
+         {
+            throw std::runtime_error("Invalid filter");
+         }
+         assert(parser.result.size() == 1);
+         return std::move(parser.result[0]);
+      }
+
+      boost::log::formatter parse_formatter(std::string_view formatter)
+      {
+         formatter_parser parser{formatter.begin(), formatter.end()};
+         if (!parser.parse())
+         {
+            throw std::runtime_error("Invalid formatter");
+         }
+         return parser.reduce();
+      }
+
+      template <typename T>
+      boost::log::filter make_filter_impl(boost::log::attribute_name name,
+                                          std::string_view           op,
+                                          const T&)
+      {
+         throw std::runtime_error(name.string() + " does not support " + std::string(op));
+      }
+      template <typename T, typename F, typename... U>
+      boost::log::filter make_filter_impl(boost::log::attribute_name name,
+                                          std::string_view           op,
+                                          const T&                   value,
+                                          std::string_view           op0,
+                                          F                          f,
+                                          U... u)
+      {
+         if (op == op0)
+         {
+            return [name, value, f](const auto& attrs)
+            {
+               if (auto attr = boost::log::extract<T>(name, attrs))
+               {
+                  return f(*attr, value);
+               }
+               return false;
+            };
+         }
+         else
+         {
+            return make_filter_impl(name, op, value, u...);
+         }
+      }
+
+      template <typename T>
+      auto make_simple_filter_factory()
+      {
+         return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
+         {
+            T v = boost::lexical_cast<T>(std::string(value));
+            return make_filter_impl(name, op, v, "=", std::equal_to<>(),
+                                    "!=", std::not_equal_to<>(), "<", std::less<>(), ">",
+                                    std::greater<>(), "<=", std::less_equal<>(),
+                                    ">=", std::greater_equal<>());
+         };
+      };
+
+      template <>
+      auto make_simple_filter_factory<std::chrono::system_clock::time_point>()
+      {
+         return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
+         {
+            psio::input_stream                    stream(value);
+            std::chrono::system_clock::time_point v;
+            // TODO: allow optional subseconds
+            if (!parse_timestamp(v, stream) || stream.remaining())
+            {
+               throw std::runtime_error("invalid timestamp value");
+            }
+            return make_filter_impl(name, op, v, "=", std::equal_to<>(),
+                                    "!=", std::not_equal_to<>(), "<", std::less<>(), ">",
+                                    std::greater<>(), "<=", std::less_equal<>(),
+                                    ">=", std::greater_equal<>());
+         };
+      };
+
+      template <>
+      auto make_simple_filter_factory<Checksum256>()
+      {
+         return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
+         {
+            Checksum256 v;
+            if (value.size() != v.size() * 2 || !psio::unhex(v.begin(), value.begin(), value.end()))
+            {
+               throw std::runtime_error("Invalid value for " + name.string());
+            }
+            return make_filter_impl(name, op, v, "=", std::equal_to<>(),
+                                    "!=", std::not_equal_to<>(), "<", std::less<>(), ">",
+                                    std::greater<>(), "<=", std::less_equal<>(),
+                                    ">=", std::greater_equal<>());
+         };
+      };
+
+      template <>
+      auto make_simple_filter_factory<BlockHeader>()
+      {
+         return [](boost::log::attribute_name name, std::string_view op,
+                   std::string_view value) -> boost::log::filter
+         { throw std::runtime_error(name.string() + " does not support " + std::string(op)); };
+      };
+
+      template <>
+      auto make_simple_filter_factory<boost::log::process_id>()
+      {
+         return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
+         {
+            boost::log::process_id v{
+                boost::lexical_cast<boost::log::process_id::native_type>(value)};
+            return make_filter_impl(name, op, v, "=", std::equal_to<>(),
+                                    "!=", std::not_equal_to<>(), "<", std::less<>(), ">",
+                                    std::greater<>(), "<=", std::less_equal<>(),
+                                    ">=", std::greater_equal<>());
+         };
+      };
+
+      template <typename T>
+      auto make_simple_formatter_factory()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("std::format not supported yet");
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<T>(name, rec))
+               {
+                  stream << *attr;
+               }
+            };
+         };
+      }
+
+      template <>
+      auto make_simple_formatter_factory<std::chrono::system_clock::time_point>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("std::format not supported yet");
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr =
+                       boost::log::extract<std::chrono::system_clock::time_point>(name, rec))
+               {
+                  format_timestamp(stream, *attr);
+               }
+            };
+         };
+      }
+
+      template <>
+      auto make_simple_formatter_factory<Checksum256>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("Unexpected format spec for " + name.string());
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<Checksum256>(name, rec))
+               {
+                  stream << loggers::to_string(*attr);
+               }
+            };
+         };
+      }
+
+      template <>
+      auto make_simple_formatter_factory<BlockHeader>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("Unexpected format spec for " + name.string());
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<BlockHeader>(name, rec))
+               {
+                  stream << psio::convert_to_json(*attr);
+               }
+            };
+         };
+      }
+
+      template <>
+      auto make_simple_formatter_factory<boost::log::process_id>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("std::format not supported yet");
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<boost::log::process_id>(name, rec))
+               {
+                  stream << attr->native_id();
+               }
+            };
+         };
+      }
+
+      // name must refer to a string with static storage duration
+      template <typename T>
+      void add_attribute(std::string_view name)
+      {
+         filter_parser::global_filters.try_emplace(name, make_simple_filter_factory<T>());
+         formatter_parser::global_formatters.try_emplace(
+             name, boost::log::attribute_name{std::string(name)},
+             make_simple_formatter_factory<T>());
+      }
+
+      template <typename F>
+      void add_compound_format(std::string_view name, F&& f)
+      {
+         formatter_parser::global_formatters.try_emplace(name, boost::log::attribute_name(),
+                                                         std::forward<F>(f));
+      }
+
       void do_init()
       {
          auto core = boost::log::core::get();
@@ -1661,21 +2292,28 @@ namespace psibase::loggers
          core->add_global_attribute("Process", boost::log::attributes::current_process_name());
          core->add_global_attribute("ProcessId", boost::log::attributes::current_process_id());
 
-         boost::log::register_simple_formatter_factory<level, char>("Severity");
-         boost::log::register_simple_filter_factory<level, char>("Severity");
-         boost::log::register_formatter_factory("TimeStamp",
-                                                boost::make_shared<timestamp_formatter_factory>());
-         boost::log::register_formatter_factory("BlockId",
-                                                boost::make_shared<blockid_formatter_factory>());
-         boost::log::register_formatter_factory(
-             "BlockHeader", boost::make_shared<json_formatter_factory<BlockHeader>>());
-         boost::log::register_formatter_factory(
-             "ProcessId", boost::make_shared<id_formatter_factory<boost::log::process_id>>());
-         // Compound formatters
-         register_function_formatter("Json", json_formatter);
-         boost::log::register_formatter_factory("Syslog",
-                                                boost::make_shared<syslog_formatter_factory>());
-         boost::log::register_formatter_factory("if", boost::make_shared<if_formatter_factory>());
+         add_attribute<std::string>("Message");
+         add_attribute<level>("Severity");
+         add_attribute<std::chrono::system_clock::time_point>("TimeStamp");
+         add_attribute<std::string>("RemoteEndpoint");
+         add_attribute<Checksum256>("BlockId");
+         add_attribute<std::string>("Process");
+         add_attribute<std::string>("Channel");
+         add_attribute<std::string>("Host");
+         add_attribute<int>("PeerId");
+         add_attribute<boost::log::process_id>("ProcessId");
+         add_attribute<BlockHeader>("BlockHeader");
+
+         add_compound_format("Json",
+                             [](auto name, std::string_view spec)
+                             {
+                                if (!spec.empty())
+                                {
+                                   throw std::runtime_error("Unexpected format spec for Json");
+                                }
+                                return json_formatter;
+                             });
+         add_compound_format("Syslog", make_syslog_formatter);
       }
 
       struct log_config
@@ -1696,19 +2334,12 @@ namespace psibase::loggers
                return std::pair{name.substr(0, pos), name.substr(pos + 1)};
             };
 
-            auto                  core = boost::log::core::get();
-            std::string_view      current_name;
-            sink_config           current_config;
-            sink_args_type        current_args;
-            per_channel_formatter current_formatter;
-            bool                  has_channel_formatter = false;
-            auto                  push_sink             = [&]()
+            auto             core = boost::log::core::get();
+            std::string_view current_name;
+            sink_config      current_config;
+            sink_args_type   current_args;
+            auto             push_sink = [&]()
             {
-               if (has_channel_formatter)
-               {
-                  current_config.format_str += '}';
-                  current_config.format = std::move(current_formatter);
-               }
                if (current_config.type == "file")
                {
                   current_config.backend.emplace<FileSinkConfig>(current_args);
@@ -1740,11 +2371,9 @@ namespace psibase::loggers
                   {
                      push_sink();
                   }
-                  current_name          = logger_name;
-                  current_config        = sink_config();
-                  current_args          = sink_args_type();
-                  current_formatter     = per_channel_formatter();
-                  has_channel_formatter = false;
+                  current_name   = logger_name;
+                  current_config = sink_config();
+                  current_args   = sink_args_type();
                }
                std::string_view value = v.as<std::string>();
                if (var_name == "type")
@@ -1754,48 +2383,12 @@ namespace psibase::loggers
                else if (var_name == "filter")
                {
                   current_config.filter_str = value;
-                  current_config.filter     = boost::log::parse_filter(value.begin(), value.end());
+                  current_config.filter     = parse_filter(value);
                }
                else if (var_name == "format")
                {
-                  current_config.format_str = psio::convert_to_json(value);
-                  current_config.format = boost::log::parse_formatter(value.begin(), value.end());
-               }
-               else if (var_name.starts_with("format."))
-               {
-                  if (!has_channel_formatter)
-                  {
-                     if (!current_config.format_str.empty())
-                     {
-                        current_formatter.default_ = std::move(current_config.format);
-                        current_config.format_str =
-                            "{\"default\":" + current_config.format_str + ',';
-                     }
-                     else
-                     {
-                        current_config.format_str = "{";
-                     }
-                     has_channel_formatter = true;
-                  }
-                  else
-                  {
-                     current_config.format_str += ',';
-                  }
-                  var_name = var_name.substr(7);
-                  current_config.format_str += psio::convert_to_json(var_name);
-                  current_config.format_str += ':';
-                  current_config.format_str += psio::convert_to_json(value);
-                  if (var_name == "default")
-                  {
-                     current_formatter.default_ =
-                         boost::log::parse_formatter(value.begin(), value.end());
-                  }
-                  else
-                  {
-                     current_formatter.formatters.try_emplace(
-                         std::string(var_name),
-                         boost::log::parse_formatter(value.begin(), value.end()));
-                  }
+                  current_config.format_str = value;
+                  current_config.format     = parse_formatter(value);
                }
                else
                {
@@ -1938,12 +2531,8 @@ namespace psibase::loggers
       configure(R"({
          "console": {
             "type": "console",
-            "filter": "%Severity% >= info",
-            "format": {
-               "default": "[%TimeStamp%] [%Severity%] [%Channel%]: %Message%",
-               "p2p": "[%TimeStamp%] [%Severity%] [%Channel%] [%RemoteEndpoint%]: %Message%",
-               "block": "[%TimeStamp%] [%Severity%] [%Channel%]: %Message% %BlockId%"
-            }
+            "filter": "Severity >= info",
+            "format": "[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {BlockId}}"
          }
       })");
    }
@@ -2084,31 +2673,6 @@ namespace psibase::loggers
       file.set(section, "path", obj.path.native(), "");
    }
 
-   void format_to_config(const std::string& section, std::string format_json, ConfigFile& file)
-   {
-      psio::json_token_stream stream(format_json.data());
-      if (stream.peek_token().get().type == psio::json_token_type::type_start_object)
-      {
-         psio::from_json_object(stream,
-                                [&](std::string_view key)
-                                {
-                                   if (key == "default")
-                                   {
-                                      file.set(section, "format", stream.get_string(), "");
-                                   }
-                                   else
-                                   {
-                                      file.set(section, "format." + std::string(key),
-                                               stream.get_string(), "");
-                                   }
-                                });
-      }
-      else
-      {
-         file.set(section, "format", stream.get_string(), "");
-      }
-   }
-
    void to_config(const Config& obj, ConfigFile& file)
    {
       if (obj.impl)
@@ -2118,7 +2682,7 @@ namespace psibase::loggers
             auto section = "logger." + name;
             file.set(section, "type", sink.type, "");
             file.set(section, "filter", sink.filter_str, "");
-            format_to_config(section, sink.format_str, file);
+            file.set(section, "format", sink.format_str, "");
             std::visit([&](auto& v) { to_config_impl(section, v, file); }, sink.backend);
          }
       }

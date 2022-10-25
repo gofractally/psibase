@@ -11,7 +11,7 @@ import {
     setOperations,
 } from "common/rpc.mjs";
 import { wait } from "./helpers";
-import { Button, Form, Service, Logger } from "./components";
+import { Button, Form, Service, Logger, readLoggers } from "./components";
 
 type Peer = {
     id: number;
@@ -328,7 +328,7 @@ function App() {
         }
     };
 
-    const [logFilter, setLogFilter] = useState("%Severity% >= info");
+    const [logFilter, setLogFilter] = useState("Severity >= info");
     const [logData, setLogData] = useState<LogRecord[]>();
     const maxLog = 20;
 
@@ -459,6 +459,7 @@ function App() {
                             );
                         return { key: old ? old.key : newId(), ...s };
                     });
+                    result.loggers = readLoggers(result.loggers);
                     result.admin = result.admin ? result.admin : "";
                     let newState = mergeConfig(oldDefaults, result, userValues);
                     if (
