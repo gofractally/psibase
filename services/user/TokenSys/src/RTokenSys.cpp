@@ -16,6 +16,16 @@ using namespace psibase;
 
 auto tokenSys = QueryableService<TokenSys::Tables, TokenSys::Events>{TokenSys::service};
 
+struct UserBalanceRecord
+{
+   AccountNumber user;
+   uint64_t      balance;
+   uint8_t       precision;
+   TID           token;
+   SID           symbol;
+};
+PSIO_REFLECT(UserBalanceRecord, user, balance, precision, token, symbol);
+
 struct TokenQuery
 {
    auto allBalances() const
@@ -24,12 +34,15 @@ struct TokenQuery
    }
    auto userBalances(AccountNumber user) const
    {  //
-      vector<BalanceRecord> balances;
+      vector<UserBalanceRecord> balances;
       for (auto tokenType : tokenSys.index<TokenTable, 0>())
       {
          auto tid = tokenType.id;
          if (auto bal = tokenSys.index<BalanceTable, 0>().get(BalanceKey{user, tid}))
-            balances.push_back(*bal);
+         {
+            balances.push_back(UserBalanceRecord{user, bal->balance, tokenType.precision.value, tid,
+                                                 tokenType.symbolId});
+         }
       }
       return balances;
    }
