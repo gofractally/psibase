@@ -61,6 +61,12 @@ type LogConfig = {
     format: string;
     filename?: string;
     target?: string;
+    rotationSize?: string;
+    rotationTime?: string;
+    maxSize?: string;
+    maxFiles?: string;
+    path?: string;
+    flush?: boolean;
 };
 
 type ServiceConfig = {
@@ -202,8 +208,47 @@ function mergeServices(
 }
 
 function mergeLogger(prev: LogConfig, updated: LogConfig, user: LogConfig) {
-    // TODO:
-    return user;
+    const result = { ...updated };
+    if (updated.filter == prev.filter) {
+        result.filter = user.filter;
+    }
+    if (updated.format == prev.format) {
+        result.format = user.format;
+    }
+    if (user.type == "file" && updated.type == prev.type) {
+        result.type = user.type;
+        result.filename = mergeSimple(
+            prev.filename,
+            updated.filename,
+            user.filename
+        );
+        result.target = mergeSimple(prev.target, updated.target, user.target);
+        result.rotationSize = mergeSimple(
+            prev.rotationSize,
+            updated.rotationSize,
+            user.rotationSize
+        );
+        result.rotationTime = mergeSimple(
+            prev.rotationTime,
+            updated.rotationTime,
+            user.rotationTime
+        );
+        result.maxSize = mergeSimple(
+            prev.maxSize,
+            updated.maxSize,
+            user.maxSize
+        );
+        result.maxFiles = mergeSimple(
+            prev.maxFiles,
+            updated.maxFiles,
+            user.maxFiles
+        );
+        result.flush = mergeSimple(prev.flush, updated.flush, user.flush);
+    } else if (user.type == "local" && updated.type == prev.type) {
+        result.type = user.type;
+        result.path = mergeSimple(prev.path, updated.path, user.path);
+    }
+    return result;
 }
 
 function mergeLoggers(
@@ -212,7 +257,6 @@ function mergeLoggers(
     user: { [index: string]: LogConfig }
 ): { [index: string]: LogConfig } {
     const result = { ...user };
-    console.log(prev, updated, user);
     for (const key in prev) {
         if (!(key in updated)) {
             delete result[key];
@@ -628,14 +672,19 @@ function App() {
                         <Logger
                             key={name}
                             name={name}
-                            register={(field) =>
-                                configForm.register(`loggers.${name}.${field}`)
+                            register={(field, options) =>
+                                configForm.register(
+                                    `loggers.${name}.${field}`,
+                                    options
+                                )
                             }
                             watch={(field) =>
                                 configForm.watch(`loggers.${name}.${field}`)
                             }
                             remove={() =>
-                                configForm.unregister(`loggers.${name}`)
+                                configForm.unregister(`loggers.${name}`, {
+                                    keepDefaultValue: true,
+                                })
                             }
                         />
                     ))}

@@ -1,3 +1,4 @@
+import { RegisterOptions } from "react-hook-form";
 import { Form } from "./form";
 import { Button } from "./button";
 import "../styles/logger.css";
@@ -32,6 +33,34 @@ export function readLogger(config: LogConfig): LogConfig {
             result[key] = undefined;
         }
     }
+    if (result.type == "file") {
+        if (result.filename === undefined) {
+            result.filename = "";
+        }
+        if (result.target === undefined) {
+            result.target = "";
+        }
+        if (result.rotationSize === undefined) {
+            result.rotationSize = "";
+        }
+        if (result.rotationTime === undefined) {
+            result.rotationTime = "";
+        }
+        if (result.maxSize === undefined) {
+            result.maxSize = "";
+        }
+        if (result.maxFiles === undefined) {
+            result.maxFiles = "";
+        }
+        if (result.flush === undefined) {
+            result.flush = false;
+        }
+    }
+    if (result.type == "local") {
+        if (result.path === undefined) {
+            result.path = "";
+        }
+    }
     return result;
 }
 
@@ -49,13 +78,13 @@ export function readLoggers(config: { [index: string]: LogConfig }): {
 
 type LoggerProps = {
     name: string;
-    register: (name: keyof LogConfig) => any;
-    watch: (name: keyof LogConfig) => string | undefined;
+    register: (name: keyof LogConfig, options?: RegisterOptions) => any;
+    watch: (name: keyof LogConfig) => string | boolean | undefined;
     remove: () => void;
 };
 
 export const Logger = ({ name, register, watch, remove }: LoggerProps) => {
-    const type_ = watch("type");
+    const type_ = watch("type") as string;
     return (
         <fieldset className="logger-control">
             <legend>{name}</legend>
@@ -71,48 +100,40 @@ export const Logger = ({ name, register, watch, remove }: LoggerProps) => {
             <Form.Input label="Format" {...register("format")} />
             <Form.Input
                 label="File Name"
-                disabled={type_ != "file"}
-                {...register("filename")}
+                {...register("filename", { disabled: type_ != "file" })}
             />
             <Form.Input
                 label="Target File Name"
-                disabled={type_ != "file"}
-                {...register("target")}
+                {...register("target", { disabled: type_ != "file" })}
             />
             <Form.Input
                 type="number"
                 label="File Rotation Size"
-                disabled={type_ != "file"}
-                {...register("rotationSize")}
+                {...register("rotationSize", { disabled: type_ != "file" })}
             />
             <Form.Input
                 label="File Rotation Time"
-                disabled={type_ != "file"}
-                {...register("rotationTime")}
+                {...register("rotationTime", { disabled: type_ != "file" })}
             />
             <Form.Input
                 type="number"
                 label="Max Total File Size"
-                disabled={type_ != "file"}
-                {...register("maxSize")}
+                {...register("maxSize", { disabled: type_ != "file" })}
             />
             <Form.Input
                 type="number"
                 label="Max Total Files"
-                disabled={type_ != "file"}
-                {...register("maxFiles")}
+                {...register("maxFiles", { disabled: type_ != "file" })}
             />
             <fieldset disabled={type_ != "file"}>
                 <Form.Checkbox
                     label="Flush every record"
-                    disabled={type_ != "file"}
-                    {...register("flush")}
+                    {...register("flush", { disabled: type_ != "file" })}
                 />
             </fieldset>
             <Form.Input
                 label="Socket Path"
-                disabled={type_ != "local"}
-                {...register("path")}
+                {...register("path", { disabled: type_ != "local" })}
             />
         </fieldset>
     );
