@@ -1,6 +1,7 @@
 #include "services/system/RAuthEcSys.hpp"
 
 #include <psibase/dispatch.hpp>
+#include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/ProxySys.hpp>
@@ -9,14 +10,43 @@
 #include <string_view>
 
 using namespace psibase;
+using std::optional;
 using std::string;
 using std::string_view;
 
 namespace SystemService
 {
+
+   struct AuthEcQuery
+   {
+      auto accWithKey(psibase::PublicKey key) const
+      {
+         auto idx = AuthEcSys::Tables{AuthEcSys::service}
+                        .open<AuthEcSys::AuthTable>()
+                        .getIndex<1>()
+                        .subindex(key);
+
+         optional<std::tuple<AccountNumber>> gt;
+         optional<std::tuple<AccountNumber>> ge;
+         optional<std::tuple<AccountNumber>> lt;
+         optional<std::tuple<AccountNumber>> le;
+         optional<uint32_t>                  first;
+         optional<uint32_t>                  last;
+         optional<string>                    before;
+         optional<string>                    after;
+
+         return makeConnection<Connection<AuthRecord, "AuthConnection", "AuthEdge">>(
+             idx, gt, ge, lt, le, first, last, before, after);
+      }
+   };
+   PSIO_REFLECT(AuthEcQuery, method(accWithKey, key))
+
    std::optional<HttpReply> RAuthEcSys::serveSys(HttpRequest request)
    {
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
+         return result;
+
+      if (auto result = serveGraphQL(request, AuthEcQuery{}))
          return result;
 
       if (auto result = servePackAction<AuthEcSys>(request))
@@ -84,7 +114,7 @@ namespace SystemService
             psibase::AccountNumber acc{accountParam};
 
             AuthEcSys::Tables db{AuthEcSys::service};
-            auto account = db.open<AuthEcSys::AuthTable>().getIndex<0>().get(acc);
+            auto              account = db.open<AuthEcSys::AuthTable>().getIndex<0>().get(acc);
 
             return to_json(account.value_or(SystemService::AuthRecord()));
          }

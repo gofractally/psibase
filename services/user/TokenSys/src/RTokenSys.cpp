@@ -18,9 +18,20 @@ auto tokenSys = QueryableService<TokenSys::Tables, TokenSys::Events>{TokenSys::s
 
 struct TokenQuery
 {
-   auto balances() const
+   auto allBalances() const
    {  //
       return tokenSys.index<BalanceTable, 0>();
+   }
+   auto userBalances(AccountNumber user) const
+   {  //
+      vector<BalanceRecord> balances;
+      for (auto tokenType : tokenSys.index<TokenTable, 0>())
+      {
+         auto tid = tokenType.id;
+         if (auto bal = tokenSys.index<BalanceTable, 0>().get(BalanceKey{user, tid}))
+            balances.push_back(*bal);
+      }
+      return balances;
    }
 
    auto sharedBalances() const
@@ -33,7 +44,7 @@ struct TokenQuery
       return tokenSys.index<TokenTable, 0>();
    }
 
-   auto getUserConf(AccountNumber user, psibase::NamedBit flag) const
+   auto userConf(AccountNumber user, psibase::NamedBit flag) const
    {
       return to<TokenSys>().getUserConf(user, flag);
    }
@@ -51,10 +62,11 @@ struct TokenQuery
    }
 };
 PSIO_REFLECT(TokenQuery,
-             method(balances),
+             method(allBalances),
+             method(userBalances, user),
              method(sharedBalances),
              method(tokenTypes),
-             method(getUserConf, user, flag),
+             method(userConf, user, flag),
              method(events),
              method(userEvents, user, first, after))
 
