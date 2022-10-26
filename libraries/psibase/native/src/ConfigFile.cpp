@@ -210,7 +210,32 @@ void ConfigFile::postProcess()
       if (nextInsertPoint == insertions.end() ||
           nextInsertPoint->first > nextSection - lines.begin())
       {
-         for (; iter != nextSection; ++iter)
+         // If the section is preceded by a blank line, remove it
+         if (auto insertHere = insertions.find(iter - lines.begin());
+             insertHere != insertions.end())
+         {
+            if (insertHere->second.ends_with("\n\n"))
+            {
+               insertHere->second.pop_back();
+            }
+         }
+         else if (iter != lines.begin())
+         {
+            auto prev = iter;
+            --prev;
+            if (*prev == "\n")
+            {
+               prev->clear();
+            }
+         }
+         // If the section ends with a blank line, do not remove it
+         auto sectionEnd = nextSection;
+         --sectionEnd;
+         if (*sectionEnd != "\n")
+         {
+            ++sectionEnd;
+         }
+         for (; iter != sectionEnd; ++iter)
          {
             iter->clear();
          }
