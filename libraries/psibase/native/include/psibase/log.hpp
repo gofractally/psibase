@@ -60,10 +60,7 @@ namespace psibase
       // This should be called before configure, as it does not
       // affect existing loggers.
       void        set_path(std::string_view p);
-      void        configure();
-      void        configure(std::string_view json);
       void        configure(const boost::program_options::variables_map&);
-      void        configure_default();
       std::string get_config();
 
       class Config;

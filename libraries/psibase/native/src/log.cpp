@@ -1446,7 +1446,6 @@ namespace psibase::loggers
                    old_cfg = std::move(new_cfg);
                 },
                 new_cfg.backend);
-            throw std::runtime_error("Unkown sink type: " + new_cfg.type);
          }
       }
 
@@ -2326,7 +2325,7 @@ namespace psibase::loggers
          {
             auto split_name = [](std::string_view name)
             {
-               auto pos = name.find('.');
+               auto pos = name.rfind('.');
                if (pos == std::string::npos)
                {
                   throw std::runtime_error("Unknown option: logger." + std::string(name));
@@ -2410,45 +2409,9 @@ namespace psibase::loggers
             {
                push_sink();
             }
-         }
-         void set(auto& stream)
-         {
-            auto                          core = boost::log::core::get();
-            std::vector<std::string_view> found_keys;
-            psio::from_json_object(stream,
-                                   [&](std::string_view key)
-                                   {
-                                      found_keys.push_back(key);
-                                      auto iter = sinks.find(key);
-                                      if (iter == sinks.end())
-                                      {
-                                         sink_config cfg;
-                                         from_json(cfg, stream);
-                                         auto sink = make_sink(cfg);
-                                         sinks.try_emplace(std::string(key), std::move(cfg), sink);
-                                         core->add_sink(sink);
-                                      }
-                                      else
-                                      {
-                                         sink_config cfg;
-                                         from_json(cfg, stream);
-                                         update_sink(iter->second.second, iter->second.first,
-                                                     std::move(cfg));
-                                      }
-                                   });
-            // Remove obsolete sinks
-            std::sort(found_keys.begin(), found_keys.end());
-            for (auto iter = sinks.begin(), end = sinks.end(); iter != end;)
+            if (sinks.empty())
             {
-               if (std::binary_search(found_keys.begin(), found_keys.end(), iter->first))
-               {
-                  ++iter;
-               }
-               else
-               {
-                  core->remove_sink(iter->second.second);
-                  iter = sinks.erase(iter);
-               }
+               core->set_logging_enabled(false);
             }
          }
          void set_parsed(auto&& map)
@@ -2468,6 +2431,7 @@ namespace psibase::loggers
                   update_sink(iter->second.second, iter->second.first, sink_config(cfg));
                }
             }
+            core->set_logging_enabled(!map.empty());
             for (auto iter = sinks.begin(), end = sinks.end(); iter != end;)
             {
                if (map.find(iter->first) != map.end())
@@ -2510,6 +2474,16 @@ namespace psibase::loggers
          stream.write('}');
       }
 
+      void check_logger_name(std::string_view name)
+      {
+         // forbid characters that would cause problems in ini section names
+         if (name.find_first_of(std::string_view{"#\n", 3}) != std::string_view::npos ||
+             name.ends_with('.'))
+         {
+            throw std::runtime_error("Logger name not allowed: " + std::string(name));
+         }
+      }
+
    }  // namespace
 
    void set_path(std::string_view p)
@@ -2517,35 +2491,9 @@ namespace psibase::loggers
       log_file_path = std::filesystem::current_path() / p;
    }
 
-   void configure(std::string_view cfg)
-   {
-      std::vector<char> data(cfg.begin(), cfg.end());
-      data.push_back(0);
-      data.push_back(0);
-      data.push_back(0);
-      psio::json_token_stream stream(data.data());
-      log_config::instance().set(stream);
-   }
-   void configure()
-   {
-      configure(R"({
-         "console": {
-            "type": "console",
-            "filter": "Severity >= info",
-            "format": "[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {BlockId}}"
-         }
-      })");
-   }
    void configure(const boost::program_options::variables_map& map)
    {
       log_config::instance().init(map);
-   }
-   void configure_default()
-   {
-      if (log_config::instance().sinks.empty())
-      {
-         configure();
-      }
    }
    std::string get_config()
    {
@@ -2593,6 +2541,7 @@ namespace psibase::loggers
       from_json_object(stream,
                        [&](std::string_view key)
                        {
+                          check_logger_name(key);
                           sink_config cfg;
                           from_json(cfg, stream);
                           auto [iter, inserted] =

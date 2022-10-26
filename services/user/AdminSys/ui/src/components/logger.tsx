@@ -64,14 +64,64 @@ export function readLogger(config: LogConfig): LogConfig {
     return result;
 }
 
+// a . or a leading digit causes problems for react-hook-form
+function escapeKey(k: string): string {
+    let prefix = "";
+    if (/^\d/.test(k)) {
+        prefix = "\\";
+    }
+    return prefix + k.replace("\\", "\\\\").replace(".", "\\p");
+}
+
+function unescapeKey(k: string): string {
+    let result = "";
+    let escape = false;
+    for (const ch of k) {
+        if (escape) {
+            if (ch == "p") {
+                result += ".";
+            } else {
+                result += ch;
+            }
+            escape = false;
+        } else if (ch == "\\") {
+            escape = true;
+        } else {
+            result += ch;
+            escape = false;
+        }
+    }
+    return result;
+}
+
 export function readLoggers(config: { [index: string]: LogConfig }): {
     [index: string]: LogConfig;
 } {
     const result: any = {};
     if (config !== undefined) {
         for (const key in config) {
-            result[key] = readLogger(config[key]);
+            result[escapeKey(key)] = readLogger(config[key]);
         }
+    }
+    return result;
+}
+
+function writeLogger(logger: LogConfig): LogConfig {
+    const result: any = { ...logger };
+    for (const key in result) {
+        if (result[key] == "") {
+            delete result[key];
+        }
+    }
+    return result;
+}
+
+export function writeLoggers(loggers: { [index: string]: LogConfig }): {
+    [index: string]: LogConfig;
+} {
+    const result: any = {};
+    for (const key in loggers) {
+        result[unescapeKey(key)] = writeLogger(loggers[key]);
     }
     return result;
 }
@@ -139,4 +189,4 @@ export const Logger = ({ name, register, watch, remove }: LoggerProps) => {
     );
 };
 
-export default { Logger, readLoggers };
+export default { Logger, readLoggers, writeLoggers };

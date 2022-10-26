@@ -11,7 +11,14 @@ import {
     setOperations,
 } from "common/rpc.mjs";
 import { wait } from "./helpers";
-import { Button, Form, Service, Logger, readLoggers } from "./components";
+import {
+    Button,
+    Form,
+    Service,
+    Logger,
+    readLoggers,
+    writeLoggers,
+} from "./components";
 
 type Peer = {
     id: number;
@@ -315,26 +322,6 @@ function defaultService(root: string) {
     }
 }
 
-function normalizeLogger(logger: LogConfig): LogConfig {
-    const result: any = { ...logger };
-    for (const key in result) {
-        if (result[key] == "") {
-            delete result[key];
-        }
-    }
-    return result;
-}
-
-function normalizeLoggers(loggers: { [index: string]: LogConfig }): {
-    [index: string]: LogConfig;
-} {
-    const result: any = {};
-    for (const key in loggers) {
-        result[key] = normalizeLogger(loggers[key]);
-    }
-    return result;
-}
-
 function App() {
     const [peers, peersError, refetchPeers] = pollJson<Peer[]>(
         "/native/admin/peers"
@@ -466,7 +453,7 @@ function App() {
                         root: s.root,
                     })),
                 admin: input.admin != "" ? input.admin : null,
-                loggers: normalizeLoggers(input.loggers),
+                loggers: writeLoggers(input.loggers),
             });
             if (result.ok) {
                 configForm.reset(input);
@@ -656,10 +643,7 @@ function App() {
                     label="Block Producer Name"
                     {...configForm.register("producer")}
                 />
-                <Form.Input
-                    label="Host"
-                    {...configForm.register("host")}
-                />
+                <Form.Input label="Host" {...configForm.register("host")} />
                 <Form.Input
                     label="Port (requires restart)"
                     type="number"
@@ -681,11 +665,15 @@ function App() {
                             watch={(field) =>
                                 configForm.watch(`loggers.${name}.${field}`)
                             }
-                            remove={() =>
-                                configForm.unregister(`loggers.${name}`, {
-                                    keepDefaultValue: true,
-                                })
-                            }
+                            remove={() => {
+                                // This differs from unregister by preserving the loggers
+                                // subobject even if it becomes empty
+                                const state = configForm.getValues();
+                                delete state.loggers[name];
+                                configForm.reset(state, {
+                                    keepDefaultValues: true,
+                                });
+                            }}
                         />
                     ))}
                 <Button
@@ -694,7 +682,7 @@ function App() {
                         if (!state.loggers) {
                             state.loggers = {};
                         }
-                        const autogen = /~[0-9A-F]{16}/;
+                        const autogen = /^~[0-9A-F]{16}$/;
                         let current = 0;
                         for (const key in state.loggers) {
                             if (autogen.test(key)) {
