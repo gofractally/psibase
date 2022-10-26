@@ -28,9 +28,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_simple_index(&request))
-            .or_else(|| serve_schema::<Wrapper>(&request))
-            .or_else(|| serve_action_templates::<Wrapper>(&request))
+        serve_simple_ui::<Wrapper>(&request)
     }
 }
 

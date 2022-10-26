@@ -1,5 +1,8 @@
 use crate::fracpack::{Packable, PackableOwned};
+use crate::reflect::Reflect;
 use crate::{get_result_bytes, native_raw, reflect, AccountNumber, Action, MethodNumber, Reflect};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 #[cfg(target_family = "wasm")]
 static mut SERVICE: AccountNumber = AccountNumber::new(0);
@@ -64,6 +67,21 @@ pub unsafe fn set_service(_acc: AccountNumber) {
 #[cfg(target_family = "wasm")]
 pub unsafe fn set_sender(_acc: AccountNumber) {
     SENDER = _acc;
+}
+
+pub trait ProcessActionStruct {
+    type Output;
+
+    fn process<
+        Return: Reflect + PackableOwned + Serialize + DeserializeOwned,
+        ArgStruct: Reflect + PackableOwned + Serialize + DeserializeOwned,
+    >(
+        self,
+    ) -> Self::Output;
+}
+
+pub trait WithActionStruct {
+    fn with_action_struct<P: ProcessActionStruct>(action: &str, process: P) -> Option<P::Output>;
 }
 
 pub trait Caller: Clone {

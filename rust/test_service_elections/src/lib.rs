@@ -7,6 +7,7 @@ mod service {
         check, check_none, check_some, get_sender, AccountNumber, DbId, Reflect, TableHandler,
         TableWrapper, TimePointSec, ToKey,
     };
+    use serde::{Deserialize, Serialize};
 
     // TODO: make these configurable in a singleton
     // An election cannot run for more than 24h
@@ -18,7 +19,7 @@ mod service {
     const MIN_ELECTION_TIME_SECONDS: TimePointSec = TimePointSec { seconds: 60 * 60 };
 
     #[table(name = "ElectionsTable", index = 0)]
-    #[derive(Debug, Reflect)]
+    #[derive(Debug, Reflect, Serialize, Deserialize)]
     pub struct ElectionRecord {
         #[primary_key]
         pub id: u32,
@@ -35,7 +36,7 @@ mod service {
     }
 
     #[table(name = "CandidatesTable", index = 1)]
-    #[derive(Eq, PartialEq, Clone, Debug, Reflect)]
+    #[derive(Eq, PartialEq, Clone, Debug, Reflect, Serialize, Deserialize)]
     pub struct CandidateRecord {
         pub election_id: u32,
         pub candidate: AccountNumber,
@@ -55,7 +56,7 @@ mod service {
     }
 
     #[table(name = "VotesTable", index = 2)]
-    #[derive(Eq, PartialEq, Clone, Reflect)]
+    #[derive(Eq, PartialEq, Clone, Reflect, Serialize, Deserialize)]
     struct VotingRecord {
         election_id: u32,
         voter: AccountNumber,

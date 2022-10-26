@@ -156,6 +156,7 @@ fn process_mod(
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut reflect_methods = proc_macro2::TokenStream::new();
+        let mut with_action_struct = proc_macro2::TokenStream::new();
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
@@ -172,7 +173,8 @@ fn process_mod(
                 );
                 process_action_callers(psibase_mod, f, &mut action_callers, &invoke_args);
                 process_dispatch_body(psibase_mod, f, &mut dispatch_body, invoke_struct_args);
-                let name = f.sig.ident.to_string();
+                let name = &f.sig.ident;
+                let name_str = name.to_string();
                 let num_args = f.sig.inputs.len();
                 let output = match &f.sig.output {
                     ReturnType::Default => quote! {()},
@@ -180,9 +182,15 @@ fn process_mod(
                 };
                 reflect_methods = quote! {
                     #reflect_methods
-                    .method::<#output>(#name.into(), #num_args)
+                    .method::<#output>(#name_str.into(), #num_args)
                     #reflect_args
                     .end()
+                };
+                with_action_struct = quote! {
+                    #with_action_struct
+                    if action == #name_str {
+                        return Some(process.process::<#output, #structs::#name>());
+                    }
                 };
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
                     f.attrs.remove(i);
@@ -479,6 +487,16 @@ fn process_mod(
                         .with_methods(#num_actions)
                         #reflect_methods
                         .end()
+                }
+            }
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            impl #psibase_mod::WithActionStruct for #wrapper {
+                // TODO: macro doc for this
+                fn with_action_struct<P: #psibase_mod::ProcessActionStruct>(action: &str, process: P) -> Option<P::Output> {
+                    #with_action_struct
+                    None
                 }
             }
         });
