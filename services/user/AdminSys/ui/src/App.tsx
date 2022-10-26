@@ -657,7 +657,7 @@ function App() {
                     {...configForm.register("producer")}
                 />
                 <Form.Input
-                    label="Host (requires restart)"
+                    label="Host"
                     {...configForm.register("host")}
                 />
                 <Form.Input
@@ -757,7 +757,7 @@ function App() {
                     </table>
                 </fieldset>
                 <fieldset>
-                    <legend>Access to admin API (Requires restart)</legend>
+                    <legend>Access to admin API</legend>
                     <Form.Radio
                         {...configForm.register("admin")}
                         value="static:*"

@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
+#include <shared_mutex>
 
 namespace psibase::http
 {
@@ -78,7 +79,6 @@ namespace psibase::http
    {
       std::filesystem::path path;
       std::string           content_type;
-      std::uintmax_t        size;
    };
    using services_t =
        std::map<std::string, std::map<std::string, native_content, std::less<>>, std::less<>>;
@@ -164,7 +164,10 @@ namespace psibase::http
       bool                      host_perf              = false;
       services_t                services;
       std::atomic<bool>         enable_p2p;
+      std::atomic<bool>         enable_transactions;
       std::atomic<http_status>  status;
+
+      mutable std::shared_mutex mutex;
    };
 
    struct server

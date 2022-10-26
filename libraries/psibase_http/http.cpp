@@ -382,10 +382,11 @@ namespace psibase::http
 
       try
       {
-         auto host = deport(req.at(bhttp::field::host));
-
          if (!req.target().starts_with("/native"))
          {
+            auto host = deport(req.at(bhttp::field::host));
+
+            std::shared_lock l{server.http_config->mutex};
             if (auto iter = server.http_config->services.find(host);
                 iter != server.http_config->services.end())
             {
@@ -404,8 +405,10 @@ namespace psibase::http
 
                   std::vector<char> contents;
                   // read file
+                  auto          size = std::filesystem::file_size(file->second.path);
                   std::ifstream in(file->second.path, std::ios_base::binary);
-                  contents.resize(file->second.size);
+                  l.unlock();
+                  contents.resize(size);
                   in.read(contents.data(), contents.size());
                   return send(ok(std::move(contents), file->second.content_type.c_str()));
                }
@@ -437,6 +440,9 @@ namespace psibase::http
             data.target      = req.target().to_string();
             data.contentType = (std::string)req[bhttp::field::content_type];
             data.body        = std::move(req.body());
+
+            // Do not use any reconfigurable members of server.http_config after this point
+            l.unlock();
 
             // TODO: time limit
             auto          system = server.sharedState->getSystemContext();
@@ -488,7 +494,7 @@ namespace psibase::http
          }  // !native
          else if (req.target() == "/native/push_boot" && server.http_config->push_boot_async)
          {
-            if (server.http_config->host.empty())
+            if (!server.http_config->enable_transactions)
                return send(not_found(req.target()));
 
             if (req.method() != bhttp::verb::post)
@@ -546,7 +552,7 @@ namespace psibase::http
          else if (req.target() == "/native/push_transaction" &&
                   server.http_config->push_transaction_async)
          {
-            if (server.http_config->host.empty())
+            if (!server.http_config->enable_transactions)
                return send(not_found(req.target()));
 
             if (req.method() != bhttp::verb::post)
@@ -614,9 +620,6 @@ namespace psibase::http
          else if (req.target() == "/native/p2p" && websocket::is_upgrade(req) &&
                   server.http_config->accept_p2p_websocket && server.http_config->enable_p2p)
          {
-            if (server.http_config->host.empty())
-               return send(not_found(req.target()));
-
             if (forbid_cross_origin())
                return;
             // Stop reading HTTP requests

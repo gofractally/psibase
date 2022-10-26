@@ -444,10 +444,10 @@ Each peer has the following fields:
 |------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `p2p`      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                                             |
 | `producer` | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
-| `host`     | String  | The server's hostname. Changes to the host will take effect the next time the server starts.                                                                                                              |
+| `host`     | String  | The server's hostname.                                                                                                                                                                                    |
 | `port`     | Number  | The port that the server runs on. Changes to the port will take effect the next time the server starts.                                                                                                   |
 | `services` | Array   | A list of built in services. `host` is the virtual hostname for the service. If `host` ends with `.` the global `host` will be appended to it. `root` is a directory containing the content to be served. |
-| `admin`    | String  | Controls service access to the admin API. `*` allows access for all services.  `builtin:*` allows access for builtin services. The name of a service allows access for that service.                      |
+| `admin`    | String  | Controls service access to the admin API. `*` allows access for all services.  `static:*` allows access for builtin services. The name of a service allows access for that service.                       |
 | `loggers`  | Object  | A description of the [destinations for log records](#logging)                                                                                                                                             |
 
 Example:
