@@ -68,7 +68,7 @@ function App() {
     }, []);
 
     useEffect(() => {
-        const serverState = debitModeResult.data?.userConf;
+        const serverState = Boolean(debitModeResult.data?.userConf);
         if (serverState === manualDebitMode) return;
         setManualDebitMode(serverState);
     }, [debitModeResult.data?.userConf]);
