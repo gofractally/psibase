@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/program_options/parsers.hpp>
 #include <functional>
 #include <iosfwd>
 #include <map>
@@ -10,7 +11,6 @@
 namespace psibase
 {
    // Config file editor that attempts to preserve ordering and comments.
-   // To load a config file, use Boost.ProgramOptions instead.
    class ConfigFile
    {
      public:
@@ -21,6 +21,8 @@ namespace psibase
       // Sets the value of a property.  For top level properties, the section
       // should be the empty string.  If a comment is specified, it will be
       // used only when adding a new property to the config file.
+      // The value may be automatically enclosed in "" and escaped if it
+      // would otherwise fail to round-trip.
       void set(std::string_view section,
                std::string_view key,
                std::string_view value,
@@ -52,5 +54,14 @@ namespace psibase
       std::map<std::size_t, std::string>              insertions;
       std::map<std::string, std::size_t, std::less<>> sectionInsertPoints;
    };
+
+   // Differences from boost::program_options::parse_config_file:
+   // - Allows double-quoted strings in value
+   //   - # inside a double-quoted string does not begin a comment
+   //   - backslash escapes are processed inside double-quoted strings
+   boost::program_options::parsed_options parse_config_file(
+       std::istream&,
+       const boost::program_options::options_description&,
+       const std::string& filename = "<unknown>");
 
 }  // namespace psibase

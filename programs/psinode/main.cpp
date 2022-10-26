@@ -1003,15 +1003,15 @@ int main(int argc, char* argv[])
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
-            po::store(po::parse_config_file(in, cfg_opts), vm);
+            po::store(psibase::parse_config_file(in, cfg_opts, config_path), vm);
          }
          else if (!exists(config_path))
          {
             auto template_path = config_template_path();
             if (std::filesystem::is_regular_file(template_path))
             {
-               std::ifstream in(config_template_path());
-               po::store(po::parse_config_file(in, cfg_opts), vm);
+               std::ifstream in(template_path);
+               po::store(psibase::parse_config_file(in, cfg_opts, template_path), vm);
             }
          }
       }
