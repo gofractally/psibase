@@ -16,3 +16,5 @@ downloadThirdParty("semantic-ui-react" "https://cdn.jsdelivr.net/npm/semantic-ui
 downloadThirdParty("use-local-storage-state" "https://cdn.jsdelivr.net/npm/use-local-storage-state@18.1.0/src/useLocalStorageState.js")
 
 conditional_add()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

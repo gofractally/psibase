@@ -12,3 +12,5 @@ if(DEFINED IS_NATIVE)
   add_subdirectory(psibase_http)
   add_subdirectory(net)
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

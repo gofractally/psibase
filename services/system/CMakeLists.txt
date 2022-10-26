@@ -32,3 +32,5 @@ if(DEFINED IS_WASM)
     add_subdirectory(TransactionSys)
     add_subdirectory(VerifyEcSys)
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

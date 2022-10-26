@@ -59,3 +59,5 @@ if(IS_WASM)
     copy_headers(include/psio/to_json psio/include/psio/to_json)
     configure_file(consthash/LICENSE ${ROOT_BINARY_DIR}/psidk/licenses/LICENSE.consthash COPYONLY)
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

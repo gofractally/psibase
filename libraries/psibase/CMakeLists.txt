@@ -198,3 +198,5 @@ if(IS_WASM)
     configure_file(sdk/toolchain.cmake ${ROOT_BINARY_DIR}/psidk/toolchain.cmake COPYONLY)
     configure_file(sdk/psidk-config.cmake ${ROOT_BINARY_DIR}/psidk/psidk-config.cmake COPYONLY)
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

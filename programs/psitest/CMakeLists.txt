@@ -29,3 +29,5 @@ add_custom_command(TARGET psitest POST_BUILD
 # "longjmp causes uninitialized stack frame"
 # when the --subst option is used.
 # target_compile_options(psitest PRIVATE -D_FORTIFY_SOURCE=0)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

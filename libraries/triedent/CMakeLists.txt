@@ -31,3 +31,5 @@ add_executable(triedent-tests-bigdb big.cpp)
 target_link_libraries(triedent-tests-bigdb PUBLIC Boost::program_options triedent)
 target_include_directories(triedent-tests-bigdb PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
 set_target_properties(triedent-tests-bigdb PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

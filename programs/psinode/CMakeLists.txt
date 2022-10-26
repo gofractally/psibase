@@ -26,3 +26,5 @@ add_custom_command(TARGET psinode POST_BUILD
     COMMAND mkdir -p ${ROOT_BINARY_DIR}/psidk/bin
     COMMAND cp -a $<TARGET_FILE:psinode> ${ROOT_BINARY_DIR}/psidk/bin
 )
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

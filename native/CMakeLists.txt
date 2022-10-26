@@ -49,3 +49,5 @@ if(NOT CLIO_ONLY)
     add_subdirectory(../services services)
     add_subdirectory(../programs programs)
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

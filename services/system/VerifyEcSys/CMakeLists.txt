@@ -14,3 +14,5 @@ function(add suffix)
 endfunction(add)
 
 conditional_add()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)

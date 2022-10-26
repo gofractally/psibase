@@ -214,3 +214,5 @@ add_subdirectory(../libraries libraries)
 add_subdirectory(../services services)
 add_subdirectory(../programs programs)
 add_subdirectory(boost)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)
