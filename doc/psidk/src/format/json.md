@@ -8,7 +8,7 @@ Both psio and serde_json represent structs with named fields as JSON objects.
 
 ## Tuples
 
-Both psio and serde_json represent tuples as JSON arrays. The empty tuple has a problem. `psio` renders `std::tuple<>{}` as you'd expect: `[]`. `serde_json`, however, renders `()`, the unit, as `null`. [schema](schema.html) doesn't support Rust's unit to avoid this inconsistency. See `Empty`, below, for a workaround.
+Both psio and serde_json represent tuples as JSON arrays. The empty tuple has a problem. `psio` renders `std::tuple<>{}` as you'd expect: `[]`. `serde_json`, however, renders `()`, the unit, as `null`. See `Empty`, below, for a workaround.
 
 - TODO: psio json support for tuples
 

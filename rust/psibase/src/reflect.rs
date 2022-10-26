@@ -30,6 +30,7 @@ pub trait Visitor {
     fn custom_json(self) -> Self;
     fn definition_will_not_change(self) -> Self;
 
+    fn unit(self) -> Self::Return;
     fn builtin<T: Reflect>(self, name: &'static str) -> Self::Return;
     fn refed<Inner: Reflect>(self) -> Self::Return;
     fn mut_ref<Inner: Reflect>(self) -> Self::Return;
@@ -262,7 +263,13 @@ macro_rules! tuple_impls {
     }
 }
 
-// Reflect excludes () to avoid an inconsistency between serde_json and psio::to_json
+impl Reflect for () {
+    type StaticType = ();
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.unit()
+    }
+}
+
 tuple_impls! {
     1 => (0 T0)
     2 => (0 T0 1 T1)

@@ -5,12 +5,19 @@ use crate::reflect::{
 use serde_json::to_string;
 
 pub fn generate_action_templates<T: Reflect>() -> String {
-    let mut result = String::new();
-    T::reflect(TemplateGenerator(&mut result));
+    let mut result = "{".to_owned();
+    T::reflect(TemplateGenerator {
+        result: &mut result,
+        first: true,
+    });
+    result.push('}');
     result
 }
 
-struct TemplateGenerator<'a>(&'a mut String);
+struct TemplateGenerator<'a> {
+    result: &'a mut String,
+    first: bool,
+}
 
 impl<'a> Visitor for TemplateGenerator<'a> {
     type Return = ();
@@ -32,6 +39,9 @@ impl<'a> Visitor for TemplateGenerator<'a> {
     }
     fn definition_will_not_change(self) -> Self {
         self
+    }
+    fn unit(self) {
+        unimplemented!()
     }
     fn builtin<T: Reflect>(self, _name: &'static str) {
         unimplemented!()
@@ -111,10 +121,13 @@ impl<'a> MethodsVisitor<()> for TemplateGenerator<'a> {
         name: std::borrow::Cow<'static, str>,
         _num_args: usize,
     ) -> Self::ArgVisitor {
-        self.0.push_str(&to_string(&name).unwrap());
-        self.0.push_str(":{");
+        if !self.first {
+            self.result.push(',');
+        }
+        self.result.push_str(&to_string(&name).unwrap());
+        self.result.push_str(":{");
         ArgsGenerator {
-            result: self.0,
+            result: self.result,
             first: true,
         }
     }
@@ -142,7 +155,10 @@ impl<'a> ArgVisitor<TemplateGenerator<'a>> for ArgsGenerator<'a> {
     }
     fn end(self) -> TemplateGenerator<'a> {
         self.result.push('}');
-        TemplateGenerator(self.result)
+        TemplateGenerator {
+            result: self.result,
+            first: false,
+        }
     }
 }
 
@@ -167,6 +183,9 @@ impl<'a> Visitor for ValueGenerator<'a> {
     }
     fn definition_will_not_change(self) -> Self {
         self
+    }
+    fn unit(self) {
+        self.result.push_str("null")
     }
     fn builtin<T: Reflect>(self, name: &'static str) {
         if !self.skip {

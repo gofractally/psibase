@@ -226,7 +226,7 @@ The following break backwards compatibility; if you do these, data will end up c
 
 `{"ty":"..."}` can name one of the following built-in types:
 
-- `void`: only supported as a method return type
+- `void`: only supported as a method return type. This has a different fracpack encoding (no bytes) than an empty tuple has (some bytes). The Rust schema generator treats methods that return `()` as if they returned `void` to match the C++ convention.
 - `bool`
 - `u8`, `u16`, `u32`, `u64`: unsigned integers
 - `i8`, `i16`, `i32`, `i64`: signed integers

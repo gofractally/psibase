@@ -2372,6 +2372,7 @@ version = "0.1.0"
 dependencies = [
  "psibase",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -97,9 +97,7 @@ fn process_mod(
 ) -> TokenStream {
     let mod_name = &impl_mod.ident;
     let service_account = &options.name;
-    let mut action_structs = proc_macro2::TokenStream::new();
-    let mut action_callers = proc_macro2::TokenStream::new();
-    let mut dispatch_body = proc_macro2::TokenStream::new();
+    let service_account_str = service_account.to_string();
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
@@ -154,10 +152,15 @@ fn process_mod(
             }
         }
 
+        let mut action_structs = proc_macro2::TokenStream::new();
+        let mut action_callers = proc_macro2::TokenStream::new();
+        let mut dispatch_body = proc_macro2::TokenStream::new();
+        let mut reflect_methods = proc_macro2::TokenStream::new();
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
+                let mut reflect_args = quote! {};
                 process_action_args(
                     options,
                     psibase_mod,
@@ -165,9 +168,22 @@ fn process_mod(
                     &mut action_structs,
                     &mut invoke_args,
                     &mut invoke_struct_args,
+                    &mut reflect_args,
                 );
                 process_action_callers(psibase_mod, f, &mut action_callers, &invoke_args);
                 process_dispatch_body(psibase_mod, f, &mut dispatch_body, invoke_struct_args);
+                let name = f.sig.ident.to_string();
+                let num_args = f.sig.inputs.len();
+                let output = match &f.sig.output {
+                    ReturnType::Default => quote! {()},
+                    ReturnType::Type(_, t) => quote! {#t},
+                };
+                reflect_methods = quote! {
+                    #reflect_methods
+                    .method::<#output>(#name.into(), #num_args)
+                    #reflect_args
+                    .end()
+                };
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
                     f.attrs.remove(i);
                 }
@@ -446,6 +462,23 @@ fn process_mod(
                 -> #actions<#psibase_mod::ActionPacker>
                 {
                     #psibase_mod::ActionPacker { sender, service }.into()
+                }
+            }
+        });
+        let num_actions = action_fns.len();
+        items.push(parse_quote! {
+            #[automatically_derived]
+            impl #psibase_mod::reflect::Reflect for #wrapper {
+                type StaticType = #wrapper;
+                fn reflect<V: #psibase_mod::reflect::Visitor>(visitor: V) -> V::Return {
+                    use #psibase_mod::reflect::StructVisitor;
+                    use #psibase_mod::reflect::MethodsVisitor;
+                    use #psibase_mod::reflect::ArgVisitor;
+                    visitor
+                        .struct_named::<#wrapper>(#service_account_str.into(), 0)
+                        .with_methods(#num_actions)
+                        #reflect_methods
+                        .end()
                 }
             }
         });
@@ -872,6 +905,7 @@ fn process_action_args(
     new_items: &mut proc_macro2::TokenStream,
     invoke_args: &mut proc_macro2::TokenStream,
     invoke_struct_args: &mut proc_macro2::TokenStream,
+    reflect_args: &mut proc_macro2::TokenStream,
 ) {
     let mut struct_members = proc_macro2::TokenStream::new();
     for input in f.sig.inputs.iter() {
@@ -879,6 +913,7 @@ fn process_action_args(
             FnArg::Receiver(_) => (), // Compiler generates errors on self args
             FnArg::Typed(pat_type) => match &*pat_type.pat {
                 Pat::Ident(name) => {
+                    let name_str = name.ident.to_string();
                     let ty = &*pat_type.ty;
                     struct_members = quote! {
                         #struct_members
@@ -891,6 +926,10 @@ fn process_action_args(
                     *invoke_struct_args = quote! {
                         #invoke_struct_args
                         args.#name,
+                    };
+                    *reflect_args = quote! {
+                        #reflect_args
+                        .arg::<#ty>(#name_str.into())
                     };
                 }
                 _ => abort!(*pat_type.pat, "expected identifier"),
