@@ -61,7 +61,7 @@ export const TransferHistory = ({
     currentUser,
     queryResult: result,
 }: Props) => {
-    const transfers: TransferResult[] = result.data?.holderEvents?.edges?.map(
+    const transfers: TransferResult[] = result.data?.userEvents?.edges?.map(
         (e: any) => e.node
     );
 

@@ -2,8 +2,15 @@ interface Uint64 {
     value: string;
 }
 
-export interface FungibleToken {
+export interface TokenMeta {
     id: number;
+    precision: {
+        value: number;
+    };
+    symbolId: string;
+}
+
+export interface FungibleToken extends TokenMeta {
     ownerNft: number;
     inflation: {
         settings: {
@@ -19,12 +26,8 @@ export interface FungibleToken {
     config: {
         bits: number;
     };
-    precision: {
-        value: number;
-    };
     currentSupply: Uint64;
     maxSupply: Uint64;
-    symbolId: string;
 }
 
 export interface TokenBalance {
@@ -50,7 +53,7 @@ export type SharedBalanceKey = {
     creditor: string;
     debitor: string;
     tokenId: number;
-}
+};
 
 export type SharedBalance = {
     balance: string;
