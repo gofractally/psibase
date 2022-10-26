@@ -87,7 +87,7 @@ export const Logger = ({ name, register, watch, remove }: LoggerProps) => {
     const type_ = watch("type") as string;
     return (
         <fieldset className="logger-control">
-            <legend>{name}</legend>
+            <legend>Logger</legend>
             <Button onClick={remove}>Remove</Button>
             <Form.Select label="Type" {...register("type")}>
                 <option value="">--Choose Logger Type--</option>

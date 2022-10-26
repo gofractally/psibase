@@ -694,7 +694,27 @@ function App() {
                         if (!state.loggers) {
                             state.loggers = {};
                         }
-                        state.loggers["New Logger"] = {
+                        const autogen = /~[0-9A-F]{16}/;
+                        let current = 0;
+                        for (const key in state.loggers) {
+                            if (autogen.test(key)) {
+                                const val = parseInt(key.substring(1), 16);
+                                if (val > current) {
+                                    current = val;
+                                }
+                            }
+                        }
+                        current =
+                            (current & 0xffff0000) +
+                            0x10000 +
+                            Math.floor(Math.random() * 0x10000);
+                        state.loggers[
+                            "~" +
+                                current
+                                    .toString(16)
+                                    .toUpperCase()
+                                    .padStart(8, "0")
+                        ] = {
                             type: "",
                             filter: "",
                             format: "",
