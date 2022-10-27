@@ -67,7 +67,7 @@ namespace psibase
    ///
    /// If `request` is a POST to `/pack_action/x`, where `x` is an action
    /// on `Service`, then this parses a JSON object containing the arguments
-   /// to `x`, packs them using frackpac, and returns the result as an
+   /// to `x`, packs them using fracpack, and returns the result as an
    /// `application/octet-stream`.
    ///
    /// If `request` doesn't match the above, or the action name is not found,

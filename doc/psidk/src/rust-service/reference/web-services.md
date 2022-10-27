@@ -100,10 +100,19 @@ mod service {
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_simple_index(request))
-            .or_else(|| serve_schema::<Wrapper>(request))
-            .or_else(|| serve_action_templates::<Wrapper>(request))
-            .or_else(|| serve_pack_action::<Wrapper>(request))
+        if request.method == "GET"
+        && (request.target == "/" || request.target == "/index.html")
+        {
+            return Some(HttpReply {
+                contentType: "text/html".into(),
+                body: "<b>This is my UI</b>".into(),
+                headers: vec![],
+            });
+        }
+
+        None.or_else(|| serve_schema::<Wrapper>(&request))
+            .or_else(|| serve_action_templates::<Wrapper>(&request))
+            .or_else(|| serve_pack_action::<Wrapper>(&request))
     }
 }
 ```
