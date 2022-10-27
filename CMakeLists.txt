@@ -109,23 +109,25 @@ if(BUILD_JS)
     endforeach()
 endif()
 
-function(psinode_files target pfx)
-add_custom_target(
-  ${target}
-  ALL
-  DEPENDS AdminSys_js
-  COMMAND rm -rf ${pfx}/share/psibase/services/admin-sys
-  COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
-  COMMAND cp -a -T ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist ${pfx}/share/psibase/services/admin-sys
-  COMMAND cp -a -T ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
-  COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/rpc.mjs ${pfx}/share/psibase/services/admin-sys/common/
-  COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/keyConversions.mjs ${pfx}/share/psibase/services/admin-sys/common/
-  COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
-  )
-endfunction()
+if(BUILD_JS)
+    function(psinode_files target pfx)
+    add_custom_target(
+    ${target}
+    ALL
+    DEPENDS AdminSys_js
+    COMMAND rm -rf ${pfx}/share/psibase/services/admin-sys
+    COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
+    COMMAND cp -a -T ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist ${pfx}/share/psibase/services/admin-sys
+    COMMAND cp -a -T ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/rpc.mjs ${pfx}/share/psibase/services/admin-sys/common/
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/keyConversions.mjs ${pfx}/share/psibase/services/admin-sys/common/
+    COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
+    )
+    endfunction()
 
-psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-psinode_files(psinode-psidk-share ${CMAKE_CURRENT_BINARY_DIR}/psidk)
+    psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
+    psinode_files(psinode-psidk-share ${CMAKE_CURRENT_BINARY_DIR}/psidk)
+endif()
 
 option(BUILD_RUST "Build rust" ON)
 if(BUILD_RUST)
