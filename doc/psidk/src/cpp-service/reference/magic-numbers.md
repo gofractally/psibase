@@ -1,4 +1,4 @@
-# Magic Numbers
+# C++ Magic Numbers
 
 - [psibase::AccountNumber]
 - [psibase::MethodNumber]

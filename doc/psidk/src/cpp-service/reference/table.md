@@ -1,4 +1,4 @@
-# Table
+# C++ Table
 
 - [psibase::ServiceTables]
   - [Modifying table set](#modifying-table-set)
