@@ -24,6 +24,7 @@ mod time;
 mod to_bin;
 mod to_key;
 mod trace;
+mod web_services;
 
 pub mod services;
 
@@ -49,6 +50,7 @@ pub use time::*;
 pub use to_bin::*;
 pub use to_key::*;
 pub use trace::*;
+pub use web_services::*;
 
 use internal_macros::*;
 

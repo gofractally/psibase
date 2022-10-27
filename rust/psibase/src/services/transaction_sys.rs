@@ -138,7 +138,8 @@ pub mod auth_interface {
 ///
 /// Other services use it to get information about the chain,
 /// current block, and head block. They also use it to call actions
-/// using other accounts' authorities via [runAs](Self::runAs).
+/// using other accounts' authorities via
+/// [runAs](crate::services::transaction_sys::Actions::runAs).
 // TODO: tables
 // TODO: service flags
 #[crate::service(name = "transact-sys", dispatch = false, psibase_mod = "crate")]
