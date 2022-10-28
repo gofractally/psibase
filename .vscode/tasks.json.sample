@@ -10,16 +10,31 @@
     "tasks": [
         // Compilation
         {
-            "label": "make",
+            "label": "buildcpp",
             "type": "shell",
-            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes .. && make -j $(nproc)",
+            "command": "cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=no -DBUILD_JS=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc)",
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
             "options": {
                 "statusbar": {
-                    "label": "$(diff-insert) Build",
+                    "label": "$(diff-insert) Build services",
+                    "tooltip": "Build cpp/rust only"
+                }
+            }
+        },
+        {
+            "label": "make",
+            "type": "shell",
+            "command": "cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc)",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "statusbar": {
+                    "label": "$(diff-insert) Full Build",
                     "tooltip": "Build with cmake"
                 }
             }
@@ -27,7 +42,7 @@
         {
             "label": "testnet",
             "type": "shell",
-            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes .. && make -j $(nproc) && ./psitest launchTestChain-test-debug.wasm -s -r compact",
+            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc) && ./psitest launchTestChain-test-debug.wasm -s -r compact",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -50,8 +65,8 @@
             },
             "options": {
                 "statusbar": {
-                    "label": "$(diff-insert) Test Token App",
-                    "tooltip": "Invoke psitest on the system token application"
+                    "label": "$(diff-insert) Test Token",
+                    "tooltip": "Invoke psitest on the system token service"
                 }
             }
         }
