@@ -87,6 +87,10 @@ SCENARIO("Using system token")
          {
             CHECK(a.credit(sysToken, bob, userBalance / 2, memo).succeeded());
          }
+         AND_THEN("Alice may not credit the system token to herself")
+         {
+            CHECK(a.credit(sysToken, alice, userBalance / 2, memo).failed(senderIsReceiver));
+         }
       }
    }
 }

@@ -17,20 +17,21 @@ export const SharedBalances = ({
     queryResult,
     refetchData,
 }: Props) => {
-    const balances: SharedBalance[] = queryResult.data?.sharedBalances?.edges?.map(
-        (e: any) => e.node
-    );
+    const balances: SharedBalance[] =
+        queryResult.data?.sharedBalances?.edges?.map((e: any) => e.node);
 
     const onCancel = async (
         incoming: boolean,
         receiver: string,
         symbol: string,
+        tokenId: number,
         maxAmount: string
     ) => {
         if (incoming) {
             // TODO: implement incoming deposits cancel function when backend supports it
         } else {
             await tokenContract.unCreditOp({
+                tokenId,
                 symbol,
                 receiver,
                 maxAmount,
@@ -40,8 +41,14 @@ export const SharedBalances = ({
         }
     };
 
-    const onAccept = async (sender: string, symbol: string, amount: string) => {
+    const onAccept = async (
+        sender: string,
+        symbol: string,
+        tokenId: number,
+        amount: string
+    ) => {
         await tokenContract.debitOp({
+            tokenId,
             symbol,
             sender,
             amount,
@@ -150,6 +157,7 @@ export const SharedBalances = ({
                                                     incoming,
                                                     counterparty,
                                                     symbol,
+                                                    token.token,
                                                     b.balance
                                                 )
                                             }
@@ -164,6 +172,7 @@ export const SharedBalances = ({
                                                 onAccept(
                                                     counterparty,
                                                     symbol,
+                                                    token.token,
                                                     b.balance
                                                 )
                                             }

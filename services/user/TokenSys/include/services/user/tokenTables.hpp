@@ -1,10 +1,10 @@
 #pragma once
 
 #include <compare>
-#include <services/user/tokenTypes.hpp>
 #include <limits>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
+#include <services/user/tokenTypes.hpp>
 
 #include "services/user/NftSys.hpp"
 #include "services/user/symbolTables.hpp"

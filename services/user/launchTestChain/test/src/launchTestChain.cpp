@@ -90,5 +90,5 @@ SCENARIO("Testing default psibase chain")
    psibase::execute("mkdir tester_psinode_db");
    psibase::execute("cp -a " + t.getPath() + "/. tester_psinode_db/");
    psibase::execute(
-       "psinode --slow -o psibase.127.0.0.1.sslip.io tester_psinode_db --producer testchain");
+       "psinode -o psibase.127.0.0.1.sslip.io tester_psinode_db --producer testchain");
 }

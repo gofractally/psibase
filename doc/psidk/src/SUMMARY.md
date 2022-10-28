@@ -25,6 +25,8 @@
     - [Minimal UI](rust-service/minimal-ui.md)
     - [Reference]()
       - [Web Services](rust-service/reference/web-services.md)
+  - [Concepts]()
+    - [Events](concepts/events.md)
 - [Data Formats]()
   - [JSON](format/json.md)
   - [Schema](format/schema.md)

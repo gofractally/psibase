@@ -4,22 +4,22 @@
 #include <psibase/Service.hpp>
 #include <psibase/String.hpp>
 #include <psibase/check.hpp>
-#include <psibase/serveContent.hpp>
+#include <psibase/eventIndex.hpp>
 #include <string>
 
+#include <services/user/symbolTables.hpp>
 #include <services/user/tokenErrors.hpp>
 #include <services/user/tokenTables.hpp>
 #include <services/user/tokenTypes.hpp>
-#include "services/user/symbolTables.hpp"
 
 namespace UserService
 {
-
    class TokenSys : public psibase::Service<TokenSys>
    {
      public:
       using Tables = psibase::
           ServiceTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
+
       static constexpr auto service  = psibase::AccountNumber("token-sys");
       static constexpr auto sysToken = TID{1};
 
@@ -90,28 +90,22 @@ namespace UserService
          {
             void initialized() {}
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
-            void minted(TID tokenId, uint64_t prevEvent, Account minter, Quantity amount, StringView memo) {}
-            void burned(TID tokenId, uint64_t prevEvent, Account burner, Quantity amount) {}
+            void minted(uint64_t prevEvent, TID tokenId, Account minter, Quantity amount, StringView memo) {}
+            void burned(uint64_t prevEvent, TID tokenId, Account burner, Quantity amount) {}
             void userConfSet(Account account, psibase::NamedBit flag, bool enable) {}
-            void tokenConfSet(TID tokenId, uint64_t prevEvent, Account setter, psibase::NamedBit flag, bool enable) {}
-            void symbolMapped(TID tokenId, uint64_t prevEvent, Account account, SID symbolId) {}
+            void tokenConfSet(uint64_t prevEvent, TID tokenId, Account setter, psibase::NamedBit flag, bool enable) {}
+            void symbolMapped(uint64_t prevEvent, TID tokenId, Account account, SID symbolId) {}
             // TODO: time is redundant with which block the event was written in
-            void transferred(TID tokenId, uint64_t prevEvent, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, StringView memo) {}
-            void recalled(TID tokenId, uint64_t prevEvent, psibase::TimePointSec time, Account from, Quantity amount, StringView memo) {}
+            void transferred(uint64_t prevEvent, TID tokenId, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, StringView memo) {}
+            void recalled(uint64_t prevEvent, TID tokenId, psibase::TimePointSec time, Account from, Quantity amount, StringView memo) {}
          };
 
-         struct Ui
-         {
-            void credited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-            void uncredited(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-         };
+         struct Ui {};
 
-         struct Merkle
-         {
-            void transferred(TID tokenId, Account sender, Account receiver, Quantity amount, StringView memo) {}
-            void recalled(TID tokenId, Account from, Quantity amount, StringView memo) {}
-         };
+         struct Merkle{};
       };
+      using UserEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, "prevEvent">;
+
       // clang-format on
    };
 
@@ -146,17 +140,11 @@ namespace UserService
       method(userConfSet, account, flag, enable),
       method(tokenConfSet, prevEvent, tokenId, setter, flag, enable),
       method(symbolMapped, prevEvent, tokenId, account, symbolId),
-      method(transferred, tokenId, prevEvent, time, sender, receiver, amount, memo),
-      method(recalled, tokenId, prevEvent, time, from, amount, memo),
+      method(transferred, prevEvent, tokenId, time, sender, receiver, amount, memo),
+      method(recalled, prevEvent, tokenId, time, from, amount, memo),
    );
-   PSIBASE_REFLECT_UI_EVENTS(TokenSys,
-      method(credited, tokenId, sender, receiver, amount, memo),
-      method(uncredited, tokenId, sender, receiver, amount, memo),
-   );
-   PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys,
-      method(transferred, tokenId, sender, receiver, amount, memo),
-      method(recalled, tokenId, from, amount, memo)
-   );
+   PSIBASE_REFLECT_UI_EVENTS(TokenSys);
+   PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys);
    // clang-format on
 
 }  // namespace UserService

@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
+
 import { TransferHistory, SharedBalances } from "./views";
 import { Button, Form, Heading, Icon, Text, Switch } from "./components";
 import { getParsedBalanceFromToken, wait } from "./helpers";
 import {
     getLoggedInUser,
-    getTokens,
-    pollForBalanceChange,
     useTransferHistory,
     useSharedBalances,
-    getUserConf,
+    useUserBalances,
+    useUserDebitModeConf,
 } from "./queries";
 import { TokenBalance } from "./types";
 import WalletIcon from "./assets/app-wallet-icon.svg";
@@ -33,19 +33,25 @@ window.React = React;
 function App() {
     const [userName, setUserName] = useState("");
     const [transferError, setTransferError] = useState("");
-    const [tokens, setTokens] = useState<TokenBalance[]>();
     const [formSubmitted, setFormSubmitted] = useState(false);
+    const [manualDebitMode, setManualDebitMode] = useState(false);
+
     const [transferHistoryResult, invalidateTransferHistoryQuery] =
         useTransferHistory(userName);
-    const [manualDebitMode, setManualDebitMode] = useState(false);
+    const [debitModeResult, invalidateDebitModeQuery] =
+        useUserDebitModeConf(userName);
+    const [balancesResult, invalidateBalancesQuery] = useUserBalances(userName);
     const [sharedBalancesResult, invalidateSharedBalancesQuery] =
         useSharedBalances();
 
     const refetchData = async () => {
-        await wait(1000);
+        await wait(2000);
         invalidateTransferHistoryQuery();
+        invalidateBalancesQuery();
         invalidateSharedBalancesQuery();
     };
+
+    const tokens: TokenBalance[] = balancesResult.data?.userBalances;
 
     useEffect(() => {
         (async () => {
@@ -55,17 +61,17 @@ function App() {
                     throw new Error("Unable to fetch logged-in user.");
                 }
                 setUserName(userName);
-
-                const tokens = await getTokens(userName);
-                setTokens(tokens);
-
-                const debitMode = await getUserConf(userName, "manualDebit");
-                setManualDebitMode(Boolean(debitMode));
             } catch (e) {
                 console.error("Error getting user or balance information:", e);
             }
         })();
     }, []);
+
+    useEffect(() => {
+        const serverState = Boolean(debitModeResult.data?.userConf);
+        if (serverState === manualDebitMode) return;
+        setManualDebitMode(serverState);
+    }, [debitModeResult.data?.userConf]);
 
     const {
         register,
@@ -101,7 +107,7 @@ function App() {
                 setTransferError(`${e}`);
             }
         }
-        refetchData();
+        await refetchData();
         setFormSubmitted(false);
     };
 
@@ -119,14 +125,12 @@ function App() {
         const parsedAmount = `${amountSegments[0]}${decimal}`;
 
         await tokenContract.creditOp({
+            tokenId: token.token,
             symbol,
             receiver: to,
             amount: parsedAmount,
             memo: "Working",
         });
-
-        const updatedTokens = await pollForBalanceChange(userName, token);
-        setTokens(updatedTokens);
     };
 
     const tokensOptions =
@@ -144,12 +148,19 @@ function App() {
         );
 
     const manualDebitModeChange = async () => {
+        // TODO: Factor this toggle and related code out into a component.
         const newManualDebitModeValue = !manualDebitMode;
         setManualDebitMode(newManualDebitModeValue);
-        await tokenContract.setUserConfOp({
-            flag: "manualDebit",
-            enable: newManualDebitModeValue,
-        });
+        try {
+            await tokenContract.setUserConfOp({
+                flag: "manualDebit",
+                enable: newManualDebitModeValue,
+            });
+        } catch (e) {
+            console.error("Error updating user debit configuration:", e);
+        }
+        await wait(2000);
+        invalidateDebitModeQuery();
     };
 
     return (
@@ -232,7 +243,7 @@ function App() {
                                         if (!v.includes(".")) return true;
                                         return (
                                             v.split(".")[1].length <
-                                            token.precision + 1 ||
+                                                token.precision + 1 ||
                                             `Only ${token.precision} decimals allowed`
                                         );
                                     },
@@ -240,8 +251,8 @@ function App() {
                                         if (!token) return true;
                                         return (
                                             Number(v) *
-                                            Math.pow(10, token.precision) <=
-                                            Number(token.balance) ||
+                                                Math.pow(10, token.precision) <=
+                                                Number(token.balance) ||
                                             "Insufficient funds"
                                         );
                                     },

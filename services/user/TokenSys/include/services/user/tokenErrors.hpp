@@ -19,5 +19,6 @@ namespace UserService
       constexpr std::string_view wrongSysTokenId     = "System token must have TID: 1";
       constexpr std::string_view invalidConfigUpdate = "Invalid configuration update";
       constexpr std::string_view tokenUntradeable    = "Token untradeable";
+      constexpr std::string_view senderIsReceiver    = "Sender cannot be receiver";
    }  // namespace Errors
 }  // namespace UserService

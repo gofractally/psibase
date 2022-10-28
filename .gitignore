@@ -2,6 +2,7 @@
 .DS_Store
 .nyc_output
 .vscode
+.trunk
 *.a
 *.log
 *.o
