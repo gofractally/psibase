@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{AccountNumber, Fracpack, MethodNumber, TimePointSec, ToKey};
+use crate::{AccountNumber, Fracpack, MethodNumber, Reflect, TimePointSec, ToKey};
 use serde::{Deserialize, Serialize};
 
 // TODO: move
@@ -16,8 +16,9 @@ pub type BlockNum = u32;
 ///
 /// Transactions also contains actions requested by the
 /// transaction authorizers.
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct Action {
     /// Account sending the action
@@ -33,8 +34,9 @@ pub struct Action {
     pub rawData: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedAction<'a> {
     pub sender: AccountNumber,
@@ -46,16 +48,18 @@ pub struct SharedAction<'a> {
 /// The genesis action is the first action of the first transaction of
 /// the first block. The action struct's fields are ignored, except
 /// rawData, which contains this struct.
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct GenesisActionData {
     pub memo: String,
     pub services: Vec<GenesisService>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedGenesisActionData<'a> {
     pub memo: String,
@@ -63,8 +67,9 @@ pub struct SharedGenesisActionData<'a> {
     pub services: Vec<SharedGenesisService<'a>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct GenesisService {
     pub service: AccountNumber,
@@ -74,8 +79,9 @@ pub struct GenesisService {
     pub code: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedGenesisService<'a> {
     pub service: AccountNumber,
@@ -85,8 +91,9 @@ pub struct SharedGenesisService<'a> {
     pub code: &'a [u8],
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct Claim {
     pub service: AccountNumber,
@@ -115,8 +122,9 @@ pub struct Claim {
 /// * It references a block that isn't on the current fork, or a block which
 ///   is too old. For best results, use the most-recent irreversible block which
 ///   meets the criteria.
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct Tapos {
     pub expiration: TimePointSec,
@@ -130,8 +138,9 @@ impl Tapos {
     pub const VALID_FLAGS: u16 = 0x0001;
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct Transaction {
     pub tapos: Tapos,
@@ -139,8 +148,9 @@ pub struct Transaction {
     pub claims: Vec<Claim>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct SignedTransaction {
     // Contains a packed `Transaction`. TODO: shared_view_ptr
@@ -150,16 +160,18 @@ pub struct SignedTransaction {
 
 type TermNum = u32;
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct Producer {
     pub name: AccountNumber,
     pub auth: Claim,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct BlockHeader {
     pub previous: Checksum256,
@@ -178,8 +190,9 @@ pub struct BlockHeader {
     pub newProducers: Option<Vec<Producer>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct Block {
     pub header: BlockHeader,
@@ -187,16 +200,18 @@ pub struct Block {
     pub subjectiveData: Vec<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct BlockInfo {
     pub header: BlockHeader,

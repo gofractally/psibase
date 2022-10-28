@@ -1,6 +1,6 @@
 [package]
 name = "psibase"
-version = "0.1.3"
+version = "0.1.5"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -12,13 +12,14 @@ license = "MIT"
 anyhow = "1.0"
 chrono = "0.4"
 custom_error = "1.9"
-fracpack = { version = "0.1.4", path = "../fracpack" }
+fracpack = { version = "0.1.6", path = "../fracpack" }
 include_dir = "0.7"
 mime_guess = "2.0"
-psibase_macros = { version = "0.1.4", path = "../psibase_macros" }
-psibase_names = { version = "0.1.3", path = "../psibase_names" }
+psibase_macros = { version = "0.1.5", path = "../psibase_macros" }
+psibase_names = { version = "0.1.4", path = "../psibase_names" }
 ripemd = "0.1"
 serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = {version = "3.1", features = ["derive"]}
@@ -26,5 +27,4 @@ futures = "0.3"
 indicatif = "0.17"
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
 secp256k1 = { version="0.22", features = ["global-context", "bitcoin_hashes"] }
-serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }

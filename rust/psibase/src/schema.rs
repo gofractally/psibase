@@ -95,7 +95,7 @@ fn extract_str(str: &BuildString) -> String {
 
 pub fn create_schema<T: Reflect>() -> Schema<BuildString> {
     let mut builder: SchemaBuilder = Default::default();
-    builder.get_type_ref::<T>();
+    builder.get_type_ref::<T>(false);
     let mut names: HashSet<String> = HashSet::new();
     for shared_name in builder.names {
         let name = extract_str(&shared_name);
@@ -125,13 +125,14 @@ struct SchemaBuilder {
 }
 
 impl SchemaBuilder {
-    fn get_type_ref<T: Reflect>(&mut self) -> TypeRef<BuildString> {
+    fn get_type_ref<T: Reflect>(&mut self, for_return: bool) -> TypeRef<BuildString> {
         let type_id = TypeId::of::<T::StaticType>();
         if let Some(tr) = self.type_refs.get(&type_id) {
             tr.clone()
         } else {
             T::StaticType::reflect(TypeBuilder {
                 schema_builder: self,
+                for_return,
                 custom_json: None,
                 definition_will_not_change: None,
             })
@@ -156,6 +157,7 @@ impl SchemaBuilder {
 
 struct TypeBuilder<'a> {
     schema_builder: &'a mut SchemaBuilder,
+    for_return: bool,
     custom_json: Option<bool>,
     definition_will_not_change: Option<bool>,
 }
@@ -177,6 +179,14 @@ impl<'a> Visitor for TypeBuilder<'a> {
         self
     }
 
+    fn unit(self) -> Self::Return {
+        if self.for_return {
+            TypeRef::ty(Rc::new(RefCell::new("void".into())))
+        } else {
+            TypeRef::tuple(Vec::new())
+        }
+    }
+
     fn builtin<T: Reflect>(self, name: &'static str) -> Self::Return {
         let name = Rc::new(RefCell::new(name.into()));
         self.schema_builder
@@ -185,49 +195,49 @@ impl<'a> Visitor for TypeBuilder<'a> {
     }
 
     fn refed<Inner: Reflect>(self) -> Self::Return {
-        self.schema_builder.get_type_ref::<Inner>()
+        self.schema_builder.get_type_ref::<Inner>(false)
     }
 
     fn mut_ref<Inner: Reflect>(self) -> Self::Return {
-        self.schema_builder.get_type_ref::<Inner>()
+        self.schema_builder.get_type_ref::<Inner>(false)
     }
 
     fn boxed<Inner: Reflect>(self) -> Self::Return {
-        self.schema_builder.get_type_ref::<Inner>()
+        self.schema_builder.get_type_ref::<Inner>(false)
     }
 
     fn rc<Inner: Reflect>(self) -> Self::Return {
-        self.schema_builder.get_type_ref::<Inner>()
+        self.schema_builder.get_type_ref::<Inner>(false)
     }
 
     fn arc<Inner: Reflect>(self) -> Self::Return {
-        self.schema_builder.get_type_ref::<Inner>()
+        self.schema_builder.get_type_ref::<Inner>(false)
     }
 
     fn cell<Inner: Reflect>(self) -> Self::Return {
-        self.schema_builder.get_type_ref::<Inner>()
+        self.schema_builder.get_type_ref::<Inner>(false)
     }
 
     fn ref_cell<Inner: Reflect>(self) -> Self::Return {
-        self.schema_builder.get_type_ref::<Inner>()
+        self.schema_builder.get_type_ref::<Inner>(false)
     }
 
     fn option<Inner: Reflect>(self) -> Self::Return {
-        let inner = self.schema_builder.get_type_ref::<Inner>();
+        let inner = self.schema_builder.get_type_ref::<Inner>(false);
         self.schema_builder
             .insert::<Option<Inner>>(None, TypeRef::option(Box::new(inner)))
             .clone()
     }
 
     fn container<T: Reflect, Inner: Reflect>(self) -> Self::Return {
-        let inner = self.schema_builder.get_type_ref::<Inner>();
+        let inner = self.schema_builder.get_type_ref::<Inner>(false);
         self.schema_builder
             .insert::<T>(None, TypeRef::vector(Box::new(inner)))
             .clone()
     }
 
     fn array<Inner: Reflect, const SIZE: usize>(self) -> Self::Return {
-        let inner = self.schema_builder.get_type_ref::<Inner>();
+        let inner = self.schema_builder.get_type_ref::<Inner>(false);
         self.schema_builder
             .insert::<[Inner; SIZE]>(None, TypeRef::array(Box::new(inner), SIZE as u32))
             .clone()
@@ -242,7 +252,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
     }
 
     fn struct_single<T: Reflect, Inner: Reflect>(self, name: Cow<'static, str>) -> Self::Return {
-        let inner = self.schema_builder.get_type_ref::<Inner>();
+        let inner = self.schema_builder.get_type_ref::<Inner>(false);
         let name = Rc::new(RefCell::new(name));
         self.schema_builder.schema.userTypes.push(Definition {
             name: name.clone(),
@@ -293,6 +303,7 @@ impl<'a> Visitor for TypeBuilder<'a> {
             custom_json: self.custom_json,
             definition_will_not_change: self.definition_will_not_change,
             fields: Vec::with_capacity(fields_len),
+            methods: None,
         }
     }
 
@@ -323,7 +334,8 @@ struct TupleBuilder<'a> {
 
 impl<'a> UnnamedVisitor<TypeRef<BuildString>> for TupleBuilder<'a> {
     fn field<T: Reflect>(mut self) -> Self {
-        self.fields.push(self.schema_builder.get_type_ref::<T>());
+        self.fields
+            .push(self.schema_builder.get_type_ref::<T>(false));
         self
     }
 
@@ -345,7 +357,8 @@ struct StructTupleBuilder<'a> {
 
 impl<'a> UnnamedVisitor<TypeRef<BuildString>> for StructTupleBuilder<'a> {
     fn field<T: Reflect>(mut self) -> Self {
-        self.fields.push(self.schema_builder.get_type_ref::<T>());
+        self.fields
+            .push(self.schema_builder.get_type_ref::<T>(false));
         self
     }
 
@@ -370,6 +383,7 @@ struct StructBuilder<'a> {
     custom_json: Option<bool>,
     definition_will_not_change: Option<bool>,
     fields: Vec<Field<BuildString>>,
+    methods: Option<Vec<Method<BuildString>>>,
 }
 
 impl<'a> NamedVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
@@ -377,7 +391,7 @@ impl<'a> NamedVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
         let name = Rc::new(RefCell::new(name));
         self.fields.push(Field {
             name,
-            ty: self.schema_builder.get_type_ref::<T>(),
+            ty: self.schema_builder.get_type_ref::<T>(false),
         });
         self
     }
@@ -390,7 +404,7 @@ impl<'a> NamedVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
             unionFields: None,
             customJson: self.custom_json,
             definitionWillNotChange: self.definition_will_not_change,
-            methods: None,
+            methods: self.methods,
         });
         self.type_ref
     }
@@ -399,12 +413,59 @@ impl<'a> NamedVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
 impl<'a> StructVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
     type MethodsVisitor = Self;
 
-    fn with_methods(self) -> Self {
+    fn with_methods(mut self, num_methods: usize) -> Self {
+        self.methods = Some(Vec::with_capacity(num_methods));
         self
     }
 }
 
-impl<'a> reflect::MethodsVisitor<TypeRef<BuildString>> for StructBuilder<'a> {}
+impl<'a> reflect::MethodsVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
+    type ArgVisitor = MethodBuilder<'a>;
+
+    fn method<MethodReturn: Reflect>(
+        self,
+        name: Cow<'static, str>,
+        num_args: usize,
+    ) -> Self::ArgVisitor {
+        let returns = self.schema_builder.get_type_ref::<MethodReturn>(true);
+        MethodBuilder {
+            struct_builder: self,
+            name: Rc::new(name.into()),
+            returns,
+            args: Vec::with_capacity(num_args),
+        }
+    }
+
+    fn end(self) -> TypeRef<BuildString> {
+        <Self as NamedVisitor<TypeRef<BuildString>>>::end(self)
+    }
+}
+
+struct MethodBuilder<'a> {
+    struct_builder: StructBuilder<'a>,
+    name: BuildString,
+    returns: TypeRef<BuildString>,
+    args: Vec<Field<BuildString>>,
+}
+
+impl<'a> reflect::ArgVisitor<StructBuilder<'a>> for MethodBuilder<'a> {
+    fn arg<T: Reflect>(mut self, name: Cow<'static, str>) -> Self {
+        self.args.push(Field {
+            name: Rc::new(name.into()),
+            ty: self.struct_builder.schema_builder.get_type_ref::<T>(false),
+        });
+        self
+    }
+
+    fn end(mut self) -> StructBuilder<'a> {
+        self.struct_builder.methods.as_mut().unwrap().push(Method {
+            name: self.name,
+            returns: self.returns,
+            args: self.args,
+        });
+        self.struct_builder
+    }
+}
 
 struct EnumBuilder<'a> {
     schema_builder: &'a mut SchemaBuilder,
@@ -420,7 +481,7 @@ impl<'a> EnumVisitor<TypeRef<BuildString>> for EnumBuilder<'a> {
     fn single<T: Reflect, Inner: Reflect>(mut self, name: Cow<'static, str>) -> Self {
         self.fields.push(Field {
             name: Rc::new(RefCell::new(name)),
-            ty: self.schema_builder.get_type_ref::<Inner>(),
+            ty: self.schema_builder.get_type_ref::<Inner>(false),
         });
         self
     }
@@ -464,7 +525,7 @@ struct EnumTupleBuilder<'a> {
 impl<'a> UnnamedVisitor<EnumBuilder<'a>> for EnumTupleBuilder<'a> {
     fn field<T: Reflect>(mut self) -> Self {
         self.fields
-            .push(self.enum_builder.schema_builder.get_type_ref::<T>());
+            .push(self.enum_builder.schema_builder.get_type_ref::<T>(false));
         self
     }
 
@@ -487,7 +548,7 @@ impl<'a> NamedVisitor<EnumBuilder<'a>> for EnumNamedBuilder<'a> {
     fn field<T: Reflect>(mut self, name: Cow<'static, str>) -> Self {
         self.fields.push(Field {
             name: Rc::new(RefCell::new(name)),
-            ty: self.enum_builder.schema_builder.get_type_ref::<T>(),
+            ty: self.enum_builder.schema_builder.get_type_ref::<T>(false),
         });
         self
     }

@@ -407,7 +407,11 @@ namespace psibase::net
             _state = producer_state::nonvoting;
          }
       }
-      void load_producers() { set_producers(chain().getProducers()); }
+      void load_producers()
+      {
+         current_term = chain().get_head()->term;
+         set_producers(chain().getProducers());
+      }
       bool is_sole_producer() const
       {
          return ((active_producers[0]->size() == 0 && self != AccountNumber()) ||

@@ -440,13 +440,15 @@ Each peer has the following fields:
 
 `/native/admin/config` provides `GET` and `PUT` access to the server's configuration. Changes made using this API are persistent across server restarts. New versions of psibase may add fields at any time. Clients that wish to set the configuration should `GET` the configuration first and return unknown fields to the server unchanged.
 
-| Field      | Type    | Description                                                                                                                                                                          |
-|------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `p2p`      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                        |
-| `producer` | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production. |
-| `host`     | String  | The server's hostname. Changes to the host will take effect the next time the server starts.                                                                                         |
-| `port`     | Number  | The port that the server runs on. Changes to the port will take effect the next time the server starts.                                                                              |
-| `loggers`  | Object  | A description of the [destinations for log records](#logging)                                                                                                                        |
+| Field      | Type    | Description                                                                                                                                                                                               |
+|------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `p2p`      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                                             |
+| `producer` | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
+| `host`     | String  | The server's hostname.                                                                                                                                                                                    |
+| `port`     | Number  | The port that the server runs on. Changes to the port will take effect the next time the server starts.                                                                                                   |
+| `services` | Array   | A list of built in services. `host` is the virtual hostname for the service. If `host` ends with `.` the global `host` will be appended to it. `root` is a directory containing the content to be served. |
+| `admin`    | String  | Controls service access to the admin API. `*` allows access for all services.  `static:*` allows access for builtin services. The name of a service allows access for that service.                       |
+| `loggers`  | Object  | A description of the [destinations for log records](#logging)                                                                                                                                             |
 
 Example:
 ```json
@@ -455,21 +457,34 @@ Example:
     "producer": "prod",
     "host": "127.0.0.1.sslip.io",
     "port": 8080,
+    "services": [
+        {
+            "host": "localhost",
+            "root": "/usr/share/psibase/services/admin-sys"
+        }
+    ],
+    "admin": "builtin:*",
     "loggers": {
         "console": {
             "type": "console",
-            "filter": "%Severity% >= info",
-            "format": "[%TimeStamp%] [%Severity%]: %Message%"
+            "filter": "Severity >= info",
+            "format": "[{TimeStamp}] [{Severity}]: {Message}"
         },
         "file": {
             "type": "file",
-            "filter": "%Severity >= info%",
-            "format": "[%TimeStamp%]: %Message%",
+            "filter": "Severity >= info",
+            "format": "[{TimeStamp}]: {Message}",
             "filename": "psibase.log",
             "target": "psibase-%Y%m%d-%N.log",
             "rotationTime": "00:00:00Z",
             "rotationSize": 16777216,
             "maxSize": 1073741824
+        },
+        "syslog": {
+            "type": "local",
+            "filter": "Severity >= info",
+            "format": "{Syslog:glibc}{Message}",
+            "path": "/dev/log"
         }
     }
 }
@@ -530,8 +545,8 @@ Example:
 {
     "file-log": {
         "type": "file",
-        "filter": "%Severity >= info%",
-        "format": "[%TimeStamp%]: %Message%",
+        "filter": "Severity >= info",
+        "format": "[{TimeStamp}]: {Message}",
         "filename": "psibase.log",
         "target": "psibase-%Y%m%d-%N.log",
         "rotationTime": "00:00:00Z",
@@ -554,8 +569,8 @@ Example:
 {
     "syslog": {
         "type": "local",
-        "filter": "%Severity% >= info",
-        "format": "%Syslog(format=glibc)%%Message%",
+        "filter": "Severity >= info",
+        "format": "{Syslog:glibc}{Message}",
         "path": "/dev/log"
     }
 }

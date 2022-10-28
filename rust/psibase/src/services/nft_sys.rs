@@ -1,27 +1,33 @@
 // TODO: tables
 // TODO: events
 
-use crate::AccountNumber;
+use fracpack::Fracpack;
+use serde::{Deserialize, Serialize};
+
+use crate::{AccountNumber, Reflect};
 
 pub type NID = u32;
 
-#[derive(crate::Fracpack)]
+#[derive(Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 pub struct NftRecord {
     id: NID,
     issuer: AccountNumber,
     owner: AccountNumber,
 }
 
-#[derive(crate::Fracpack)]
+#[derive(Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 pub struct NftHolderRecord {
     account: AccountNumber,
     config: u8, // todo: Implement Bitset
 }
 
-#[derive(crate::Fracpack)]
+#[derive(Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 pub struct CreditRecord {
     nftId: NID,
     debitor: AccountNumber,

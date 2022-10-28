@@ -1,4 +1,5 @@
 mod account_number;
+mod action_template;
 mod block;
 mod boot;
 mod crypto;
@@ -14,6 +15,7 @@ pub mod reflect;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod schema;
+mod serve_http;
 mod service;
 mod table;
 pub mod tester;
@@ -22,10 +24,12 @@ mod time;
 mod to_bin;
 mod to_key;
 mod trace;
+mod web_services;
 
 pub mod services;
 
 pub use account_number::*;
+pub use action_template::*;
 pub use block::*;
 pub use boot::*;
 pub use crypto::*;
@@ -38,6 +42,7 @@ pub use native_tables::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use schema::*;
+pub use serve_http::*;
 pub use service::*;
 pub use table::*;
 pub use tester::*;
@@ -45,6 +50,7 @@ pub use time::*;
 pub use to_bin::*;
 pub use to_key::*;
 pub use trace::*;
+pub use web_services::*;
 
 use internal_macros::*;
 

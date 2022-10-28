@@ -609,6 +609,63 @@ fn test_enum_more() {
     ]));
 }
 
+#[derive(psibase::Reflect)]
+struct StructMethods {}
+
+#[psibase::reflect]
+#[allow(unused_variables, unused_mut)]
+impl StructMethods {
+    fn not_included_1() {} // not pub, no self
+    pub fn not_included_2() {} // no self
+    fn not_included_3(self) {} // not pub
+    pub fn self_0(self) {}
+    pub fn ref_self_0(&self) {}
+    pub fn mut_ref_self_0(&mut self) {}
+    pub fn mut_self_0(mut self) {}
+    pub fn with_args(self, a0: i32, a1: Vec<String>) {}
+    pub fn with_ret(self) -> Vec<Cell<i32>> {
+        unimplemented!()
+    }
+}
+
+#[test]
+fn test_methods() {
+    verify::<StructMethods>(json!([
+        {
+            "name": "StructMethods",
+            "structFields": [],
+            "methods": [{
+                "name": "self_0",
+                "returns": {"ty": "void"},
+                "args": [],
+            }, {
+                "name": "ref_self_0",
+                "returns": {"ty": "void"},
+                "args": [],
+            }, {
+                "name": "mut_ref_self_0",
+                "returns": {"ty": "void"},
+                "args": [],
+            }, {
+                "name": "mut_self_0",
+                "returns": {"ty": "void"},
+                "args": [],
+            }, {
+                "name": "with_args",
+                "returns": {"ty": "void"},
+                "args": [
+                    {"name": "a0", "ty": {"ty": "i32"}},
+                    {"name": "a1", "ty": {"vector": {"ty": "string"}}},
+                ],
+            }, {
+                "name": "with_ret",
+                "returns": {"vector": {"ty": "i32"}},
+                "args": [],
+            }],
+        }
+    ]));
+}
+
 #[test]
 fn test_schema_schema() {
     verify::<psibase::Schema<String>>(json!([

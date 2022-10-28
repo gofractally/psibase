@@ -7,6 +7,8 @@
 /// This is where a detailed description would go.
 #[psibase::service]
 mod service {
+    use psibase::*;
+
     /// Add two numbers together.
     ///
     /// See also [Self::multiply].
@@ -22,6 +24,12 @@ mod service {
     fn multiply(a: i32, b: i32) -> i32 {
         a * b
     }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+        serve_simple_ui::<Wrapper>(&request)
+    }
 }
 
 #[psibase::test_case(services("test_contract"))]
@@ -32,4 +40,17 @@ fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
     println!("{}", Wrapper::push(&chain).add(9, 8).trace);
 
     Ok(())
+}
+
+#[test]
+fn dump_schema() {
+    use psibase::*;
+    let s = serde_json::to_string_pretty(&create_schema::<Wrapper>()).unwrap();
+    println!("{}", s);
+}
+
+#[test]
+fn dump_templates() {
+    use psibase::*;
+    println!("{}", generate_action_templates::<Wrapper>());
 }

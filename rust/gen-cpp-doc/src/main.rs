@@ -775,6 +775,10 @@ fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
                     format!("<pre class=\"svgbob\">{}</pre>", svgbob::to_svg(markup))
                 })
                 .to_string();
+            // chapter.content = chapter.content.replace(
+            //     "https://docs.rs/psibase/latest/psibase/",
+            //     "http://127.0.0.1:8080/psibase/",
+            // );
         }
         BookItem::Separator => (),
         BookItem::PartTitle(_) => (),

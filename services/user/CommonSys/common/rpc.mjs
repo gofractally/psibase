@@ -286,6 +286,7 @@ export async function signAndPushTransaction(
                 signedTransaction
             );
             console.log("Transaction pushed!", { pushedTransaction });
+            return pushedTransaction;
         } catch (e) {
             console.error("Failed pushing transaction", e);
             throw new Error(e);

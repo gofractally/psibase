@@ -42,7 +42,7 @@ extern "C" {
     /// * After the call to B, `getCurrentAction()` returns B.
     /// * After B returns, `getCurrentAction()` returns A.
     ///
-    /// Note: The above only applies if the service uses [call]. [Actor] uses [call].
+    /// Note: The above only applies if the service uses [call].
     pub fn getCurrentAction() -> u32;
 
     /// Call a service, store the return value into result, and return the result size

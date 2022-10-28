@@ -11,7 +11,14 @@ import {
     setOperations,
 } from "common/rpc.mjs";
 import { wait } from "./helpers";
-import { Button, Form, Service } from "./components";
+import {
+    Button,
+    Form,
+    Service,
+    Logger,
+    readLoggers,
+    writeLoggers,
+} from "./components";
 
 type Peer = {
     id: number;
@@ -55,6 +62,20 @@ function websocketURL(path: string) {
     return result;
 }
 
+type LogConfig = {
+    type: string;
+    filter: string;
+    format: string;
+    filename?: string;
+    target?: string;
+    rotationSize?: string;
+    rotationTime?: string;
+    maxSize?: string;
+    maxFiles?: string;
+    path?: string;
+    flush?: boolean;
+};
+
 type ServiceConfig = {
     host: string;
     root: string;
@@ -69,6 +90,7 @@ type PsinodeConfig = {
     port: number;
     services: ServiceConfig[];
     admin: string;
+    loggers: { [index: string]: LogConfig };
 };
 
 async function putJson(url: string, json: any) {
@@ -192,6 +214,71 @@ function mergeServices(
     return leading.concat(...result);
 }
 
+function mergeLogger(prev: LogConfig, updated: LogConfig, user: LogConfig) {
+    const result = { ...updated };
+    if (updated.filter == prev.filter) {
+        result.filter = user.filter;
+    }
+    if (updated.format == prev.format) {
+        result.format = user.format;
+    }
+    if (user.type == "file" && updated.type == prev.type) {
+        result.type = user.type;
+        result.filename = mergeSimple(
+            prev.filename,
+            updated.filename,
+            user.filename
+        );
+        result.target = mergeSimple(prev.target, updated.target, user.target);
+        result.rotationSize = mergeSimple(
+            prev.rotationSize,
+            updated.rotationSize,
+            user.rotationSize
+        );
+        result.rotationTime = mergeSimple(
+            prev.rotationTime,
+            updated.rotationTime,
+            user.rotationTime
+        );
+        result.maxSize = mergeSimple(
+            prev.maxSize,
+            updated.maxSize,
+            user.maxSize
+        );
+        result.maxFiles = mergeSimple(
+            prev.maxFiles,
+            updated.maxFiles,
+            user.maxFiles
+        );
+        result.flush = mergeSimple(prev.flush, updated.flush, user.flush);
+    } else if (user.type == "local" && updated.type == prev.type) {
+        result.type = user.type;
+        result.path = mergeSimple(prev.path, updated.path, user.path);
+    }
+    return result;
+}
+
+function mergeLoggers(
+    prev: { [index: string]: LogConfig },
+    updated: { [index: string]: LogConfig },
+    user: { [index: string]: LogConfig }
+): { [index: string]: LogConfig } {
+    const result = { ...user };
+    for (const key in prev) {
+        if (!(key in updated)) {
+            delete result[key];
+        }
+    }
+    for (const key in updated) {
+        if (key in result) {
+            result[key] = mergeLogger(prev[key], updated[key], result[key]);
+        } else if (!(key in prev)) {
+            result[key] = updated[key];
+        }
+    }
+    return result;
+}
+
 function mergeSimple<T>(prev: T, updated: T, user: T): T {
     return prev == updated ? user : updated;
 }
@@ -219,6 +306,7 @@ function mergeConfig(
             user.services
         ),
         admin: mergeSimple(prev.admin, updated.admin, user.admin),
+        loggers: mergeLoggers(prev.loggers, updated.loggers, user.loggers),
     };
 }
 
@@ -271,7 +359,7 @@ function App() {
         }
     };
 
-    const [logFilter, setLogFilter] = useState("%Severity% >= info");
+    const [logFilter, setLogFilter] = useState("Severity >= info");
     const [logData, setLogData] = useState<LogRecord[]>();
     const maxLog = 20;
 
@@ -344,6 +432,7 @@ function App() {
             port: 0,
             services: [{ host: "", root: "", key: "x" }],
             admin: "",
+            loggers: {},
         },
     });
     configForm.formState.dirtyFields;
@@ -364,6 +453,7 @@ function App() {
                         root: s.root,
                     })),
                 admin: input.admin != "" ? input.admin : null,
+                loggers: writeLoggers(input.loggers),
             });
             if (result.ok) {
                 configForm.reset(input);
@@ -400,6 +490,7 @@ function App() {
                             );
                         return { key: old ? old.key : newId(), ...s };
                     });
+                    result.loggers = readLoggers(result.loggers);
                     result.admin = result.admin ? result.admin : "";
                     let newState = mergeConfig(oldDefaults, result, userValues);
                     if (
@@ -426,6 +517,7 @@ function App() {
                         setTimeout(() => setConfigTimeout(undefined), 3000)
                     );
                 } catch (e) {
+                    console.error(e);
                     setConfigError("Failed to load /native/admin/config");
                     setConfigTimeout(
                         setTimeout(() => setConfigTimeout(undefined), 10000)
@@ -439,6 +531,8 @@ function App() {
         control: configForm.control,
         name: "services",
     });
+
+    const loggers = configForm.watch("loggers");
 
     // Fix up the default value of the key after deleting the last row
     // This is strictly to keep the form's dirty state correct.
@@ -549,10 +643,7 @@ function App() {
                     label="Block Producer Name"
                     {...configForm.register("producer")}
                 />
-                <Form.Input
-                    label="Host (requires restart)"
-                    {...configForm.register("host")}
-                />
+                <Form.Input label="Host" {...configForm.register("host")} />
                 <Form.Input
                     label="Port (requires restart)"
                     type="number"
@@ -560,6 +651,67 @@ function App() {
                     max="65535"
                     {...configForm.register("port")}
                 />
+                {loggers &&
+                    Object.entries(loggers).map(([name, contents]) => (
+                        <Logger
+                            key={name}
+                            name={name}
+                            register={(field, options) =>
+                                configForm.register(
+                                    `loggers.${name}.${field}`,
+                                    options
+                                )
+                            }
+                            watch={(field) =>
+                                configForm.watch(`loggers.${name}.${field}`)
+                            }
+                            remove={() => {
+                                // This differs from unregister by preserving the loggers
+                                // subobject even if it becomes empty
+                                const state = configForm.getValues();
+                                delete state.loggers[name];
+                                configForm.reset(state, {
+                                    keepDefaultValues: true,
+                                });
+                            }}
+                        />
+                    ))}
+                <Button
+                    onClick={() => {
+                        const state = configForm.getValues();
+                        if (!state.loggers) {
+                            state.loggers = {};
+                        }
+                        const autogen = /^~[0-9A-F]{16}$/;
+                        let current = 0;
+                        for (const key in state.loggers) {
+                            if (autogen.test(key)) {
+                                const val = parseInt(key.substring(1), 16);
+                                if (val > current) {
+                                    current = val;
+                                }
+                            }
+                        }
+                        current =
+                            (current & 0xffff0000) +
+                            0x10000 +
+                            Math.floor(Math.random() * 0x10000);
+                        state.loggers[
+                            "~" +
+                                current
+                                    .toString(16)
+                                    .toUpperCase()
+                                    .padStart(8, "0")
+                        ] = {
+                            type: "",
+                            filter: "",
+                            format: "",
+                        };
+                        configForm.reset(state, { keepDefaultValues: true });
+                    }}
+                >
+                    New Logger
+                </Button>
                 <fieldset>
                     <legend>Builtin Services</legend>
                     <table className="service-table">
@@ -593,7 +745,7 @@ function App() {
                     </table>
                 </fieldset>
                 <fieldset>
-                    <legend>Access to admin API (Requires restart)</legend>
+                    <legend>Access to admin API</legend>
                     <Form.Radio
                         {...configForm.register("admin")}
                         value="static:*"

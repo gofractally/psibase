@@ -33,11 +33,84 @@ namespace
       }
    }
 
+   constexpr std::string_view ws(" \t\r\n");
+
+   std::string maybeQuoteValue(std::string_view s)
+   {
+      if (s.find_first_of("\n\\\"#") == std::string::npos &&
+          (s.empty() ||
+           (ws.find(s.front()) == std::string::npos && ws.find(s.back()) == std::string::npos)))
+      {
+         return std::string(s);
+      }
+      std::string result;
+      result.push_back('"');
+      for (char ch : s)
+      {
+         if (ch == '\n')
+         {
+            result += "\\n";
+         }
+         else if (ch == '\"')
+         {
+            result += "\\\"";
+         }
+         else if (ch == '\\')
+         {
+            result += "\\\\";
+         }
+         else
+         {
+            result += ch;
+         }
+      }
+      result.push_back('"');
+      return result;
+   }
+
+   std::string unquoteValue(std::string_view s, const std::string& filename, std::size_t line)
+   {
+      std::string result;
+      bool        quoted = false;
+      for (std::size_t i = 0; i < s.size(); ++i)
+      {
+         if (s[i] == '"')
+         {
+            quoted = !quoted;
+         }
+         else if (quoted && s[i] == '\\')
+         {
+            ++i;
+            if (i == s.size())
+            {
+               break;
+            }
+            if (s[i] == 'n')
+            {
+               result.push_back('\n');
+            }
+            else
+            {
+               result.push_back(s[i]);
+            }
+         }
+         else
+         {
+            result.push_back(s[i]);
+         }
+      }
+      if (quoted)
+      {
+         throw std::runtime_error(filename + ":" + std::to_string(line) + ": Unterminated \"");
+      }
+      return result;
+   }
+
    std::string editLine(std::string_view key, std::string_view value, std::string_view comment)
    {
       std::string result(key);
       result += " = ";
-      result += value;
+      result += maybeQuoteValue(value);
       if (!comment.empty())
       {
          result += " ";
@@ -61,8 +134,7 @@ namespace
 
    std::string_view trim(std::string_view s)
    {
-      static constexpr auto ws    = " \t\r\n";
-      auto                  start = s.find_first_not_of(ws);
+      auto start = s.find_first_not_of(ws);
       if (start == std::string::npos)
       {
          return "";
@@ -117,22 +189,44 @@ namespace
    std::tuple<std::string_view, std::string_view, std::string_view, bool> parseLine(
        std::string_view s)
    {
-      auto pos     = s.find_first_not_of(" \t\r\n");
+      auto pos     = s.find_first_not_of(ws);
       bool enabled = true;
       if (pos != std::string::npos && s[pos] == '#')
       {
          enabled = false;
          s       = s.substr(pos + 1);
       }
-      auto [kv, comment] = splitComment(s);
-      pos                = kv.find('=');
+      pos = s.find('=');
       if (pos == std::string::npos)
       {
          return {};
       }
       else
       {
-         return {trim(kv.substr(0, pos)), trim(kv.substr(pos + 1)), comment, enabled};
+         auto        k       = s.substr(0, pos);
+         auto        v       = s.substr(pos + 1);
+         bool        quoted  = false;
+         std::size_t comment = v.size();
+         for (std::size_t i = pos; i < v.size(); ++i)
+         {
+            if (v[i] == '\"')
+            {
+               quoted = !quoted;
+            }
+            else if (quoted && v[i] == '\\')
+            {
+               if (++i == v.size())
+               {
+                  break;
+               }
+            }
+            else if (!quoted && v[i] == '#')
+            {
+               comment = i;
+               break;
+            }
+         }
+         return {trim(k), trim(v.substr(0, comment)), v.substr(comment), enabled};
       }
    }
 
@@ -210,7 +304,32 @@ void ConfigFile::postProcess()
       if (nextInsertPoint == insertions.end() ||
           nextInsertPoint->first > nextSection - lines.begin())
       {
-         for (; iter != nextSection; ++iter)
+         // If the section is preceded by a blank line, remove it
+         if (auto insertHere = insertions.find(iter - lines.begin());
+             insertHere != insertions.end())
+         {
+            if (insertHere->second.ends_with("\n\n"))
+            {
+               insertHere->second.pop_back();
+            }
+         }
+         else if (iter != lines.begin())
+         {
+            auto prev = iter;
+            --prev;
+            if (*prev == "\n")
+            {
+               prev->clear();
+            }
+         }
+         // If the section ends with a blank line, do not remove it
+         auto sectionEnd = nextSection;
+         --sectionEnd;
+         if (*sectionEnd != "\n")
+         {
+            ++sectionEnd;
+         }
+         for (; iter != sectionEnd; ++iter)
          {
             iter->clear();
          }
@@ -250,6 +369,7 @@ void ConfigFile::set(std::string_view section,
       std::string& line = insertions[findSection(section)];
       if (!comment.empty())
       {
+         line += "# ";
          line += comment;
          line += '\n';
       }
@@ -317,6 +437,7 @@ void ConfigFile::set(std::string_view                             section,
       std::string& line = insertions[findSection(section)];
       if (!comment.empty())
       {
+         line += "# ";
          line += comment;
          line += '\n';
       }
@@ -361,4 +482,77 @@ void ConfigFile::set(std::string_view                             section,
          lines[location].clear();
       }
    }
+}
+
+boost::program_options::parsed_options psibase::parse_config_file(
+    std::istream&                                      file,
+    const boost::program_options::options_description& opts,
+    const std::string&                                 filename)
+{
+   boost::program_options::parsed_options result{&opts};
+   std::string                            line;
+   std::string                            section;
+   bool                                   defaultSectionSet = false;
+   std::size_t                            line_number       = 0;
+   std::vector<std::string_view>          exact_options;
+   std::vector<std::string_view>          prefix_options;
+   for (auto opt : opts.options())
+   {
+      std::string_view name = opt->long_name();
+      if (!name.empty())
+      {
+         if (name.ends_with("*"))
+         {
+            prefix_options.push_back(name.substr(0, name.size() - 1));
+         }
+         else
+         {
+            exact_options.push_back(name);
+         }
+      }
+   }
+   std::sort(exact_options.begin(), exact_options.end());
+   std::sort(prefix_options.begin(), prefix_options.end());
+   auto allowedOption = [&](std::string_view key)
+   {
+      if (std::binary_search(exact_options.begin(), exact_options.end(), key))
+      {
+         return true;
+      }
+      auto next = std::upper_bound(prefix_options.begin(), prefix_options.end(), key);
+      if (next != prefix_options.begin())
+      {
+         --next;
+         if (key.starts_with(*next))
+         {
+            return true;
+         }
+      }
+      return false;
+   };
+   while (!std::getline(file, line).fail())
+   {
+      ++line_number;
+      if (isSection(line))
+      {
+         section = parseSection(line);
+      }
+      else
+      {
+         auto [key, value, comment, enabled] = parseLine(line);
+         if (enabled)
+         {
+            auto k = fullKey(section, key);
+            if (!allowedOption(k))
+            {
+               throw std::runtime_error(filename + ":" + std::to_string(line_number) +
+                                        ": Unknown option " + k);
+            }
+            boost::program_options::option opt{k, {unquoteValue(value, filename, line_number)}};
+            opt.original_tokens = {k, std::string(value)};
+            result.options.push_back(std::move(opt));
+         }
+      }
+   }
+   return result;
 }

@@ -9,24 +9,22 @@ producer = psibase
 host     = 127.0.0.1.sslip.io
 port     = 8080
 # peer     = localhost:8080
+service  = localhost:$PREFIX/share/psibase/services/admin-sys
+admin    = static:*
 
 # Default logger writes to stderr
 [logger.stderr]
 
 type         = console
 filter       = %Severity% >= info
-format       = [%TimeStamp%] [%Severity%]: %Message%
-format.p2p   = [%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%
-format.block = [%TimeStamp%] [%Severity%]: %Message% %BlockId%
+format       = [{TimeStamp}] [{Severity}]{?: [RemoteEndpoint]}: {Message}{?: {BlockId}}
 
 # File logger
 # [logger.file]
 #
 # type         = file
-# filter       = %Severity% >= info
-# format       = [%TimeStamp%] [%Severity%]: %Message%
-# format.p2p   = [%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%
-# format.block = [%TimeStamp%] [%Severity%]: %Message% %BlockId%
+# filter       = Severity >= info
+# format       = [{TimeStamp}] [{Severity}]{?: [RemoteEndpoint]}: {Message}{?: {BlockId}}
 #
 # filename     = psibase.log
 # target       = psibase-%3N.log

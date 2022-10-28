@@ -17,8 +17,8 @@ Each logger has a section in the config file called `[logger.<NAME>]`. The name 
 ```ini
 [logger.stderr]
 type   = console
-filter = %Severity% >= info
-format = [%TimeStamp%] [%Severity%]: %Message%
+filter = Severity >= info
+format = [{TimeStamp}] [{Severity}]: {Message}
 ```
 
 Each logger should have the following properties
@@ -64,8 +64,8 @@ Example:
 ```ini
 [logger.file]
 type         = file
-filter       = %Severity >= info%
-format       = [%TimeStamp%]: %Message%
+filter       = Severity >= info
+format       = [{TimeStamp}]: {Message}
 filename     = psibase.log
 target       = psibase-%Y%m%d-%N.log
 rotationTime = 00:00:00Z
@@ -86,8 +86,8 @@ Example:
 ```ini
 [logger.syslog]
 type   = local
-filter = %Severity% >= info
-format = %Syslog(format=glibc)%%Message%
+filter = Severity >= info
+format = {Syslog:glibc}{Message}
 path   = /dev/log
 ```
 
@@ -101,63 +101,80 @@ The config file format is intended to allow manual editing and is therefore more
 
 ## Log Filters
 
-Every logger has an associated filter. Filters determine whether to output any particular log record. The filter `%Attribute%` tests whether an attribute is present. `%Attribute% op value` tests that an attribute is present and meets a specific condition. Filters can be grouped using parentheses or combined using the boolean operators `and`, `or`, and `not`.
+Every logger has an associated filter. Filters determine whether to output any particular log record.
+
+```
+FILTER      ::= OR-FILTER
+OR-FILTER   ::= AND-FILTER ( "or" AND-FILTER ) *
+AND-FILTER  ::= ATTR-FILTER ( "and" ATTR-FILTER ) *
+ATTR-FILTER ::= "not" ATTR-FILTER
+ATTR-FILTER ::= "(" OR-FILTER ")"
+ATTR-FILTER ::= ATTR-NAME
+ATTR-FILTER ::= ATTR-NAME ATTR-OP ATTR-VALUE
+ATTR-NAME   ::= alphanumeric chars
+ATTR-VALUE  ::= chars that are neither whitespace nor any of "&|:{}()
+ATTR-VALUE  ::= double-quoted string
+```
 
 Examples:
-- Everything except debug messages: `%Severity% >= info`
-- Everything about a specific peer: `%PeerId% = 42`
-- Warnings, errors, and blocks: `%Severity% >= warning or %Channel% = block`
+- Everything except debug messages: `Severity >= info`
+- Everything about a specific peer: `PeerId = 42`
+- Warnings, errors, and blocks: `Severity >= warning or Channel = block`
 
-| Attribute          | Availability                                                                     | Predicates                      | Notes                                                                |
-|--------------------|----------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------------|
-| `%BlockId%`        | Log records related to blocks                                                    | `=`, `!=`                       |                                                                      |
-| `%Channel%`        | All records                                                                      | `=`, `!=`                       | Possible values are `p2p`, `chain`, `block`, and `consensus`         |
-| `%Host%`           | All records                                                                      | `=`, `!=`                       | The server's hostname.                                               |
-| `%PeerId%`         | Log records related to p2p connections                                           | `=`, `!=`, `<`, `>`, `<=`, `>=` |                                                                      |
-| `%RemoteEndpoint%` | Log records related to HTTP requests, websocket connections, and p2p connections | `=`, `!=`                       |                                                                      |
-| `%Severity%`       | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
-| `%TimeStamp%`      | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                             |
+| Attribute        | Availability                                                                     | Predicates                      | Notes                                                                |
+|------------------|----------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------------|
+| `BlockId`        | Log records related to blocks                                                    | `=`, `!=`                       |                                                                      |
+| `Channel`        | All records                                                                      | `=`, `!=`                       | Possible values are `p2p`, `chain`, `block`, and `consensus`         |
+| `Host`           | All records                                                                      | `=`, `!=`                       | The server's hostname.                                               |
+| `PeerId`         | Log records related to p2p connections                                           | `=`, `!=`, `<`, `>`, `<=`, `>=` |                                                                      |
+| `Process`        | All records                                                                      | `=`, `!=`                       | The program name (usually `psinode`)                                 |
+| `ProcessId`      | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | The server's pid                                                     |
+| `RemoteEndpoint` | Log records related to HTTP requests, websocket connections, and p2p connections | `=`, `!=`                       |                                                                      |
+| `Severity`       | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
+| `TimeStamp`      | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                             |
 
 ## Log Formatters
 
-Formatters specify how a log record is formatted. In JSON, a formatter can be either a template string or an object. If the formatter is an object the keys should be channel names or `"default"`.
+Formatters specify how a log record is formatted. The following replacements are performed on the template string:
+- `{attribute}`: If `attribute` is defined, expands to its textual representation. If `attribute` is not defined, expands to the empty string.
+- `{attribute:format-spec}`: If `attribute` is defined, expands to the textual representation specified by `format-spec`. If `attribute` is not defined, expands to the empty string.
+- `{?filter:subformat}`: If `filter` is true, expands `subformat`. Otherwise, expands to the empty string.
+- `{?:subformat}`: If every attribute in `subformat` is defined, expands `subformat`. Otherwise, expands to the empty string.
+- `{{`: Replaced with `{`
+- `}}`: Replaced with `}` only outside of any expansion
 
 Examples:
-- `[%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%`
-- ```json
-  {
-    "default": "[%TimeStamp%] [%Severity%]: %Message%",
-    "p2p": "[%TimeStamp%] [%Severity%] [%RemoteEndpoint%]: %Message%",
-    "block": "[%TimeStamp%] [%Severity%]: %Message% %BlockId%"
-  }
-  ```
+- `[{TimeStamp}] [{Severity}]: {Message}`
+- `[{Timestamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {BlockId}}`
 
 Formatters have several attributes beyond those available for filters including several compound formats.
 
-| Attribute          | Availability                                                                     | Notes                                                                |
-|--------------------|----------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| `%BlockHeader%`    | Log records related to blocks                                                    |                                                                      |
-| `%BlockId%`        | Log records related to blocks                                                    |                                                                      |
-| `%Channel%`        | All records                                                                      | Possible values are `p2p`, `chain`, `block`, and `consensus`         |
-| `%Host%`           | All records                                                                      | The server's hostname                                                |
-| `%Json%`           |                                                                                  | Formats the entire log record as JSON                                |
-| `%Message%`        |                                                                                  | The log message                                                      |
-| `%PeerId%`         | Log records related to p2p connections                                           |                                                                      |
-| `%Process%`        | All records                                                                      | The program name (usually `psinode`)                                 |
-| `%ProcessId%`      | All records                                                                      | The server's pid                                                     |
-| `%RemoteEndpoint%` | Log records related to HTTP requests, websocket connections, and p2p connections |                                                                      |
-| `%Severity%`       | All records                                                                      | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
-| `%Syslog%`         |                                                                                  | Formats a [syslog](#syslog) header.                                  |
-| `%TimeStamp%`      | All records                                                                      | ISO 8601 extended format                                             |
+| Attribute        | Availability                                                                     | Notes                                                                |
+|------------------|----------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| `BlockHeader`    | Log records related to blocks                                                    |                                                                      |
+| `BlockId`        | Log records related to blocks                                                    |                                                                      |
+| `Channel`        | All records                                                                      | Possible values are `p2p`, `chain`, `block`, and `consensus`         |
+| `Host`           | All records                                                                      | The server's hostname                                                |
+| `Json`           |                                                                                  | Formats the entire log record as JSON                                |
+| `Message`        |                                                                                  | The log message                                                      |
+| `PeerId`         | Log records related to p2p connections                                           |                                                                      |
+| `Process`        | All records                                                                      | The program name (usually `psinode`)                                 |
+| `ProcessId`      | All records                                                                      | The server's pid                                                     |
+| `RemoteEndpoint` | Log records related to HTTP requests, websocket connections, and p2p connections |                                                                      |
+| `Severity`       | All records                                                                      | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
+| `Syslog`         |                                                                                  | Formats a [syslog](#syslog) header.                                  |
+| `TimeStamp`      | All records                                                                      | ISO 8601 extended format                                             |
 
 ### Syslog
 
 The `Syslog` format creates a syslog header. It should be prepended to the desired message format with no space.
 
-`Syslog` has additional options:
-- `format`: one of `bsd` (equivalent to `rfc3164`), `rfc3164`, `rfc5424`, `glibc`. Default is `bsd`.
-- `facility`: A syslog facility number or keyword.  Default is `local0`.
+The `format-spec` for `Syslog` may contain the following options:
+- format: one of `bsd` (equivalent to `rfc3164`), `rfc3164`, `rfc5424`, `glibc`. Default is `bsd`.
+- facility: A syslog facility number or keyword.  Default is `local0`.
+
+If both a format and facility are specified, they should be separated by a `;`.
 
 Examples:
-- `%Syslog(facility=local1,format=rfc5424)%`
-- `%Syslog(format=glibc)%`: Suitable for writing to `/dev/log` on linux systems.
+- `{Syslog:local1;rfc5424}`
+- `{Syslog:glibc}`: Suitable for writing to `/dev/log` on linux systems.

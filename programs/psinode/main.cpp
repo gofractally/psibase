@@ -172,7 +172,6 @@ void load_service(const native_service& config,
       }
       if (!result.content_type.empty() && entry.is_regular_file())
       {
-         result.size = entry.file_size();
          result.path = entry.path();
          auto path   = "/" + entry.path().lexically_relative(config.root).generic_string();
          service.try_emplace(path, result);
@@ -592,14 +591,15 @@ void run(const std::string&              db_path,
    if (!host.empty() || !services.empty())
    {
       // TODO: command-line options
-      http_config->num_threads      = 4;
-      http_config->max_request_size = 20 * 1024 * 1024;
-      http_config->idle_timeout_ms  = std::chrono::milliseconds{4000};
-      http_config->allow_origin     = "*";
-      http_config->address          = "0.0.0.0";
-      http_config->port             = port;
-      http_config->host             = host;
-      http_config->host_perf        = host_perf;
+      http_config->num_threads         = 4;
+      http_config->max_request_size    = 20 * 1024 * 1024;
+      http_config->idle_timeout_ms     = std::chrono::milliseconds{4000};
+      http_config->allow_origin        = "*";
+      http_config->address             = "0.0.0.0";
+      http_config->port                = port;
+      http_config->host                = host;
+      http_config->host_perf           = host_perf;
+      http_config->enable_transactions = !host.empty();
       http_config->status =
           http::http_status{.slow = system->sharedDatabase.isSlow(), .startup = 1};
 
@@ -701,6 +701,15 @@ void run(const std::string&              db_path,
                             &db_path, &http_config, &host, &port, &services, &admin,
                             callback = std::move(callback)]() mutable
                            {
+                              std::optional<http::services_t> new_services;
+                              if (services != config.services || host != config.host)
+                              {
+                                 new_services.emplace();
+                                 for (const auto& entry : config.services)
+                                 {
+                                    load_service(entry, *new_services, config.host);
+                                 }
+                              }
                               node.set_producer_id(config.producer);
                               http_config->enable_p2p = config.p2p;
                               host                    = config.host;
@@ -708,6 +717,18 @@ void run(const std::string&              db_path,
                               services                = config.services;
                               admin                   = config.admin;
                               loggers::configure(config.loggers);
+                              {
+                                 std::shared_lock l{http_config->mutex};
+                                 http_config->host                = host;
+                                 http_config->admin               = admin;
+                                 http_config->enable_transactions = !host.empty();
+                                 if (new_services)
+                                 {
+                                    // Use swap instead of move to delay freeing the old
+                                    // services until after releasing the mutex
+                                    http_config->services.swap(*new_services);
+                                 }
+                              }
                               {
                                  auto       path = std::filesystem::path(db_path) / "config";
                                  ConfigFile file;
@@ -982,15 +1003,15 @@ int main(int argc, char* argv[])
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
-            po::store(po::parse_config_file(in, cfg_opts), vm);
+            po::store(psibase::parse_config_file(in, cfg_opts, config_path), vm);
          }
          else if (!exists(config_path))
          {
             auto template_path = config_template_path();
             if (std::filesystem::is_regular_file(template_path))
             {
-               std::ifstream in(config_template_path());
-               po::store(po::parse_config_file(in, cfg_opts), vm);
+               std::ifstream in(template_path);
+               po::store(psibase::parse_config_file(in, cfg_opts, template_path), vm);
             }
          }
       }
@@ -1016,7 +1037,6 @@ int main(int argc, char* argv[])
    {
       psibase::loggers::set_path(db_path);
       psibase::loggers::configure(vm);
-      psibase::loggers::configure_default();
       auto prover = std::make_shared<CompoundProver>();
       for (const auto& key : keys)
       {

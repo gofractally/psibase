@@ -97,13 +97,12 @@ fn process_mod(
 ) -> TokenStream {
     let mod_name = &impl_mod.ident;
     let service_account = &options.name;
-    let mut action_structs = proc_macro2::TokenStream::new();
-    let mut action_callers = proc_macro2::TokenStream::new();
-    let mut dispatch_body = proc_macro2::TokenStream::new();
+    let service_account_str = service_account.to_string();
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
+    let psibase_mod_str = psibase_mod.to_string();
 
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
@@ -153,10 +152,16 @@ fn process_mod(
             }
         }
 
+        let mut action_structs = proc_macro2::TokenStream::new();
+        let mut action_callers = proc_macro2::TokenStream::new();
+        let mut dispatch_body = proc_macro2::TokenStream::new();
+        let mut reflect_methods = proc_macro2::TokenStream::new();
+        let mut with_action_struct = proc_macro2::TokenStream::new();
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
+                let mut reflect_args = quote! {};
                 process_action_args(
                     options,
                     psibase_mod,
@@ -164,9 +169,29 @@ fn process_mod(
                     &mut action_structs,
                     &mut invoke_args,
                     &mut invoke_struct_args,
+                    &mut reflect_args,
                 );
                 process_action_callers(psibase_mod, f, &mut action_callers, &invoke_args);
                 process_dispatch_body(psibase_mod, f, &mut dispatch_body, invoke_struct_args);
+                let name = &f.sig.ident;
+                let name_str = name.to_string();
+                let num_args = f.sig.inputs.len();
+                let output = match &f.sig.output {
+                    ReturnType::Default => quote! {()},
+                    ReturnType::Type(_, t) => quote! {#t},
+                };
+                reflect_methods = quote! {
+                    #reflect_methods
+                    .method::<#output>(#name_str.into(), #num_args)
+                    #reflect_args
+                    .end()
+                };
+                with_action_struct = quote! {
+                    #with_action_struct
+                    if action == #name_str {
+                        return Some(process.process::<#output, #structs::#name>());
+                    }
+                };
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
                     f.attrs.remove(i);
                 }
@@ -204,11 +229,14 @@ fn process_mod(
             .iter()
             .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
             .fold(quote! {}, |a, b| quote! {#a #b});
+        let static_type = quote! {#psibase_mod::JustSchema}.to_string();
         items.push(parse_quote! {
-            #[derive(Clone)]
+            #[derive(Debug, Clone, #psibase_mod::Reflect)]
+            #[reflect(psibase_mod = #psibase_mod_str, static_type=#static_type)]
             #[automatically_derived]
             #doc
             pub struct #actions <T: #psibase_mod::Caller> {
+                #[reflect(skip)]
                 pub caller: T,
             }
         });
@@ -442,6 +470,33 @@ fn process_mod(
                 -> #actions<#psibase_mod::ActionPacker>
                 {
                     #psibase_mod::ActionPacker { sender, service }.into()
+                }
+            }
+        });
+        let num_actions = action_fns.len();
+        items.push(parse_quote! {
+            #[automatically_derived]
+            impl #psibase_mod::reflect::Reflect for #wrapper {
+                type StaticType = #wrapper;
+                fn reflect<V: #psibase_mod::reflect::Visitor>(visitor: V) -> V::Return {
+                    use #psibase_mod::reflect::StructVisitor;
+                    use #psibase_mod::reflect::MethodsVisitor;
+                    use #psibase_mod::reflect::ArgVisitor;
+                    visitor
+                        .struct_named::<#wrapper>(#service_account_str.into(), 0)
+                        .with_methods(#num_actions)
+                        #reflect_methods
+                        .end()
+                }
+            }
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            impl #psibase_mod::WithActionStruct for #wrapper {
+                // TODO: macro doc for this
+                fn with_action_struct<P: #psibase_mod::ProcessActionStruct>(action: &str, process: P) -> Option<P::Output> {
+                    #with_action_struct
+                    None
                 }
             }
         });
@@ -868,6 +923,7 @@ fn process_action_args(
     new_items: &mut proc_macro2::TokenStream,
     invoke_args: &mut proc_macro2::TokenStream,
     invoke_struct_args: &mut proc_macro2::TokenStream,
+    reflect_args: &mut proc_macro2::TokenStream,
 ) {
     let mut struct_members = proc_macro2::TokenStream::new();
     for input in f.sig.inputs.iter() {
@@ -875,6 +931,7 @@ fn process_action_args(
             FnArg::Receiver(_) => (), // Compiler generates errors on self args
             FnArg::Typed(pat_type) => match &*pat_type.pat {
                 Pat::Ident(name) => {
+                    let name_str = name.ident.to_string();
                     let ty = &*pat_type.ty;
                     struct_members = quote! {
                         #struct_members
@@ -888,13 +945,18 @@ fn process_action_args(
                         #invoke_struct_args
                         args.#name,
                     };
+                    *reflect_args = quote! {
+                        #reflect_args
+                        .arg::<#ty>(#name_str.into())
+                    };
                 }
                 _ => abort!(*pat_type.pat, "expected identifier"),
             },
         };
     }
     let fn_name = &f.sig.ident;
-    let fracpack_mod = psibase_mod.to_string() + "::fracpack";
+    let psibase_mod_str = psibase_mod.to_string();
+    let fracpack_mod = psibase_mod_str.clone() + "::fracpack";
 
     let doc = format!(
         "This structure has the same JSON and Fracpack format as the arguments to [{actions}::{fn_name}]({actions}::{fn_name}).",
@@ -902,8 +964,9 @@ fn process_action_args(
 
     *new_items = quote! {
         #new_items
-        #[derive(#psibase_mod::Fracpack, serde::Deserialize, serde::Serialize)]
+        #[derive(Debug, Clone, #psibase_mod::Fracpack, #psibase_mod::Reflect, serde::Deserialize, serde::Serialize)]
         #[fracpack(fracpack_mod = #fracpack_mod)]
+        #[reflect(psibase_mod = #psibase_mod_str)]
         #[doc = #doc]
         pub struct #fn_name {
             #struct_members

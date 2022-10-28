@@ -10,6 +10,16 @@ pub trait Reflect {
     fn reflect<V: Visitor>(visitor: V) -> V::Return;
 }
 
+pub trait ReflectNoMethods {
+    fn reflect_methods<Return>(visitor: impl StructVisitor<Return>) -> Return;
+}
+
+impl<T> ReflectNoMethods for T {
+    fn reflect_methods<Return>(visitor: impl StructVisitor<Return>) -> Return {
+        visitor.end()
+    }
+}
+
 pub trait Visitor {
     type Return;
     type TupleVisitor: UnnamedVisitor<Self::Return>;
@@ -20,6 +30,7 @@ pub trait Visitor {
     fn custom_json(self) -> Self;
     fn definition_will_not_change(self) -> Self;
 
+    fn unit(self) -> Self::Return;
     fn builtin<T: Reflect>(self, name: &'static str) -> Self::Return;
     fn refed<Inner: Reflect>(self) -> Self::Return;
     fn mut_ref<Inner: Reflect>(self) -> Self::Return;
@@ -63,10 +74,24 @@ pub trait NamedVisitor<Return> {
 pub trait StructVisitor<Return>: NamedVisitor<Return> {
     type MethodsVisitor: MethodsVisitor<Return>;
 
-    fn with_methods(self) -> Self::MethodsVisitor;
+    fn with_methods(self, num_methods: usize) -> Self::MethodsVisitor;
 }
 
-pub trait MethodsVisitor<Return> {}
+pub trait MethodsVisitor<Return>: Sized {
+    type ArgVisitor: ArgVisitor<Self>;
+
+    fn method<MethodReturn: Reflect>(
+        self,
+        name: Cow<'static, str>,
+        num_args: usize,
+    ) -> Self::ArgVisitor;
+    fn end(self) -> Return;
+}
+
+pub trait ArgVisitor<Return> {
+    fn arg<T: Reflect>(self, name: Cow<'static, str>) -> Self;
+    fn end(self) -> Return;
+}
 
 pub trait EnumVisitor<Return>: Sized {
     type TupleVisitor: UnnamedVisitor<Self>;
@@ -188,6 +213,8 @@ macro_rules! builtin_impl {
     };
 }
 
+pub struct Void;
+
 builtin_impl!(bool, "bool");
 builtin_impl!(u8, "u8");
 builtin_impl!(u16, "u16");
@@ -200,6 +227,7 @@ builtin_impl!(i64, "i64");
 builtin_impl!(f32, "f32");
 builtin_impl!(f64, "f64");
 builtin_impl!(String, "string");
+builtin_impl!(Void, "void");
 
 impl<'a> Reflect for &'a str {
     type StaticType = &'static str;
@@ -235,7 +263,13 @@ macro_rules! tuple_impls {
     }
 }
 
-// Reflect excludes () to avoid an inconsistency between serde_json and psio::to_json
+impl Reflect for () {
+    type StaticType = ();
+    fn reflect<V: Visitor>(visitor: V) -> V::Return {
+        visitor.unit()
+    }
+}
+
 tuple_impls! {
     1 => (0 T0)
     2 => (0 T0 1 T1)
@@ -253,4 +287,74 @@ tuple_impls! {
     14 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13)
     15 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14)
     16 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14 15 T15)
+}
+
+pub struct IgnoreVisit<Return>(pub Return);
+
+impl<Return> UnnamedVisitor<Return> for IgnoreVisit<Return> {
+    fn field<T: Reflect>(self) -> Self {
+        self
+    }
+    fn end(self) -> Return {
+        self.0
+    }
+}
+
+impl<Return> NamedVisitor<Return> for IgnoreVisit<Return> {
+    fn field<T: Reflect>(self, _name: Cow<'static, str>) -> Self {
+        self
+    }
+    fn end(self) -> Return {
+        self.0
+    }
+}
+
+impl<Return> StructVisitor<Return> for IgnoreVisit<Return> {
+    type MethodsVisitor = Self;
+
+    fn with_methods(self, _num_methods: usize) -> Self::MethodsVisitor {
+        self
+    }
+}
+
+impl<Return> MethodsVisitor<Return> for IgnoreVisit<Return> {
+    type ArgVisitor = IgnoreVisit<Self>;
+
+    fn method<MethodReturn: Reflect>(
+        self,
+        _name: Cow<'static, str>,
+        _num_args: usize,
+    ) -> Self::ArgVisitor {
+        IgnoreVisit(self)
+    }
+    fn end(self) -> Return {
+        self.0
+    }
+}
+
+impl<Return> ArgVisitor<Return> for IgnoreVisit<Return> {
+    fn arg<T: Reflect>(self, _name: Cow<'static, str>) -> Self {
+        self
+    }
+    fn end(self) -> Return {
+        self.0
+    }
+}
+
+impl<Return> EnumVisitor<Return> for IgnoreVisit<Return> {
+    type TupleVisitor = IgnoreVisit<Self>;
+    type NamedVisitor = IgnoreVisit<Self>;
+
+    fn single<T: Reflect, Inner: Reflect>(self, _name: Cow<'static, str>) -> Self {
+        self
+    }
+    fn tuple<T: Reflect>(self, _name: Cow<'static, str>, _fields_len: usize) -> Self::TupleVisitor {
+        IgnoreVisit(self)
+    }
+    fn named<T: Reflect>(self, _name: Cow<'static, str>, _fields_len: usize) -> Self::NamedVisitor {
+        IgnoreVisit(self)
+    }
+    fn end(self) -> Return {
+        self.0
+    }
 }
