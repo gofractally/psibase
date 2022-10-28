@@ -14,20 +14,18 @@ admin    = static:*
 
 # Default logger writes to stderr
 [logger.stderr]
-
 type         = console
-filter       = %Severity% >= info
-format       = [{TimeStamp}] [{Severity}]{?: [RemoteEndpoint]}: {Message}{?: {BlockId}}
+filter       = Severity >= info
+format = [{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}
 
-# File logger
-# [logger.file]
-#
+# Log all HTTP reqests to a separate file
+# [logger.http]
 # type         = file
-# filter       = Severity >= info
-# format       = [{TimeStamp}] [{Severity}]{?: [RemoteEndpoint]}: {Message}{?: {BlockId}}
+# filter       = ResponseStatus
+# format       = [{TimeStamp}] [{RemoteEndpoint}]: {RequestHost}: {RequestMethod} {RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}
 #
-# filename     = psibase.log
-# target       = psibase-%3N.log
+# filename     = http.log
+# target       = http-%3N.log
 # rotationSize = 64 MiB
 # rotationTime = R/2022-10-01T00:00:00Z/P1D
 # maxFiles     = 90

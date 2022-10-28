@@ -37,12 +37,14 @@ namespace psibase::net
       {
          static constexpr unsigned type    = 1;
          std::uint32_t             version = protocol_version;
+         std::string to_string() const { return "init: version=" + std::to_string(version); }
          PSIO_REFLECT_INLINE(init_message, version);
       };
       struct producer_message
       {
          static constexpr unsigned type = 2;
          producer_id               producer;
+         std::string               to_string() const { return "producer: " + producer.str(); }
          PSIO_REFLECT_INLINE(producer_message, producer)
       };
       auto get_message_impl()
@@ -55,6 +57,7 @@ namespace psibase::net
       template <typename Msg, typename F>
       void async_send_block(peer_id id, const Msg& msg, F&& f)
       {
+         PSIBASE_LOG(peers().logger(id), debug) << "Sending message: " << msg.to_string();
          peers().async_send(id, serialize_message(msg), std::forward<F>(f));
       }
       // Sends a message to each peer in a list
@@ -67,6 +70,7 @@ namespace psibase::net
          auto serialized_message = serialize_message(msg);
          for (auto peer : dest)
          {
+            PSIBASE_LOG(peers().logger(peer), debug) << "Sending message: " << msg.to_string();
             peers().async_send(peer, serialized_message, [](const std::error_code& ec) {});
          }
       }
@@ -191,6 +195,7 @@ namespace psibase::net
       }
       void recv(peer_id peer, const init_message& msg)
       {
+         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
          if (msg.version != protocol_version)
          {
             peers().disconnect(peer);
@@ -198,6 +203,7 @@ namespace psibase::net
       }
       void recv(peer_id peer, const producer_message& msg)
       {
+         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
          producers.insert({msg.producer, peer});
       }
       template <typename T>

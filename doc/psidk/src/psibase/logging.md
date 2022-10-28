@@ -121,18 +121,6 @@ Examples:
 - Everything about a specific peer: `PeerId = 42`
 - Warnings, errors, and blocks: `Severity >= warning or Channel = block`
 
-| Attribute        | Availability                                                                     | Predicates                      | Notes                                                                |
-|------------------|----------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------------|
-| `BlockId`        | Log records related to blocks                                                    | `=`, `!=`                       |                                                                      |
-| `Channel`        | All records                                                                      | `=`, `!=`                       | Possible values are `p2p`, `chain`, `block`, and `consensus`         |
-| `Host`           | All records                                                                      | `=`, `!=`                       | The server's hostname.                                               |
-| `PeerId`         | Log records related to p2p connections                                           | `=`, `!=`, `<`, `>`, `<=`, `>=` |                                                                      |
-| `Process`        | All records                                                                      | `=`, `!=`                       | The program name (usually `psinode`)                                 |
-| `ProcessId`      | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | The server's pid                                                     |
-| `RemoteEndpoint` | Log records related to HTTP requests, websocket connections, and p2p connections | `=`, `!=`                       |                                                                      |
-| `Severity`       | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
-| `TimeStamp`      | All records                                                                      | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                             |
-
 ## Log Formatters
 
 Formatters specify how a log record is formatted. The following replacements are performed on the template string:
@@ -147,23 +135,29 @@ Examples:
 - `[{TimeStamp}] [{Severity}]: {Message}`
 - `[{Timestamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {BlockId}}`
 
-Formatters have several attributes beyond those available for filters including several compound formats.
+## Attributes
 
-| Attribute        | Availability                                                                     | Notes                                                                |
-|------------------|----------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| `BlockHeader`    | Log records related to blocks                                                    |                                                                      |
-| `BlockId`        | Log records related to blocks                                                    |                                                                      |
-| `Channel`        | All records                                                                      | Possible values are `p2p`, `chain`, `block`, and `consensus`         |
-| `Host`           | All records                                                                      | The server's hostname                                                |
-| `Json`           |                                                                                  | Formats the entire log record as JSON                                |
-| `Message`        |                                                                                  | The log message                                                      |
-| `PeerId`         | Log records related to p2p connections                                           |                                                                      |
-| `Process`        | All records                                                                      | The program name (usually `psinode`)                                 |
-| `ProcessId`      | All records                                                                      | The server's pid                                                     |
-| `RemoteEndpoint` | Log records related to HTTP requests, websocket connections, and p2p connections |                                                                      |
-| `Severity`       | All records                                                                      | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
-| `Syslog`         |                                                                                  | Formats a [syslog](#syslog) header.                                  |
-| `TimeStamp`      | All records                                                                      | ISO 8601 extended format                                             |
+| Attribute        | Availability                      | Filter Predicates               | Notes                                                                |
+|------------------|-----------------------------------|---------------------------------|----------------------------------------------------------------------|
+| `BlockHeader`    | blocks                            | None                            |                                                                      |
+| `BlockId`        | blocks                            | `=`, `!=`                       |                                                                      |
+| `Channel`        | All records                       | `=`, `!=`                       | Possible values are `http`, `p2p`, `chain`, `block`, and `consensus` |
+| `Host`           | All records                       | `=`, `!=`                       | The system's FQDN (not the HTTP server's virtual hostname)           |
+| `Json`           | Formatters                        | N/A                             | Formats the entire log record as JSON                                |
+| `Message`        | Formatters                        | N/A                             | The log message                                                      |
+| `PeerId`         | p2p connections                   | `=`, `!=`, `<`, `>`, `<=`, `>=` |                                                                      |
+| `Process`        | All records                       | `=`, `!=`                       | The program name (usually `psinode`)                                 |
+| `ProcessId`      | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | The server's pid                                                     |
+| `RemoteEndpoint` | HTTP requests and p2p connections | `=`, `!=`                       |                                                                      |
+| `RequestHost`    | HTTP requests                     | `=`, `!=`                       | The value of the `Host` header                                       |
+| `RequestMethod`  | HTTP requests                     | `=`, `!=`                       | The HTTP method of the request: `GET`, `POST`, etc.                  |
+| `RequestTarget`  | HTTP requests                     | `=`, `!=`                       |                                                                      |
+| `ResponseBytes`  | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The size of the response payload                                     |
+| `ResponseStatus` | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The numeric status code of the response                              |
+| `ResponseTime`   | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The elapsed time in microseconds spent handling the request          |
+| `Severity`       | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | The value is one of `debug`, `info`, `notice`, `warning`, or `error` |
+| `Syslog`         | Formatters                        | N/A                             | Formats a [syslog](#syslog) header.                                  |
+| `TimeStamp`      | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                             |
 
 ### Syslog
 

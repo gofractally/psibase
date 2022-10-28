@@ -70,7 +70,7 @@ namespace psibase::net
          std::string               to_string() const
          {
             return "hello: id=" + loggers::to_string(xid.id()) +
-                   " num=" + std::to_string(xid.num());
+                   " blocknum=" + std::to_string(xid.num());
          }
          PSIO_REFLECT_INLINE(hello_request, xid)
       };

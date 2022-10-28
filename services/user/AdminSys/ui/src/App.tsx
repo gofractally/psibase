@@ -39,6 +39,8 @@ type LogRecord = {
     Message: string;
     RemoteEndpoint?: string;
     BlockId?: string;
+    Request?: { Method: string; Target: string; Host: string };
+    Response?: { Status: number; Bytes?: number; Time?: number };
 };
 
 function formatLog(row: LogRecord): string {
@@ -48,6 +50,18 @@ function formatLog(row: LogRecord): string {
     }
     if (row.BlockId) {
         result = `${result} ${row.BlockId}`;
+    }
+    if (row.Request) {
+        result = `${result}: ${row.Request.Method} ${row.Request.Host}${row.Request.Target}`;
+        if (row.Response) {
+            result += ` ${row.Response.Status}`;
+            if (row.Response.Bytes) {
+                result += ` ${row.Response.Bytes}`;
+            }
+            if (row.Response.Time) {
+                result += ` ${row.Response.Time} \u00B5s`;
+            }
+        }
     }
     return result;
 }

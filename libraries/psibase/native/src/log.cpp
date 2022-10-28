@@ -34,6 +34,7 @@ namespace psibase::loggers
    // Additional attributes for specific Channels:
    // p2p: PeerId, RemoteEndpoint
    // block: BlockId, BlockHeader
+   // http: RequestMethod, RequestTarget, ResponseStatus, ResponseBytes
 
    namespace
    {
@@ -266,6 +267,54 @@ namespace psibase::loggers
          if (auto attr = boost::log::extract<BlockHeader>("BlockHeader", rec))
          {
             os << ",\"BlockHeader\":" << psio::convert_to_json(*attr);
+         }
+
+         if (auto attr = boost::log::extract<std::string>("RequestMethod", rec))
+         {
+            os << ",\"Request\":{\"Method\":" << psio::convert_to_json(*attr);
+            if (auto target = boost::log::extract<std::string>("RequestTarget", rec))
+            {
+               os << ",\"Target\":" << psio::convert_to_json(*target);
+            }
+            if (auto host = boost::log::extract<std::string>("RequestHost", rec))
+            {
+               os << ",\"Host\":" << psio::convert_to_json(*host);
+            }
+            os << "}";
+         }
+
+         if (auto attr = boost::log::extract<unsigned>("ResponseStatus", rec))
+         {
+            os << ",\"Response\":{\"Status\":" << *attr;
+            if (auto bytes = boost::log::extract<std::uint64_t>("ResponseBytes", rec))
+            {
+               os << ",\"Bytes\":" << *bytes << std::endl;
+            }
+            if (auto time = boost::log::extract<std::chrono::microseconds>("ResponseTime", rec))
+            {
+               os << ",\"Time\":" << time->count() << std::endl;
+            }
+            os << "}";
+         }
+
+         if (auto attr = boost::log::extract<std::chrono::microseconds>("PackTime", rec))
+         {
+            os << ",\"PackTime\":" << attr->count();
+         }
+
+         if (auto attr = boost::log::extract<std::chrono::microseconds>("ServiceLoadTime", rec))
+         {
+            os << ",\"ServiceLoadTime\":" << attr->count();
+         }
+
+         if (auto attr = boost::log::extract<std::chrono::microseconds>("DatabaseTime", rec))
+         {
+            os << ",\"DatabaseTime\":" << attr->count();
+         }
+
+         if (auto attr = boost::log::extract<std::chrono::microseconds>("WasmExecTime", rec))
+         {
+            os << ",\"WasmExecTime\":" << attr->count();
          }
 
          os << '}';
@@ -1518,19 +1567,18 @@ namespace psibase::loggers
                   {
                      return false;
                   }
-                  if (!states.empty() && states.back() == '!')
+                  while (true)
                   {
-                     states.pop_back();
-                  }
-                  parse_ws();
-                  if (begin == end || (in_format && begin != end && *begin == ':'))
-                  {
-                     collect_and();
-                     collect_or();
-                     return states.empty();
-                  }
-                  if (*begin == ')')
-                  {
+                     if (!states.empty() && states.back() == '!')
+                     {
+                        states.pop_back();
+                        not_ = !not_;
+                     }
+                     parse_ws();
+                     if (begin == end || *begin != ')')
+                     {
+                        break;
+                     }
                      collect_and();
                      collect_or();
                      if (states.empty() || states.back() != '(')
@@ -1538,11 +1586,13 @@ namespace psibase::loggers
                         return false;
                      }
                      states.pop_back();
-                     if (!states.empty() && states.back() == '!')
-                     {
-                        states.pop_back();
-                     }
                      ++begin;
+                  }
+                  if (begin == end || (in_format && begin != end && *begin == ':'))
+                  {
+                     collect_and();
+                     collect_or();
+                     return states.empty();
                   }
                   else if (parse_and())
                   {
@@ -2161,6 +2211,20 @@ namespace psibase::loggers
          };
       };
 
+      template <>
+      auto make_simple_filter_factory<std::chrono::microseconds>()
+      {
+         return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
+         {
+            // TODO: interpret units
+            std::chrono::microseconds v{boost::lexical_cast<std::chrono::microseconds::rep>(value)};
+            return make_filter_impl(name, op, v, "=", std::equal_to<>(),
+                                    "!=", std::not_equal_to<>(), "<", std::less<>(), ">",
+                                    std::greater<>(), "<=", std::less_equal<>(),
+                                    ">=", std::greater_equal<>());
+         };
+      };
+
       template <typename T>
       auto make_simple_formatter_factory()
       {
@@ -2257,6 +2321,25 @@ namespace psibase::loggers
          };
       }
 
+      template <>
+      auto make_simple_formatter_factory<std::chrono::microseconds>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("std::format not supported yet");
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<std::chrono::microseconds>(name, rec))
+               {
+                  stream << attr->count();
+               }
+            };
+         };
+      }
+
       // name must refer to a string with static storage duration
       template <typename T>
       void add_attribute(std::string_view name)
@@ -2302,6 +2385,16 @@ namespace psibase::loggers
          add_attribute<int>("PeerId");
          add_attribute<boost::log::process_id>("ProcessId");
          add_attribute<BlockHeader>("BlockHeader");
+         add_attribute<std::string>("RequestMethod");
+         add_attribute<std::string>("RequestTarget");
+         add_attribute<std::string>("RequestHost");
+         add_attribute<unsigned>("ResponseStatus");
+         add_attribute<std::uint64_t>("ResponseBytes");
+         add_attribute<std::chrono::microseconds>("PackTime");
+         add_attribute<std::chrono::microseconds>("ServiceLoadTime");
+         add_attribute<std::chrono::microseconds>("DatabaseTime");
+         add_attribute<std::chrono::microseconds>("WasmExecTime");
+         add_attribute<std::chrono::microseconds>("ResponseTime");
 
          add_compound_format("Json",
                              [](auto name, std::string_view spec)

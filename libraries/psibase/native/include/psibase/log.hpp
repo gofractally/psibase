@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/asio/any_io_executor.hpp>
+#include <boost/log/attributes/scoped_attribute.hpp>
 #include <boost/log/expressions/keyword.hpp>
 #include <boost/log/sources/global_logger_storage.hpp>
 #include <boost/log/sources/record_ostream.hpp>
@@ -86,9 +87,14 @@ namespace psibase
    }  // namespace loggers
 
 #define PSIBASE_LOG(logger, log_level) BOOST_LOG_SEV(logger, psibase::loggers::level::log_level)
-#define PSIBASE_LOG_BLOCK(logger, log_level, header, id)                                           \
-   PSIBASE_LOG(logger, log_level) << ::boost::log::add_value(                                      \
-                                         ::psibase::loggers::keyword::BlockHeader, (header))       \
-                                  << ::boost::log::add_value(::psibase::loggers::keyword::BlockId, \
-                                                             (id))
+
+#define PSIBASE_LOG_CONTEXT_BLOCK(header, id)                                                \
+   auto _psibase_log_ctx = ::std::tuple                                                      \
+   {                                                                                         \
+      ::boost::log::add_scoped_thread_attribute(                                             \
+          "BlockHeader", boost::log::attributes::constant< ::psibase::BlockHeader>(header)), \
+          ::boost::log::add_scoped_thread_attribute(                                         \
+              "BlockId", boost::log::attributes::constant< ::psibase::Checksum256>(id))      \
+   }
+
 }  // namespace psibase

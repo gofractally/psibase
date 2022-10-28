@@ -522,7 +522,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    file.keep("", "sign");
    file.keep("", "peer");
    file.keep("", "leeway");
-   file.keep("", "host-perf");
    //
    to_config(config.loggers, file);
 }
@@ -541,7 +540,6 @@ void run(const std::string&              db_path,
          unsigned short                  port,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
-         bool                            host_perf,
          uint32_t                        leeway_us,
          const std::string&              replay_blocks,
          const std::string&              save_blocks)
@@ -598,7 +596,6 @@ void run(const std::string&              db_path,
       http_config->address             = "0.0.0.0";
       http_config->port                = port;
       http_config->host                = host;
-      http_config->host_perf           = host_perf;
       http_config->enable_transactions = !host.empty();
       http_config->status =
           http::http_status{.slow = system->sharedDatabase.isSlow(), .startup = 1};
@@ -945,7 +942,6 @@ int main(int argc, char* argv[])
    std::vector<PrivateKey>     keys;
    std::string                 host      = {};
    unsigned short              port      = 8080;
-   bool                        host_perf = false;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
    bool                        enable_incoming_p2p = false;
@@ -968,7 +964,6 @@ int main(int argc, char* argv[])
    opt("port", po::value(&port), "http server port");
    opt("service", po::value(&services), "Static content");
    opt("admin", po::value(&admin), "Controls which services can access the admin API");
-   opt("host-perf,O", po::bool_switch(&host_perf), "Show various hosting metrics");
    opt("leeway,l", po::value<uint32_t>(&leeway_us),
        "Transaction leeway, in us. Defaults to 200000.");
    desc.add(common_opts);
@@ -1044,7 +1039,7 @@ int main(int argc, char* argv[])
              std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"}, key));
       }
       run(db_path, AccountNumber{producer}, prover, peers, enable_incoming_p2p, host, port,
-          services, admin, host_perf, leeway_us, replay_blocks, save_blocks);
+          services, admin, leeway_us, replay_blocks, save_blocks);
       return 0;
    }
    catch (std::exception& e)

@@ -161,7 +161,6 @@ namespace psibase::http
       get_config_t              get_config             = {};
       connect_t                 set_config             = {};
       admin_service             admin                  = {};
-      bool                      host_perf              = false;
       services_t                services;
       std::atomic<bool>         enable_p2p;
       std::atomic<bool>         enable_transactions;

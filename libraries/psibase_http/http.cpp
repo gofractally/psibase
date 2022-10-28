@@ -52,9 +52,9 @@ namespace psibase::http
    };
 
    // Report a failure
-   static void fail(beast::error_code ec, const char* what)
+   static void fail(psibase::loggers::common_logger& logger, beast::error_code ec, const char* what)
    {
-      // TODO: elog("${w}: ${s}", ("w", what)("s", ec.message()));
+      PSIBASE_LOG(logger, warning) << what << ": " << ec.message();
    }
 
    struct server_impl : server, std::enable_shared_from_this<server_impl>
@@ -468,24 +468,23 @@ namespace psibase::http
             // printf("%s\n", prettyTrace(atrace).c_str());
             auto result  = psio::convert_from_frac<std::optional<HttpReply>>(atrace.rawRetval);
             auto endTime = steady_clock::now();
-            if (server.http_config->host_perf)
-            {
-               auto t = [](const auto& duration) {
-                  return std::to_string(
-                      std::chrono::duration_cast<std::chrono::microseconds>(duration).count());
-               };
-               std::string report;
-               report += "handling " + data.host + " " + data.method + " " + data.target + "\n";
-               report += "   pack request:   " + t(startExecTime - startTime) + " us\n";
-               report +=
-                   "   load services: " + t(endExecTime - startExecTime - tc.getBillableTime()) +
-                   " us\n";
-               report += "   database:       " + t(tc.databaseTime) + " us\n";
-               report +=
-                   "   exec wasm:      " + t(tc.getBillableTime() - tc.databaseTime) + " us\n";
-               report += "   total:          " + t(endTime - startTime) + " us\n";
-               std::cout << report;
-            }
+
+            // TODO: consider bundling into a single attribute
+            BOOST_LOG_SCOPED_LOGGER_TAG(
+                send.self.logger, "PackTime",
+                std::chrono::duration_cast<std::chrono::microseconds>(startExecTime - startTime));
+            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "ServiceLoadTime",
+                                        std::chrono::duration_cast<std::chrono::microseconds>(
+                                            endExecTime - startExecTime - tc.getBillableTime()));
+            BOOST_LOG_SCOPED_LOGGER_TAG(
+                send.self.logger, "DatabaseTime",
+                std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime));
+            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "WasmExecTime",
+                                        std::chrono::duration_cast<std::chrono::microseconds>(
+                                            tc.getBillableTime() - tc.databaseTime));
+            BOOST_LOG_SCOPED_LOGGER_TAG(
+                send.self.logger, "ResponseTime",
+                std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime));
             if (!result)
                return send(
                    error(bhttp::status::not_found,
@@ -916,6 +915,16 @@ namespace psibase::http
                }
             };
 
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(self.logger, "ResponseStatus",
+                                           static_cast<unsigned>(msg.result_int()));
+               BOOST_LOG_SCOPED_LOGGER_ATTR(self.logger, "ResponseBytes",
+                                            boost::log::attributes::constant<std::uint64_t>(
+                                                msg.payload_size() ? *msg.payload_size() : 0));
+               PSIBASE_LOG(self.logger, info) << "Handled HTTP request";
+               self.request_attrs.reset();
+            }
+
             // Allocate and store the work
             items.push_back(boost::make_unique<work_impl>(self, std::move(msg)));
 
@@ -971,6 +980,14 @@ namespace psibase::http
                }
             };
 
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(
+                   self.logger, "ResponseStatus",
+                   static_cast<unsigned>(bhttp::status::switching_protocols));
+               PSIBASE_LOG(self.logger, info) << "Handled HTTP request";
+               self.request_attrs.reset();
+            }
+
             // Allocate and store the work
             items.push_back(
                 boost::make_unique<work_impl>(self, std::move(msg), std::forward<F>(f)));
@@ -993,11 +1010,24 @@ namespace psibase::http
       server_impl& server;
       queue        queue_;
 
-      http_session(server_impl& server) : server(server), queue_(*this) {}
+      psibase::loggers::common_logger logger;
+      using scoped_attribute = decltype(boost::log::add_scoped_logger_attribute(
+          logger,
+          std::string(),
+          boost::log::attributes::constant{std::string()}));
+      std::optional<std::tuple<scoped_attribute, scoped_attribute, scoped_attribute>> request_attrs;
+
+      http_session(server_impl& server) : server(server), queue_(*this)
+      {
+         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
+      }
+
+      ~http_session() { PSIBASE_LOG(logger, debug) << "Connection closed"; }
 
       // Start the session
       void run()
       {
+         PSIBASE_LOG(logger, debug) << "Accepted connection";
          _timer.reset(
              new boost::asio::steady_timer(derived_session().stream.socket().get_executor()));
          last_activity_timepoint = steady_clock::now();
@@ -1025,8 +1055,7 @@ namespace psibase::http
                 }
                 else
                 {
-                   ec = beast::error::timeout;
-                   fail(ec, "timeout");
+                   PSIBASE_LOG(logger, info) << "timeout";
                    return do_close();
                 }
              });
@@ -1059,8 +1088,23 @@ namespace psibase::http
 
          if (ec)
          {
-            fail(ec, "read");
+            fail(logger, ec, "read");
             return do_close();
+         }
+
+         {
+            const auto& req = parser->get();
+            request_attrs.emplace(std::tuple{
+                boost::log::add_scoped_logger_attribute(
+                    logger, "RequestMethod",
+                    boost::log::attributes::constant{std::string(req.method_string())}),
+                boost::log::add_scoped_logger_attribute(
+                    logger, "RequestTarget",
+                    boost::log::attributes::constant{std::string(req.target())}),
+                boost::log::add_scoped_logger_attribute(
+                    logger, "RequestHost",
+                    boost::log::attributes::constant{std::string(req.at(bhttp::field::host))})});
+            PSIBASE_LOG(logger, debug) << "Received HTTP request";
          }
 
          // Send the response
@@ -1077,7 +1121,7 @@ namespace psibase::http
 
          if (ec)
          {
-            fail(ec, "write");
+            fail(logger, ec, "write");
             return do_close();
          }
 
@@ -1113,6 +1157,10 @@ namespace psibase::http
       tcp_http_session(server_impl& server, tcp::socket&& socket)
           : http_session<tcp_http_session>(server), stream(std::move(socket))
       {
+         std::ostringstream ss;
+         ss << stream.socket().remote_endpoint();
+         logger.add_attribute("RemoteEndpoint",
+                              boost::log::attributes::constant<std::string>(ss.str()));
       }
 
       beast::tcp_stream stream;
@@ -1124,6 +1172,8 @@ namespace psibase::http
       unix_http_session(server_impl& server, unixs::socket&& socket)
           : http_session<unix_http_session>(server), stream(std::move(socket))
       {
+         logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
+                                                    socket.remote_endpoint().path()));
       }
 
       beast::basic_stream<unixs,
@@ -1144,12 +1194,15 @@ namespace psibase::http
       unixs::acceptor unix_acceptor;
       bool            acceptor_ready = false;
 
+      psibase::loggers::common_logger logger;
+
      public:
       listener(server_impl& server)
           : server(server),
             tcp_acceptor(net::make_strand(server.ioc)),
             unix_acceptor(net::make_strand(server.ioc))
       {
+         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
          if (server.http_config->address.size())
          {
             boost::asio::ip::address a;
@@ -1176,19 +1229,28 @@ namespace psibase::http
 
             //looks like a service is already running on that socket, don't touch it... fail out
             if (test_ec == boost::system::errc::success)
-               check(false, "wasmql http unix socket is in use");
+            {
+               PSIBASE_LOG(logger, error) << "http unix socket is in use";
+               listen_fail();
+            }
             //socket exists but no one home, go ahead and remove it and continue on
             else if (test_ec == boost::system::errc::connection_refused)
                ::unlink(server.http_config->unix_path.c_str());
             else if (test_ec != boost::system::errc::no_such_file_or_directory)
-               check(false, "unexpected failure when probing existing wasmql http unix socket: " +
-                                test_ec.message());
+            {
+               PSIBASE_LOG(logger, error)
+                   << "unexpected failure when probing existing http unix socket: "
+                   << test_ec.message();
+               listen_fail();
+            }
 
             start_listen(unix_acceptor, unixs::endpoint(server.http_config->unix_path));
          }
 
          acceptor_ready = true;
       }
+
+      void listen_fail() { throw std::runtime_error("unable to open listen socket"); }
 
       template <typename Acceptor, typename Endpoint>
       void start_listen(Acceptor& acceptor, const Endpoint& endpoint)
@@ -1199,8 +1261,8 @@ namespace psibase::http
          {
             if (!ec)
                return;
-            // TODO: elog("${w}: ${m}", ("w", what)("m", ec.message()));
-            check(false, "unable to open listen socket");
+            PSIBASE_LOG(logger, error) << what << ": " << ec.message();
+            listen_fail();
          };
 
          // Open the acceptor
@@ -1242,7 +1304,7 @@ namespace psibase::http
                  {
                     if (ec)
                     {
-                       fail(ec, "accept");
+                       fail(logger, ec, "accept");
                     }
                     else
                     {
@@ -1250,12 +1312,6 @@ namespace psibase::http
                        if constexpr (std::is_same_v<Acceptor, tcp::acceptor>)
                        {
                           boost::system::error_code ec;
-                          // TODO:
-                          // dlog("Accepting connection from ${ra}:${rp} to ${la}:${lp}",
-                          //      ("ra", socket.remote_endpoint(ec).address().to_string())(
-                          //          "rp", socket.remote_endpoint(ec).port())(
-                          //          "la", socket.local_endpoint(ec).address().to_string())(
-                          //          "lp", socket.local_endpoint(ec).port()));
                           std::make_shared<tcp_http_session>(self->server, std::move(socket))
                               ->run();
                        }
@@ -1263,7 +1319,6 @@ namespace psibase::http
                        {
                           boost::system::error_code ec;
                           auto                      rep = socket.remote_endpoint(ec);
-                          // TODO: dlog("Accepting connection from ${r}", ("r", rep.path()));
                           std::make_shared<unix_http_session>(self->server, std::move(socket))
                               ->run();
                        }

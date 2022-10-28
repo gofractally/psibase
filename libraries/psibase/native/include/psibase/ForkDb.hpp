@@ -320,6 +320,7 @@ namespace psibase
                {
                   BlockContext ctx(*systemContext, state->revision, writer, true);
                   auto         blockPtr = get(next_state->blockId());
+                  PSIBASE_LOG_CONTEXT_BLOCK(next_state->info.header, next_state->blockId());
                   ctx.start(Block(blockPtr->block()));
                   ctx.callStartBlock();
                   ctx.execAllInBlock();
@@ -331,7 +332,7 @@ namespace psibase
                   // TODO: handle other errors and blacklist the block and its descendants
                   next_state->revision = newRevision;
 
-                  PSIBASE_LOG_BLOCK(blockLogger, info, ctx.current.header, id) << "Accepted block";
+                  PSIBASE_LOG(blockLogger, info) << "Accepted block";
                }
                systemContext->sharedDatabase.setHead(*writer, next_state->revision);
                state = next_state;
@@ -506,8 +507,8 @@ namespace psibase
             byOrderIndex.insert({state_iter->second.order(), id});
             head = &state_iter->second;
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
-            PSIBASE_LOG_BLOCK(blockLogger, info, blockContext->current.header, id)
-                << "Produced block";
+            PSIBASE_LOG_CONTEXT_BLOCK(blockContext->current.header, id);
+            PSIBASE_LOG(blockLogger, info) << "Produced block";
             blockContext.reset();
             return head;
          }
