@@ -13,33 +13,42 @@ using namespace psibase;
 using std::optional;
 using std::string;
 using std::string_view;
+using std::tuple;
 
 namespace SystemService
 {
 
    struct AuthEcQuery
    {
-      auto accWithKey(psibase::PublicKey key) const
+      auto accWithKey(psibase::PublicKey      key,
+                      optional<AccountNumber> gt,
+                      optional<AccountNumber> ge,
+                      optional<AccountNumber> lt,
+                      optional<AccountNumber> le,
+                      optional<uint32_t>      first,
+                      optional<uint32_t>      last,
+                      optional<string>        before,
+                      optional<string>        after) const
       {
          auto idx = AuthEcSys::Tables{AuthEcSys::service}
                         .open<AuthEcSys::AuthTable>()
                         .getIndex<1>()
                         .subindex(key);
 
-         optional<std::tuple<AccountNumber>> gt;
-         optional<std::tuple<AccountNumber>> ge;
-         optional<std::tuple<AccountNumber>> lt;
-         optional<std::tuple<AccountNumber>> le;
-         optional<uint32_t>                  first;
-         optional<uint32_t>                  last;
-         optional<string>                    before;
-         optional<string>                    after;
+         auto convert = [](const auto& opt)
+         {
+            optional<tuple<AccountNumber>> ret;
+            if (opt)
+               ret.emplace(std::make_tuple(opt.value()));
+            return ret;
+         };
 
          return makeConnection<Connection<AuthRecord, "AuthConnection", "AuthEdge">>(
-             idx, gt, ge, lt, le, first, last, before, after);
+             idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last, before,
+             after);
       }
    };
-   PSIO_REFLECT(AuthEcQuery, method(accWithKey, key))
+   PSIO_REFLECT(AuthEcQuery, method(accWithKey, key, gt, ge, lt, le, first, last, before, after))
 
    std::optional<HttpReply> RAuthEcSys::serveSys(HttpRequest request)
    {

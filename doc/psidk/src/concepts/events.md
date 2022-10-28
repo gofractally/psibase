@@ -12,17 +12,12 @@ The Psibase event system is one of its many important innovations. If you're an 
 
 Events are queryable objects that are stored in a database and that describe past events related to a particular web service. Since events do not store the active service state, they could be pruned without affecting the core operations of a particular service, and therefore Psinode allows node operators to configure the times beyond which events are automatically pruned.
 
-```mermaid
-    C4Context
-      Boundary(b0, "Psibase node") {
-        Boundary(b1, "Non-prunable") {
-            SystemDb(ChainState, "Distributed Chain State", "Accounts/Tables/Services")
-        }
-        Boundary(b2, "Prunable") {
-            SystemDb(EventLog, "Local Event Log", "Events")
-        }
-      }
-```
+There are several different databases managed by Psinode, two of them are:
+
+| Database Type | Prunable | Description             |
+| ------------- | -------- | ----------------------- |
+| Service State | No       | Distributed chain state |
+| Event Log     | Yes      | Local event log         |
 
 A web service is responsible for defining the types of events it can emit, emitting the events, and exposing access to the events over some RPC interface. Any Psibase applet may then query the events through that RPC interface and display them according to its users' needs. Psibase applets are also able to use the Event Sourcing design pattern, in which they may subscribe to events and define handlers for automatic execution whenever such events are emitted.
 
@@ -62,9 +57,6 @@ Whenever an event is emitted from a service, a unique event ID is returned to th
 
 For example, in the example Token Service, a `Transferred` event is defined, and is included in an index of events called `UserEvents`:
 
-<details>
-  <summary>Reveal code</summary>
-
 ```cpp
   struct Events
   {
@@ -85,16 +77,9 @@ For example, in the example Token Service, a `Transferred` event is defined, and
   );
 ```
 
-</details>
-
-<br>
-
 The definition of `UserEvents` indicates that the head event ID is stored in the `lastHistoryEvent` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`.
 
 When the `transferred` event gets emitted by the service, the ID of the previous transferred event is included (via the `prevEvent` field) in the new event, and the event ID of the new event is saved to state (in the `lastHistoryEvent` field of the sender's `TokenHolderRecord`):
-
-<details>
-  <summary>Reveal code</summary>
 
 ```cpp
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
@@ -115,18 +100,11 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 }
 ```
 
-</details>
-
-<br>
-
 Notice that the `transferred` event is emitted twice, in order to generate the event for the sender's `UserEvents` index, and another event for the receiver's `UserEvents` index. As you will see, Psibase has mechanisms for efficiently querying event chains created in this way.
 
 ## Providing GraphQL access to event chains
 
 In Psibase, it is very simple to provide GraphQL access to any event chain. In the below example, you can see how the Token Service exposes an index of all events (via the `events` query), and an index on just the user events (via the `userEvents` query):
-
-<details>
-  <summary>Reveal code</summary>
 
 ```cpp
   // Create a QueryableService object using TokenSys service details
@@ -159,14 +137,8 @@ In Psibase, it is very simple to provide GraphQL access to any event chain. In t
   }
 ```
 
-</details>
-
-<br>
-
 Once the above Service and RPC Service are deployed, a front-end developer may access `https://token-sys.<domain>/graphql` to see these queries are now available as part of the GraphQL schema:
 
-<details>
-  <summary>Reveal</summary>
 
 ```
   ...
@@ -177,14 +149,7 @@ Once the above Service and RPC Service are deployed, a front-end developer may a
 
 ```
 
-</details>
-
-<br>
-
 A query for the User Events index can be easily constructed by following that GraphQL Schema:
-
-<details>
-  <summary>Reveal</summary>
 
 ```
   query {
@@ -204,14 +169,7 @@ A query for the User Events index can be easily constructed by following that Gr
 }
 ```
 
-</details>
-
-<br>
-
 Which, when submitted to a Psinode, returns the User Events index as expected:
-
-<details>
-  <summary>Reveal</summary>
 
 ```json
 {
@@ -278,10 +236,6 @@ Which, when submitted to a Psinode, returns the User Events index as expected:
   }
 }
 ```
-
-</details>
-
-<br>
 
 ## Event types
 
