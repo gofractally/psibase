@@ -76,8 +76,11 @@ namespace
          return days{era * 146097 + static_cast<int>(doe) - 719468};
       }
       inline year_month_day(const year_t& y, const month_t& m, const day_t& d) : y(y), m(m), d(d) {}
-      inline year_month_day(const year_month_day&) = default;
-      inline year_month_day(year_month_day&&)      = default;
+      inline year_month_day(const year_month_day&)                      = default;
+      inline year_month_day(year_month_day&&)                           = default;
+      inline year_month_day& operator=(const year_month_day&)           = default;
+      inline year_month_day& operator=(year_month_day&& other) noexcept = default;
+      inline ~year_month_day()                                          = default;
       inline year_month_day(sys_days ds) : year_month_day(from_days(ds.time_since_epoch())) {}
       inline auto year() const { return y.y; }
       inline auto month() const { return m.m; }

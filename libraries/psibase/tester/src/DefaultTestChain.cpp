@@ -143,7 +143,7 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                     }}),
                {});
 
-   check(psibase::show(show, trace) == "", "Failed to deploy genesis services");
+   check(psibase::show(show, trace).empty(), "Failed to deploy genesis services");
 }
 
 void DefaultTestChain::setBlockProducers(bool show /* = false*/)
@@ -152,7 +152,7 @@ void DefaultTestChain::setBlockProducers(bool show /* = false*/)
                                                SystemService::ProducerSys::service};
    std::vector<ProducerConfigRow>         producerConfig = {{"testchain"_a, {}}};
    auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
-   check(psibase::show(show, trace) == "", "Failed to set producers");
+   check(psibase::show(show, trace).empty(), "Failed to set producers");
 }
 
 void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
@@ -163,7 +163,7 @@ void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
                                                   SystemService::TransactionSys::service};
    auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
 
-   check(psibase::show(show, trace) == "", "Failed to create system service accounts");
+   check(psibase::show(show, trace).empty(), "Failed to create system service accounts");
 }
 
 AccountNumber DefaultTestChain::add_account(
@@ -177,7 +177,7 @@ AccountNumber DefaultTestChain::add_account(
    auto trace = pushTransaction(  //
        makeTransaction({asys.newAccount(acc, authService, true)}));
 
-   check(psibase::show(show, trace) == "", "Failed to add account");
+   check(psibase::show(show, trace).empty(), "Failed to add account");
 
    return acc;
 }
@@ -205,7 +205,7 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
        asys.from(name).setAuthCntr(SystemService::AuthEcSys::service),
    }));
 
-   check(psibase::show(show, trace) == "", "Failed to add ec account");
+   check(psibase::show(show, trace).empty(), "Failed to add ec account");
    return name;
 }  // add_ec_account()
 
@@ -227,7 +227,7 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
    auto trace =
        pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
 
-   check(psibase::show(show, trace) == "", "Failed to create service");
+   check(psibase::show(show, trace).empty(), "Failed to create service");
 
    return acc;
 }  // addService()
@@ -254,7 +254,7 @@ void DefaultTestChain::registerSysRpc()
    };
 
    auto trace = pushTransaction(makeTransaction(std::move(a)));
-   check(psibase::show(false, trace) == "", "Failed to register system rpc services");
+   check(psibase::show(false, trace).empty(), "Failed to register system rpc services");
 
    transactor<CommonSys>   rpcCommon(CommonSys::service, CommonSys::service);
    transactor<RAccountSys> rpcAccount(RAccountSys::service, RAccountSys::service);
@@ -320,11 +320,16 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/common/keyConversions.mjs", js,
                           readWholeFile(comDir + "/common/keyConversions.mjs")),
        rpcCommon.storeSys("/common/widgets.mjs", js, readWholeFile(comDir + "/common/widgets.mjs")),
-       rpcCommon.storeSys("/common/fonts/raleway.css", css, readWholeFile(comDir + "/common/fonts/raleway.css")),
-       rpcCommon.storeSys("/common/fonts/raleway-variable-italic.ttf", ttf, readWholeFile(comDir + "/common/fonts/raleway-variable-italic.ttf")),
-       rpcCommon.storeSys("/common/fonts/raleway-variable-normal.ttf", ttf, readWholeFile(comDir + "/common/fonts/raleway-variable-normal.ttf")),
-       rpcCommon.storeSys("/common/fonts/red-hat-mono.css", css, readWholeFile(comDir + "/common/fonts/red-hat-mono.css")),
-       rpcCommon.storeSys("/common/fonts/red-hat-mono-variable-normal.ttf", ttf, readWholeFile(comDir + "/common/fonts/red-hat-mono-variable-normal.ttf")),
+       rpcCommon.storeSys("/common/fonts/raleway.css", css,
+                          readWholeFile(comDir + "/common/fonts/raleway.css")),
+       rpcCommon.storeSys("/common/fonts/raleway-variable-italic.ttf", ttf,
+                          readWholeFile(comDir + "/common/fonts/raleway-variable-italic.ttf")),
+       rpcCommon.storeSys("/common/fonts/raleway-variable-normal.ttf", ttf,
+                          readWholeFile(comDir + "/common/fonts/raleway-variable-normal.ttf")),
+       rpcCommon.storeSys("/common/fonts/red-hat-mono.css", css,
+                          readWholeFile(comDir + "/common/fonts/red-hat-mono.css")),
+       rpcCommon.storeSys("/common/fonts/red-hat-mono-variable-normal.ttf", ttf,
+                          readWholeFile(comDir + "/common/fonts/red-hat-mono-variable-normal.ttf")),
 
        // CommonSys - 3rd party
        rpcCommon.storeSys("/common/iframeResizer.js", js,
@@ -389,5 +394,5 @@ void DefaultTestChain::registerSysRpc()
    };
 
    trace = pushTransaction(makeTransaction(std::move(b)));
-   check(psibase::show(false, trace) == "", "Failed to add UI files to system rpc services");
+   check(psibase::show(false, trace).empty(), "Failed to add UI files to system rpc services");
 }

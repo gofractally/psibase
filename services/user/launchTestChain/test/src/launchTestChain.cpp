@@ -74,7 +74,7 @@ SCENARIO("Testing default psibase chain")
 
    t.startBlock();
 
-   /****** At t.getPath(): 
+   /****** At t.getPath():
       drwxr-xr-x block_log
       drwxr-xr-x state
       drwxr-xr-x subjective

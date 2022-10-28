@@ -30,10 +30,10 @@ namespace SystemService
       //       a fix to SystemContext caching, to prevent frequent allocating
       //       and freeing of ExecutionMemory instances.
       ConfigRow config;
-      kvPut(config.db, config.key(), config);
+      kvPut(ConfigRow::db, ConfigRow::key(), config);
       WasmConfigRow wasmConfig;
-      kvPut(wasmConfig.db, wasmConfig.key(transactionWasmConfigTable), wasmConfig);
-      kvPut(wasmConfig.db, wasmConfig.key(proofWasmConfigTable), wasmConfig);
+      kvPut(WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable), wasmConfig);
+      kvPut(WasmConfigRow::db, WasmConfigRow::key(proofWasmConfigTable), wasmConfig);
    }
 
    // CAUTION: startBlock() is critical to chain operations. If it fails, the chain stops.
@@ -157,14 +157,14 @@ namespace SystemService
 
    psibase::BlockHeader TransactionSys::headBlock() const
    {
-      auto& stat = getStatus();
+      const auto& stat = getStatus();
       check(stat.head.has_value(), "head does not exist yet");
       return stat.head->header;
    }
 
    psibase::TimePointSec TransactionSys::headBlockTime() const
    {
-      auto& stat = getStatus();
+      const auto& stat = getStatus();
       if (stat.head)
          return stat.head->header.time;
       return {};

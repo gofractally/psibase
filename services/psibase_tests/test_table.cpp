@@ -3,7 +3,7 @@
 
 using namespace psibase;
 
-namespace table_test
+namespace TableTest
 {
    struct S0
    {
@@ -127,4 +127,4 @@ namespace table_test
    {
       __wasm_call_ctors();
    }
-}  // namespace table_test
+}  // namespace TableTest

@@ -34,16 +34,16 @@ namespace
       return sumOverflows(addend1, addend2) || addend1 + addend2 > limit;
    }
 
-   namespace userConfig
+   namespace UserConfig
    {
       constexpr auto manualDebit = psibase::NamedBit{"manualDebit"};
    }
 
-   namespace tokenConfig
+   namespace TokenConfig
    {
       constexpr auto unrecallable = psibase::NamedBit{"unrecallable"};
       constexpr auto untradeable  = psibase::NamedBit{"untradeable"};
-   }  // namespace tokenConfig
+   }  // namespace TokenConfig
 
 }  // namespace
 
@@ -70,15 +70,15 @@ void TokenSys::init()
    auto nftService = to<NftSys>();
 
    // Configure manual debit for self and NFT
-   tokService.setUserConf(userConfig::manualDebit, true);
-   nftService.setUserConf(userConfig::manualDebit, true);
+   tokService.setUserConf(UserConfig::manualDebit, true);
+   nftService.setUserConf(UserConfig::manualDebit, true);
 
    // Create system token
    auto tid = tokService.create(Precision{8}, Quantity{1'000'000'000e8});
    check(tid == TID{1}, wrongSysTokenId);
 
    // Make system token default untradeable
-   tokService.setTokenConf(tid, tokenConfig::untradeable, true);
+   tokService.setTokenConf(tid, TokenConfig::untradeable, true);
 
    // Pass system token ownership to symbol service
    auto tNft = getToken(tid).ownerNft;
@@ -182,7 +182,7 @@ void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
 void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
 {
    check(isSenderIssuer(tokenId), missingRequiredAuth);
-   if (flag == tokenConfig::unrecallable)
+   if (flag == TokenConfig::unrecallable)
    {
       check(enable, invalidConfigUpdate);
    }
@@ -201,15 +201,14 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
 {
    auto sender      = getSender();
    auto balance     = getBalance(tokenId, sender);
-   auto token       = getToken(tokenId);
-   auto untradeable = getTokenConf(tokenId, tokenConfig::untradeable);
+   auto untradeable = getTokenConf(tokenId, TokenConfig::untradeable);
 
    check(sender != receiver, senderIsReceiver);
    check(amount.value > 0, quantityGt0);
    check(amount.value <= balance.balance, insufficientBalance);
    if (not isSenderIssuer(tokenId))
    {  // Token issuer may still distribute untradeable tokens
-      check(untradeable == false, tokenUntradeable);
+      check(!untradeable, tokenUntradeable);
    }
 
    balance.balance -= amount.value;
@@ -305,10 +304,9 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
 void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
 {
-   auto sender          = getSender();
    auto token           = getToken(tokenId);
    auto fromBalance     = getBalance(tokenId, from);
-   auto unrecallableBit = TokenRecord::Configurations::getIndex(tokenConfig::unrecallable);
+   auto unrecallableBit = TokenRecord::Configurations::getIndex(TokenConfig::unrecallable);
    auto time            = to<TransactionSys>().currentBlock().time;
 
    check(isSenderIssuer(tokenId), missingRequiredAuth);
@@ -450,14 +448,12 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
 bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
 {
    auto hodler = db.open<TokenHolderTable>().getIndex<0>().get(account);
-   if (hodler.has_value() == false)
+   if (!hodler.has_value())
    {
       return false;
    }
-   else
-   {
-      return (*hodler).config.get(TokenHolderConfig::getIndex(flag));
-   }
+
+   return (*hodler).config.get(TokenHolderConfig::getIndex(flag));
 }
 
 bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit flag)

@@ -11,25 +11,14 @@
 using namespace UserService;
 using namespace UserService::Errors;
 using namespace psibase;
-using std::optional;
-using std::pair;
 using std::string;
-using std::vector;
 using UserService::NftRecord;
 
 namespace
 {
    constexpr bool storageBillingImplemented        = false;
    constexpr bool contextFreeValidationImplemented = false;
-
-   struct DiskUsage_NftRecord
-   {
-      static constexpr int64_t firstEmplace      = 100;
-      static constexpr int64_t subsequentEmplace = 100;
-      static constexpr int64_t update            = 100;
-   };
-
-   constexpr auto manualDebit = "manualDebit"_m;
+   constexpr auto manualDebit                      = "manualDebit"_m;
 }  // namespace
 
 SCENARIO("Minting & burning nfts")

@@ -266,7 +266,7 @@ namespace psibase
       try
       {
          exec(trx, trace, initialWatchdogLimit, enableUndo, commit);
-         current.transactions.push_back(std::move(trx));
+         current.transactions.push_back(trx);
       }
       catch (...)
       {

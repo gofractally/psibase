@@ -48,11 +48,11 @@ namespace psibase
    };
    PSIO_REFLECT(Signature, definitionWillNotChange(), data)
 
-   std::string publicKeyToString(const PublicKey& obj);
+   std::string publicKeyToString(const PublicKey& key);
    PublicKey   publicKeyFromString(std::string_view s);
-   std::string privateKeyToString(const PrivateKey& obj);
+   std::string privateKeyToString(const PrivateKey& private_key);
    PrivateKey  privateKeyFromString(std::string_view s);
-   std::string signatureToString(const Signature& obj);
+   std::string signatureToString(const Signature& signature);
    Signature   signatureFromString(std::string_view s);
 
    template <typename S>

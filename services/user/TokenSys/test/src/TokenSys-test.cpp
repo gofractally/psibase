@@ -22,13 +22,6 @@ namespace
    constexpr bool eventEmissionTestingSupported = false;
    constexpr bool customTokensSupported         = false;
 
-   struct DiskUsage_TokenRecord
-   {
-      static constexpr int64_t firstEmplace      = 100;
-      static constexpr int64_t subsequentEmplace = 100;
-      static constexpr int64_t update            = 100;
-   };
-
    const psibase::String memo{"memo"};
 
    const std::vector<std::pair<AccountNumber, const char*>> neededServices = {
@@ -103,7 +96,6 @@ SCENARIO("Creating a token")
 
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
-      auto bob   = t.from(t.add_account("bob"_a));
 
       // Initialize user services
       alice.to<NftSys>().init();
@@ -246,7 +238,6 @@ SCENARIO("Recalling tokens")
       auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
-      auto b     = bob.to<TokenSys>();
 
       // Initialize user services
       alice.to<NftSys>().init();
@@ -406,7 +397,6 @@ SCENARIO("Burning tokens")
       alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
-      auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e8, memo);
       a.credit(tokenId, bob, 100e8, memo);
 
@@ -559,7 +549,6 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
-      auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e8, memo);
       a.credit(tokenId, bob, 100e8, memo);
 
@@ -636,7 +625,6 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
       alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
-      auto token   = a.getToken(tokenId).returnVal();
 
       a.mint(tokenId, 200e8, memo);
       a.credit(tokenId, bob, 100e8, memo);

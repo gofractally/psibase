@@ -65,8 +65,8 @@ psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
 
 bool psibase::TraceResult::succeeded()
 {
-   bool hasErrObj = (_t.error != std::nullopt);
-   bool failed    = hasErrObj && (*_t.error) != "";
+   bool hasErrObj = _t.error.has_value();
+   bool failed    = hasErrObj && !(_t.error->empty());
    if (failed)
    {
       UNSCOPED_INFO("transaction failed: " << *_t.error << "\n");
@@ -136,8 +136,8 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
 
 psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& digest)
 {
-   static auto context = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
-   auto*       k1      = std::get_if<0>(&key.data);
+   static auto* context = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+   const auto*  k1      = std::get_if<0>(&key.data);
    check(k1, "only k1 currently supported");
 
    secp256k1_ecdsa_signature sig;
@@ -223,8 +223,8 @@ void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 
 void psibase::TestChain::startBlock(std::string_view time)
 {
-   uint64_t value;
-   auto     data = time.data();
+   uint64_t    value;
+   const auto* data = time.data();
    check(stringToUtcMicroseconds(value, data, data + time.size(), true), "bad time");
    startBlock(TimePointSec{.seconds = uint32_t(value / 1000)});
 }
@@ -281,7 +281,7 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
     Transaction                                          trx,
     const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
 {
-   for (auto& [pub, priv] : keys)
+   for (const auto& [pub, priv] : keys)
       trx.claims.push_back({
           .service = SystemService::VerifyEcSys::service,
           .rawData = psio::convert_to_frac(pub),
@@ -289,7 +289,7 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    SignedTransaction signedTrx;
    signedTrx.transaction = trx;
    auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
-   for (auto& [pub, priv] : keys)
+   for (const auto& [pub, priv] : keys)
       signedTrx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
    return pushTransaction(signedTrx);
 }

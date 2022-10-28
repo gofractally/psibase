@@ -30,7 +30,7 @@ namespace psibase
       std::string::size_type pos = 0;
       while (true)
       {
-         auto nl = s.find_first_of("\n", pos);
+         auto nl = s.find_first_of('\n', pos);
          if (nl >= s.size())
             break;
          dest += s.substr(pos, nl - pos);
@@ -58,7 +58,7 @@ namespace psibase
       dest += indent + "    " + atrace.action.sender.str() + " => " + atrace.action.service.str() +
               "::" + atrace.action.method.str() + "\n";
       dest += indent + "    " + psio::convert_to_json(atrace.action.rawData) + "\n";
-      for (auto& inner : atrace.innerTraces)
+      for (const auto& inner : atrace.innerTraces)
          std::visit([&](auto& inner) { prettyTrace(dest, inner, indent + "    "); }, inner.inner);
       if (!atrace.rawRetval.empty())
          dest += indent + "    rawRetval: " + psio::convert_to_json(atrace.rawRetval) + "\n";
@@ -66,7 +66,7 @@ namespace psibase
 
    void prettyTrace(std::string& dest, const TransactionTrace& ttrace, const std::string& indent)
    {
-      for (auto& a : ttrace.actionTraces)
+      for (const auto& a : ttrace.actionTraces)
          prettyTrace(dest, a, indent);
       if (!!ttrace.error)
       {

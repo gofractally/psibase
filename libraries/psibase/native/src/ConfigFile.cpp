@@ -12,7 +12,7 @@ namespace
 
    std::string_view getComment(std::string_view s)
    {
-      auto pos = s.find("#");
+      auto pos = s.find('#');
       if (pos != std::string::npos)
       {
          return s.substr(pos, s.size() - pos - 1);
@@ -441,7 +441,7 @@ void ConfigFile::set(std::string_view                             section,
          line += comment;
          line += '\n';
       }
-      for (auto value : values)
+      for (const auto& value : values)
       {
          line += editLine(key, value, "");
       }
@@ -459,7 +459,7 @@ void ConfigFile::set(std::string_view                             section,
       }
 
       auto insertPoint = findSection(section);
-      for (auto value : values)
+      for (const auto& value : values)
       {
          auto iter = locations.find(normalize(value));
          if (iter == locations.end())

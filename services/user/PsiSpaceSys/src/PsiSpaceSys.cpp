@@ -101,7 +101,7 @@ namespace SystemService
    {
       Tables tables{getReceiver()};
       auto   table = tables.template open<PsiSpaceContentTable>();
-      table.erase(PsiSpaceContentKey{getSender(), path});
+      table.erase(PsiSpaceContentKey{getSender(), std::move(path)});
    }
 }  // namespace SystemService
 

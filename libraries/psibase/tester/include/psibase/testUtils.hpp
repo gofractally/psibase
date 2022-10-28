@@ -1,7 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -11,15 +10,15 @@ namespace psibase
    {
       /* Usage
          // Create the object that will collect all benchmark data
-         auto d = std::make_shared<BenchmarkData>();
-         
+         BenchmarkData d{};
+
          // Call actions that touch each of the services you're interested in without benchmarking
          // The first time a test accesses a service should be ignored
          alice.action1();
          alice.action2();
 
          // Call actions to benchmark in a loop, creating a Benchmarker in the scope of each transaction
-         for (int i = 0; i < 30; ++i, d->nextColumn())
+         for (int i = 0; i < 30; ++i, d.nextColumn())
          {
             {
                Benchmarker t(d);
@@ -32,7 +31,7 @@ namespace psibase
          }
 
          // Print the data collected by the BenchmarkData object
-         d->print();
+         d.print();
       */
 
       class BenchmarkData
@@ -53,12 +52,12 @@ namespace psibase
         public:
          using Clock = std::chrono::high_resolution_clock;
 
-         Benchmarker(std::shared_ptr<BenchmarkData> data);
+         Benchmarker(BenchmarkData& data);
          ~Benchmarker();
 
         private:
          std::chrono::steady_clock::time_point startClock;
-         std::shared_ptr<BenchmarkData>        d;
+         BenchmarkData&                        d;
       };
 
    }  // namespace benchmarking

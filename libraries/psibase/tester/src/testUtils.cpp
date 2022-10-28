@@ -13,7 +13,7 @@ BenchmarkData::BenchmarkData() : activeColumn{0}
 }
 void BenchmarkData::print() const
 {
-   if (timings.size() == 0 || timings[0].size() == 0)
+   if (timings.empty() || timings[0].empty())
    {
       std::cout << "No benchmark data.\n";
       return;
@@ -37,17 +37,17 @@ void BenchmarkData::addTime(const std::string& t)
 {
    while (timings.size() <= activeColumn)
    {
-      timings.push_back({});
+      timings.emplace_back();
    }
    timings[activeColumn].push_back(t);
 }
 
-Benchmarker::Benchmarker(std::shared_ptr<BenchmarkData> data) : d(data)
+Benchmarker::Benchmarker(BenchmarkData& data) : d(data)
 {
    startClock = Clock::now();
 }
 
 Benchmarker::~Benchmarker()
 {
-   d->addTime(std::to_string((Clock::now() - startClock).count() / 1000));
+   d.addTime(std::to_string((Clock::now() - startClock).count() / 1000));
 }

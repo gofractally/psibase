@@ -35,6 +35,7 @@ namespace psibase
          signedTransaction{signedTransaction},
          transactionTrace{transactionTrace},
          startTime{std::chrono::steady_clock::now()},
+         databaseTime{},
          allowDbRead{allowDbRead},
          allowDbWrite{allowDbWrite},
          allowDbReadSubjective{allowDbReadSubjective},

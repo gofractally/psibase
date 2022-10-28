@@ -153,11 +153,11 @@ NftRecord NftSys::getNft(NID nftId)
    bool exists    = nftRecord.has_value();
 
    // Todo
-   if (false)  // if (nftId < nextAvailableID()) // Then the NFt definitely existed at one point
-   {
-      check(exists, nftBurned);
-   }
-   else
+   // if (nftId < nextAvailableID()) // Then the NFt definitely existed at one point
+   //{
+   //    check(exists, nftBurned);
+   //}
+   //else
    {
       check(exists, nftDNE);
    }
@@ -206,15 +206,13 @@ bool NftSys::exists(NID nftId)
 bool NftSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
 {
    auto hodler = db.open<NftHolderTable>().getIndex<0>().get(account);
-   if (hodler.has_value() == false)
+   if (!hodler)
    {
       return false;
    }
-   else
-   {
-      auto bit = NftHolderRecord::Configurations::getIndex(flag);
-      return (*hodler).config.get(bit);
-   }
+
+   auto bit = NftHolderRecord::Configurations::getIndex(flag);
+   return (*hodler).config.get(bit);
 }
 
 PSIBASE_DISPATCH(UserService::NftSys)

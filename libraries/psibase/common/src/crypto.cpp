@@ -32,7 +32,7 @@ namespace
    void base58ToBinary(Container& result, std::string_view s)
    {
       std::size_t offset = result.size();
-      for (auto& src_digit : s)
+      for (const auto& src_digit : s)
       {
          int carry = base58Map[static_cast<uint8_t>(src_digit)];
          psibase::check(carry >= 0, "Invalid key or signature");
@@ -46,7 +46,7 @@ namespace
          if (carry)
             result.push_back(static_cast<uint8_t>(carry));
       }
-      for (auto& src_digit : s)
+      for (const auto& src_digit : s)
          if (src_digit == '1')
             result.push_back(0);
          else

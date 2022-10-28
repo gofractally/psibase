@@ -31,9 +31,9 @@
  */
 
 #ifdef __cplusplus
-extern "C" int fpconv_dtoa(double fp, char dest[24]);
+extern "C" int fpconv_dtoa(double d, char dest[24]);
 #else
-int fpconv_dtoa(double fp, char dest[24]);
+int fpconv_dtoa(double d, char dest[24]);
 #endif
 
 #endif

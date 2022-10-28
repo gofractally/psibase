@@ -21,7 +21,8 @@ TEST_CASE("recursion")
                             .number = 3,
                             .memo   = "Counting down",
                         }),
-                    }}))) == "");
+                    }})))
+           .empty());
 }  // recursion
 
 TEST_CASE("kv")
@@ -36,7 +37,8 @@ TEST_CASE("kv")
                     {{
                         .sender  = test_kv_service,
                         .service = test_kv_service,
-                    }}))) == "");
+                    }})))
+           .empty());
 }  // kv
 
 TEST_CASE("table")
@@ -51,5 +53,6 @@ TEST_CASE("table")
                     {{
                         .sender  = test_table_service,
                         .service = test_table_service,
-                    }}))) == "");
+                    }})))
+           .empty());
 }  // table

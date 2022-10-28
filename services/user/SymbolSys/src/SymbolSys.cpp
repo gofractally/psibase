@@ -63,12 +63,12 @@ void SymbolSys::init()
       s.activePrice = s.activePrice * 2 / 3;
       return s;
    };
-   auto       symLengthTable = db.open<SymbolLengthTable>();
-   Quantity_t initialPrice   = (Quantity_t)1000e8;
-   auto       s              = SymbolLengthRecord{.symbolLength        = 3,
-                                                  .targetCreatedPerDay = 24,
-                                                  .floorPrice{(Quantity_t)100e8},
-                                                  .activePrice{initialPrice}};
+   auto symLengthTable = db.open<SymbolLengthTable>();
+   auto initialPrice   = (Quantity_t)1000e8;
+   auto s              = SymbolLengthRecord{.symbolLength        = 3,
+                                            .targetCreatedPerDay = 24,
+                                            .floorPrice{(Quantity_t)100e8},
+                                            .activePrice{initialPrice}};
    symLengthTable.put(s);           // Length 3
    symLengthTable.put(nextSym(s));  // Length 4
    symLengthTable.put(nextSym(s));  // Length 5

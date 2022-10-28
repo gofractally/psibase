@@ -36,7 +36,10 @@ namespace SystemService
       AccountNumber service = {};
       AccountNumber server  = {};
 
-      auto key(AccountNumber thisService) { return registeredServiceKey(thisService, service); }
+      auto key(AccountNumber thisService) const
+      {
+         return registeredServiceKey(thisService, service);
+      }
    };
    PSIO_REFLECT(RegisteredServiceRow, service, server)
 

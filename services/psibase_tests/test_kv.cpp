@@ -8,7 +8,7 @@ using namespace psibase;
 
 static constexpr bool enable_print = false;
 
-struct item
+struct Item
 {
    std::vector<unsigned char> key;
    uint8_t                    value;
@@ -37,7 +37,7 @@ auto    none = std::nullopt;
 uint8_t skip = 0xff;  // TODO: verify abort
 
 // clang-format off
-std::vector<item> items = {
+std::vector<Item> items = {
    //                         add    keep       lt4   lt5   lt6      ge4   ge5   ge6      max
    {{},                 0x00, false, false,     none, skip, skip,    0x10, skip, skip,    0x19},
    {{0x10},             0x10, true,  true,      none, none, skip,    0x10, 0x10, skip,    0x15},

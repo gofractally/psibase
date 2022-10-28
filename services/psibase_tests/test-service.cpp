@@ -9,11 +9,11 @@
 using namespace psibase;
 using namespace test_cntr;
 
-struct startup
+struct Startup
 {
-   startup() { printf("Starting up test-service\n"); }
+   Startup() { printf("Starting up test-service\n"); }
 };
-startup s;
+Startup s;
 
 extern "C" void __wasm_call_ctors();
 extern "C" void start(AccountNumber this_service)
