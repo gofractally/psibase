@@ -214,7 +214,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    balance.balance -= amount.value;
    db.open<BalanceTable>().put(balance);
 
-   auto manualDebitFlag = TokenHolderConfig::getIndex(userConfig::manualDebit);
+   auto manualDebitFlag = TokenHolderConfig::getIndex(UserConfig::manualDebit);
    bool manualDebitBit  = getTokenHolder(receiver).config.get(manualDebitFlag);
    if (manualDebitBit)
    {
