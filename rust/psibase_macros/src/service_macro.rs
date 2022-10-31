@@ -673,6 +673,7 @@ fn process_service_tables(
         sks_fns = quote! {
             #sks_fns
             fn #sk_fn_name(&self) -> #psibase_mod::TableIndex<#sk_ty, #table_record_struct_name> {
+                use #psibase_mod::Table;
                 self.get_index(#sk_idx)
             }
         }
@@ -699,8 +700,6 @@ fn process_service_tables(
     }
     let table_options = table_options.unwrap();
 
-    let table_wrapper_name =
-        Ident::new(&format!("{}Wrapper", table_options.name), Span::call_site());
     let table_name = Ident::new(table_options.name.as_str(), table_record_struct_name.span());
     let table_index = table_options.index;
     let table_index = quote! { #table_index };
@@ -732,27 +731,21 @@ fn process_service_tables(
         }
     };
 
-    let table_wrapper_trait = quote! {
-        trait #table_wrapper_name: #psibase_mod::Table<#table_record_struct_name> {
+    let table_struct_impl = quote! {
+        impl #table_name {
             #sks_fns
         }
     };
 
-    let table_wrapper_impl = quote! {
-        impl #table_wrapper_name for #table_name {}
-    };
-
     // eprintln!(
-    //     "Table impl >>>\n{}\n{}\n{}\n{}\n{}\n{}",
+    //     "Table impl >>>\n{}\n{}\n{}",
     //     table_struct,
     //     table_base_impl,
-    //     table_wrapper_trait,
-    //     table_wrapper_impl
+    //     table_wrapper_impl,
     // );
     items.push(parse_quote! {#table_struct});
     items.push(parse_quote! {#table_impl});
-    items.push(parse_quote! {#table_wrapper_trait});
-    items.push(parse_quote! {#table_wrapper_impl});
+    items.push(parse_quote! {#table_struct_impl});
 
     table_options.index
 }
