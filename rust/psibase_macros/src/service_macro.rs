@@ -713,34 +713,27 @@ fn process_service_tables(
         }
     };
 
-    let table_base_impl = quote! {
-        impl #psibase_mod::TableBase for #table_name {
-            fn prefix(&self) -> &[u8] {
-                &self.prefix
-            }
-            fn db_id(&self) -> DbId {
-                self.db_id
-            }
-        }
-    };
-
-    let table_handler_impl = quote! {
-        impl #psibase_mod::TableHandler for #table_name {
+    let table_impl = quote! {
+        impl #psibase_mod::Table<#table_record_struct_name> for #table_name {
             const TABLE_SERVICE: #psibase_mod::AccountNumber = SERVICE;
             const TABLE_INDEX: u16 = #table_index;
 
             fn new(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
                 #table_name{db_id, prefix}
             }
+
+            fn prefix(&self) -> &[u8] {
+                &self.prefix
+            }
+
+            fn db_id(&self) -> DbId {
+                self.db_id
+            }
         }
     };
 
-    let table_raw_wrapper_impl = quote! {
-        impl #psibase_mod::TableWrapper<#table_record_struct_name> for #table_name {}
-    };
-
     let table_wrapper_trait = quote! {
-        trait #table_wrapper_name: #psibase_mod::TableWrapper<#table_record_struct_name> {
+        trait #table_wrapper_name: #psibase_mod::Table<#table_record_struct_name> {
             #sks_fns
         }
     };
@@ -753,15 +746,11 @@ fn process_service_tables(
     //     "Table impl >>>\n{}\n{}\n{}\n{}\n{}\n{}",
     //     table_struct,
     //     table_base_impl,
-    //     table_handler_impl,
-    //     table_raw_wrapper_impl,
     //     table_wrapper_trait,
     //     table_wrapper_impl
     // );
     items.push(parse_quote! {#table_struct});
-    items.push(parse_quote! {#table_base_impl});
-    items.push(parse_quote! {#table_handler_impl});
-    items.push(parse_quote! {#table_raw_wrapper_impl});
+    items.push(parse_quote! {#table_impl});
     items.push(parse_quote! {#table_wrapper_trait});
     items.push(parse_quote! {#table_wrapper_impl});
 

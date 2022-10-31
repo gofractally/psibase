@@ -44,12 +44,7 @@ pub trait TableRecord: PackableOwned {
     }
 }
 
-pub trait TableBase {
-    fn prefix(&self) -> &[u8];
-    fn db_id(&self) -> DbId;
-}
-
-pub trait TableHandler: Sized {
+pub trait Table<Record: TableRecord>: Sized {
     const TABLE_INDEX: u16;
     const TABLE_SERVICE: AccountNumber;
 
@@ -68,9 +63,10 @@ pub trait TableHandler: Sized {
     fn create_table_from_prefix(prefix: Vec<u8>) -> Self {
         Self::new(DbId::Service, prefix)
     }
-}
 
-pub trait TableWrapper<Record: TableRecord>: TableBase {
+    fn prefix(&self) -> &[u8];
+    fn db_id(&self) -> DbId;
+
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
     fn get_index<Key: ToKey>(&self, idx: u8) -> TableIndex<Key, Record> {
         let mut idx_prefix = self.prefix().to_owned();
