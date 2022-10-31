@@ -707,16 +707,19 @@ fn process_service_tables(
 
     // eprintln!("Table name >>> \n{}", table_name);
     let table_struct = quote! {
-        struct #table_name(#psibase_mod::Table);
+        struct #table_name {
+            db_id: #psibase_mod::DbId,
+            prefix: Vec<u8>,
+        }
     };
 
     let table_base_impl = quote! {
         impl #psibase_mod::TableBase for #table_name {
             fn prefix(&self) -> Vec<u8> {
-                self.0.prefix.clone()
+                self.prefix.clone()
             }
             fn db_id(&self) -> DbId {
-                self.0.db_id
+                self.db_id
             }
         }
     };
@@ -727,8 +730,8 @@ fn process_service_tables(
             const TABLE_SERVICE: #psibase_mod::AccountNumber = SERVICE;
             const TABLE_INDEX: u16 = #table_index;
 
-            fn new(table: #psibase_mod::Table) -> #table_name {
-                #table_name(table)
+            fn new(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> #table_name {
+                #table_name{db_id, prefix}
             }
         }
     };
