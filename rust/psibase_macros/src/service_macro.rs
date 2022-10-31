@@ -635,7 +635,7 @@ fn process_service_tables(
     for idx in table_idxs {
         match &mut items[*idx] {
             Item::Struct(s) => {
-                process_table_attrs(s, &mut table_options, psibase_mod);
+                process_table_attrs(s, &mut table_options);
                 process_table_fields(s, &mut pk_data);
                 table_vis = Some(s.vis.clone());
             }
@@ -752,11 +752,7 @@ fn process_service_tables(
     table_options.index
 }
 
-fn process_table_attrs(
-    table_struct: &mut ItemStruct,
-    table_options: &mut Option<TableOptions>,
-    psibase_mod: &proc_macro2::TokenStream,
-) {
+fn process_table_attrs(table_struct: &mut ItemStruct, table_options: &mut Option<TableOptions>) {
     // Parse table name and remove #[table]
     if let Some(i) = table_struct.attrs.iter().position(is_table_attr) {
         let attr = &table_struct.attrs[i];
@@ -784,11 +780,6 @@ fn process_table_attrs(
 
         table_struct.attrs.remove(i);
     }
-
-    // TODO: allow dead_code?
-    table_struct
-        .attrs
-        .push(parse_quote! {#[derive(#psibase_mod::Fracpack)]});
 }
 
 fn process_table_fields(table_record_struct: &mut ItemStruct, pk_data: &mut Option<PkIdentData>) {
