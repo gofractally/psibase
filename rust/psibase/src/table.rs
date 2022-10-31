@@ -49,24 +49,23 @@ pub trait TableBase {
     fn db_id(&self) -> DbId;
 }
 
-pub trait TableHandler {
-    type TableType;
+pub trait TableHandler: Sized {
     const TABLE_INDEX: u16;
     const TABLE_SERVICE: AccountNumber;
 
-    fn new(db_id: DbId, prefix: Vec<u8>) -> Self::TableType;
+    fn new(db_id: DbId, prefix: Vec<u8>) -> Self;
 
-    fn open() -> Self::TableType {
+    fn open() -> Self {
         let prefix = (Self::TABLE_SERVICE, Self::TABLE_INDEX).to_key();
         Self::create_table_from_prefix(prefix)
     }
 
-    fn open_custom(service: AccountNumber, table_index: u16) -> Self::TableType {
+    fn open_custom(service: AccountNumber, table_index: u16) -> Self {
         let prefix = (service, table_index).to_key();
         Self::create_table_from_prefix(prefix)
     }
 
-    fn create_table_from_prefix(prefix: Vec<u8>) -> Self::TableType {
+    fn create_table_from_prefix(prefix: Vec<u8>) -> Self {
         Self::new(DbId::Service, prefix)
     }
 }

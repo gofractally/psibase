@@ -726,11 +726,10 @@ fn process_service_tables(
 
     let table_handler_impl = quote! {
         impl #psibase_mod::TableHandler for #table_name {
-            type TableType = Self;
             const TABLE_SERVICE: #psibase_mod::AccountNumber = SERVICE;
             const TABLE_INDEX: u16 = #table_index;
 
-            fn new(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> #table_name {
+            fn new(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
                 #table_name{db_id, prefix}
             }
         }
