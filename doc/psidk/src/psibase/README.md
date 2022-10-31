@@ -5,8 +5,6 @@ psidk comes with two executables for working with chains:
 - `psinode` runs a chain. It can optionally be a producer or a non-producer node on a chain. It also optionally hosts an http interface which provides RPC services, GraphQL services, and hosts web UIs. On-chain services define most of the http interface.
 - `psibase` is a command-line client for interacting with the chain. It connects to the http interface on a running node.
 
-psinode has an explicit interface; it won't boot a new chain or connect to an existing chain unless you instruct it to. It also won't open any ports you didn't request or store its database at a location you didn't tell it about.
-
 ## psinode
 
 `psinode` has the following command-line interface:
@@ -25,21 +23,34 @@ If you don't give it any other options, psinode will just sit there with nothing
 
 Three more options are important for connecting multiple nodes together in a network:
 
-- `--port` tells psinode the TCP port for the http interface. The default port is 8080. This option is only useful with `-o`.
+- `--port` tells psinode the TCP port for the http interface. The default port is 8080.
 - `--peer` tells psinode a peer to sync with. The argument should have the form `host:port`. This argument can appear any number of times.
 - `--p2p` tells psinode to allow external nodes to peer to it over its http interface at `/native/p2p`.
 
 psinode does not include https hosting; use a [reverse proxy](https.md) to add that when hosting a public node.
 
-Options can also be specified in a configuration file loaded from `<DATABASE>/config`. If an option is specified on both the command line and the config file, the command line takes precedence.
+Options controlling native content (enabled in new nodes by default):
 
+- `--service` *host*:*path*: tells psinode to host static content from *path*.
+- `--admin` `'builtin:*'` | `'*'` | *service*: tells psinode to enable the [admin API](../http.md#node-administrator-services)
+
+Options can also be specified in a configuration file loaded from `<DATABASE>/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, it will be initialized with a default configuration file that hosts the [administrator service](../system-service/admin-sys.md) on [http://localhost:8080/](http://localhost:8080/).
+
+The configuration file also controls [logging](logging.md).
+
+Example:
 ```ini
 producer = prod
 host     = 127.0.0.1.sslip.io
 port     = 8080
-```
+service  = localhost:$PREFIX/share/psibase/services/admin-sys
+admin    = builtin:*
 
-The configuration file also controls [logging](logging.md).
+[logger.stderr]
+type   = console
+filter = Severity >= info
+format = [{TimeStamp}] {Message}
+```
 
 ## psibase
 

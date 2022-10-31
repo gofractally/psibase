@@ -391,7 +391,7 @@ TODO
 
 ## Node administrator services
 
-The administrator interface under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`).
+The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). [admin-sys](system-service/admin-sys.md) provides a user interface for this API.
 
 | Method | URL                        | Description                                                                   |
 |--------|----------------------------|-------------------------------------------------------------------------------|

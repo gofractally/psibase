@@ -40,4 +40,5 @@
   - [common-sys](system-service/common-sys.md)
   - [proxy-sys](system-service/proxy-sys.md)
   - [psispace-sys](system-service/psispace-sys.md)
+  - [admin-sys](system-service/admin-sys.md)
 - [Standard Actions](standards/actions.md)
