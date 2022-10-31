@@ -123,7 +123,7 @@ fn process_mod(
         }
 
         // A second loop is needed in case the code has `impl` for a relevant table above the struct definition
-        for (item_index, item) in items.iter_mut().enumerate() {
+        for (item_index, item) in items.iter().enumerate() {
             if let Item::Impl(i) = item {
                 if let Type::Path(type_path) = &*i.self_ty {
                     if let Some(tpps) = type_path.path.segments.first() {
@@ -630,12 +630,14 @@ fn process_service_tables(
     let mut pk_data: Option<PkIdentData> = None;
     let mut secondary_keys = Vec::new();
     let mut table_options: Option<TableOptions> = None;
+    let mut table_vis = None;
 
     for idx in table_idxs {
         match &mut items[*idx] {
             Item::Struct(s) => {
                 process_table_attrs(s, &mut table_options, psibase_mod);
                 process_table_fields(s, &mut pk_data);
+                table_vis = Some(s.vis.clone());
             }
             Item::Impl(i) => process_table_impls(i, &mut pk_data, &mut secondary_keys),
             item => abort!(item, "Unknown table item to be processed"),
@@ -706,7 +708,7 @@ fn process_service_tables(
 
     // eprintln!("Table name >>> \n{}", table_name);
     let table_struct = quote! {
-        struct #table_name {
+        #table_vis struct #table_name {
             db_id: #psibase_mod::DbId,
             prefix: Vec<u8>,
         }
@@ -870,7 +872,7 @@ fn process_table_impls(
     }
 }
 
-fn check_unique_pk(pk_data: &mut Option<PkIdentData>, item_ident: &Ident) {
+fn check_unique_pk(pk_data: &Option<PkIdentData>, item_ident: &Ident) {
     if pk_data.is_some() {
         abort!(
             item_ident,
