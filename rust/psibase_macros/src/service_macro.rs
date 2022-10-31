@@ -715,8 +715,8 @@ fn process_service_tables(
 
     let table_base_impl = quote! {
         impl #psibase_mod::TableBase for #table_name {
-            fn prefix(&self) -> Vec<u8> {
-                self.prefix.clone()
+            fn prefix(&self) -> &[u8] {
+                &self.prefix
             }
             fn db_id(&self) -> DbId {
                 self.db_id

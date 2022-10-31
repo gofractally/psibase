@@ -45,7 +45,7 @@ pub trait TableRecord: PackableOwned {
 }
 
 pub trait TableBase {
-    fn prefix(&self) -> Vec<u8>;
+    fn prefix(&self) -> &[u8];
     fn db_id(&self) -> DbId;
 }
 
@@ -74,7 +74,7 @@ pub trait TableHandler {
 pub trait TableWrapper<Record: TableRecord>: TableBase {
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
     fn get_index<Key: ToKey>(&self, idx: u8) -> TableIndex<Key, Record> {
-        let mut idx_prefix = self.prefix();
+        let mut idx_prefix = self.prefix().to_owned();
         idx.append_key(&mut idx_prefix);
 
         TableIndex::new(self.db_id(), idx_prefix, idx > 0)
@@ -101,7 +101,7 @@ pub trait TableWrapper<Record: TableRecord>: TableBase {
     }
 
     fn serialize_key<K: ToKey>(&self, idx: u8, key: &K) -> RawKey {
-        let mut data = self.prefix();
+        let mut data = self.prefix().to_owned();
         idx.append_key(&mut data);
         key.append_key(&mut data);
         RawKey::new(data)
@@ -164,7 +164,7 @@ pub trait TableWrapper<Record: TableRecord>: TableBase {
     }
 
     fn make_prefixed_key_bytes(&self, key_idx: u8, raw_key: &RawKey) -> Vec<u8> {
-        let mut key = self.prefix();
+        let mut key = self.prefix().to_owned();
         key_idx.append_key(&mut key);
         raw_key.append_key(&mut key);
         key
