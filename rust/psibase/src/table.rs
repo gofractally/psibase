@@ -44,11 +44,6 @@ pub trait TableRecord: PackableOwned {
     }
 }
 
-pub struct Table {
-    pub db_id: DbId,
-    pub prefix: Vec<u8>,
-}
-
 pub trait TableBase {
     fn prefix(&self) -> Vec<u8>;
     fn db_id(&self) -> DbId;
@@ -59,7 +54,7 @@ pub trait TableHandler {
     const TABLE_INDEX: u16;
     const TABLE_SERVICE: AccountNumber;
 
-    fn new(table: Table) -> Self::TableType;
+    fn new(db_id: DbId, prefix: Vec<u8>) -> Self::TableType;
 
     fn open() -> Self::TableType {
         let prefix = (Self::TABLE_SERVICE, Self::TABLE_INDEX).to_key();
@@ -72,11 +67,7 @@ pub trait TableHandler {
     }
 
     fn create_table_from_prefix(prefix: Vec<u8>) -> Self::TableType {
-        let table = Table {
-            db_id: DbId::Service,
-            prefix,
-        };
-        Self::new(table)
+        Self::new(DbId::Service, prefix)
     }
 }
 
