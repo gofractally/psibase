@@ -2,7 +2,7 @@
 
 Services store data in psibase's key-value store, normally using tables.
 
-## A simple table
+## A Simple Table
 
 Let's build a service which allows users to send public messages to each other. We'll store the messages in a table.
 
@@ -84,7 +84,7 @@ mod service {
 }
 ```
 
-## Trying it out
+## Trying It Out
 
 ```
 # Deploy the service
@@ -255,3 +255,167 @@ We modified the behavior of an already-deployed service and introduced a
 bug in the process. The new version gradually overwrites messages created
 by the previous version. Production services need to be very careful with
 upgrades.
+
+## Secondary Indexes
+
+So far we have a way to page through all messages, but don't have a good
+way to page through all messages from a particular user, or to a particular
+user. We can add secondary indexes to solve this.
+
+```rust
+#[allow(non_snake_case)]
+#[psibase::service]
+mod service {
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
+
+    // Same as before
+    #[table(name = "MessageTable", index = 0)]
+    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    pub struct Message {
+        #[primary_key]
+        id: u64,
+
+        from: AccountNumber,
+        to: AccountNumber,
+        content: String,
+    }
+
+    impl Message {
+        // The first secondary key has index 1 (the primary key is always 0)
+        #[secondary_key(1)]
+        fn by_from(&self) -> (AccountNumber, u64) {
+            // Secondary keys must be unique. If we only returned self.from,
+            // then a user would only be able to store a single message.
+            (self.from, self.id)
+        }
+
+        #[secondary_key(2)]
+        fn by_to(&self) -> (AccountNumber, u64) {
+            (self.to, self.id)
+        }
+    }
+
+    // Same as before
+    #[table(name = "LastUsedTable", index = 1)]
+    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    pub struct LastUsed {
+        lastMessageId: u64,
+    }
+
+    // Same as before
+    impl LastUsed {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    // Same as before
+    fn get_next_message_id() -> u64 {
+        let table = LastUsedTable::open();
+        let mut lastUsed = if let Some(record) = table.get_index_pk().iter().next() {
+            record
+        } else {
+            LastUsed { lastMessageId: 0 }
+        };
+        lastUsed.lastMessageId += 1;
+        table.put(&lastUsed).unwrap();
+        lastUsed.lastMessageId
+    }
+
+    // Same as before
+    #[action]
+    fn storeMessage(to: AccountNumber, content: String) -> u64 {
+        let message_table = MessageTable::open();
+        let id = get_next_message_id();
+        message_table
+            .put(&Message {
+                id,
+                from: get_sender(),
+                to,
+                content,
+            })
+            .unwrap();
+        id
+    }
+
+    #[action]
+    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+        let message_table = MessageTable::open();
+
+        let re = regex::Regex::new("^/messages/([a-z]+)/([a-z]+)/([0-9]+)/([0-9]+)$").unwrap();
+        if let Some(captures) = re.captures(&request.target) {
+            let index_name = &captures[1];
+            let account: AccountNumber = captures[2].parse().unwrap();
+            let begin: u64 = captures[3].parse().unwrap();
+            let end: u64 = captures[4].parse().unwrap();
+
+            // /messages/from/user/begin/end
+            if index_name == "from" {
+                // We named our secondary key "by_from"
+                let index = message_table.get_index_by_from();
+
+                return Some(HttpReply {
+                    contentType: "application/json".into(),
+                    body: serde_json::to_vec(
+                        &index
+                            .range((account, begin)..(account, end))
+                            .collect::<Vec<_>>(),
+                    )
+                    .unwrap(),
+                    headers: vec![],
+                });
+            }
+
+            // /messages/to/user/begin/end
+            if index_name == "to" {
+                let index = message_table.get_index_by_to();
+
+                return Some(HttpReply {
+                    contentType: "application/json".into(),
+                    body: serde_json::to_vec(
+                        &index
+                            .range((account, begin)..(account, end))
+                            .collect::<Vec<_>>(),
+                    )
+                    .unwrap(),
+                    headers: vec![],
+                });
+            }
+        }
+
+        serve_simple_ui::<Wrapper>(&request)
+    }
+}
+```
+
+We replaced the `/messages` query with two new ones. Let's try them out:
+
+```
+curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/from/alice/0/99999999 | jq
+curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/to/bob/0/99999999 | jq
+```
+
+## Why Is It Empty?
+
+The above queries should be empty, even if Alice and Bob exchanged messages before you
+upgraded the service. Many database engines automatically rescan tables when you add
+indexes. Psibase doesn't, since it has a potentially unbound execution time cost which
+would make busy chains unavailable for other users. Instead, psibase adds index entries
+only when putting rows. We could add an action which gradually reputs `n` rows of the
+table. For now, you can test the above by storing more messages.
+
+## Modifying Tables And Indexes
+
+The following corrupt tables:
+
+- Changing the definition of an existing primary or secondary key.
+- Renumbering the secondary keys.
+- Renumbering the tables.
+- Removing secondary keys. TODO: it may be possible to relax this in the future.
+- Removing tables. TODO: it may be possible to relax this in the future.
+- Changing the definitions of fields within tables.
+
+There is an exemption to the last rule. You may add new `Option<...>` fields
+to the end of an existing table. You may not add non-option fields to an
+existing table, add fields to the middle of a table, change a field's type,
+or remove a field.
