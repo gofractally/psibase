@@ -9,7 +9,7 @@ Let's build a service which allows users to send public messages to each other. 
 ```
 cargo new --lib messages
 cd messages
-cargo add psibase serde_json
+cargo add psibase serde_json regex
 cargo add -F derive serde
 ```
 
@@ -110,3 +110,148 @@ transactions just to run a query. We can add a custom RPC endpoint to address
 these issues.
 
 ## Custom RPC
+
+Replace `serveSys` with the following. This handles RPC requests of the form
+`/messages/begin/end`, where `begin` and `end` are integer keys. This returns
+messages in range as JSON.
+
+```rust
+#[action]
+fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+    let re = regex::Regex::new("^/messages/([0-9]+)/([0-9]+)$").unwrap();
+    if let Some(captures) = re.captures(&request.target) {
+        return Some(HttpReply {
+            contentType: "application/json".into(),
+            body: serde_json::to_vec(&getMessages(
+                captures[1].parse().unwrap(),
+                captures[2].parse().unwrap(),
+            ))
+            .unwrap(),
+            headers: vec![],
+        });
+    }
+
+    serve_simple_ui::<Wrapper>(&request)
+}
+```
+
+Redeploy the service and test it out:
+
+```
+cargo psibase deploy -ip
+
+curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/0/99999999 | jq
+curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/20/30 | jq
+```
+
+`jq`, if you have it installed, pretty-prints the result.
+
+## Singletons
+
+A singleton is a table that has at most 1 row. Let's add one to track the
+most-recent message ID so we can keep messages in order.
+
+```rust
+#[allow(non_snake_case)]
+#[psibase::service]
+mod service {
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
+
+    // We can't renumber tables without corrupting
+    // them. This table remains 0.
+    #[table(name = "MessageTable", index = 0)]
+    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    pub struct Message {
+        #[primary_key]
+        id: u64,
+
+        from: AccountNumber,
+        to: AccountNumber,
+        content: String,
+    }
+
+    // This table stores the last used message ID
+    #[table(name = "LastUsedTable", index = 1)]
+    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    pub struct LastUsed {
+        lastMessageId: u64,
+    }
+
+    impl LastUsed {
+        // The primary key is an empty tuple. Rust functions
+        // which return nothing actually return ().
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    // This is not an action; others can't call it.
+    fn get_next_message_id() -> u64 {
+        let table = LastUsedTable::open();
+
+        // Get record, if any
+        let mut lastUsed = if let Some(record) = table.get_index_pk().iter().next() {
+            record
+        } else {
+            LastUsed { lastMessageId: 0 }
+        };
+
+        // Update lastMessageId
+        lastUsed.lastMessageId += 1;
+        table.put(&lastUsed).unwrap();
+        lastUsed.lastMessageId
+    }
+
+    // The caller no longer provides an ID; we return it instead.
+    #[action]
+    fn storeMessage(to: AccountNumber, content: String) -> u64 {
+        let message_table = MessageTable::open();
+        let id = get_next_message_id();
+        message_table
+            .put(&Message {
+                id,
+                from: get_sender(),
+                to,
+                content,
+            })
+            .unwrap();
+        id
+    }
+
+    // Same as before
+    #[action]
+    fn getMessages(begin: u64, end: u64) -> Vec<Message> {
+        let message_table = MessageTable::open();
+        let index = message_table.get_index_pk();
+        index.range(begin..end).collect()
+    }
+
+    // Same as before
+    #[action]
+    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+        let re = regex::Regex::new("^/messages/([0-9]+)/([0-9]+)$").unwrap();
+        if let Some(captures) = re.captures(&request.target) {
+            return Some(HttpReply {
+                contentType: "application/json".into(),
+                body: serde_json::to_vec(&getMessages(
+                    captures[1].parse().unwrap(),
+                    captures[2].parse().unwrap(),
+                ))
+                .unwrap(),
+                headers: vec![],
+            });
+        }
+
+        serve_simple_ui::<Wrapper>(&request)
+    }
+}
+```
+
+You should be able to try this as before. This time however, `storeMessage`
+returns an ID; users can't post messages out of order or overwrite other
+users' messages, except for a new bug.
+
+We modified the behavior of an already-deployed service and introduced a
+bug in the process. The new version gradually overwrites messages created
+by the previous version. Production services need to be very careful with
+upgrades.
