@@ -497,3 +497,54 @@ The following builds and runs the test:
 ```
 cargo psibase test
 ```
+
+## Storing Structs Defined Elsewhere
+
+Sometimes services need to define tables whose struct isn't defined
+within the service module itself. Here's an example where we define
+the struct in the service's crate. It could also be defined in another
+library.
+
+```rust
+// This definition lives outside of the service module. We can't use
+// `#[table]`, `#[primary_key]`, or `#[secondary_key]` here since
+// those attributes are part of the `#[service]` macro.
+#[derive(psibase::Fracpack, psibase::Reflect, serde::Serialize, serde::Deserialize)]
+pub struct Message {
+    pub id: u64,
+    pub from: psibase::AccountNumber,
+    pub to: psibase::AccountNumber,
+    pub content: String,
+}
+```
+
+```rust
+// Inside the service module
+#[table(name = "MessageTable", index = 0)]
+#[derive(Fracpack, Reflect, Serialize, Deserialize)]
+pub struct WrapMessage(crate::Message);
+
+impl WrapMessage {
+    #[primary_key]
+    fn pk(&self) -> u64 {
+        self.0.id
+    }
+
+    #[secondary_key(1)]
+    fn by_from(&self) -> (AccountNumber, u64) {
+        (self.0.from, self.0.id)
+    }
+
+    #[secondary_key(2)]
+    fn by_to(&self) -> (AccountNumber, u64) {
+        (self.0.to, self.0.id)
+    }
+}
+```
+
+`WrapMessage` falls under a special exemption to Fracpack,
+serde_json, and schema rules since it has exactly 1 unnamed
+field. All 3 formats treat `WrapMessage` as an alias to
+`Message` instead of treating it as a type which contains
+`Message`. e.g. They don't treat it as a tuple. They would
+treat it as a tuple if it contained more than 1 unnamed field.
