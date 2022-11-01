@@ -1,4 +1,4 @@
-# Calling Other Services
+# Calling Other Services (Rust)
 
 We covered how to create transactions in test cases which call
 services in the [previous chapter](testing.html). Now we'll cover

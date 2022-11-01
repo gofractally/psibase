@@ -1,4 +1,4 @@
-# Testing Rust Services
+# Testing Services (Rust)
 
 Psibase extends Rust's unit and integration test system to support testing services.
 

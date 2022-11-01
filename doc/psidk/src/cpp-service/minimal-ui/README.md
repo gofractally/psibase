@@ -1,4 +1,4 @@
-# Minimal User Interface
+# Minimal User Interface (C++)
 
 psidk can provide a minimal UI to your services. This UI can help get you started developing your own services, but isn't suitable for end users.
 

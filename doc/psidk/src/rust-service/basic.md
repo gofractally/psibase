@@ -1,4 +1,4 @@
-# Basic Rust Service
+# Basic Service (Rust)
 
 ## Installation
 
