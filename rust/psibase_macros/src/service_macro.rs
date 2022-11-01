@@ -727,7 +727,7 @@ fn process_service_tables(
                 &self.prefix
             }
 
-            fn db_id(&self) -> DbId {
+            fn db_id(&self) -> #psibase_mod::DbId {
                 self.db_id
             }
         }
@@ -819,7 +819,9 @@ fn process_table_impls(
                             let pk_call = quote! {#pk_method()};
                             *pk_data = Some(PkIdentData::new(pk_method.clone(), pk_type, pk_call));
                         } else {
-                            abort!(impl_item, "Invalid primary key return type");
+                            let pk_type = quote! {()};
+                            let pk_call = quote! {#pk_method()};
+                            *pk_data = Some(PkIdentData::new(pk_method.clone(), pk_type, pk_call));
                         }
 
                         removable_attr_idxs.push(attr_idx);
