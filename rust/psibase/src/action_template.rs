@@ -249,6 +249,7 @@ impl<'a> Visitor for ValueGenerator<'a> {
         FieldGenerator {
             result: self.result,
             first: true,
+            skip: self.skip,
         }
     }
     fn struct_single<T: Reflect, Inner: Reflect>(self, _name: std::borrow::Cow<'static, str>) {
@@ -267,6 +268,7 @@ impl<'a> Visitor for ValueGenerator<'a> {
         FieldGenerator {
             result: self.result,
             first: true,
+            skip: self.skip,
         }
     }
     fn struct_named<T: Reflect>(
@@ -280,6 +282,7 @@ impl<'a> Visitor for ValueGenerator<'a> {
         FieldGenerator {
             result: self.result,
             first: true,
+            skip: self.skip,
         }
     }
     fn enumeration<T: Reflect>(
@@ -297,18 +300,21 @@ impl<'a> Visitor for ValueGenerator<'a> {
 struct FieldGenerator<'a> {
     result: &'a mut String,
     first: bool,
+    skip: bool,
 }
 
 impl<'a> UnnamedVisitor<()> for FieldGenerator<'a> {
     fn field<T: Reflect>(mut self) -> Self {
-        if !self.first {
-            self.result.push(',');
+        if !self.skip {
+            if !self.first {
+                self.result.push(',');
+            }
+            self.first = false;
+            T::reflect(ValueGenerator {
+                result: self.result,
+                skip: false,
+            });
         }
-        self.first = false;
-        T::reflect(ValueGenerator {
-            result: self.result,
-            skip: false,
-        });
         self
     }
     fn end(self) {}
@@ -316,20 +322,24 @@ impl<'a> UnnamedVisitor<()> for FieldGenerator<'a> {
 
 impl<'a> NamedVisitor<()> for FieldGenerator<'a> {
     fn field<T: Reflect>(mut self, name: std::borrow::Cow<'static, str>) -> Self {
-        if !self.first {
-            self.result.push(',');
+        if !self.skip {
+            if !self.first {
+                self.result.push(',');
+            }
+            self.first = false;
+            self.result.push_str(&to_string(&name).unwrap());
+            self.result.push(':');
+            T::reflect(ValueGenerator {
+                result: self.result,
+                skip: false,
+            });
         }
-        self.first = false;
-        self.result.push_str(&to_string(&name).unwrap());
-        self.result.push(':');
-        T::reflect(ValueGenerator {
-            result: self.result,
-            skip: false,
-        });
         self
     }
     fn end(self) {
-        self.result.push('}');
+        if !self.skip {
+            self.result.push('}');
+        }
     }
 }
 
