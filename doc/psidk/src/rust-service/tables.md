@@ -282,7 +282,10 @@ mod service {
     }
 
     impl Message {
-        // The first secondary key has index 1 (the primary key is always 0)
+        // Secondary keys must be functions; unlike primary_key, the
+        // secondary_key attribute does not work on data members.
+        //
+        // The first secondary key is 1 (the primary key is always 0)
         #[secondary_key(1)]
         fn by_from(&self) -> (AccountNumber, u64) {
             // Secondary keys must be unique. If we only returned self.from,
@@ -419,3 +422,78 @@ There is an exemption to the last rule. You may add new `Option<...>` fields
 to the end of an existing table. You may not add non-option fields to an
 existing table, add fields to the middle of a table, change a field's type,
 or remove a field.
+
+## Reading Tables in Test Cases
+
+Let's make the following adjustment to Message. `Debug, PartialEq, Eq` aid
+testability. We also changed the fields to public.
+
+```rust
+#[table(name = "MessageTable", index = 0)]
+#[derive(Debug, PartialEq, Eq, Fracpack, Reflect, Serialize, Deserialize)]
+pub struct Message {
+    #[primary_key]
+    pub id: u64,
+
+    pub from: AccountNumber,
+    pub to: AccountNumber,
+    pub content: String,
+}
+```
+
+Add the following below the `service` module:
+
+```rust
+#[psibase::test_case(services("messages"))]
+fn test_store_message(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use psibase::*;
+    use service::*;
+
+    chain.new_account(account!("alice")).unwrap();
+    chain.new_account(account!("bob")).unwrap();
+
+    // Create some messages. Verify the returned IDs.
+    assert_eq!(
+        Wrapper::push_from(&chain, account!("alice"))
+            .storeMessage(account!("bob"), "hello Bob".into())
+            .get()?,
+        1
+    );
+    assert_eq!(
+        Wrapper::push_from(&chain, account!("bob"))
+            .storeMessage(account!("alice"), "hello Alice".into())
+            .get()?,
+        2
+    );
+
+    // Verify table content
+    assert_eq!(
+        MessageTable::open()
+            .get_index_pk()
+            .iter()
+            .collect::<Vec<_>>(),
+        vec![
+            Message {
+                id: 1,
+                from: account!("alice"),
+                to: account!("bob"),
+                content: "hello Bob".into()
+            },
+            Message {
+                id: 2,
+                from: account!("bob"),
+                to: account!("alice"),
+                content: "hello Alice".into()
+            }
+        ]
+    );
+
+    Ok(())
+}
+```
+
+The following builds and runs the test:
+
+```
+cargo psibase test
+```
