@@ -215,7 +215,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     }
 
     /// Get the table record for the given key, if any
-    pub fn get(&self, key: Key) -> Option<Record> {
+    pub fn get(&self, key: &Key) -> Option<Record> {
         let mut key_bytes = self.prefix.clone();
         key.append_key(&mut key_bytes);
 

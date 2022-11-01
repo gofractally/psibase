@@ -75,7 +75,7 @@ mod service {
     fn get_election(election_id: u32) -> ElectionRecord {
         let table = ElectionsTable::open();
         let idx = table.get_index_pk();
-        let election_opt = idx.get(election_id);
+        let election_opt = idx.get(&election_id);
         check_some(election_opt, "election does not exist")
     }
 
@@ -83,7 +83,7 @@ mod service {
     fn get_candidate(election_id: u32, candidate: AccountNumber) -> CandidateRecord {
         let table = CandidatesTable::open();
         let idx = table.get_index_pk();
-        let candidate_opt = idx.get((election_id, candidate));
+        let candidate_opt = idx.get(&(election_id, candidate));
         check_some(candidate_opt, "candidate for election does not exist")
     }
 
@@ -228,7 +228,7 @@ mod service {
         let idx = table.get_index_pk();
 
         let candidate = get_sender();
-        let candidate_record = idx.get((election_id, candidate));
+        let candidate_record = idx.get(&(election_id, candidate));
         check_none(candidate_record, "candidate is already registered");
 
         let new_candidate_record = CandidateRecord {
@@ -279,7 +279,7 @@ mod service {
         let idx = table.get_index_pk();
 
         let voter = get_sender();
-        let voting_record = idx.get((election_id, voter));
+        let voting_record = idx.get(&(election_id, voter));
         check_none(voting_record, "voter has already submitted a vote");
 
         let new_voting_record = VotingRecord {
