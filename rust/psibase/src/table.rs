@@ -13,7 +13,7 @@ use crate::{
 };
 
 // TODO: remove helper
-fn to_hex(bytes: &[u8]) -> String {
+fn _to_hex(bytes: &[u8]) -> String {
     let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
     for byte in bytes {
@@ -242,12 +242,12 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         let mut front_key = self.prefix.clone();
         let front_key = match range.start_bound() {
             Bound::Included(k) => {
-                println!("included fc");
+                // println!("included fc");
                 k.append_key(&mut front_key);
                 Some(front_key)
             }
             Bound::Excluded(k) => {
-                println!("excluded fc");
+                // println!("excluded fc");
                 k.append_key(&mut front_key);
                 front_key.push(0);
                 Some(front_key)
@@ -255,29 +255,29 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
             Bound::Unbounded => None,
         }
         .map(RawKey::new);
-        if front_key.is_some() {
-            println!("range2 fc: {}", to_hex(&front_key.as_ref().unwrap().data));
-        }
+        // if front_key.is_some() {
+        //     println!("range2 fc: {}", _to_hex(&front_key.as_ref().unwrap().data));
+        // }
 
         let mut back_key = self.prefix.clone();
         let back_key = match range.end_bound() {
             Bound::Included(k) => {
-                println!("excluded bc");
+                // println!("excluded bc");
                 k.append_key(&mut back_key);
                 back_key.push(0);
                 Some(back_key)
             }
             Bound::Excluded(k) => {
-                println!("excluded bc");
+                // println!("excluded bc");
                 k.append_key(&mut back_key);
                 Some(back_key)
             }
             Bound::Unbounded => None,
         }
         .map(RawKey::new);
-        if back_key.is_some() {
-            println!("range2 bc: {}", to_hex(&back_key.as_ref().unwrap().data));
-        }
+        // if back_key.is_some() {
+        //     println!("range2 bc: {}", _to_hex(&back_key.as_ref().unwrap().data));
+        // }
 
         TableIter {
             table_index: self,
@@ -320,7 +320,7 @@ impl<'a, Key: ToKey, Record: TableRecord> Iterator for TableIter<'a, Key, Record
             return None;
         }
 
-        println!(">>> iterating from the front with key {:?}", self.front_key);
+        // println!(">>> iterating from the front with key {:?}", self.front_key);
 
         let key = self
             .front_key
@@ -336,7 +336,7 @@ impl<'a, Key: ToKey, Record: TableRecord> Iterator for TableIter<'a, Key, Record
             self.front_key = Some(RawKey::new(get_key_bytes()));
 
             if self.back_key.is_some() && self.front_key >= self.back_key {
-                println!(">>> front cursor met back cursor, it's the end");
+                // println!(">>> front cursor met back cursor, it's the end");
                 self.is_end = true;
                 return None;
             }
@@ -344,11 +344,11 @@ impl<'a, Key: ToKey, Record: TableRecord> Iterator for TableIter<'a, Key, Record
             // prepare the front key for the next iteration
             self.front_key.as_mut().unwrap().data.push(0);
 
-            println!(">>> iterated and got key {:?}", self.front_key);
+            // println!(">>> iterated and got key {:?}", self.front_key);
 
             self.table_index.get_value_from_bytes(value)
         } else {
-            println!(">>> setting end of iterator!");
+            // println!(">>> setting end of iterator!");
             self.is_end = true;
             None
         }
@@ -386,27 +386,27 @@ impl<'a, Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIter<'a, 
         if let Some(value) = value {
             self.back_key = Some(RawKey::new(get_key_bytes()));
 
-            if self.front_key.is_some() {
-                println!(
-                    "iterated from the back bc: {} fc: {}",
-                    to_hex(&self.back_key.as_ref().unwrap().data),
-                    to_hex(&self.front_key.as_ref().unwrap().data)
-                );
-            } else {
-                println!(
-                    "iterated from the back bc: {} NO FC",
-                    to_hex(&self.back_key.as_ref().unwrap().data)
-                );
-            }
+            // if self.front_key.is_some() {
+            //     println!(
+            //         "iterated from the back bc: {} fc: {}",
+            //         _to_hex(&self.back_key.as_ref().unwrap().data),
+            //         _to_hex(&self.front_key.as_ref().unwrap().data)
+            //     );
+            // } else {
+            //     println!(
+            //         "iterated from the back bc: {} NO FC",
+            //         _to_hex(&self.back_key.as_ref().unwrap().data)
+            //     );
+            // }
 
             if self.back_key <= self.front_key {
-                println!(">>> back cursor met front cursor, it's the end");
+                // println!(">>> back cursor met front cursor, it's the end");
                 self.is_end = true;
                 return None;
             }
             self.table_index.get_value_from_bytes(value)
         } else {
-            println!(">>> setting end of iterator!");
+            // println!(">>> setting end of iterator!");
             self.is_end = true;
             None
         }

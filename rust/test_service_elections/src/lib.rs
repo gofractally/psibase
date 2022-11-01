@@ -4,7 +4,7 @@
 #[psibase::service(name = "elections")]
 mod service {
     use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, DbId, Fracpack, Reflect, Table,
+        check, check_none, check_some, get_sender, AccountNumber, Fracpack, Reflect, Table,
         TimePointSec, ToKey,
     };
     use serde::{Deserialize, Serialize};
