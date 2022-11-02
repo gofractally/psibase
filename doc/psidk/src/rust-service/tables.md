@@ -21,23 +21,15 @@ mod service {
     use serde::{Deserialize, Serialize};
 
     // Our first table (index 0) is MessageTable. It stores Message.
-    //
-    // We need the following derives on Message:
-    // - Fracpack since tables use it to store data and
-    //   so we can return it from actions
-    // - Reflect so serve_simple_ui can generate
-    //   the schema and action templates
-    // - Serialize so we can convert it to JSON
-    // - Deserialize so we can convert it from JSON
     #[table(name = "MessageTable", index = 0)]
     #[derive(Fracpack, Reflect, Serialize, Deserialize)]
     pub struct Message {
-        // Every message has a unique key. This doesn't have to be
-        // a u64; we could have used a String, a Vec, a tuple,
-        // or even another struct. It also doesn't have to be a
-        // field; the #[primary_key] attribute works on methods.
-        // It's common to have a primary key method which returns
-        // a tuple containing field values.
+        // Every table has a unique primary key. This doesn't have
+        // to be a u64; many types may be keys, including String,
+        // Vec, tuples, and structs. It also doesn't have to be a
+        // field; the #[primary_key] attribute can work on methods.
+        // Primary key methods often return tuples containing field
+        // values.
         #[primary_key]
         id: u64,
 
@@ -49,12 +41,13 @@ mod service {
     // Store a message
     #[action]
     fn storeMessage(id: u64, to: AccountNumber, content: String) {
-        // Open the table. #[table(...)] defined the MessageTable type.
+        // Open the table. #[table(...)] defined MessageTable.
         let message_table = MessageTable::open();
 
-        // This will overwrite any messages with the same ID, including
-        // messages from other users. It also allows users to insert
-        // messages out of order. We'll fix both issues below.
+        // This will overwrite any messages with the same ID,
+        // including messages from other users. It also allows users
+        // to insert messages out of order. We'll fix both issues
+        // below.
         message_table
             .put(&Message {
                 id,
@@ -87,7 +80,7 @@ mod service {
 ## Trying It Out
 
 ```
-# Deploy the service
+# Build and deploy the service
 cargo psibase deploy -ip
 
 # Create some test users
@@ -99,7 +92,7 @@ psibase create -i sue
 If you're running psibase locally, you should be able to
 
 - Connect to [http://messages.psibase.127.0.0.1.sslip.io:8080/](http://messages.psibase.127.0.0.1.sslip.io:8080/)
-- Use `storeMessage` to create messages between accounts
+- Use `storeMessage` to create messages
 - Use `getMessages`
 
 `getMessages` makes it possible for other services to retrieve messages without
@@ -113,12 +106,13 @@ these issues.
 
 Replace `serveSys` with the following. This handles RPC requests of the form
 `/messages/begin/end`, where `begin` and `end` are integer keys. This returns
-messages in range as JSON.
+the selected messages in a JSON array.
 
 ```rust
 #[action]
 fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-    let re = regex::Regex::new("^/messages/([0-9]+)/([0-9]+)$").unwrap();
+    let re = regex::Regex::new(
+        "^/messages/([0-9]+)/([0-9]+)$").unwrap();
     if let Some(captures) = re.captures(&request.target) {
         return Some(HttpReply {
             contentType: "application/json".into(),
@@ -173,7 +167,7 @@ mod service {
 
     // This table stores the last used message ID
     #[table(name = "LastUsedTable", index = 1)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Default, Fracpack, Reflect, Serialize, Deserialize)]
     pub struct LastUsed {
         lastMessageId: u64,
     }
@@ -189,12 +183,9 @@ mod service {
     fn get_next_message_id() -> u64 {
         let table = LastUsedTable::open();
 
-        // Get record, if any
-        let mut lastUsed = if let Some(record) = table.get_index_pk().iter().next() {
-            record
-        } else {
-            LastUsed { lastMessageId: 0 }
-        };
+        // Get record, or default if doesn't yet exist
+        let mut lastUsed =
+            table.get_index_pk().get(&()).unwrap_or_default();
 
         // Update lastMessageId
         lastUsed.lastMessageId += 1;
@@ -229,7 +220,8 @@ mod service {
     // Same as before
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        let re = regex::Regex::new("^/messages/([0-9]+)/([0-9]+)$").unwrap();
+        let re = regex::Regex::new(
+            "^/messages/([0-9]+)/([0-9]+)$").unwrap();
         if let Some(captures) = re.captures(&request.target) {
             return Some(HttpReply {
                 contentType: "application/json".into(),
@@ -285,11 +277,12 @@ mod service {
         // Secondary keys must be functions; unlike primary_key, the
         // secondary_key attribute does not work on data members.
         //
-        // The first secondary key is 1 (the primary key is always 0)
+        // The first secondary key is 1 (the primary key is 0).
         #[secondary_key(1)]
         fn by_from(&self) -> (AccountNumber, u64) {
-            // Secondary keys must be unique. If we only returned self.from,
-            // then a user would only be able to store a single message.
+            // Secondary keys must be unique. If we only returned
+            // self.from, then a user would only be able to store a
+            // single message.
             (self.from, self.id)
         }
 
@@ -301,7 +294,7 @@ mod service {
 
     // Same as before
     #[table(name = "LastUsedTable", index = 1)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Default, Fracpack, Reflect, Serialize, Deserialize)]
     pub struct LastUsed {
         lastMessageId: u64,
     }
@@ -315,11 +308,8 @@ mod service {
     // Same as before
     fn get_next_message_id() -> u64 {
         let table = LastUsedTable::open();
-        let mut lastUsed = if let Some(record) = table.get_index_pk().iter().next() {
-            record
-        } else {
-            LastUsed { lastMessageId: 0 }
-        };
+        let mut lastUsed =
+            table.get_index_pk().get(&()).unwrap_or_default();
         lastUsed.lastMessageId += 1;
         table.put(&lastUsed).unwrap();
         lastUsed.lastMessageId
@@ -345,7 +335,9 @@ mod service {
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         let message_table = MessageTable::open();
 
-        let re = regex::Regex::new("^/messages/([a-z]+)/([a-z]+)/([0-9]+)/([0-9]+)$").unwrap();
+        let re = regex::Regex::new(
+            "^/messages/([a-z]+)/([a-z]+)/([0-9]+)/([0-9]+)$"
+        ).unwrap();
         if let Some(captures) = re.captures(&request.target) {
             let index_name = &captures[1];
             let account: AccountNumber = captures[2].parse().unwrap();
@@ -445,7 +437,8 @@ Add the following below the `service` module:
 
 ```rust
 #[psibase::test_case(services("messages"))]
-fn test_store_message(chain: psibase::Chain) -> Result<(), psibase::Error> {
+fn test_store_message(chain: psibase::Chain)
+-> Result<(), psibase::Error> {
     use psibase::*;
     use service::*;
 
