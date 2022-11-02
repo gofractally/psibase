@@ -2,6 +2,11 @@ use crate::{
     create_schema, generate_action_templates, reflect::Reflect, HttpReply, HttpRequest,
     ProcessActionStruct, WithActionStruct,
 };
+use async_graphql::{
+    http::{playground_source, receive_body, GraphQLPlaygroundConfig},
+    EmptyMutation, EmptySubscription,
+};
+use futures::executor::block_on;
 use serde_json::to_vec;
 
 const SIMPLE_UI: &[u8] = br#"<html><div id="root" class="ui container"></div><script src="/common/SimpleUI.mjs" type="module"></script></html>"#;
@@ -127,6 +132,78 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
 
     if request.method == "POST" && request.target.starts_with("/pack_action/") {
         Wrapper::with_action_struct(&request.target[13..], PackAction(&request.body))
+    } else {
+        None
+    }
+}
+
+/// Handle `/graphql` request
+///
+/// This handles graphql requests, including fetching the schema.
+///
+/// * `GET /graphql`: Returns the schema.
+/// * `GET /graphql?query=...`: Run query in URL and return JSON result.
+/// * `POST /graphql?query=...`: Run query in URL and return JSON result.
+/// * `POST /graphql` with `Content-Type = application/graphql`: Run query that's in body and return JSON result.
+/// * `POST /graphql` with `Content-Type = application/json`: Body contains a JSON object of the form `{"query"="..."}`. Run query and return JSON result.
+pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
+    request: &HttpRequest,
+    query: Query,
+) -> Option<HttpReply> {
+    let (base, args) = if let Some((b, q)) = request.target.split_once('?') {
+        (b, q)
+    } else {
+        (request.target.as_ref(), "")
+    };
+    if base != "/graphql" || request.method != "GET" && request.method != "POST" {
+        return None;
+    }
+    block_on(async move {
+        let schema = async_graphql::Schema::new(query, EmptyMutation, EmptySubscription);
+        if let Some(request) = args.strip_prefix("?query=") {
+            let res = schema.execute(request).await;
+            Some(HttpReply {
+                contentType: "application/json".into(),
+                body: serde_json::to_vec(&res).unwrap(),
+                headers: vec![],
+            })
+        } else if request.method == "GET" {
+            Some(HttpReply {
+                contentType: "text".into(), // TODO
+                body: schema.sdl().into(),
+                headers: vec![],
+            })
+        } else {
+            let request = receive_body(
+                Some(&request.contentType),
+                request.body.as_ref(),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+            let res = schema.execute(request).await;
+            Some(HttpReply {
+                contentType: "application/json".into(),
+                body: serde_json::to_vec(&res).unwrap(),
+                headers: vec![],
+            })
+        }
+    })
+}
+
+/// Serve GraphQL Playground
+///
+/// This function serves the GraphQL Playground UI for
+/// `GET /playground.html`. Use with [serve_graphql].
+///
+/// This wraps [playground_source].
+pub fn serve_playground(request: &HttpRequest) -> Option<HttpReply> {
+    if request.method == "GET" && request.target == "/playground.html" {
+        Some(HttpReply {
+            contentType: "text/html".into(),
+            body: playground_source(GraphQLPlaygroundConfig::new("/graphql")).into(),
+            headers: vec![],
+        })
     } else {
         None
     }

@@ -10,9 +10,11 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0"
+async-graphql = "4.0"
 chrono = "0.4"
 custom_error = "1.9"
 fracpack = { version = "0.1.6", path = "../fracpack" }
+futures = "0.3"
 include_dir = "0.7"
 mime_guess = "2.0"
 psibase_macros = { version = "0.1.5", path = "../psibase_macros" }
@@ -23,7 +25,6 @@ serde_json = "1.0"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = {version = "3.1", features = ["derive"]}
-futures = "0.3"
 indicatif = "0.17"
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
 secp256k1 = { version="0.22", features = ["global-context", "bitcoin_hashes"] }
