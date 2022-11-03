@@ -72,7 +72,7 @@ mod service {
     }
 
     fn get_current_time() -> TimePointSec {
-        transaction_sys::Wrapper::call().headBlockTime()
+        transaction_sys::Wrapper::call().currentBlock().time
     }
 
     #[action]
