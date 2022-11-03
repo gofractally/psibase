@@ -6,8 +6,8 @@
 #[psibase::service(name = "psispace-sys")]
 mod service {
     use psibase::{
-        check, get_sender, get_service, serve_action_templates, serve_pack_action, serve_schema,
-        AccountNumber, Fracpack, HttpReply, HttpRequest, Reflect, Table, TableIndex,
+        check, get_sender, get_service, serve_action_templates, serve_pack_action, AccountNumber,
+        Fracpack, HttpReply, HttpRequest, Reflect, Table, TableIndex,
     };
     use serde::{Deserialize, Serialize};
 
@@ -83,7 +83,7 @@ mod service {
     fn handle_contract_request(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_action_templates::<Wrapper>(&request))
             .or_else(|| serve_pack_action::<Wrapper>(&request))
-            .or_else(|| serve_schema::<Wrapper>(&request)) // TODO: Replace with GraphQL
+            // TODO: add GraphQL
             .or_else(|| handle_content_request(get_service(), request))
     }
 
