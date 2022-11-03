@@ -9,6 +9,7 @@ members = [
     "psibase",
     "test_contract",
     "test_service_elections",
+    "test_service_psispace",
     "test_fracpack",
 ]
 
