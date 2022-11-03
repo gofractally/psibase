@@ -3,7 +3,7 @@ use crate::{
     ProcessActionStruct, WithActionStruct,
 };
 use async_graphql::{
-    http::{playground_source, receive_body, GraphQLPlaygroundConfig},
+    http::{graphiql_source, receive_body},
     EmptyMutation, EmptySubscription,
 };
 use futures::executor::block_on;
@@ -191,17 +191,17 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
     })
 }
 
-/// Serve GraphQL Playground
+/// Serve GraphiQL UI
 ///
-/// This function serves the GraphQL Playground UI for
-/// `GET /playground.html`. Use with [serve_graphql].
+/// This function serves the GraphiQL UI for `GET /graphiql.html`.
+/// Use with [serve_graphql].
 ///
-/// This wraps [playground_source].
-pub fn serve_playground(request: &HttpRequest) -> Option<HttpReply> {
-    if request.method == "GET" && request.target == "/playground.html" {
+/// This wraps [graphiql_source].
+pub fn serve_graphiql(request: &HttpRequest) -> Option<HttpReply> {
+    if request.method == "GET" && request.target == "/graphiql.html" {
         Some(HttpReply {
             contentType: "text/html".into(),
-            body: playground_source(GraphQLPlaygroundConfig::new("/graphql")).into(),
+            body: graphiql_source("/graphql", None).into(),
             headers: vec![],
         })
     } else {
