@@ -50,7 +50,7 @@ mod service {
             content_type: contentType,
             content,
         };
-        ContentTable::open().put(&new_content).unwrap();
+        ContentTable::new().put(&new_content).unwrap();
     }
 
     /// Remove an existing file
@@ -58,7 +58,7 @@ mod service {
     #[allow(non_snake_case)]
     fn removeSys(path: String) {
         let key = (get_sender(), path);
-        ContentTable::open().erase(&key);
+        ContentTable::new().erase(&key);
     }
 
     #[action]
@@ -94,7 +94,7 @@ mod service {
             target.truncate(query_params_begin_pos);
         }
 
-        let table = ContentTable::open().get_index_pk();
+        let table = ContentTable::new().get_index_pk();
         let content_key = (account, target.clone());
         let content = table.get(&content_key);
 
@@ -159,7 +159,7 @@ mod tests {
             content.clone(),
         );
 
-        let stored_content = ContentTable::open()
+        let stored_content = ContentTable::with_service(account!("psispace-sys"), 0)
             .get_index_pk()
             .get(&(bob, path.clone()));
 

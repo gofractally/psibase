@@ -8,8 +8,9 @@ use custom_error::custom_error;
 use fracpack::PackableOwned;
 
 use crate::{
-    get_key_bytes, kv_get, kv_get_bytes, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes,
-    kv_put, kv_put_bytes, kv_remove, kv_remove_bytes, AccountNumber, DbId, KeyView, RawKey, ToKey,
+    get_key_bytes, get_service, kv_get, kv_get_bytes, kv_greater_equal_bytes, kv_less_than_bytes,
+    kv_max_bytes, kv_put, kv_put_bytes, kv_remove, kv_remove_bytes, AccountNumber, DbId, KeyView,
+    RawKey, ToKey,
 };
 
 // TODO: remove helper
@@ -46,25 +47,24 @@ pub trait TableRecord: PackableOwned {
 
 pub trait Table<Record: TableRecord>: Sized {
     const TABLE_INDEX: u16;
-    const TABLE_SERVICE: AccountNumber;
     const SECONDARY_KEYS: u8;
 
-    fn new(db_id: DbId, prefix: Vec<u8>) -> Self;
+    fn with_prefix(db_id: DbId, prefix: Vec<u8>) -> Self;
     fn prefix(&self) -> &[u8];
     fn db_id(&self) -> DbId;
 
-    fn open() -> Self {
-        let prefix = (Self::TABLE_SERVICE, Self::TABLE_INDEX).to_key();
+    fn new() -> Self {
+        let prefix = (get_service(), Self::TABLE_INDEX).to_key();
         Self::create_table_from_prefix(prefix)
     }
 
-    fn open_custom(service: AccountNumber, table_index: u16) -> Self {
+    fn with_service(service: AccountNumber, table_index: u16) -> Self {
         let prefix = (service, table_index).to_key();
         Self::create_table_from_prefix(prefix)
     }
 
     fn create_table_from_prefix(prefix: Vec<u8>) -> Self {
-        Self::new(DbId::Service, prefix)
+        Self::with_prefix(DbId::Service, prefix)
     }
 
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes

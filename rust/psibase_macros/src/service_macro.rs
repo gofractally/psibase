@@ -717,11 +717,10 @@ fn process_service_tables(
 
     let table_impl = quote! {
         impl #psibase_mod::Table<#table_record_struct_name> for #table_name {
-            const TABLE_SERVICE: #psibase_mod::AccountNumber = SERVICE;
             const TABLE_INDEX: u16 = #table_index;
             const SECONDARY_KEYS: u8 = #sks_len;
 
-            fn new(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
+            fn with_prefix(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
                 #table_name{db_id, prefix}
             }
 

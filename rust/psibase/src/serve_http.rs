@@ -1,5 +1,5 @@
 use crate::{
-    create_schema, generate_action_templates, reflect::Reflect, HttpReply, HttpRequest,
+    check, create_schema, generate_action_templates, reflect::Reflect, HttpReply, HttpRequest,
     ProcessActionStruct, WithActionStruct,
 };
 use async_graphql::{
@@ -120,11 +120,13 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
         >(
             self,
         ) -> Self::Output {
+            let arg_struct_result = serde_json::from_slice::<ArgStruct>(self.0);
+            if let Err(err) = &arg_struct_result {
+                check(false, &format!("err parsing action args json {}", err));
+            }
             HttpReply {
                 contentType: "application/octet-stream".into(),
-                body: serde_json::from_slice::<ArgStruct>(self.0)
-                    .unwrap()
-                    .packed(),
+                body: arg_struct_result.unwrap().packed(),
                 headers: vec![],
             }
         }

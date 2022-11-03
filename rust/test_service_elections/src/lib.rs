@@ -77,7 +77,7 @@ mod service {
 
     #[action]
     fn get_election(election_id: u32) -> ElectionRecord {
-        let table = ElectionsTable::open();
+        let table = ElectionsTable::new();
         let idx = table.get_index_pk();
         let election_opt = idx.get(&election_id);
         check_some(election_opt, "election does not exist")
@@ -85,7 +85,7 @@ mod service {
 
     #[action]
     fn get_candidate(election_id: u32, candidate: AccountNumber) -> CandidateRecord {
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
         let idx = table.get_index_pk();
         let candidate_opt = idx.get(&(election_id, candidate));
         check_some(candidate_opt, "candidate for election does not exist")
@@ -94,7 +94,7 @@ mod service {
     // Full elections paginator
     #[action]
     fn list_elections(cursor: Option<u32>, reverse: bool, page_size: u32) -> Vec<ElectionRecord> {
-        let table = ElectionsTable::open();
+        let table = ElectionsTable::new();
         let idx = table.get_index_pk();
         let page_size = page_size as usize;
 
@@ -115,7 +115,7 @@ mod service {
 
     #[action]
     fn list_active_elections() -> Vec<ElectionRecord> {
-        let table = ElectionsTable::open();
+        let table = ElectionsTable::new();
         let idx = table.get_index_by_dates_key();
 
         let current_time = get_current_time();
@@ -135,7 +135,7 @@ mod service {
         // check election exists
         get_election(election_id);
 
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
 
         let idx = table.get_index_pk();
 
@@ -157,7 +157,7 @@ mod service {
             "election is not finished",
         );
 
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
         let idx = table.get_index_by_election_votes_key();
 
         let winner = idx
@@ -189,7 +189,7 @@ mod service {
             "Election can't start in the past",
         );
 
-        let table = ElectionsTable::open();
+        let table = ElectionsTable::new();
         let idx = table.get_index_pk();
 
         let last_election = idx.into_iter().last();
@@ -226,7 +226,7 @@ mod service {
             "election is already in progress",
         );
 
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
         let idx = table.get_index_pk();
 
         let candidate = get_sender();
@@ -256,7 +256,7 @@ mod service {
 
         let candidate = get_sender();
 
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
         let candidate_record = get_candidate(election_id, candidate);
         table.remove(&candidate_record);
     }
@@ -275,7 +275,7 @@ mod service {
 
         let mut candidate_record = get_candidate(election_id, candidate);
 
-        let table = VotesTable::open();
+        let table = VotesTable::new();
         let idx = table.get_index_pk();
 
         let voter = get_sender();
@@ -293,7 +293,7 @@ mod service {
 
         // Increment candidate vote
         candidate_record.votes += 1;
-        CandidatesTable::open().put(&candidate_record).unwrap();
+        CandidatesTable::new().put(&candidate_record).unwrap();
     }
 
     // The UI allows us to test things manually
