@@ -4,8 +4,8 @@
 #[psibase::service(name = "elections")]
 mod service {
     use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, Fracpack, Reflect, Table,
-        TimePointSec, ToKey,
+        check, check_none, check_some, get_sender, serve_simple_ui, services::transaction_sys,
+        AccountNumber, Fracpack, HttpReply, HttpRequest, Reflect, Table, TimePointSec, ToKey,
     };
     use serde::{Deserialize, Serialize};
 
@@ -71,9 +71,13 @@ mod service {
         }
     }
 
+    fn get_current_time() -> TimePointSec {
+        transaction_sys::Wrapper::call().currentBlock().time
+    }
+
     #[action]
     fn get_election(election_id: u32) -> ElectionRecord {
-        let table = ElectionsTable::open();
+        let table = ElectionsTable::new();
         let idx = table.get_index_pk();
         let election_opt = idx.get(&election_id);
         check_some(election_opt, "election does not exist")
@@ -81,7 +85,7 @@ mod service {
 
     #[action]
     fn get_candidate(election_id: u32, candidate: AccountNumber) -> CandidateRecord {
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
         let idx = table.get_index_pk();
         let candidate_opt = idx.get(&(election_id, candidate));
         check_some(candidate_opt, "candidate for election does not exist")
@@ -90,13 +94,9 @@ mod service {
     // Full elections paginator
     #[action]
     fn list_elections(cursor: Option<u32>, reverse: bool, page_size: u32) -> Vec<ElectionRecord> {
-        let table = ElectionsTable::open();
+        let table = ElectionsTable::new();
         let idx = table.get_index_pk();
         let page_size = page_size as usize;
-
-        // for x in &idx {
-        //     println!("{:?}", x);
-        // }
 
         if let Some(cursor) = cursor {
             if reverse {
@@ -114,11 +114,11 @@ mod service {
     }
 
     #[action]
-    fn list_active_elections(date_time: TimePointSec) -> Vec<ElectionRecord> {
-        let table = ElectionsTable::open();
+    fn list_active_elections() -> Vec<ElectionRecord> {
+        let table = ElectionsTable::new();
         let idx = table.get_index_by_dates_key();
 
-        let current_time = date_time; // TODO: get the current time
+        let current_time = get_current_time();
 
         idx.range(
             (current_time, TimePointSec::from(0), 0)
@@ -135,7 +135,7 @@ mod service {
         // check election exists
         get_election(election_id);
 
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
 
         let idx = table.get_index_pk();
 
@@ -150,15 +150,14 @@ mod service {
     fn get_winner(election_id: u32) -> CandidateRecord {
         let election = get_election(election_id);
 
-        // TODO: implement get time
-        let current_time = TimePointSec { seconds: 9000 };
+        let current_time = get_current_time();
 
         check(
             current_time > election.voting_end_time,
             "election is not finished",
         );
 
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
         let idx = table.get_index_by_election_votes_key();
 
         let winner = idx
@@ -184,7 +183,13 @@ mod service {
             "Election is less than the minimum allowed duration of 1h",
         );
 
-        let table = ElectionsTable::open();
+        let current_time = get_current_time();
+        check(
+            current_time < voting_start_time,
+            "Election can't start in the past",
+        );
+
+        let table = ElectionsTable::new();
         let idx = table.get_index_pk();
 
         let last_election = idx.into_iter().last();
@@ -194,8 +199,6 @@ mod service {
         } else {
             1
         };
-
-        println!(">>> new key {}", new_key);
 
         let new_election = ElectionRecord {
             id: new_key,
@@ -216,15 +219,14 @@ mod service {
     fn register(election_id: u32) {
         let election = get_election(election_id);
 
-        // TODO: implement get current time
-        let current_time = TimePointSec { seconds: 0 };
+        let current_time = get_current_time();
 
         check(
             current_time < election.voting_start_time,
             "election is already in progress",
         );
 
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
         let idx = table.get_index_pk();
 
         let candidate = get_sender();
@@ -245,8 +247,7 @@ mod service {
     fn unregister(election_id: u32) {
         let election = get_election(election_id);
 
-        // TODO: implement get current time
-        let current_time = TimePointSec { seconds: 0 };
+        let current_time = get_current_time();
 
         check(
             current_time < election.voting_start_time,
@@ -255,7 +256,7 @@ mod service {
 
         let candidate = get_sender();
 
-        let table = CandidatesTable::open();
+        let table = CandidatesTable::new();
         let candidate_record = get_candidate(election_id, candidate);
         table.remove(&candidate_record);
     }
@@ -265,8 +266,7 @@ mod service {
     fn vote(election_id: u32, candidate: AccountNumber) {
         let election = get_election(election_id);
 
-        // TODO: implement get current time
-        let current_time = TimePointSec { seconds: 3000 };
+        let current_time = get_current_time();
 
         check(
             current_time >= election.voting_start_time,
@@ -275,7 +275,7 @@ mod service {
 
         let mut candidate_record = get_candidate(election_id, candidate);
 
-        let table = VotesTable::open();
+        let table = VotesTable::new();
         let idx = table.get_index_pk();
 
         let voter = get_sender();
@@ -293,7 +293,14 @@ mod service {
 
         // Increment candidate vote
         candidate_record.votes += 1;
-        CandidatesTable::open().put(&candidate_record).unwrap();
+        CandidatesTable::new().put(&candidate_record).unwrap();
+    }
+
+    // The UI allows us to test things manually
+    #[action]
+    #[allow(non_snake_case)]
+    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+        serve_simple_ui::<Wrapper>(&request)
     }
 }
 
@@ -377,34 +384,30 @@ mod tests {
             TimePointSec { seconds: 8000 },
         );
 
-        let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 4500 })
-            .get()?;
+        chain.start_block_at(TimePointSec { seconds: 500 });
+        let active_elections = Wrapper::push(&chain).list_active_elections().get()?;
+        assert_eq!(active_elections.len(), 0);
+
+        chain.start_block_at(TimePointSec { seconds: 4500 });
+        let active_elections = Wrapper::push(&chain).list_active_elections().get()?;
         assert_eq!(active_elections.len(), 3);
         assert_eq!(active_elections[0].id, 1);
         assert_eq!(active_elections[1].id, 2);
         assert_eq!(active_elections[2].id, 3);
 
-        let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 6500 })
-            .get()?;
+        chain.start_block_at(TimePointSec { seconds: 6500 });
+        let active_elections = Wrapper::push(&chain).list_active_elections().get()?;
         assert_eq!(active_elections.len(), 2);
         assert_eq!(active_elections[0].id, 2);
         assert_eq!(active_elections[1].id, 3);
 
-        let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 7500 })
-            .get()?;
+        chain.start_block_at(TimePointSec { seconds: 7500 });
+        let active_elections = Wrapper::push(&chain).list_active_elections().get()?;
         assert_eq!(active_elections.len(), 1);
         assert_eq!(active_elections[0].id, 3);
 
-        let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 500 })
-            .get()?;
-        assert_eq!(active_elections.len(), 0);
-        let active_elections = Wrapper::push(&chain)
-            .list_active_elections(TimePointSec { seconds: 8500 })
-            .get()?;
+        chain.start_block_at(TimePointSec { seconds: 8500 });
+        let active_elections = Wrapper::push(&chain).list_active_elections().get()?;
         assert_eq!(active_elections.len(), 0);
 
         Ok(())
@@ -509,6 +512,19 @@ mod tests {
         chain.start_block();
         Wrapper::push_from(&chain, account!("charles")).register(1);
 
+        // Candidate can't be added while election is happening
+        chain.start_block_at(TimePointSec { seconds: 3000 });
+        let error = Wrapper::push_from(&chain, account!("bobby"))
+            .register(1)
+            .trace
+            .error
+            .unwrap();
+        assert!(
+            error.contains("election is already in progress"),
+            "error = {}",
+            error
+        );
+
         let candidates = Wrapper::push(&chain).list_candidates(1).get()?;
         assert_eq!(candidates.len(), 3);
 
@@ -551,6 +567,7 @@ mod tests {
         Wrapper::push_from(&chain, account!("alicey")).register(2);
         Wrapper::push_from(&chain, account!("charlesy")).register(2);
 
+        chain.start_block_at(TimePointSec { seconds: 1500 });
         for i in 1..=20 {
             let voter = AccountNumber::from(format!("voter{i}").as_str());
             chain.new_account(voter)?;
@@ -597,6 +614,8 @@ mod tests {
             "Expected voting candidates results are wrong: {:?}",
             candidates
         );
+
+        chain.start_block_at(TimePointSec { seconds: 6500 });
 
         let winner = Wrapper::push(&chain).get_winner(1);
         println!("winner trace: {}", winner.trace);

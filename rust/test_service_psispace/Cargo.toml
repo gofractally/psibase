@@ -1,0 +1,16 @@
+[package]
+name = "psispace-sys"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+fracpack = { version = "0.1.0", path = "../fracpack" }
+psibase = { version = "0.1.0", path = "../psibase" }
+serde = { version = "1.0.145", features = ["derive"] }

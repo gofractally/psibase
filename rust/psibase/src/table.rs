@@ -8,8 +8,9 @@ use custom_error::custom_error;
 use fracpack::PackableOwned;
 
 use crate::{
-    get_key_bytes, kv_get, kv_get_bytes, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes,
-    kv_put, kv_put_bytes, kv_remove, kv_remove_bytes, AccountNumber, DbId, KeyView, RawKey, ToKey,
+    get_key_bytes, get_service, kv_get, kv_get_bytes, kv_greater_equal_bytes, kv_less_than_bytes,
+    kv_max_bytes, kv_put, kv_put_bytes, kv_remove, kv_remove_bytes, AccountNumber, DbId, KeyView,
+    RawKey, ToKey,
 };
 
 // TODO: remove helper
@@ -46,26 +47,25 @@ pub trait TableRecord: PackableOwned {
 
 pub trait Table<Record: TableRecord>: Sized {
     const TABLE_INDEX: u16;
-    const TABLE_SERVICE: AccountNumber;
+    const SECONDARY_KEYS: u8;
 
-    fn new(db_id: DbId, prefix: Vec<u8>) -> Self;
+    fn with_prefix(db_id: DbId, prefix: Vec<u8>) -> Self;
+    fn prefix(&self) -> &[u8];
+    fn db_id(&self) -> DbId;
 
-    fn open() -> Self {
-        let prefix = (Self::TABLE_SERVICE, Self::TABLE_INDEX).to_key();
+    fn new() -> Self {
+        let prefix = (get_service(), Self::TABLE_INDEX).to_key();
         Self::create_table_from_prefix(prefix)
     }
 
-    fn open_custom(service: AccountNumber, table_index: u16) -> Self {
+    fn with_service(service: AccountNumber, table_index: u16) -> Self {
         let prefix = (service, table_index).to_key();
         Self::create_table_from_prefix(prefix)
     }
 
     fn create_table_from_prefix(prefix: Vec<u8>) -> Self {
-        Self::new(DbId::Service, prefix)
+        Self::with_prefix(DbId::Service, prefix)
     }
-
-    fn prefix(&self) -> &[u8];
-    fn db_id(&self) -> DbId;
 
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
     fn get_index<Key: ToKey>(&self, idx: u8) -> TableIndex<Key, Record> {
@@ -95,6 +95,21 @@ pub trait Table<Record: TableRecord>: Sized {
         self.handle_secondary_keys_removal(value);
     }
 
+    /// Removes a key from the table
+    ///
+    /// The key must be the primary key. If object has secondary keys, this is
+    /// equivalent to looking an object up by the key, then calling [remove] if found.
+    fn erase(&self, key: &impl ToKey) {
+        if Self::SECONDARY_KEYS > 0 {
+            if let Some(record) = self.get_index(0).get(key) {
+                self.remove(&record);
+            }
+        } else {
+            let pk = self.serialize_key(0, key);
+            kv_remove(self.db_id(), &pk);
+        }
+    }
+
     fn serialize_key<K: ToKey>(&self, idx: u8, key: &K) -> RawKey {
         let mut data = self.prefix().to_owned();
         idx.append_key(&mut data);
@@ -103,6 +118,10 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 
     fn handle_secondary_keys_put(&self, pk: &[u8], value: &Record) -> Result<(), Error> {
+        if Self::SECONDARY_KEYS < 1 {
+            return Ok(());
+        }
+
         let secondary_keys = value.get_secondary_keys();
 
         let old_record: Option<Record> = kv_get(self.db_id(), &KeyView::new(pk)).unwrap();
@@ -112,6 +131,15 @@ pub trait Table<Record: TableRecord>: Sized {
         } else {
             self.write_secondary_keys(pk, &secondary_keys)
         }
+    }
+
+    fn handle_secondary_keys_removal(&self, value: &Record) {
+        if Self::SECONDARY_KEYS < 1 {
+            return;
+        }
+        let secondary_keys = value.get_secondary_keys();
+        let keys = self.make_secondary_keys_bytes_list(&secondary_keys);
+        self.remove_keys_bytes(&keys);
     }
 
     fn write_secondary_keys(&self, pk: &[u8], secondary_keys: &[RawKey]) -> Result<(), Error> {
@@ -173,12 +201,6 @@ pub trait Table<Record: TableRecord>: Sized {
             }
         }
         Ok(())
-    }
-
-    fn handle_secondary_keys_removal(&self, value: &Record) {
-        let secondary_keys = value.get_secondary_keys();
-        let keys = self.make_secondary_keys_bytes_list(&secondary_keys);
-        self.remove_keys_bytes(&keys);
     }
 
     fn put_keys_bytes(&self, keys: &Vec<Vec<u8>>, pk: &[u8]) {

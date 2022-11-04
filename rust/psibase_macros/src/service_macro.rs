@@ -658,6 +658,7 @@ fn process_service_tables(
     secondary_keys.sort_by_key(|sk| sk.idx);
     let mut sks_fns = quote! {};
     let mut sks = quote! {};
+    let sks_len = secondary_keys.len() as u8;
     for (idx, secondary_key) in secondary_keys.iter().enumerate() {
         let sk_ident = &secondary_key.ident;
         let sk_idx = secondary_key.idx;
@@ -716,10 +717,10 @@ fn process_service_tables(
 
     let table_impl = quote! {
         impl #psibase_mod::Table<#table_record_struct_name> for #table_name {
-            const TABLE_SERVICE: #psibase_mod::AccountNumber = SERVICE;
             const TABLE_INDEX: u16 = #table_index;
+            const SECONDARY_KEYS: u8 = #sks_len;
 
-            fn new(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
+            fn with_prefix(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
                 #table_name{db_id, prefix}
             }
 
