@@ -1,5 +1,7 @@
-use crate::reflect::{self, NamedVisitor};
-use crate::reflect::{EnumVisitor, Reflect, StructVisitor, UnnamedVisitor, Visitor};
+use crate::reflect::{
+    ArgVisitor, EnumVisitor, MethodsVisitor, NamedVisitor, Reflect, StructVisitor, UnnamedVisitor,
+    Visitor,
+};
 use fracpack::Fracpack;
 use psibase_macros::Reflect;
 use serde::{Deserialize, Serialize};
@@ -12,7 +14,7 @@ use std::{any::TypeId, borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc}
 #[allow(non_snake_case)]
 pub struct Schema<String>
 where
-    String: reflect::Reflect,
+    String: Reflect,
 {
     pub userTypes: Vec<Definition<String>>,
 }
@@ -23,7 +25,7 @@ where
 #[allow(non_snake_case)]
 pub struct Definition<String>
 where
-    String: reflect::Reflect,
+    String: Reflect,
 {
     pub name: String,
 
@@ -52,7 +54,7 @@ where
 #[allow(non_camel_case_types)]
 pub enum TypeRef<String>
 where
-    String: reflect::Reflect,
+    String: Reflect,
 {
     ty(String),
     user(String),
@@ -68,7 +70,7 @@ where
 #[allow(non_snake_case)]
 pub struct Field<String>
 where
-    String: reflect::Reflect,
+    String: Reflect,
 {
     name: String,
     ty: TypeRef<String>,
@@ -80,7 +82,7 @@ where
 #[allow(non_snake_case)]
 pub struct Method<String>
 where
-    String: reflect::Reflect,
+    String: Reflect,
 {
     name: String,
     returns: TypeRef<String>,
@@ -419,7 +421,7 @@ impl<'a> StructVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
     }
 }
 
-impl<'a> reflect::MethodsVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
+impl<'a> MethodsVisitor<TypeRef<BuildString>> for StructBuilder<'a> {
     type ArgVisitor = MethodBuilder<'a>;
 
     fn method<MethodReturn: Reflect>(
@@ -448,7 +450,7 @@ struct MethodBuilder<'a> {
     args: Vec<Field<BuildString>>,
 }
 
-impl<'a> reflect::ArgVisitor<StructBuilder<'a>> for MethodBuilder<'a> {
+impl<'a> ArgVisitor<StructBuilder<'a>> for MethodBuilder<'a> {
     fn arg<T: Reflect>(mut self, name: Cow<'static, str>) -> Self {
         self.args.push(Field {
             name: Rc::new(name.into()),

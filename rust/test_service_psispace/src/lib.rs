@@ -14,7 +14,7 @@ mod service {
     type ContentKey = (AccountNumber, String);
 
     #[table(name = "ContentTable", index = 0)]
-    #[derive(Debug, Fracpack, PartialEq, Reflect, Serialize, Deserialize)]
+    #[derive(Debug, Fracpack, PartialEq, Eq, Reflect, Serialize, Deserialize)]
     pub struct ContentRow {
         pub account: AccountNumber,
         pub path: String,

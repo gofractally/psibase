@@ -1,6 +1,7 @@
 // TODO: fix reading structs and tuples which have unknown fields
 // TODO: option to allow/disallow unknown fields during verify and unpack
 // TODO: rename misnamed "heap_size"
+// TODO: replace 'a with 'de; change macro to look for 'de specifically instead of assuming
 
 //! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
 //!
